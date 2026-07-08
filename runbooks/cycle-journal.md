@@ -4,6 +4,82 @@
 
 ---
 
+## Iteration ~4549 — 2026-07-08T09:15Z UTC (Larry /cycle via chat, Tier 1)
+
+**Health:** ✅ Nominal (all carry). 0 new alerts. All checks pass. Zombie PID and PR #860 CONFLICTING carry from prior iters. No new findings.
+
+**VERIFY-BEFORE-REASSERT (from iter ~4548):**
+- **"zombie PID 1834248 (40d 13h 49m+)"**: RE-VERIFIED ⚠️ — ps shows 40d 13h 55m (Ss, bash loop). CONFIRMED [carry]
+- **"HEAD=e31c2269=origin/main"**: RE-VERIFIED ✅ — git status: on main, clean, up to date. (sync.json still shows 448a60ba from 09:05Z sync; HEAD has advanced via auto-commits but repo is clean). NOMINAL
+- **"Sync 09:05:03Z (<2h)"**: CONFIRMED ✅ — ~10 min at check time, status=no-change. NOMINAL
+- **"pending=7"**: CONFIRMED ✅ — still 7 entries, same set (all chat_id=7998341473). CARRY
+- **"PR #860 CONFLICTING"**: CONFIRMED ⚠️ — gh pr view returns CONFLICTING; stall healer cooldown still active. [carry]
+- **"Mirror queue 10 tasks"**: CONFIRMED ✅ — 10 .json files in /home/larry/agents/inboxes/mirror/. Same set. NOMINAL
+- **"Beacon inbox: 0"**: CONFIRMED ✅ — no .json files in Beacon inbox. NOMINAL
+- **"PR #852 REVIEW_ESCALATE"**: CONFIRMED ⚠️ — APPROVAL_REQUEST in pending[3] (chat_id=7998341473). DM fallthrough via reply_chat_id=None (G-rule VP). [carry]
+
+**Check 0 — Alert triage:** repair-watermark: `{"repaired": false, "old_watermark": 1072, "file_length": 1072}` — 0 new alerts. Watermark unchanged. NOMINAL ✅
+
+**Check 1 — Log noise:** Outbox-notifier last entry 03:06:05 MDT (09:06:05Z UTC, ~9 min quiet at check time). Rate-limit burst from 02:36Z MDT (20+ WARNs for `gh pr view` API rate limit exceeded during PR-scan loop) — self-resolved, no recurrence. No novel ERROR/WARN patterns above threshold. Watchdog: 03:08:42 MDT (09:08:42Z UTC, ~6 min) overall=healthy. NOMINAL ✅
+
+**Check 2 — Telegram sweep:** Bot last delivery idx=1071 at 02:58:23 MDT (08:58:23Z UTC). No new Larry messages (last was "status" at 22:40:36 MDT July 7). No new deliveries since iter ~4548. NOMINAL ✅
+
+**Check 3 — Pipeline stall:** DRY-RUN 09:13Z: "0 alert(s) would fire, 0 recovery(ies)." Both carry stalls (mirror-pass-unmerged:PR#860; no-session-revision:PR#847) still under cooldown. NOMINAL ✅
+
+**Check 4 — Pending directives:** pending=7 (unchanged). No new Larry messages since last "status" at 22:40 MDT July 7. All carry; no orphan directives. NOMINAL ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-08T09:08:42Z (~6 min at check time). Watchdog overall=healthy. NOMINAL ✅
+
+**Check A — Source repo:** On main, clean, up to date with origin/main. ✅
+**Check B — Sync health:** last_sync=2026-07-08T09:05:03Z (~10 min), status=no-change. NOMINAL ✅
+**Check C — Agent liveness:** inbox_watcher=2263256 (Ssl, 5h 56m+) ✅. beacon_bot=2663456 (Ss, 2h 56m+) ✅. outbox_notifier=2664032 (Ss, 2h 56m+) ✅. Zombie PID 1834248 (Ss, 40d 13h 55m+) ⚠️ [carry].
+**Check D — Inbox state:** Mirror: 10 tasks (same set). Beacon: 0. Forge: 0. ✅
+**Check E — PR state:** 12 open PRs. All UNKNOWN via bulk gh list; PR #860 confirmed CONFLICTING via direct query. No new merges or state changes since iter ~4548. NOMINAL ✅
+
+**§5.0:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅.
+
+**Conditional checks — UTC Wednesday 2026-07-08:**
+- **Check I:** Wed firing day; timer fires 14:11Z UTC (~5h remaining). Systemd handles. ✅
+- **Check III:** Sunday gate. Skip. ✅
+- **Check IX/X:** Monday gate. Skip. ✅
+- **Check VI/VIII:** Proposals idx=990,991 carry — awaiting Larry. [carry]
+
+**New findings:** None. All findings carry from prior iters.
+
+**Actions taken:**
+1. Check 0: watermark repair no-op. 0 new alerts. ✅
+2. §5.0: all no-ops. ✅
+3. PRIME ledger: intervention appended (tier=1, kind=intervention, iter-routine). ✅
+4. Tier state: `record --checks-clean false` → Tier 1, consecutive_clean=0. ✅
+
+**Escalations:** None. All standing escalations previously delivered. Discipline 2: no duplicate Pulse DMs for carried findings.
+
+**Standing findings (carry-verified this iter):**
+- [yellow] **zombie-bash-pid-1834248** — PID 1834248 (40d 13h 55m+, bash loop waiting for build-check-viii-pr-2b archive). ask-then-do: `kill 1834248`. [carry]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07` or `reject`. [carry]
+- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
+- [yellow] **unreviewed-merge-larry-authored-pr-001** — 8th+ occurrences. Steps 1-2 unimplemented. [carry]
+- [yellow] **PR #852 REVIEW_ESCALATE** — timeout 03:00Z UTC; APPROVAL_REQUEST in pending[3], DM delivery fallthrough via reply_chat_id=None (G-rule VP). [carry]
+- [yellow] **pending[1]: mirror-review-pr-ourliberty-agent-core-851** — REVIEW_ESCALATE. DM delivered. [carry]
+- [yellow] **pending[4]: mirror-review-pr-ourliberty-agent-core-856** — REVIEW_ESCALATE. DM delivered. [carry]
+- [yellow] **pending[5]: advancer-suppress-paused-invalid-realert-001** — Sequence-invalid APPROVAL_REQUEST. DM delivered. [carry]
+- [yellow] **pending[6]: mirror-review-pr-ourliberty-agent-core-850** — PR #850 Mirror REVIEW_FAILURE; no-session approval_request. DM delivered. [carry]
+- [yellow] **pending[0]: mirror-review-pr-ourliberty-agent-core-845** — STALE (PR #845 MERGED). [carry/stale]
+- [yellow] **pending[2]: mirror-review-pr-ourliberty-agent-core-849** — STALE (PR #849 MERGED). [carry/stale]
+- [yellow] **PR #860 (xiv-b-alert-write-back)** — Mirror PASSED, CONFLICTING. Larry rebase needed. [carry]
+- [blue] **PR #846** — REVIEW_PASS. AUTO_MERGE_HELD. [carry]
+- [blue] **PR #847** — rev2 in Mirror queue. notifier-concurrent-scan-dup fix. [carry]
+- [blue] **PR #851, #854, #856, #857, #858, #862, #863** — Mirror queued/escalated/in-revision. [carry]
+- [blue] **Check I** — Wed firing day, timer 14:11Z UTC (~5h). Systemd handles. [watch]
+- [blue] **G-rules (dispatched, vp):** notifier-concurrent-scan-dup; ourliberty-health-subject-key-mismatch-001; forge-wip-redispatch-digest-tier4-001; no-session-revision-active-mirror-session-fp-001; forge-revision-preamble-missing-pr711-001; forge-wip-redispatch-exhausted-pr-exists-fp-001; decision-needed-approval-forge-dispatch-no-target-repo-001; sentinel-inflight-stall-tier4-translation-001; sequence-invalid-completeness-pr3-fanout-sentinel. [carry vp]
+- [blue] **G-rules (2/3):** check-i-force-bypass-dm-route; outbox-notifier-notification-intent-reject-tier4-001; heal-daemon-restart-manifest-drift-regenerated-tier4; review-escalate-approval-dedup-by-old-build-approval-001; no-session-revision-merged-pr-fp-001; auto-dispatch-APPROVAL_REQUEST-task-id-mismatch; auto-merge-conflict-promoted-merged-pr-001; forge-marker-task-id-mismatch-xii-v1. [carry]
+- [blue] **G-rules (1/3):** inbox-watcher-tier-pool-all-unavailable-tier4-001; larry-approval-beacon-hash-mismatch; heal-credential-registry-drift-origin-unreachable-tier4-001; mirror-runner-missing-worktree-retry-001; gate-parallelism-monitor-regression-data-001; pulse-rotation-check-source-tier4-001; mirror-malformed-verdict-heal-reap-path-001. [carry]
+
+**PRIME DIRECTIVE:** ratio=20.60 (1505 interventions / 73 systemic_fixes, trend worsening). Intervention appended.
+**Tier end-of-iter:** Tier **1** (consecutive_clean=0; zombie PID + PR #860 CONFLICTING carry).
+
+---
+
 ## Iteration ~4548 — 2026-07-08T09:10Z UTC (Larry /loop /cycle via chat, Tier 1)
 
 **Health:** ✅ Nominal (all carry). 0 new alerts. All checks pass. PR #852 REVIEW_ESCALATE APPROVAL_REQUEST confirmed in Beacon pending[3] (chat_id=7998341473); outbox-notifier DM delivery fell through (reply_chat_id=None at 03:06:05 MDT, G-rule VP). Zombie PID, PR #860 CONFLICTING, pending=7 carry.
@@ -3690,107 +3766,6 @@ NOMINAL ✅
 
 **PRIME DIRECTIVE:** ratio=20.07 (≥1465/73, worsening). Intervention appended.
 **Tier end-of-iter:** Tier **1** (consecutive_clean=0; zombie PID + pending=3).
-
----
-
-## Iteration ~4507 — 2026-07-08T04:44Z UTC (Larry /cycle via chat, Tier 1)
-
-**Health:** ⚠️ Tier-4 alert (bot-delivered). All mandatory checks nominal. 1 new alert (L1032 Tier-4: sequence-invalid paused, no active damage). PR #858 opened (completeness-pr1 build). Mirror queue 15→16. Forge 4→3 active. Zombie PID carry. pending=3 (unchanged).
-
-**VERIFY-BEFORE-REASSERT (corrections from iter ~4506):**
-- **"Check A CLEAN (HEAD=078431ca)":** UPDATED ✅ — HEAD=c963b186 (Pulse cycle 20260708T043850Z)=origin/main. Still clean. [updated, still clean]
-- **"Zombie PID 1834248 (40d 9h 15m+)":** RE-VERIFIED ⚠️ — ps alive (40d 9h 22m+, Ss, bash poll loop for check-viii archive). CONFIRMED [carry]
-- **"Sync last_sync=04:23:29Z (~15 min)":** CONFIRMED ✅ — still 04:23:29Z (~17 min, <2h), status=no-change. NOMINAL (wrapper pushes cycles; sync file updates on next sync_agent_core.sh run)
-- **"Mirror queue=15":** UPDATED ⚠️ — 16 (completeness-pr1 review-request dispatched at 22:39 MDT). [updated]
-- **"pending=3 (mirror-845 + pr3-sentinel + mirror-851)":** CONFIRMED ✅ — all 3 carry unchanged. [confirmed]
-- **"completeness-pr1 build-phase active":** UPDATED ✅ — Forge completed build → PR #858 opened (22:39 MDT) → Mirror review dispatched. Build DONE, tracking PR #858. [progressed]
-- **"proposed-pile-monthly-digest-001 build-phase active":** CONFIRMED — still in Forge inbox (build-proposed-pile-monthly-digest-001.json). [carry]
-- **"Check I: Timer fires 08:13 MDT (14:13Z)":** NOT YET. ~9.5h from now (04:44Z). [carry, watch]
-
-**Check 0 — Alert triage:** repair-watermark: `{"repaired": false, "old_watermark": 1031, "file_length": 1032}` — 1 new alert. L1032: `source=build-sequence-advancer, subject=sequence-invalid:completeness-pr3-fanout-sentinel, route=escalate` → helper returned **Tier-4** (novel, no registry template or translation match). DM already delivered by bot at 22:36 MDT (bot log: "alert idx=1031 delivered"). No separate Pulse DM needed. Watermark 1031→1032. tier-reset. ⚠️
-
-**Check 0 context (L1032):** Sequence `completeness-pr3-fanout-sentinel` failed schema validation — steps[0] `completeness-pr3-build` has dispatch_text 565 chars vs 500-char cap (spec § 5.5 discipline 2). Sequence is already in `paused` status; no state change, no active pipeline damage. Related to pending [1] (pr3-sentinel-self-arming-approval-001, PR #856 spec amendment in flight). Fix path: trim dispatch_text to ≤500 chars when spec amendment dispatches the sequence build. Bot already notified Larry.
-
-**Check 1 — Log noise:** Outbox notifier activity since ~4506 (04:38Z UTC):
-- 22:39 MDT: review-request dispatched mirror ← beacon (task=completeness-pr1, PR #858). ✅
-- 22:39 MDT: SEQUENCE_STEP_PR_OPENED seq=completeness-program step=completeness-pr1 pr=#858. ✅
-- No new WARNs or ERRORs since the 22:00 MDT preamble-missing (G-rule forge-revision-preamble-missing-pr711-001, 3/3 VP carry).
-Watchdog last: 22:38 MDT overall=healthy (5-min cadence). NOMINAL ✅ [401 WARN 18:38 MDT July 7 isolated, no recurrence — carry]
-
-**Check 2 — Telegram sweep:** No new Larry messages since "resume sequence completeness-program" 21:58:23 MDT July 7. Bot delivered seq-invalid alert at 22:36 MDT. NOMINAL ✅
-
-**Check 3 — Pipeline stall:** dry-run 04:40Z — "no stalls detected." All FORGE_NO_PR_SKIP operating normally. NOMINAL ✅
-
-**Check 4 — Pending Larry directives:** pending=3 (unchanged from ~4506).
-- [0] `mirror-review-pr-ourliberty-agent-core-845` — PR #845 Mirror TIMEOUT_ESCALATE (2100s). DM delivered. Awaiting Larry: Approve = fresh Forge revision; Reject = close/abandon. [carry]
-- [1] `pr3-sentinel-self-arming-approval-001` — doc-only: amend PR #856 sentinel spec for self-arming approval. DM queued (22:33 MDT). Awaiting Larry. [carry]
-- [2] `mirror-review-pr-ourliberty-agent-core-851` — PR #851 test-only fix (dashboard mtime race). Mirror REVIEW_ESCALATE — diff clean but regression gate BLOCK twice (non-deterministic: flaky spec-doc/origin-main tests, confirmed false-BLOCK per memory `flaky-specdoc-originmain-gate-falseblock`). Notifier re-dispatched Mirror review at 22:35 MDT (new verdict may arrive before Larry decides). DM queued (04:33 MDT). Awaiting Larry. [carry]
-
-**Check 5 — Stale daemon code:** heartbeat=2026-07-08T04:35:28Z (~9 min). Watchdog 22:38 MDT overall=healthy. NOMINAL ✅
-
-**Check A — Source repo:** HEAD=c963b186=origin/main. Clean tree. On main. ✅
-**Check B — Sync health:** last_sync=2026-07-08T04:23:29Z (~17 min, <2h), status=no-change. NOMINAL ✅
-**Check C — Agent liveness:** inbox_watcher=2263256 (Ssl, 1h 23m) ✅. outbox_notifier=2258153 (Ss, 1h 25m) ✅. beacon_bot=2258448 (Ss, 1h 25m) ✅. Zombie PID 1834248 (Ss, 40d 9h 22m+) ⚠️.
-**Check D — Inbox state:** Forge: 3 active (build-proposed-pile-monthly-digest-001 [build], flip-readiness-gauge-spec-001 [spec], xiv-b-alert-write-back-spec-001 [spec]) ✅ (build-completeness-pr1 consumed → PR #858 opened). Mirror: 16 queued (+1: review-completeness-pr1 added at 22:39 MDT) ✅. Beacon: 0 ✅.
-**Check E — PR state:** 13 open agent-core PRs (#845–#858 exc. #848). **PR #858 NEW** (0.1h, MERGEABLE, auto-merge=null, no labels — Mirror review in queue, too new for auto-merge trigger). Oldest: PR #845 (~3.8h). None >72h. NOMINAL ✅
-
-**§5.0 — audit_due_nudge:** no committed baseline; no-op. ✅
-**§5.0 — distill_detector:** no un-distilled audits; no-op. ✅
-**§5.0 — audit_cadence_signal:** no post-seed decision-grade distill artifacts; no-op. ✅
-
-**Conditional checks — UTC Wednesday 2026-07-08 (weekday=2 ∈ {0,2,4,6}):**
-- **Check I:** Timer fires 08:13 MDT (14:13Z, ~9.5h). Not yet. [watch]
-- **Check III:** Sunday gate. Skip. ✅
-- **Check IX/X:** Monday gate. Skip. ✅
-- **Check VI/VIII:** Proposals idx=990,991 carry — awaiting Larry. [carry]
-
-**G-rule assessment:**
-- **watermark-rotation-gap:** repair-watermark no-op this iter (1 new alert, no compaction gap). Still 2/3. [confirmed]
-- All other active G-rules carry unchanged from ~4506.
-
-**New findings:**
-1. ⚠️ **L1032 Tier-4: sequence-invalid:completeness-pr3-fanout-sentinel** — dispatch_text 565 chars > 500-char cap; sequence already paused, no active damage. Bot delivered (22:36 MDT). Tier-4 (novel, no translation). Related to pending pr3-sentinel spec amendment. Fix path: trim dispatch_text when spec amendment dispatches sequence build. [new, bot-delivered]
-2. ℹ️ **PR #858 opened** — completeness-pr1 build complete: `feat: completeness program PR-1 — turn on what's built`. MERGEABLE, no auto-merge yet (Mirror review pending). sequence step PR_OPENED logged. [new tracking]
-3. ℹ️ **Mirror queue 15→16** — review-completeness-pr1 added at 22:39 MDT. [tracking]
-4. ℹ️ **Forge inbox 4→3** — build-completeness-pr1 consumed (build complete). [tracking]
-
-**Actions taken:**
-1. Check 0: triage-alert L1032 → Tier-4 (novel). Helper invoked. Bot already delivered. Watermark 1031→1032. tier-reset. ✅
-2. §5.0: all no-ops. ✅
-3. PRIME ledger: intervention appended (zombie PID carry; L1032 Tier-4; pending=3 carry; PR #858 new). ✅
-4. Tier state: `record --checks-clean false` → Tier 1, consecutive_clean=0. ✅
-
-**Escalations:** 0 new DMs from Pulse (bot already delivered L1032 raw alert at 22:36 MDT). 1 alert Tier-4 (bot-delivered, journal note only). 3 pending approvals (unchanged, DMs already queued). No new stalls.
-
-**Standing findings (carry-verified this iter):**
-- [yellow] **zombie-bash-pid-1834248** — PID 1834248 (40d 9h 22m+, Ss). ask-then-do: `kill 1834248`. [carry]
-- [yellow] **check-xiv-timer-inactive** — unit present, not started. Needs `systemctl enable --now`. [carry]
-- [yellow] **check-xii-timer-inactive** — inactive. Needs `systemctl enable --now`. [carry]
-- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07` or `reject`. [carry]
-- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
-- [yellow] **unreviewed-merge-larry-authored-pr-001** — 8th+ occurrences. Steps 1-2 unimplemented. [carry]
-- [orange] **GitHub 401 WARN** — isolated 18:38:15 MDT July 7. No recurrence. [carry]
-- [yellow] **pending: mirror-review-pr-ourliberty-agent-core-845** — REVIEW_ESCALATE. DM delivered. Awaiting Larry. [carry]
-- [yellow] **pending: pr3-sentinel-self-arming-approval-001** — doc-only spec PR #856. DM queued. Awaiting Larry. [carry]
-- [yellow] **pending: mirror-review-pr-ourliberty-agent-core-851** — PR #851 false-BLOCK (flaky spec-doc tests). DM queued. Mirror re-review in flight (22:35 MDT). Awaiting Larry or new Mirror verdict. [carry]
-- [yellow] **L1032 sequence-invalid:completeness-pr3-fanout-sentinel** — dispatch_text 565>500, paused, no damage. Bot-delivered. Fix: trim text when spec amendment builds sequence. [new]
-- [blue] **PR #845 (journal rotation)** — awaiting Larry no-session decision. [carry]
-- [blue] **PR #846 (OFL slice 5a)** — AUTO_MERGE_HELD blocker=#852. [carry]
-- [blue] **PR #847 (notifier-concurrent-scan-dup)** — Mirror re-review (round=1) queued. [carry]
-- [blue] **PR #849–#857** — all Mirror queued. [carry]
-- [blue] **PR #858 (completeness-pr1)** — NEW. MERGEABLE. Mirror review dispatched. sequence step logged. [new]
-- [blue] **proposed-pile-monthly-digest-001** — Build-phase active in Forge inbox. [carry]
-- [blue] **flip-readiness-gauge-spec-001** — Spec in Forge inbox. [carry]
-- [blue] **xiv-b-alert-write-back-spec-001** — Spec in Forge inbox. [carry]
-- [blue] **sequence-dag-completeness-program** — routing-signal in Mirror inbox; sequence ACTIVE; PR #858 step opened. [progressing]
-- [blue] **Check I** — Timer fires 08:13 MDT (14:13Z, ~9.5h). [watch]
-- [blue] **G-rules (dispatched, vp):** notifier-concurrent-scan-dup (PR #847 in rev1); ourliberty-health-subject-key-mismatch-001 (3/3); forge-wip-redispatch-digest-tier4-001; no-session-revision-active-mirror-session-fp-001; forge-revision-preamble-missing-pr711-001; forge-wip-redispatch-exhausted-pr-exists-fp-001; decision-needed-approval-forge-dispatch-no-target-repo-001; sentinel-inflight-stall-tier4-translation-001. [carry vp]
-- [blue] **G-rules (2/3):** check-i-force-bypass-dm-route; outbox-notifier-notification-intent-reject-tier4-001; heal-daemon-restart-manifest-drift-regenerated-tier4; review-escalate-approval-dedup-by-old-build-approval-001; no-session-revision-merged-pr-fp-001; auto-dispatch-APPROVAL_REQUEST-task-id-mismatch; auto-merge-conflict-promoted-merged-pr-001; watermark-rotation-gap. [carry]
-- [blue] **G-rules (1/3):** inbox-watcher-tier-pool-all-unavailable-tier4-001; larry-approval-beacon-hash-mismatch; heal-credential-registry-drift-origin-unreachable-tier4-001; mirror-runner-missing-worktree-retry-001; gate-parallelism-monitor-regression-data-001; pulse-rotation-check-source-tier4-001; mirror-malformed-verdict-heal-reap-path-001; forge-marker-task-id-mismatch-xii-v1. [carry]
-- [blue] **Check I week 2026-07-06:** $1046.42 (-11.7%). 1 auto-dispatch: notify-p3a-retro-prep. [carry]
-
-**PRIME DIRECTIVE:** ratio=20.05 (≥1464/73, worsening). Intervention appended.
-**Tier end-of-iter:** Tier **1** (consecutive_clean=0; zombie PID + Tier-4 alert + pending=3).
 
 ---
 
