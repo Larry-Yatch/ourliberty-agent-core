@@ -436,6 +436,31 @@ class WaitingOnLarryAggregationTest(unittest.TestCase):
 class WaitingSourceReadersTest(unittest.TestCase):
     """Each source reader is independently fail-open (spec § 3 D4)."""
 
+    def setUp(self):
+        # Hermetic for-Larry sources (regression-gate false-BLOCK class,
+        # 2026-07-08). `load_for_larry_escalations` folds in THREE sources; the
+        # tests below override the escalations feed + legacy file but not the
+        # `for_larry_signal` source (1b), which — with no override — reads the
+        # DEFAULT `OURLIBERTY_AGENTS_ROOT/blackboard/for-larry-escalations.json`.
+        # `_bootstrap` pins one shared agents-root for the whole process, so an
+        # unresolved record written there by ANY earlier test in the full-suite
+        # run leaks into these readers and flips their strict assertions — a
+        # full-suite-only failure that passes in isolation and false-BLOCKed the
+        # regression gate. Point every for-Larry source at a fresh, nonexistent
+        # tmp path so each reader starts empty; a test that populates one source
+        # re-overrides just that key (mock.patch.dict merges, per-test wins).
+        iso = tempfile.TemporaryDirectory()
+        self.addCleanup(iso.cleanup)
+        root = Path(iso.name)
+        env = mock.patch.dict(os.environ, {
+            'OURLIBERTY_FOR_LARRY_SIGNAL_FILE': str(root / 'signal.json'),
+            'OURLIBERTY_FOR_LARRY_FEED_FILE': str(root / 'feed.json'),
+            'OURLIBERTY_ESCALATIONS_FILE': str(root / 'esc.json'),
+            'OURLIBERTY_PENDING_APPROVALS': str(root / 'pending.json'),
+        })
+        env.start()
+        self.addCleanup(env.stop)
+
     def test_pending_approvals_maps_entries(self):
         with tempfile.TemporaryDirectory() as d:
             p = Path(d) / 'pending.json'

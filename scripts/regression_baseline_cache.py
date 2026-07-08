@@ -21,10 +21,20 @@ cache: keyed by the 40-char commit SHA, written atomically to the REAL agents
 tree by the gate's PARENT process (never the jailed suite subprocess).
 
 Correctness: a cache hit returns EXACTLY what re-running the same SHA would
-produce — zero change to the verdict. The only theoretical drift is a flaky
-test that flips between the cached run and the head run; that same flakiness
-already produces false regressions in the un-cached two-run path, so caching
-does not make it worse. `--no-baseline-cache` on the gate forces a fresh run.
+produce for a DETERMINISTIC suite — zero change to the verdict. But the suite is
+not fully deterministic, and caching is NOT verdict-neutral for one flake class
+(observed 2026-07-08): a full-suite ORDERING/POLLUTION flake — a test that fails
+only after some earlier test pollutes shared state — is deterministic given the
+suite, so in the un-cached two-run path it fails at BOTH the parent and head runs
+(same ordering) and lands in the tolerated intersection. Against a FROZEN cached
+parent that captured the flake in a DIFFERENT state, the same failure at head
+looks like a brand-new regression → a false BLOCK on a clean PR. So caching CAN
+make it worse; the gate compensates by re-running the PARENT suite fresh before
+it trusts a cached-baseline BLOCK
+(test_regression_check.reverify_verdict_with_fresh_parent) — the deterministic
+flake fails in the fresh parent run too and falls back into the tolerated
+intersection, while a genuine regression still blocks.
+`--no-baseline-cache` on the gate forces a fresh run.
 
 This is the SAFE half of the gate-speedup. The further win — running only the
 diff-affected tests at head (graph-aware selection) with a full-suite post-merge

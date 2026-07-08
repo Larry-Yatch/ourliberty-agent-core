@@ -593,6 +593,51 @@ def collect_failures_at_sha(
     return failures
 
 
+# ---- flake re-verification: a would-be BLOCK against a CACHED parent baseline --
+# ---- is re-checked against a freshly re-run parent before it is trusted. -------
+#
+# WHY: the parent baseline cache (regression_baseline_cache) freezes the parent
+# failure-set. The ORIGINAL two-run gate ran BOTH SHAs fresh in ONE invocation,
+# so a deterministic full-suite ORDERING/POLLUTION flake (a test that fails only
+# after some earlier test pollutes shared state) failed at BOTH SHAs → landed in
+# the tolerated intersection. The two fresh runs canceled it. Against a FROZEN
+# cache that symmetry is gone: the same flake at head, absent from the cached
+# parent set, looks like a brand-new regression → a false BLOCK on a clean PR
+# (every escalation in the 2026-07-08 batch named `cache_hit=true`).
+#
+# The fix restores that symmetry ON DEMAND: when a CACHED baseline would BLOCK,
+# re-run the PARENT full suite fresh and recompute the verdict against it. A
+# deterministic full-suite flake fails in the fresh parent run too (same suite,
+# same ordering) → back in the intersection → tolerated. A GENUINE regression
+# still fails at head but NOT at the fresh parent → still BLOCKs. This is exactly
+# the un-cached two-run comparison, paid ONLY on a would-be BLOCK (rare), so the
+# green path and retries keep the cache speed. Chosen over re-running the
+# candidates in ISOLATION because isolation cannot distinguish a pre-existing
+# flake (passes alone) from a diff that INTRODUCES full-suite pollution (also
+# passes alone) — the full-suite parent comparison can, so it never false-PASSes.
+
+
+def reverify_verdict_with_fresh_parent(
+    head_failures: set[str],
+    cached_parent_failures: set[str],
+    fresh_parent_failures: set[str],
+) -> tuple[dict, list[str]]:
+    """Recompute the verdict against a freshly re-run parent baseline.
+
+    Returns ``(verdict_block, reverified_flakes)`` where ``reverified_flakes`` is
+    the candidate regressions (head − cached_parent) that VANISH once the parent
+    is honest (head − fresh_parent) — i.e. failures present in BOTH the fresh
+    parent and head runs that the stale cache had missed, so they are full-suite
+    flakes / pre-existing, not this PR's regressions. The verdict block is
+    computed purely from the fresh parent, so a genuine head-only regression
+    still BLOCKs.
+    """
+    cached_regressions = set(head_failures) - set(cached_parent_failures)
+    fresh_regressions = set(head_failures) - set(fresh_parent_failures)
+    reverified_flakes = sorted(cached_regressions - fresh_regressions)
+    return compute_verdict(fresh_parent_failures, head_failures), reverified_flakes
+
+
 # ---- diff-scoped skip: a non-code change cannot introduce a test regression --
 #
 # WHY: the gate runs the FULL suite at parent+head for EVERY review — even a
@@ -715,6 +760,7 @@ def render_text(report: dict) -> str:
             lines.append('  (none)')
         lines.append('')
     _block('regressions', report['regressions'])
+    _block('reverified_flakes', report.get('reverified_flakes', []))
     _block('invariant_failures', report['invariant_failures'])
     _block('pre_existing_unaffected', report['pre_existing_unaffected'])
     _block('fixed', report['fixed'])
@@ -987,6 +1033,12 @@ def main(argv: Optional[list[str]] = None) -> int:
         help='Force the full suite even when the diff touches only test-inert '
              'paths (docs/). The default short-circuits to PASS for such diffs.',
     )
+    parser.add_argument(
+        '--no-flake-reverify', action='store_true',
+        help='Skip re-running the parent suite fresh before a cached-baseline '
+             'BLOCK. The default re-verifies a would-be BLOCK against a freshly '
+             'run parent so a full-suite flake the cache missed cannot false-BLOCK.',
+    )
     args = parser.parse_args(argv)
 
     repo_root = Path(args.repo_root).resolve()
@@ -1034,8 +1086,10 @@ def main(argv: Optional[list[str]] = None) -> int:
                 'parent_failures': [],
                 'head_failures': [],
                 'used_cached_baseline': False,
+                'parent_reverified': False,
                 'parent_run_secs': None,
                 'head_run_secs': None,
+                'reverified_flakes': [],
                 # Synthesize a clean PASS verdict block (no parent/head failures).
                 **compute_verdict(set(), set()),
             }
@@ -1121,6 +1175,63 @@ def main(argv: Optional[list[str]] = None) -> int:
         file=sys.stderr,
     )
     verdict_block = compute_verdict(parent_failures, head_failures)
+    reverified_flakes: list[str] = []
+    parent_reverified = False
+    # A would-be BLOCK computed against a CACHED parent baseline is re-checked
+    # against a freshly re-run parent before it is trusted (see
+    # reverify_verdict_with_fresh_parent). Only fires when there ARE regressions
+    # AND the baseline was cached — a non-cached run already did the honest
+    # two-run comparison, and a green run has nothing to re-verify — so the cache
+    # speedup is preserved everywhere except the rare would-be-BLOCK-on-cache.
+    if (verdict_block['regressions'] and used_cached_baseline
+            and not args.no_flake_reverify):
+        try:
+            with tempfile.TemporaryDirectory(
+                    prefix='test-regression-reverify-') as rv:
+                _t2 = time.time()
+                fresh_parent_failures = collect_failures_at_sha(
+                    parent_canonical, repo_root, args.timeout_per_sha, Path(rv),
+                )
+                parent_run_secs = round(time.time() - _t2, 1)
+            parent_reverified = True
+            verdict_block, reverified_flakes = reverify_verdict_with_fresh_parent(
+                head_failures, parent_failures, fresh_parent_failures,
+            )
+            parent_failures = fresh_parent_failures
+            # Warm the cache with the accurate fresh baseline so the next review
+            # off this parent tree doesn't repeat the false-BLOCK dance.
+            if not args.no_baseline_cache:
+                try:
+                    baseline_cache.store(
+                        parent_key, fresh_parent_failures,
+                        source_commit=parent_canonical,
+                    )
+                except OSError:
+                    pass
+            if reverified_flakes:
+                print(
+                    'test_regression_check: fresh-parent re-verification cleared '
+                    f'{len(reverified_flakes)} candidate regression(s) — they '
+                    'fail in the fresh parent run too (full-suite flake / '
+                    f'pre-existing, cache-missed): {", ".join(reverified_flakes)}',
+                    file=sys.stderr,
+                )
+            else:
+                print(
+                    'test_regression_check: fresh-parent re-verification '
+                    'confirmed the regression(s) are genuine — still BLOCK',
+                    file=sys.stderr,
+                )
+        except AnalysisError as exc:
+            # Could not re-run the parent — keep the cached-baseline verdict
+            # (fail closed to today's behavior) rather than clear anything.
+            print(
+                f'test_regression_check: flake re-verification could not re-run '
+                f'the parent ({exc}); keeping the cached-baseline verdict '
+                '(fail closed)',
+                file=sys.stderr,
+            )
+
     report = {
         'parent_sha': parent_canonical,
         'head_sha': head_canonical,
@@ -1128,8 +1239,10 @@ def main(argv: Optional[list[str]] = None) -> int:
         'parent_failures': sorted(parent_failures),
         'head_failures': sorted(head_failures),
         'used_cached_baseline': used_cached_baseline,
+        'parent_reverified': parent_reverified,
         'parent_run_secs': parent_run_secs,
         'head_run_secs': head_run_secs,
+        'reverified_flakes': reverified_flakes,
         **verdict_block,
     }
 
