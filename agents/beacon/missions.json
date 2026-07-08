@@ -7787,7 +7787,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-08T20:59:46.187708+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-08T20:58:19.696972+00:00"
+      "orphan_last_activity_ts": "2026-07-08T20:58:19.696972+00:00",
+      "briefing": {
+        "what": "The team is building a smarter way for our system to wait and retry when GitHub temporarily blocks it, instead of hammering the service and jamming up automatic approvals.",
+        "why": "Right now those blocks pile up and stall work from getting merged through automatically, slowing the team down.",
+        "suggest": "Let the team finish this fix, but have someone confirm it's working smoothly before we rely on it."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-08T21:05:12.782130+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
