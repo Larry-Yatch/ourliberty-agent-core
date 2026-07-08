@@ -133,7 +133,10 @@ class LedgerTestCase(unittest.TestCase):
     def test_clear_only_targets_named_task(self):
         rifl.mark_in_flight('t1', head_sha=HEAD_A, now=T0)
         rifl.mark_in_flight('t2', head_sha=HEAD_B, now=T0)
-        rifl.clear('t1')
+        # Inject now=T0 so clear()'s _save -> _prune uses the same injected time
+        # as the marks; without it _prune runs on the real wall clock and evicts
+        # the still-valid t2 row once real UTC exceeds T0 + TTL.
+        rifl.clear('t1', now=T0)
         self.assertIsNone(rifl.get('t1'))
         self.assertIsNotNone(rifl.get('t2'))
 
