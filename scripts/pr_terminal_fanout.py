@@ -53,6 +53,8 @@ if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
 import chain_event_emit as cee  # noqa: E402
+import no_session_ledger  # noqa: E402
+import rebase_obligation_ledger  # noqa: E402
 import task_terminal_state as tts  # noqa: E402
 from atomic_io import atomic_write_json  # noqa: E402
 from decision_identity import canonical_decision_key  # noqa: E402
@@ -119,6 +121,30 @@ CAUSE_SEQUENCE_OWNED = 'sequence-owned'
 # Synthetic sequence-step task_ids never resolve to a PR; they age forever and
 # must never escalate (§ 0/§ 5).
 _SEQUENCE_TASK_PREFIX = 'seq-'
+
+# § 2.2-C — the Larry-facing chain_events types the Approvals tab surfaces
+# (dashboard_api._DECISION_EVENT_TYPES / triage_decisions.DECISION_TYPES).
+LARRY_FACING_EVENT_TYPES = ('approval_request', 'clarify_request')
+
+# § 2.2 E/A — blackboard needs-Larry record stores.
+ESCALATIONS_FILE = BLACKBOARD / 'for-larry-escalations.json'
+ALERTS_FILE = BLACKBOARD / 'larry-alerts.jsonl'
+
+# § 2.3 — missions leg: ONLY these phases are live enough to enumerate
+# (proposed/shipped/deferred would burn the gh budget probing unresolvable or
+# already-closed work — the verified v1 failure mode).
+MISSION_PHASES = frozenset({'drafting', 'in_flight', 'ready'})
+
+# § 2.4 — obligation ledgers, enumerated for the UNKNOWN ledger ONLY. Paths
+# come from the owning modules so a ledger move can't silently unwatch a store.
+OBLIGATION_LEDGER_FILES = (
+    no_session_ledger.LEDGER_FILE,
+    rebase_obligation_ledger.LEDGER_FILE,
+)
+
+# Stores whose identity-grade terminal may fan out (§ 4). Obligation items are
+# enumeration-only — their own resolvers own closure (§ 2.4).
+FANOUT_STORES = frozenset({'inreview', 'decision', 'mission'})
 
 
 # -------------------- logging + heartbeat + gates --------------------
@@ -599,6 +625,20 @@ def bound_unknown_ledger(ledger: dict[str, Any], live_keys: set[str]) -> int:
     return len(drop)
 
 
+def bound_closed_seen(cache: dict[str, Any], live_keys: set[str]) -> int:
+    """Drop closed_seen keys whose item left enumeration (mirror of
+    bound_unknown_ledger). Without this, a key persists forever once its CLOSED
+    item fans out or leaves enumeration — only re-observation non-CLOSED popped
+    it, and a fanned-out item is never re-observed."""
+    seen = cache.get('closed_seen', {})
+    if not isinstance(seen, dict):
+        return 0
+    drop = [k for k in seen if k not in live_keys]
+    for k in drop:
+        seen.pop(k, None)
+    return len(drop)
+
+
 def no_match_declare_dead(row: dict[str, Any], now: datetime) -> bool:
     """True iff a no-match row is ripe for the ONE declare-dead approval:
     cause=no-match, age >= 14d, >= 3 consecutive clean probes. sequence-owned
@@ -744,22 +784,31 @@ def enumerate_in_review(
     *, get_client: Optional[Callable[[], Any]] = None,
     fetch: Optional[Callable[[Any, str], Optional[list[dict[str, Any]]]]] = None,
     derive: Optional[Callable[..., list[dict[str, Any]]]] = None,
+    capture: Optional[dict[str, Any]] = None,
 ) -> Optional[list[dict[str, Any]]]:
     """Reuse the dashboard derivation exactly as heal_stale_in_review_reconcile
     does. A None fetch skips the whole tick (deriving on a failed verdict fetch
-    resurrects phantoms, § 2.1). Returns None to signal "skip this tick"."""
+    resurrects phantoms, § 2.1). Returns None to signal "skip this tick".
+
+    ``capture`` (when given) receives the Supabase client + the raw forge rows
+    so the C leg and the mission join reuse this fetch instead of re-querying
+    (ONE probe pass over the PR-backed surfaces, § 0)."""
     if get_client is None or fetch is None or derive is None:
         import dashboard_api as dapi  # noqa: E402 — heavy import, deferred
         get_client = get_client or dapi._get_larry_action_supabase_client
         fetch = fetch or dapi._fetch_chain_events_for_agent
         derive = derive or dapi._derive_in_review
     client = get_client()
+    if capture is not None:
+        capture['client'] = client
     if client is None:
         return None
     rows = fetch(client, BUILDER_AGENT)
     verdict_rows = fetch(client, 'mirror')
     if rows is None or verdict_rows is None:
         return None
+    if capture is not None:
+        capture['builder_rows'] = rows
     items: list[dict[str, Any]] = []
     for card in derive(rows, verdict_rows):
         if not isinstance(card, dict):
@@ -799,6 +848,254 @@ def enumerate_pending_approvals(path: Optional[Path] = None) -> list[dict[str, A
     return out
 
 
+def _fetch_unread_decision_rows(client: Any, event_type: str) -> list[dict[str, Any]]:
+    """The exact § 2.2-C query: chain_events WHERE event_type=<t> AND
+    read_at IS NULL (pr_url selected; the caller keeps only PR-backed rows).
+    Paged the way triage_decisions._fetch pages the same table."""
+    rows: list[dict[str, Any]] = []
+    page, size = 0, 1000
+    while True:
+        resp = (
+            client.table('chain_events')
+            .select('event_id,event_type,task_id,ts,pr_url,read_at')
+            .eq('event_type', event_type)
+            .is_('read_at', 'null')
+            .range(page * size, page * size + size - 1)
+            .execute()
+        )
+        batch = resp.data or []
+        rows.extend(r for r in batch if isinstance(r, dict))
+        if len(batch) < size:
+            break
+        page += 1
+    return rows
+
+
+def enumerate_chain_decisions(
+    *, client: Any = None,
+    fetch_rows: Optional[Callable[[str], list[dict[str, Any]]]] = None,
+) -> list[dict[str, Any]]:
+    """§ 2.2 C — Larry-facing chain_events rows (read_at IS NULL AND pr_url
+    set). Rows without a pr_url stay with their own resolvers (not PR-backed).
+    entry_id is None by design: only the P leg carries the beacon entry_id the
+    pop needs; overlap dedups onto the P item in run_cycle."""
+    if fetch_rows is None:
+        if client is None:
+            return []
+        bound_client = client
+
+        def fetch_rows(event_type: str) -> list[dict[str, Any]]:
+            return _fetch_unread_decision_rows(bound_client, event_type)
+    out: list[dict[str, Any]] = []
+    for event_type in LARRY_FACING_EVENT_TYPES:
+        try:
+            rows = fetch_rows(event_type) or []
+        except Exception as e:  # noqa: BLE001 — one type never unwatches the other
+            log(f'C-leg fetch {event_type} failed: {type(e).__name__}: {e}', 'WARN')
+            continue
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            tid = row.get('task_id')
+            pr_url = row.get('pr_url')
+            if not (isinstance(tid, str) and tid and isinstance(pr_url, str) and pr_url):
+                continue
+            key = canonical_decision_key(tid, pr_url)
+            out.append({'item_key': f'decision:{key}', 'store': 'decision',
+                        'task_id': tid, 'pr_url': pr_url, 'since': row.get('ts'),
+                        'entry_id': None, 'decision_key': key})
+    return out
+
+
+def enumerate_escalations(path: Optional[Path] = None) -> list[dict[str, Any]]:
+    """§ 2.2 E — for-larry-escalations.json rows still needing Larry AND
+    carrying a pr_url. Resolved rows are audit residue, not open surfaces."""
+    path = path or ESCALATIONS_FILE
+    data = _load_json(path, None)
+    rows = data.get('escalations') if isinstance(data, dict) else None
+    if not isinstance(rows, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        if row.get('resolved') or not row.get('for_larry'):
+            continue
+        pr_url = row.get('pr_url')
+        tid = row.get('task_id') or row.get('id')
+        if not (isinstance(pr_url, str) and pr_url and isinstance(tid, str) and tid):
+            continue
+        key = row.get('decision_key') or canonical_decision_key(tid, pr_url)
+        out.append({'item_key': f'decision:{key}', 'store': 'decision',
+                    'task_id': tid, 'pr_url': pr_url, 'since': row.get('ts'),
+                    'entry_id': None, 'decision_key': key})
+    return out
+
+
+def enumerate_larry_alerts(path: Optional[Path] = None) -> list[dict[str, Any]]:
+    """§ 2.2 A — larry-alerts.jsonl lines carrying a decision coordinate
+    (decision_key / pr_url). Retraction rewrites the file, so every parseable
+    line is a live record. Only PR-backed lines become items — a bare
+    decision_key can't be probed, and its record is retracted by
+    resolve_alert_by_decision_key when the decision resolves elsewhere."""
+    path = path or ALERTS_FILE
+    try:
+        text = path.read_text(encoding='utf-8')
+    except (FileNotFoundError, OSError):
+        return []
+    out: list[dict[str, Any]] = []
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            rec = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(rec, dict):
+            continue
+        if not (rec.get('decision_key') or rec.get('pr_url')):
+            continue
+        pr_url = rec.get('pr_url')
+        tid = rec.get('task_id')
+        if not (isinstance(pr_url, str) and pr_url and isinstance(tid, str) and tid):
+            continue
+        key = rec.get('decision_key') or canonical_decision_key(tid, pr_url)
+        out.append({'item_key': f'decision:{key}', 'store': 'decision',
+                    'task_id': tid, 'pr_url': pr_url, 'since': rec.get('ts'),
+                    'entry_id': None, 'decision_key': key})
+    return out
+
+
+def build_task_pr_map(rows: Optional[list[dict[str, Any]]]) -> dict[str, dict[str, Any]]:
+    """Exact task_id → {pr_url, ts} join map from forge chain_events rows
+    (§ 2.3's "exact chain_events join"). Latest row per task_id wins."""
+    out: dict[str, dict[str, Any]] = {}
+    for row in rows or []:
+        if not isinstance(row, dict):
+            continue
+        tid = row.get('task_id')
+        pr_url = row.get('pr_url')
+        if not (isinstance(tid, str) and tid and isinstance(pr_url, str) and pr_url):
+            continue
+        ts = row.get('ts') if isinstance(row.get('ts'), str) else ''
+        cur = out.get(tid)
+        if cur is None or ts > (cur.get('ts') or ''):
+            out[tid] = {'pr_url': pr_url, 'ts': ts}
+    return out
+
+
+def enumerate_missions(
+    path: Optional[Path] = None,
+    task_pr_map: Optional[dict[str, dict[str, Any]]] = None,
+) -> list[dict[str, Any]]:
+    """§ 2.3 — missions leg, enumeration-only + tightly scoped: repo missions
+    copy, phases drafting/in_flight/ready ONLY, task_id → pr_url via exact
+    chain_events join. Unresolvable missions are skipped, never ledgered.
+    Sequence-owned missions (synthetic seq-* task_ids) yield an unprobeable
+    marker item so run_cycle tracks them under cause=sequence-owned (never
+    escalates). A mission with several PR-backed task_ids is represented by its
+    first resolvable one — the per-task in-review/decision legs carry the rest."""
+    if path is None:
+        repo_root = Path(os.environ.get('OURLIBERTY_REPO_ROOT', '/home/larry/agent-core'))
+        path = repo_root / 'agents' / 'beacon' / 'missions.json'
+    data = _load_json(path, None)
+    missions = data.get('missions') if isinstance(data, dict) else None
+    if not isinstance(missions, list):
+        return []
+    task_pr_map = task_pr_map or {}
+    out: list[dict[str, Any]] = []
+    for mission in missions:
+        if not isinstance(mission, dict):
+            continue
+        mid = mission.get('id')
+        if not (isinstance(mid, str) and mid):
+            continue
+        if mission.get('phase') not in MISSION_PHASES:
+            continue
+        task_ids = [t for t in (mission.get('task_ids') or [])
+                    if isinstance(t, str) and t]
+        single = mission.get('task_id')
+        if isinstance(single, str) and single and single not in task_ids:
+            task_ids.append(single)
+        seq = next((t for t in task_ids if is_sequence_owned(t)), None)
+        if seq is not None:
+            out.append({'item_key': f'mission:{mid}', 'store': 'mission',
+                        'task_id': seq, 'pr_url': None, 'since': None,
+                        'entry_id': None, 'decision_key': None})
+            continue
+        hit = next(((t, task_pr_map[t]) for t in task_ids if t in task_pr_map), None)
+        if hit is None:
+            continue  # unresolvable → skipped, never ledgered (§ 2.3)
+        tid, joined = hit
+        pr_url = joined.get('pr_url')
+        out.append({'item_key': f'mission:{mid}', 'store': 'mission',
+                    'task_id': tid, 'pr_url': pr_url, 'since': joined.get('ts'),
+                    'entry_id': None,
+                    'decision_key': canonical_decision_key(tid, pr_url)})
+    return out
+
+
+def enumerate_obligations(
+    paths: Optional[tuple[Path, ...]] = None,
+) -> list[dict[str, Any]]:
+    """§ 2.4 — obligation ledgers (no-session revision + post-open rebase),
+    enumerated for the UNKNOWN ledger ONLY: open rows join the probe pass so a
+    vanished PR ages into the no-match declare-dead approval, but a terminal
+    NEVER fans out here — each ledger's own resolver owns closure (run_cycle
+    gates on FANOUT_STORES)."""
+    paths = paths if paths is not None else OBLIGATION_LEDGER_FILES
+    out: list[dict[str, Any]] = []
+    for path in paths:
+        data = _load_json(path, None)
+        if not isinstance(data, dict):
+            continue
+        for key, row in data.items():
+            if not isinstance(row, dict):
+                continue
+            if row.get('status') != 'open':
+                continue
+            tid = row.get('task_id') or (key if isinstance(key, str) else None)
+            if not (isinstance(tid, str) and tid):
+                continue
+            pr_url = row.get('pr_url')
+            out.append({'item_key': f'obligation:{tid}', 'store': 'obligation',
+                        'task_id': tid,
+                        'pr_url': pr_url if isinstance(pr_url, str) else None,
+                        'since': row.get('last_dispatch_at') or row.get('opened_at'),
+                        'entry_id': None, 'decision_key': None})
+    return out
+
+
+def default_enumerators() -> list[Callable[[], Optional[list[dict[str, Any]]]]]:
+    """The § 2 legs in probe-priority order — under the per-pass probe cap the
+    front of this list wins, so the fan-out-capable surfaces (in-review, then
+    the needs-Larry legs) outrank the enumeration-only ones (missions, then
+    obligations). The shared dict lets the C leg reuse the Supabase client and
+    the mission join reuse the already-fetched forge rows (§ 0)."""
+    shared: dict[str, Any] = {}
+
+    def _inreview() -> list[dict[str, Any]]:
+        return enumerate_in_review(capture=shared) or []
+
+    def _chain_decisions() -> list[dict[str, Any]]:
+        client = shared.get('client')
+        if client is None:
+            # in-review leg couldn't get a client (or died before it) — the C
+            # leg has no cheaper path to Supabase; degrade to empty, log once.
+            log('C-leg skipped: no Supabase client this pass', 'WARN')
+            return []
+        return enumerate_chain_decisions(client=client)
+
+    def _missions() -> list[dict[str, Any]]:
+        return enumerate_missions(
+            task_pr_map=build_task_pr_map(shared.get('builder_rows')))
+
+    return [_inreview, enumerate_pending_approvals, _chain_decisions,
+            enumerate_escalations, enumerate_larry_alerts, _missions,
+            enumerate_obligations]
+
+
 def is_sequence_owned(task_id: Optional[str]) -> bool:
     return isinstance(task_id, str) and task_id.startswith(_SEQUENCE_TASK_PREFIX)
 
@@ -827,11 +1124,11 @@ def run_cycle(
     ledger = _load_json(UNKNOWN_LEDGER_FILE, None) or {'rows': {}}
     cache = _load_json(TERMINAL_CACHE_FILE, None) or {'entries': {}}
 
-    # 1. Enumerate. A None from the in-review enumerator means "skip this tick".
+    # 1. Enumerate every § 2 leg. A None from the in-review enumerator means
+    #    "skip this tick" for that leg only; the other stores still run.
     if enumerators is None:
-        enumerators = [lambda: enumerate_in_review() or [],
-                       enumerate_pending_approvals]
-    items: list[dict[str, Any]] = []
+        enumerators = default_enumerators()
+    raw_items: list[dict[str, Any]] = []
     for en in enumerators:
         try:
             got = en()
@@ -839,18 +1136,34 @@ def run_cycle(
             log(f'enumerator failed: {type(e).__name__}: {e}', 'WARN')
             continue
         if got:
-            items.extend(got)
+            raw_items.extend(got)
 
-    live_keys = {it['item_key'] for it in items if it.get('item_key')}
+    # Dedup across legs by item_key — P/C/E/A can all coin the same
+    # decision:<key>. One probe per coordinate; the row carrying an entry_id
+    # wins (the P-leg pop needs it, § 4.2).
+    by_key: dict[str, dict[str, Any]] = {}
+    for it in raw_items:
+        key = it.get('item_key')
+        if not key:
+            continue
+        cur = by_key.get(key)
+        if cur is None or (not cur.get('entry_id') and it.get('entry_id')):
+            by_key[key] = it
+    items = list(by_key.values())
+
+    live_keys = set(by_key)
     artifact: dict[str, Any] = {
         'ts': now.isoformat(), 'armed': is_armed(arm),
-        'enumerated': len(items), 'probed': 0,
+        'enumerated': len(items), 'enumerated_raw': len(raw_items), 'probed': 0,
         'would_close': [], 'closed': [], 'unknown': [], 'kept': 0,
         'probe_errors': 0, 'notes': [],
     }
 
-    # 2. Probe + grade + guard each item (probe budget capped).
+    # 2. Probe + grade + guard each item (probe budget capped). Distinct items
+    #    sharing one pr_url (e.g. inreview: + decision: coordinates for the same
+    #    PR) share one gh probe via the per-pass memo.
     probes = 0
+    probe_memo: dict[str, Optional[list[dict[str, Any]]]] = {}
     decisions: list[tuple[dict[str, Any], Decision]] = []
     for item in items:
         if is_sequence_owned(item.get('task_id')):
@@ -860,14 +1173,18 @@ def run_cycle(
         if not (isinstance(pr_url, str) and _GITHUB_PR_RE.match(pr_url)):
             continue
         prior_closed = bool(cache.get('closed_seen', {}).get(item['item_key']))
-        if probes >= max_probes:
-            artifact['notes'].append(f'probe budget spent; {item["item_key"]} deferred')
-            continue
-        probes += 1
-        try:
-            prs = probe_fn(pr_url)
-        except Exception:  # noqa: BLE001 — a probe must never abort the sweep
-            prs = None
+        if pr_url in probe_memo:
+            prs = probe_memo[pr_url]
+        else:
+            if probes >= max_probes:
+                artifact['notes'].append(f'probe budget spent; {item["item_key"]} deferred')
+                continue
+            probes += 1
+            try:
+                prs = probe_fn(pr_url)
+            except Exception:  # noqa: BLE001 — a probe must never abort the sweep
+                prs = None
+            probe_memo[pr_url] = prs
         decision = evaluate_item(item, prs, now=now, prior_closed_seen=prior_closed)
         decisions.append((item, decision))
     artifact['probed'] = probes
@@ -887,6 +1204,14 @@ def run_cycle(
             else:
                 update_unknown_ledger(ledger, key, decision.cause, now)
         elif decision.action == 'fanout':
+            if item.get('store') not in FANOUT_STORES:
+                # § 2.4 — obligation items are UNKNOWN-ledger enumeration only;
+                # their own resolvers own closure. Terminal here is KEEP.
+                artifact['kept'] += 1
+                artifact['notes'].append(
+                    f'{key} terminal {decision.terminal} left to its own resolver (§ 2.4)')
+                ledger.get('rows', {}).pop(key, None)
+                continue
             would_close.append((item, decision))
             artifact['would_close'].append({'item_key': key, 'grade': decision.grade,
                                             'terminal': decision.terminal,
@@ -927,6 +1252,7 @@ def run_cycle(
 
     # 5. Aging escalations for ripe no-match rows (ONE approval each, § 5).
     bound_unknown_ledger(ledger, live_keys)
+    bound_closed_seen(cache, live_keys)
     for row in list(ledger.get('rows', {}).values()):
         if no_match_declare_dead(row, now) and not row.get('escalated'):
             _emit_alert('warning', f'pr-fanout-declare-dead:{row["item_key"]}',

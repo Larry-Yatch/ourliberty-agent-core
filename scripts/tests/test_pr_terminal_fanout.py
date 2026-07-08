@@ -14,10 +14,13 @@ try:  # engage the test sandbox before any production import reads env/paths
 except ImportError:  # discover loads this module top-level (no package parent)
     import _bootstrap  # noqa: F401
 
+import json
 import os
 import sys
+import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
@@ -600,6 +603,356 @@ class MissionRetireVsShipTest(unittest.TestCase):
         d = gc.classify_mission('in_flight', ['t-1', 'review-9'],
                                 {'t-1': tts.MERGED})
         self.assertEqual(d.action, 'ship')
+
+
+# ====================================================================
+# § 2.2 C — Larry-facing chain_events rows (read_at IS NULL, pr_url set).
+# ====================================================================
+class ChainDecisionsEnumTest(unittest.TestCase):
+    def test_pr_backed_rows_become_decision_items(self):
+        rows = {'approval_request': [{'task_id': 't-9', 'pr_url': _GH + '9',
+                                      'ts': _iso(_NOW)}],
+                'clarify_request': []}
+        items = ptf.enumerate_chain_decisions(fetch_rows=lambda et: rows[et])
+        self.assertEqual(len(items), 1)
+        it = items[0]
+        self.assertTrue(it['item_key'].startswith('decision:'))
+        self.assertEqual(it['store'], 'decision')
+        self.assertEqual(it['pr_url'], _GH + '9')
+        self.assertEqual(it['since'], _iso(_NOW))
+        self.assertIsNone(it['entry_id'])  # only the P leg carries entry_id
+
+    def test_rows_without_pr_url_are_skipped(self):
+        rows = {'approval_request': [{'task_id': 't-9', 'pr_url': None,
+                                      'ts': _iso(_NOW)}],
+                'clarify_request': [{'task_id': 't-8', 'ts': _iso(_NOW)}]}
+        items = ptf.enumerate_chain_decisions(fetch_rows=lambda et: rows[et])
+        self.assertEqual(items, [])
+
+    def test_one_type_failing_does_not_kill_the_other(self):
+        def fetch(event_type):
+            if event_type == 'approval_request':
+                raise RuntimeError('boom')
+            return [{'task_id': 't-8', 'pr_url': _GH + '8', 'ts': _iso(_NOW)}]
+        items = ptf.enumerate_chain_decisions(fetch_rows=fetch)
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]['task_id'], 't-8')
+
+    def test_no_client_no_fetch_degrades_empty(self):
+        self.assertEqual(ptf.enumerate_chain_decisions(), [])
+
+
+# ====================================================================
+# § 2.2 E — for-larry-escalations.json.
+# ====================================================================
+class EscalationsEnumTest(unittest.TestCase):
+    def _write(self, rows):
+        d = tempfile.mkdtemp()
+        p = Path(d) / 'for-larry-escalations.json'
+        p.write_text(json.dumps({'escalations': rows}))
+        return p
+
+    def test_open_pr_backed_row_enumerated(self):
+        p = self._write([{'id': 'esc-1', 'task_id': 't-5', 'pr_url': _GH + '5',
+                          'for_larry': True, 'resolved': False,
+                          'ts': _iso(_NOW)}])
+        items = ptf.enumerate_escalations(p)
+        self.assertEqual(len(items), 1)
+        self.assertTrue(items[0]['item_key'].startswith('decision:'))
+        self.assertEqual(items[0]['store'], 'decision')
+
+    def test_resolved_and_non_larry_rows_skipped(self):
+        p = self._write([
+            {'id': 'esc-1', 'pr_url': _GH + '5', 'for_larry': True,
+             'resolved': True, 'ts': _iso(_NOW)},
+            {'id': 'esc-2', 'pr_url': _GH + '6', 'for_larry': False,
+             'resolved': False, 'ts': _iso(_NOW)},
+            {'id': 'esc-3', 'for_larry': True, 'resolved': False,
+             'ts': _iso(_NOW)},  # no pr_url — not PR-backed
+        ])
+        self.assertEqual(ptf.enumerate_escalations(p), [])
+
+    def test_missing_file_degrades_empty(self):
+        self.assertEqual(
+            ptf.enumerate_escalations(Path('/nonexistent/esc.json')), [])
+
+
+# ====================================================================
+# § 2.2 A — larry-alerts.jsonl lines carrying decision_key / pr_url.
+# ====================================================================
+class LarryAlertsEnumTest(unittest.TestCase):
+    def _write(self, lines):
+        d = tempfile.mkdtemp()
+        p = Path(d) / 'larry-alerts.jsonl'
+        p.write_text('\n'.join(lines) + '\n')
+        return p
+
+    def test_pr_backed_line_enumerated(self):
+        p = self._write([json.dumps({'ts': _iso(_NOW), 'source': 'x',
+                                     'severity': 'warning', 'message': 'm',
+                                     'task_id': 't-3', 'pr_url': _GH + '3',
+                                     'decision_key': 'dk-3'})])
+        items = ptf.enumerate_larry_alerts(p)
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]['item_key'], 'decision:dk-3')
+        self.assertEqual(items[0]['store'], 'decision')
+
+    def test_lines_without_coordinate_and_malformed_skipped(self):
+        p = self._write([
+            json.dumps({'ts': _iso(_NOW), 'source': 'x', 'message': 'plain'}),
+            'not json at all {{{',
+            json.dumps({'decision_key': 'dk-only'}),  # no pr_url → unprobeable
+        ])
+        self.assertEqual(ptf.enumerate_larry_alerts(p), [])
+
+    def test_missing_file_degrades_empty(self):
+        self.assertEqual(
+            ptf.enumerate_larry_alerts(Path('/nonexistent/alerts.jsonl')), [])
+
+
+# ====================================================================
+# § 2.3 — missions leg: phase scope, exact join, unresolvable skipped,
+# sequence-owned marker.
+# ====================================================================
+class MissionsEnumTest(unittest.TestCase):
+    def _write(self, missions):
+        d = tempfile.mkdtemp()
+        p = Path(d) / 'missions.json'
+        p.write_text(json.dumps({'schema_version': 1, 'missions': missions}))
+        return p
+
+    def test_only_live_phases_enumerated(self):
+        p = self._write([
+            {'id': 'm-prop', 'phase': 'proposed', 'task_ids': ['t-1']},
+            {'id': 'm-ship', 'phase': 'shipped', 'task_ids': ['t-1']},
+            {'id': 'm-live', 'phase': 'in_flight', 'task_ids': ['t-1']},
+        ])
+        pr_map = {'t-1': {'pr_url': _GH + '1', 'ts': _iso(_NOW)}}
+        items = ptf.enumerate_missions(p, pr_map)
+        self.assertEqual([i['item_key'] for i in items], ['mission:m-live'])
+
+    def test_exact_join_populates_pr_and_since(self):
+        p = self._write([{'id': 'm-1', 'phase': 'drafting',
+                          'task_ids': ['t-a', 't-b']}])
+        pr_map = {'t-b': {'pr_url': _GH + '7', 'ts': _iso(_NOW)}}
+        items = ptf.enumerate_missions(p, pr_map)
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]['store'], 'mission')
+        self.assertEqual(items[0]['task_id'], 't-b')
+        self.assertEqual(items[0]['pr_url'], _GH + '7')
+        self.assertEqual(items[0]['since'], _iso(_NOW))
+
+    def test_unresolvable_mission_skipped_never_ledgered(self):
+        p = self._write([{'id': 'm-1', 'phase': 'ready', 'task_ids': ['t-x']}])
+        self.assertEqual(ptf.enumerate_missions(p, {}), [])
+
+    def test_sequence_owned_mission_yields_unprobeable_marker(self):
+        p = self._write([{'id': 'm-seq', 'phase': 'in_flight',
+                          'task_ids': ['seq-abc-1']}])
+        items = ptf.enumerate_missions(p, {})
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]['item_key'], 'mission:m-seq')
+        self.assertEqual(items[0]['task_id'], 'seq-abc-1')
+        self.assertIsNone(items[0]['pr_url'])
+
+    def test_build_task_pr_map_latest_row_wins(self):
+        rows = [
+            {'task_id': 't-1', 'pr_url': _GH + '1', 'ts': '2026-07-01T00:00:00+00:00'},
+            {'task_id': 't-1', 'pr_url': _GH + '2', 'ts': '2026-07-02T00:00:00+00:00'},
+            {'task_id': 't-2', 'pr_url': None, 'ts': '2026-07-03T00:00:00+00:00'},
+        ]
+        m = ptf.build_task_pr_map(rows)
+        self.assertEqual(m['t-1']['pr_url'], _GH + '2')
+        self.assertNotIn('t-2', m)
+
+
+# ====================================================================
+# § 2.4 — obligation ledgers: UNKNOWN-ledger enumeration ONLY; a terminal
+# NEVER fans out (their own resolvers own closure).
+# ====================================================================
+class ObligationsEnumTest(unittest.TestCase):
+    def _write(self, rows):
+        d = tempfile.mkdtemp()
+        p = Path(d) / 'no-session-revision-ledger.json'
+        p.write_text(json.dumps(rows))
+        return p
+
+    def test_open_rows_enumerated_resolved_skipped(self):
+        p = self._write({
+            't-open': {'task_id': 't-open', 'pr_url': _GH + '4',
+                       'status': 'open', 'opened_at': _iso(_NOW),
+                       'last_dispatch_at': _iso(_NOW)},
+            't-done': {'task_id': 't-done', 'pr_url': _GH + '5',
+                       'status': 'resolved'},
+        })
+        items = ptf.enumerate_obligations((p,))
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]['item_key'], 'obligation:t-open')
+        self.assertEqual(items[0]['store'], 'obligation')
+        self.assertEqual(items[0]['since'], _iso(_NOW))
+
+    def test_obligation_terminal_never_fans_out(self):
+        # Identity-grade settled CLOSED — everything a fan-out needs — but the
+        # store is obligation, so run_cycle must KEEP it (§ 2.4).
+        item = {'item_key': 'obligation:t-1', 'store': 'obligation',
+                'task_id': 't-1', 'pr_url': _GH + '42',
+                'since': _iso(_NOW - timedelta(hours=6)), 'entry_id': None}
+        ptf._save_json(ptf.TERMINAL_CACHE_FILE,
+                       {'entries': {}, 'closed_seen': {'obligation:t-1': _iso(_NOW)}})
+        arm = ptf.default_arm_state()
+        arm['armed'] = True
+        ptf._save_json(ptf.ARM_STATE_FILE, arm)
+        emits = []
+        try:
+            art = ptf.run_cycle(
+                enumerators=[lambda: [item]],
+                probe_fn=lambda _url: [_pr(state='CLOSED',
+                                           closed_at=_iso(_NOW - timedelta(hours=1)))],
+                emit_fn=lambda **kw: emits.append(kw) or True,
+                now=_NOW, persist=False,
+            )
+        finally:
+            for f in (ptf.TERMINAL_CACHE_FILE, ptf.ARM_STATE_FILE):
+                try:
+                    f.unlink()
+                except OSError:
+                    pass
+        self.assertEqual(art['would_close'], [])
+        self.assertEqual(art['closed'], [])
+        self.assertEqual(art['kept'], 1)
+        self.assertFalse(any(e.get('event_type') == ptf.CLOSE_EVENT_TYPE
+                             for e in emits))
+
+
+# ====================================================================
+# run_cycle over the new legs: cross-leg dedup (entry_id wins), shared
+# probe memo, sequence-owned mission ledgering, mission fan-out emits
+# but never resolves, closed_seen bounded against live keys.
+# ====================================================================
+class RunCycleLegsTest(unittest.TestCase):
+    def tearDown(self):
+        for f in (ptf.TERMINAL_CACHE_FILE, ptf.ARM_STATE_FILE,
+                  ptf.UNKNOWN_LEDGER_FILE):
+            try:
+                f.unlink()
+            except OSError:
+                pass
+
+    def _armed(self):
+        arm = ptf.default_arm_state()
+        arm['armed'] = True
+        ptf._save_json(ptf.ARM_STATE_FILE, arm)
+
+    def test_duplicate_decision_key_dedups_prefering_entry_id(self):
+        # C-leg row (no entry_id) + P-leg row (entry_id) for the SAME decision
+        # coordinate → ONE item, ONE probe, and the armed resolve uses entry_id.
+        key = 'decision:dk-1'
+        c_item = {'item_key': key, 'store': 'decision', 'task_id': 't-1',
+                  'pr_url': _GH + '42', 'since': _iso(_NOW - timedelta(hours=6)),
+                  'entry_id': None}
+        p_item = dict(c_item, entry_id='pending-77')
+        ptf._save_json(ptf.TERMINAL_CACHE_FILE,
+                       {'entries': {}, 'closed_seen': {key: _iso(_NOW)}})
+        self._armed()
+        probes = {'n': 0}
+        def probe(_url):
+            probes['n'] += 1
+            return [_pr(state='CLOSED', closed_at=_iso(_NOW - timedelta(hours=1)))]
+        resolved = {}
+        art = ptf.run_cycle(
+            enumerators=[lambda: [c_item], lambda: [p_item]],
+            probe_fn=probe, emit_fn=lambda **kw: True,
+            resolve_fn=lambda **kw: resolved.update(kw) or {},
+            now=_NOW, persist=False,
+        )
+        self.assertEqual(art['enumerated'], 1)       # deduped
+        self.assertEqual(art['enumerated_raw'], 2)
+        self.assertEqual(probes['n'], 1)
+        self.assertEqual(len(art['closed']), 1)
+        self.assertEqual(resolved.get('entry_id'), 'pending-77')
+        self.assertEqual(resolved.get('outcome'), 'expired')  # CLOSED → expired
+
+    def test_distinct_items_sharing_pr_url_share_one_probe(self):
+        a = {'item_key': 'inreview:t-1', 'store': 'inreview', 'task_id': 't-1',
+             'pr_url': _GH + '42', 'since': _iso(_NOW - timedelta(hours=6)),
+             'entry_id': None}
+        b = dict(a, item_key='decision:dk-1', store='decision')
+        probes = {'n': 0}
+        def probe(_url):
+            probes['n'] += 1
+            return [_pr(state='OPEN')]
+        art = ptf.run_cycle(
+            enumerators=[lambda: [a, b]], probe_fn=probe,
+            emit_fn=lambda **kw: True, now=_NOW, persist=False,
+        )
+        self.assertEqual(probes['n'], 1)
+        self.assertEqual(art['probed'], 1)
+        self.assertEqual(art['kept'], 2)  # both items still evaluated
+
+    def test_sequence_owned_mission_ledgered_never_escalates(self):
+        item = {'item_key': 'mission:m-seq', 'store': 'mission',
+                'task_id': 'seq-abc-1', 'pr_url': None, 'since': None,
+                'entry_id': None}
+        alerts = []
+        orig = ptf._emit_alert
+        ptf._emit_alert = lambda *a, **k: alerts.append(a) or True
+        try:
+            ptf.run_cycle(enumerators=[lambda: [item]],
+                          probe_fn=lambda _u: [], emit_fn=lambda **kw: True,
+                          now=_NOW, persist=True)
+            ledger = ptf._load_json(ptf.UNKNOWN_LEDGER_FILE, {})
+        finally:
+            ptf._emit_alert = orig
+        row = ledger['rows']['mission:m-seq']
+        self.assertEqual(row['cause'], ptf.CAUSE_SEQUENCE_OWNED)
+        self.assertFalse(ptf.no_match_declare_dead(row, _NOW + timedelta(days=90)))
+        self.assertEqual(alerts, [])
+
+    def test_mission_fanout_emits_but_never_resolves(self):
+        # § 4.3: the mission surface gets NO direct action — the close is the
+        # review_obsolete emit only (GC owns the mission file).
+        item = {'item_key': 'mission:m-1', 'store': 'mission', 'task_id': 't-1',
+                'pr_url': _GH + '42', 'since': _iso(_NOW - timedelta(hours=6)),
+                'entry_id': None}
+        ptf._save_json(ptf.TERMINAL_CACHE_FILE,
+                       {'entries': {}, 'closed_seen': {'mission:m-1': _iso(_NOW)}})
+        self._armed()
+        emits, resolved = [], {'n': 0}
+        art = ptf.run_cycle(
+            enumerators=[lambda: [item]],
+            probe_fn=lambda _u: [_pr(state='CLOSED',
+                                     closed_at=_iso(_NOW - timedelta(hours=1)))],
+            emit_fn=lambda **kw: emits.append(kw) or True,
+            resolve_fn=lambda **kw: resolved.update(n=resolved['n'] + 1) or {},
+            now=_NOW, persist=False,
+        )
+        self.assertEqual(len(art['closed']), 1)
+        self.assertTrue(any(e.get('event_type') == ptf.CLOSE_EVENT_TYPE
+                            for e in emits))
+        self.assertEqual(resolved['n'], 0)
+
+    def test_closed_seen_bounded_against_live_keys(self):
+        # A departed item's closed_seen key must be pruned (the leak fix); the
+        # still-live CLOSED item's key must survive the same pass.
+        ptf._save_json(ptf.TERMINAL_CACHE_FILE,
+                       {'entries': {},
+                        'closed_seen': {'inreview:departed': _iso(_NOW)}})
+        live = _item(store='inreview')  # inreview:t-1, first CLOSED observation
+        ptf.run_cycle(
+            enumerators=[lambda: [live]],
+            probe_fn=lambda _u: [_pr(state='CLOSED',
+                                     closed_at=_iso(_NOW - timedelta(hours=1)))],
+            emit_fn=lambda **kw: True, now=_NOW, persist=True,
+        )
+        cache = ptf._load_json(ptf.TERMINAL_CACHE_FILE, {})
+        self.assertNotIn('inreview:departed', cache.get('closed_seen', {}))
+        self.assertIn('inreview:t-1', cache.get('closed_seen', {}))
+
+    def test_bound_closed_seen_unit(self):
+        cache = {'closed_seen': {'a': 'ts', 'b': 'ts'}}
+        dropped = ptf.bound_closed_seen(cache, {'a'})
+        self.assertEqual(dropped, 1)
+        self.assertEqual(set(cache['closed_seen']), {'a'})
 
 
 if __name__ == '__main__':
