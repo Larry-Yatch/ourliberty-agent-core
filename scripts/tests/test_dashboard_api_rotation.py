@@ -206,6 +206,45 @@ class GetRotationTest(_RotationBase):
         body = self.c.get('/api/system/rotation', headers=TOKEN_ONLY).json()
         self.assertEqual(body['current_tier'], 'tier1')
 
+    # ---- pool: per-tier dispatch-pool snapshot (tier-dispatch spec § 15) ----
+
+    def test_get_carries_pool_snapshot(self):
+        body = self.c.get('/api/system/rotation', headers=TOKEN_ONLY).json()
+        pool = body['pool']
+        self.assertIsInstance(pool, dict)
+        self.assertIn('primary', pool)
+        self.assertIn('fallback', pool)
+        self.assertIn('operator_pin', pool)
+        tiers = pool['tiers']
+        self.assertIn('tier1', tiers)
+        for info in tiers.values():
+            # benched is derived (= not usable) for every tier, including the
+            # defensive {'usable': False, 'error': True} fallback shape.
+            self.assertIn('benched', info)
+            self.assertEqual(info['benched'], not info.get('usable', False))
+            if not info.get('error'):
+                self.assertIn('cooldown_until', info)
+                self.assertIn('burn_5h', info)
+                self.assertIn('near_cap', info)
+
+    def test_pool_probe_failure_yields_null_pool_not_500(self):
+        import active_tier
+
+        def _boom(*args, **kwargs):
+            raise RuntimeError('pool probe broke')
+
+        orig = active_tier.tier_pool_status
+        active_tier.tier_pool_status = _boom  # type: ignore[assignment]
+        try:
+            r = self.c.get('/api/system/rotation', headers=TOKEN_ONLY)
+            self.assertEqual(r.status_code, 200)
+            body = r.json()
+            self.assertIsNone(body['pool'])
+            # The mode switch keeps rendering despite the broken probe.
+            self.assertEqual(body['mode'], 'auto')
+        finally:
+            active_tier.tier_pool_status = orig  # type: ignore[assignment]
+
     def test_missing_token_401(self):
         r = self.c.get('/api/system/rotation')
         self.assertEqual(r.status_code, 401)
