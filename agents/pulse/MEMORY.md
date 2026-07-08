@@ -432,7 +432,7 @@ PR #814 (`fix(notifier): suppress Mirror re-review while a PR is held for deep-r
 
 **Chain:** `phase=preflight` APPROVAL_REQUEST dispatched to Forge. Trust policy routing — Larry DM expected unless carve-out auto-approves. verification_pending Forge preflight (PROCEED/CLARIFY/REJECT).
 
-Occurrences: iter ~3710 (PR #108, 1/3); iter ~4482 (PR #840/kickoff, 2/3); iter ~4483 (PR #841, 3/3).
+Occurrences: iter ~3710 (PR #108, 1/3); iter ~4482 (PR #840/kickoff, 2/3); iter ~4483 (PR #841, 3/3); iter ~4526 (PR #857, 4th — post-REVIEW_PASS re-dispatch 06:40:31Z UTC, 4 min after REVIEW_PASS at 06:36:22Z; fix in-flight PR #847).
 
 ---
 
@@ -472,8 +472,8 @@ PR #828 (`gate: delegate JS/TS repo regression checks to GitHub Actions (Piece 2
 
 ---
 
-## Status snapshot — updated 2026-07-08T06:39Z UTC (Iter ~4525, **Tier 1**)
+## Status snapshot — updated 2026-07-08T06:45Z UTC (Iter ~4526, **Tier 1**)
 
-**Iter ~4525 summary (2026-07-08T06:36Z):** Check 0 watermark-rotation-gap auto-repaired (1046→1045); 0 new alerts. PR #849 MERGED at 06:37Z ("inbox-watcher: disable NoNewPrivileges..."). PR #857 REVIEW_PASS AUTO_MERGE_HELD blocker=#847 (new positive). Mirror queue 15→14. pending=6 (was 7; #849 resolved). Zombie PID 1834248 carry. Check A HEAD=38b4a729=origin/main. Sync 06:04:36Z (~31 min, <2h). Pipeline: no stalls. **STANDING:** zombie PID 1834248; VI/VIII proposals idx=990,991; Check I timer 08:13 MDT (14:13Z); flaky-specdoc approval pending Larry (harden-specdoc-originmain-flaky-tests-001); PR #856 REVIEW_ESCALATE re-review round=2 in queue; PR #857 REVIEW_PASS held by #847; PR #846/#850 HELD (chain behind #847/#852). Beacon processing larry-approval-89b79b10. **ACTIVE G-rules:** sentinel-inflight-stall-tier4 [PR #854 rev1]; notifier-concurrent-scan-dup [PR #847 rev1]; auto-merge-conflict-promoted-merged-pr-001 [2/3]; auto-dispatch-APPROVAL_REQUEST-task-id-mismatch [2/3]; forge-marker-task-id-mismatch-xii-v1 [2/3]; ourliberty-health-subject-key-mismatch-001 [3/3 dispatched, vp]; mirror-malformed-verdict-heal-reap-path-001 [1/3]; flaky-specdoc-originmain-gate-falseblock [approval pending]; sequence-invalid-completeness-pr3-fanout-sentinel [1/3].
+**Iter ~4526 summary (2026-07-08T06:45Z):** L1046 unreviewed-merge:849 Tier-4 (bot DM'd Larry 06:42Z; 9th+ unreviewed-merge-larry-authored-pr-001). Mirror re-review re-dispatched for PR #857 at 06:40:31Z (4th notifier-concurrent-scan-dup; fix in-flight PR #847). pending=6 (unchanged). Zombie PID 1834248 carry. HEAD=972e2f31=origin/main. Sync 06:04:36Z (~41 min, <2h). Pipeline: no stalls. **STANDING:** zombie PID 1834248; VI/VIII proposals idx=990,991; Check I timer 08:13 MDT (14:13Z); flaky-specdoc approval pending Larry; PR #856 REVIEW_ESCALATE round=2 in queue (now MERGEABLE); PR #857 REVIEW_PASS held by #847 + NEW re-review dispatched; PR #846/#850 HELD. **ACTIVE G-rules:** sentinel-inflight-stall-tier4 [PR #854 rev1]; notifier-concurrent-scan-dup [PR #847 rev1, 4th occurrence]; auto-merge-conflict-promoted-merged-pr-001 [2/3]; auto-dispatch-APPROVAL_REQUEST-task-id-mismatch [2/3]; forge-marker-task-id-mismatch-xii-v1 [2/3]; ourliberty-health-subject-key-mismatch-001 [3/3 dispatched, vp]; mirror-malformed-verdict-heal-reap-path-001 [1/3]; flaky-specdoc-originmain-gate-falseblock [approval pending]; sequence-invalid-completeness-pr3-fanout-sentinel [1/3].
 
 
