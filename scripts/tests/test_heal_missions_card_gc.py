@@ -381,10 +381,17 @@ class ReadMissionsRegistryTest(unittest.TestCase):
 class ClassifyMissionTest(unittest.TestCase):
     """Pure decision logic — the conservative guard at the unit level."""
 
-    def test_all_tasks_terminal_ships(self):
-        states = {'a': h.tts.MERGED, 'b': h.tts.CLOSED}
+    def test_all_tasks_merged_ships(self):
+        states = {'a': h.tts.MERGED, 'b': h.tts.MERGED}
         self.assertEqual(
             h.classify_mission('in_flight', ['a', 'b'], states).action, 'ship')
+
+    def test_closed_unmerged_retires(self):
+        # PR-3 R2: all tasks terminal but one CLOSED-unmerged (abandoned) ⇒
+        # retire, never ship — abandoned work must not be recorded as shipped.
+        states = {'a': h.tts.MERGED, 'b': h.tts.CLOSED}
+        self.assertEqual(
+            h.classify_mission('in_flight', ['a', 'b'], states).action, 'retire')
 
     def test_one_open_task_keeps(self):
         states = {'a': h.tts.MERGED, 'b': h.tts.OPEN}

@@ -239,6 +239,15 @@
       "recommended_action": "Run `sudo systemctl restart chain-event-shipper.service` and check `journalctl -u chain-event-shipper.service -n 50` for the underlying error. If the shipper crashes immediately on restart, inspect ~/agents/logs/chain_event_shipper.log for the stack trace."
     }
   },
+  "pr-terminal-fanout": {
+    "pr-terminal-fanout-stale": {
+      "severity": "URGENT",
+      "tier": "NOW",
+      "never_silence": true,
+      "plain_language_summary": "The terminal-event fan-out sentinel's self-watch heartbeat is stale (>45 min = ~3 missed 15-min passes). The sentinel that reconciles out-of-band PR merges/closes across the needs-Larry + in-review surfaces has most likely crashed or wedged — phantom cards and un-cleared approvals can now accumulate silently. A dead self-watch must ALWAYS surface, so this entry is never_silence.",
+      "recommended_action": "ssh larry@134.209.44.80 and run `systemctl status ourliberty-pr-terminal-fanout.service && journalctl -u ourliberty-pr-terminal-fanout.service --since '1 hour ago' | tail -100`. If wedged, `sudo systemctl start ourliberty-pr-terminal-fanout.service`. The sentinel is conservative (report-only until armed), so a brief outage is cosmetic — but a persistent one hides real terminal reconciliations."
+    }
+  },
   "dispatch-branch-cleanup": {
     "summary": {
       "severity": "INFO",
@@ -495,6 +504,12 @@
       "tier": "SOON",
       "plain_language_summary": "The missions-card garbage collector (it retires stale desktop-session cards and ages out old parked captures, then commits captures.json) computed its cleanup but couldn't fully land it. The subject suffix names which: `wrong-branch`, `commit-failed`, or `push-failed` is a git problem persisting the captures.json change; otherwise one or more card-retirement events failed to emit. Stale cards may linger on the Missions board until a later clean run.",
       "recommended_action": "Grep ~/agents/logs/missions-card-gc.log around the alert time for the exact git/emit error. For a wrong-branch / commit / push failure, check the droplet repo state (`cd ~/agent-core && git status`) — the captures.json change is retained locally and the next GC run retries. For emit-failures the affected card ids are in the alert body; verify Supabase / chain_event_emit health."
+    },
+    "missions-retired-abandoned": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "plain_language_summary": "The missions-card GC retired one or more missions whose every PR-backed task reached a terminal state, but at least one task was CLOSED-unmerged — i.e. the work was abandoned, not shipped (PR-3 R2). Rather than silently record it as shipped, the mission is moved to a `retired` phase and surfaced here so the drop is a deliberate, visible decision. The mission ids and the closed-unmerged task(s) are in the alert body.",
+      "recommended_action": "Review each retired mission in the alert body. If the abandoned work is still wanted, re-open the mission / re-dispatch the closed task; if the drop is correct, no action is needed — the card is already off the active board."
     }
   },
   "pulse-check-iv": {

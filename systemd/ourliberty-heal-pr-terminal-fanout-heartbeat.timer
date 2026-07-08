@@ -1,0 +1,14 @@
+[Unit]
+Description=Run heal_pr_terminal_fanout_heartbeat every 15 min (completeness PR-3 § 6)
+
+[Timer]
+# 45-min staleness threshold == ~3 missed 15-min sentinel passes, so a 15-min
+# watcher cadence detects a dead sentinel inside one threshold window. OnCalendar
+# (dies-when-stopped lesson) at a :12/15 offset off the sentinel's own :09/15.
+OnCalendar=*-*-* *:12/15:00
+Persistent=true
+RandomizedDelaySec=30
+Unit=ourliberty-heal-pr-terminal-fanout-heartbeat.service
+
+[Install]
+WantedBy=timers.target

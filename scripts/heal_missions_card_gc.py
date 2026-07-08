@@ -112,6 +112,11 @@ MISSIONS_REL = 'agents/beacon/missions.json'
 # drafting/in_flight/ready").
 RECONCILABLE_MISSION_PHASES = frozenset({'drafting', 'in_flight', 'ready'})
 SHIPPED_PHASE = 'shipped'
+# completeness PR-3 R2: a mission all of whose PR-backed tasks are terminal but at
+# least one is CLOSED-unmerged (abandoned, not merged) is RETIRED, not shipped —
+# recording abandoned work as "shipped" corrupts the mission ledger. Retired
+# missions also raise one needs-attention surface. all-MERGED still ships.
+RETIRED_PHASE = 'retired'
 
 # task_ids the orchestrator never opens a PR for — DAG-preflight routing signals,
 # inter-agent notifies, and code-review handoffs. They can never resolve to a
@@ -686,7 +691,7 @@ def read_missions_registry(path: Path) -> Optional[dict[str, Any]]:
 
 @dataclass(frozen=True)
 class MissionDecision:
-    action: str   # 'ship' | 'keep'
+    action: str   # 'ship' | 'retire' | 'keep'
     reason: str
 
 
@@ -716,7 +721,7 @@ def classify_mission(
 ) -> MissionDecision:
     """Decide whether a mission flips to `shipped`. Pure.
 
-    Ships ONLY when ALL of: the phase is reconcilable (drafting/in_flight/ready
+    Terminal ONLY when ALL of: the phase is reconcilable (drafting/in_flight/ready
     — `proposed`/`deferred`/`shipped` are left alone), the mission has at least
     one PR-backed (non-review-shaped) task_id, and EVERY PR-backed task_id
     resolves to a terminal state (MERGED/CLOSED) in ``terminal_states``. A
@@ -725,7 +730,11 @@ def classify_mission(
     PR, so requiring them terminal would block shipping permanently. Any
     OPEN/UNKNOWN/missing PR-backed task, no probeable task at all (empty list or
     only review-shaped ids), or a non-reconcilable phase ⇒ KEEP — the
-    conservative posture (spec § 1): never falsely retire live work."""
+    conservative posture (spec § 1): never falsely retire live work.
+
+    Once all-terminal, the terminal MIX decides the outcome (PR-3 R2): every task
+    MERGED ⇒ SHIP; at least one CLOSED-unmerged (abandoned) ⇒ RETIRE — abandoned
+    work must never be recorded as shipped."""
     if phase not in RECONCILABLE_MISSION_PHASES:
         return MissionDecision('keep', f'phase={phase} not reconcilable')
     probeable = probeable_task_ids(task_ids)
@@ -741,12 +750,19 @@ def classify_mission(
     ]
     if non_terminal:
         return MissionDecision('keep', f'{len(non_terminal)} task(s) not terminal')
-    return MissionDecision('ship', 'all-pr-backed-tasks-terminal')
+    closed_unmerged = [t for t in probeable if terminal_states.get(t) == tts.CLOSED]
+    if closed_unmerged:
+        return MissionDecision(
+            'retire',
+            f'{len(closed_unmerged)} task(s) CLOSED-unmerged (abandoned): '
+            f'{closed_unmerged}')
+    return MissionDecision('ship', 'all-pr-backed-tasks-merged')
 
 
 @dataclass
 class MissionReconcileResult:
     shipped: list[tuple[str, str]] = field(default_factory=list)  # (id, prior_phase)
+    retired: list[tuple[str, str]] = field(default_factory=list)  # (id, reason) — R2
     flagged: list[tuple[str, str]] = field(default_factory=list)  # (id, reason)
     kept: int = 0
     probed: int = 0
@@ -812,6 +828,21 @@ def reconcile_mission_phases(
             if states[tid] not in tts.TERMINAL_STATES:
                 break  # one live/indeterminate task ⇒ KEEP; stop probing
         decision = classify_mission(phase, task_ids, states)
+        if decision.action == 'retire':
+            # R2: all-terminal but at least one CLOSED-unmerged (abandoned work).
+            # Flip to `retired`, NOT `shipped`, and surface for attention.
+            if dry_run:
+                res.retired.append((mid, f'{decision.reason} (dry-run)'))
+                continue
+            mission['phase'] = RETIRED_PHASE
+            mission['retired_at'] = now.isoformat()
+            mission['retired_by'] = 'heal_missions_card_gc'
+            mission['retired_reason'] = decision.reason
+            mission['prior_phase'] = phase
+            res.retired.append((mid, decision.reason))
+            log(f'mission {mid}: {phase} -> retired ({decision.reason}; '
+                f'states={states})')
+            continue
         if decision.action != 'ship':
             res.kept += 1
             continue
@@ -826,7 +857,7 @@ def reconcile_mission_phases(
         mission['prior_phase'] = phase
         res.shipped.append((mid, str(phase)))
         log(f'mission {mid}: {phase} -> shipped (all {len(probeable)} PR-backed '
-            f'task_id(s) terminal: {states})')
+            f'task_id(s) merged: {states})')
     return res
 
 
@@ -1579,6 +1610,11 @@ def _emit_summary(retire: RetireResult, aged: list[str], commit_status: str,
                     f'{m_brief_verb} {mission_briefed} funnel mission(s), '
                     f'deferred {mission_deferred}; '
                     f'missions-commit={missions_commit_status}')
+        if missions.retired:
+            retire_verb = 'would retire' if dry_run else 'retired'
+            retired_ids = [mid for mid, _ in missions.retired]
+            summary += (f'; {retire_verb} {len(missions.retired)} abandoned '
+                        f'mission(s) {retired_ids} (CLOSED-unmerged, not shipped)')
         if missions.flagged:
             flagged_ids = [mid for mid, _ in missions.flagged]
             summary += (f'; flagged {len(missions.flagged)} unprobeable mission(s) '
@@ -1608,6 +1644,19 @@ def _emit_summary(retire: RetireResult, aged: list[str], commit_status: str,
         larry_alerts.append_alert(
             source='missions-card-gc', severity='warning',
             message=summary, subject=f'failure:{fail_token}', route='escalate')
+
+    # R2: one needs-attention surface per tick that retired abandoned missions —
+    # abandoned work (CLOSED-unmerged) shouldn't vanish silently into `retired`.
+    if missions is not None and missions.retired:
+        retired_detail = '; '.join(f'{mid}: {reason}' for mid, reason in missions.retired)
+        larry_alerts.append_alert(
+            source='missions-card-gc', severity='warning',
+            subject='missions-retired-abandoned',
+            message=(f'{len(missions.retired)} mission(s) retired (all tasks '
+                     f'terminal but at least one CLOSED-unmerged — abandoned, not '
+                     f'shipped): {retired_detail}. Review whether the work should '
+                     f'be re-attempted or is correctly dropped.'),
+            suggested_action='Review the retired mission(s); re-open if the work is still wanted.')
 
 
 # ---------- main ----------
@@ -1893,7 +1942,7 @@ def run_once(*, dry_run: bool,
             except Exception as e:  # noqa: BLE001 — fail-safe: never abort the tick
                 log(f'narrator mission sweep raised: {type(e).__name__}: {e}')
                 mission_briefed, mission_deferred = 0, 0
-            if (missions.shipped or mission_briefed) and not dry_run:
+            if (missions.shipped or missions.retired or mission_briefed) and not dry_run:
                 # Lost-update guard (mirrors the captures path): the mission sweep
                 # can hold the registry for minutes (one claude spawn per pending
                 # mission). Re-read fresh and apply only this tick's per-mission
@@ -2002,8 +2051,10 @@ def _commit_audit(retire: RetireResult, aged: list[str], briefed: int = 0,
 
 def _missions_commit_audit(missions: MissionReconcileResult) -> str:
     shipped = [f'{mid}({prior}->shipped)' for mid, prior in missions.shipped]
+    retired = [f'{mid}(->retired)' for mid, _ in missions.retired]
     return (f'Auto-committed by heal_missions_card_gc. '
-            f'terminal-state reconcile shipped={len(missions.shipped)} {shipped}.')
+            f'terminal-state reconcile shipped={len(missions.shipped)} {shipped} '
+            f'retired={len(missions.retired)} {retired}.')
 
 
 def main(argv: Optional[list[str]] = None) -> int:

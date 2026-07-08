@@ -1,0 +1,27 @@
+[Unit]
+Description=Terminal-event fan-out sentinel — fans a PR terminal (merge/close) close across the surfaces sharing its decision coordinate (completeness PR-3)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/pr_terminal_fanout.py
+After=network.target
+# EMERGENCY_HALT stops the pass at the OS layer too (belt-and-suspenders with the
+# in-process kill_switch_active() check). If the halt file exists the unit is a
+# clean no-op start (ConditionPathExists=! → condition fails → success, no run).
+ConditionPathExists=!/home/larry/agents/blackboard/EMERGENCY_HALT
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+# Supabase creds (SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY) feed the dashboard
+# derivation reuse the in-review enumeration requires (§ 1/§ 2.1).
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/pr_terminal_fanout.py
+TimeoutStartSec=300
+Nice=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-pr-terminal-fanout
+
+[Install]
+WantedBy=multi-user.target

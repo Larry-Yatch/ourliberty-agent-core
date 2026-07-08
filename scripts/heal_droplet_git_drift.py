@@ -91,6 +91,25 @@ UNCOMMITTED_AGE_THRESHOLD_SEC = 6 * 60 * 60
 # cooldown is the floor; this 6h gate is the binding constraint.
 PER_SUBJECT_COOLDOWN_SEC = 6 * 60 * 60
 
+# --- G7 wedged-committer delta-age (completeness PR-3 R1) ---
+# A managed runtime path is written by an ingest writer on its own cadence and
+# committed by a SOLE healer-committer on a timer. The 6h newest-mtime gate above
+# can NEVER catch a dead committer: the ingest writer keeps the mtime fresh
+# exactly while the committer is wedged, so the file looks "actively edited"
+# forever. G7 tracks time-since-FIRST-OBSERVED-DIRTY per managed path in a small
+# state file; if a path stays continuously dirty past its committer's SLA the
+# committer is wedged and we fire ONE escalation naming it. Threshold per path is
+# max(3x cadence_min, G7_MIN_THRESHOLD_SEC) — 3 missed commits or 45 min,
+# whichever is longer.
+G7_MIN_THRESHOLD_SEC = 45 * 60
+
+# Deploy-grace suppression (R1): right after a deploy every runtime file looks
+# dirty until the committers catch up; a marker file's mtime opens a short grace
+# window during which G7 stays silent. Absent marker ⇒ NOT in grace (fail-open:
+# a real wedge must still page). Injectable in evaluate for tests.
+DEPLOY_MARKER_FILE = AGENTS_ROOT / 'blackboard' / 'last-deploy.marker'
+DEPLOY_GRACE_SEC = 10 * 60
+
 
 # -------------------- logging --------------------
 
@@ -273,6 +292,44 @@ def healer_managed_paths() -> tuple[str, ...]:
     return _HEALER_MANAGED_PATHS_FALLBACK
 
 
+def healer_managed_committers() -> list[dict]:
+    """Return the R1 `committers` list: [{path, committer, cadence_min}, ...].
+
+    Empty list on a missing/malformed file (G7 then simply doesn't run — it
+    never crashes the tick nor silences the other signals). Each entry is
+    validated for the three required keys with the right types; malformed rows
+    are dropped individually."""
+    try:
+        data = json.loads(HEALER_MANAGED_RUNTIME_PATHS_FILE.read_text())
+        rows = data.get('committers')
+    except (FileNotFoundError, json.JSONDecodeError, OSError, AttributeError):
+        return []
+    if not isinstance(rows, list):
+        return []
+    out: list[dict] = []
+    for row in rows:
+        if (isinstance(row, dict)
+                and isinstance(row.get('path'), str) and row['path']
+                and isinstance(row.get('committer'), str) and row['committer']
+                and isinstance(row.get('cadence_min'), (int, float))
+                and row['cadence_min'] > 0):
+            out.append({'path': row['path'], 'committer': row['committer'],
+                        'cadence_min': float(row['cadence_min'])})
+    return out
+
+
+def _in_deploy_grace(now: Optional[float] = None,
+                     marker: Optional[Path] = None) -> bool:
+    """True iff a deploy landed within the last DEPLOY_GRACE_SEC (R1). Absent
+    marker ⇒ False (fail-open so a real wedge still pages)."""
+    marker = marker or DEPLOY_MARKER_FILE
+    try:
+        mt = marker.stat().st_mtime
+    except OSError:
+        return False
+    return ((now if now is not None else time.time()) - mt) < DEPLOY_GRACE_SEC
+
+
 def newest_mtime_of(paths: list[str], root: Path) -> Optional[float]:
     """Return the newest mtime among tracked-file paths, or None if none stat."""
     newest: Optional[float] = None
@@ -428,12 +485,85 @@ def evaluate_uncommitted(
     return True
 
 
+def evaluate_managed_committer_wedged(
+    branch: str, state: dict, now: Optional[float] = None,
+    *, dirty_paths: Optional[list[str]] = None,
+    in_deploy_grace: Optional[bool] = None,
+) -> bool:
+    """G7 (R1): detect a WEDGED healer-committer via first-observed-dirty age.
+
+    For each managed committer path: while it is dirty, remember when it FIRST
+    went dirty (a small `managed_dirty` map in the cooldown state file); when it
+    goes clean, forget it. If a path stays continuously dirty past
+    max(3x cadence_min, G7_MIN_THRESHOLD_SEC) the committer that owns it is
+    wedged — fire ONE escalation naming the committer (6h cooldown). Deploy-grace
+    suppresses (post-deploy everything is transiently dirty). Delta-age (NOT
+    newest-mtime) is load-bearing: the ingest writer keeps the mtime fresh
+    exactly while the committer is dead, so mtime can never catch this."""
+    committers = healer_managed_committers()
+    if not committers:
+        return False
+    now = now if now is not None else time.time()
+    if dirty_paths is None:
+        dirty_paths = uncommitted_files()
+    dirty = set(dirty_paths)
+    tracked = state.setdefault('managed_dirty', {})
+
+    # Update first-observed-dirty bookkeeping for every managed path.
+    managed_paths = {c['path'] for c in committers}
+    for path in managed_paths:
+        if path in dirty:
+            tracked.setdefault(path, now)
+        else:
+            tracked.pop(path, None)
+    # Drop stale keys for paths no longer managed (schema shrank).
+    for path in [p for p in tracked if p not in managed_paths]:
+        tracked.pop(path, None)
+
+    if in_deploy_grace is None:
+        in_deploy_grace = _in_deploy_grace(now)
+    if in_deploy_grace:
+        save_state(state)
+        log('G7: deploy grace active; suppressing wedged-committer check')
+        return False
+
+    fired = False
+    for c in committers:
+        path, committer, cadence_min = c['path'], c['committer'], c['cadence_min']
+        first = tracked.get(path)
+        if not isinstance(first, (int, float)):
+            continue
+        threshold = max(3 * cadence_min * 60, G7_MIN_THRESHOLD_SEC)
+        age_sec = now - first
+        if age_sec <= threshold:
+            continue
+        age_min = age_sec / 60.0
+        subject = f'managed-committer-wedged:{committer}'
+        msg = (
+            f'Runtime path `{path}` has been continuously uncommitted for '
+            f'{age_min:.0f} min (> {threshold/60:.0f} min SLA = max(3x '
+            f'{cadence_min:.0f}min cadence, 45min)). Its sole committer '
+            f'`{committer}` appears WEDGED — the file keeps being written but '
+            f'never committed.\n\n'
+            f'Check the committer:\n'
+            f'  systemctl status ourliberty-{committer.replace("_", "-")}.* \n'
+            f'  journalctl -u "ourliberty-{committer.replace("_", "-")}*" '
+            f'--since "1 hour ago" | tail -80'
+        )
+        if emit_alert(state, subject, msg,
+                      suggested_action=f'Inspect committer {committer}; restart if crashed.',
+                      now=now):
+            fired = True
+    save_state(state)
+    return fired
+
+
 # -------------------- main --------------------
 
 def run_tick(now: Optional[float] = None) -> dict:
     """One healer tick. Returns a small dict of per-signal trip booleans for tests."""
     result = {'ahead': False, 'behind': False, 'uncommitted': False,
-              'fetched': False}
+              'committer_wedged': False, 'fetched': False}
     if not fetch_origin():
         return result
     result['fetched'] = True
@@ -449,10 +579,13 @@ def run_tick(now: Optional[float] = None) -> dict:
         result['ahead'] = evaluate_ahead(upstream_branch, branch, state, now=now)
         result['behind'] = evaluate_behind(upstream_branch, branch, state, now=now)
     result['uncommitted'] = evaluate_uncommitted(branch, state, now=now)
+    result['committer_wedged'] = evaluate_managed_committer_wedged(
+        branch, state, now=now)
     tripped = [k for k, v in result.items() if v and k != 'fetched']
     log(f'GIT_DRIFT_CHECK ahead={int(result["ahead"])} '
         f'behind={int(result["behind"])} '
         f'uncommitted={int(result["uncommitted"])} '
+        f'committer_wedged={int(result["committer_wedged"])} '
         f'tripped={tripped}')
     return result
 
