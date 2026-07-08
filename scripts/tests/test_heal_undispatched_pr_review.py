@@ -562,10 +562,12 @@ class _FakeNotifier:
 
 
 class _FakeSafeWriteInbox:
-    # main()'s post-dispatch verify now reads INBOXES_ROOT to locate the mirror
-    # inbox for the `.claimed/` race check. Default at a nonexistent tree so the
-    # helper finds nothing (empty `.claimed/` ⇒ False) and the existing main-flow
-    # tests keep their outcomes (e.g. a failed dispatch still escalates).
+    # main() derives Mirror's inbox path from INBOXES_ROOT for two probes:
+    # the post-dispatch `.claimed/` race check and recent_review_record. Default
+    # at a nonexistent tree so both find nothing (empty `.claimed/` ⇒ False; the
+    # recent-review scan hits its OSError no-match leg), keeping the existing
+    # main-flow tests' outcomes (e.g. a failed dispatch still escalates) unless a
+    # test patches the probe or overrides INBOXES_ROOT.
     INBOXES_ROOT = Path('/nonexistent-test-inboxes-root')
 
     @staticmethod
@@ -579,7 +581,7 @@ class TestMainDispatchFlow(unittest.TestCase):
 
     @staticmethod
     def _pr_realnow(number, branch, age_minutes=60, *, is_draft=False, labels=(),
-                    repo='Larry-Yatch/ourliberty-agent-core'):
+                    repo='Larry-Yatch/ourliberty-agent-core', head=None):
         # main() compares createdAt against the real wall clock, so these
         # fixtures must be dated relative to actual now (not the fixed NOW).
         created = (datetime.now(timezone.utc)
@@ -590,13 +592,15 @@ class TestMainDispatchFlow(unittest.TestCase):
             'headRefName': branch,
             'createdAt': created,
             'title': 't',
+            'headRefOid': head,
             'isDraft': is_draft,
             'labels': list(labels),
             '_repo': repo,
         }
 
     def _run_main(self, *, prs, dispatch_succeeds, enabled=True, failed=None,
-                  pr_open=True, inboxes_root=None):
+                  pr_open=True, inboxes_root=None, head_status=False,
+                  recent_review=None):
         import os
         from unittest import mock
         fake_notifier = _FakeNotifier(dispatch_succeeds=dispatch_succeeds,
@@ -622,9 +626,15 @@ class TestMainDispatchFlow(unittest.TestCase):
                 mock.patch.object(h, 'load_state', return_value=state), \
                 mock.patch.object(h, 'save_state',
                                   side_effect=lambda s: saved.update(s)), \
+                mock.patch.object(h, 'head_has_passing_review_status',
+                                  return_value=head_status) as status_probe, \
+                mock.patch.object(h, 'recent_review_record',
+                                  return_value=recent_review) as recent_probe, \
                 mock.patch.object(h, 'emit_failed_alert',
                                   side_effect=lambda pr: alerts.append(pr) or True):
             rc = h.main()
+        self._status_probe = status_probe
+        self._recent_probe = recent_probe
         return rc, fake_notifier, saved, alerts
 
     def test_successful_dispatch_no_alert(self):
@@ -737,6 +747,71 @@ class TestMainDispatchFlow(unittest.TestCase):
         self.assertEqual(alerts, [])  # …but the FP page is suppressed
         self.assertEqual(saved.get('failed_prs'), {})  # no failure-ledger entry
 
+    # ---- ground-truth back-off (the PR #865 triple-dispatch, 2026-07-08) ----
+
+    def test_passing_head_skips_dispatch(self):
+        # A SUCCESS mirror-review status on the CURRENT head = this head already
+        # PASSED; the backstop must stand down (the 17:00Z dup: re-reviewing a
+        # PASSed head overwrote a merged PR's findings comment with a stale red).
+        # recency (mocked None) runs first and doesn't block → status probe runs.
+        prs = [self._pr_realnow(865, 'forge/completeness-pr3-build',
+                                age_minutes=60, head='6de22a9058eb')]
+        rc, fn, saved, alerts = self._run_main(
+            prs=prs, dispatch_succeeds=True, head_status=True)
+        self.assertEqual(fn.dispatch_calls, [])
+        self.assertEqual(alerts, [])
+        self._status_probe.assert_called_once_with(
+            'Larry-Yatch/ourliberty-agent-core', '6de22a9058eb')
+
+    def test_status_error_or_failure_falls_through_to_dispatch(self):
+        # No PASS status (gh error OR a failure/REVISION status → probe False)
+        # and no recent record → fall through and rescue, NOT a permanent skip
+        # (the fail-quiet anti-pattern). The window-bounded recency guard, not
+        # this terminal status check, is what holds off an in-flight REVISION.
+        prs = [self._pr_realnow(865, 'forge/completeness-pr3-build',
+                                age_minutes=60, head='6de22a9058eb')]
+        rc, fn, saved, alerts = self._run_main(
+            prs=prs, dispatch_succeeds=True, head_status=False,
+            recent_review=None)
+        self.assertEqual(len(fn.dispatch_calls), 1)
+        self.assertEqual(alerts, [])
+
+    def test_recent_review_activity_skips_dispatch(self):
+        # A review record for the task written inside the window (incl. the
+        # -revN names the dedup never matches) = cascade mid-cycle; stand down
+        # (the 16:35Z dup: head moved while the REVISION round was in flight).
+        # recency runs BEFORE the gh status probe, so the probe isn't called.
+        prs = [self._pr_realnow(865, 'forge/completeness-pr3-build',
+                                age_minutes=60, head='668573d21e95')]
+        rc, fn, saved, alerts = self._run_main(
+            prs=prs, dispatch_succeeds=True, head_status=True,
+            recent_review='.archive/review-completeness-pr3-build-rev1.json '
+                          'written 2m ago')
+        self.assertEqual(fn.dispatch_calls, [])
+        self.assertEqual(alerts, [])
+        self._status_probe.assert_not_called()  # local recency short-circuits
+
+    def test_no_status_no_recent_record_dispatches(self):
+        # The genuine #412 orphan shape: no PASS status on the head, no review
+        # records at all → the backstop acts, exactly as before.
+        prs = [self._pr_realnow(412, 'forge/harden-x-001', age_minutes=60,
+                                head='abc123')]
+        rc, fn, saved, alerts = self._run_main(
+            prs=prs, dispatch_succeeds=True, head_status=False,
+            recent_review=None)
+        self.assertEqual(len(fn.dispatch_calls), 1)
+        self.assertEqual(alerts, [])
+
+    def test_missing_head_skips_status_probe_but_still_checks_recency(self):
+        # No headRefOid (older gh / mocks): can't consult commit statuses, but
+        # the recency guard still applies before dispatching.
+        prs = [self._pr_realnow(412, 'forge/harden-x-001', age_minutes=60)]
+        rc, fn, saved, alerts = self._run_main(
+            prs=prs, dispatch_succeeds=True, head_status=True)
+        self._status_probe.assert_not_called()
+        self._recent_probe.assert_called_once()
+        self.assertEqual(len(fn.dispatch_calls), 1)
+
 
 class TestReviewTaskInClaimed(unittest.TestCase):
     """Pure helper: is the review task present in any `.claimed/<slot>/`?"""
@@ -777,6 +852,228 @@ class TestReviewTaskInClaimed(unittest.TestCase):
         mirror = self._mirror()  # no `.claimed` created at all
         self.assertFalse(h._review_task_in_claimed(
             'review-pr-ourliberty-agent-core-910.json', mirror))
+
+
+class TestHeadHasPassingReviewStatus(unittest.TestCase):
+    """The gh combined-status probe: True only on a definitive SUCCESS
+    mirror-review status; False on a failure/absent status OR any gh error
+    (so the caller falls through to the recency guard, never a permanent skip)."""
+
+    def _run(self, *, stdout='[]', returncode=0, exc=None):
+        from unittest import mock
+        proc = mock.Mock(returncode=returncode, stdout=stdout, stderr='')
+        patcher = (
+            mock.patch.object(h.subprocess, 'run', side_effect=exc) if exc
+            else mock.patch.object(h.subprocess, 'run', return_value=proc)
+        )
+        with patcher:
+            return h.head_has_passing_review_status(
+                'Larry-Yatch/ourliberty-agent-core', '6de22a9058eb')
+
+    def test_success_state_is_true(self):
+        # jq returns the mirror-review context's states; a success → True.
+        self.assertIs(self._run(stdout='["success"]'), True)
+
+    def test_failure_state_only_is_false(self):
+        # A REVISION/ESCALATE verdict posts a failure status → not a PASS.
+        self.assertIs(self._run(stdout='["failure"]'), False)
+
+    def test_no_matching_status_is_false(self):
+        self.assertIs(self._run(stdout='[]'), False)
+
+    def test_nonzero_exit_is_false(self):
+        self.assertIs(self._run(returncode=1), False)
+
+    def test_timeout_is_false(self):
+        import subprocess as sp
+        self.assertIs(self._run(exc=sp.TimeoutExpired(cmd='gh', timeout=1)), False)
+
+    def test_garbage_stdout_is_false(self):
+        self.assertIs(self._run(stdout='not json'), False)
+        self.assertIs(self._run(stdout='{"a": 1}'), False)
+
+    def test_context_constant_matches_notifier(self):
+        # The probe filters on the exact context the notifier posts verdicts
+        # under; if the notifier's constant drifts, this healer goes blind.
+        import outbox_notifier as on
+        self.assertEqual(
+            h.MIRROR_REVIEW_STATUS_CONTEXT, on._MIRROR_REVIEW_STATUS_CONTEXT)
+
+
+class TestRecentReviewRecord(unittest.TestCase):
+    """The review-record recency scan over Mirror's inbox/.archive/.invalid."""
+
+    TASK = 'completeness-pr3-build'
+
+    def setUp(self):
+        import tempfile
+        self._tmp = tempfile.TemporaryDirectory()
+        self.inbox = Path(self._tmp.name)
+        (self.inbox / '.archive').mkdir()
+        (self.inbox / '.invalid').mkdir()
+        self.now = datetime.now(timezone.utc)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _write(self, relpath, *, age_minutes=0.0):
+        import os
+        p = self.inbox / relpath
+        p.write_text('{}')
+        ts = (self.now - timedelta(minutes=age_minutes)).timestamp()
+        os.utime(p, (ts, ts))
+        return p
+
+    def _probe(self, stem=None):
+        # recent_review_record takes the canonical review-record STEM
+        # (`review-<task>`), matching what the writer produces on disk.
+        return h.recent_review_record(
+            stem or f'review-{self.TASK}', self.inbox, self.now)
+
+    def test_empty_tree_is_none(self):
+        self.assertIsNone(self._probe())
+
+    def test_nonexistent_inbox_is_none(self):
+        self.assertIsNone(h.recent_review_record(
+            f'review-{self.TASK}', Path('/nonexistent-mirror-inbox'), self.now))
+
+    def test_fresh_archived_base_record_blocks(self):
+        self._write(f'.archive/review-{self.TASK}.json', age_minutes=5)
+        self.assertIsNotNone(self._probe())
+
+    def test_fresh_archived_rev_round_blocks(self):
+        # THE #865 record shape the head-aware dedup never matched: the
+        # revision-round file (which also recorded no head).
+        self._write(f'.archive/review-{self.TASK}-rev1.json', age_minutes=2)
+        self.assertIsNotNone(self._probe())
+
+    def test_fresh_replan_round_blocks(self):
+        self._write(f'.archive/review-{self.TASK}-replan2-rev1.json',
+                    age_minutes=2)
+        self.assertIsNotNone(self._probe())
+
+    def test_fresh_uniquified_collision_blocks(self):
+        self._write(f'.archive/review-{self.TASK}.2.json', age_minutes=2)
+        self.assertIsNotNone(self._probe())
+
+    def test_stale_archived_record_does_not_block(self):
+        self._write(f'.archive/review-{self.TASK}-rev1.json',
+                    age_minutes=h.RECENT_REVIEW_ACTIVITY_MINUTES + 30)
+        self.assertIsNone(self._probe())
+
+    def test_live_inbox_record_blocks_regardless_of_age(self):
+        # A queued review is pending no matter how long it has queued.
+        self._write(f'review-{self.TASK}-rev1.json',
+                    age_minutes=h.RECENT_REVIEW_ACTIVITY_MINUTES * 10)
+        self.assertIsNotNone(self._probe())
+
+    def test_future_mtime_blocks(self):
+        # Clock skew: a record "from the future" reads as recent (conservative).
+        self._write(f'.archive/review-{self.TASK}.json', age_minutes=-10)
+        self.assertIsNotNone(self._probe())
+
+    def test_invalid_leg_scanned(self):
+        self._write(f'.invalid/review-{self.TASK}.json', age_minutes=5)
+        self.assertIsNotNone(self._probe())
+
+    def test_sibling_task_prefix_does_not_block(self):
+        # A DIFFERENT task whose id starts with this one must not hold the
+        # backstop off this task's PR.
+        self._write(f'.archive/review-{self.TASK}-extra-leg.json',
+                    age_minutes=2)
+        self.assertIsNone(self._probe())
+
+    def test_rev_without_digits_does_not_block(self):
+        # `-revamp` is a sibling task name, not a revision round.
+        self._write(f'.archive/review-{self.TASK}-revamp.json', age_minutes=2)
+        self.assertIsNone(self._probe())
+
+    def test_lost_result_subdir_not_scanned(self):
+        # .archive/.lost-result/ redispatch pacing belongs to the shared dedup
+        # predicate (debounce + cap); this scan must not double-gate it.
+        lost = self.inbox / '.archive' / '.lost-result'
+        lost.mkdir()
+        self._write(f'.archive/.lost-result/review-{self.TASK}.json',
+                    age_minutes=2)
+        self.assertIsNone(self._probe())
+
+    def test_canonical_stem_matches_sanitized_on_disk_name(self):
+        # A task_id with a path-structural byte is written under its SANITIZED
+        # name (canonical_inbox_name turns `/` → `-`), so the recency scan must
+        # be given the canonical stem — the exact name on disk — or it goes
+        # blind while the cascade is mid-cycle (the #865 class for exotic ids).
+        import safe_write_inbox
+        raw_task = 'foo/bar'
+        stem = safe_write_inbox.canonical_inbox_name(f'review-{raw_task}.json')
+        stem = stem[:-len('.json')] if stem.endswith('.json') else stem
+        self.assertEqual(stem, 'review-foo-bar')  # sanitized on write
+        self._write(f'.archive/{stem}-rev1.json', age_minutes=2)
+        # Probing with the canonical stem finds it; the raw stem would not.
+        self.assertIsNotNone(self._probe(stem=stem))
+        self.assertIsNone(self._probe(stem=f'review-{raw_task}'))
+
+
+class TestPipelineBackoffReason(unittest.TestCase):
+    """pipeline_backoff_reason: local checks (active review, recency) before the
+    gh status probe; only a genuine orphan (no signal anywhere) returns None."""
+
+    def setUp(self):
+        import tempfile
+        self._tmp = tempfile.TemporaryDirectory()
+        self.inbox = Path(self._tmp.name)
+        self.now = datetime.now(timezone.utc)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _pr(self, *, head='abc123', repo='Larry-Yatch/ourliberty-agent-core'):
+        return {'number': 865, 'task_id': 'completeness-pr3-build',
+                '_repo': repo, 'headRefOid': head}
+
+    def _run(self, pr, *, live=(False, ''), recent=None, passing=False):
+        from unittest import mock
+        with mock.patch.object(h.pipeline_live_state, 'pr_review_in_progress',
+                               return_value=live) as live_p, \
+                mock.patch.object(h, 'recent_review_record',
+                                  return_value=recent) as rec_p, \
+                mock.patch.object(h, 'head_has_passing_review_status',
+                                  return_value=passing) as pass_p:
+            result = h.pipeline_backoff_reason(
+                pr, self.inbox, 'review-completeness-pr3-build', self.now)
+        return result, live_p, rec_p, pass_p
+
+    def test_active_review_backs_off_without_touching_recency_or_gh(self):
+        r, live_p, rec_p, pass_p = self._run(
+            self._pr(), live=(True, 'live_pid'))
+        self.assertIn('active review', r)
+        rec_p.assert_not_called()   # short-circuits before local recency
+        pass_p.assert_not_called()  # and before the gh probe
+
+    def test_recent_record_backs_off_without_touching_gh(self):
+        r, live_p, rec_p, pass_p = self._run(
+            self._pr(), recent='.archive/review-...-rev1.json written 2m ago')
+        self.assertIn('recent review record', r)
+        pass_p.assert_not_called()  # local recency short-circuits the gh probe
+
+    def test_passing_status_backs_off(self):
+        r, *_ = self._run(self._pr(), passing=True)
+        self.assertIn('passing mirror-review status', r)
+
+    def test_no_signal_is_orphan(self):
+        r, *_ = self._run(self._pr(), passing=False)
+        self.assertIsNone(r)
+
+    def test_missing_repo_skips_gh_probe(self):
+        pr = self._pr(repo=None)
+        r, live_p, rec_p, pass_p = self._run(pr, passing=True)
+        pass_p.assert_not_called()  # no repo → never guess one for the probe
+        self.assertIsNone(r)
+
+    def test_missing_head_skips_gh_probe(self):
+        pr = self._pr(head=None)
+        r, live_p, rec_p, pass_p = self._run(pr, passing=True)
+        pass_p.assert_not_called()
+        self.assertIsNone(r)
 
 
 if __name__ == '__main__':

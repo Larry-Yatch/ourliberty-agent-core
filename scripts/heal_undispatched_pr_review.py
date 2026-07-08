@@ -36,6 +36,27 @@ noticed. This healer now also routes any *non-draft* PR carrying the
 `auto-review` label to a Mirror review, exactly like a Forge PR (a Mirror PASS
 auto-merges).
 
+GROUND-TRUTH BACK-OFF (the PR #865 triple-dispatch, 2026-07-08):
+
+The head-aware dedup alone proved too eager on a PR mid-pipeline. Between a
+review's dispatch and its verdict the head keeps moving (build checkpoints,
+revision pushes), so "no archived review record carries the CURRENT head" is
+true for long stretches of a perfectly healthy review cascade — and the
+revision-round records (`review-<task>-rev<N>.json`) recorded no head at all.
+This healer fired three times in 40 minutes for one task; the third dispatch
+re-reviewed a head that already carried a PASS `mirror-review` commit status
+and overwrote the merged PR's findings comment with a stale REVISION.
+`pipeline_backoff_reason` now runs before any dispatch (local checks first, gh
+last): an active Mirror session, a recent review record of ANY round shape
+(dispatch-time window), or a SUCCESS `mirror-review` status on the current head
+each mean the pipeline owns the PR. A failure status or a gh error falls
+through to the window-bounded recency guard rather than permanently exempting
+the PR — only a definitive PASS terminally backs off (re-reviewing a PASS is
+the exact #865 harm). Companion notifier fixes: re-review dispatches record the
+head they cover, and the shared `review_record_name_re` grammar (reused here)
+teaches the dedup predicate — archive, live-inbox, AND lost-result legs — the
+revision-round filenames.
+
 Why a LABEL and not a branch rule: neither branch prefix nor PR author can
 separate Larry's hand-opened PRs from the agent team's. The team commits as
 Larry's own GitHub identity and uses the very same prefixes (`fix/`, `feat/`,
@@ -99,6 +120,7 @@ prefix `undispatched-pr-review`), enforced by the translation-coverage gate
 """
 from __future__ import annotations
 
+import glob
 import json
 import os
 import subprocess
@@ -175,6 +197,28 @@ DISPATCH_GRACE_MINUTES = 10
 # (the dedup is head-SHA-aware), so the downside of being slightly eager is one
 # re-review cycle, not a wrong merge.
 HAND_PR_GRACE_MINUTES = 3
+# Ground-truth back-off window (the PR #865 triple-dispatch, 2026-07-08). Any
+# review-task record for the task — including the revision-round names the
+# exact-name dedup never matches — with an mtime younger than this means the
+# review cascade is actively working the PR, so the backstop stands down.
+#
+# Anchored on DISPATCH time, not verdict time: inbox_watcher archives a review
+# task by a plain rename, which preserves the file's original (dispatch-time)
+# mtime. So the interval this window must span is dispatch → NEXT-round
+# dispatch, which includes the verdict AND the whole Forge revision run before
+# the re-review is dispatched — far longer than the ~25-40min dispatch→verdict
+# gap. Sized well above a full revision cycle (a REVISION whose Forge run runs
+# long, plus routing lag — the very lag this healer exists to tolerate) so a
+# healthy-but-slow cascade is never mistaken for an orphan (the #865 shape). A
+# genuinely orphaned PR (the #412 shape) has NO review records at all, so a
+# generous window delays nothing on the actual rescue path; a cascade that DIES
+# mid-cycle is still rescued one window later.
+RECENT_REVIEW_ACTIVITY_MINUTES = 180
+# Commit-status context the notifier posts every Mirror verdict under. MUST
+# stay in sync with outbox_notifier._MIRROR_REVIEW_STATUS_CONTEXT (a test
+# asserts the two are equal). A SUCCESS status with this context on a PR's
+# CURRENT head is GitHub-truth that the head already has a passing review.
+MIRROR_REVIEW_STATUS_CONTEXT = 'mirror-review'
 # Keep the failure ledger from growing without bound.
 MAX_FAILED_LEDGER = 200
 
@@ -400,6 +444,145 @@ def parse_open_prs(raw_json: str, repo: Optional[str] = None) -> list[dict[str, 
             '_repo': repo,
         })
     return out
+
+
+def head_has_passing_review_status(repo: str, head_sha: str) -> bool:
+    """Does this exact head carry a SUCCESS `mirror-review` commit status?
+
+    GitHub-side ground truth the pipeline itself writes:
+    `outbox_notifier._post_mirror_review_commit_status` posts one status per
+    Mirror verdict (PASS → success; REVISION / ESCALATE / HALT → failure). A
+    SUCCESS status on the CURRENT head means this head already PASSED — the PR
+    is not orphaned, it is waiting on auto-merge (possibly held on an overlap),
+    and re-reviewing it is exactly the harm the PR #865 incident showed (a
+    re-review of a PASSed head returned REVISION and left a stale red verdict
+    on a merged PR).
+
+    Returns True ONLY on a definitively observed success. Everything else —
+    a failure status (an in-flight REVISION round, which the window-bounded
+    recency check already covers, and a dead cascade must stay rescuable), no
+    status yet, OR any gh error — returns False, so the caller falls through to
+    the recency guard rather than permanently exempting the PR from rescue
+    (avoiding the fail-quiet 'healer looks healthy while doing nothing'
+    anti-pattern). One cheap combined-status call."""
+    cmd = [
+        'gh', 'api', f'repos/{repo}/commits/{head_sha}/status',
+        '--jq', f'[.statuses[] | select(.context=="{MIRROR_REVIEW_STATUS_CONTEXT}") '
+                f'| .state]',
+    ]
+    try:
+        proc = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=GH_TIMEOUT_S,
+        )
+    except (subprocess.TimeoutExpired, OSError) as e:
+        log(f'gh commit-status ({repo}@{head_sha[:12]}) failed: '
+            f'{type(e).__name__}: {e}', 'WARN')
+        return False
+    if proc.returncode != 0:
+        log(f'gh commit-status ({repo}@{head_sha[:12]}) returned '
+            f'{proc.returncode}: {proc.stderr.strip()[:200]}', 'WARN')
+        return False
+    try:
+        states = json.loads(proc.stdout or '[]')
+    except (json.JSONDecodeError, ValueError):
+        return False
+    return isinstance(states, list) and 'success' in states
+
+
+def recent_review_record(
+    review_stem: str,
+    mirror_inbox: Path,
+    now: datetime,
+    window_minutes: int = RECENT_REVIEW_ACTIVITY_MINUTES,
+) -> Optional[str]:
+    """Reason string when the review pipeline holds a recent record for this
+    task that should keep the backstop off; None when the task looks genuinely
+    orphaned. `review_stem` is the CANONICAL review filename stem the writer
+    produced — `canonical_inbox_name('review-<task>.json')` minus `.json` — so
+    a task_id that `sanitize_component` rewrites (e.g. a `/` in the id) is
+    matched under its real on-disk name, not the raw form.
+
+    Scans Mirror's inbox + `.archive/` + `.invalid/` for ALL of the task's
+    review-record shapes via `outbox_notifier.review_record_name_re` — the
+    SAME name grammar the head-aware dedup uses, so the two can't disagree
+    about which records exist (the drift that caused #865, where the `-rev<N>`
+    round names were invisible to one scanner). `.archive/.lost-result/` is NOT
+    descended into (glob is non-recursive): died-verdictless re-dispatch pacing
+    is owned by the dedup predicate's debounce+cap, not this time window.
+
+    - a matching file LIVE in the inbox blocks regardless of age (a queued
+      review is pending no matter how long it has queued);
+    - a matching `.archive/` / `.invalid/` record blocks only while its mtime
+      (= dispatch time; archive is a plain rename) is younger than
+      `window_minutes`. A future mtime (clock skew) also blocks: conservative.
+
+    Fail-open per directory: an unreadable dir/entry is skipped, so an fs
+    hiccup can only make the backstop MORE willing to dispatch (its default
+    posture), never wedge it."""
+    import outbox_notifier  # grammar owner; already imported by main() by now
+    name_re = outbox_notifier.review_record_name_re(review_stem)
+    glob_pat = f'{glob.escape(review_stem)}*.json'
+    for sub in ('', '.archive', '.invalid'):
+        d = mirror_inbox / sub if sub else mirror_inbox
+        try:
+            entries = d.glob(glob_pat)
+        except OSError:
+            continue
+        for p in entries:
+            if not name_re.fullmatch(p.name):
+                continue
+            if not sub:
+                return f'{p.name} still queued in Mirror inbox'
+            try:
+                mtime = datetime.fromtimestamp(
+                    p.stat().st_mtime, tz=timezone.utc,
+                )
+            except OSError:
+                continue
+            age_min = (now - mtime).total_seconds() / 60.0
+            if age_min <= window_minutes:
+                return f'{sub}/{p.name} written {max(0, int(age_min))}m ago'
+    return None
+
+
+def pipeline_backoff_reason(
+    pr: dict[str, Any],
+    mirror_inbox: Path,
+    review_stem: str,
+    now: datetime,
+) -> Optional[str]:
+    """Reason to NOT dispatch a backstop review — the review pipeline already
+    owns this PR — or None if it looks genuinely orphaned (the #412 shape).
+
+    Local checks FIRST, gh LAST, so a mid-cascade PR (the common false-orphan)
+    backs off with zero gh round-trips:
+      1. an active Mirror session for the PR (live claude proc / inbox task);
+      2. a recent review record for the task (any round shape, dispatch-time
+         window) — catches a healthy cascade whose head has moved since its
+         review was dispatched (the exact #865 head-drift the head-keyed dedup
+         misses);
+      3. a SUCCESS `mirror-review` status on the CURRENT head — a PASS merely
+         held/unmerged, which must never be re-reviewed. Failure / absent / gh
+         error fall through to a real dispatch, gated by (2)."""
+    repo_short = _repo_segment(pr.get('_repo') or '')
+    live, live_reason = pipeline_live_state.pr_review_in_progress(
+        repo_short, pr['number'],
+    )
+    if live:
+        return f'active review ({live_reason})'
+    recent = recent_review_record(review_stem, mirror_inbox, now)
+    if recent:
+        return f'recent review record — {recent}'
+    # gh, last. Only probe with the PR's OWN repo (never guess a fallback: a
+    # wrong-repo status query 404s → False anyway, but the guess could also
+    # false-match a same-SHA commit in the other repo). Missing repo/head →
+    # skip the probe and fall through (recency already had its say).
+    repo = pr.get('_repo')
+    head_sha = pr.get('headRefOid')
+    if repo and isinstance(head_sha, str) and head_sha:
+        if head_has_passing_review_status(repo, head_sha):
+            return f'passing mirror-review status on {head_sha[:12]}'
+    return None
 
 
 # -------------------- core detection (pure) --------------------
@@ -671,10 +854,40 @@ def main() -> int:
     log(f'scanned {len(open_prs)} open PR(s); {len(orphaned)} reviewable PR(s) '
         f'(Forge + non-draft auto-review) past grace with no Mirror review')
 
+    mirror_inbox = safe_write_inbox.INBOXES_ROOT / 'mirror'
     dry_run = not healer_enabled()
     dispatched = 0
     for pr in orphaned:
         url = str(pr['url']).rstrip('/')
+
+        # Ground-truth back-off (the PR #865 triple-dispatch, 2026-07-08).
+        # Between a review's dispatch and its verdict the PR head keeps moving
+        # (build + revision pushes), so the head-keyed dedup in select_orphaned
+        # reports "current head never reviewed" for long stretches of a
+        # perfectly healthy review cascade — this healer fired three times in
+        # 40min for ONE task, the third re-reviewing a head that already carried
+        # a PASS status and overwriting the merged PR's findings comment with a
+        # stale REVISION. `pipeline_backoff_reason` consults the records the
+        # pipeline itself writes (active session, recent review record of any
+        # round shape, a PASS commit status on the current head) so a
+        # mid-cascade PR is left alone. Evaluated BEFORE the dry-run branch so a
+        # dry-run tick reports exactly what a live tick would do (no phantom
+        # "would dispatch" for a PR the guards protect). Local checks run before
+        # any gh call, so the common false-orphan skips with zero round-trips.
+        review_stem = safe_write_inbox.canonical_inbox_name(
+            f'review-{pr["task_id"]}.json'
+        )
+        review_stem = (
+            review_stem[:-len('.json')]
+            if review_stem.endswith('.json') else review_stem
+        )
+        backoff = pipeline_backoff_reason(pr, mirror_inbox, review_stem, now)
+        if backoff:
+            log(f'PIPELINE_BACKOFF PR #{pr["number"]} task={pr["task_id"]} '
+                f'pr={url} — {backoff}; review pipeline owns this PR, not '
+                f'dispatching', 'INFO')
+            continue
+
         if dry_run:
             log(f'[dry-run] would dispatch Mirror review for PR #{pr["number"]} '
                 f'(task={pr["task_id"]}, {url})', 'WARN')
@@ -695,26 +908,6 @@ def main() -> int:
                 log(f'PR #{pr["number"]} no longer open (merged/closed since '
                     f'listing); skipping review dispatch', 'INFO')
                 continue
-
-        # Active-review guard (shared with heal_pipeline_stall via #716's probe,
-        # now the canonical pipeline_live_state.pr_review_in_progress). The
-        # `_already_dispatched` predicate above keys off the inbox TASK FILE,
-        # which Mirror MOVES out of its inbox the instant it picks the review up
-        # — so a review that is actively RUNNING (claude proc live in its
-        # `wt-mirror-pr-<repo>-<num>` worktree) no longer has an inbox file and
-        # would pass `_already_dispatched`, letting this backstop re-dispatch a
-        # duplicate review of a PR already mid-review. The probe catches that
-        # live-proc case. Fail-safe: it returns (False,'') on any error, so a
-        # probe hiccup never blocks a legitimate dispatch.
-        repo_short = _repo_segment(pr.get('_repo') or '')
-        review_live, live_reason = pipeline_live_state.pr_review_in_progress(
-            repo_short, pr['number'],
-        )
-        if review_live:
-            log(f'ACTIVE_REVIEW_SKIP task={pr["task_id"]} reason={live_reason} '
-                f'pr={url} — Mirror review already in progress; not re-dispatching',
-                'INFO')
-            continue
 
         log(f'ORPHANED_PR_REVIEW PR #{pr["number"]} task={pr["task_id"]} '
             f'pr={url} — no Mirror review dispatched; dispatching backstop review',

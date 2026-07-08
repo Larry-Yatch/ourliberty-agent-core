@@ -4400,6 +4400,29 @@ def _extract_pr_url_from_build_result(result_text: str) -> Optional[str]:
     return urls[0]
 
 
+def review_record_name_re(stem: str) -> 're.Pattern[str]':
+    """Compiled matcher for EVERY on-disk review-record filename the pipeline
+    files for the review-task stem `stem` (e.g. `review-<task_id>`):
+
+      - the base            `<stem>.json`
+      - `move_to()` collisions `<stem>.<i>.json`
+      - revision rounds     `<stem>-rev<N>.json`      (+ `.<i>`)
+      - replan rounds       `<stem>-replan<P>.json`   (+ `.<i>`)
+      - replan+revision     `<stem>-replan<P>-rev<N>.json` (+ `.<i>`)
+
+    ONE grammar, so the head-aware dedup, its lost-result debounce leg, and the
+    heal-undispatched-pr-review recency scan can't disagree about which records
+    exist — the exact divergence that caused the PR #865 triple-dispatch, where
+    the rev-round names were invisible to one scanner. `stem` is `re.escape`d, so
+    a task_id carrying regex/glob metacharacters matches only its own records.
+    Callers use `.fullmatch`. The heal-undispatched-pr-review healer imports and
+    reuses this (a cross-file behavior-sync test pins the two call sites)."""
+    return re.compile(
+        re.escape(stem)
+        + r'(?:-replan\d+)?(?:-rev\d+)?(?:\.\d+)?\.json$'
+    )
+
+
 def _recorded_review_head_sha(path: Path) -> Optional[str]:
     """Read the `head_sha` a review-request was dispatched for, or None.
 
@@ -4457,12 +4480,13 @@ def _review_request_already_dispatched(
     THAT head. A review of an older head no longer blocks re-review of new
     commits — the gap that left a PR pushed-after-its-first-review stuck
     forever (the dedup keyed on task-id, not commit, so commits after the first
-    reviewed head never got re-reviewed). A LIVE review in the inbox still
-    blocks regardless of head — Mirror is actively on it; never pile on.
-    Callers that pass None (the reconcile sweep) keep the exact prior
-    existence-only behavior. `move_to()` uniquifies archive collisions as
+    reviewed head never got re-reviewed). A LIVE review with THIS EXACT
+    filename in the inbox still blocks regardless of head — Mirror is actively
+    on it; never pile on — and a live round record covering the current head
+    blocks too. Callers that pass None (the reconcile sweep) keep the exact
+    prior existence-only behavior. `move_to()` uniquifies archive collisions as
     `<stem>.<i><suffix>`, so a task accrues one archived copy per reviewed head
-    — all are scanned for a head match.
+    — all round shapes are scanned for a head match via `review_record_name_re`.
 
     Died-verdictless recovery (2026-07-07, post-#850): a same-head envelope in
     `.archive/.lost-result/` — inbox_watcher's POSITIVE marker that the run's
@@ -4490,37 +4514,46 @@ def _review_request_already_dispatched(
             or (mirror_inbox / '.invalid' / review_filename).exists()
         )
     # Head-aware: a prior review counts only if it covered the current head.
+    # ONE name grammar (`review_record_name_re`) covers the base name, the
+    # `move_to()` `.<i>` uniquifier, AND the `-rev<N>` / `-replan<P>` round
+    # names — the round names are the exact records the PR #865 triple-dispatch
+    # scan was blind to (a re-review that PASSed the current head was invisible,
+    # so the backstop re-reviewed an already-verdicted head). Regex-`fullmatch`
+    # over a single `<stem>*` glob (not a bare glob) so a sibling task whose id
+    # merely starts with this stem (`review-<task>-extra.json`) can't false-
+    # match; `glob.escape`/`re.escape` so glob/regex metacharacters in a task_id
+    # match only its own records. The LIVE inbox (`''`) is scanned too: a queued
+    # round record (rev or base) that covers the current head means a review of
+    # THIS head is already pending, so an inline re-process must not queue a
+    # duplicate alongside it.
     stem = (
         review_filename[:-len('.json')]
         if review_filename.endswith('.json') else review_filename
     )
-    for sub in ('.archive', '.invalid'):
-        d = mirror_inbox / sub
+    name_re = review_record_name_re(stem)
+    glob_pat = f'{glob.escape(stem)}*.json'
+    for sub in ('', '.archive', '.invalid'):
+        d = mirror_inbox / sub if sub else mirror_inbox
         if not d.exists():
             continue
-        # The exact name plus the `<stem>.<i>.json` uniquified collisions.
-        # glob.escape so a task_id with glob metacharacters can't turn the
-        # variant scan into a character class (which would miss its own
-        # archives → re-dispatch storm) or match a sibling task.
-        candidates = [
-            d / review_filename,
-            *sorted(d.glob(f'{glob.escape(stem)}.*.json')),
-        ]
-        for p in candidates:
-            if p.exists() and _recorded_review_head_sha(p) == current_head_sha:
+        for p in d.glob(glob_pat):
+            if (name_re.fullmatch(p.name)
+                    and _recorded_review_head_sha(p) == current_head_sha):
                 return True
     # No live/archived/.invalid envelope covers this head. A same-head
     # LOST-RESULT envelope (run happened, outbox unpersistable, verdict lost)
     # deliberately does not dedup — but it debounces and caps the re-dispatch.
+    # Scanned with the SAME name grammar so a lost RE-REVIEW round
+    # (`<stem>-rev<N>.json`) is paced by the debounce + attempts cap too — else
+    # a repeatedly-dying rerun round would re-dispatch with no bound (the round
+    # names were taught to the archive scan above but not, originally, here).
     lost_dir = mirror_inbox / '.archive' / safe_write_inbox.LOST_RESULT_SUBDIR
     if not lost_dir.exists():
         return False
     lost = [
-        p for p in (
-            lost_dir / review_filename,
-            *sorted(lost_dir.glob(f'{glob.escape(stem)}.*.json')),
-        )
-        if p.exists() and _recorded_review_head_sha(p) == current_head_sha
+        p for p in lost_dir.glob(glob_pat)
+        if name_re.fullmatch(p.name)
+        and _recorded_review_head_sha(p) == current_head_sha
     ]
     if not lost:
         return False
@@ -6109,23 +6142,33 @@ def _dispatch_mirror_review_rerun(
         )
         return
 
+    # Resolve the PR's CURRENT head once, up front — used both to gate the
+    # deep-review-hold suppression AND to stamp the record this re-review
+    # covers. The envelope's carried `head_sha` predates Forge's revision push,
+    # so it is NOT the head this re-review will look at; always prefer a fresh
+    # gh lookup and fall back to the (stale) envelope head only when gh can't
+    # resolve one (best-effort — an unresolvable head is fine, see below).
+    _rerun_coords = _parse_pr_url(pr_url)
+    _current_head = (
+        _gh_pr_head_sha(_rerun_coords[0], _rerun_coords[1])
+        if _rerun_coords is not None else None
+    )
+    if not _current_head:
+        _env_head = data.get('head_sha')
+        _current_head = _env_head if isinstance(_env_head, str) and _env_head else None
+
     # Deep-review-hold suppression (review-dispatch-post-auto-merge-held) — the
     # re-review sibling of the guard in `_dispatch_mirror_review`. If this PR is
-    # parked in AUTO_MERGE_HELD_DEEP_REVIEW at this SAME head, a re-review only
-    # re-PASSes and re-arms the merge gate. Unlike the first-review path, this
-    # fn doesn't already carry the head — prefer one on the envelope, else
-    # resolve it via gh (best-effort; None simply won't suppress, fail-OPEN).
-    _rerun_head = data.get('head_sha')
-    if not (isinstance(_rerun_head, str) and _rerun_head):
-        _rerun_coords = _parse_pr_url(pr_url)
-        _rerun_head = (
-            _gh_pr_head_sha(_rerun_coords[0], _rerun_coords[1])
-            if _rerun_coords is not None else None
-        )
-    if _deep_review_hold_suppresses_dispatch(pr_url, _rerun_head):
+    # parked in AUTO_MERGE_HELD_DEEP_REVIEW at the head this re-review targets, a
+    # re-review only re-PASSes and re-arms the merge gate. Gate on the FRESH head
+    # (not the stale envelope head — else a hold recorded at the pre-revision
+    # head would wrongly suppress a re-review of the new pushed head, the exact
+    # case test_new_head_rereview_allowed_and_clears guards). None simply won't
+    # suppress (fail-OPEN).
+    if _deep_review_hold_suppresses_dispatch(pr_url, _current_head):
         log(
             f'MIRROR_REVIEW_SUPPRESSED_DEEP_REVIEW_HELD task={task_id} '
-            f'pr={pr_url} head={_rerun_head} round={round_num} — PR is held '
+            f'pr={pr_url} head={_current_head} round={round_num} — PR is held '
             f'for /code-review high at this head; not re-dispatching a review',
             'INFO',
         )
@@ -6139,6 +6182,15 @@ def _dispatch_mirror_review_rerun(
         'max_revisions': max_revisions,
         'dispatched_by': 'outbox-notifier',
     }
+    # Record the PR head this re-review covers — the rerun sibling of the
+    # round-0 `review_base['head_sha']` stamp above (the PR #865 triple-dispatch,
+    # 2026-07-08: rerun records carried NO head, so `_recorded_review_head_sha`
+    # returned None, the head-aware dedup treated a PASSed re-review as covering
+    # no head, and the undispatched-PR backstop re-dispatched a duplicate review
+    # of an already-verdicted head). Best-effort — an unresolvable head
+    # dispatches without the field (exact prior behavior).
+    if _current_head:
+        review_base['head_sha'] = _current_head
     if branch:
         review_base['branch'] = branch
     # M-8 second-pass fix: also propagate previous_findings forward so the
