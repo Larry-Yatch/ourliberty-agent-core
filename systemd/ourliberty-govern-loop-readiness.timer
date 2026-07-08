@@ -1,0 +1,15 @@
+[Unit]
+Description=Run the slice-7 kickoff trip-wire daily (readiness = ledger thickness, not a calendar date)
+
+[Timer]
+# Daily at 07:00 Larry-local (same named-zone convention as the ceo-digest
+# timers) — after the 05:30 rank-brain pass and the 06:00 digest, so a
+# ready-day nudge arrives while Larry is already looking at the morning
+# surfaces. Weekly re-nudge cadence lives in the module, not here.
+OnCalendar=*-*-* 07:00:00 America/Denver
+Persistent=true
+RandomizedDelaySec=300
+Unit=ourliberty-govern-loop-readiness.service
+
+[Install]
+WantedBy=timers.target
