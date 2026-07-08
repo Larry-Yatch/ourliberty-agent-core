@@ -28,7 +28,17 @@ StandardError=journal
 SyslogIdentifier=ourliberty-inbox-watcher
 
 # Hardening
-NoNewPrivileges=true
+# NoNewPrivileges is deliberately DISABLED here (2026-07-08). The regression
+# gate's test-isolation wall (scripts/test_isolation_wall.py) relies on
+# setuid-root bwrap to build its read-only namespace, because this droplet
+# restricts unprivileged user namespaces (kernel.apparmor_restrict_unprivileged_userns=1).
+# NoNewPrivileges=true makes the kernel ignore bwrap's setuid bit, so bwrap fails
+# ("setting up uid map: Permission denied") and the wall silently falls open —
+# tests then cross-contaminate the real ~/agents/logs and the gate emits false
+# BLOCK verdicts on clean PRs. The wall is itself the containment we want, so it
+# takes priority over NNP for this dispatch service. Proven: `setpriv --no-new-privs
+# bwrap --dev-bind / / --ro-bind ~/agents ~/agents -- /bin/true` fails; without it, passes.
+NoNewPrivileges=false
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
