@@ -7492,7 +7492,28 @@
         "at": "2026-07-08T07:58:12.464923+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-08T08:10:11.491286+00:00",
+      "retired_reason": "orphan-terminal"
+    },
+    {
+      "id": "proposed-xiv-b-alert-write-back-spec-001",
+      "name": "Xiv B Alert Write Back Spec 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `xiv-b-alert-write-back-spec-001`. Last activity 2026-07-08T07:56:59.192264+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "xiv-b-alert-write-back-spec-001"
+      ],
+      "repo": null,
+      "created": "2026-07-08",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-08T08:10:11.491286+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-08T07:56:59.192264+00:00"
     }
   ]
 }
