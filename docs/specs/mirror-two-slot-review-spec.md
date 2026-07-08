@@ -113,6 +113,16 @@ identity, same routing. N comes from config; default 1 (inert).
 - **Lost-verdict class.** The .lost-result / reap-before-harvest fixes (#850,
   #857) are per-session and carry over per-slot; PR2 verifies the marker paths
   are slot-safe (no shared marker filename).
+- **Global claude-process semaphore.** `scripts/concurrency_guard.py`
+  (ConcurrencyGuard, shelf card `concurrency_guard`) caps TOTAL concurrent
+  claude processes at 6, sized by RAM math (6×400MB on the 7.8GB VM). A second
+  concurrent review permanently draws one more global slot at burst time,
+  competing with Beacon/Forge/Pulse. PR3 verification: confirm guard headroom
+  under 2-slot burst (guard `active_count` never pins at 6 / no acquire
+  starvation for the bots). If tight, redo the RAM math before raising the
+  ceiling — the guard deliberately refuses env-var raises.
+  (Shelf consult also flagged `atomic_io` — reuse its write-temp-then-rename
+  helper for the claim-dir sweep bookkeeping rather than hand-rolling.)
 
 ## 6. Activation gate + rollout
 
