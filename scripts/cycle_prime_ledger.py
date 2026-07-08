@@ -451,6 +451,59 @@ def promote_verification_pending(
     )
 
 
+def expired_unpromoted_verification_pending(
+    *,
+    now: Optional[datetime] = None,
+    rows: Optional[list[dict[str, Any]]] = None,
+    window_days: int = PROMOTE_WINDOW_DAYS,
+) -> list[dict[str, Any]]:
+    """The Decision II rows that expired silently: ``verification_pending`` rows
+    whose verifying signal never arrived inside ``window_days`` and which were
+    never promoted to a ``systemic_fix``.
+
+    ``promote_verification_pending`` only fires WITHIN the window; a row that
+    ages past it just stops being promotable and otherwise vanishes from every
+    surface. G5 (spec § 1(c)) surfaces these exactly once in the weekly
+    retrospective. This query is the deterministic producer — it is pure (no IO
+    when ``rows`` is supplied) and idempotency (surface-once) is the caller's
+    concern.
+
+    Grouped by ``intervention_id`` (one entry per id — the LATEST pending row
+    for that id), so a re-verification attempt that is still within the window
+    keeps the id off the expired list. Ordered oldest-first by ts.
+    """
+    if now is None:
+        now = datetime.now(timezone.utc)
+    if rows is None:
+        rows = _read_rows()
+
+    cutoff = now - timedelta(days=window_days)
+    promoted_ids = {
+        r.get('intervention_id') for r in rows
+        if r.get('kind') == 'systemic_fix' and r.get('intervention_id')
+    }
+
+    latest_pending: dict[str, dict[str, Any]] = {}
+    for r in rows:
+        if r.get('kind') != 'verification_pending':
+            continue
+        iid = r.get('intervention_id')
+        if not isinstance(iid, str) or not iid or iid in promoted_ids:
+            continue
+        ts = _parse_ts(r.get('ts'))
+        if ts is None:
+            continue
+        prev = latest_pending.get(iid)
+        prev_ts = _parse_ts(prev.get('ts')) if prev else None
+        if prev_ts is None or ts > prev_ts:
+            latest_pending[iid] = r
+
+    out = [r for r in latest_pending.values()
+           if (_parse_ts(r.get('ts')) or now) < cutoff]
+    out.sort(key=lambda r: _parse_ts(r.get('ts')) or now)
+    return out
+
+
 # -------------------- CLI --------------------
 
 

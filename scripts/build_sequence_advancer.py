@@ -122,6 +122,20 @@ GATE_MISMATCH_TIMEOUT_SEC = 30 * 60
 # Tunable; see spec launch-repo-validation-and-silent-wedge.md § 3 Layer C.
 DISPATCH_STALL_TIMEOUT_SEC = 4 * 60 * 60
 
+# Wall-clock backstop for the WITH-PR wedge (completeness-pr2 Face 2 /
+# sequence-step-stall-recovery Fix B). A step that opened a PR and then wedged
+# in review — Mirror never reviewed, or her REVISION dead-lettered (the #532
+# shape) — otherwise has NO timeout ever: the no-PR stall guard above short-
+# circuits on `and not step.get('pr_url')`, and the pre-check that records
+# `pr_url` on detecting an open PR then permanently suppresses re-escalation.
+# This closes that permanently-unmonitored state. Set generously (6h) vs. the
+# ~1h typical review round so a healthy long review is never disturbed; a step
+# still `dispatched` with a live-but-unmerged PR past this has a demonstrably
+# dead review loop and its review is re-dispatched (recover-then-alert).
+# Distinct from the 4h no-PR DISPATCH_STALL_TIMEOUT_SEC — different failure
+# mode, different (longer) horizon. Tunable.
+REVIEW_STALL_TIMEOUT_SEC = 6 * 60 * 60
+
 # Bounded subprocess timeout for `gh pr view`. The CLI usually responds in
 # under a second; 30s gives the network layer wide headroom without
 # letting a wedged subprocess block the entire tick.
@@ -1608,6 +1622,220 @@ def _escalate_stranded_dispatched_steps(
     return False
 
 
+# -------------------- with-PR review-stall recovery (Face 2 / Fix B) --------------------
+
+
+def _review_stall_already_handled(
+    sequence: dict[str, Any], step_id: str, dispatched_at: Any,
+) -> bool:
+    """True iff this wedged `(step_id, dispatched_at)` epoch was already
+    recover-or-routed — a `step-review-redispatched` or `step-review-stall-
+    alerted` audit entry names the SAME step_id AND the SAME dispatched_at.
+
+    Keyed on dispatched_at so a fresh dispatch (a `retry`, which clears
+    dispatched_at then re-stamps it) re-arms, while the same wedged dispatch is
+    handled ONCE per epoch — not re-dispatched/alerted every tick."""
+    for entry in sequence.get('audit_log') or []:
+        if not isinstance(entry, dict):
+            continue
+        if entry.get('event') not in (
+            'step-review-redispatched', 'step-review-stall-alerted',
+        ):
+            continue
+        if entry.get('step_id') == step_id and \
+                entry.get('dispatched_at') == dispatched_at:
+            return True
+    return False
+
+
+def _gh_pr_open(pr_url: str) -> Optional[bool]:
+    """True iff gh reports the PR `OPEN`; False for MERGED/CLOSED; None if the
+    state couldn't be determined (gh timeout / auth / network). Distinct from
+    `gh_pr_says_merged` because the review-stall pass must tell OPEN (act) apart
+    from CLOSED-unmerged (skip — terminal, not our stall)."""
+    if not pr_url:
+        return None
+    data = tts.gh_json(
+        ['gh', 'pr', 'view', pr_url, '--json', 'state'],
+        timeout=GH_PR_VIEW_TIMEOUT_SEC,
+    )
+    if not isinstance(data, dict) or data.get('state') is None:
+        return None
+    return data.get('state') == 'OPEN'
+
+
+def _redispatch_review_for_wedged_step(
+    step_id: str, target_repo: Any, pr_url: str, pr_title: Any,
+    logger: logging.Logger,
+) -> bool:
+    """Fix B recovery (`sequence-step-stall-recovery.md` §4): re-dispatch a
+    Mirror review of the wedged PR via the notifier's canonical, presence-gated
+    `_dispatch_mirror_review`. Re-priming the review from durable PR state
+    reconstructs the whole review→revision loop idempotently — Mirror re-reviews
+    the (still-unfixed) PR and, on findings, the notifier's MECHANICAL
+    `_dispatch_revision_to_forge` applies them to the EXISTING branch
+    (`forge/<step_id>`), exactly the manual #532 recovery. A step's build
+    task_id IS its `step_id` (advancer envelope), so the review-request file is
+    `review-<step_id>.json`. Returns True iff a review request is present
+    afterward (idempotent: the notifier's own presence-gate makes a duplicate
+    call a safe no-op that still counts as landed)."""
+    try:
+        import outbox_notifier as notifier  # noqa: E402
+        import safe_write_inbox as swi  # noqa: E402
+    except Exception as e:  # noqa: BLE001
+        logger.warning(
+            f'review-stall recover: import failed for {step_id}: '
+            f'{type(e).__name__}: {e}'
+        )
+        return False
+    data = {
+        'task_id': step_id,
+        'target_repo': (target_repo or '').split('/')[-1] if isinstance(
+            target_repo, str) else '',
+        'branch': f'forge/{step_id}',
+        'pr_title': pr_title if isinstance(pr_title, str) else '',
+        'dispatched_by': 'build-sequence-advancer',
+    }
+    try:
+        notifier._dispatch_mirror_review(data, pr_url)
+    except Exception as e:  # noqa: BLE001 — inner call swallows routing/cost denials
+        logger.warning(
+            f'review-stall recover: dispatch raised for {step_id}: '
+            f'{type(e).__name__}: {e}'
+        )
+    try:
+        fname = swi.canonical_inbox_name(f'review-{step_id}.json')
+        landed = bool(notifier._review_request_already_dispatched(fname))
+    except Exception as e:  # noqa: BLE001
+        logger.warning(
+            f'review-stall recover: verify failed for {step_id}: '
+            f'{type(e).__name__}: {e}'
+        )
+        return False
+    logger.info(f'review-stall recover: step={step_id} landed={landed}')
+    return landed
+
+
+def _recover_review_stalled_steps(
+    sequence: dict[str, Any], path: Path, now: datetime,
+    logger: logging.Logger,
+) -> bool:
+    """Face 2 (completeness-pr2 §1a) — recover-or-route a WITH-PR wedged step.
+
+    Closes the permanently-unmonitored state the no-PR stall guard leaves: a
+    step that opened a PR and then wedged in review (Mirror never reviewed, or
+    her REVISION dead-lettered — the #532 shape) has no timeout otherwise,
+    because `_escalate_stranded_dispatched_steps` short-circuits on `and not
+    step.get('pr_url')` and its pr_url-recording pre-check then suppresses any
+    future escalation for that step.
+
+    Per-step, for a `dispatched` step carrying a `pr_url` past
+    REVIEW_STALL_TIMEOUT_SEC and not yet advanced:
+      * epoch dedup (`_review_stall_already_handled`) → skip if already handled;
+      * probe the PR from durable state (`_gh_pr_open`): only act on a live
+        (OPEN) PR — MERGED/CLOSED means the review resolved out-of-band
+        (merge-gate / reconcile owns it), and an unverifiable state defers one
+        tick (never act on unknown, per the ~85%-false-history anti-noise
+        constraint);
+      * recover-then-alert: re-dispatch the review (Fix B). On success, stamp
+        `step-review-redispatched` and leave the sequence ACTIVE (the loop is
+        being re-primed — do NOT pause). On failure, fire exactly ONE actionable
+        Larry alert and stamp `step-review-stall-alerted` so it never loops.
+
+    Detects from durable state only (sequence file + gh), never from logs.
+    Returns True iff it acted on any step (recovered or alerted)."""
+    steps = sequence.get('steps') or []
+    seq_id = sequence.get('seq_id', path.stem)
+    acted = False
+    for step in steps:
+        if not isinstance(step, dict) or step.get('status') != 'dispatched':
+            continue
+        pr_url = step.get('pr_url')
+        if not pr_url or not isinstance(pr_url, str):
+            continue  # no-PR wedge → Fix A / the 4h no-PR strand guard own it
+        step_id = step.get('step_id')
+        if not isinstance(step_id, str) or not step_id:
+            continue
+        dispatched_at = step.get('dispatched_at')
+        age = _dispatched_age_sec(dispatched_at, now)
+        if age is None or age < REVIEW_STALL_TIMEOUT_SEC:
+            continue  # healthy / recently-dispatched review — leave it alone
+        if _review_stall_already_handled(sequence, step_id, dispatched_at):
+            continue  # already recover-or-routed this dispatch epoch
+        is_open = _gh_pr_open(pr_url)
+        if is_open is None:
+            logger.warning(
+                f'review-stall: sequence={seq_id} step={step_id} PR {pr_url} '
+                f'state unverifiable this tick (gh); deferring one tick.'
+            )
+            continue
+        if not is_open:
+            logger.info(
+                f'review-stall: sequence={seq_id} step={step_id} PR {pr_url} '
+                f'no longer OPEN; skipping (merge-gate / reconcile owns it).'
+            )
+            continue
+        recovered = _redispatch_review_for_wedged_step(
+            step_id, step.get('target_repo'), pr_url, step.get('label'), logger,
+        )
+        audit = list(sequence.get('audit_log') or [])
+        if recovered:
+            audit.append(_audit_entry(
+                'step-review-redispatched', step_id=step_id,
+                dispatched_at=dispatched_at, pr_url=pr_url,
+            ))
+            sequence['audit_log'] = audit
+            try:
+                _atomic_write_sequence(path, sequence)
+            except OSError as e:
+                logger.error(
+                    f'review-stall: atomic write failed recording re-dispatch '
+                    f'for {seq_id} step={step_id}: {e}'
+                )
+            logger.info(
+                f'review-stall: sequence={seq_id} step={step_id} review loop '
+                f'wedged past {REVIEW_STALL_TIMEOUT_SEC // 3600}h; re-dispatched '
+                f'Mirror review on {pr_url} (sequence stays active).'
+            )
+            acted = True
+            continue
+        # Recovery could not fire → one actionable alert, deduped by the stamp.
+        reason = (
+            f'Sequence `{seq_id}` step `{step_id}` has a PR ({pr_url}) wedged in '
+            f'review for over {REVIEW_STALL_TIMEOUT_SEC // 3600}h and its review '
+            f'loop is dead (Mirror never reviewed, or a revision dead-lettered — '
+            f'the #532 shape). Auto-recovery (re-dispatch review) could not fire.'
+        )
+        audit.append(_audit_entry(
+            'step-review-stall-alerted', step_id=step_id,
+            dispatched_at=dispatched_at, pr_url=pr_url,
+        ))
+        sequence['audit_log'] = audit
+        try:
+            _atomic_write_sequence(path, sequence)
+        except OSError as e:
+            logger.error(
+                f'review-stall: atomic write failed recording alert for '
+                f'{seq_id} step={step_id}: {e}'
+            )
+        logger.warning(
+            f'review-stall: sequence={seq_id} step={step_id} unrecoverable; '
+            f'alerting Larry. {reason}'
+        )
+        _dm_larry(
+            message=reason,
+            subject=f'sequence-review-stall:{seq_id}:{step_id}',
+            severity='warning',
+            suggested_action=(
+                f'Review the PR {pr_url}. Re-run Mirror\'s review by hand, or '
+                f'`retry sequence {seq_id} step {step_id}` to re-dispatch the '
+                f'build, or close the PR if the step is obsolete.'
+            ),
+        )
+        acted = True
+    return acted
+
+
 # -------------------- already-merged build bridge (no-PR strand backstop) --------------------
 
 
@@ -2456,6 +2684,19 @@ def tick(now: Optional[datetime] = None) -> int:
             except Exception as e:
                 logger.error(
                     f'escalate: unexpected error for {path.name}: '
+                    f'{type(e).__name__}: {e}'
+                )
+        # With-PR review-stall recover-or-route (completeness-pr2 Face 2 / Fix B)
+        # — flag-INDEPENDENT (a wedged review is wedged regardless of whether
+        # forward-dispatch is on) but `active`-only: a sequence just paused by
+        # the escalate pass above is skipped. Unlike escalate, this pass never
+        # pauses — a re-dispatched review keeps the sequence live.
+        if status == 'active':
+            try:
+                _recover_review_stalled_steps(seq, path, now, logger)
+            except Exception as e:
+                logger.error(
+                    f'review-stall: unexpected error for {path.name}: '
                     f'{type(e).__name__}: {e}'
                 )
         # Forward-dispatch leg — flag-GATED and active-only. Paused sequences

@@ -206,6 +206,107 @@ class TestPromoteVerificationPending(_LedgerTestBase):
         self.assertIsNone(out)
 
 
+class TestExpiredUnpromotedVerificationPending(unittest.TestCase):
+    """G5: verification_pending rows that aged past PROMOTE_WINDOW_DAYS without
+    ever promoting are the silent-expiry class the weekly retrospective surfaces.
+    Pure function — driven with injected rows, no disk."""
+
+    def _ids(self, rows):
+        return [r['intervention_id'] for r in rows]
+
+    def test_expired_unpromoted_row_returned(self):
+        rows = [_row(kind='verification_pending', hours_ago=8 * 24,
+                     intervention_id='x1')]
+        out = cpl.expired_unpromoted_verification_pending(rows=rows, now=NOW)
+        self.assertEqual(self._ids(out), ['x1'])
+
+    def test_within_window_row_excluded(self):
+        rows = [_row(kind='verification_pending', hours_ago=24,
+                     intervention_id='x1')]
+        out = cpl.expired_unpromoted_verification_pending(rows=rows, now=NOW)
+        self.assertEqual(out, [])
+
+    def test_promoted_row_excluded(self):
+        rows = [
+            _row(kind='verification_pending', hours_ago=8 * 24,
+                 intervention_id='x1'),
+            _row(kind='systemic_fix', hours_ago=6 * 24, intervention_id='x1'),
+        ]
+        out = cpl.expired_unpromoted_verification_pending(rows=rows, now=NOW)
+        self.assertEqual(out, [])
+
+    def test_latest_pending_within_window_keeps_id_off_list(self):
+        # A re-verification attempt landed inside the window — the id is being
+        # actively re-checked, so it is NOT expired.
+        rows = [
+            _row(kind='verification_pending', hours_ago=10 * 24,
+                 intervention_id='x1'),
+            _row(kind='verification_pending', hours_ago=2,
+                 intervention_id='x1'),
+        ]
+        out = cpl.expired_unpromoted_verification_pending(rows=rows, now=NOW)
+        self.assertEqual(out, [])
+
+    def test_two_expired_pending_same_id_returns_one_latest(self):
+        rows = [
+            _row(kind='verification_pending', hours_ago=12 * 24,
+                 intervention_id='x1'),
+            _row(kind='verification_pending', hours_ago=8 * 24,
+                 intervention_id='x1'),
+        ]
+        out = cpl.expired_unpromoted_verification_pending(rows=rows, now=NOW)
+        self.assertEqual(len(out), 1)
+        # The latest (8d-old) row is the representative.
+        self.assertEqual(out[0]['ts'],
+                         (NOW - timedelta(hours=8 * 24)).isoformat())
+
+    def test_non_verification_rows_ignored(self):
+        rows = [
+            _row(kind='intervention', hours_ago=9 * 24, intervention_id='x1'),
+            _row(kind='systemic_fix', hours_ago=9 * 24, intervention_id='x2'),
+            _row(kind='iter_clean', hours_ago=9 * 24),
+        ]
+        out = cpl.expired_unpromoted_verification_pending(rows=rows, now=NOW)
+        self.assertEqual(out, [])
+
+    def test_empty_intervention_id_ignored(self):
+        rows = [_row(kind='verification_pending', hours_ago=9 * 24,
+                     intervention_id='')]
+        out = cpl.expired_unpromoted_verification_pending(rows=rows, now=NOW)
+        self.assertEqual(out, [])
+
+    def test_unparseable_ts_ignored(self):
+        row = _row(kind='verification_pending', hours_ago=9 * 24,
+                   intervention_id='x1')
+        row['ts'] = 'not-a-timestamp'
+        out = cpl.expired_unpromoted_verification_pending(rows=[row], now=NOW)
+        self.assertEqual(out, [])
+
+    def test_ordered_oldest_first(self):
+        rows = [
+            _row(kind='verification_pending', hours_ago=8 * 24,
+                 intervention_id='newer'),
+            _row(kind='verification_pending', hours_ago=20 * 24,
+                 intervention_id='older'),
+        ]
+        out = cpl.expired_unpromoted_verification_pending(rows=rows, now=NOW)
+        self.assertEqual(self._ids(out), ['older', 'newer'])
+
+    def test_mixed_expired_and_promoted_and_fresh(self):
+        rows = [
+            _row(kind='verification_pending', hours_ago=9 * 24,
+                 intervention_id='expired'),
+            _row(kind='verification_pending', hours_ago=9 * 24,
+                 intervention_id='promoted'),
+            _row(kind='systemic_fix', hours_ago=8 * 24,
+                 intervention_id='promoted'),
+            _row(kind='verification_pending', hours_ago=12,
+                 intervention_id='fresh'),
+        ]
+        out = cpl.expired_unpromoted_verification_pending(rows=rows, now=NOW)
+        self.assertEqual(self._ids(out), ['expired'])
+
+
 class TestCanonicalInterventionId(unittest.TestCase):
     """The load-bearing tagging helper: a canonical id is
     '<template>:<detail>' with a kebab-case template that Check V can
