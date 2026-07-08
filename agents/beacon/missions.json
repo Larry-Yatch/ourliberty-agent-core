@@ -7818,7 +7818,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-08T21:15:05.159099+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-08T21:00:16.186045+00:00"
+      "orphan_last_activity_ts": "2026-07-08T21:00:16.186045+00:00",
+      "briefing": {
+        "what": "A new piece of work your team kicked off on their own that hasn't been attached to any active project goal yet.",
+        "why": "Untethered work can quietly eat time and drift away from your priorities, so it's worth knowing whether it's earning its keep.",
+        "suggest": "Before it goes further, ask the team what problem this solves and confirm it lines up with something on your roadmap."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-08T21:15:13.091985+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
