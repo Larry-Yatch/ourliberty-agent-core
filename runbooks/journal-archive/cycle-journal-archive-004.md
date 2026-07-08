@@ -78213,3 +78213,99 @@ Watermark advanced 991→994. NOMINAL ✅
 
 ---
 
+## Iteration ~4627 — 2026-07-08T18:07Z UTC (Larry /loop /cycle chat, Tier 1)
+
+**Health:** ✅ Nominal with carry (zombie) + positive resolution. 7 new alerts L995-L1001 (all Tier-3, heal-systemd-install-drift). Standing finding `silence-file-auditor-timer-not-installed` CLEARED. G-rule `no-session-revision-merged-pr-fp-001` reaches 3/3 → dispatched to Beacon.
+
+**VERIFY-BEFORE-REASSERT (from iter ~4626):**
+- **"beacon_bot=3740653, inbox_watcher=3577889, outbox_notifier=3741083"**: UPDATED ✅ — heal-systemd-install-drift content-healed `ourliberty-inbox-watcher.service` at 18:00:15Z (drifted from repo), restarted with new PID=3746752. Old PID 3577889 gone as expected. beacon_bot=3740653 ✅. outbox_notifier=3741083 ✅. [updated]
+- **"zombie PID 1834248 (~40d+22h+39m)"**: UPDATED ⚠️ — now 40d+22h+45m (Ss, bash loop). CONFIRMED. [carry]
+- **"pending=1 (advancer-suppress-paused-invalid-realert-001)"**: CONFIRMED ✅ — pending=1, created 07:59:45Z, reminders_sent=[6]. [confirmed]
+- **"Last sync 17:34:07Z"**: CONFIRMED ✅ — still 2026-07-08T17:34:07Z (~33 min from 18:07Z, <2h), status=success. [confirmed]
+- **"Daemon heartbeat 17:54:18Z"**: CONFIRMED ✅ — still 17:54:18Z (~13 min from 18:07Z, <60 min). Normal cadence expected. [confirmed]
+- **"Watchdog 11:55:00 MDT overall=healthy"**: UPDATED ✅ — now 12:00:02 MDT (18:00:02Z UTC), overall=healthy. [updated]
+- **"0 new alerts, watermark=994=file_length"**: UPDATED — file_length=1001 (7 new L995-L1001, all Tier-3). Watermark advanced to 1001. [updated]
+- **"PR #847 OPEN, AUTO_MERGE_HELD held_deep_review"**: CONFIRMED ✅ (stall dry-run MIRROR_PASS_UNMERGED_SKIP). [carry]
+- **"PR #854 OPEN"**: CONFIRMED ✅ (FORGE_NO_PR_SKIP sentinel-in-flight-stall-translation-001). [carry]
+- **"silence-file-auditor-timer-not-installed [yellow carry]"**: RESOLVED ✅ — heal-systemd-install-drift auto-installed `ourliberty-silence-file-auditor.service` + `.timer` at 18:00:11-13Z. Timer active/waiting, next fire Thu 07:03 MDT. [CLEARED from standing]
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 994, "file_length": 1001}`. 7 new alerts L995-L1001, all `source=heal-systemd-install-drift, route=digest`:
+- L995: `install-healed:ourliberty-heal-pr-terminal-fanout-heartbeat.service` — severity=info. Tier-3 (confirmed via triage helper: "known-pattern match"). ✅
+- L996: `install-healed:ourliberty-heal-pr-terminal-fanout-heartbeat.timer` — enabled-now, severity=info. Tier-3. ✅
+- L997: `install-healed:ourliberty-pr-terminal-fanout.service` — severity=info. Tier-3. ✅
+- L998: `install-healed:ourliberty-pr-terminal-fanout.timer` — enabled-now, next fire 12:09 MDT. Tier-3. ✅
+- L999: `install-healed:ourliberty-silence-file-auditor.service` — severity=info. Tier-3. ✅
+- L1000: `install-healed:ourliberty-silence-file-auditor.timer` — enabled-now, next fire Thu 07:03 MDT. Tier-3. ✅
+- L1001: `content-healed:ourliberty-inbox-watcher.service` — severity=warning (drifted content, restarted). Tier-3. ✅
+All 7 fired at 18:00:03-15Z UTC (heal-systemd-install-drift batch run), triggered by PR #865 merge shipping 3 new systemd unit pairs. route=digest — outbox-notifier silenced DMs already. Watermark advanced 994→1001. NOMINAL ✅
+
+**Check 1 — Log noise:** Watchdog 12:00:02 MDT (18:00:02Z UTC) overall=healthy, 5-min cadence intact ✅. Outbox-notifier: 7 digest alerts at 18:00Z (heal-systemd-install-drift batch). inbox_watcher restarted (content-heal). All expected post-PR-#865 behavior. NOMINAL ✅
+
+**Check 2 — Telegram sweep:** Last Larry message 09:38:30 MDT ("resume sequence completeness-pr3-fanout-sentinel"). No new directives. NOMINAL ✅
+
+**Check 3 — Pipeline stall:** DRY-RUN 18:03Z → `1 alert(s) would fire`: `no_session_revision:completeness-pr3-build`. **Finding: PR #865 (completeness-pr3-build) MERGED at 17:44:10Z — this is G-rule `no-session-revision-merged-pr-fp-001` occurrence 3/3.** The stall checker would attempt recovery + alert for a task whose PR is already merged. Dispatch to Beacon at 3/3. FORGE_NO_PR_SKIP ×many. MIRROR_PASS_UNMERGED_SKIP ×1 (PR #847 held_deep_review). Cooldowns: stalled-active-step:completeness-pr3-fanout-sentinel:completeness-pr3-build, mirror_pass_unmerged:xiv-b-alert-write-back-spec-001. ⚠️ (G-rule)
+
+**Check 4 — Pending directives:** pending=1 (`advancer-suppress-paused-invalid-realert-001`, created 07:59:45Z, reminders_sent=[6]). Awaiting Larry approval for Forge preflight. CARRY ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-08T17:54:18Z UTC (~13 min from 18:07Z, <60 min). NOMINAL ✅
+
+**Check A — Source repo:** HEAD=38d2da95=origin/main. Clean tree. On main. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-08T17:34:07Z (~33 min, <2h), status=success. NOMINAL ✅
+**Check C — Agent liveness:** beacon_bot PID 3740653 ✅. inbox_watcher PID 3746752 ✅ (new — content-heal restart at 18:00:15Z). outbox_notifier PID 3741083 ✅. Zombie PID 1834248 (Ss, 40d+22h+45m, bash loop) ⚠️ [carry].
+**Check D — Inbox state:** Forge: EMPTY ✅. Mirror: EMPTY ✅. Beacon: 1 envelope `card-message-6c764fce48ed08d6e8aa00020f2f4ba933dd1260.json` (new — prior card-message processed) ✅. NOMINAL ✅
+**Check E — PR state:** Stall dry-run: 1 would-fire (FP — PR #865 MERGED, G-rule 3/3). PR #847 OPEN (held_deep_review). PR #854 OPEN. NOMINAL (with G-rule dispatch).
+
+**§5.0 — audit_due_nudge:** no committed baseline; no-op. ✅
+**§5.0 — distill_detector:** no un-distilled audits; no-op. ✅
+
+**Conditional checks — UTC Wednesday 2026-07-08:**
+- **Check I:** ✅ Fired 14:12:51Z today (iter ~4594). No re-invocation. [carry]
+- **Check III:** Sunday gate. Skip. ✅
+- **Check IX/X:** Monday gate. Skip. ✅
+- **Check VI/VIII:** Proposals idx=990,991 carry — awaiting Larry. [carry]
+
+**G-rule assessment:**
+- **no-session-revision-merged-pr-fp-001 [3/3 → DISPATCHED]:** DRY-RUN confirms healer would fire `no_session_revision:completeness-pr3-build` despite PR #865 MERGED. Root cause: `check_revision_dispatched_with_no_session` has no skip-on-merged guard (unlike `check_forge_built_no_pr` which has FORGE_NO_PR_SKIP). Direction-ask dispatched to Beacon: `direction-ask-no-session-revision-merged-pr-3of3-001.json`. verification_pending.
+- **beacon-double-start [2/3]:** No new occurrence. Beacon bot stable at PID 3740653 (running since 11:54 MDT). [carry]
+- No new G-rule occurrences for other tracked patterns.
+
+**New systemd units installed (PR #865 — completeness-pr3 fan-out sentinel):**
+- `ourliberty-pr-terminal-fanout.timer` — active/waiting, next fire 12:09 MDT (3 min from iter start). First scheduled run imminent.
+- `ourliberty-heal-pr-terminal-fanout-heartbeat.timer` — active/waiting.
+- `ourliberty-silence-file-auditor.timer` — active/waiting, next fire Thu 07:03 MDT. **RESOLVES standing [yellow] silence-file-auditor-timer-not-installed.**
+
+**Actions taken:**
+1. Check 0: 7 new alerts L995-L1001 → all Tier-3 (heal-systemd-install-drift known-pattern); watermark advanced 994→1001. ✅
+2. G-rule 3/3 dispatch: `direction-ask-no-session-revision-merged-pr-3of3-001.json` written to Beacon inbox. ✅
+3. PRIME ledger: `intervention` appended (tier=1, zombie-carry+L995-L1001+silence-file-auditor-RESOLVED+inbox-watcher-restarted+no-session-revision-FP-3of3, ts=18:07:08Z). ✅
+4. PRIME ledger: `systemic_fix` appended (tier=1, no-session-revision-merged-pr-fp-3of3, ts=18:07:11Z). ✅
+5. Tier state: `record --checks-clean false` → Tier 1 (consecutive_clean=0; zombie carry). ✅
+6. Watermark: set-watermark --line 1001. ✅
+
+**Escalations:** 0 new Pulse DMs. 0 new Pulse-authored alerts.
+
+**Standing findings (carry-verified this iter):**
+- [yellow] **zombie-bash-pid-1834248** — PID 1834248 (~40d+22h+45m Ss bash loop). Polling for `/home/larry/agents/outboxes/forge/.archive/build-check-viii-pr-2b-analyzer-001.json`. ask-then-do: `kill 1834248`. [carry]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07` or `reject`. [carry]
+- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
+- [yellow] **unreviewed-merge-larry-authored-pr-001** — 12 occurrences. Steps 1-2 still unimplemented. [carry]
+- [yellow] **advancer-suppress-paused-invalid-realert-001** — pending[0] (07:59:45Z, reminders_sent=[6]). Awaiting Larry approval for Forge preflight. [carry]
+- [blue] **PR #847** — OPEN, AUTO_MERGE_HELD held_deep_review. [carry]
+- [blue] **PR #854** — OPEN (sentinel in-flight stall translation). [carry]
+- [blue] **PR #850/860/861/862/863/864** — Open PRs. [carry]
+- [blue] **Check I** — Fired 14:12:51Z (iter ~4594). 1 [small] proposal. [carry]
+- [blue] **ledger-weekly-duplicate-pulse-alert** — 1/3. [carry]
+- [blue] **beacon-double-start** — [2/3 watch]. [carry]
+- [blue] **G-rule 1/3: heal-pipeline-stall-stalled-active-step-tier4-001** — no new occurrence. [carry]
+- [blue] **G-rules (dispatched, vp):** no-session-revision-merged-pr-fp-001 (NEW ✅ dispatched 3/3 this iter); sentinel-inflight-stall-tier4 (fix=PR #854 OPEN); notifier-concurrent-scan-dup (PR #847 held); ourliberty-health-subject-key-mismatch-001; forge-wip-redispatch-digest-tier4-001; no-session-revision-active-mirror-session-fp-001; forge-revision-preamble-missing-pr711-001; forge-wip-redispatch-exhausted-pr-exists-fp-001; decision-needed-approval-forge-dispatch-no-target-repo-001; sequence-invalid-completeness-pr3-fanout-sentinel. [carry vp]
+- [blue] **G-rule 2/3: auto-merge-conflict-promoted-merged-pr-001** — no new occurrence. [carry]
+- [blue] **G-rule 2/3: forge-marker-task-id-mismatch-xii-v1** — no new occurrence. [carry]
+- [blue] **G-rule 1/3: outbox-notifier-merge-held-deep-review-tier4-001** — no new occurrence. [carry]
+- [blue] **G-rule 2/3: forge-preflight-no-marker re-occurrence** — no new occurrence. [carry]
+- [blue] **pr3-sentinel-self-arming-approval-001 PREFLIGHT_EXIT** — 1/3 watch. [carry]
+
+**PRIME DIRECTIVE:** ratio≈21.68 (interventions=1583, systemic_fixes=74, vp=33; trend: worsening). Intervention appended (zombie-carry(40d+22h45m)+L995-L1001-heal-systemd-install-drift-tier3+silence-file-auditor-RESOLVED+inbox-watcher-restarted+no-session-revision-FP-3of3-dispatched, ts=18:07:08Z). Systemic_fix appended (no-session-revision-merged-pr-fp-3of3, ts=18:07:11Z).
+**Tier end-of-iter:** Tier **1** (consecutive_clean=0; zombie carry).
+
+---
+
