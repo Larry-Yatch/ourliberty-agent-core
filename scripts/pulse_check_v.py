@@ -384,21 +384,25 @@ def _iso_now() -> str:
 
 def consecutive_clean_streak(executions: Optional[list[dict[str, Any]]]) -> int:
     """The per-template streak = consecutive CLEAN executions from the TAIL of
-    the list. A "clean" execution is ``outcome == "success"`` AND
-    ``larry_correction_signal`` falsy. A failure or a Larry-correction breaks
-    the streak. This is the single reader of the track record (the brief's
-    enforcement: the streak is never read from the vestigial
-    ``payload.larry_modified`` ledger fields)."""
+    the list. Only ``outcome == "success"`` (with ``larry_correction_signal``
+    falsy) increments the streak. An adverse execution — ``outcome ==
+    "failure"`` OR a Larry-correction — BREAKS the streak. An ``"unverified"``
+    execution is NEUTRAL: it neither increments nor breaks the streak (the
+    verifier simply hasn't confirmed it yet), so the walk skips over it and
+    keeps counting older successes. This is the single reader of the track
+    record (the brief's enforcement: the streak is never read from the
+    vestigial ``payload.larry_modified`` ledger fields)."""
     if not executions:
         return 0
     streak = 0
     for ex in reversed(executions):
         if not isinstance(ex, dict):
             break
-        if ex.get('outcome') == 'success' and not ex.get('larry_correction_signal'):
+        if ex.get('larry_correction_signal') or ex.get('outcome') == 'failure':
+            break  # adverse -> streak ends
+        if ex.get('outcome') == 'success':
             streak += 1
-        else:
-            break
+        # else: 'unverified' (or any non-adverse) -> neutral, skip, keep walking
     return streak
 
 

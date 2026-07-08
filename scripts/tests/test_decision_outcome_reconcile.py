@@ -131,8 +131,9 @@ class ReconcileTest(unittest.TestCase):
             return mapping.get((slug, num))
         return runner
 
-    def test_records_terminal_skips_pending_and_non_pr(self) -> None:
+    def test_records_terminal_and_keeps_pending(self) -> None:
         # three decisions: a merged PR, an open PR, and a task-keyed dispatch
+        # whose bare key the kernel can't resolve (UNKNOWN => KEEP).
         dol.record_decision(f'pr-{_AC}-1', 'approved', actor='dashboard', cleared=1)
         dol.record_decision(f'pr-{_AC}-2', 'approved', actor='dashboard', cleared=1)
         dol.record_decision('dispatch-task-xyz', 'approved', actor='telegram',
@@ -141,12 +142,15 @@ class ReconcileTest(unittest.TestCase):
             (_AC_SLUG, 1): {'state': 'MERGED', 'labels': []},
             (_AC_SLUG, 2): {'state': 'OPEN'},
         })
-        summary = dor.reconcile(runner=runner)
+        # bare-key seam injected so no real gh shell-out; UNKNOWN keeps pending.
+        summary = dor.reconcile(runner=runner,
+                                terminal_state_fn=lambda k: 'UNKNOWN')
         self.assertEqual(summary['recorded'], 1)
-        self.assertEqual(summary['pending'], 1)
-        self.assertEqual(summary['skipped_non_pr'], 1)
+        # open PR (pending) + bare-key UNKNOWN (KEEP) both stay pending.
+        self.assertEqual(summary['pending'], 2)
         self.assertTrue(dol.has_build_outcome(f'pr-{_AC}-1'))
         self.assertFalse(dol.has_build_outcome(f'pr-{_AC}-2'))
+        self.assertFalse(dol.has_build_outcome('dispatch-task-xyz'))
 
     def test_unknown_repo_is_skipped_not_queried(self) -> None:
         dol.record_decision('pr-not-a-real-repo-5', 'approved', actor='x',
@@ -204,6 +208,90 @@ class ReconcileTest(unittest.TestCase):
         self.assertEqual(summary['errors'], 1)
         self.assertEqual(summary['recorded'], 0)
         self.assertFalse(dol.has_build_outcome(f'pr-{_AC}-4'))
+
+    # ---- item (c): bare task_id keys join via the terminal-state kernel ----
+
+    def test_bare_key_merged_is_recorded(self) -> None:
+        dol.record_decision('dispatch-task-abc', 'approved', actor='telegram',
+                            cleared=1)
+        summary = dor.reconcile(terminal_state_fn=lambda k: 'MERGED')
+        self.assertEqual(summary['recorded'], 1)
+        self.assertTrue(dol.has_build_outcome('dispatch-task-abc'))
+        self.assertEqual(dol.latest_build_outcome('dispatch-task-abc'), 'merged')
+
+    def test_bare_key_closed_is_recorded_closed_unmerged(self) -> None:
+        dol.record_decision('dispatch-task-def', 'approved', actor='telegram',
+                            cleared=1)
+        summary = dor.reconcile(terminal_state_fn=lambda k: 'CLOSED')
+        self.assertEqual(summary['recorded'], 1)
+        self.assertEqual(dol.latest_build_outcome('dispatch-task-def'),
+                         'closed_unmerged')
+
+    def test_bare_key_unknown_keeps_pending_records_nothing(self) -> None:
+        dol.record_decision('dispatch-task-ghi', 'approved', actor='telegram',
+                            cleared=1)
+        for state in ('UNKNOWN', 'OPEN'):
+            summary = dor.reconcile(terminal_state_fn=lambda k, s=state: s)
+            self.assertEqual(summary['recorded'], 0)
+            self.assertEqual(summary['pending'], 1)
+            self.assertFalse(dol.has_build_outcome('dispatch-task-ghi'))
+
+    def test_bare_key_kernel_raises_is_error_not_terminal(self) -> None:
+        dol.record_decision('dispatch-task-jkl', 'approved', actor='telegram',
+                            cleared=1)
+
+        def boom(k):
+            raise RuntimeError('gh exploded')
+
+        summary = dor.reconcile(terminal_state_fn=boom)
+        self.assertEqual(summary['errors'], 1)
+        self.assertEqual(summary['recorded'], 0)
+        self.assertFalse(dol.has_build_outcome('dispatch-task-jkl'))
+
+    # ---- item (b): closed_unmerged re-check + merged supersede ----
+
+    def test_closed_unmerged_supersedes_to_merged_on_recheck(self) -> None:
+        # First pass sees CLOSED -> records closed_unmerged. A later merge (a PR
+        # reopened + merged) is picked up on the re-check inside the settle
+        # window and supersedes.
+        dol.record_decision(f'pr-{_AC}-7', 'approved', actor='x', cleared=1)
+        first = dor.reconcile(
+            runner=self._stub({(_AC_SLUG, 7): {'state': 'CLOSED'}}))
+        self.assertEqual(first['recorded'], 1)
+        self.assertEqual(dol.latest_build_outcome(f'pr-{_AC}-7'), 'closed_unmerged')
+        second = dor.reconcile(
+            runner=self._stub({(_AC_SLUG, 7): {'state': 'MERGED', 'labels': []}}))
+        self.assertEqual(second['superseded'], 1)
+        self.assertEqual(dol.latest_build_outcome(f'pr-{_AC}-7'), 'merged')
+
+    def test_closed_unmerged_recheck_no_change_records_nothing(self) -> None:
+        dol.record_decision(f'pr-{_AC}-8', 'approved', actor='x', cleared=1)
+        dor.reconcile(runner=self._stub({(_AC_SLUG, 8): {'state': 'CLOSED'}}))
+        second = dor.reconcile(
+            runner=self._stub({(_AC_SLUG, 8): {'state': 'CLOSED'}}))
+        self.assertEqual(second['recorded'], 0)
+        self.assertEqual(second['superseded'], 0)
+        self.assertEqual(second['rechecked_no_change'], 1)
+        rows = [r for r in dol.records_for_key(f'pr-{_AC}-8')
+                if r.get('kind') == 'build_outcome']
+        self.assertEqual(len(rows), 1)  # no churn — still one row
+
+    # ---- item (a): the single-writer lock ----
+
+    def test_run_once_skips_when_lock_held(self) -> None:
+        import decision_outcome_reconcile as _dor
+        with _dor._reconcile_lock() as acquired:
+            self.assertTrue(acquired)
+            # A second acquisition while the first is held must be refused.
+            summary = _dor.run_once()
+            self.assertEqual(summary, {'skipped_locked': True})
+
+    def test_run_once_runs_when_lock_free(self) -> None:
+        dol.record_decision(f'pr-{_AC}-11', 'approved', actor='x', cleared=1)
+        summary = dor.run_once(
+            runner=self._stub({(_AC_SLUG, 11): {'state': 'MERGED', 'labels': []}}))
+        self.assertNotIn('skipped_locked', summary)
+        self.assertEqual(summary['recorded'], 1)
 
 
 if __name__ == '__main__':

@@ -199,10 +199,69 @@ def _mark_cooldown(severity: str, key: str) -> None:
 # default for task-id-specific subjects, which can never legitimately recur.
 
 SILENCE_ROOT = AGENTS_ROOT / 'state' / 'alert-silenced'
+# G8 silence auditor: a silence is invisible by design — while it holds,
+# `append_alert` drops the matching alert with no DM, so nobody sees how much it
+# is suppressing. A silence written for a transient false positive that has
+# since become a REAL recurring signal would keep swallowing it forever, and the
+# only symptom is silence. To make that observable, every suppression bumps a
+# per-key counter here (sidecar to the silence file); the standing auditor
+# (scripts/silence_file_auditor.py) reads both to report each silence's key,
+# age, and how many alerts it has eaten.
+SILENCE_COUNTER_ROOT = AGENTS_ROOT / 'state' / 'alert-silenced-counts'
 
 
 def _silence_path(key: str) -> Path:
     return SILENCE_ROOT / _safe_key(key)
+
+
+def _silence_counter_path(key: str) -> Path:
+    return SILENCE_COUNTER_ROOT / _safe_key(key)
+
+
+def silence_suppressed_count(key: str) -> int:
+    """How many alerts a silence for `key` has dropped (0 if none/unreadable).
+    Fail-safe: a missing or corrupt counter reads as 0, never raises."""
+    try:
+        with open(_silence_counter_path(key), encoding='utf-8') as f:
+            data = json.load(f)
+        return int(data.get('count', 0)) if isinstance(data, dict) else 0
+    except (OSError, json.JSONDecodeError, TypeError, ValueError):
+        return 0
+
+
+def _note_silenced_suppression(key: str, now: Optional[float] = None) -> None:
+    """Best-effort bump of the per-key suppressed counter at the moment a silence
+    drops an alert. Read-modify-write under the shared sidecar flock so
+    concurrent producers don't lose increments; degrades to a no-op on any error
+    (this is telemetry — it must never turn a fire-and-forget append into a
+    raise, and a lost tick is strictly better than a dropped/duplicated alert)."""
+    path = _silence_counter_path(key)
+    try:
+        SILENCE_COUNTER_ROOT.mkdir(parents=True, exist_ok=True)
+        lock_path = file_lock.sidecar_lock_path(path)
+        try:
+            with file_lock.exclusive_lock(lock_path, timeout=_APPEND_LOCK_TIMEOUT_SEC):
+                _bump_counter_file(path, key, now)
+        except file_lock.LockTimeout:
+            _bump_counter_file(path, key, now)
+    except OSError:
+        return
+
+
+def _bump_counter_file(path: Path, key: str, now: Optional[float]) -> None:
+    count = 0
+    try:
+        with open(path, encoding='utf-8') as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            count = int(data.get('count', 0))
+    except (OSError, json.JSONDecodeError, TypeError, ValueError):
+        count = 0
+    ts = datetime.now(timezone.utc).isoformat()
+    atomic_io.atomic_write_json(
+        path,
+        {'key': key, 'count': count + 1, 'last_suppressed': ts},
+    )
 
 
 def is_silenced(key: str, now: Optional[float] = None) -> bool:
@@ -405,8 +464,11 @@ def append_alert(
         route = DEFAULT_ROUTE
     key = f'{source}:{subject}' if subject else source
     # Durable silence (Medic-confirmed false positive) takes precedence over
-    # the short cooldown: a silenced fingerprint never reaches Larry.
+    # the short cooldown: a silenced fingerprint never reaches Larry. G8: record
+    # the suppression so the standing auditor can tell how much this silence eats
+    # (a silence over a now-real signal is otherwise invisible).
     if is_silenced(key):
+        _note_silenced_suppression(key)
         return False
     if in_cooldown(severity, key):
         return False

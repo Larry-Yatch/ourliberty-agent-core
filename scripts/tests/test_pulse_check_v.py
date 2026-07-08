@@ -260,5 +260,47 @@ class TestGuardListLoading(unittest.TestCase):
             Path(path).unlink()
 
 
+class TestConsecutiveCleanStreak(unittest.TestCase):
+    """Item (d): the triage default flipped to 'unverified'. Check V's streak
+    reader must treat 'unverified' as NEUTRAL — it neither increments the streak
+    nor breaks it (the verifier just hasn't confirmed it yet); only 'success'
+    counts and only 'failure'/a Larry-correction breaks."""
+
+    @staticmethod
+    def _ex(outcome, correction=False):
+        return {'outcome': outcome, 'larry_correction_signal': correction}
+
+    def test_all_success_counts_all(self):
+        exs = [self._ex('success')] * 4
+        self.assertEqual(p5.consecutive_clean_streak(exs), 4)
+
+    def test_failure_at_tail_breaks_streak(self):
+        exs = [self._ex('success'), self._ex('success'), self._ex('failure')]
+        self.assertEqual(p5.consecutive_clean_streak(exs), 0)
+
+    def test_correction_at_tail_breaks_streak(self):
+        exs = [self._ex('success'), self._ex('success', correction=True)]
+        self.assertEqual(p5.consecutive_clean_streak(exs), 0)
+
+    def test_unverified_is_neutral_skipped(self):
+        # tail 'unverified' is skipped; the two older successes still count.
+        exs = [self._ex('success'), self._ex('success'), self._ex('unverified')]
+        self.assertEqual(p5.consecutive_clean_streak(exs), 2)
+
+    def test_unverified_between_successes_does_not_break(self):
+        exs = [self._ex('success'), self._ex('unverified'), self._ex('success')]
+        self.assertEqual(p5.consecutive_clean_streak(exs), 2)
+
+    def test_failure_behind_unverified_still_breaks(self):
+        # walking from the tail: unverified (skip) -> failure (break); no success
+        # after the failure, so the streak is 0.
+        exs = [self._ex('success'), self._ex('failure'), self._ex('unverified')]
+        self.assertEqual(p5.consecutive_clean_streak(exs), 0)
+
+    def test_empty_is_zero(self):
+        self.assertEqual(p5.consecutive_clean_streak([]), 0)
+        self.assertEqual(p5.consecutive_clean_streak(None), 0)
+
+
 if __name__ == '__main__':
     unittest.main()

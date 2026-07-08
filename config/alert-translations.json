@@ -715,5 +715,13 @@
       "plain_language_summary": "The weekly Mirror review-ceiling fit-monitor digest (scripts/heal_review_ceiling_fit.py). A READ-ONLY reporter that recomputes the Mirror PR-review duration distribution (p50/p90/p95/p99/max), counts review_session_timeout ceiling firings and likely false-kills (fired-then-merged PRs), and reports whether the harness review ceiling (agent_runner.REVIEW_SESSION_CEILING_SECONDS, default 35min) is still right-sized -- with a recommended value. It NEVER mutates the ceiling and NEVER pages: this is a route=digest record surfaced in the CEO digest, not a DM. By-design FYI, not a failure.",
       "recommended_action": "None by default -- this is an observe-and-report digest. If it recommends RAISING the ceiling (HEADROOM_LOW: p95 creeping into the ceiling, or FALSE_KILL: a fired review whose PR later merged), that is a signal to consider bumping OL_REVIEW_SESSION_CEILING_SECONDS; the monitor does not auto-tune it. Detail: the digest body carries the distribution, headroom, firing count, false-kill count, and the recommendation line."
     }
+  },
+  "auditor": {
+    "silence-file-audit": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "plain_language_summary": "The daily silence-file auditor (scripts/silence_file_auditor.py) found one or more alert silences that are still actively eating alerts. A silence is a deliberate mute Medic wrote for a confirmed false positive; while it holds, matching alerts are dropped with no DM. This digest fires only for silences that are permanent AND aged AND still suppressing alerts (or any silence over a hard volume ceiling) -- a sign the muted condition may have turned into a real, recurring signal that nobody is seeing.",
+      "recommended_action": "Review the listed silences (each shows key, age, and how many alerts it has suppressed). If the underlying condition is genuinely back, clear the mute so the alert surfaces again -- delete the file under ~/agents/state/alert-silenced/ for that key (or call larry_alerts.unsilence). If it is still a known false positive, leave it. This is a route=digest report surfaced in the CEO digest, not a page; thresholds live in scripts/silence_file_auditor.py."
+    }
   }
 }
