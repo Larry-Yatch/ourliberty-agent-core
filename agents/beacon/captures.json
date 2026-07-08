@@ -1511,6 +1511,64 @@
         "from_state": "parked"
       },
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+    },
+    {
+      "id": "cap-run-sort-once-cleanup-of-352-stale-tier-4-asks-a-bbf0",
+      "title": "Run sort-once cleanup of 352 stale tier-4 asks after completeness PR-1 lands",
+      "note": "Larry decided 2026-07-07: one grouped sort-once pass over the open tier-4 alert asks (352 at decision time), AFTER completeness PR-1 merges so the decision-outcome ledger records the dispositions. One grouped approval per class (keep/retire/park), not per-item. Context: ol-work/completeness-architecture-design.md v2 + memory alert-system-default-deny-northstar.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "main",
+        "captured_at": "2026-07-08T03:11:24.052756+00:00"
+      },
+      "last_touched": "2026-07-08T03:11:24.052756+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "A one-time cleanup to sort through 352 old, low-priority alerts that have been piling up unanswered.",
+        "why": "Clearing this backlog keeps your alerts trustworthy, so the ones that reach you are the ones that actually need your attention.",
+        "suggest": "Wait until the record-keeping update is in place, then do it in one grouped pass where you approve each batch at once instead of item-by-item \u2014 it's low-stakes, so no rush."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-08T03:15:20.936075+00:00",
+        "from_state": "parked"
+      }
+    },
+    {
+      "id": "cap-add-monthly-digest-line-for-proposed-mission-pil-7457",
+      "title": "Add monthly digest line for proposed-mission pile (extend parked-aging-digest)",
+      "note": "Larry decided 2026-07-07: the proposed-mission pile (239 cards, median age 25d) gets one line per month in the existing parked-aging digest \u2014 count, oldest age, top 3 by relevance. Never auto-retire (park-dont-decay). Small build: extend the script behind ourliberty-parked-aging-digest.timer. Context: memory alert-system-default-deny-northstar decision 3.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "main",
+        "captured_at": "2026-07-08T03:11:24.452926+00:00"
+      },
+      "last_touched": "2026-07-08T03:11:24.452926+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "A once-a-month status line showing how many parked mission ideas are piling up, how old the oldest is, and the three most relevant ones.",
+        "why": "It keeps 239 shelved ideas visible so good ones don't quietly rot, without ever forcing you to throw any away.",
+        "suggest": "Go ahead \u2014 it's a small, low-stakes add to a report you already get, so approve it and move on."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-08T03:15:20.936075+00:00",
+        "from_state": "parked"
+      }
     }
   ]
 }
