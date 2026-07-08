@@ -85,6 +85,7 @@ import larry_alerts                # noqa: E402
 import mirror_review_handler as mrh  # noqa: E402
 import no_session_ledger            # noqa: E402  # S1: cold-start obligation ledger
 import rebase_obligation_ledger     # noqa: E402  # post-open auto-rebase obligation ledger
+import revision_in_flight_ledger    # noqa: E402  # dup-review guard: Forge revision-in-flight flag
 import routing_validator            # noqa: E402  # allowed_repos source of truth
 import safe_write_inbox             # noqa: E402
 import sequence_shortcut_helpers as ssh  # noqa: E402  # V6: step-merged signal
@@ -4428,6 +4429,31 @@ def _dispatch_mirror_review(
             review_head_sha = _gh_pr_head_sha(_pr_coords[0], _pr_coords[1])
     if review_head_sha:
         review_base['head_sha'] = review_head_sha
+    # Revision-in-flight suppression (notifier-concurrent-scan-dup-review-dispatch-001).
+    # When Mirror emitted REVIEW_REVISION, _dispatch_revision_to_forge wrote a
+    # revision task to Forge and set a durable flag; the PR stays OPEN at the
+    # same head while Forge works. In that window the concurrent reconcile sweep
+    # can read the PR as "needs review" (round-0 review file archived, PR still
+    # open) and re-enter here — spawning a DUPLICATE review of a PR mid-revision.
+    # The legitimate re-review AFTER Forge pushes is dispatched by
+    # _dispatch_mirror_review_rerun (which clears the flag), never here. Suppress
+    # only when the revision is in flight AT THIS SAME head: a landed revision
+    # produces a NEW head, so the guard lets that re-review through (head compare
+    # inside is_in_flight). A TTL bounds a crashed-mid-revision Forge so the
+    # reconcile net can still recover the PR once it lapses. This is an ADDITIONAL
+    # guard alongside the round-0 head_sha dedup, not a replacement.
+    if revision_in_flight_ledger.is_in_flight(
+        task_id, current_head_sha=review_head_sha,
+    ):
+        log(
+            f'MIRROR_REVIEW_SUPPRESSED_REVISION_IN_FLIGHT task={task_id} '
+            f'pr={pr_url} head={review_head_sha} — a Forge revision is in '
+            f'flight for this PR at this head; not dispatching a duplicate '
+            f'review (the legitimate re-review fires via '
+            f'_dispatch_mirror_review_rerun once Forge pushes)',
+            'INFO',
+        )
+        return
     # Deep-review-hold suppression (review-dispatch-post-auto-merge-held). If
     # this PR is parked in AUTO_MERGE_HELD_DEEP_REVIEW at this SAME head, a new
     # review would only re-PASS and re-arm the merge gate — the wasteful loop.
@@ -5149,6 +5175,20 @@ def _dispatch_revision_to_forge(
             f'revision-{next_count} dispatched forge <- beacon '
             f'(task={task_id}, file={dest.name}, {resume_note})'
         )
+        # Set the revision-in-flight flag ONLY after the revision task actually
+        # landed in Forge's inbox (this success branch — not the DM-to-Larry or
+        # missing-target_repo early-returns, which write no Forge task). Keyed on
+        # the PR head the revision targets so the guard in _dispatch_mirror_review
+        # suppresses a concurrent reconcile-scan duplicate review at THIS head,
+        # while letting the legitimate new-head re-review through. Cold-start
+        # revisions write a real (fresh) Forge task, so they set the flag too.
+        # (notifier-concurrent-scan-dup-review-dispatch-001)
+        revision_in_flight_ledger.mark_in_flight(
+            task_id,
+            head_sha=data.get('head_sha'),
+            pr_url=pr_url,
+            round_num=next_count,
+        )
         if cold_start:
             _open_cold_start_obligation()
     except (
@@ -5698,6 +5738,13 @@ def _dispatch_mirror_review_rerun(
     same session.
     """
     task_id = data.get('task_id') or 'unknown'
+    # Clear the revision-in-flight flag: Forge has pushed her revision (that is
+    # what triggered this re-review), so the in-flight window is over and this
+    # legitimate re-review must NOT be suppressed. Cleared up front so it happens
+    # even if a downstream early-return (missing target_repo/pr_url, terminal PR)
+    # aborts the re-review dispatch. Idempotent no-op when no flag is set.
+    # (notifier-concurrent-scan-dup-review-dispatch-001)
+    revision_in_flight_ledger.clear(task_id)
     target_repo = data.get('target_repo')
     if not target_repo:
         # M3: derive target_repo from the task's chain_events before dead-ending.
@@ -12043,6 +12090,11 @@ def process_outbox(outbox_file: Path) -> str:
             no_session_ledger.resolve_obligation(
                 _merged_task_id, resolution='already-merged',
             )
+            # Clear any dangling revision-in-flight flag: the PR merged/closed
+            # mid-revision, so no re-review will fire to clear it via the rerun
+            # path. Idempotent no-op when none is set.
+            # (notifier-concurrent-scan-dup-review-dispatch-001)
+            revision_in_flight_ledger.clear(_merged_task_id)
             for_larry_escalations.clear(_no_session_record_id(_merged_task_id))
             _archive_outbox(outbox_file)
             return 'review-revision-already-merged'
@@ -12375,6 +12427,13 @@ def process_outbox(outbox_file: Path) -> str:
                     data.get('task_id') or 'unknown',
                     resolution=str(_mtype).replace('review_', ''),
                 )
+                # Clear any dangling revision-in-flight flag on a terminal Mirror
+                # verdict (the loop ended — pass/escalate/emergency, or a
+                # revision that downgraded to escalate). Normally the rerun path
+                # already cleared it; this is the belt-and-suspenders for a loop
+                # that terminated without a fresh rerun dispatch. Idempotent.
+                # (notifier-concurrent-scan-dup-review-dispatch-001)
+                revision_in_flight_ledger.clear(data.get('task_id') or 'unknown')
                 # mirror-review-visibility (Contract C/D, decision d): the
                 # trigger for a no-session action-needed record is the OPEN
                 # obligation / unrecovered PR. A terminal verdict clears that
