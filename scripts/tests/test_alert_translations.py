@@ -525,6 +525,25 @@ class LookupRuleTest(unittest.TestCase):
         self.assertEqual(t['severity'], 'INFO')
         self.assertEqual(t['tier'], 'FYI')
 
+    def test_sentinel_in_flight_stall_full_path_subject(self):
+        # dispatch_sentinel emits subject='in-flight-stall:<full path>' (the
+        # path uses '/', so the only viable key is the stripped prefix
+        # 'in-flight-stall'). The entry must be the silenceable Tier-3 shape:
+        # INFO/FYI with NO never_silence, so Check 0 mutes it to the digest
+        # (the reaper auto-recovers both wt-mirror-* and wt-forge-* stalls).
+        t = larry_alerts.translate_alert(
+            'sentinel',
+            'in-flight-stall:/home/larry/agents/state/in-flight/build-xyz.json',
+        )
+        self.assertIsNotNone(t)
+        self.assertEqual(t['severity'], 'INFO')
+        self.assertEqual(t['tier'], 'FYI')
+        self.assertFalse(
+            t.get('never_silence'),
+            'sentinel in-flight-stall must stay silenceable (Tier-3 to digest) '
+            '— a never_silence flag would force-surface auto-remediated noise',
+        )
+
     def test_pulse_check_stale_id_suffix_translates(self):
         # Decision 4: the watcher emits pulse-check-stale:<id>; the id-suffixed
         # subject must strip back to the 'pulse-check-stale' entry and render.
