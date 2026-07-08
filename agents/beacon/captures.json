@@ -1476,6 +1476,36 @@
         "at": "2026-07-08T00:04:21.515203+00:00",
         "from_state": "parked"
       }
+    },
+    {
+      "id": "cap-rotate-the-cycle-journal-31mb-file-committed-eve-69e7",
+      "title": "Rotate the /cycle journal \u2014 31MB file committed every Pulse iteration bloats git",
+      "note": "ROOT CAUSE of the 2026-07-07 droplet overload: the cycle journal markdown is a 31MB append-only file re-committed every ~15min Pulse cycle; each commit stores a full ~4.5MB-compressed blob. ~8000 loose objects / 3.9GB piled up in agent-core/.git, git gc --auto fired and starved the box (load 9, Mirror review timeouts on PRs 838/839). Fix: rotate the journal \u2014 keep last N entries in the committed file (cycle-prompt.md only reads last 5-10), archive older entries outside git or compressed. Also: gc.auto is now 0 on the droplet agent-core clone (throttled one-shot repack draining the backlog 2026-07-07, log ~/agents/logs/agentcore-repack-oneshot.log); after rotation lands, decide gc policy (re-enable gc.auto or scheduled off-hours repack).",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": null,
+        "branch": null,
+        "captured_at": "2026-07-08T00:07:48.149511+00:00"
+      },
+      "last_touched": "2026-07-08T00:07:48.149511+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "A background housekeeping file has quietly grown huge and is being re-saved every few minutes, which recently overloaded the server and slowed things down.",
+        "why": "Left alone it keeps piling up storage and can stall the whole system at random moments, exactly like the slowdown we just hit today.",
+        "suggest": "Trim the file down to only the recent entries it actually needs and tuck the rest away \u2014 worth doing soon, but carefully and tested first since it touches the running system."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-08T00:14:30.501617+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     }
   ]
 }
