@@ -1675,6 +1675,11 @@
         "model": "claude-opus-4-8",
         "at": "2026-07-08T03:25:23.242248+00:00",
         "from_state": "parked"
+      },
+      "spawned": {
+        "kind": "delegate",
+        "task_id": "delegate-cap-verify-pr-3-sentinel-has-self-firing-arming-appr-b272",
+        "stamped_at": "2026-07-08T04:22:09.491480+00:00"
       }
     }
   ]
