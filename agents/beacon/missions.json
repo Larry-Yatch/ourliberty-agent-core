@@ -7641,7 +7641,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-08T20:44:46.116335+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-08T20:44:29.527226+00:00"
+      "orphan_last_activity_ts": "2026-07-08T20:44:29.527226+00:00",
+      "briefing": {
+        "what": "A new piece of work the team kicked off on its own that hasn't been tied to any goal yet, now waiting for a sign-off.",
+        "why": "Loose, unassigned work can quietly pull time away from your priorities and pile up if no one decides where it fits.",
+        "suggest": "Take a quick look before waving it through \u2014 confirm it's worth doing and connect it to a real goal, or set it aside until it earns a place."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-08T20:44:50.100031+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-direction-ask-notifier-gh-rate-limit-no-backoff-3of3-001",
@@ -7658,7 +7672,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-08T20:44:46.116335+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-08T20:32:10.817779+00:00"
+      "orphan_last_activity_ts": "2026-07-08T20:32:10.817779+00:00",
+      "briefing": {
+        "what": "The system that pings you when a decision is needed can get temporarily silenced when we make too many requests too fast, and this is the final piece of work to fix that.",
+        "why": "If those pings go quiet, decisions you need to weigh in on could sit unnoticed and stall the team.",
+        "suggest": "Give this the go-ahead to finish, but have someone confirm the notifications actually come through reliably before we call it done."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-08T20:44:50.100031+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
