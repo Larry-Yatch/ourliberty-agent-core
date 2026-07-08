@@ -598,18 +598,85 @@ class SpecDocPresenceTest(unittest.TestCase):
 
 
 class SpecDocCliTest(unittest.TestCase):
-    """CLI `check-spec-doc <seq-id|path>` against the real repo checkout
-    (origin/main resolves), exercising the present and not-authored exit
-    codes. The behind-origin branch is covered hermetically at the function
-    level (SpecDocPresenceTest) since it needs a crafted git state."""
+    """CLI `check-spec-doc <seq-id|path>` exit-code coverage.
+
+    Hermetic: instead of leaning on the ambient checkout (whose `origin/main`
+    only resolves when the surrounding worktree happened to fetch it — the
+    non-determinism that false-BLOCKed clean PRs #838/#839/#849 under the
+    regression gate), every git-touching case runs against a throwaway git
+    repo built under a /tmp TemporaryDirectory. The CLI is pointed at the
+    fixture via SPEC_DOC_REPO_ROOT_ENV, so `origin/main` deterministically
+    resolves regardless of the ambient checkout's fetch state. The env seam is
+    inert when unset (production behavior unchanged)."""
+
+    PRESENT_SPEC = 'agents/beacon/specs/present.md'
+    ABSENT_SPEC = 'agents/beacon/specs/__this_spec_does_not_exist__.md'
+    BEHIND_SPEC = 'agents/beacon/specs/behind-origin.md'
 
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
         self.tmpdir = Path(self._tmp.name)
         self.script = _SCRIPTS_DIR / 'build_sequence_validator.py'
+        # Isolate git from any ambient user/system config and supply a fixed
+        # identity so commits succeed without touching the real gitconfig.
+        self._git_env = {
+            **os.environ,
+            'GIT_CONFIG_GLOBAL': os.devnull,
+            'GIT_CONFIG_SYSTEM': os.devnull,
+            'GIT_AUTHOR_NAME': 'Forge Test',
+            'GIT_AUTHOR_EMAIL': 'forge-test@example.invalid',
+            'GIT_COMMITTER_NAME': 'Forge Test',
+            'GIT_COMMITTER_EMAIL': 'forge-test@example.invalid',
+        }
+        self.repo = self._build_fixture_repo()
 
     def tearDown(self):
         self._tmp.cleanup()
+
+    def _git(self, cwd: Path, *args: str) -> None:
+        subprocess.run(
+            ['git', '-C', str(cwd), *args],
+            check=True, capture_output=True, text=True,
+            env=self._git_env, timeout=30,
+        )
+
+    def _commit_spec(self, work: Path, rel_spec: str, msg: str) -> None:
+        target = work / rel_spec
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(f'# {rel_spec}\n')
+        self._git(work, 'add', rel_spec)
+        self._git(work, 'commit', '-m', msg)
+
+    def _build_fixture_repo(self) -> Path:
+        """Init a work repo, commit PRESENT_SPEC, push `main` to a local bare
+        origin, and fetch so `origin/main` resolves. Then advance origin with
+        BEHIND_SPEC while resetting the work tree back — so BEHIND_SPEC exists
+        on origin/main but not in the working copy (the behind-origin case),
+        and ABSENT_SPEC exists in neither (the not-authored case)."""
+        work = self.tmpdir / 'work'
+        origin = self.tmpdir / 'origin.git'
+        work.mkdir()
+        self._git(work, 'init', '-q')
+        # Version-robust default-branch pin (older git lacks `init -b`).
+        self._git(work, 'symbolic-ref', 'HEAD', 'refs/heads/main')
+        self._commit_spec(work, self.PRESENT_SPEC, 'add present spec')
+
+        subprocess.run(
+            ['git', 'init', '-q', '--bare', str(origin)],
+            check=True, capture_output=True, text=True,
+            env=self._git_env, timeout=30,
+        )
+        self._git(work, 'remote', 'add', 'origin', str(origin))
+        self._git(work, 'push', '-q', '-u', 'origin', 'main')
+
+        # Advance origin/main by one commit that adds BEHIND_SPEC, then move the
+        # local branch + work tree back so that file is present on origin/main
+        # but absent locally. The push updates the origin/main tracking ref to
+        # the advanced commit; the reset leaves that ref untouched.
+        self._commit_spec(work, self.BEHIND_SPEC, 'add spec that lands on origin only')
+        self._git(work, 'push', '-q', 'origin', 'main')
+        self._git(work, 'reset', '--hard', '-q', 'HEAD~1')
+        return work
 
     def _seq_file(self, spec_doc: str) -> Path:
         f = self.tmpdir / 'seq.json'
@@ -618,28 +685,51 @@ class SpecDocCliTest(unittest.TestCase):
         f.write_text(json.dumps(seq))
         return f
 
-    def _run(self, path: Path) -> subprocess.CompletedProcess:
+    def _run(self, path: Path, *, use_fixture: bool = True
+             ) -> subprocess.CompletedProcess:
+        env = {**os.environ}
+        if use_fixture:
+            env[bsv.SPEC_DOC_REPO_ROOT_ENV] = str(self.repo)
+        else:
+            env.pop(bsv.SPEC_DOC_REPO_ROOT_ENV, None)
         return subprocess.run(
             [sys.executable, str(self.script), 'check-spec-doc', str(path)],
-            capture_output=True, text=True, timeout=30,
+            capture_output=True, text=True, timeout=30, env=env,
         )
 
     def test_cli_present_spec_exits_zero(self):
-        # A file that exists in this checkout, relative to the repo root.
-        proc = self._run(self._seq_file('agents/mirror/CLAUDE.md'))
+        # Present in the fixture working copy → short-circuits before git.
+        proc = self._run(self._seq_file(self.PRESENT_SPEC))
         self.assertEqual(proc.returncode, 0, msg=proc.stderr)
         self.assertIn('OK', proc.stdout)
 
     def test_cli_absent_spec_exits_one_not_authored(self):
-        proc = self._run(self._seq_file(
-            'agents/beacon/specs/__this_spec_does_not_exist__.md'))
-        self.assertEqual(proc.returncode, 1)
+        # Absent locally AND on origin/main (which resolves in the fixture) →
+        # deterministically NOT_AUTHORED. This is the branch that flaked to
+        # INDETERMINATE (exit 0) whenever the ambient origin/main didn't fetch.
+        proc = self._run(self._seq_file(self.ABSENT_SPEC))
+        self.assertEqual(proc.returncode, 1, msg=proc.stdout)
         self.assertIn('NOT_AUTHORED', proc.stderr)
+
+    def test_cli_behind_origin_spec_exits_three(self):
+        # Present on origin/main, absent in the working copy → behind-origin.
+        proc = self._run(self._seq_file(self.BEHIND_SPEC))
+        self.assertEqual(proc.returncode, 3, msg=proc.stdout + proc.stderr)
+        self.assertIn('BEHIND_ORIGIN', proc.stderr)
 
     def test_cli_missing_sequence_file_exits_one(self):
         proc = self._run(self.tmpdir / 'nope.json')
         self.assertEqual(proc.returncode, 1)
         self.assertIn('not a file', proc.stderr)
+
+    def test_env_seam_inert_when_unset(self):
+        # With the seam unset, the CLI anchors at REPO_ROOT (the ambient
+        # checkout). A file that exists in this repo resolves PRESENT without
+        # any git probe, proving the unset path preserves production behavior.
+        proc = self._run(self._seq_file('agents/mirror/CLAUDE.md'),
+                         use_fixture=False)
+        self.assertEqual(proc.returncode, 0, msg=proc.stderr)
+        self.assertIn('OK', proc.stdout)
 
 
 if __name__ == '__main__':
