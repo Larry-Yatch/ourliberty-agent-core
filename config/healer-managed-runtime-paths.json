@@ -4,7 +4,13 @@
     "agents/beacon/missions.json",
     "agents/beacon/projects.json"
   ],
+  "committers": [
+    {"path": "agents/beacon/missions.json", "committer": "heal_missions_card_gc", "cadence_min": 10},
+    {"path": "agents/beacon/captures.json", "committer": "heal_missions_card_gc", "cadence_min": 10},
+    {"path": "agents/beacon/projects.json", "committer": "heal_projects_store", "cadence_min": 10}
+  ],
   "_meta": {
-    "purpose": "Working-tree files written by a healer/ingest on its own cadence and committed by a SOLE healer-committer on a timer. A working tree whose ONLY dirt is these paths is nominal-by-design, not a discipline violation. Consumed by sync_agent_core.sh, heal_droplet_git_drift.py, and Pulse cycle Check A."
+    "purpose": "Working-tree files written by a healer/ingest on its own cadence and committed by a SOLE healer-committer on a timer. A working tree whose ONLY dirt is these paths is nominal-by-design, not a discipline violation. Consumed by sync_agent_core.sh, heal_droplet_git_drift.py, and Pulse cycle Check A.",
+    "paths_vs_committers": "`paths` is the flat backward-compat list (existing consumers subtract it from the dirty set so managed dirt never pages on the 6h newest-mtime gate). `committers` is the PR-3 R1 extension: each entry names the SOLE committer that commits that path and its commit cadence_min, so the G7 delta-age evaluator can detect a WEDGED committer — a managed path continuously dirty for longer than max(3x cadence_min, 45min) means its committer died, which the newest-mtime gate can never catch because the ingest writer keeps the mtime fresh. The two lists must stay consistent: every committers[].path SHOULD appear in paths."
   }
 }

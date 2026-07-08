@@ -1,0 +1,15 @@
+[Unit]
+Description=Run the terminal-event fan-out sentinel every 15 min (completeness PR-3)
+
+[Timer]
+# OnCalendar (NOT OnUnitActiveSec) per the OnUnitActiveSec-dies-when-stopped
+# lesson — an absolute wall-clock schedule keeps firing even after a missed/slow
+# run. Every 15 min per spec § 1. The :09/15 offset avoids colliding with the
+# :0/5 and :17/30 heal-timer slots.
+OnCalendar=*-*-* *:09/15:00
+Persistent=true
+RandomizedDelaySec=45
+Unit=ourliberty-pr-terminal-fanout.service
+
+[Install]
+WantedBy=timers.target
