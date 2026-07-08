@@ -44,6 +44,8 @@ class _IsolatedQueueTest(unittest.TestCase):
                               self._tmp_path / 'state' / 'alert-cooldown'),
             mock.patch.object(larry_alerts, 'SILENCE_ROOT',
                               self._tmp_path / 'state' / 'alert-silenced'),
+            mock.patch.object(larry_alerts, 'SILENCE_COUNTER_ROOT',
+                              self._tmp_path / 'state' / 'alert-silenced-counts'),
             mock.patch.object(larry_alerts, 'OFFSET_FILE',
                               self._tmp_path / 'state' / 'beacon-alerts-offset.txt'),
         ]
@@ -626,6 +628,40 @@ class SilenceLayerTest(_IsolatedQueueTest):
         key = 'forge:' + ('x' * 400)
         self.assertTrue(larry_alerts.silence(key))
         self.assertTrue(larry_alerts.is_silenced(key))
+
+
+class SilenceSuppressCounterTest(_IsolatedQueueTest):
+    """Item (e)/G8: each suppression by a silence bumps a per-key counter so the
+    auditor can see how much a silence is actually eating."""
+
+    FP = 'heal:forge-no-pr:task-123'
+
+    def _src_subj(self):
+        src, subj = self.FP.split(':', 1)
+        return src, subj
+
+    def test_no_count_when_not_silenced(self):
+        self.assertEqual(larry_alerts.silence_suppressed_count(self.FP), 0)
+
+    def test_each_suppression_increments_counter(self):
+        src, subj = self._src_subj()
+        larry_alerts.silence(self.FP)
+        for _ in range(3):
+            self.assertFalse(
+                larry_alerts.append_alert(src, 'warning', 'stall', subject=subj))
+        self.assertEqual(larry_alerts.silence_suppressed_count(self.FP), 3)
+
+    def test_delivered_alert_does_not_increment(self):
+        # A NON-silenced alert must not touch the suppressed counter.
+        larry_alerts.append_alert('watchdog', 'critical', 'disk', subject='d')
+        self.assertEqual(
+            larry_alerts.silence_suppressed_count('watchdog:d'), 0)
+
+    def test_corrupt_counter_reads_zero(self):
+        path = larry_alerts._silence_counter_path(self.FP)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text('not json{')
+        self.assertEqual(larry_alerts.silence_suppressed_count(self.FP), 0)
 
 
 class ResolveAlertTest(unittest.TestCase):

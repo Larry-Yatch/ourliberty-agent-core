@@ -620,12 +620,15 @@ class TestTriageExecutionRecording(_ATSTestBase):
         return doc.get('action_templates', {}).get(template, {}).get(
             'executions', [])
 
-    def test_tier1_records_one_clean_execution(self):
+    def test_tier1_records_one_unverified_execution(self):
+        # Item (d): a fix that just ran is 'unverified' by default — the fix
+        # executed but no verifier has confirmed the fault cleared. Only a
+        # verifier path upgrades it to 'success'.
         self._triage('a-grad', {'source': 's', 'subject': 'sub',
                                 'template': 'reinstall-systemd-unit'})
         execs = self._execs('reinstall-systemd-unit')
         self.assertEqual(len(execs), 1)
-        self.assertEqual(execs[0]['outcome'], 'success')
+        self.assertEqual(execs[0]['outcome'], 'unverified')
         self.assertFalse(execs[0]['larry_correction_signal'])
 
     def test_tier2_approved_records_execution_and_dispatches(self):
@@ -635,8 +638,17 @@ class TestTriageExecutionRecording(_ATSTestBase):
         self.assertEqual(row['status'], 'action-dispatched')
         execs = self._execs('restart-daemon')
         self.assertEqual(len(execs), 1)
-        self.assertEqual(execs[0]['outcome'], 'success')
+        self.assertEqual(execs[0]['outcome'], 'unverified')
         self.assertFalse(execs[0]['larry_correction_signal'])
+
+    def test_explicit_success_outcome_is_honored(self):
+        # A verifier path passes outcome='success' explicitly -> recorded as-is.
+        self._triage('a-grad', {'source': 's', 'subject': 'sub',
+                                'template': 'reinstall-systemd-unit'},
+                     outcome='success')
+        execs = self._execs('reinstall-systemd-unit')
+        self.assertEqual(len(execs), 1)
+        self.assertEqual(execs[0]['outcome'], 'success')
 
     def test_tier2_without_approval_records_nothing(self):
         row = self._triage('a-prob', {'source': 's', 'subject': 'sub',
@@ -659,6 +671,40 @@ class TestTriageExecutionRecording(_ATSTestBase):
         execs = self._execs('restart-daemon')
         self.assertEqual(len(execs), 1)
         self.assertEqual(execs[0]['outcome'], 'failure')
+
+
+class TestOutcomeDefaults(_ATSTestBase):
+    """Item (d): 'unverified' is a first-class outcome and the recorder default;
+    the triage-alert CLI exposes a validated --outcome flag."""
+
+    def test_valid_outcomes_membership(self):
+        self.assertEqual(set(ats.VALID_OUTCOMES),
+                         {'success', 'failure', 'unverified'})
+
+    def test_record_execution_defaults_to_unverified(self):
+        ats.record_action_template_execution('some-template')
+        doc = json.loads((self.tmp / ats.ACTION_TEMPLATE_EXEC_REL).read_text())
+        execs = doc['action_templates']['some-template']['executions']
+        self.assertEqual(execs[-1]['outcome'], 'unverified')
+
+    def test_record_execution_rejects_unknown_outcome(self):
+        with self.assertRaises(ValueError):
+            ats.record_action_template_execution('t', outcome='bogus')
+
+    def test_cli_outcome_flag_rejects_invalid_choice(self):
+        with self.assertRaises(SystemExit):
+            ats.main(['triage-alert', '--alert-id', 'x',
+                      '--alert', '{}', '--outcome', 'bogus'])
+
+    def test_cli_outcome_flag_accepts_valid_choice(self):
+        from io import StringIO
+        from contextlib import redirect_stdout
+        buf = StringIO()
+        with redirect_stdout(buf):
+            rc = ats.main(['triage-alert', '--alert-id', 'x',
+                           '--alert', json.dumps({'source': 's', 'subject': 'sub'}),
+                           '--outcome', 'unverified'])
+        self.assertEqual(rc, 0)
 
 
 class TestWatermark(_ATSTestBase):

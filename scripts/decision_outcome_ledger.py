@@ -85,7 +85,7 @@ import json
 import os
 import sys
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -104,6 +104,13 @@ VALID_OUTCOMES = ('approved', 'rejected', 'modified', 'expired')
 # a classifier return value. A recorded build_outcome row is terminal.
 VALID_BUILD_OUTCOMES = ('merged', 'merged_regressed', 'closed_unmerged')
 
+# A `closed_unmerged` outcome is NOT permanently terminal: a CLOSED PR can be
+# reopened and merged. So a closed_unmerged row younger than the settle period
+# is RE-CHECKABLE — the reconciler re-probes it each pass and a later `merged`
+# supersedes it (readers take the newest row per key). Past the settle window
+# the abandonment is treated as final and the key stops being re-checked.
+SETTLE_PERIOD_DAYS = 14
+
 
 def _log(level: str, msg: str) -> None:
     """Append a structured line to the ledger's own log. Never raises; if the
@@ -116,6 +123,19 @@ def _log(level: str, msg: str) -> None:
             f.write(f'[{ts}] [{level}] decision_outcome_ledger: {msg}\n')
     except OSError:
         pass
+
+
+def _parse_ts(ts) -> Optional[datetime]:
+    """Parse an ISO-8601 ledger `ts` to a tz-aware datetime, or None if it is
+    missing/unparseable. A naive timestamp is assumed UTC (the writer always
+    stamps tz-aware UTC; the fallback is defensive)."""
+    if not isinstance(ts, str) or not ts:
+        return None
+    try:
+        dt = datetime.fromisoformat(ts)
+    except ValueError:
+        return None
+    return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
 
 
 def _iter_records():
@@ -247,6 +267,65 @@ def has_build_outcome(decision_key: str) -> bool:
     return False
 
 
+def _latest_build_outcome_records(records) -> dict:
+    """{decision_key: newest build_outcome RECORD}. `records` is yielded
+    oldest-first, so the last write per key wins — a later `merged` row
+    supersedes an earlier `closed_unmerged` (readers take the newest row per
+    key). Empty-key rows are ignored (a build outcome needs a join target)."""
+    latest: dict = {}
+    for rec in records:
+        if rec.get('kind') != 'build_outcome':
+            continue
+        key = rec.get('decision_key')
+        if isinstance(key, str) and key:
+            latest[key] = rec
+    return latest
+
+
+def _is_recheckable(rec: Optional[dict], now: datetime) -> bool:
+    """True if a build_outcome record is a `closed_unmerged` still inside the
+    settle window (SETTLE_PERIOD_DAYS) — so a later reopen+merge can still
+    supersede it. Any other outcome, or a closed_unmerged past the window, is
+    final. An unparseable ts is treated as settled (don't churn on bad data)."""
+    if not isinstance(rec, dict) or rec.get('build_outcome') != 'closed_unmerged':
+        return False
+    dt = _parse_ts(rec.get('ts'))
+    if dt is None:
+        return False
+    return (now - dt) < timedelta(days=SETTLE_PERIOD_DAYS)
+
+
+def latest_build_outcomes() -> dict:
+    """{decision_key: newest build_outcome VALUE} across the whole ledger.
+    Newest row wins per key (so a corrected `merged` is what reads back). The
+    reconciler uses this to record only a SUPERSEDING verdict and never
+    re-append an unchanged closed_unmerged row during its re-check window."""
+    latest = _latest_build_outcome_records(_iter_records())
+    return {k: r.get('build_outcome') for k, r in latest.items()}
+
+
+def latest_build_outcome(decision_key: str) -> Optional[str]:
+    """The newest build_outcome verdict for one key, or None. Newest row wins,
+    so this returns the CORRECTED outcome after a supersede (not the earlier
+    closed_unmerged)."""
+    if not isinstance(decision_key, str) or not decision_key:
+        return None
+    return latest_build_outcomes().get(decision_key)
+
+
+def is_recheckable_closed_unmerged(decision_key: str,
+                                   now: Optional[datetime] = None) -> bool:
+    """True if the key's NEWEST build_outcome is a `closed_unmerged` still
+    inside the settle window — i.e. the reconciler should re-check it because a
+    reopen+merge can still supersede. Backs the (b) re-check semantics: the
+    'already has an outcome' skip must NOT block this correction."""
+    if not isinstance(decision_key, str) or not decision_key:
+        return False
+    now = now or datetime.now(timezone.utc)
+    rec = _latest_build_outcome_records(_iter_records()).get(decision_key)
+    return _is_recheckable(rec, now)
+
+
 def records_for_key(decision_key: str) -> list[dict]:
     """All records for one canonical decision key, oldest first. Empty key or
     missing/malformed file -> []. Backs the later build-result join (match a
@@ -273,37 +352,44 @@ def outcome_counts(actor: Optional[str] = None) -> dict:
     return dict(counts)
 
 
-def decision_keys_without_outcome(limit: int = 500) -> list[str]:
-    """Distinct decision_keys from DECISION rows (kind 'decision' or, for
-    forward-compat with pre-`kind` rows, missing) that do NOT yet have a
-    build_outcome row — the reconciler's work-list. Empty keys are excluded (a
-    build outcome needs a join target). Scans at most the last `limit` rows for
-    bounded cost; oldest-first among the returned distinct keys. Missing /
-    malformed file -> [].
+def decision_keys_without_outcome(limit: int = 500,
+                                  now: Optional[datetime] = None) -> list[str]:
+    """Distinct decision_keys (from DECISION rows — kind 'decision', or missing
+    for forward-compat with pre-`kind` rows) that still need a reconcile check —
+    the reconciler's work-list. A key qualifies when it has NO build_outcome
+    row, OR its NEWEST build_outcome is a re-checkable `closed_unmerged` still
+    inside the settle window (a closed PR can be reopened + merged, so an
+    un-settled abandonment is not yet final). Keys whose newest outcome is
+    terminal-and-settled (merged / merged_regressed / a settled closed_unmerged)
+    are excluded. Empty keys are excluded (a build outcome needs a join target).
 
-    KNOWN LIMITATION: a decision whose row scrolls past the last `limit` rows
-    before its PR reaches a terminal state is never reconciled (missing data, not
-    wrong data — `has_build_outcome` scans the whole file, so idempotency is
-    unaffected). At current approval volume `limit=500` spans far longer than a
-    PR stays open, so this is theoretical; if volume rises or PRs stay open for
-    weeks, raise `limit` or walk unresolved decisions regardless of recency."""
-    recent = read_recent(limit)
-    if not recent:
+    WHOLE-FILE SCAN (not a windowed one): build_outcome rows share this file, so
+    the resolved-set MUST be computed over the entire ledger — a window-scoped
+    scan could re-list a key resolved long ago whose decision row happens to
+    fall in the recent window. The scan is O(rows); `limit` caps the RETURNED
+    work-list (bounding the gh calls a single reconcile tick makes), not the
+    rows examined. Oldest-first among returned keys. Missing/malformed file ->
+    []."""
+    now = now or datetime.now(timezone.utc)
+    records = list(_iter_records())
+    if not records:
         return []
-    resolved = {r.get('decision_key') for r in recent
-                if r.get('kind') == 'build_outcome'}
+    latest = _latest_build_outcome_records(records)
     out: list[str] = []
     seen: set = set()
-    for rec in recent:
+    for rec in records:
         if rec.get('kind') == 'build_outcome':
             continue
         key = rec.get('decision_key')
-        if not isinstance(key, str) or not key:
-            continue
-        if key in resolved or key in seen:
+        if not isinstance(key, str) or not key or key in seen:
             continue
         seen.add(key)
+        bo = latest.get(key)
+        if bo is not None and not _is_recheckable(bo, now):
+            continue  # terminal-and-settled -> resolved, skip
         out.append(key)
+        if len(out) >= limit:
+            break
     return out
 
 

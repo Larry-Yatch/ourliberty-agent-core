@@ -233,6 +233,53 @@ class DecisionKeysWithoutOutcomeTest(_IsolatedLedger):
         self.assertEqual(dol.decision_keys_without_outcome(), [])
 
 
+class ClosedUnmergedRecheckTest(_IsolatedLedger):
+    """Item (b): a closed_unmerged is re-checkable inside the settle window; a
+    later merged supersedes (newest row wins); the work-list re-lists an
+    un-settled closed_unmerged and drops it once settled."""
+
+    def _future(self, days: float):
+        from datetime import datetime, timedelta, timezone
+        return datetime.now(timezone.utc) + timedelta(days=days)
+
+    def test_newest_build_outcome_row_wins(self) -> None:
+        dol.record_decision('pr-repo-3', 'approved', actor='x', cleared=1)
+        dol.record_build_outcome('pr-repo-3', 'closed_unmerged', pr_number=3)
+        dol.record_build_outcome('pr-repo-3', 'merged', pr_number=3)
+        self.assertEqual(dol.latest_build_outcome('pr-repo-3'), 'merged')
+
+    def test_recheckable_true_inside_window_false_after(self) -> None:
+        dol.record_decision('pr-repo-4', 'approved', actor='x', cleared=1)
+        dol.record_build_outcome('pr-repo-4', 'closed_unmerged', pr_number=4)
+        self.assertTrue(dol.is_recheckable_closed_unmerged('pr-repo-4'))
+        # Past the settle window -> final, no longer re-checkable.
+        self.assertFalse(dol.is_recheckable_closed_unmerged(
+            'pr-repo-4', now=self._future(dol.SETTLE_PERIOD_DAYS + 1)))
+
+    def test_merged_is_never_recheckable(self) -> None:
+        dol.record_decision('pr-repo-5', 'approved', actor='x', cleared=1)
+        dol.record_build_outcome('pr-repo-5', 'merged', pr_number=5)
+        self.assertFalse(dol.is_recheckable_closed_unmerged('pr-repo-5'))
+
+    def test_worklist_relists_unsettled_closed_unmerged(self) -> None:
+        # A closed_unmerged still inside the window is re-listed (the "already
+        # has an outcome" skip must NOT block the correction path); merged is not.
+        dol.record_decision('pr-repo-6', 'approved', actor='x', cleared=1)
+        dol.record_build_outcome('pr-repo-6', 'closed_unmerged', pr_number=6)
+        dol.record_decision('pr-repo-7', 'approved', actor='x', cleared=1)
+        dol.record_build_outcome('pr-repo-7', 'merged', pr_number=7)
+        self.assertEqual(dol.decision_keys_without_outcome(), ['pr-repo-6'])
+
+    def test_worklist_drops_settled_closed_unmerged(self) -> None:
+        dol.record_decision('pr-repo-8', 'approved', actor='x', cleared=1)
+        dol.record_build_outcome('pr-repo-8', 'closed_unmerged', pr_number=8)
+        # Once the window elapses the abandonment is final -> off the work-list.
+        self.assertEqual(
+            dol.decision_keys_without_outcome(
+                now=self._future(dol.SETTLE_PERIOD_DAYS + 1)),
+            [])
+
+
 class ResolveDecisionWiringTest(_IsolatedLedger):
     """Prove the hook in decision_resolve.resolve_decision actually writes a
     ledger row on a genuine resolution — and stays silent on a no-op. Patches

@@ -1,0 +1,13 @@
+[Unit]
+Description=Run silence_file_auditor daily 07:00 (G8 standing check over the alert-silence directory; completeness PR-1)
+
+[Timer]
+# Daily 07:00 local — a standing check; a stale silence is a slow leak, so a
+# daily cadence is ample. Persistent catches a missed run after downtime.
+OnCalendar=*-*-* 07:00:00
+RandomizedDelaySec=300
+Persistent=true
+Unit=ourliberty-silence-file-auditor.service
+
+[Install]
+WantedBy=timers.target

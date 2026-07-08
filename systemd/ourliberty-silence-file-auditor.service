@@ -1,0 +1,35 @@
+[Unit]
+Description=G8 silence-file auditor — list every alert silence with key, age, and suppressed volume; DM a digest for silences still actively eating alerts (completeness PR-1)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/silence_file_auditor.py
+After=network.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+WorkingDirectory=/home/larry/agent-core
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/silence_file_auditor.py --once
+TimeoutStartSec=120
+Nice=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-silence-file-auditor
+
+# Memory cap: bounded directory scan + tiny JSON reads; small.
+MemoryMax=256M
+MemoryHigh=128M
+
+# Hardening — read-mostly standing check: reads the silence dir + counters and
+# writes ONLY the digest alert + logs under ~/agents; reads everything else.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/larry/agents /tmp
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true

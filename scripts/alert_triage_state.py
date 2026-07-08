@@ -97,7 +97,12 @@ ACTION_TEMPLATE_EXEC_REL = 'state/action-template-executions.json'
 
 # A recorded execution's outcome is one of these. "success" + a falsy
 # larry_correction_signal is the only "clean" combination (the streak input).
-VALID_OUTCOMES = ('success', 'failure')
+# "unverified" is the DEFAULT (no execution signal was actually observed): it is
+# neither a success (must not accrue a graduation streak) nor a failure (must
+# not auto-demote) — only a real verifier probe may record "success". This
+# stops a decision-time recording from silently poisoning Check V's graduation
+# feed with unearned successes.
+VALID_OUTCOMES = ('success', 'failure', 'unverified')
 
 # Config inputs for the data-driven § 6.6 decision table. Both are the same
 # files Phase A (#279) shipped + #277 added; read at classify time, never copied.
@@ -460,7 +465,7 @@ def load_executions() -> dict[str, list[dict[str, Any]]]:
 
 
 def record_action_template_execution(
-    template: str, *, outcome: str = 'success',
+    template: str, *, outcome: str = 'unverified',
     larry_correction_signal: bool = False,
     ts: Optional[str] = None,
 ) -> dict[str, Any]:
@@ -470,6 +475,11 @@ def record_action_template_execution(
     it for BOTH Tier-1 auto-fixes AND Tier-2 approved-probation fixes so a
     probation pattern accrues a track record at all. A "clean" execution is
     ``outcome == "success"`` AND ``larry_correction_signal`` falsy.
+
+    ``outcome`` DEFAULTS to ``"unverified"`` — the honest record when no
+    execution signal was actually observed. Only a caller that ran a real
+    verification probe passes ``outcome="success"``; nothing defaults to it.
+    ``"unverified"`` neither accrues a graduation streak nor auto-demotes.
 
     Side effect — auto-demotion (single-sourced in ``pulse_check_v``): when this
     is an ADVERSE execution (``outcome == "failure"`` OR ``larry_correction_signal``)
@@ -748,7 +758,7 @@ def triage_alert(alert_id: str, alert: dict[str, Any], *, iter_num: int = 0,
                  registry: Optional[dict[str, dict[str, Any]]] = None,
                  translations: Optional[dict[str, Any]] = None,
                  route_fn: Optional[Callable[[str, Optional[str], bool], str]] = None,
-                 outcome: str = 'success',
+                 outcome: str = 'unverified',
                  larry_correction_signal: bool = False,
                  apply_approved_fix: bool = False,
                  ) -> dict[str, Any]:
@@ -768,11 +778,13 @@ def triage_alert(alert_id: str, alert: dict[str, Any], *, iter_num: int = 0,
         ``triaged-tier-N`` awaiting Larry (the default Phase-B behavior).
       - Tier 3: silence IS the resolution → advance directly to ``resolved``.
 
-    ``outcome`` (``success``|``failure``) and ``larry_correction_signal`` describe
-    the acted fix's result; the defaults (success, uncorrected) are the clean
-    common case. A recorded failure/correction of a graduated template
-    auto-demotes it immediately (handled inside
-    ``record_action_template_execution``).
+    ``outcome`` (``success``|``failure``|``unverified``) and
+    ``larry_correction_signal`` describe the acted fix's result. The default is
+    ``unverified`` (uncorrected) — the honest record when no verification probe
+    ran: it accrues no graduation streak and triggers no demotion. ``success``
+    is recorded ONLY when a caller passes it explicitly after a real verifier
+    probe. A recorded failure/correction of a graduated template auto-demotes it
+    immediately (handled inside ``record_action_template_execution``).
 
     Idempotency: if the alert is already ``action-dispatched`` or ``resolved``,
     return the existing row unchanged — no re-classify, no re-record, no second
@@ -857,7 +869,8 @@ def _cli_triage_alert(args) -> int:
     """Durable + idempotent: classify, persist, and (Tier-1) record the ledger
     link for one alert JSON. This is the backend Check 0 calls per iter."""
     alert = json.loads(args.alert)
-    row = triage_alert(args.alert_id, alert, iter_num=args.iter)
+    row = triage_alert(args.alert_id, alert, iter_num=args.iter,
+                       outcome=args.outcome)
     print(json.dumps(row))
     return 0
 
@@ -899,6 +912,11 @@ def main(argv: Optional[list[str]] = None) -> int:
     p_ta.add_argument('--alert-id', required=True)
     p_ta.add_argument('--alert', required=True, help='Alert object as JSON.')
     p_ta.add_argument('--iter', type=int, default=0)
+    p_ta.add_argument('--outcome', choices=list(VALID_OUTCOMES),
+                      default='unverified',
+                      help='Execution outcome to record for a Tier-1 fix. '
+                           'Defaults to "unverified"; pass "success" ONLY from '
+                           'a verifier path that ran a real probe.')
     p_d = sub.add_parser('dispatched', help='Mark an alert as dispatched.')
     p_d.add_argument('--alert-id', required=True)
     p_d.add_argument('--dispatch-ts', required=True)
