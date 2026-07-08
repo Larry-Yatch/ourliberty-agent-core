@@ -79,6 +79,11 @@ RECURRENCE_WEEKS_THRESHOLD = 2
 # (modeled on promote_alerts.py's "promote-once until it re-crosses" anchor).
 DEDUP_REISSUE_MARGIN = 2
 
+# G5: mirror of cycle_prime_ledger.PROMOTE_WINDOW_DAYS, for the expired-
+# verification summary line only (the actual expiry filter lives in the ledger
+# module — this is display copy).
+PROMOTE_WINDOW_DAYS = 7
+
 # ---- chain_events event-type vocabulary (spec § "Data + join") ----
 EV_ESCALATION = 'escalation'
 EV_LARRY_ALERT = 'larry_alert'
@@ -109,6 +114,7 @@ _SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
+import cycle_prime_ledger as cpl  # noqa: E402  (G5 expired-verification producer)
 from atomic_io import atomic_write_json  # noqa: E402
 from fixture_patterns import is_fixture_task_id  # noqa: E402
 from log_ts import parse_log_ts  # noqa: E402  (shared log-ts parser)
@@ -457,13 +463,39 @@ def load_ledger(path: Path = LEDGER_FILE) -> dict[str, dict[str, Any]]:
 
 def write_ledger(
     signatures: dict[str, dict[str, Any]], path: Path = LEDGER_FILE,
+    *, surfaced_verifications: Optional[Iterable[str]] = None,
 ) -> Path:
+    # G5: the surfaced set is what makes the retrospective surface each expired
+    # row ONCE, not weekly forever. Stage A and Stage B (the author) both commit
+    # this shared ledger in the same weekly window; Stage B calls write_ledger
+    # without the kwarg. Default None must therefore PRESERVE the on-disk set,
+    # not clobber it with [] — otherwise the last committer silently drops what
+    # its sibling just persisted and every expired row re-surfaces next week.
+    # An explicit iterable (including an empty one) still overrides.
+    if surfaced_verifications is None:
+        surfaced_verifications = load_surfaced_verifications(path)
     payload = {
         'version': 1,
         'updated_at': datetime.now(timezone.utc).isoformat(),
         'signatures': signatures,
+        'surfaced_verifications': sorted(set(surfaced_verifications)),
     }
     return atomic_write_json(path, payload, indent=2)
+
+
+def load_surfaced_verifications(path: Path = LEDGER_FILE) -> set[str]:
+    """The intervention_ids of expired verification_pending rows already
+    surfaced in a prior retrospective (G5 surface-once idempotency key)."""
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return set()
+    if not isinstance(data, dict):
+        return set()
+    ids = data.get('surfaced_verifications')
+    if not isinstance(ids, list):
+        return set()
+    return {i for i in ids if isinstance(i, str) and i}
 
 
 def _dedup_status(prev: Optional[dict[str, Any]], count_this_period: int) -> str:
@@ -667,6 +699,22 @@ def _trend_line(buckets: list[Bucket], resolved: list[dict[str, Any]]) -> str:
     )
 
 
+def _expired_verification_line(entries: list[dict[str, Any]]) -> str:
+    """One grouped summary line for G5's expired verification_pending rows
+    (spec § 1(c): 'one grouped summary line', surfacing not spam)."""
+    if not entries:
+        return ''
+    n = len(entries)
+    ids = ', '.join(str(e.get('intervention_id')) for e in entries[:5])
+    more = f' (+{n - 5} more)' if n > 5 else ''
+    return (
+        f'{n} cycle-ledger verification_pending row(s) expired past the '
+        f'{PROMOTE_WINDOW_DAYS}d promote window without ever promoting to a '
+        f'systemic_fix: {ids}{more}. The verifying signal never landed — '
+        'inspect whether the fix actually held.'
+    )
+
+
 def build_artifact(
     buckets: list[Bucket],
     resolved: list[dict[str, Any]],
@@ -675,9 +723,11 @@ def build_artifact(
     as_of_iso: str,
     total_elevations: int,
     lookback_days: int = LOOKBACK_DAYS,
+    expired_verifications: Optional[list[dict[str, Any]]] = None,
 ) -> dict[str, Any]:
     fresh = [b for b in buckets if b.dedup_status == 'fresh']
     suppressed = [b for b in buckets if b.dedup_status == 'suppressed-dismissed']
+    expired = expired_verifications or []
     return {
         'as_of': as_of_iso,
         'week_anchor': week_anchor,
@@ -689,9 +739,12 @@ def build_artifact(
             'suppressed': len(suppressed),
             'resolved_since_last': len(resolved),
             'trend_line': _trend_line(buckets, resolved),
+            'expired_verifications': len(expired),
+            'expired_verifications_line': _expired_verification_line(expired),
         },
         'candidates': [b.to_dict() for b in buckets],
         'resolved': resolved,
+        'expired_verifications': expired,
     }
 
 
@@ -780,6 +833,21 @@ def _connect_supabase():
 # -------------------- orchestration --------------------
 
 
+def _expired_verification_entry(
+    row: dict[str, Any], *, now: datetime,
+) -> dict[str, Any]:
+    """Compact one cycle-ledger verification_pending row for the artifact."""
+    ts = _parse_ts(row.get('ts'))
+    age_days = (now - ts).days if ts is not None else None
+    return {
+        'intervention_id': row.get('intervention_id'),
+        'ts': row.get('ts'),
+        'tier': row.get('tier'),
+        'iter': row.get('iter'),
+        'age_days': age_days,
+    }
+
+
 def run_retrospective(
     *,
     elevations: list[Elevation],
@@ -789,9 +857,14 @@ def run_retrospective(
     live_unresolved_task_ids: set[str],
     week_anchor: str,
     now: datetime,
+    expired_verifications: Optional[list[dict[str, Any]]] = None,
 ) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
     """Pure entry point — returns ``(artifact, new_ledger)`` from pre-loaded
-    inputs. No IO; the whole flow is unit-testable without Supabase or disk."""
+    inputs. No IO; the whole flow is unit-testable without Supabase or disk.
+
+    ``expired_verifications`` are the NEWLY-expired cycle-ledger
+    verification_pending rows (already filtered against the surface-once set by
+    the caller); they are embedded in the artifact as a grouped G5 surface."""
     resolutions_by_eid = join_resolutions(resolutions)
     buckets = bucket_elevations(
         elevations, resolutions_by_eid,
@@ -805,10 +878,15 @@ def run_retrospective(
         alert_signature_weeks=alert_signature_weeks,
         week_anchor=week_anchor, now=now,
     )
+    expired_entries = [
+        _expired_verification_entry(r, now=now)
+        for r in (expired_verifications or [])
+    ]
     artifact = build_artifact(
         buckets, resolved,
         week_anchor=week_anchor, as_of_iso=now.isoformat(),
         total_elevations=len(elevations),
+        expired_verifications=expired_entries,
     )
     return artifact, new_ledger
 
@@ -818,7 +896,7 @@ def run_retrospective(
 
 def _load_fixture(path: str, now: datetime) -> tuple[
     list[Elevation], list[Resolution], dict[str, set[str]],
-    dict[str, dict[str, Any]], set[str],
+    dict[str, dict[str, Any]], set[str], list[dict[str, Any]], set[str],
 ]:
     with open(path) as fh:
         raw = json.load(fh)
@@ -836,7 +914,10 @@ def _load_fixture(path: str, now: datetime) -> tuple[
     }
     ledger = raw.get('ledger', {}) if isinstance(raw.get('ledger'), dict) else {}
     live = set(raw.get('live_unresolved_task_ids', []))
-    return elevations, resolutions, alert_weeks, ledger, live
+    cycle_rows = raw.get('cycle_ledger_rows', [])
+    expired = cpl.expired_unpromoted_verification_pending(now=now, rows=cycle_rows)
+    surfaced = set(raw.get('surfaced_verifications', []))
+    return elevations, resolutions, alert_weeks, ledger, live, expired, surfaced
 
 
 def main(argv: Optional[list[str]] = None) -> int:
@@ -863,7 +944,7 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     if args.fixture:
         (elevations, resolutions, alert_weeks,
-         ledger, live) = _load_fixture(args.fixture, now)
+         ledger, live, expired, surfaced) = _load_fixture(args.fixture, now)
     else:
         try:
             supa = _connect_supabase()
@@ -874,11 +955,19 @@ def main(argv: Optional[list[str]] = None) -> int:
         alert_weeks = load_alert_signature_weeks(now=now)
         ledger = load_ledger()
         live = load_live_unresolved_task_ids()
+        expired = cpl.expired_unpromoted_verification_pending(now=now)
+        surfaced = load_surfaced_verifications()
+
+    # G5 surface-once: only rows not already surfaced in a prior retrospective.
+    newly_expired = [
+        r for r in expired if r.get('intervention_id') not in surfaced
+    ]
 
     artifact, new_ledger = run_retrospective(
         elevations=elevations, resolutions=resolutions,
         alert_signature_weeks=alert_weeks, ledger=ledger,
         live_unresolved_task_ids=live, week_anchor=week_anchor, now=now,
+        expired_verifications=newly_expired,
     )
 
     if args.dry_run:
@@ -886,12 +975,17 @@ def main(argv: Optional[list[str]] = None) -> int:
         return 0
 
     write_artifact(artifact)
-    write_ledger(new_ledger)
+    new_surfaced = surfaced | {
+        r.get('intervention_id') for r in newly_expired
+        if r.get('intervention_id')
+    }
+    write_ledger(new_ledger, surfaced_verifications=new_surfaced)
     s = artifact['summary']
     log(
         f'Retrospective complete: elevations={s["total_elevations"]} '
         f'buckets={s["total_buckets"]} fresh={s["fresh_candidates"]} '
-        f'suppressed={s["suppressed"]} resolved={s["resolved_since_last"]}'
+        f'suppressed={s["suppressed"]} resolved={s["resolved_since_last"]} '
+        f'expired_verifications={s["expired_verifications"]}'
     )
     return 0
 

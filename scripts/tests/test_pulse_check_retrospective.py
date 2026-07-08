@@ -26,11 +26,13 @@ try:  # engage the test sandbox before any production import reads env/paths
 except ImportError:  # discover loads this module top-level (no package parent)
     import _bootstrap  # noqa: F401
 
+import io
 import json
 import shutil
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -550,6 +552,158 @@ class TestMainFixturePath(unittest.TestCase):
         fpath.write_text(json.dumps(fixture))
         rc = pr.main(['--dry-run', '--fixture', str(fpath)])
         self.assertEqual(rc, 0)
+
+
+# ---------------- G5: expired verification_pending surfacing ----------------
+
+
+def _cycle_pending_row(intervention_id, *, days_ago, tier=1):
+    """A cycle_prime_ledger verification_pending row, aged relative to real
+    now (main() uses wall-clock now on the fixture path)."""
+    ts = (datetime.now(timezone.utc) - timedelta(days=days_ago)).isoformat()
+    return {
+        'ts': ts, 'iter': 1, 'tier': tier, 'kind': 'verification_pending',
+        'intervention_id': intervention_id,
+        'fix_commit_sha': None, 'chain_event_id': None,
+        'verifies_at': None, 'verified_at': None, 'verification_anchor': None,
+    }
+
+
+class TestExpiredVerificationArtifact(unittest.TestCase):
+
+    def test_expired_list_and_summary_present(self):
+        entries = [
+            {'intervention_id': 'restart-daemon:beacon', 'ts': _iso(240),
+             'tier': 1, 'iter': 5, 'age_days': 10},
+            {'intervention_id': 'retry-sync-push:iter-9', 'ts': _iso(300),
+             'tier': 2, 'iter': 9, 'age_days': 12},
+        ]
+        art = pr.build_artifact([], [], week_anchor=WEEK,
+                                as_of_iso=NOW.isoformat(), total_elevations=0,
+                                expired_verifications=entries)
+        self.assertEqual(art['expired_verifications'], entries)
+        self.assertEqual(art['summary']['expired_verifications'], 2)
+        line = art['summary']['expired_verifications_line']
+        self.assertIn('restart-daemon:beacon', line)
+        self.assertIn('2', line)
+
+    def test_empty_expired_gives_blank_line(self):
+        art = pr.build_artifact([], [], week_anchor=WEEK,
+                                as_of_iso=NOW.isoformat(), total_elevations=0)
+        self.assertEqual(art['expired_verifications'], [])
+        self.assertEqual(art['summary']['expired_verifications'], 0)
+        self.assertEqual(art['summary']['expired_verifications_line'], '')
+
+    def test_run_retrospective_embeds_expired_with_age(self):
+        raw = {'ts': _iso(9 * 24), 'iter': 3, 'tier': 1,
+               'kind': 'verification_pending', 'intervention_id': 'x1'}
+        artifact, _ = pr.run_retrospective(
+            elevations=[], resolutions=[], alert_signature_weeks={},
+            ledger={}, live_unresolved_task_ids=set(),
+            week_anchor=WEEK, now=NOW, expired_verifications=[raw],
+        )
+        self.assertEqual(len(artifact['expired_verifications']), 1)
+        entry = artifact['expired_verifications'][0]
+        self.assertEqual(entry['intervention_id'], 'x1')
+        self.assertEqual(entry['age_days'], 9)
+
+
+class TestSurfacedVerificationLedger(unittest.TestCase):
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.ledger = self.tmp / 'retrospective-ledger.json'
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_round_trips_surfaced_set(self):
+        pr.write_ledger({'healer::boom': {'weeks': ['2026-06-08']}},
+                        self.ledger, surfaced_verifications=['x1', 'x2'])
+        self.assertEqual(pr.load_surfaced_verifications(self.ledger),
+                         {'x1', 'x2'})
+        # signatures survive alongside surfaced ids.
+        self.assertIn('healer::boom', pr.load_ledger(self.ledger))
+
+    def test_default_write_preserves_on_disk_surfaced(self):
+        # Stage A persists the surfaced set with the explicit kwarg...
+        pr.write_ledger({'healer::boom': {'weeks': ['2026-06-08']}},
+                        self.ledger, surfaced_verifications=['x1', 'x2'])
+        # ...then Stage B (the author) commits the same shared ledger WITHOUT
+        # the kwarg. The set must survive (surface-once), not reset to [].
+        pr.write_ledger({'healer::boom': {'weeks': ['2026-06-08']}}, self.ledger)
+        self.assertEqual(pr.load_surfaced_verifications(self.ledger),
+                         {'x1', 'x2'})
+
+    def test_explicit_empty_still_clears_surfaced(self):
+        # An explicit (even empty) iterable overrides the on-disk value, so a
+        # caller that means to clear can still do so.
+        pr.write_ledger({}, self.ledger, surfaced_verifications=['x1'])
+        pr.write_ledger({}, self.ledger, surfaced_verifications=[])
+        self.assertEqual(pr.load_surfaced_verifications(self.ledger), set())
+
+    def test_missing_file_is_empty_set(self):
+        self.assertEqual(
+            pr.load_surfaced_verifications(self.tmp / 'nope.json'), set())
+
+    def test_absent_key_is_empty_set(self):
+        self.ledger.write_text(json.dumps({'version': 1, 'signatures': {}}))
+        self.assertEqual(pr.load_surfaced_verifications(self.ledger), set())
+
+
+class TestMainFixtureExpiredSurfacing(unittest.TestCase):
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _run_dry(self, fixture):
+        fpath = self.tmp / 'fixture.json'
+        fpath.write_text(json.dumps(fixture))
+        buf = io.StringIO()
+        with redirect_stdout(buf):
+            rc = pr.main(['--dry-run', '--fixture', str(fpath)])
+        self.assertEqual(rc, 0)
+        # Last JSON object printed is the artifact.
+        return json.loads(buf.getvalue())
+
+    def test_expired_row_surfaces_when_unseen(self):
+        fixture = {
+            'elevation_rows': [], 'resolution_rows': [],
+            'alert_signature_weeks': {}, 'ledger': {},
+            'live_unresolved_task_ids': [],
+            'cycle_ledger_rows': [_cycle_pending_row('x1', days_ago=9)],
+            'surfaced_verifications': [],
+        }
+        art = self._run_dry(fixture)
+        ids = [e['intervention_id'] for e in art['expired_verifications']]
+        self.assertEqual(ids, ['x1'])
+        self.assertEqual(art['summary']['expired_verifications'], 1)
+
+    def test_already_surfaced_row_suppressed(self):
+        fixture = {
+            'elevation_rows': [], 'resolution_rows': [],
+            'alert_signature_weeks': {}, 'ledger': {},
+            'live_unresolved_task_ids': [],
+            'cycle_ledger_rows': [_cycle_pending_row('x1', days_ago=9)],
+            'surfaced_verifications': ['x1'],
+        }
+        art = self._run_dry(fixture)
+        self.assertEqual(art['expired_verifications'], [])
+        self.assertEqual(art['summary']['expired_verifications'], 0)
+
+    def test_within_window_row_not_surfaced(self):
+        fixture = {
+            'elevation_rows': [], 'resolution_rows': [],
+            'alert_signature_weeks': {}, 'ledger': {},
+            'live_unresolved_task_ids': [],
+            'cycle_ledger_rows': [_cycle_pending_row('x1', days_ago=2)],
+            'surfaced_verifications': [],
+        }
+        art = self._run_dry(fixture)
+        self.assertEqual(art['expired_verifications'], [])
 
 
 if __name__ == '__main__':

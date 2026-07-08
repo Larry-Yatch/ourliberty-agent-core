@@ -863,6 +863,187 @@ class ReconcileFailedCardsTest(unittest.TestCase):
         self.assertIn('(dry-run)', res.rung[0][1])
 
 
+# ------------------------------ G3: terminal-state backstop (completeness-pr2)
+
+
+class ReconcileTerminalCapturesTest(unittest.TestCase):
+    """The task_terminal_state backstop that catches the terminal cases S3/S4
+    miss: MERGED-without-auto_merge-event ⇒ complete-by-risk; CLOSED-unmerged ⇒
+    ring + keep parked; UNKNOWN/OPEN ⇒ KEEP (the failed-delegate shape). Stamps
+    spawned.outcome by replacing the top-level key (lost-update-safe)."""
+
+    def _now(self):
+        return datetime(2026, 7, 8, 12, 0, 0, tzinfo=timezone.utc)
+
+    def _cap(self, cid, risk, **over):
+        cap = {
+            'id': cid, 'state': 'parked', 'risk': risk,
+            'title': f'card {cid}',
+            'spawned': {'kind': 'delegate', 'task_id': f'delegate-{cid}',
+                        'stamped_at': '2026-07-01T00:00:00+00:00'},
+        }
+        cap.update(over)
+        return cap
+
+    def _registry(self, *caps):
+        return {'schema_version': 1, 'captures': list(caps)}
+
+    def test_merged_safe_card_auto_closes_to_done(self):
+        reg = self._registry(self._cap('c1', 'safe', aging=True))
+        res = h.reconcile_terminal_captures(
+            reg, self._now(),
+            terminal_fn=lambda t: h.tts.MERGED, ring_fn=mock.Mock(), dry_run=False)
+        cap = reg['captures'][0]
+        self.assertEqual(cap['state'], 'done')
+        self.assertEqual(cap['spawned']['outcome'], 'merged')
+        self.assertEqual(cap['closed_by'], h.TERMINAL_BACKSTOP_BY)
+        self.assertEqual(cap['shipped_note'], 'shipped (linked work merged)')
+        self.assertIn('closed_at', cap)
+        self.assertNotIn('aging', cap)
+        self.assertEqual([cid for cid, _ in res.completed], ['c1'])
+        self.assertTrue(res.changed)
+
+    def test_merged_risky_card_routes_to_review_close(self):
+        reg = self._registry(self._cap('c2', 'careful'))
+        ring = mock.Mock()
+        res = h.reconcile_terminal_captures(
+            reg, self._now(),
+            terminal_fn=lambda t: h.tts.MERGED, ring_fn=ring, dry_run=False)
+        cap = reg['captures'][0]
+        self.assertEqual(cap['state'], 'review_close')
+        self.assertTrue(cap['awaiting_ack'])
+        self.assertEqual(cap['spawned']['outcome'], 'merged')
+        self.assertEqual(res.closeouts, ['c2'])
+        ring.assert_not_called()
+
+    def test_merged_replaces_spawned_top_level_not_in_place(self):
+        # The lost-update delta merge diffs top-level keys against a shallow
+        # snapshot; an in-place nested mutation would be invisible. Assert we
+        # rebind a NEW spawned dict so the stamp is a detectable top-level delta.
+        cap = self._cap('c3', 'safe')
+        original_spawned = cap['spawned']
+        reg = self._registry(cap)
+        h.reconcile_terminal_captures(
+            reg, self._now(),
+            terminal_fn=lambda t: h.tts.MERGED, ring_fn=mock.Mock(), dry_run=False)
+        self.assertIsNot(reg['captures'][0]['spawned'], original_spawned)
+        self.assertNotIn('outcome', original_spawned)
+
+    def test_closed_card_rings_and_stays_parked(self):
+        reg = self._registry(self._cap('c4', 'medium'))
+        ring = mock.Mock(return_value={'rung': True})
+        res = h.reconcile_terminal_captures(
+            reg, self._now(),
+            terminal_fn=lambda t: h.tts.CLOSED, ring_fn=ring, dry_run=False)
+        cap = reg['captures'][0]
+        self.assertEqual(cap['state'], 'parked')  # surfaces, never auto-closes
+        self.assertEqual(cap['spawned']['outcome'], 'closed')
+        self.assertEqual(cap['failure_signaled']['by'], h.TERMINAL_BACKSTOP_BY)
+        self.assertIn('closed without merging', cap['failure_signaled']['reason'])
+        self.assertEqual([cid for cid, _ in res.closed_failed], ['c4'])
+        self.assertTrue(res.changed)
+        _, kw = ring.call_args
+        self.assertEqual(kw['capture_id'], 'c4')
+        self.assertTrue(kw['blocked'])
+        self.assertEqual(kw['risk'], 'medium')
+        self.assertEqual(kw['deep_link'],
+                         'https://dashboard.ourliberty.dev/missions?card=c4')
+
+    def test_unknown_probe_keeps_card_open(self):
+        # The failed-delegate shape: no PR ever opened ⇒ UNKNOWN ⇒ KEEP.
+        reg = self._registry(self._cap('c5', 'safe'))
+        ring = mock.Mock()
+        res = h.reconcile_terminal_captures(
+            reg, self._now(),
+            terminal_fn=lambda t: h.tts.UNKNOWN, ring_fn=ring, dry_run=False)
+        cap = reg['captures'][0]
+        self.assertEqual(cap['state'], 'parked')
+        self.assertNotIn('outcome', cap['spawned'])
+        self.assertNotIn('failure_signaled', cap)
+        ring.assert_not_called()
+        self.assertFalse(res.changed)
+        self.assertEqual(res.kept, 1)
+
+    def test_open_probe_keeps_card(self):
+        reg = self._registry(self._cap('c6', 'safe'))
+        res = h.reconcile_terminal_captures(
+            reg, self._now(),
+            terminal_fn=lambda t: h.tts.OPEN, ring_fn=mock.Mock(), dry_run=False)
+        self.assertEqual(reg['captures'][0]['state'], 'parked')
+        self.assertFalse(res.changed)
+        self.assertEqual(res.kept, 1)
+
+    def test_already_stamped_outcome_is_skipped(self):
+        cap = self._cap('c7', 'safe')
+        cap['spawned']['outcome'] = 'merged'
+        reg = self._registry(cap)
+        probe = mock.Mock(return_value=h.tts.MERGED)
+        res = h.reconcile_terminal_captures(
+            reg, self._now(), terminal_fn=probe, ring_fn=mock.Mock(), dry_run=False)
+        probe.assert_not_called()  # idempotent: no re-probe of a stamped card
+        self.assertFalse(res.changed)
+
+    def test_failure_signaled_card_left_to_s4(self):
+        cap = self._cap('c8', 'safe', failure_signaled={'reason': 'x', 'at': 'y'})
+        reg = self._registry(cap)
+        probe = mock.Mock(return_value=h.tts.MERGED)
+        res = h.reconcile_terminal_captures(
+            reg, self._now(), terminal_fn=probe, ring_fn=mock.Mock(), dry_run=False)
+        probe.assert_not_called()
+        self.assertFalse(res.changed)
+
+    def test_non_parked_and_no_spawn_are_skipped(self):
+        done = self._cap('c9', 'safe', state='done')
+        no_spawn = {'id': 'c10', 'state': 'parked', 'risk': 'safe'}
+        reg = self._registry(done, no_spawn)
+        probe = mock.Mock(return_value=h.tts.MERGED)
+        res = h.reconcile_terminal_captures(
+            reg, self._now(), terminal_fn=probe, ring_fn=mock.Mock(), dry_run=False)
+        probe.assert_not_called()
+        self.assertFalse(res.changed)
+
+    def test_probe_error_keeps_card(self):
+        def _boom(task_id):
+            raise RuntimeError('gh down')
+        reg = self._registry(self._cap('c11', 'safe'))
+        res = h.reconcile_terminal_captures(
+            reg, self._now(), terminal_fn=_boom, ring_fn=mock.Mock(), dry_run=False)
+        self.assertEqual(reg['captures'][0]['state'], 'parked')
+        self.assertNotIn('outcome', reg['captures'][0]['spawned'])
+        self.assertEqual(res.kept, 1)
+        self.assertFalse(res.changed)
+
+    def test_ring_error_keeps_card_unstamped(self):
+        def _boom(**kw):
+            raise RuntimeError('alerts down')
+        reg = self._registry(self._cap('c12', 'safe'))
+        res = h.reconcile_terminal_captures(
+            reg, self._now(),
+            terminal_fn=lambda t: h.tts.CLOSED, ring_fn=_boom, dry_run=False)
+        cap = reg['captures'][0]
+        self.assertEqual(cap['state'], 'parked')
+        self.assertNotIn('outcome', cap['spawned'])
+        self.assertNotIn('failure_signaled', cap)
+        self.assertEqual(res.kept, 1)
+
+    def test_dry_run_does_not_mutate(self):
+        reg = self._registry(self._cap('c13', 'safe'), self._cap('c14', 'medium'))
+        res = h.reconcile_terminal_captures(
+            reg, self._now(),
+            terminal_fn=lambda t: h.tts.MERGED, ring_fn=mock.Mock(), dry_run=True)
+        self.assertTrue(res.changed)
+        for cap in reg['captures']:
+            self.assertEqual(cap['state'], 'parked')
+            self.assertNotIn('outcome', cap['spawned'])
+
+    def test_default_terminal_fn_wraps_shared_probe(self):
+        with mock.patch.object(h.tts, 'task_terminal_state',
+                               return_value=h.tts.MERGED) as probe:
+            fn = h._default_terminal_fn()
+            self.assertEqual(fn('some-task'), h.tts.MERGED)
+        probe.assert_called_once_with('some-task')
+
+
 # ---------------------------------------- S7: in-flight overrules a late pause
 
 

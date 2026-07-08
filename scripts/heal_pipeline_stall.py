@@ -208,6 +208,14 @@ LOG_LOOKBACK_HOURS = 24              # Read at most this far back into outbox-no
 JOURNAL_LOOKBACK_HOURS = 1           # Read at most this far back for retry-exhausted lines
 ALERT_DEDUP_HOURS = 1                # Same stall key not re-DMed within this window
 STALLED_PENDING_SEQUENCE_MIN = 30    # 30 min — sequence pending after unresolved DAG REVISION
+# Check 11 (sequence-step-stall-recovery Fix A, completeness-pr2). An `active`
+# sequence's step stuck `dispatched` with NO pr_url this long is stalled: a
+# healthy Forge build opens its PR within minutes, so a step 30m+ dispatched with
+# no PR either never got picked up or its build/revision dead-lettered (the #532
+# shape). The with-PR wedged-review face has its own, far longer timeout in the
+# advancer (REVIEW_STALL_TIMEOUT_SEC, 6h) — a step carrying a pr_url is in review,
+# NOT this stall, so it is excluded here to avoid false-firing on healthy reviews.
+STALLED_ACTIVE_STEP_MIN = 30         # 30 min — active-sequence step dispatched, no PR
 # Check 10 (mirror-review-visibility Contract E, spec §8). Backstop grace before
 # a PR sitting on a RED `mirror-review` commit status is treated as the #653
 # silent-red shape. Deliberately the longest threshold here: a healthy revision
@@ -2449,6 +2457,98 @@ def check_stalled_pending_sequence(state: dict) -> list[dict]:
     return alerts
 
 
+# ---------- Check 11: Stalled active-sequence step, no PR (sequence-step-stall-recovery Fix A) ----------
+def check_stalled_active_step(state: dict) -> list[dict]:
+    """Scan build-sequences for an `active` sequence carrying a step stuck
+    `dispatched` with NO `pr_url` past STALLED_ACTIVE_STEP_MIN (Fix A of
+    `agents/beacon/specs/sequence-step-stall-recovery.md`, completeness-pr2).
+
+    Origin (#532): a sequence step was dispatched, its build/revision
+    dead-lettered, and the step sat `dispatched` for hours with ZERO monitor
+    coverage — `check_stalled_pending_sequence` only fires for `status ==
+    'pending'` sequences, so a step-level stall inside an `active` sequence was
+    invisible. This is the standing healer that ends that silence.
+
+    A step is STALLED iff, in an `active` sequence:
+      * step status == 'dispatched', AND
+      * the step has NO `pr_url` (a step carrying a pr_url is in review — that
+        wedge has its own far-longer timeout in the advancer,
+        REVIEW_STALL_TIMEOUT_SEC; re-alerting it here would double-fire on a
+        healthy review), AND
+      * `dispatched_at` is older than STALLED_ACTIVE_STEP_MIN (a healthy Forge
+        build opens its PR within minutes, so 30m dispatched + no PR = the build
+        never got picked up or dead-lettered), AND
+      * the `dispatched_at` is within SCAN_WINDOW_SECONDS (an ancient
+        dispatched step in a stale file is historical record, not a live stall).
+
+    No `recovery` primitive: a no-PR step has no PR branch or Mirror findings to
+    reconstruct from (spec §4 recovers only a dead-lettered *revision*, which by
+    definition has a PR), so recovery "cannot fire" and this escalates directly
+    to Larry as an actionable alert — exactly spec §4's "escalate ONLY if
+    recovery cannot fire (no reconstructable findings/branch)."
+
+    Dedup: keyed on `stalled_active_step:<seq_id>:<step_id>:<dispatched_at>` so a
+    fresh dispatch (new dispatched_at, e.g. a `retry`) re-arms, while the same
+    wedged dispatch fires once per ALERT_DEDUP_HOURS via the shared cooldown.
+    """
+    alerts: list[dict] = []
+    if not BUILD_SEQUENCES_DIR.is_dir():
+        return alerts
+    now = datetime.now(timezone.utc)
+    for seq_path in sorted(BUILD_SEQUENCES_DIR.glob('*.json')):
+        try:
+            seq = json.loads(seq_path.read_text())
+        except (OSError, json.JSONDecodeError) as e:
+            log(
+                f'check_stalled_active_step: skip {seq_path.name} '
+                f'({type(e).__name__}: {e})', 'WARN',
+            )
+            continue
+        if not isinstance(seq, dict) or seq.get('status') != 'active':
+            continue
+        steps = seq.get('steps')
+        if not isinstance(steps, list):
+            continue
+        seq_id = seq.get('seq_id') or seq_path.stem
+        for step in steps:
+            if not isinstance(step, dict) or step.get('status') != 'dispatched':
+                continue
+            if step.get('pr_url'):
+                continue  # in review → advancer's REVIEW_STALL_TIMEOUT_SEC owns it
+            step_id = step.get('step_id')
+            if not isinstance(step_id, str) or not step_id:
+                continue
+            disp_raw = step.get('dispatched_at')
+            disp_ts = _parse_ts(disp_raw) if isinstance(disp_raw, str) else None
+            if disp_ts is None:
+                continue  # unparseable / absent → can't time the stall (fail safe)
+            if not _within_scan_window(disp_ts, now):
+                continue  # ancient dispatch in a stale file, not a live stall
+            elapsed_min = int((now - disp_ts).total_seconds() / 60)
+            if elapsed_min < STALLED_ACTIVE_STEP_MIN:
+                continue  # give a healthy build time to open its PR
+            key = f'stalled_active_step:{seq_id}:{step_id}:{disp_ts.isoformat()}'
+            alerts.append({
+                'key': key,
+                'message': (
+                    f'Build sequence `{seq_id}` step `{step_id}` has been stuck '
+                    f'`dispatched` for {elapsed_min} min with no PR ({seq_path}). '
+                    f'A healthy Forge build opens its PR within minutes, so the '
+                    f'build either never got picked up or its build/revision '
+                    f'dead-lettered (the #532 shape). Work you kicked off is '
+                    f'stalled and nothing self-healed it.'
+                ),
+                'subject': f'stalled-active-step:{seq_id}:{step_id}',
+                'suggested_action': (
+                    f'Inspect the step: `cat {seq_path}`. Check for a dead-letter '
+                    f'or `.invalid` build task for `{step_id}`. Re-dispatch it via '
+                    f'`retry sequence {seq_id} step {step_id}`, or cancel the '
+                    f'sequence if it is no longer needed.'
+                ),
+            })
+    return alerts
+
+
 # ---------- Check 10: Silent red mirror-review status (Contract E) ----------
 
 def _self_heal_in_progress(task_id: str) -> bool:
@@ -3393,6 +3493,11 @@ def run(dry_run: bool = False) -> int:
         all_alerts += check_stalled_pending_sequence(state)
     except Exception as e:
         log(f'check_stalled_pending_sequence failed: {type(e).__name__}: {e}',
+            'ERROR')
+    try:
+        all_alerts += check_stalled_active_step(state)
+    except Exception as e:
+        log(f'check_stalled_active_step failed: {type(e).__name__}: {e}',
             'ERROR')
     try:
         all_alerts += check_red_mirror_status_no_artifact(open_prs, state)

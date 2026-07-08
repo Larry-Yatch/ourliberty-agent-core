@@ -3480,6 +3480,108 @@ class TestStalledPendingSequence(_TempAgentsRootMixin, unittest.TestCase):
         self.assertFalse(self.hps.should_alert(state, a1['key']))
 
 
+class TestStalledActiveStep(_TempAgentsRootMixin, unittest.TestCase):
+    """Check 11 — an `active` sequence step stuck `dispatched` with no PR
+    (sequence-step-stall-recovery Fix A, completeness-pr2). Detection-only + a
+    Larry-actionable alert: a no-PR step has no branch/findings to reconstruct,
+    so recovery cannot fire (spec §4)."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.seqdir = self.agents_root / 'blackboard' / 'build-sequences'
+        self.seqdir.mkdir(parents=True, exist_ok=True)
+
+    def _step(self, step_id='step-a', status='dispatched',
+              dispatched_min_ago=45, pr_url=None):
+        step = {'step_id': step_id, 'status': status}
+        if dispatched_min_ago is not None:
+            step['dispatched_at'] = _iso(dispatched_min_ago)
+        if pr_url is not None:
+            step['pr_url'] = pr_url
+        return step
+
+    def _write_seq(self, seq_id, status='active', steps=None):
+        seq = {
+            'seq_id': seq_id,
+            'status': status,
+            'steps': steps or [],
+            'audit_log': [],
+        }
+        (self.seqdir / f'{seq_id}.json').write_text(json.dumps(seq, indent=2))
+
+    def test_fires_for_dispatched_no_pr_past_threshold(self) -> None:
+        self._write_seq('seq', steps=[self._step('delegate-endpoint', dispatched_min_ago=45)])
+        alerts = self.hps.check_stalled_active_step({})
+        self.assertEqual(len(alerts), 1)
+        a = alerts[0]
+        self.assertEqual(a['subject'], 'stalled-active-step:seq:delegate-endpoint')
+        self.assertTrue(a['key'].startswith('stalled_active_step:seq:delegate-endpoint:'))
+        self.assertIn('delegate-endpoint', a['message'])
+        # No-PR step is unrecoverable → escalates directly, no recovery primitive.
+        self.assertNotIn('recovery', a)
+
+    def test_silent_when_dispatched_recent(self) -> None:
+        # Under the 30m threshold — give a healthy build time to open its PR.
+        self._write_seq('seq', steps=[self._step(dispatched_min_ago=10)])
+        self.assertEqual(self.hps.check_stalled_active_step({}), [])
+
+    def test_silent_when_step_has_pr_url(self) -> None:
+        # In review — the advancer's REVIEW_STALL_TIMEOUT_SEC owns this wedge.
+        self._write_seq('seq', steps=[
+            self._step(dispatched_min_ago=200,
+                       pr_url='https://github.com/o/r/pull/5'),
+        ])
+        self.assertEqual(self.hps.check_stalled_active_step({}), [])
+
+    def test_silent_when_sequence_not_active(self) -> None:
+        for status in ('pending', 'paused', 'complete', 'failed'):
+            with self.subTest(status=status):
+                (self.seqdir / 's.json').unlink(missing_ok=True)
+                self._write_seq('s', status=status,
+                                steps=[self._step(dispatched_min_ago=45)])
+                self.assertEqual(self.hps.check_stalled_active_step({}), [])
+
+    def test_silent_when_step_not_dispatched(self) -> None:
+        for status in ('pending', 'dispatchable', 'merged', 'failed'):
+            with self.subTest(status=status):
+                (self.seqdir / 's.json').unlink(missing_ok=True)
+                self._write_seq('s', steps=[
+                    self._step(status=status, dispatched_min_ago=45)])
+                self.assertEqual(self.hps.check_stalled_active_step({}), [])
+
+    def test_silent_when_dispatched_outside_scan_window(self) -> None:
+        # 2 days old — historical record in a stale file, not a live stall.
+        self._write_seq('seq', steps=[self._step(dispatched_min_ago=2 * 24 * 60)])
+        self.assertEqual(self.hps.check_stalled_active_step({}), [])
+
+    def test_silent_when_dispatched_at_missing(self) -> None:
+        # Unparseable / absent dispatched_at → can't time the stall (fail safe).
+        self._write_seq('seq', steps=[self._step(dispatched_min_ago=None)])
+        self.assertEqual(self.hps.check_stalled_active_step({}), [])
+
+    def test_only_stalled_step_fires_among_many(self) -> None:
+        self._write_seq('seq', steps=[
+            self._step('healthy', dispatched_min_ago=5),
+            self._step('in-review', dispatched_min_ago=300,
+                       pr_url='https://github.com/o/r/pull/9'),
+            self._step('merged-step', status='merged', dispatched_min_ago=300),
+            self._step('stalled', dispatched_min_ago=45),
+        ])
+        alerts = self.hps.check_stalled_active_step({})
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(alerts[0]['subject'], 'stalled-active-step:seq:stalled')
+
+    def test_dedup_key_stable_and_cooldown(self) -> None:
+        self._write_seq('seq', steps=[self._step(dispatched_min_ago=45)])
+        a1 = self.hps.check_stalled_active_step({})[0]
+        a2 = self.hps.check_stalled_active_step({})[0]
+        self.assertEqual(a1['key'], a2['key'])
+        state: dict = {}
+        self.assertTrue(self.hps.should_alert(state, a1['key']))
+        self.hps.record_alert(state, a1['key'])
+        self.assertFalse(self.hps.should_alert(state, a1['key']))
+
+
 class TestCheckRedMirrorStatusNoArtifact(_TempAgentsRootMixin, unittest.TestCase):
     """mirror-review-visibility Contract E (spec §8 / §10-E). The backstop for
     the #653 silent-red failure mode: a session-less PR sitting on a RED

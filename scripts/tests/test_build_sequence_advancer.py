@@ -1749,6 +1749,155 @@ class TestStrandedDispatchEscalation(_AdvancerHarness):
         self.assertIn('deferring escalation', joined)
 
 
+class TestReviewStallRecovery(_AdvancerHarness):
+    """Face 2 / Fix B (completeness-pr2 §1a): a WITH-PR step wedged in review
+    past REVIEW_STALL_TIMEOUT_SEC is recover-or-routed — re-dispatch Mirror
+    review (recover), else exactly one Larry alert; a healthy review is left
+    alone. Closes the permanently-unmonitored state the no-PR stall guard's
+    `and not step.get('pr_url')` short-circuit created (the #532 shape)."""
+
+    def setUp(self):
+        super().setUp()
+        self.redispatch_calls = []
+        self.bsa._gh_pr_open = lambda *_a, **_kw: True
+
+        def _fake_redispatch(step_id, target_repo, pr_url, pr_title, logger):
+            self.redispatch_calls.append({
+                'step_id': step_id, 'target_repo': target_repo,
+                'pr_url': pr_url, 'pr_title': pr_title,
+            })
+            return self._redispatch_result
+
+        self._redispatch_result = True
+        self.bsa._redispatch_review_for_wedged_step = _fake_redispatch
+
+    def _stale_review_iso(self):
+        return (datetime.now(timezone.utc) - timedelta(
+            seconds=self.bsa.REVIEW_STALL_TIMEOUT_SEC + 3600)).isoformat()
+
+    def _wedged_seq(self, *, dispatched_at=None,
+                    pr_url='https://github.com/x/y/pull/7',
+                    step_status='dispatched', status='active'):
+        seq = _make_sequence(
+            status=status,
+            steps=[_make_step('only-step', status=step_status, pr_url=pr_url,
+                              dispatched_at=dispatched_at
+                              if dispatched_at is not None
+                              else self._stale_review_iso())],
+            current_steps=['only-step'],
+        )
+        return seq
+
+    def _run_pass(self, seq):
+        path = self._write_sequence(seq)
+        now = datetime.now(timezone.utc)
+        logger = self.bsa._setup_logging()
+        result = self.bsa._recover_review_stalled_steps(seq, path, now, logger)
+        return result, self._read_sequence(seq['seq_id'])
+
+    def _events(self, seq):
+        return [e['event'] for e in seq['audit_log']]
+
+    def test_recovers_wedged_review(self):
+        self._redispatch_result = True
+        acted, seq = self._run_pass(self._wedged_seq())
+        self.assertTrue(acted)
+        self.assertIn('step-review-redispatched', self._events(seq))
+        # Recovery re-primes the loop — the sequence stays ACTIVE, never paused.
+        self.assertEqual(seq['status'], 'active')
+        self.assertEqual(seq['steps'][0]['status'], 'dispatched')
+        # No alert on a successful recovery.
+        self.assertFalse(any(
+            d['subject'].startswith('sequence-review-stall:') for d in self.dms))
+        # Recovery targets the build task_id (== step_id) + its branch's PR.
+        self.assertEqual(len(self.redispatch_calls), 1)
+        self.assertEqual(self.redispatch_calls[0]['step_id'], 'only-step')
+        self.assertEqual(self.redispatch_calls[0]['pr_url'],
+                         'https://github.com/x/y/pull/7')
+
+    def test_alerts_when_recovery_cannot_fire(self):
+        self._redispatch_result = False
+        acted, seq = self._run_pass(self._wedged_seq())
+        self.assertTrue(acted)
+        self.assertIn('step-review-stall-alerted', self._events(seq))
+        self.assertNotIn('step-review-redispatched', self._events(seq))
+        subjects = [d['subject'] for d in self.dms]
+        self.assertIn('sequence-review-stall:seq-001:only-step', subjects)
+        # Alert, not pause — the sequence is left active for a human to steer.
+        self.assertEqual(seq['status'], 'active')
+
+    def test_dedup_one_shot_per_dispatch_epoch(self):
+        # First tick recovers + stamps; a second tick over the SAME dispatch
+        # epoch is a no-op (no second re-dispatch, no duplicate audit entry).
+        seq = self._wedged_seq()
+        path = self._write_sequence(seq)
+        now = datetime.now(timezone.utc)
+        logger = self.bsa._setup_logging()
+        self.assertTrue(
+            self.bsa._recover_review_stalled_steps(seq, path, now, logger))
+        second = self.bsa._recover_review_stalled_steps(seq, path, now, logger)
+        self.assertFalse(second)
+        stamps = [e for e in seq['audit_log']
+                  if e['event'] == 'step-review-redispatched']
+        self.assertEqual(len(stamps), 1)
+        self.assertEqual(len(self.redispatch_calls), 1)
+
+    def test_healthy_recent_review_untouched(self):
+        # Under the 6h threshold → no probe, no recovery, no alert.
+        probed = []
+        self.bsa._gh_pr_open = lambda *a, **k: probed.append(1) or True
+        acted, seq = self._run_pass(
+            self._wedged_seq(dispatched_at=_recent_iso()))
+        self.assertFalse(acted)
+        self.assertEqual(probed, [])  # age check short-circuits before gh
+        self.assertEqual(self.redispatch_calls, [])
+        self.assertNotIn('step-review-redispatched', self._events(seq))
+        self.assertNotIn('step-review-stall-alerted', self._events(seq))
+        self.assertEqual(self.dms, [])
+
+    def test_no_pr_step_skipped(self):
+        # A no-PR wedge belongs to Fix A / the 4h no-PR strand guard, not here.
+        acted, seq = self._run_pass(self._wedged_seq(pr_url=None))
+        self.assertFalse(acted)
+        self.assertEqual(self.redispatch_calls, [])
+        self.assertEqual(self.dms, [])
+
+    def test_merged_or_closed_pr_skipped(self):
+        # PR resolved out-of-band → merge-gate / reconcile owns it; skip.
+        self.bsa._gh_pr_open = lambda *a, **k: False
+        acted, seq = self._run_pass(self._wedged_seq())
+        self.assertFalse(acted)
+        self.assertEqual(self.redispatch_calls, [])
+        self.assertEqual(self.dms, [])
+        self.assertNotIn('step-review-redispatched', self._events(seq))
+
+    def test_gh_unverifiable_defers(self):
+        # Unknown PR state must never trigger action (anti-noise: verify first).
+        self.bsa._gh_pr_open = lambda *a, **k: None
+        acted, seq = self._run_pass(self._wedged_seq())
+        self.assertFalse(acted)
+        self.assertEqual(self.redispatch_calls, [])
+        self.assertEqual(self.dms, [])
+
+    def test_non_dispatched_step_skipped(self):
+        acted, seq = self._run_pass(self._wedged_seq(step_status='merged'))
+        self.assertFalse(acted)
+        self.assertEqual(self.redispatch_calls, [])
+
+    def test_tick_wires_review_stall_pass(self):
+        # Integration: the pass runs inside a real tick for an active sequence.
+        self.bsa._valid_target_repos = lambda: frozenset(
+            {'ourliberty-agent-core'})
+        self._patch_gates(chain_merged=False, gh_merged=None)
+        self.bsa._gh_pr_open = lambda *a, **k: True
+        self._redispatch_result = True
+        self._write_sequence(self._wedged_seq())
+        self.bsa.tick()
+        seq = self._read_sequence('seq-001')
+        self.assertIn('step-review-redispatched', self._events(seq))
+        self.assertEqual(len(self.redispatch_calls), 1)
+
+
 class TestAlreadyMergedBridge(_AdvancerHarness):
     """no-PR already-merged backstop (2026-06-20 incident).
 

@@ -1180,6 +1180,158 @@ def _default_ring_fn() -> Callable[..., dict[str, Any]]:
     return missions_doorbell.ring_doorbell
 
 
+# ---------- G3 (completeness-pr2): terminal-state backstop reconcile ----------
+#
+# S3 (reconcile_completed_cards) closes a parked card only on the belt-and-
+# suspenders verified-merge signal — a chain_events `auto_merge` row AND `gh pr
+# view MERGED`. S4 (reconcile_failed_cards) surfaces only a RECOGNIZED
+# chain_events failure (mirror_revision_exhausted / mirror_emergency_halt /
+# forge_reject). A spawned capture whose PR reached a terminal state NEITHER leg
+# observes — a merge that never emitted an `auto_merge` event, or a PR
+# closed-without-merging (abandoned/superseded) — is stamped by neither and sits
+# `parked` forever, violating the terminal-state-reconciliation invariant (no
+# in-flight record outlives its work's terminal state). This backstop probes the
+# shared conservative gh-only `task_terminal_state` ground truth and stamps the
+# card on a MERGED/CLOSED verdict. UNKNOWN/OPEN change NOTHING (KEEP): a failed
+# delegate that never opened a PR probes UNKNOWN and MUST surface as still-open,
+# never silently close (spec § 1(b) — the `delegate-cap-slice-…` shape).
+
+TERMINAL_BACKSTOP_BY = 'heal_missions_card_gc:terminal-backstop'
+
+
+@dataclass
+class TerminalReconcileResult:
+    completed: list[tuple[str, str]] = field(default_factory=list)      # (id, note) → done
+    closeouts: list[str] = field(default_factory=list)                  # id → review_close
+    closed_failed: list[tuple[str, str]] = field(default_factory=list)  # (id, reason) → rung
+    kept: int = 0
+
+    @property
+    def changed(self) -> bool:
+        """True iff this tick stamped a capture (so the caller writes+commits)."""
+        return bool(self.completed or self.closeouts or self.closed_failed)
+
+
+def reconcile_terminal_captures(
+    registry: dict[str, Any],
+    now: datetime,
+    *,
+    terminal_fn: Callable[[str], str],
+    ring_fn: Callable[..., dict[str, Any]],
+    dry_run: bool,
+) -> TerminalReconcileResult:
+    """Backstop reconcile (completeness-pr2 G3): stamp a parked capture whose
+    spawned work reached an identity-grade terminal state that S3/S4 missed.
+
+    For each parked capture carrying a `spawned.task_id`, probe
+    ``terminal_fn(task_id)`` (production: tts.task_terminal_state — the shared,
+    conservative gh-only probe: OPEN wins, any ambiguity → UNKNOWN) and route:
+
+      * MERGED → stamp `spawned.outcome='merged'` and complete the card by risk
+        (classify_completion: safe → `done`, else → `review_close`) — the S3
+        completion the belt-and-suspenders gate never saw.
+      * CLOSED → stamp `spawned.outcome='closed'` and ring the loud
+        blocked-on-you doorbell (the work was abandoned/rejected); the card STAYS
+        parked — failure surfaces for Larry, it never auto-closes (mirrors S4).
+      * OPEN / UNKNOWN → KEEP, no mutation. UNKNOWN is the failed-delegate shape
+        that must surface as still-open, never silently close (spec § 1(b)).
+
+    Runs AFTER S3/S4 so this only sees cards those passes KEPT; guards on
+    `state=='parked'`, an absent `spawned.outcome`, and no `failure_signaled`, so
+    a stamped card is skipped on every later tick (idempotent). Stamps the
+    outcome by REPLACING the top-level `spawned` key with a copy carrying
+    `outcome` (never an in-place nested mutation) so the lost-update delta merge
+    in run_once detects and persists it — the same top-level-keys-only discipline
+    S3/S4 follow. Effectful ONLY on the in-memory registry — the caller (run_once)
+    owns the single write+commit (single-committer invariant). Fail-safe per
+    capture: a probe/ring error keeps the card (retried next tick)."""
+    res = TerminalReconcileResult()
+    for cap in registry.get('captures', []):
+        if not isinstance(cap, dict) or cap.get('state') != 'parked':
+            continue
+        if cap.get('failure_signaled'):  # S4 already surfaced it — leave alone
+            continue
+        spawned = cap.get('spawned')
+        if not isinstance(spawned, dict):
+            continue
+        if spawned.get('outcome'):  # already reconciled by this backstop — idempotent
+            continue
+        task_id = spawned.get('task_id')
+        if not (isinstance(task_id, str) and task_id):
+            continue
+        try:
+            state = terminal_fn(task_id)
+        except Exception as e:  # noqa: BLE001 — per-capture fail-safe
+            log(f'terminal-backstop: probe failed for {task_id}: '
+                f'{type(e).__name__}: {e} — keep')
+            res.kept += 1
+            continue
+        if state not in tts.TERMINAL_STATES:  # OPEN / UNKNOWN → KEEP (spec § 1(b))
+            res.kept += 1
+            continue
+        cid = cap.get('id') if isinstance(cap.get('id'), str) else '<unknown>'
+        if state == tts.MERGED:
+            decision = classify_completion(cap, verified_merged=True)
+            note = shipped_note(None)  # tts gives no url; degrades to PR-less phrasing
+            if dry_run:
+                res.completed.append((cid, note + ' (dry-run)'))
+                continue
+            cap['spawned'] = {**spawned, 'outcome': 'merged'}
+            cap.pop('aging', None)  # a completed card is no longer an aging nudge
+            cap['closed_by'] = TERMINAL_BACKSTOP_BY
+            cap['shipped_note'] = note
+            if decision.action == 'auto_close':
+                cap['state'] = COMPLETED_STATE_DONE
+                cap['closed_at'] = now.isoformat()
+                res.completed.append((cid, note))
+                log(f'terminal-backstop: capture {cid} (safe) -> done '
+                    f'[MERGED via task_terminal_state]')
+            else:
+                cap['state'] = COMPLETED_STATE_REVIEW
+                cap['awaiting_ack'] = True
+                res.closeouts.append(cid)
+                log(f'terminal-backstop: capture {cid} '
+                    f'({cap.get("risk") or "unbriefed"}) -> review_close '
+                    f'[MERGED via task_terminal_state]')
+            continue
+        # state == CLOSED — abandoned/rejected work; surface loudly, keep parked.
+        reason = 'linked PR was closed without merging (terminal-state backstop)'
+        if dry_run:
+            res.closed_failed.append((cid, reason + ' (dry-run)'))
+            continue
+        try:
+            ring_fn(
+                capture_id=cid,
+                blocked=True,
+                risk=cap.get('risk'),
+                title=cap.get('title'),
+                deep_link=card_deep_link(cid),
+                detail=reason,
+            )
+        except Exception as e:  # noqa: BLE001 — per-capture fail-safe
+            log(f'terminal-backstop: ring failed for {cid}: '
+                f'{type(e).__name__}: {e} — keep')
+            res.kept += 1
+            continue
+        cap['spawned'] = {**spawned, 'outcome': 'closed'}
+        cap['failure_signaled'] = {
+            'reason': reason,
+            'at': now.isoformat(),
+            'by': TERMINAL_BACKSTOP_BY,
+        }
+        res.closed_failed.append((cid, reason))
+        log(f'terminal-backstop: capture {cid} rang blocked-on-you '
+            f'[CLOSED via task_terminal_state]')
+    return res
+
+
+def _default_terminal_fn() -> Callable[[str], str]:
+    """Production terminal-state probe (completeness-pr2 G3): the shared
+    conservative gh-only `task_terminal_state`. Stdlib + gh only (no Supabase),
+    so this seam degrades independently of the chain_events-backed S3/S4 seams."""
+    return lambda task_id: tts.task_terminal_state(task_id)  # noqa: E731
+
+
 # ---------- Phase S (S7): apply a deferred pause/drop after a safe stop ------
 
 
@@ -1471,6 +1623,7 @@ def run_once(*, dry_run: bool,
              completion_closeout_fn: Optional[Callable[[dict[str, Any], Optional[str], datetime], dict[str, Any]]] = None,
              failure_fn: Optional[Callable[[str], Optional[str]]] = None,
              ring_fn: Optional[Callable[..., dict[str, Any]]] = None,
+             terminal_fn: Optional[Callable[[str], str]] = None,
              in_flight_fn: Optional[Callable[[str], bool]] = None,
              state_log_fn: Optional[Callable[..., Any]] = None,
              now: Optional[datetime] = None) -> int:
@@ -1538,6 +1691,7 @@ def run_once(*, dry_run: bool,
     deferred = 0
     completed = CompletionResult()
     failed = FailureResult()
+    terminal_backstop = TerminalReconcileResult()
     deferred_actions = DeferredActionResult()
     commit_status = 'nothing'
     cap_path = captures_path(repo_paths)
@@ -1623,6 +1777,26 @@ def run_once(*, dry_run: bool,
                 except Exception as e:  # noqa: BLE001 — fail-safe: report, never corrupt
                     log(f'failure-reconcile raised: {type(e).__name__}: {e}')
                     failed = FailureResult()
+            # --- G3 (completeness-pr2): terminal-state backstop. Runs AFTER S3/S4
+            # so it only sees cards those passes KEPT (their belt-and-suspenders /
+            # recognized-failure gates didn't fire), and BEFORE aging (a card just
+            # stamped terminal isn't also aged this tick). Probes the shared gh-only
+            # task_terminal_state and stamps MERGED/CLOSED; UNKNOWN/OPEN keep. The
+            # probe seam is stdlib+gh (no Supabase) so it degrades independently of
+            # the S3/S4 chain_events seams; the ring seam is shared with S4. ---
+            if terminal_fn is None:
+                try:
+                    terminal_fn = _default_terminal_fn()
+                except Exception as e:  # noqa: BLE001 — degrade: skip backstop this tick
+                    log(f'terminal-backstop: probe seam unavailable: {type(e).__name__}: {e}')
+            if terminal_fn is not None and ring_fn is not None:
+                try:
+                    terminal_backstop = reconcile_terminal_captures(
+                        registry, now,
+                        terminal_fn=terminal_fn, ring_fn=ring_fn, dry_run=dry_run)
+                except Exception as e:  # noqa: BLE001 — fail-safe: report, never corrupt
+                    log(f'terminal-backstop-reconcile raised: {type(e).__name__}: {e}')
+                    terminal_backstop = TerminalReconcileResult()
             try:
                 aged = age_parked_captures(registry, now)
             except Exception as e:  # noqa: BLE001 — fail-safe
@@ -1638,8 +1812,8 @@ def run_once(*, dry_run: bool,
             except Exception as e:  # noqa: BLE001 — fail-safe: never abort the tick
                 log(f'narrator sweep raised: {type(e).__name__}: {e}')
                 briefed, deferred = 0, 0
-            if (completed.changed or failed.changed or deferred_actions.changed
-                    or aged or briefed) and not dry_run:
+            if (completed.changed or failed.changed or terminal_backstop.changed
+                    or deferred_actions.changed or aged or briefed) and not dry_run:
                 # The Narrator sweep can hold the registry for minutes (one claude
                 # spawn per pending capture, up to NARRATOR_MAX_PER_TICK ×
                 # CLAUDE_TIMEOUT_SEC). Writing the stale in-memory copy would clobber
@@ -1671,7 +1845,8 @@ def run_once(*, dry_run: bool,
                     try:
                         commit_status = commit_and_push_captures(
                             core, _commit_audit(retire, aged, briefed, completed,
-                                                failed, deferred_actions))
+                                                failed, deferred_actions,
+                                                terminal_backstop))
                     except Exception as e:  # noqa: BLE001 — fail-safe
                         log(f'commit+push raised: {type(e).__name__}: {e}')
                         commit_status = 'push-failed'
@@ -1807,15 +1982,22 @@ def run_once(*, dry_run: bool,
 def _commit_audit(retire: RetireResult, aged: list[str], briefed: int = 0,
                   completed: Optional['CompletionResult'] = None,
                   failed: Optional['FailureResult'] = None,
-                  deferred_actions: Optional['DeferredActionResult'] = None) -> str:
+                  deferred_actions: Optional['DeferredActionResult'] = None,
+                  terminal_backstop: Optional['TerminalReconcileResult'] = None) -> str:
     closed = len(completed.closed) if completed else 0
     closeouts = len(completed.closeouts) if completed else 0
     rang = len(failed.rung) if failed else 0
     applied = len(deferred_actions.applied) if deferred_actions else 0
+    ts_done = len(terminal_backstop.completed) if terminal_backstop else 0
+    ts_closeouts = len(terminal_backstop.closeouts) if terminal_backstop else 0
+    ts_closed = len(terminal_backstop.closed_failed) if terminal_backstop else 0
     return (f'Auto-committed by heal_missions_card_gc. '
             f'retired={len(retire.retired)} aged={len(aged)} briefed={briefed} '
             f'closed={closed} closeouts={closeouts} failure-rings={rang} '
-            f'deferred-applied={applied}.')
+            f'deferred-applied={applied} '
+            f'terminal-backstop-done={ts_done} '
+            f'terminal-backstop-closeouts={ts_closeouts} '
+            f'terminal-backstop-closed={ts_closed}.')
 
 
 def _missions_commit_audit(missions: MissionReconcileResult) -> str:
