@@ -2202,7 +2202,12 @@ def check_retry_exhausted(state: dict) -> list[dict]:
 
 # ---------- Check 6: REVIEW_REVISION dispatched with no Forge session ----------
 
-def check_revision_dispatched_with_no_session(state: dict) -> list[dict]:
+def check_revision_dispatched_with_no_session(
+    state: dict,
+    open_prs: Optional[list[dict]] = None,
+    merged_prs: Optional[list[dict]] = None,
+    closed_prs: Optional[list[dict]] = None,
+) -> list[dict]:
     """Backstop for the cold-start no-session revision loop (forge-cold-start-revision S3).
 
     Reads the durable obligation ledger (`no_session_ledger`) instead of
@@ -2219,7 +2224,22 @@ def check_revision_dispatched_with_no_session(state: dict) -> list[dict]:
     with the PR link. No silent re-deposit — the mechanical cold-start dispatch
     already ran, so a blind re-dispatch would risk a loop. Same 6h-cooldown
     idempotency as Checks 1-5 via `should_alert`/`record_alert`.
+
+    Skip-on-terminal reconciliation (mirrors `check_forge_built_no_pr`'s
+    FORGE_NO_PR_SKIP): before appending an alert, correlate the task against the
+    already-fetched merged+closed PR union via `_pr_matches_task` (free — no gh
+    call). Only if that misses AND the obligation carries a real stored pr_url do
+    we spend at most ONE `_gh_pr_state` call to catch a just-merged PR outside
+    the recent-merged fetch window. A terminal (MERGED/CLOSED) resolution clears
+    the ledger row, emits a `NO_SESSION_REVISION_SKIP` INFO log, and skips the
+    alert. Fail-safe: an OPEN / None / unverifiable state preserves the alert
+    (verify-before-alarm — never silently swallow a possible real stall). This
+    fixes the `no-session-revision-merged-pr-fp` recurrence (PRs #865/#753/#693
+    merged out-of-band, still paging because the check never checked). The
+    `open_prs`/`merged_prs`/`closed_prs` args default to None for back-compat
+    with callers that pass `state` alone; correlation is a no-op when unset.
     """
+    merged_union = (merged_prs or []) + (closed_prs or [])
     try:
         stuck = no_session_ledger.list_open(
             older_than_minutes=NO_SESSION_STUCK_MIN,
@@ -2251,12 +2271,52 @@ def check_revision_dispatched_with_no_session(state: dict) -> list[dict]:
                 f'expected, suppressing page (obligation stays open for '
                 f'merge/PASS auto-resolve)', 'INFO')
             continue
+        # Skip-on-terminal (mirrors check_forge_built_no_pr's FORGE_NO_PR_SKIP):
+        # if the task's PR already MERGED/CLOSED out-of-band the loop is done,
+        # not stalled — resolve the ledger row and skip the page. Cheapest-first,
+        # and scan ONLY the merged+closed union: an OPEN matching PR is the
+        # genuine stall we still want to alert on.
+        #   1. Correlate against the merged+closed union (free — no gh call).
+        #   2. Only on a miss, and only when a real stored pr_url exists, spend at
+        #      most ONE _gh_pr_state call to catch a just-merged PR outside the
+        #      recent-merged fetch window.
+        # Fail-safe: an OPEN / None / unverifiable state does NOT skip
+        # (verify-before-alarm), matching _gh_pr_state's None-on-error contract.
+        terminal_reason = None  # 'pr_merged' | 'pr_closed'
+        terminal_pr_num = None
+        for pr in merged_union:
+            if _pr_matches_task(pr, task):
+                # A merged PR carries `mergedAt`; a closed-not-merged PR (from
+                # `_all_closed_prs_recent`, kept only when state == 'CLOSED') has
+                # none. `mergedAt` is the reliable discriminator.
+                terminal_reason = (
+                    'pr_merged' if pr.get('mergedAt') else 'pr_closed'
+                )
+                terminal_pr_num = pr.get('number')
+                break
+        if terminal_reason is None and pr_url and pr_url != '(no pr_url)':
+            gh_state = _gh_pr_state(pr_url)
+            if gh_state in ('MERGED', 'CLOSED'):
+                terminal_reason = (
+                    'pr_merged' if gh_state == 'MERGED' else 'pr_closed'
+                )
+        if terminal_reason is not None:
+            resolution = 'merged' if terminal_reason == 'pr_merged' else 'closed'
+            try:
+                no_session_ledger.resolve_obligation(task, resolution=resolution)
+            except Exception as e:  # noqa: BLE001 — ledger hiccup must not crash
+                log(f'resolve_obligation failed for {task}: '
+                    f'{type(e).__name__}: {e}', 'WARN')
+            pr_tag = f'#{terminal_pr_num}' if terminal_pr_num else (pr_url or '?')
+            log(f'NO_SESSION_REVISION_SKIP task={task} reason={terminal_reason} '
+                f'pr={pr_tag}', 'INFO')
+            continue
         last = _parse_ts(ob.get('last_dispatch_at') or ob.get('opened_at'))
         elapsed_min = int((now - last).total_seconds() / 60) if last else 0
         round_num = ob.get('round', 1)
         key = f'no_session_revision:{task}'
         pr_ref = pr_url if pr_url and pr_url != '(no pr_url)' else 'unknown'
-        alerts.append({
+        alert: dict = {
             'key': key,
             'message': (
                 f'A cold-start (session-less) revision on task `{task}` '
@@ -2280,7 +2340,14 @@ def check_revision_dispatched_with_no_session(state: dict) -> list[dict]:
             'recovery': functools.partial(
                 _recover_no_session_revision, task, pr_url,
             ),
-        })
+        }
+        # Defense-in-depth: expose the stored pr_url to the main-loop merge-truth
+        # gate so a PR that merges between this build and fire time is still
+        # suppressed (and the dry-run path is honest for the stored-url case).
+        # Only a real url — the sentinel/empty would make the gate no-op anyway.
+        if pr_url and pr_url != '(no pr_url)':
+            alert['pr_url'] = pr_url
+        alerts.append(alert)
     return alerts
 
 
@@ -3467,7 +3534,9 @@ def run(dry_run: bool = False) -> int:
     except Exception as e:
         log(f'check_retry_exhausted failed: {type(e).__name__}: {e}', 'ERROR')
     try:
-        all_alerts += check_revision_dispatched_with_no_session(state)
+        all_alerts += check_revision_dispatched_with_no_session(
+            state, open_prs=open_prs, merged_prs=merged_prs,
+            closed_prs=closed_prs)
     except Exception as e:
         log(
             f'check_revision_dispatched_with_no_session failed: '
