@@ -51,16 +51,19 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
 import time
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 import atomic_io
 import regression_baseline_cache as baseline_cache
+import suite_guardian_ledger as ledger
 import test_regression_check as trc
 
 
@@ -575,6 +578,465 @@ def run_guardian(
         invoker.teardown()
 
 
+# --- D2 proposal loop: propose -> approve -> dispatch (PR-2) ------------------
+#
+# WHAT THIS ADDS (shadow -> propose): the guardian already classifies standing
+# reds (above). In propose mode it now drives them to zero through the existing
+# propose->approve->dispatch fabric, without ever paging Larry for routine work:
+#
+#   * ONE decision per run (L1): every new actionable finding this cycle — new
+#     order-flakes, a genuine-break episode, a suite-event — is batched into a
+#     SINGLE pending-approval entry (id `suite-guardian-run-<date>`, chat_id=0,
+#     bare_approvable=False) + one approval_request chain_event for the dashboard
+#     Approvals tab. Never a per-finding DM.
+#   * An FYI signal card (needs_larry=False) mirrors the run to the "what the
+#     team did on its own" surface — informational, never a DECIDE-lane item.
+#   * The outcome ledger (suite_guardian_ledger) measures each proposal's full
+#     window: approve keeps it open for the serial drain; reject parks it (L9,
+#     never re-proposed); a dispatched fix resolves off the OBSERVABLE (victim
+#     green >=2 runs AND its named poison-injection test present + passing),
+#     regardless of merge provenance; an approved-but-dead obligation ages out.
+#   * Serial drain (D2.1): at most OPEN_FIX_CAP fix obligations in flight; the
+#     next dispatches as one resolves.
+#   * Edge-triggered escalation (D2.3): a genuine break DMs Larry ONCE per
+#     episode at 2 consecutive reds (a new episode only after the victim returns
+#     green) — the only path in this loop that pages.
+#
+# Every side effect that cannot run under the test jail (approval writes,
+# chain_event emit, the FYI card, the escalation DM, the fix dispatch, and the
+# source-grep that decides "poison test present") is an injectable dependency
+# (`ProposalDeps`), mirroring PR-1's injectable ``invoker``. The state-file ops
+# (registry + ledger) hit tmp files naturally under _bootstrap's redirection, so
+# the whole cycle is unit-testable without a real worktree, Supabase, or DM.
+
+PROPOSAL_TARGET_REPO = 'ourliberty-agent-core'
+PROPOSAL_KIND = 'suite-guardian-proposal'
+FYI_CARD_KEY = 'suite-guardian:run'
+
+# Classifications the guardian proposes a fix for. order-flake = test-order
+# pollution (a scripts/tests/** isolation fix); genuine-break = a real
+# regression. env-fail/backlog/infra-flake are NOT code the guardian can fix,
+# and unstable/recovered/parked are terminal — none are ever proposed.
+_ACTIONABLE_CLASSIFICATIONS = frozenset({CLS_ORDER_FLAKE, CLS_GENUINE_BREAK})
+
+# Edge-triggered escalation fires at this many consecutive reds (D2.3).
+_GENUINE_BREAK_ESCALATE_AFTER = 2
+
+
+def _run_entry_task_id(now: Optional[datetime] = None) -> str:
+    """The batched pending-approval id for a run — one per calendar day (the
+    guardian runs nightly), so ``find_by_id_any_state`` dedups a same-day retry."""
+    dt = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    return f'suite-guardian-run-{dt.strftime("%Y-%m-%d")}'
+
+
+def _slug(test_id: str) -> str:
+    """A grep-safe identifier fragment derived from a victim test_id."""
+    slug = re.sub(r'[^0-9a-zA-Z]+', '_', test_id or '').strip('_').lower()
+    return slug or 'unknown'
+
+
+def poison_test_name(test_id: str) -> str:
+    """The named poison-injection test that proves a fix holds (D2.4). A unique,
+    grep-able symbol under scripts/tests/**: its presence + passing is the
+    observable half of ledger resolution."""
+    return f'test_poison_{_slug(test_id)}'
+
+
+def build_fix_task_prompt(
+    test_id: str, classification: str, poison_test_name_: str,
+) -> str:
+    """The fix-task template Forge receives when a proposal is dispatched. Names
+    the poison-injection test explicitly and constrains its scope to
+    scripts/tests/** (D2.4)."""
+    if classification == CLS_ORDER_FLAKE:
+        cause = (
+            'This test is an ORDER-FLAKE: it fails in the full suite but passes '
+            'in isolation, so some other test leaks shared state into it. Find '
+            'the polluter and make the isolation deterministic (fixture teardown '
+            '/ per-test tmp state), not by reordering or skipping.'
+        )
+    else:
+        cause = (
+            'This test is a GENUINE-BREAK: it was previously green and now fails '
+            'in isolation with no environment signature — a real regression. Fix '
+            'the underlying cause so the test passes alone AND in the full suite.'
+        )
+    return (
+        f'Main-Suite Green Guardian fix task for `{test_id}`.\n\n'
+        f'{cause}\n\n'
+        f'REQUIRED: add a named poison-injection regression test '
+        f'`{poison_test_name_}` under scripts/tests/** that reproduces the '
+        f'failure mode and would fail if this fix regresses. The guardian '
+        f'resolves this obligation only once `{test_id}` is green for >=2 '
+        f'consecutive nightly runs AND `{poison_test_name_}` is present and '
+        f'passing at main. Keep the poison test itself scoped to '
+        f'scripts/tests/** only.'
+    )
+
+
+def should_escalate_break(entry: dict) -> bool:
+    """Pure edge-trigger (D2.3): a genuine break at >=2 consecutive reds that has
+    not already been escalated this episode. ``break_escalated`` is reset when the
+    victim returns green (a new episode), so a standing break pages exactly once."""
+    return bool(
+        entry.get('classification') == CLS_GENUINE_BREAK
+        and entry.get('consecutive_red_runs', 0) >= _GENUINE_BREAK_ESCALATE_AFTER
+        and not entry.get('break_escalated')
+    )
+
+
+def select_actionable(
+    run_result: dict, registry: dict, *, ledger_path: Optional[Path] = None,
+) -> list[dict]:
+    """The new actionable findings to propose fixes for THIS run. Pure over the
+    run result + registry + ledger state. Filters out anything already tracked:
+    a test with a live (proposed/approved) or parked ledger row is skipped
+    (dedup + L9), while a test with no row — or a terminal non-parked row whose
+    break recurred — is proposed. Ordered deterministically by test_id."""
+    lp = ledger_path or ledger.default_ledger_path()
+    classifications = run_result.get('classifications') or {}
+    tests = registry.get('tests', {})
+    out: list[dict] = []
+    for tid in sorted(classifications):
+        cls = classifications[tid]
+        if cls not in _ACTIONABLE_CLASSIFICATIONS:
+            continue
+        if tests.get(tid, {}).get('parked'):
+            continue
+        row = ledger.get(tid, path=lp)
+        if isinstance(row, dict):
+            # Live obligation (awaiting decision or in the fix pipeline) — do not
+            # re-propose. A PARKED row is never re-proposed (L9). Only a terminal
+            # non-parked row (resolved/abandoned) whose break recurred is eligible.
+            if row.get('status') == ledger.OPEN:
+                continue
+            if row.get('decision') == ledger.DEC_PARKED:
+                continue
+        out.append({
+            'test_id': tid,
+            'classification': cls,
+            'poison_test_name': poison_test_name(tid),
+        })
+    return out
+
+
+# --- injectable side-effect dependencies -------------------------------------
+
+def _prod_lookup_decision(run_task_id: Optional[str]) -> Optional[str]:
+    """Production decision reader: map an approval entry's resolved status back to
+    the ledger's decision vocabulary. 'pending' -> undecided (None-ish), an
+    approve/modify -> 'approved', a reject/expire -> 'rejected'. A missing entry
+    reads as undecided (the batch may not have been surfaced yet)."""
+    if not run_task_id:
+        return None
+    try:
+        import beacon_approval_handler as ah
+        entry = ah.find_by_id_any_state(run_task_id)
+    except Exception:  # noqa: BLE001 — decision read is best-effort
+        return None
+    if not isinstance(entry, dict):
+        return None
+    status = entry.get('status')
+    if status in ('approved', 'modified'):
+        return 'approved'
+    if status in ('rejected', 'expired'):
+        return 'rejected'
+    return None  # 'pending' or unknown — still awaiting Larry
+
+
+def _prod_escalate(*, test_id: str, entry: dict) -> None:
+    import larry_alerts as la
+    la.append_alert(
+        source='suite-guardian',
+        severity='critical',
+        message=(
+            f'Guardian: genuine regression standing red for '
+            f'{entry.get("consecutive_red_runs", 0)} consecutive runs: {test_id}. '
+            f'Isolation-reproducible, no env signature — this is a real break.'
+        ),
+        subject=test_id,
+        route='escalate',
+        needs_larry=True,
+    )
+
+
+def _prod_dispatch_fix(
+    repo_root: Path,
+    *, test_id: str, classification: str, poison_test_name_: str,
+    prompt: str, now: datetime,
+) -> Optional[str]:
+    """Land one approved fix task in Forge's inbox. Returns the fix task_id on a
+    successful write, None on any rejection/failure (the drain retries next run)."""
+    dt = now.astimezone(timezone.utc)
+    fix_task_id = f'suite-guardian-fix-{_slug(test_id)}-{dt.strftime("%Y%m%d")}'
+    task = {
+        'task_id': fix_task_id,
+        'source': 'beacon',
+        'target_agent': 'forge',
+        'target_repo': PROPOSAL_TARGET_REPO,
+        'task_type': 'code',
+        'pr_title': f'fix(suite-guardian): drive standing red to green — {test_id}',
+        'summary': f'Guardian fix for {test_id} ({classification}).',
+        'prompt': prompt,
+    }
+    try:
+        import safe_write_inbox
+        safe_write_inbox.safe_write_inbox(
+            'forge', task, 'beacon', f'{fix_task_id}.json',
+        )
+    except Exception:  # noqa: BLE001 — a failed dispatch stays undispatched
+        return None
+    return fix_task_id
+
+
+def _prod_poison_present(repo_root: Path, poison_test_name_: Optional[str]) -> bool:
+    """Observable half of resolution: is the named poison test present in the
+    source tree? A source-grep of scripts/tests/** for the symbol. Best-effort;
+    a scan error reads as absent (keeps the obligation open rather than
+    falsely resolving)."""
+    if not poison_test_name_:
+        return False
+    tests_dir = Path(repo_root) / 'scripts' / 'tests'
+    try:
+        for py in tests_dir.rglob('test_*.py'):
+            try:
+                if poison_test_name_ in py.read_text(encoding='utf-8'):
+                    return True
+            except OSError:
+                continue
+    except OSError:
+        return False
+    return False
+
+
+@dataclass
+class ProposalDeps:
+    """Injectable side-effect surface for the propose loop. Every field is a
+    callable; production wiring is filled by :func:`default_proposal_deps`, and
+    tests pass fakes that record calls and hit tmp state files."""
+
+    add_pending: Callable[[dict, int], dict]
+    find_pending: Callable[[str], Optional[dict]]
+    emit_approval_request: Callable[[dict], bool]
+    lookup_decision: Callable[[Optional[str]], Optional[str]]
+    upsert_card: Callable[[str, dict], None]
+    resolve_card: Callable[[str], bool]
+    escalate: Callable[..., None]
+    dispatch_fix: Callable[..., Optional[str]]
+    poison_present: Callable[[Optional[str]], bool]
+
+
+def default_proposal_deps(
+    repo_root: Path, *, chat_id: int = 0,
+) -> ProposalDeps:
+    """Production dependency wiring — lazy imports so the module loads clean under
+    the test jail (larry_alerts/safe_write_inbox refuse-under-test)."""
+
+    def _add_pending(payload: dict, cid: int) -> dict:
+        import beacon_approval_handler as ah
+        return ah.add_pending(payload, cid)
+
+    def _find_pending(task_id: str) -> Optional[dict]:
+        import beacon_approval_handler as ah
+        return ah.find_by_id_any_state(task_id)
+
+    def _emit_approval_request(payload: dict) -> bool:
+        import beacon_approval_handler as ah
+        import chain_event_emit as ce
+        return ce.emit_event(**ah.build_approval_request_chain_event(payload))
+
+    def _upsert_card(key: str, record: dict) -> None:
+        import for_larry_signal as fls
+        fls.upsert_record(key, record)
+
+    def _resolve_card(key: str) -> bool:
+        import for_larry_signal as fls
+        return fls.resolve_record(key)
+
+    def _dispatch(**kw) -> Optional[str]:
+        return _prod_dispatch_fix(repo_root, **kw)
+
+    def _poison(name: Optional[str]) -> bool:
+        return _prod_poison_present(repo_root, name)
+
+    return ProposalDeps(
+        add_pending=_add_pending,
+        find_pending=_find_pending,
+        emit_approval_request=_emit_approval_request,
+        lookup_decision=_prod_lookup_decision,
+        upsert_card=_upsert_card,
+        resolve_card=_resolve_card,
+        escalate=_prod_escalate,
+        dispatch_fix=_dispatch,
+        poison_present=_poison,
+    )
+
+
+def _build_batch_summary(proposals: list[dict]) -> str:
+    lines = [
+        'Main-Suite Green Guardian — proposed fixes for this run.',
+        f'{len(proposals)} standing red(s) worth a fix task:',
+    ]
+    for p in proposals:
+        lines.append(f'  • {p["test_id"]} [{p["classification"]}]')
+    lines.append(
+        'Approve to let the guardian dispatch these (serial-drained, <=3 in '
+        'flight); reject to park them (never re-proposed).'
+    )
+    return '\n'.join(lines)
+
+
+def run_proposal_cycle(
+    repo_root,
+    run_result: dict,
+    *,
+    registry_path=None,
+    ledger_path=None,
+    deps: Optional[ProposalDeps] = None,
+    now: Optional[datetime] = None,
+    chat_id: int = 0,
+) -> dict:
+    """Drive the propose->approve->dispatch loop for one guardian run. Reads the
+    registry + ledger, reconciles prior decisions, resolves/ages-out obligations,
+    serial-drains approved fixes, batches new actionable findings into ONE pending
+    entry (+ FYI card), and edge-triggers escalation. Returns a summary dict of
+    what changed. Never raises into the nightly timer — each side effect is
+    guarded, and the pure ledger/registry ops are fail-safe."""
+    repo_root = Path(repo_root)
+    registry_path = Path(registry_path) if registry_path else default_registry_path()
+    lp = Path(ledger_path) if ledger_path else ledger.default_ledger_path()
+    if deps is None:
+        deps = default_proposal_deps(repo_root, chat_id=chat_id)
+    n = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    now_iso = _now_iso(now)
+
+    summary: dict = {
+        'proposed': [], 'dispatched': [], 'resolved': [], 'parked': [],
+        'abandoned': [], 'escalated': [], 'pending_entry': None,
+    }
+
+    registry = load_registry(registry_path)
+    tests = registry.setdefault('tests', {})
+    registry_dirty = False
+
+    # 1. Reconcile prior proposals' decisions: approve keeps the obligation open
+    #    for the serial drain; reject parks it (L9 — never re-proposed).
+    for row in ledger.list_open(path=lp):
+        if row.get('decision') != ledger.DEC_PROPOSED:
+            continue
+        decision = deps.lookup_decision(row.get('run_task_id'))
+        if decision == 'approved':
+            ledger.set_decision(row['test_id'], ledger.DEC_APPROVED, now=n, path=lp)
+        elif decision == 'rejected':
+            if ledger.set_decision(row['test_id'], ledger.DEC_PARKED, now=n, path=lp):
+                summary['parked'].append(row['test_id'])
+
+    # 2. Episode reset: a victim that is currently green clears its escalation
+    #    latch, so a NEW break episode can page again (D2.3 edge-trigger).
+    for tid, entry in tests.items():
+        if entry.get('consecutive_red_runs', 0) == 0 and entry.get('break_escalated'):
+            entry['break_escalated'] = False
+            registry_dirty = True
+
+    # 3. Observable-based resolution of dispatched fixes (D2.6): victim green >=2
+    #    runs AND the named poison test present + passing, regardless of merge
+    #    provenance.
+    for row in ledger.list_open(path=lp):
+        if not row.get('fix_task_id'):
+            continue
+        entry = tests.get(row['test_id'], {})
+        green_streak = int(entry.get('consecutive_green_runs', 0))
+        present = bool(deps.poison_present(row.get('poison_test_name')))
+        if ledger.record_observation(
+            row['test_id'], green_streak=green_streak, poison_present=present,
+            now=n, path=lp,
+        ):
+            summary['resolved'].append(row['test_id'])
+
+    # 4. Abandoned age-out: an approved-but-dead obligation terminates (D2.6).
+    summary['abandoned'] = ledger.age_out_abandoned(now=n, path=lp)
+
+    # 5. Serial drain: dispatch approved, not-yet-dispatched fixes up to the cap.
+    for row in ledger.dispatchable_fixes(cap=ledger.OPEN_FIX_CAP, path=lp):
+        tid = row['test_id']
+        cls = tests.get(tid, {}).get('classification', CLS_GENUINE_BREAK)
+        pname = row.get('poison_test_name') or poison_test_name(tid)
+        prompt = build_fix_task_prompt(tid, cls, pname)
+        fix_task_id = deps.dispatch_fix(
+            test_id=tid, classification=cls, poison_test_name_=pname,
+            prompt=prompt, now=n,
+        )
+        if fix_task_id and ledger.mark_dispatched(tid, fix_task_id, now=n, path=lp):
+            summary['dispatched'].append(tid)
+
+    # 6. New proposals -> ONE pending entry per run (L1) + one approval_request.
+    actionable = select_actionable(run_result, registry, ledger_path=lp)
+    if actionable:
+        run_task_id = _run_entry_task_id(n)
+        proposals = []
+        for item in actionable:
+            ledger.open_proposal(
+                item['test_id'], run_task_id=run_task_id,
+                poison_test_name=item['poison_test_name'], now=n, path=lp,
+            )
+            proposals.append(item)
+            summary['proposed'].append(item['test_id'])
+        # Dedup the surfaced decision: emit at most once per run id (a same-day
+        # retry finds the existing entry and skips the re-emit + re-DM).
+        if deps.find_pending(run_task_id) is None:
+            payload = {
+                'task_id': run_task_id,
+                'summary': _build_batch_summary(proposals),
+                'prompt': _build_batch_summary(proposals),
+                'target_agent': 'forge',
+                'target_repo': PROPOSAL_TARGET_REPO,
+                'kind': PROPOSAL_KIND,
+                'bare_approvable': False,
+                'proposals': proposals,
+            }
+            deps.add_pending(payload, chat_id)
+            deps.emit_approval_request(payload)
+            summary['pending_entry'] = run_task_id
+
+    # 7. Edge-triggered escalation for genuine breaks (the only paging path).
+    for tid, entry in tests.items():
+        if should_escalate_break(entry):
+            deps.escalate(test_id=tid, entry=entry)
+            entry['break_escalated'] = True
+            registry_dirty = True
+            summary['escalated'].append(tid)
+
+    # 8. FYI signal card (needs_larry=False) — informational mirror, never a
+    #    DECIDE-lane item. Self-clears on a quiet run.
+    activity = (summary['proposed'] or summary['dispatched']
+                or summary['resolved'] or summary['escalated']
+                or summary['parked'] or summary['abandoned'])
+    if activity:
+        deps.upsert_card(FYI_CARD_KEY, {
+            'needs_larry': False,
+            'source': 'suite-guardian',
+            'ts': now_iso,
+            'summary': (
+                f'Guardian run: {len(summary["proposed"])} proposed, '
+                f'{len(summary["dispatched"])} dispatched, '
+                f'{len(summary["resolved"])} resolved, '
+                f'{len(summary["escalated"])} escalated.'
+            ),
+            'proposed': summary['proposed'],
+            'dispatched': summary['dispatched'],
+            'resolved': summary['resolved'],
+            'escalated': summary['escalated'],
+        })
+    else:
+        deps.resolve_card(FYI_CARD_KEY)
+
+    if registry_dirty:
+        save_registry(registry_path, registry)
+
+    return summary
+
+
 # --- CLI ---------------------------------------------------------------------
 
 def _default_mode(repo_root: Path) -> str:
@@ -612,6 +1074,19 @@ def main(argv: Optional[list] = None) -> int:
     except trc.AnalysisError as exc:
         print(f'main_suite_guardian: run failed: {exc}', file=sys.stderr)
         return 2
+
+    # In propose mode a conclusive run drives the propose->approve->dispatch loop
+    # (D2). Shadow mode detects + records only. A skipped/inconclusive run carries
+    # no per-test verdict, so there is nothing to propose or drain this cycle.
+    if mode == 'propose' and result.get('status') in (RUN_GREEN, RUN_RED):
+        try:
+            proposal = run_proposal_cycle(
+                repo_root, result, registry_path=args.registry,
+            )
+            result['proposal'] = proposal
+        except Exception as exc:  # noqa: BLE001 — the loop must never wedge the timer
+            print(f'main_suite_guardian: proposal cycle failed: {exc}',
+                  file=sys.stderr)
 
     print(json.dumps(result, indent=2, sort_keys=True))
     return 0
