@@ -467,5 +467,49 @@ class DeepReviewHeldDmOnceTest(_GateTestBase):
         self.assertEqual(self.gh.merge_calls, [])              # never merged
 
 
+class DeepReviewHoldBroadcastRouteTest(_GateTestBase):
+    """merge-held-deep-review-notifier-tier4-001: the broadcast fallback (no
+    reply chat_id, e.g. autonomous build-sequence / Pulse-cycle PRs) must emit
+    route='escalate' so the Telegram bot DMs Larry instead of skipping the
+    'outbox-notifier'-graduated 'hold' route at read-time."""
+
+    def test_broadcast_fallback_emits_escalate_route(self):
+        self.on._dm_larry_deep_review_hold(
+            pr_url=_pr_url(REPO, 823),
+            pr_number=823,
+            repo_coords=REPO,
+            task_id='autonomous-seq-step-823',
+            chat_id=None,               # autonomous PR → broadcast fallback
+            summary='fan-out change',
+        )
+        alerts = self._read_alerts()
+        self.assertEqual(len(alerts), 1)
+        rec = alerts[0]
+        self.assertEqual(rec['route'], 'escalate')      # the fix: not 'hold'
+        self.assertEqual(rec['severity'], 'warning')    # severity unchanged
+        # subject dedup key preserved (per-(repo,PR) cooldown still works).
+        self.assertEqual(
+            rec['subject'], f'auto-merge-deep-review-hold:{REPO}:823')
+        self.assertIn('merge_reviewed_pr.sh 823', rec['message'])
+
+    def test_reply_chat_path_untouched_no_broadcast_alert(self):
+        # chat_id is an int → the append_notification path fires and returns;
+        # the broadcast append_alert must NOT run (no route/severity record).
+        self.on._dm_larry_deep_review_hold(
+            pr_url=_pr_url(REPO, 830),
+            pr_number=830,
+            repo_coords=REPO,
+            task_id='chat-initiated-830',
+            chat_id=4242,
+            summary='',
+        )
+        records = self._read_alerts()
+        self.assertEqual(len(records), 1)
+        rec = records[0]
+        self.assertEqual(rec.get('kind'), 'notification')   # not a broadcast
+        self.assertNotIn('route', rec)
+        self.assertEqual(rec.get('chat_id'), 4242)
+
+
 if __name__ == '__main__':
     unittest.main()
