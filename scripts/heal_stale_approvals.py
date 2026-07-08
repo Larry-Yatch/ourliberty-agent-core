@@ -373,6 +373,39 @@ def _entry_decision_key(entry: dict[str, Any]) -> Optional[str]:
     return canonical_decision_key(_entry_task_id(entry), pr_url)
 
 
+# The exact wrapper these session-less PR-decision approvals carry. Requiring it
+# (not a bare `pr-<repo>-<num>`) is the guard that keeps the direct probe scoped
+# to Mirror's PR-decision cards: a plain approval whose id merely looks
+# coordinate-shaped never carries this prefix, so it can never be expired via the
+# coordinate path. Matches outbox_notifier's `mirror-review-<task_id>[-<head8>]`.
+_MIRROR_REVIEW_PR_PREFIX = 'mirror-review-pr-'
+
+
+def _entry_pr_coordinate(entry: dict[str, Any]) -> Optional[tuple[str, int]]:
+    """(qualified_repo, pr_number) when this pending entry is one of Mirror's
+    session-less PR-decision approvals — id shaped
+    `mirror-review-pr-<repo>-<num>` or `...-<num>-<head8>` — else None.
+
+    GUARD (never expire a non-PR approval off an id that merely looks
+    PR-shaped): two conditions, both required —
+      1. the id carries the `mirror-review-pr-` wrapper (Mirror's PR-decision
+         cards; a plain approval never does), and
+      2. the dispatch_payload targets that SAME work: `add_pending` sets
+         `entry['id'] = payload['task_id']`, so a genuine card has
+         `payload['task_id'] == id`. A missing payload, or one whose task_id
+         names different work, disqualifies the entry.
+    A disqualified entry falls through to the generic token probe (which keeps on
+    UNKNOWN as ever), so the guard can only ever withhold the direct probe, never
+    cause a false retire."""
+    eid = entry.get('id')
+    if not isinstance(eid, str) or not eid.startswith(_MIRROR_REVIEW_PR_PREFIX):
+        return None
+    payload = entry.get('dispatch_payload')
+    if not isinstance(payload, dict) or payload.get('task_id') != eid:
+        return None
+    return tts.parse_pr_coordinate(eid)
+
+
 def _approval_age_hours(entry: dict[str, Any], now: datetime) -> Optional[float]:
     """Hours since the entry was created, or None if created_at is missing or
     unparseable (which the caller treats as KEEP — never retire on a bad ts)."""
@@ -391,6 +424,7 @@ def classify_terminal_approval(
     now: datetime,
     grace_hours: float,
     probe: Any,
+    coord_probe: Any = None,
 ) -> tuple[bool, str]:
     """(retire?, reason) for one pending approval against its work's terminal
     ground truth. Conservative posture (spec § 1): retire ONLY when the work is
@@ -398,12 +432,37 @@ def classify_terminal_approval(
     window. EVERY other path — missing/unparseable created_at, within grace,
     missing task_id, OPEN, or UNKNOWN/indeterminate — is KEEP. An indeterminate
     probe can only ever leave a phantom for another cycle, never falsely retire
-    live work."""
+    live work.
+
+    Mirror's session-less PR-decision cards (id `mirror-review-pr-<repo>-<num>`,
+    guarded by `_entry_pr_coordinate`) take a DIRECT path: the generic token
+    `probe` is structurally blind to number-coordinate ids — the PR number
+    appears in no branch or title — which is how six such cards kept emitting
+    reminder DMs for 4-11h after their PRs merged out-of-band (2026-07-08). For
+    these, `coord_probe` asks gh for THAT PR directly and its verdict is
+    AUTHORITATIVE: the card asks "is the decision on PR #N moot?", and PR #N is
+    moot exactly when #N itself is MERGED/CLOSED — a separate still-OPEN revision
+    PR is new, distinct work, not the PR this card governs. So a terminal #N
+    retires and an OPEN/UNKNOWN #N keeps, WITHOUT consulting the generic probe
+    (deliberately NOT the OPEN-variant-wins reduction `task_terminal_state` uses
+    for the different "is the task live anywhere?" question). UNKNOWN (gh outage)
+    keeps — a lookup failure never expires — and does not fall through to a
+    second, redundant gh probe."""
     age = _approval_age_hours(entry, now)
     if age is None:
         return False, 'no/unparseable created_at (keep)'
     if age < grace_hours:
         return False, f'within grace ({age:.1f}h < {grace_hours}h) (keep)'
+    coord = _entry_pr_coordinate(entry)
+    if coord is not None:
+        repo, number = coord
+        coord_probe = coord_probe or tts.pr_coordinate_state
+        state, merge_sha = coord_probe(repo, number)
+        if state in tts.TERMINAL_STATES:
+            sha_note = f', merge sha {merge_sha}' if merge_sha else ''
+            return True, (f'PR {repo}#{number} {state}{sha_note} '
+                          f'past {grace_hours}h grace')
+        return False, f'PR {repo}#{number} {state} (keep)'
     task_id = _entry_task_id(entry)
     if not task_id:
         return False, 'no task_id to probe (keep)'
@@ -419,6 +478,7 @@ def reconcile_terminal_approvals(
     now: Optional[datetime] = None,
     grace_hours: float = TERMINAL_APPROVAL_GRACE_HOURS,
     probe: Any = None,
+    coord_probe: Any = None,
     dry_run: bool = False,
 ) -> dict[str, int]:
     """Spec § 3.1: retire pending approvals whose work has reached a terminal
@@ -446,7 +506,8 @@ def reconcile_terminal_approvals(
     for entry in pending:
         if not isinstance(entry, dict):
             continue
-        retire, reason = classify_terminal_approval(entry, now, grace_hours, probe)
+        retire, reason = classify_terminal_approval(
+            entry, now, grace_hours, probe, coord_probe=coord_probe)
         approval_id = entry.get('id')
         if retire and isinstance(approval_id, str) and approval_id:
             to_retire.append((approval_id, reason))

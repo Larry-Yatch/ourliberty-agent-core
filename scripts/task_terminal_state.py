@@ -41,6 +41,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -231,6 +232,102 @@ def _combine(states: list[str]) -> str:
     if CLOSED in states:
         return CLOSED
     return UNKNOWN
+
+
+# -------------------- direct PR-coordinate probe --------------------
+
+# A session-less PR's review is tracked under the synthetic task_id
+# `pr-<repo>-<num>` (the shape `heal_pipeline_stall._PR_TASK_ID_RE` canonicalizes
+# and `decision_identity.canonical_decision_key` normalizes wrapped ids to). Such
+# an id NAMES its PR by NUMBER — the number never appears as a token in the PR's
+# branch or title, so the token-search `task_terminal_state` below is
+# structurally blind to it and stayed UNKNOWN forever after a coordinate PR
+# merged out-of-band (the 2026-07-08 six-phantom-reminder incident). These two
+# helpers are the direct probe for that shape. They are a DELIBERATELY SEPARATE
+# primitive from `task_terminal_state`, not wired into it: the two answer
+# different questions — `task_terminal_state` asks "is this task's work live
+# under ANY branch/variant?" (OPEN-variant-wins, for stall/mission liveness),
+# while `pr_coordinate_state` asks "is THIS specific PR terminal?" (the right
+# question for "is the decision on PR #N moot?"). Merging them would force one
+# semantics onto both callers.
+
+# The numeric-plus-optional-head8 tail of a coordinate stem: `<num>` or
+# `<num>-<head8>`. The head8 suffix is `(head_sha or '')[:8]` (hex), appended by
+# outbox_notifier._emit_no_session_decision_approval when a head SHA is present —
+# so both `pr-<repo>-<num>` and `pr-<repo>-<num>-<head8>` are live id shapes and
+# the parser must tolerate the suffix (a `[0-9]+$` anchor would silently miss
+# every head8-suffixed card, re-opening the phantom class for that shape).
+_PR_NUM_TAIL_RE = re.compile(r'^([0-9]+)(?:-[0-9a-fA-F]{4,40})?$')
+
+# The wrapper these session-less PR-decision approvals carry (outbox_notifier
+# mints `mirror-review-<task_id>[-<head8>]`). Stripped before coordinate parsing.
+_MIRROR_REVIEW_WRAPPER = 'mirror-review-'
+
+
+def parse_pr_coordinate(
+    task_id: str, repos: Optional[Iterable[str]] = None,
+) -> Optional[tuple[str, int]]:
+    """Parse a `pr-<repo>-<num>` coordinate — bare, `mirror-review-`-wrapped, or
+    with a trailing `-<head8>` SHA suffix — to (qualified_repo, pr_number), else
+    None.
+
+    Anchored on the KNOWN repo short name rather than a greedy regex: for each
+    tracked repo (`repos` or `default_repos()`) we test the exact prefix
+    `pr-<short>-` and parse only the remainder as `<num>[-<head8>]`. Anchoring on
+    the known repo removes the greedy-split ambiguity a monolithic regex has when
+    the head8 tail is itself all-digits (`pr-<repo>-845-00001234`), and scopes the
+    later gh lookup to tracked repos. An id whose repo segment matches no tracked
+    repo returns None (never guessed).
+
+    NOTE (single-owner assumption): the short->full map keys on the repo's short
+    name, so two tracked repos sharing a short name across owners would collide
+    (last wins). All tracked repos are single-owner today; revisit if a fork is
+    ever tracked."""
+    if not isinstance(task_id, str) or not task_id:
+        return None
+    s = task_id.strip()
+    if s.startswith(_MIRROR_REVIEW_WRAPPER):
+        s = s[len(_MIRROR_REVIEW_WRAPPER):]
+    repo_list = list(repos) if repos is not None else default_repos()
+    for repo in repo_list:
+        full = _qualify_repo(repo)
+        if not full:
+            continue
+        short = full.split('/', 1)[-1]
+        prefix = f'pr-{short}-'
+        if not s.startswith(prefix):
+            continue
+        m = _PR_NUM_TAIL_RE.match(s[len(prefix):])
+        if m:
+            return full, int(m.group(1))
+    return None
+
+
+def pr_coordinate_state(
+    repo: str,
+    number: int,
+    *,
+    timeout: float = DEFAULT_GH_TIMEOUT_SEC,
+) -> tuple[str, Optional[str]]:
+    """Direct gh lookup for one PR by (qualified `repo`, `number`): returns
+    (state, merge_sha). `(UNKNOWN, None)` on ANY gh failure — the conservative
+    kernel posture: a lookup failure is never a terminal verdict, so a reconciler
+    consuming this can only ever KEEP on error, never falsely retire. merge_sha is
+    the merge commit oid when GitHub surfaces one (MERGED PRs), else None.
+
+    Takes an already-parsed (repo, number) — the caller parses once via
+    `parse_pr_coordinate` — so the coordinate is not re-derived here."""
+    data = gh_json(
+        ['gh', 'pr', 'view', str(number), '--repo', repo,
+         '--json', 'state,mergeCommit'],
+        timeout=timeout,
+    )
+    if not isinstance(data, dict):
+        return UNKNOWN, None
+    state = classify_state(data.get('state'))
+    merge_commit = data.get('mergeCommit')
+    sha = merge_commit.get('oid') if isinstance(merge_commit, dict) else None
+    return state, (sha if isinstance(sha, str) and sha else None)
 
 
 # -------------------- the canonical probe (spec § 2) --------------------

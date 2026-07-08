@@ -269,5 +269,115 @@ class DefaultReposTest(unittest.TestCase):
         self.assertEqual(tts._qualify_repo('owner/core'), 'owner/core')
 
 
+# -------------------- direct PR-coordinate probe --------------------
+
+COORD_REPOS = ['owner/agent-core']
+COORD_ID = 'pr-agent-core-845'
+WRAPPED_COORD_ID = 'mirror-review-pr-agent-core-845'
+# The head8-suffixed shape outbox_notifier mints when a head SHA is present:
+# `mirror-review-<task_id>-<head8>` (head8 = (head_sha or '')[:8], hex).
+HEAD8_WRAPPED_ID = 'mirror-review-pr-agent-core-845-a1b2c3d4'
+
+
+class ParsePrCoordinateTest(unittest.TestCase):
+    def test_bare_coordinate(self):
+        self.assertEqual(tts.parse_pr_coordinate(COORD_ID, COORD_REPOS),
+                         ('owner/agent-core', 845))
+
+    def test_wrapped_coordinate(self):
+        # The 2026-07-08 phantom shape: mirror-review-pr-<repo>-<num>.
+        self.assertEqual(tts.parse_pr_coordinate(WRAPPED_COORD_ID, COORD_REPOS),
+                         ('owner/agent-core', 845))
+
+    def test_head8_suffixed_wrapped_coordinate(self):
+        # The common shape when head_sha is present — a hex tail an all-digits
+        # anchor would silently miss, re-opening the phantom class.
+        self.assertEqual(tts.parse_pr_coordinate(HEAD8_WRAPPED_ID, COORD_REPOS),
+                         ('owner/agent-core', 845))
+
+    def test_all_digit_head8_not_mis_read_as_pr_number(self):
+        # Anchoring on the known repo short name (`agent-core`) resolves the
+        # greedy ambiguity: the number right after the repo is the PR (#845),
+        # the trailing all-digit group is the head8, not the PR number.
+        self.assertEqual(
+            tts.parse_pr_coordinate('pr-agent-core-845-00001234', COORD_REPOS),
+            ('owner/agent-core', 845))
+
+    def test_multi_segment_repo_short_name(self):
+        # A real short name has internal dashes; the anchor must match it whole.
+        repos = ['Larry-Yatch/ourliberty-agent-core']
+        self.assertEqual(
+            tts.parse_pr_coordinate(
+                'mirror-review-pr-ourliberty-agent-core-857', repos),
+            ('Larry-Yatch/ourliberty-agent-core', 857))
+
+    def test_unknown_repo_is_none(self):
+        self.assertIsNone(tts.parse_pr_coordinate('pr-other-repo-845', COORD_REPOS))
+
+    def test_short_nonhead_tail_is_none_not_wrong_pr(self):
+        # `pr-agent-core-845-001`: a real head8 is 8 hex chars, so a 3-char `001`
+        # tail does not match the optional suffix and the whole remainder fails
+        # to parse -> None (never mis-read as PR #1). Conservative: don't guess.
+        self.assertIsNone(
+            tts.parse_pr_coordinate('pr-agent-core-845-001', COORD_REPOS))
+
+    def test_non_coordinate_is_none(self):
+        self.assertIsNone(tts.parse_pr_coordinate(TASK, COORD_REPOS))
+        self.assertIsNone(tts.parse_pr_coordinate('', COORD_REPOS))
+        self.assertIsNone(tts.parse_pr_coordinate(None, COORD_REPOS))
+
+
+class PrCoordinateStateTest(unittest.TestCase):
+    """pr_coordinate_state takes an already-parsed (repo, number)."""
+
+    def test_merged_with_sha(self):
+        data = {'state': 'MERGED', 'mergeCommit': {'oid': 'abc123def456'}}
+        with mock.patch.object(tts, 'gh_json', return_value=data) as gj:
+            state, sha = tts.pr_coordinate_state('owner/agent-core', 845)
+        self.assertEqual(state, tts.MERGED)
+        self.assertEqual(sha, 'abc123def456')
+        # The lookup names the PR by number against the qualified repo.
+        args = gj.call_args[0][0]
+        self.assertIn('845', args)
+        self.assertIn('owner/agent-core', args)
+
+    def test_closed_without_merge_commit(self):
+        data = {'state': 'CLOSED', 'mergeCommit': None}
+        with mock.patch.object(tts, 'gh_json', return_value=data):
+            self.assertEqual(tts.pr_coordinate_state('owner/agent-core', 845),
+                             (tts.CLOSED, None))
+
+    def test_open(self):
+        with mock.patch.object(tts, 'gh_json', return_value={'state': 'OPEN'}):
+            self.assertEqual(tts.pr_coordinate_state('owner/agent-core', 845),
+                             (tts.OPEN, None))
+
+    def test_gh_failure_is_unknown(self):
+        with mock.patch.object(tts, 'gh_json', return_value=None):
+            self.assertEqual(tts.pr_coordinate_state('owner/agent-core', 845),
+                             (tts.UNKNOWN, None))
+
+
+class CoordinateNotWiredIntoCanonicalProbeTest(unittest.TestCase):
+    """pr_coordinate_state is a DELIBERATELY SEPARATE primitive: it is NOT wired
+    into task_terminal_state, whose token search answers the different "is the
+    task live under any branch/variant?" question. This guards against a future
+    edit re-introducing the divergence (direct-PR verdict vs OPEN-variant-wins
+    _combine) that a merged probe would create."""
+
+    def test_task_terminal_state_does_not_resolve_a_pure_coordinate(self):
+        # A coordinate id with a MERGED PR but no token-matching branch/title:
+        # task_terminal_state must stay UNKNOWN (it never calls pr view), proving
+        # the coordinate leg is not folded in.
+        def fake_gh(args, timeout=None):
+            if 'view' in args:
+                raise AssertionError('task_terminal_state must not gh-pr-view')
+            return []  # pr list: no token match
+        with mock.patch.object(tts, 'gh_json', side_effect=fake_gh):
+            self.assertEqual(
+                tts.task_terminal_state(WRAPPED_COORD_ID, repos=COORD_REPOS),
+                tts.UNKNOWN)
+
+
 if __name__ == '__main__':
     unittest.main()
