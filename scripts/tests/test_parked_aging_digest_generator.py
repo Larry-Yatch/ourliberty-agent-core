@@ -237,5 +237,256 @@ class RealCapturesFixtureTest(unittest.TestCase):
             self.assertIs(cap.get('aging'), True)
 
 
+def _mission(mid, *, name='Card', phase='proposed', archived=False,
+             created='2026-05-01T00:00:00+00:00', brief='b'):
+    m = {'id': mid, 'name': name, 'phase': phase, 'brief': brief}
+    if archived:
+        m['archived'] = True
+    if created is not None:
+        m['created'] = created
+    return m
+
+
+def _write_missions(path, *missions):
+    path.write_text(json.dumps({'missions': list(missions)}))
+
+
+def _write_rank(path, *entries):
+    path.write_text(json.dumps({'ranked': list(entries)}))
+
+
+def _write_staleness(path, *candidates):
+    path.write_text(json.dumps({'candidates': list(candidates)}))
+
+
+class ProposedPileFieldsTest(unittest.TestCase):
+    """proposed_count / actionable_count / oldest_* computed from a fixture
+    missions.json (+ staleness file)."""
+
+    def test_counts_oldest_and_actionable(self):
+        with tempfile.TemporaryDirectory() as d:
+            missions = Path(d) / 'missions.json'
+            staleness = Path(d) / 'staleness.json'
+            rank = Path(d) / 'rank.json'  # absent → age_fallback, but not asserted here
+            _write_missions(
+                missions,
+                _mission('a', name='Oldest', created='2026-01-01T00:00:00+00:00'),
+                _mission('b', name='Newer', created='2026-06-01T00:00:00+00:00'),
+                _mission('c', name='Shipped', phase='shipped'),        # excluded
+                _mission('d', name='Archived', archived=True),          # excluded
+                _mission('e', name='NoDate', created=None),             # counted, skipped for age
+            )
+            _write_staleness(staleness, {'id': 'a'}, {'id': 'b'})
+            pile = pad.build_proposed_pile(
+                NOW, missions_path=missions, rank_path=rank, staleness_path=staleness)
+            self.assertEqual(pile['proposed_count'], 3)          # a, b, e
+            self.assertEqual(pile['actionable_count'], 1)        # 3 - 2 candidates
+            self.assertEqual(pile['oldest_name'], 'Oldest')
+            # 2026-01-01 → 2026-06-10 is 160 calendar days.
+            self.assertEqual(pile['oldest_age_days'], 160)
+            self.assertEqual(pile['as_of_month'], '2026-06')
+
+    def test_actionable_null_when_staleness_absent(self):
+        with tempfile.TemporaryDirectory() as d:
+            missions = Path(d) / 'missions.json'
+            _write_missions(missions, _mission('a'))
+            pile = pad.build_proposed_pile(
+                NOW, missions_path=missions,
+                rank_path=Path(d) / 'nope-rank.json',
+                staleness_path=Path(d) / 'nope-staleness.json')
+            self.assertEqual(pile['proposed_count'], 1)
+            self.assertIsNone(pile['actionable_count'])
+
+    def test_oldest_none_when_no_parseable_created(self):
+        with tempfile.TemporaryDirectory() as d:
+            missions = Path(d) / 'missions.json'
+            _write_missions(
+                missions,
+                _mission('a', created=None),
+                _mission('b', created='garbage'),
+            )
+            pile = pad.build_proposed_pile(
+                NOW, missions_path=missions,
+                rank_path=Path(d) / 'r.json', staleness_path=Path(d) / 's.json')
+            self.assertEqual(pile['proposed_count'], 2)
+            self.assertIsNone(pile['oldest_age_days'])
+            self.assertIsNone(pile['oldest_name'])
+
+
+class TopRelevantTest(unittest.TestCase):
+    """top_relevant reads rank-file top-3; age_fallback path when it's absent."""
+
+    def test_reads_rank_top_three(self):
+        with tempfile.TemporaryDirectory() as d:
+            missions = Path(d) / 'missions.json'
+            rank = Path(d) / 'rank.json'
+            _write_missions(missions, _mission('a'))
+            _write_rank(
+                rank,
+                {'name': 'Best', 'rank_score': 90.0, 'brief': {'what': 'do X'}},
+                {'name': 'Second', 'rank_score': 80.0, 'brief': {'what': 'do Y'}},
+                {'name': 'Third', 'rank_score': 70.0, 'brief': {'what': 'do Z'}},
+                {'name': 'Fourth', 'rank_score': 60.0, 'brief': {'what': 'do W'}},
+            )
+            pile = pad.build_proposed_pile(
+                NOW, missions_path=missions, rank_path=rank,
+                staleness_path=Path(d) / 's.json')
+            self.assertEqual(pile['relevance_basis'], 'portfolio_rank')
+            self.assertEqual(len(pile['top_relevant']), 3)
+            self.assertEqual(
+                pile['top_relevant'][0],
+                {'name': 'Best', 'rank_score': 90.0, 'what': 'do X'})
+            self.assertEqual(pile['top_relevant'][2]['name'], 'Third')
+
+    def test_age_fallback_when_rank_absent(self):
+        with tempfile.TemporaryDirectory() as d:
+            missions = Path(d) / 'missions.json'
+            _write_missions(
+                missions,
+                _mission('a', name='Oldest', created='2026-01-01T00:00:00+00:00'),
+                _mission('b', name='Middle', created='2026-03-01T00:00:00+00:00'),
+                _mission('c', name='Newest', created='2026-06-01T00:00:00+00:00'),
+                _mission('d', name='NoDate', created=None),
+            )
+            pile = pad.build_proposed_pile(
+                NOW, missions_path=missions,
+                rank_path=Path(d) / 'absent-rank.json',
+                staleness_path=Path(d) / 's.json')
+            self.assertEqual(pile['relevance_basis'], 'age_fallback')
+            names = [it['name'] for it in pile['top_relevant']]
+            self.assertEqual(names, ['Oldest', 'Middle', 'Newest'])
+            self.assertIn('age_days', pile['top_relevant'][0])
+            self.assertNotIn('rank_score', pile['top_relevant'][0])
+
+    def test_age_fallback_when_rank_empty(self):
+        with tempfile.TemporaryDirectory() as d:
+            missions = Path(d) / 'missions.json'
+            rank = Path(d) / 'rank.json'
+            _write_missions(missions, _mission('a', created='2026-02-01T00:00:00+00:00'))
+            rank.write_text(json.dumps({'ranked': []}))
+            pile = pad.build_proposed_pile(
+                NOW, missions_path=missions, rank_path=rank,
+                staleness_path=Path(d) / 's.json')
+            self.assertEqual(pile['relevance_basis'], 'age_fallback')
+
+
+class MonthlyCadenceTest(unittest.TestCase):
+    """CADENCE INVARIANT: a second run in the same month carries the block
+    forward unchanged; a run in a new month recomputes + re-stamps as_of_month."""
+
+    def _fixtures(self, d):
+        missions = Path(d) / 'missions.json'
+        _write_missions(missions, _mission('a', name='One',
+                        created='2026-01-01T00:00:00+00:00'))
+        return missions, Path(d) / 'rank.json', Path(d) / 'staleness.json'
+
+    def test_same_month_carries_forward_unchanged(self):
+        with tempfile.TemporaryDirectory() as d:
+            missions, rank, staleness = self._fixtures(d)
+            caps = Path(d) / 'captures.json'
+            caps.write_text(json.dumps(_registry(_cap('p', state='parked'))))
+            out = Path(d) / 'digest.json'
+            first = datetime(2026, 6, 10, 12, 0, tzinfo=timezone.utc)
+            self.assertEqual(0, pad.run(
+                now=first, captures_path=caps, artifact_path=out,
+                missions_path=missions, rank_path=rank, staleness_path=staleness))
+            pile_before = json.loads(out.read_text())['proposed_pile']
+
+            # Grow the pile mid-month; a same-month run must NOT recompute it.
+            _write_missions(
+                missions,
+                _mission('a', name='One', created='2026-01-01T00:00:00+00:00'),
+                _mission('b', name='Two', created='2026-02-01T00:00:00+00:00'),
+            )
+            later = datetime(2026, 6, 25, 9, 0, tzinfo=timezone.utc)
+            self.assertEqual(0, pad.run(
+                now=later, trigger='on-demand', captures_path=caps, artifact_path=out,
+                missions_path=missions, rank_path=rank, staleness_path=staleness))
+            artifact = json.loads(out.read_text())
+            self.assertEqual(artifact['proposed_pile'], pile_before)
+            self.assertEqual(artifact['proposed_pile']['proposed_count'], 1)
+            # The parked/aging half + generated_at DID refresh.
+            self.assertEqual(artifact['trigger'], 'on-demand')
+            self.assertEqual(artifact['generated_at'], later.isoformat())
+
+    def test_new_month_recomputes_and_restamps(self):
+        with tempfile.TemporaryDirectory() as d:
+            missions, rank, staleness = self._fixtures(d)
+            caps = Path(d) / 'captures.json'
+            caps.write_text(json.dumps(_registry(_cap('p', state='parked'))))
+            out = Path(d) / 'digest.json'
+            june = datetime(2026, 6, 10, 12, 0, tzinfo=timezone.utc)
+            self.assertEqual(0, pad.run(
+                now=june, captures_path=caps, artifact_path=out,
+                missions_path=missions, rank_path=rank, staleness_path=staleness))
+            self.assertEqual(
+                json.loads(out.read_text())['proposed_pile']['proposed_count'], 1)
+
+            _write_missions(
+                missions,
+                _mission('a', name='One', created='2026-01-01T00:00:00+00:00'),
+                _mission('b', name='Two', created='2026-02-01T00:00:00+00:00'),
+            )
+            july = datetime(2026, 7, 3, 8, 0, tzinfo=timezone.utc)
+            self.assertEqual(0, pad.run(
+                now=july, captures_path=caps, artifact_path=out,
+                missions_path=missions, rank_path=rank, staleness_path=staleness))
+            pile = json.loads(out.read_text())['proposed_pile']
+            self.assertEqual(pile['as_of_month'], '2026-07')
+            self.assertEqual(pile['proposed_count'], 2)  # recomputed across boundary
+
+    def test_carry_forward_helper_direct(self):
+        prior = {'proposed_pile': {'as_of_month': '2026-06', 'proposed_count': 42}}
+        carried = pad.carry_or_recompute_pile(NOW, prior)
+        self.assertEqual(carried, prior['proposed_pile'])
+
+
+class ProposedPileFailOpenTest(unittest.TestCase):
+    """fail-open: a missing missions.json / rank file / staleness file never
+    raises and never breaks the parked/aging portion."""
+
+    def test_all_inputs_absent_degrades(self):
+        pile = pad.build_proposed_pile(
+            NOW,
+            missions_path=Path('/nonexistent/missions.json'),
+            rank_path=Path('/nonexistent/rank.json'),
+            staleness_path=Path('/nonexistent/staleness.json'))
+        self.assertEqual(pile['proposed_count'], 0)
+        self.assertIsNone(pile['actionable_count'])
+        self.assertIsNone(pile['oldest_age_days'])
+        self.assertEqual(pile['top_relevant'], [])
+        self.assertEqual(pile['relevance_basis'], 'age_fallback')
+
+    def test_malformed_missions_degrades(self):
+        with tempfile.TemporaryDirectory() as d:
+            missions = Path(d) / 'missions.json'
+            missions.write_text('{ not json')
+            pile = pad.build_proposed_pile(
+                NOW, missions_path=missions,
+                rank_path=Path(d) / 'r.json', staleness_path=Path(d) / 's.json')
+            self.assertEqual(pile['proposed_count'], 0)
+
+    def test_run_still_writes_parked_half_when_pile_inputs_absent(self):
+        with tempfile.TemporaryDirectory() as d:
+            caps = Path(d) / 'captures.json'
+            caps.write_text(json.dumps(_registry(
+                _cap('a', state='parked', aging=True),
+                _cap('b', state='parked', aging=False),
+            )))
+            out = Path(d) / 'digest.json'
+            rc = pad.run(
+                now=NOW, captures_path=caps, artifact_path=out,
+                missions_path=Path('/nonexistent/missions.json'),
+                rank_path=Path('/nonexistent/rank.json'),
+                staleness_path=Path('/nonexistent/staleness.json'))
+            self.assertEqual(rc, 0)
+            digest = json.loads(out.read_text())
+            # Parked/aging half intact...
+            self.assertEqual(digest['parked_count'], 2)
+            self.assertEqual(digest['aging_count'], 1)
+            # ...and the pile block is present but degraded.
+            self.assertEqual(digest['proposed_pile']['proposed_count'], 0)
+
+
 if __name__ == '__main__':
     unittest.main()
