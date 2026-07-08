@@ -7579,7 +7579,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-08T17:44:09.852376+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-08T17:39:08.515609+00:00"
+      "orphan_last_activity_ts": "2026-07-08T17:39:08.515609+00:00",
+      "briefing": {
+        "what": "Some work the team kicked off on their own that isn't attached to any active project yet.",
+        "why": "Loose, unassigned work can quietly eat time and money if it drifts without a clear purpose behind it.",
+        "suggest": "Hold off on greenlighting it until we confirm what it's for and whether it's worth the effort."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-08T17:44:17.731028+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-mirror-review-pr-ourliberty-agent-core-856",
@@ -7596,7 +7610,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-08T17:44:09.852376+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-08T17:34:06.373858+00:00"
+      "orphan_last_activity_ts": "2026-07-08T17:34:06.373858+00:00",
+      "briefing": {
+        "what": "A piece of work the team kicked off on their own that hasn't been attached to any of our active projects yet.",
+        "why": "Unassigned work can quietly eat time and money without moving one of your priorities, so it's worth a quick look before it grows.",
+        "suggest": "Take a moment to confirm this fits a current goal before giving it the green light \u2014 if it doesn't clearly serve one, hold off."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-08T17:44:17.731028+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
