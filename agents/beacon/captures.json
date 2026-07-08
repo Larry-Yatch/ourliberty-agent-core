@@ -1539,6 +1539,11 @@
         "model": "claude-opus-4-8",
         "at": "2026-07-08T03:15:20.936075+00:00",
         "from_state": "parked"
+      },
+      "spawned": {
+        "kind": "delegate",
+        "task_id": "delegate-cap-run-sort-once-cleanup-of-352-stale-tier-4-asks-a-bbf0",
+        "stamped_at": "2026-07-08T03:38:08.400566+00:00"
       }
     },
     {
@@ -1568,6 +1573,11 @@
         "model": "claude-opus-4-8",
         "at": "2026-07-08T03:15:20.936075+00:00",
         "from_state": "parked"
+      },
+      "spawned": {
+        "kind": "delegate",
+        "task_id": "delegate-cap-add-monthly-digest-line-for-proposed-mission-pil-7457",
+        "stamped_at": "2026-07-08T03:38:08.416770+00:00"
       }
     },
     {
