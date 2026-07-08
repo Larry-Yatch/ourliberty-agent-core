@@ -7416,7 +7416,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-08T07:55:11.939691+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-08T07:54:15.29223+00:00"
+      "orphan_last_activity_ts": "2026-07-08T07:54:15.29223+00:00",
+      "briefing": {
+        "what": "The team paused a piece of in-progress work at its final step while waiting for your go-ahead on which direction to take.",
+        "why": "It's the last step of an effort that's already mostly done, so it's sitting idle and can't finish until someone decides.",
+        "suggest": "Take a quick look and give a clear yes or new direction so it can wrap up, but confirm the details first since it's been stalled."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-08T07:58:12.464923+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-harden-specdoc-originmain-flaky-tests-001",
@@ -7433,7 +7447,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-08T07:55:11.939691+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-08T07:47:46.481165+00:00"
+      "orphan_last_activity_ts": "2026-07-08T07:47:46.481165+00:00",
+      "briefing": {
+        "what": "The team is fixing some quality checks that have been giving unreliable, on-and-off results.",
+        "why": "Unreliable checks slow the team down and can let real problems slip through or raise false alarms, eating time and trust.",
+        "suggest": "Let them finish this cleanup, but give it a quick look before it goes live to confirm the checks are now dependable."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-08T07:58:12.464923+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-proposed-pile-monthly-digest-001",
@@ -7450,7 +7478,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-08T07:55:11.939691+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-08T07:44:46.327668+00:00"
+      "orphan_last_activity_ts": "2026-07-08T07:44:46.327668+00:00",
+      "briefing": {
+        "what": "A new monthly summary that rounds up loose work the team has picked up but hasn't yet attached to any formal project.",
+        "why": "It gives you a single at-a-glance view of stray efforts so nothing valuable gets lost and nothing wastes time drifting without a purpose.",
+        "suggest": "Give it a quick look and confirm it's tracking the right things before letting it become a regular fixture."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-08T07:58:12.464923+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
