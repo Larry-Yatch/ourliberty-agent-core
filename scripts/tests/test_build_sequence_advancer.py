@@ -551,6 +551,87 @@ class TestCorruptedSequence(_AdvancerHarness):
         self.assertNotIn('sequence-paused-invalid', events)
 
 
+class TestPausedInvalidRealertSuppression(_AdvancerHarness):
+    """Per advancer-suppress-paused-invalid-realert-001: a sequence already
+    off the active path (paused/failed/archived) that stays schema-invalid
+    must DM Larry AT MOST ONCE per distinct error signature — no hourly
+    re-nag for a deliberately-parked file. A genuinely different error set
+    fires one fresh DM. The active->pause transition alert is unaffected."""
+
+    def _invalid_seq(self, seq_id='parked', status='paused'):
+        seq = _make_sequence(seq_id=seq_id, status=status)
+        # A depends_on pointing at a non-existent step → schema-invalid but
+        # still parses cleanly as JSON (the off-path branch's precondition).
+        seq['steps'].append(_make_step('beta', deps=['ghost']))
+        return seq
+
+    def _call(self, seq, errors):
+        import logging
+        path = (
+            self.agents_root / 'blackboard' / 'build-sequences'
+            / f'{seq["seq_id"]}.json'
+        )
+        self.bsa._handle_invalid_sequence(
+            path, seq, errors, logging.getLogger('test-advancer'),
+        )
+
+    def _invalid_dms(self, seq_id):
+        return [d for d in self.dms if d['subject'] == f'sequence-invalid:{seq_id}']
+
+    def test_same_signature_dms_once(self):
+        seq = self._invalid_seq()
+        errors = ["step beta depends_on unknown step 'ghost'"]
+        self._call(seq, errors)
+        self._call(seq, errors)  # same parked seq, same errors, next tick
+        self.assertEqual(len(self._invalid_dms('parked')), 1)
+
+    def test_changed_signature_dms_again(self):
+        seq = self._invalid_seq()
+        self._call(seq, ["error A"])
+        self._call(seq, ["error B — a genuinely different validation problem"])
+        self.assertEqual(len(self._invalid_dms('parked')), 2)
+
+    def test_signature_is_order_independent(self):
+        seq = self._invalid_seq()
+        self._call(seq, ["err one", "err two"])
+        self._call(seq, ["err two", "err one"])  # same set, reordered
+        self.assertEqual(len(self._invalid_dms('parked')), 1)
+
+    def test_failed_and_archived_statuses_also_suppressed(self):
+        for status in ('failed', 'archived'):
+            with self.subTest(status=status):
+                self.dms.clear()
+                seq = self._invalid_seq(seq_id=f'parked-{status}', status=status)
+                self._call(seq, ["boom"])
+                self._call(seq, ["boom"])
+                self.assertEqual(len(self._invalid_dms(f'parked-{status}')), 1)
+
+    def test_sig_write_atomic_and_slash_safe(self):
+        # A '/'-bearing seq_id must not escape the sig dir or create a subdir.
+        seq = self._invalid_seq(seq_id='has/slash')
+        self._call(seq, ["boom"])
+        sig_dir = self.bsa.INVALID_ALERT_SIG_DIR
+        entries = list(sig_dir.iterdir())
+        self.assertEqual(len(entries), 1)
+        self.assertTrue(entries[0].is_file())  # '/' did NOT create a subdir
+        self.assertTrue(entries[0].name.startswith('has_slash'))
+        self.assertEqual(list(sig_dir.glob('*.tmp')), [])  # no leftover temp
+        data = json.loads(entries[0].read_text())
+        self.assertIn('sig', data)
+        self.assertIn('ts', data)
+
+    def test_active_to_pause_transition_still_dms_and_audits(self):
+        # The state-changing branch is UNCHANGED: still pauses, still writes
+        # the sequence-paused-invalid audit entry, still DMs on transition.
+        seq = self._invalid_seq(seq_id='fresh', status='active')
+        self._call(seq, ["schema boom"])
+        written = self._read_sequence('fresh')
+        self.assertEqual(written['status'], 'paused')
+        events = [e['event'] for e in written['audit_log']]
+        self.assertIn('sequence-paused-invalid', events)
+        self.assertEqual(len(self._invalid_dms('fresh')), 1)
+
+
 class TestRebootResilience(_AdvancerHarness):
     """Per spec § 5.4: advancer has NO internal state file. On reboot,
     first tick rebuilds live state from the sequence file + chain_events

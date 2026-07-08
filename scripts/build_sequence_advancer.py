@@ -69,6 +69,7 @@ Operator interface:
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import logging
 import os
@@ -95,6 +96,15 @@ BEACON_INBOX = AGENTS_ROOT / 'inboxes' / 'beacon'
 # the sequence stalled at `pending` (observed live on seq `pulse-check-xii`,
 # 2026-07-07). `_drain_kickoff_inbox` closes that gap source-agnostically.
 ADVANCER_INBOX = AGENTS_ROOT / 'inboxes' / 'build_sequence_advancer'
+
+# Per-sequence last-alerted validation-error signature for sequences that are
+# ALREADY off the active path (status paused/failed/archived). Kept OUTSIDE the
+# sequence file so re-validating a deliberately-parked, schema-invalid sequence
+# every tick doesn't append to its audit_log (write amplification) nor re-DM
+# Larry hourly (an expected-by-design, non-actionable alert). One small JSON
+# ({sig, ts}) per sequence, written atomically. Module-level so tests can
+# redirect it (it also follows OURLIBERTY_AGENTS_ROOT for free).
+INVALID_ALERT_SIG_DIR = AGENTS_ROOT / 'state' / 'advancer-invalid-alert-sigs'
 
 # Canonical kickoff wording per build-sequence-orchestrator spec § 5.5
 # discipline 2 (`prompt: kickoff <seq-id>`). Same shape outbox_notifier's
@@ -865,6 +875,67 @@ def _handle_unparseable_sequence(path: Path, error: str, logger: logging.Logger)
     )
 
 
+def _invalid_alert_sig(errors: list[str]) -> str:
+    """Stable, order-independent fingerprint of a validation-error set. Two
+    ticks that surface the SAME problems hash identically; a genuinely
+    different validation failure hashes differently (→ one fresh DM)."""
+    return hashlib.sha256('\n'.join(sorted(errors)).encode('utf-8')).hexdigest()
+
+
+def _safe_seq_key(seq_id: str) -> str:
+    """Filesystem-safe form of a seq_id for use as a state-file name. Mirrors
+    larry_alerts._safe_key: map every disallowed char to `_`, and append a
+    short stable hash whenever sanitization changed the string OR it is
+    over-length. This keeps a `/`-bearing id from escaping the dir and keeps
+    the mapping injective (distinct ids can't collide onto one file)."""
+    safe = ''.join(c if (c.isalnum() or c in '-._') else '_' for c in seq_id)
+    if safe == seq_id and len(safe) <= 200:
+        return safe
+    digest = hashlib.sha1(seq_id.encode('utf-8')).hexdigest()[:10]
+    if len(safe) > 200:
+        safe = safe[:200]
+    return f'{safe}.{digest}'
+
+
+def _invalid_sig_path(seq_id: str) -> Path:
+    return INVALID_ALERT_SIG_DIR / f'{_safe_seq_key(seq_id)}.json'
+
+
+def _read_invalid_alert_sig(seq_id: str) -> Optional[str]:
+    """Return the last-alerted error signature for `seq_id`, or None if none
+    stored / unreadable. Fail-safe: a missing or corrupt file reads as None
+    (→ we re-DM once and rewrite), never raises."""
+    try:
+        data = json.loads(_invalid_sig_path(seq_id).read_text())
+    except (OSError, json.JSONDecodeError):
+        return None
+    sig = data.get('sig') if isinstance(data, dict) else None
+    return sig if isinstance(sig, str) else None
+
+
+def _write_invalid_alert_sig(seq_id: str, sig: str) -> None:
+    """Persist the just-alerted error signature atomically (tmp + os.replace).
+    Raises OSError on durable write failure (caller logs + tolerates: a lost
+    write just means one extra DM next tick, the safe direction)."""
+    path = _invalid_sig_path(seq_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_path = tempfile.mkstemp(
+        prefix=f'.{path.name}.', suffix='.tmp', dir=str(path.parent),
+    )
+    try:
+        with os.fdopen(fd, 'w') as f:
+            json.dump(
+                {'sig': sig, 'ts': datetime.now(timezone.utc).isoformat()}, f,
+            )
+        os.replace(tmp_path, path)
+    except Exception:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
+
+
 def _handle_invalid_sequence(
     path: Path, seq: dict[str, Any], errors: list[str], logger: logging.Logger,
 ) -> None:
@@ -877,7 +948,19 @@ def _handle_invalid_sequence(
     # Don't downgrade a sequence that's already paused / failed / archived.
     current_status = seq.get('status')
     if current_status in ('paused', 'failed', 'archived'):
-        # Already off the active path; just log + DM (cooldown-gated).
+        # Already off the active path — make NO state change. But this handler
+        # runs every tick for every sequence file, so a deliberately-parked,
+        # schema-invalid sequence would re-DM Larry every WARNING cooldown
+        # window (60 min) forever — an expected-by-design, non-actionable
+        # alert. Suppress the repeat: DM only when the error signature is new
+        # (first observation) or has genuinely changed; otherwise log + return.
+        sig = _invalid_alert_sig(errors)
+        if _read_invalid_alert_sig(seq_id) == sig:
+            logger.info(
+                f'invalid sequence {seq_id} still in status {current_status} '
+                f'with unchanged error signature; suppressing repeat DM'
+            )
+            return
         _dm_larry(
             message=(
                 f'Sequence `{seq_id}` failed schema validation but is '
@@ -888,6 +971,12 @@ def _handle_invalid_sequence(
             subject=f'sequence-invalid:{seq_id}',
             severity='warning',
         )
+        try:
+            _write_invalid_alert_sig(seq_id, sig)
+        except OSError as e:
+            logger.warning(
+                f'could not persist invalid-alert signature for {seq_id}: {e}'
+            )
         return
     # Active / pending / complete → pause it. (complete is unusual; would
     # only happen if someone hand-edited a finalized file into invalidity.)
