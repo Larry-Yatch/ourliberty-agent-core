@@ -38,6 +38,9 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from atomic_io import atomic_write_text  # noqa: E402  (shared durable atomic write, PR-E #366)
+
 # An entry begins at a top-level "## Iteration ~<N> ..." heading and runs up to
 # the next such heading (or EOF). Everything before the first heading is
 # preamble. Requiring the iteration number after the word avoids false-splitting
@@ -103,15 +106,6 @@ def _chunk_header(n: int) -> str:
     )
 
 
-def _atomic_write(path: Path, text: str) -> None:
-    tmp = path.with_suffix(path.suffix + ".tmp")
-    with open(tmp, "w", encoding="utf-8") as fh:
-        fh.write(text)
-        fh.flush()
-        os.fsync(fh.fileno())
-    os.replace(tmp, path)
-
-
 def _current_chunk(archive_dir: Path) -> tuple[Path, int]:
     """Highest-numbered existing chunk, or (path-for-chunk-001, 1) if none."""
     highest_num = 0
@@ -145,7 +139,7 @@ def archive_entries(evicted: list[str], archive_dir: Path, cap: int) -> list[Pat
     archive_dir.mkdir(parents=True, exist_ok=True)
     cur_path, cur_num = _current_chunk(archive_dir)
     if not cur_path.exists():
-        _atomic_write(cur_path, _chunk_header(cur_num))
+        atomic_write_text(cur_path, _chunk_header(cur_num))
     touched: list[Path] = [cur_path]
     # Track size in-memory to avoid a stat() per entry; seed from the chunk's
     # current on-disk size (it may already carry a header and prior entries).
@@ -161,7 +155,7 @@ def archive_entries(evicted: list[str], archive_dir: Path, cap: int) -> list[Pat
             batch = []
             cur_num += 1
             cur_path = archive_dir / CHUNK_FMT.format(n=cur_num)
-            _atomic_write(cur_path, _chunk_header(cur_num))
+            atomic_write_text(cur_path, _chunk_header(cur_num))
             touched.append(cur_path)
             size = cur_path.stat().st_size
             header_len = len(_chunk_header(cur_num).encode("utf-8"))
@@ -192,7 +186,7 @@ def rotate(journal_path: Path, keep_recent: int, chunk_cap: int) -> dict:
     archive_dir = journal_path.parent / ARCHIVE_DIRNAME
     chunks = archive_entries(evicted, archive_dir, chunk_cap)
 
-    _atomic_write(journal_path, preamble + "".join(kept))
+    atomic_write_text(journal_path, preamble + "".join(kept))
     return {
         "status": "rotated",
         "evicted": len(evicted),
