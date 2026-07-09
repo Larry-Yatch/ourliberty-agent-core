@@ -125,6 +125,19 @@ class RoundTripTest(_TmpAgentsRoot):
         self.assertEqual(body['ranked'][1]['risk'], 'careful')
         self.assertEqual(body['ranked'][0]['brief']['suggest'], 's')
 
+    def test_source_passes_through_and_defaults_unknown(self) -> None:
+        # The source-badge contract: a stamped source survives the
+        # endpoint verbatim; a row missing it degrades to 'unknown'
+        # (never dropped, never null) so the badge always has a value.
+        e = _entry(1); e['source'] = 'you'
+        no_src = _entry(2)  # legacy row, no source field
+        no_src.pop('source', None)
+        self._write({'generated_at': None, 'mode': 'shadow',
+                     'summary': {}, 'ranked': [e, no_src]})
+        body = self.client.get(URL, headers=AUTH).json()
+        self.assertEqual(body['ranked'][0]['source'], 'you')
+        self.assertEqual(body['ranked'][1]['source'], 'unknown')
+
     def test_bad_rows_skipped_good_rows_survive(self) -> None:
         self._write({'ranked': [
             'not-a-dict',

@@ -10651,6 +10651,7 @@ class OperatorQueueEntry(BaseModel):
     rank_score: float = 0.0
     scored: bool = False        # False = fallback-ranked; UI must badge it
     risk: str = 'careful'
+    source: str = 'unknown'     # normalized provenance (source badge)
     brief: dict[str, str] = {}  # plain-language what/why/suggest
 
 
@@ -10709,6 +10710,7 @@ def _sanitize_operator_entry(e: Any) -> Optional[dict[str, Any]]:
         'rank_score': float(_num(e.get('rank_score'), 0.0)),
         'scored': e.get('scored') is True,
         'risk': _s(e.get('risk')) or 'careful',
+        'source': _s(e.get('source')) or 'unknown',
         'brief': brief,
     }
 
