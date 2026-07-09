@@ -288,6 +288,52 @@ def engage() -> None:
     # chain_event_emit._get_client() returns None when this is set.
     os.environ['OURLIBERTY_DISABLE_LIVE_EMIT'] = '1'
 
+    # Hermetic `gh` (2026-07-08 gh-quota flake family — the PR #884 false
+    # BLOCK): integration tests that drive production routing deep enough to
+    # reach the gh read helpers (headRefOid dedup, mergeable prechecks,
+    # terminal-PR-state, label lookups) shell out to the REAL gh CLI —
+    # ~106 GraphQL-backed `gh pr view`/`gh pr list` calls per full-suite run,
+    # none of them behind a mock. Those calls burn the shared account's
+    # 5000/hr GraphQL quota out from under live automation (Mirror, healers)
+    # AND couple test outcomes/timing to network + quota state: the
+    # 2026-07-08 head run flaked with graphql remaining=0 while the parent
+    # ran clean, a false BLOCK the #866 fresh-parent reverify cannot cover
+    # when the HEAD run is the flaky one. Every production helper is
+    # fail-open on gh errors (the full suite is green with gh hard-failing),
+    # so the hermetic default is a PATH-shimmed `gh` that exits 1 with a
+    # marker on stderr. PATH is inherited by children, so scripts spawned by
+    # tests are covered too; tests that assert specific gh behavior keep
+    # patching subprocess per-test on top (mocks intercept before PATH ever
+    # resolves). Deliberate network tests can opt out per-invocation via
+    # OURLIBERTY_ALLOW_REAL_GH=1.
+    if not os.environ.get('OURLIBERTY_ALLOW_REAL_GH'):
+        _gh_shim_dir = tempfile.mkdtemp(prefix='ourliberty-test-gh-shim-')
+        _gh_shim = os.path.join(_gh_shim_dir, 'gh')
+        with open(_gh_shim, 'w') as _fh:
+            _fh.write(
+                '#!/bin/sh\n'
+                'echo "hermetic-test-guard: real gh blocked during test runs'
+                ' (scripts/tests/_bootstrap.py; set OURLIBERTY_ALLOW_REAL_GH=1'
+                ' to opt out)" >&2\n'
+                'exit 1\n'
+            )
+        os.chmod(_gh_shim, 0o755)
+        os.environ['PATH'] = (
+            _gh_shim_dir + os.pathsep + os.environ.get('PATH', '')
+        )
+
+    # Block the post-merge baseline warm fork from test processes: tests that
+    # mock `gh pr merge` to success (AutoMergePRTest and the routing
+    # integration classes) reach outbox_notifier's
+    # _spawn_post_merge_baseline_warm with subprocess.Popen UNMOCKED — on the
+    # droplet that detaches a REAL `git fetch` + full-suite warm from inside
+    # the gate's own suite run. The production #764 re-entrancy guard already
+    # skips the spawn when REGBASELINE_WARMING=1, so default it on for the
+    # whole test process. The warm-fixture classes
+    # (PostMergeBaselineWarmTest, test_regression_baseline_cache) pop it in
+    # setUp — and mock Popen — to exercise the real spawn construction.
+    os.environ.setdefault('REGBASELINE_WARMING', '1')
+
     # Runtime production-write tripwire (#428). pytest owns the scan via
     # conftest's session-scoped fixture; arming here too would double-instrument
     # the helpers and double-fire the exit. Under pytest, still set the sentinel
