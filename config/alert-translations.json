@@ -34,6 +34,26 @@
       "recommended_action": "None at the Pulse layer — the doorbell notifier chat_id DM is the primary delivery and is already in your thread. Producer: scripts/doorbell_notifier.py; payload carries intent=doorbell + chat_id (subject is None, so this matches via the intent fallback)."
     }
   },
+  "heal-dashboard-api-sha-drift": {
+    "dashboard-api-sha-drift-stuck": {
+      "severity": "URGENT",
+      "tier": "NOW",
+      "plain_language_summary": "The dashboard-api process is STILL running stale code after the healer already auto-restarted it once within the cooldown window for this same on-disk HEAD. The restart is not making the process pick up the new code — a genuine loop or stuck deploy, not a transient drift. The healer stopped restarting to avoid a restart loop and escalated instead.",
+      "recommended_action": "Hands-on recovery needed. ssh larry@134.209.44.80 and inspect: `systemctl status ourliberty-dashboard-api.service`, `git -C /home/larry/agent-core log --oneline -3`, and `journalctl -u ourliberty-dashboard-api.service --since \"20 min ago\" | tail -80`. Then manually `sudo systemctl restart ourliberty-dashboard-api.service`. Producer: scripts/heal_dashboard_api_sha_drift.py."
+    },
+    "dashboard-api-sha-drift-healed": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "The dashboard-api was running stale code (running git_sha lagged on-disk HEAD after a deploy race), and the healer auto-restarted it so it now reloads the current on-disk HEAD. No action needed — a routine self-heal success surfaced for the record only.",
+      "recommended_action": "None — the service was restarted onto the current HEAD. Self-healed; details appear in the daily digest. Producer: scripts/heal_dashboard_api_sha_drift.py."
+    },
+    "dashboard-api-sha-drift-restart-failed": {
+      "severity": "URGENT",
+      "tier": "NOW",
+      "plain_language_summary": "The dashboard-api was running stale code and the healer tried to auto-restart it, but the `systemctl restart` itself FAILED. The service may be down or wedged — this needs hands, the healer cannot recover it.",
+      "recommended_action": "ssh larry@134.209.44.80 and run: `sudo systemctl restart ourliberty-dashboard-api.service && systemctl status ourliberty-dashboard-api.service`. Inspect the restart error in the alert body for the failure cause. Producer: scripts/heal_dashboard_api_sha_drift.py."
+    }
+  },
   "medic": {
     "medic-silenced-needs-fix": {
       "severity": "WARNING",

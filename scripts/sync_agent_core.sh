@@ -507,7 +507,32 @@ fi
 # ourliberty-orchestrator.service, which no longer exists, and is removed.)
 MANIFEST_CLI="${SCRIPTS_DIR}/daemon_restart_manifest.py"
 DAEMON_RESTART_STORM_THRESHOLD="${DAEMON_RESTART_STORM_THRESHOLD:-5}"
-if [ "$OLD_HEAD" != "$NEW_HEAD" ] && [ -f "$MANIFEST_CLI" ]; then
+
+# ── Ordering guard (dashboard-api-deploy-race-001, 2026-07-08) ──
+# We must NEVER act on the deployed code — restart a daemon (Step 7) or install
+# + activate a unit file (Step 7b) — while the working tree is at anything other
+# than NEW_HEAD, or the action runs whatever code is on disk instead of the
+# commit we're deploying. The ff-merge at Step 1 already advanced HEAD; this
+# re-asserts it so a concurrent tick, an aborted merge, or a rollback between
+# then and now can't let an action race ahead of the code landing. Computed
+# once here and consulted by BOTH steps below.
+#
+# Only a POSITIVELY-read divergent SHA trips the guard. An unreadable HEAD
+# (empty — e.g. a transient git error / index.lock) does NOT skip: the ff-merge
+# at Step 1 already succeeded, so the tree IS at NEW_HEAD, and a git hiccup here
+# must not suppress a real deploy's restart (which would leave the daemon on
+# stale code — the exact failure this guard exists to prevent).
+HEAD_DRIFT=false
+if [ "$OLD_HEAD" != "$NEW_HEAD" ]; then
+    LIVE_HEAD="$(cd "$REPO_DIR" && git rev-parse HEAD 2>/dev/null || true)"
+    if [ -n "$LIVE_HEAD" ] && [ "$LIVE_HEAD" != "$NEW_HEAD" ]; then
+        HEAD_DRIFT=true
+        log "Deploy: working tree HEAD ($LIVE_HEAD) != NEW_HEAD ($NEW_HEAD); refusing to restart daemons or install units on a tree not at the deployed commit."
+        emit_larry_alert_envelope "deploy-restart-head-drift" "ourliberty-sync.service: refusing daemon restarts + unit installs because ${REPO_DIR} HEAD is ${LIVE_HEAD:0:8}, not the deploy target ${NEW_HEAD:0:8}. Acting now would run/install stale code. Recovery: cd ${REPO_DIR}; git status; the next sync tick and heal_dashboard_api_sha_drift will reconcile once HEAD is clean." escalate
+    fi
+fi
+
+if [ "$OLD_HEAD" != "$NEW_HEAD" ] && [ "$HEAD_DRIFT" = false ] && [ -f "$MANIFEST_CLI" ]; then
     CHANGED_PATHS="$(cd "$REPO_DIR" && git diff --name-only "$OLD_HEAD" "$NEW_HEAD" 2>/dev/null || true)"
     UNITS_TO_RESTART="$(printf '%s\n' "$CHANGED_PATHS" | python3 "$MANIFEST_CLI" units-for-changed 2>/dev/null || true)"
     if [ -n "$UNITS_TO_RESTART" ]; then
@@ -556,7 +581,12 @@ fi
 # re-DM dedup) still apply. Non-fatal: a healer error is a WARN and sync continues;
 # the 12h timer stays as the backstop.
 INSTALL_DRIFT_HEALER="${SCRIPTS_DIR}/heal_systemd_install_drift.py"
-if [ "$OLD_HEAD" != "$NEW_HEAD" ] && [ -f "$INSTALL_DRIFT_HEALER" ]; then
+if [ "$OLD_HEAD" != "$NEW_HEAD" ] && [ "$HEAD_DRIFT" = true ]; then
+    # Same ordering guard as Step 7: installing/activating units from a tree not
+    # at NEW_HEAD would deploy stale unit files. Skip; the 12h install-drift
+    # timer and the next sync tick reconcile once HEAD is clean.
+    log "Install-drift trigger: skipped (HEAD drift guard)."
+elif [ "$OLD_HEAD" != "$NEW_HEAD" ] && [ -f "$INSTALL_DRIFT_HEALER" ]; then
     UNIT_CHANGED_PATHS="$(cd "$REPO_DIR" && git diff --name-only "$OLD_HEAD" "$NEW_HEAD" 2>/dev/null || true)"
     if printf '%s\n' "$UNIT_CHANGED_PATHS" | grep -Eq '^systemd/.*\.(service|timer)$'; then
         log "Install-drift trigger: a systemd unit file changed this sync; running healer (--triggered)."

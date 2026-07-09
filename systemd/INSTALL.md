@@ -146,6 +146,7 @@ sudo systemctl enable --now ourliberty-heal-credential-registry-drift.timer  # E
 sudo systemctl enable --now ourliberty-heal-systemd-install-drift.timer  # E1.5.2 — DRY-RUN by default
 sudo systemctl enable --now ourliberty-sync-deploy-targets.timer  # E2.1 — DRY-RUN by default
 sudo systemctl enable --now ourliberty-deploy-notifier.timer  # E2.2 — DRY-RUN by default
+sudo systemctl enable --now ourliberty-heal-dashboard-api-sha-drift.timer  # dashboard-api-deploy-race-001 (every 3 min) — restarts ourliberty-dashboard-api when its reported git SHA drifts from on-disk HEAD (stale-process backstop); needs EnvironmentFile=.env.larry for DASHBOARD_API_TOKEN
 sudo systemctl enable --now ourliberty-heal-chain-event-shipper-heartbeat.timer  # E4.4d PR-B
 sudo systemctl enable --now ourliberty-heal-chain-event-type-audit.timer  # E4.4d PR-B (weekly Sundays)
 sudo systemctl enable --now ourliberty-heal-build-sequence-advancer-heartbeat.timer  # E-orchestrator PR-S2 (every 5 min)

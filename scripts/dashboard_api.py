@@ -82,6 +82,40 @@ def _repo_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
+def _read_git_sha(repo_root: Path) -> Optional[str]:
+    """Best-effort full git SHA of ``repo_root``'s HEAD, or None.
+
+    ``OURLIBERTY_PROCESS_GIT_SHA`` overrides the git call (tests inject a
+    known value; a deploy could also stamp it into the unit environment).
+    """
+    override = os.environ.get('OURLIBERTY_PROCESS_GIT_SHA')
+    if override:
+        return override.strip() or None
+    try:
+        proc = subprocess.run(
+            ['git', '-C', str(repo_root), 'rev-parse', 'HEAD'],
+            capture_output=True, text=True, timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if proc.returncode != 0:
+        return None
+    return proc.stdout.strip() or None
+
+
+# Captured ONCE at module import — the git SHA of the code THIS process
+# loaded into memory. Deliberately NOT recomputed per request: a live
+# `git rev-parse HEAD` reads the on-disk HEAD, which advances on deploy and
+# would therefore ALWAYS match, masking the very stale-process drift this
+# field exists to expose. A SHA-drift healer compares this reported value
+# against the live on-disk HEAD and restarts the service on mismatch
+# (dashboard-api-deploy-race, 2026-07-08: a restart raced 48s ahead of the
+# merge, the process served a route-less build for ~2h, and the mtime-based
+# stale-daemon healer's race-avoidance window silently classified the small
+# gap as benign — a SHA equality check has no such blind spot).
+_PROCESS_GIT_SHA: Optional[str] = _read_git_sha(_repo_root())
+
+
 def _cgroup_base() -> Path:
     """Cgroup v2 directory for the inbox-watcher slice.
 
@@ -520,6 +554,11 @@ class SystemHealthResponse(BaseModel):
     meminfo: Optional[dict[str, int]]
     loadavg: Optional[dict[str, float]]
     top_process: Optional[dict[str, Any]]
+    # Git SHA of the code THIS process is running (captured at import). The
+    # SHA-drift healer compares it against the live on-disk HEAD to catch a
+    # stale process left behind by a deploy race. Nullable: git may be
+    # unavailable at process start. See _PROCESS_GIT_SHA.
+    git_sha: Optional[str] = None
 
 
 class SystemWorktree(BaseModel):
@@ -2255,6 +2294,7 @@ def _reader_system_health(
         'meminfo': signals.get('meminfo'),
         'loadavg': signals.get('loadavg'),
         'top_process': signals.get('top_process'),
+        'git_sha': _PROCESS_GIT_SHA,
     }
 
 
