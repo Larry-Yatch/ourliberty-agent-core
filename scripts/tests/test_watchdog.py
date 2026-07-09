@@ -131,6 +131,12 @@ class CheckAutoRestartTest(_IsolatedRootsTest):
         self.assertIn('auto-restarted', contents)
         self.assertIn('"info"', contents)
         self.assertIn('"digest"', contents)
+        # The recovery subject carries a `:recovered` suffix, keeping it
+        # distinct from the genuine down alert so a translation can silence
+        # this benign restart-window race without muting real outages.
+        record = json.loads(contents.splitlines()[-1])
+        self.assertEqual(record['subject'], 'ourliberty-x:recovered')
+        self.assertTrue(record['subject'].endswith(':recovered'))
 
     def test_dead_service_start_fails_appends_critical(self):
         with mock.patch.object(watchdog, '_systemctl_states',
