@@ -10317,6 +10317,7 @@ def _auto_merge_queue_sweep() -> None:
     # cleared entries).
     entries = _load_auto_merge_queue()
     changed = False
+    removed_ids: set[int] = set()
     for entry in entries:
         if entry.get('watchdog_dm_sent'):
             continue
@@ -10332,6 +10333,25 @@ def _auto_merge_queue_sweep() -> None:
         age = (now - queued_dt).total_seconds()
         if age < watchdog_threshold_sec:
             continue
+        # Merged/closed suppression gate: a stale-aged entry whose OWN PR has
+        # already merged (or closed) is not actually stuck — its queue row just
+        # lingered. Drop it silently instead of firing a false 'manual review'
+        # DM. Only `is False` (positively MERGED/CLOSED) suppresses; True (OPEN)
+        # or None (transient gh error / unknown) falls through to the alert, so
+        # a genuinely stuck PR is never swallowed by a flaky query. Mirrors the
+        # Pass 2 blocker-release convention. `_queue_remove_pr` persists the
+        # drop, and `removed_ids` keeps the final in-memory save from re-adding
+        # it.
+        entry_repo = entry.get('repo')
+        entry_pr = entry.get('pr_number')
+        if (
+            isinstance(entry_repo, str)
+            and isinstance(entry_pr, int)
+            and _gh_pr_is_open(entry_repo, entry_pr) is False
+        ):
+            _queue_remove_pr(entry_pr, entry_repo)
+            removed_ids.add(id(entry))
+            continue
         dedup_key = (entry.get('repo') or '', entry.get('pr_number') or 0)
         if dedup_key in _WATCHDOG_DMED_PRS:
             continue
@@ -10339,8 +10359,9 @@ def _auto_merge_queue_sweep() -> None:
         _dm_larry_queue_stale(entry)
         entry['watchdog_dm_sent'] = True
         changed = True
-    if changed:
-        _save_auto_merge_queue(entries)
+    if changed or removed_ids:
+        remaining = [e for e in entries if id(e) not in removed_ids]
+        _save_auto_merge_queue(remaining)
 
 
 def _bump_pending_auto_merge_attempt(repo: str, pr_number: int) -> None:
