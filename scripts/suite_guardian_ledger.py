@@ -36,6 +36,9 @@ by ``test_id`` (one live obligation per victim test at a time). Per-row schema::
       "green_streak_after_fix": <int>, # victim consecutive green runs observed
       "poison_present": <bool>,        # named poison test present + passing
       "window_closed": <bool>,         # 14 clean runs since resolution (D3 graduation)
+      "resolved_run": <int>|null,      # guardian run seq at resolution (D3 window clock)
+      "filed_stage": <int>|null,       # effective stage when the fix was dispatched (D3: "auto-filed" = >=2)
+      "scope_violation": <bool>,       # fix PR touched outside scripts/tests/** (L4 diff gate)
       "regressed": <bool>,
       "regressed_attribution": "same-leak"|"new-polluter"|null,
       "status": "open"|"resolved"|"abandoned",
@@ -107,6 +110,10 @@ _GREEN_STREAK_TO_RESOLVE = 2
 # Serial-drain cap: at most this many open, dispatched fix obligations at once
 # (L1 / D2.1 — the guardian dispatches the next as one resolves).
 OPEN_FIX_CAP = 3
+
+# A resolved fix's window "closes" after this many clean guardian runs since
+# resolution (spec D3 — "only CLOSED 14-run windows count" toward graduation).
+WINDOW_RUNS = 14
 
 
 # -------------------- time --------------------
@@ -220,6 +227,9 @@ def open_proposal(
             'green_streak_after_fix': 0,
             'poison_present': False,
             'window_closed': False,
+            'resolved_run': None,
+            'filed_stage': None,
+            'scope_violation': False,
             'regressed': False,
             'regressed_attribution': None,
             'status': OPEN,
@@ -273,11 +283,14 @@ def mark_dispatched(
     test_id: str,
     fix_task_id: str,
     *,
+    filed_stage: Optional[int] = None,
     now: Optional[datetime] = None,
     path: Optional[Path] = None,
 ) -> bool:
-    """Record that the guardian dispatched the fix task for ``test_id``. Never
-    raises."""
+    """Record that the guardian dispatched the fix task for ``test_id``.
+    ``filed_stage`` stamps the EFFECTIVE stage in force at dispatch time — a fix
+    dispatched at stage >=2 is "auto-filed" (no prior consent), the denominator
+    for the Stage 2->3 graduation evidence (spec D3). Never raises."""
     p = path or default_ledger_path()
     n = _now(now)
     try:
@@ -287,6 +300,8 @@ def mark_dispatched(
             return False
         row['fix_task_id'] = fix_task_id
         row['dispatched_at'] = _iso(n)
+        if filed_stage is not None:
+            row['filed_stage'] = int(filed_stage)
         _touch(row, n)
         state[test_id] = row
         _save(p, state, n)
@@ -329,13 +344,16 @@ def record_observation(
     *,
     green_streak: int,
     poison_present: bool,
+    current_run: Optional[int] = None,
     now: Optional[datetime] = None,
     path: Optional[Path] = None,
 ) -> bool:
     """Fold one guardian run's observation into an OPEN obligation and AUTO-RESOLVE
     on the observable (D2.6): victim green >=2 consecutive runs AND the named
     poison test present + passing. Returns True iff this call RESOLVED the row.
-    Records the observation regardless. Never raises."""
+    ``current_run`` (the guardian's completed-run sequence) stamps ``resolved_run``
+    on resolution — the clock :func:`close_windows` uses to close the 14-run
+    graduation window (spec D3). Records the observation regardless. Never raises."""
     p = path or default_ledger_path()
     n = _now(now)
     try:
@@ -352,6 +370,8 @@ def record_observation(
             row['status'] = RESOLVED
             row['resolved_at'] = _iso(n)
             row['resolution'] = 'observed-green'
+            if current_run is not None:
+                row['resolved_run'] = int(current_run)
         state[test_id] = row
         _save(p, state, n)
         return resolved
@@ -363,10 +383,12 @@ def resolve(
     test_id: str,
     *,
     resolution: str = 'manual',
+    current_run: Optional[int] = None,
     now: Optional[datetime] = None,
     path: Optional[Path] = None,
 ) -> bool:
-    """Force an OPEN obligation to RESOLVED. Never raises."""
+    """Force an OPEN obligation to RESOLVED. ``current_run`` stamps ``resolved_run``
+    (the D3 window clock). Never raises."""
     p = path or default_ledger_path()
     n = _now(now)
     try:
@@ -377,12 +399,77 @@ def resolve(
         row['status'] = RESOLVED
         row['resolved_at'] = _iso(n)
         row['resolution'] = resolution
+        if current_run is not None:
+            row['resolved_run'] = int(current_run)
         _touch(row, n)
         state[test_id] = row
         _save(p, state, n)
         return True
     except OSError:
         return False
+
+
+def mark_scope_violation(
+    test_id: str,
+    *,
+    now: Optional[datetime] = None,
+    path: Optional[Path] = None,
+) -> bool:
+    """Flag that a guardian-lane fix PR touched a path outside ``scripts/tests/**``
+    (L4 diff-gate violation). A scope violation is a hard graduation disqualifier
+    (spec D3 "0 scope violations") and drives a Stage-0 downgrade (L10). Idempotent;
+    never raises. Returns True iff a row existed and was flagged."""
+    p = path or default_ledger_path()
+    n = _now(now)
+    try:
+        state = _load(p)
+        row = state.get(test_id)
+        if not isinstance(row, dict):
+            return False
+        row['scope_violation'] = True
+        _touch(row, n)
+        state[test_id] = row
+        _save(p, state, n)
+        return True
+    except OSError:
+        return False
+
+
+def close_windows(
+    current_run: int,
+    *,
+    window: int = WINDOW_RUNS,
+    path: Optional[Path] = None,
+) -> list[str]:
+    """Mark every RESOLVED, non-regressed obligation whose ``resolved_run`` is at
+    least ``window`` guardian runs in the past as ``window_closed`` (spec D3 — only
+    CLOSED windows count toward graduation). A regression re-opens the accounting,
+    so a regressed row never closes. Returns the test_ids newly closed this call.
+    Never raises."""
+    p = path or default_ledger_path()
+    n = _now()
+    closed: list[str] = []
+    try:
+        state = _load(p)
+        changed = False
+        for tid, row in state.items():
+            if row.get('status') != RESOLVED or row.get('window_closed'):
+                continue
+            if row.get('regressed'):
+                continue
+            resolved_run = row.get('resolved_run')
+            if not isinstance(resolved_run, int):
+                continue
+            if current_run - resolved_run >= window:
+                row['window_closed'] = True
+                _touch(row, n)
+                closed.append(tid)
+                changed = True
+        if changed:
+            _save(p, state, n)
+    except OSError:
+        return closed
+    return closed
 
 
 def mark_regressed(
@@ -479,6 +566,79 @@ def list_open(*, path: Optional[Path] = None) -> list[dict[str, Any]]:
 def list_by_status(status: str, *, path: Optional[Path] = None) -> list[dict[str, Any]]:
     return [r for r in _load(path or default_ledger_path()).values()
             if r.get('status') == status]
+
+
+def count_closed_windows(
+    *,
+    since_run: Optional[int] = None,
+    auto_filed: bool = False,
+    path: Optional[Path] = None,
+) -> int:
+    """Count CLOSED graduation windows (spec D3). A closed window is a resolved
+    obligation with ``window_closed`` true, no regression, and no scope violation.
+    ``since_run`` (the L10 evidence-reset floor) excludes windows resolved on or
+    before that run — after a downgrade, only evidence accrued AFTER counts.
+    ``auto_filed`` restricts to fixes dispatched at stage >=2 (the Stage 2->3
+    denominator). Never raises."""
+    n = 0
+    for row in _load(path or default_ledger_path()).values():
+        if not row.get('window_closed'):
+            continue
+        if row.get('regressed') or row.get('scope_violation'):
+            continue
+        if since_run is not None:
+            resolved_run = row.get('resolved_run')
+            if not isinstance(resolved_run, int) or resolved_run <= since_run:
+                continue
+        if auto_filed:
+            fs = row.get('filed_stage')
+            if not isinstance(fs, int) or fs < 2:
+                continue
+        n += 1
+    return n
+
+
+def count_same_leak_regressions(
+    *,
+    since_run: Optional[int] = None,
+    path: Optional[Path] = None,
+) -> int:
+    """Count ``same-leak`` regressions (spec D3/L10 — the disqualifier that must
+    be 0 to graduate). ``since_run`` scopes to regressions of fixes resolved after
+    the evidence-reset floor. Never raises."""
+    n = 0
+    for row in _load(path or default_ledger_path()).values():
+        if not row.get('regressed'):
+            continue
+        if row.get('regressed_attribution') != 'same-leak':
+            continue
+        if since_run is not None:
+            resolved_run = row.get('resolved_run')
+            if not isinstance(resolved_run, int) or resolved_run <= since_run:
+                continue
+        n += 1
+    return n
+
+
+def count_scope_violations(
+    *,
+    since_run: Optional[int] = None,
+    path: Optional[Path] = None,
+) -> int:
+    """Count L4 scope violations (spec D3 — must be 0 to graduate past Stage 1).
+    ``since_run`` scopes to violations recorded after the evidence-reset floor
+    (keyed off the fix's ``resolved_run`` where present; unresolved-then-violated
+    fixes always count since they carry no reset anchor). Never raises."""
+    n = 0
+    for row in _load(path or default_ledger_path()).values():
+        if not row.get('scope_violation'):
+            continue
+        if since_run is not None:
+            resolved_run = row.get('resolved_run')
+            if isinstance(resolved_run, int) and resolved_run <= since_run:
+                continue
+        n += 1
+    return n
 
 
 def count_open_dispatched_fixes(*, path: Optional[Path] = None) -> int:

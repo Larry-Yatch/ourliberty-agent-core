@@ -79,6 +79,13 @@
             "_note": "Sensitive-path carve-out (2026-06-21; fresh-build hole closed 2026-06-23 #8). A Beacon\u2192Forge agent-core dispatch that DECLARES it touches config/systemd/deploy/CI/migrations/account-tier/kill-switch/secrets still asks Larry. The old CAVEAT (file_patterns only match when the task carries changed_files \u2014 so a FRESH build with no declared files bypassed this) is now covered by match_sensitive_intent: the chokepoints (beacon_approval_handler.trust_decision + outbox_notifier's pulse twin) scan the dispatch summary/prompt with trust_policy.SENSITIVE_INTENT_KEYWORDS and stamp task['sensitive_intent'], which trips this rule. Remaining backstops for un-named sensitive work: Mirror's review + ESCALATE/halt before any merge. MUST stay ordered BEFORE the broad auto_approve rule (first-match-wins)."
         },
         {
+            "source": "suite-guardian",
+            "target": "forge",
+            "file_patterns": ["scripts/tests/**"],
+            "action": "auto_approve",
+            "_note": "STAGE-2 PREREQUISITE (spec agents/beacon/specs/main-suite-green-guardian.md D3 / L4). The Main-Suite Green Guardian's auto-filed fix tasks touch ONLY scripts/tests/** — a source='suite-guardian' dispatch whose declared changed_files stay inside that allow-list auto-approves. Fix scope is ALSO enforced MECHANICALLY (not just on self-declared changed_files) by the outbox_notifier merge-eligibility diff gate: SHA-bound to headRefOid, re-checked immediately pre-merge, fail-closed on fetch failure, keyed off the ledger fix_task_id join — this JSON rule is only the policy-layer half. Under the 'conservative' dial the guardian is pinned <= Stage 1 by the dial map (so it never auto-files); this rule bites only at balanced/loose. Mirrored in trust_policy.policy_for_level (balanced+loose presets)."
+        },
+        {
             "source": "beacon",
             "target": "forge",
             "repos": ["ourliberty-agent-core"],
