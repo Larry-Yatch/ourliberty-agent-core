@@ -1255,7 +1255,8 @@ def _clear_cancel(task_stem):
 def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                system_prompt_file=None, timeout=14400, context='default',
                model_override=None, session_id=None, effort='high',
-               task_stem=None, out_meta=None, expected_agent=None, phase=None):
+               task_stem=None, out_meta=None, expected_agent=None, phase=None,
+               review_slot=None):
     """
     Run a claude CLI command with concurrency guard + token management.
     Max 6 concurrent across entire system to prevent OOM.
@@ -1506,6 +1507,13 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
             log(agent_id, 'Running (model=' + model +
                 ', account=' + account_id +
                 ', dispatch_tier=' + active_tier_name +
+                # review_slot rides the review start-line so two concurrent
+                # Mirror reviews are distinguishable in the log by (slot, tier)
+                # — spec mirror-two-slot-review §4 PR3 / verification §7.2. None
+                # for every non-review dispatch (single-slot agents), so their
+                # start-line shape is unchanged.
+                ((', review_slot=' + str(review_slot))
+                 if review_slot is not None else '') +
                 ', auth=' + auth_source +
                 ', attempt=' + str(attempt+1) + '/' + str(MAX_RETRIES) +
                 ', active=' + str(guard.active_count()) + '/' + str(MAX_CONCURRENT) +

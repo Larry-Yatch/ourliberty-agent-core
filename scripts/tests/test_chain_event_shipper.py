@@ -890,6 +890,12 @@ class TestKnownEventTypesContract(unittest.TestCase):
             # flag them as unknown.
             'parked_capture',
             'sequence_needs_you',
+            # added by mirror-two-slot-review §4 PR3 — push-emitted by
+            # inbox_watcher.emit_review_queue_wait at each Mirror review-start,
+            # carrying the PR-open → review-start queue_wait_sec + review_slot.
+            # Feeds the burst-latency success metric (§8) and the sibling
+            # gauge's "need a third slot?" decision.
+            'review_queue_wait',
         }
         self.assertEqual(ces.KNOWN_EVENT_TYPES, frozenset(spec_listed))
 
