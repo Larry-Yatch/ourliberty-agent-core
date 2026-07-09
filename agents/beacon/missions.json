@@ -8018,7 +8018,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-09T07:03:59.775607+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-09T06:55:52.57686+00:00"
+      "orphan_last_activity_ts": "2026-07-09T06:55:52.57686+00:00",
+      "briefing": {
+        "what": "A safeguard that automatically finishes handling approved updates that got stuck when the system briefly hit a traffic limit, instead of leaving them hanging.",
+        "why": "Without it, some already-approved work can quietly stall and never complete, which means delays and manual cleanup nobody notices until later.",
+        "suggest": "Worth doing, but let the team confirm it reliably catches every stalled item before you give it the green light."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-09T07:09:04.676516+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-fix-auto-merge-queue-stale-merged-gate-001",
@@ -8035,7 +8049,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-09T07:03:59.775607+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-09T06:50:00.507032+00:00"
+      "orphan_last_activity_ts": "2026-07-09T06:50:00.507032+00:00",
+      "briefing": {
+        "what": "A fix for the automated merge system that keeps sending false alarms about jobs being stuck when they've actually already finished.",
+        "why": "The false alarms have fired at least three times, and every bogus alert erodes trust in the system and wastes attention chasing problems that aren't real.",
+        "suggest": "Approve the fix, but have someone confirm it silences the false alarms without hiding genuinely stuck jobs before it goes live."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-09T07:09:04.676516+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
