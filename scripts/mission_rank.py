@@ -66,14 +66,16 @@ if str(_SCRIPTS_DIR) not in sys.path:
 HOME = Path.home()
 AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', str(HOME / 'agents')))
 MISSIONS_JSON = AGENTS_ROOT / 'agents' / 'beacon' / 'workspace' / 'missions.json'
+CAPTURES_JSON = AGENTS_ROOT / 'agents' / 'beacon' / 'workspace' / 'captures.json'
 STALENESS_FILE = AGENTS_ROOT / 'state' / 'mission-staleness-candidates.json'
 RANK_FILE = AGENTS_ROOT / 'state' / 'mission-rank.json'
 LOG_FILE = AGENTS_ROOT / 'logs' / 'mission-rank.log'
 PORTFOLIO_FILE = Path(__file__).resolve().parent.parent / 'config' / 'operator-portfolio.json'
 
-# Bound LLM spend per pass. The live post-staleness pile is ~19 cards; 40 gives
-# headroom without letting a junk-flood burn a tier's budget.
-DEFAULT_LLM_CAP = 40
+# Bound LLM spend per pass. The pool is the post-staleness proposed pile (~19)
+# PLUS eligible parked captures (~23) — 60 covers the merged shelf with headroom
+# without letting a junk-flood burn a tier's budget.
+DEFAULT_LLM_CAP = 60
 
 
 def _log(level: str, msg: str) -> None:
@@ -190,6 +192,90 @@ def derive_source(card: Any) -> str:
     return SOURCE_UNKNOWN
 
 
+# ---------------- parked captures (the second, higher-trust shelf) -------
+#
+# The rank brain scored only the auto-proposed missions pile. Parked captures
+# — Larry's deliberately set-aside ideas, already narrator-briefed + risk-tagged
+# — were invisible to it, so his best ideas were the ones the operator couldn't
+# rank. We fold eligible captures into the SAME scoring pool so one ranked queue
+# answers "what to build next" across both shelves. Captures carry `kind:
+# 'capture'` so the dashboard routes their one-click to the capture action
+# endpoints (not the mission ones); their authored briefing is REUSED as the
+# card brief (we don't re-brief deliberate, human-reviewed work).
+
+def _valid_briefing(b: Any) -> bool:
+    """A briefing dict with non-empty what/why/suggest strings."""
+    return (isinstance(b, dict)
+            and all(isinstance(b.get(k), str) and b.get(k).strip()
+                    for k in ('what', 'why', 'suggest')))
+
+
+def _briefing_text(briefing: Any) -> str:
+    """Flatten a briefing to prompt context (what/why/suggest joined)."""
+    if not isinstance(briefing, dict):
+        return ''
+    parts = [briefing.get(k) for k in ('what', 'why', 'suggest')]
+    return ' '.join(p.strip() for p in parts if isinstance(p, str) and p.strip())
+
+
+def _capture_snoozed(cap: dict, now: datetime) -> bool:
+    """True only if `snoozed_until` is a FUTURE timestamp — an expired snooze
+    resurfaces (a bare-present check would hide a capture forever). Unparseable
+    → treat as not snoozed (fail toward surfacing, never silently hiding)."""
+    raw = cap.get('snoozed_until')
+    if not isinstance(raw, str) or not raw:
+        return False
+    try:
+        until = datetime.fromisoformat(raw)
+    except (ValueError, OverflowError, OSError):
+        return False
+    if until.tzinfo is None:
+        until = until.replace(tzinfo=timezone.utc)
+    return until > now
+
+
+def load_parked_captures(now: datetime,
+                         path: Optional[Path] = None) -> list[dict]:
+    """Eligible parked captures: state=='parked', not already spawned into work
+    (`spawned`/`promoted_to`), and not currently snoozed. READ-ONLY. Missing/
+    malformed file → []."""
+    data = _read_json(path or CAPTURES_JSON)
+    caps = data.get('captures') if isinstance(data, dict) else (
+        data if isinstance(data, list) else None)
+    if not isinstance(caps, list):
+        return []
+    out: list[dict] = []
+    for c in caps:
+        if not isinstance(c, dict):
+            continue
+        if c.get('state') != 'parked':
+            continue
+        if c.get('spawned') or c.get('promoted_to'):
+            continue  # already became work — never double-list
+        if _capture_snoozed(c, now):
+            continue
+        out.append(c)
+    return out
+
+
+def capture_to_card(cap: dict) -> dict:
+    """Normalize a capture into the mission-shaped card score_card consumes,
+    carrying `kind` (dashboard routing) + `prebrief` (the authored briefing to
+    reuse) + `origin` (so derive_source reads 'you'/'beacon')."""
+    origin = cap.get('origin') if isinstance(cap.get('origin'), dict) else {}
+    briefing = cap.get('briefing')
+    name = cap.get('title') if isinstance(cap.get('title'), str) and cap.get('title') else '(unnamed capture)'
+    return {
+        'id': cap.get('id'),
+        'name': name,
+        'brief': _briefing_text(briefing) or name,  # LLM prompt context
+        'repo': origin.get('repo'),
+        'origin': origin,
+        'kind': 'capture',
+        'prebrief': briefing if _valid_briefing(briefing) else None,
+    }
+
+
 def build_rank_prompt(mission: dict, project: dict) -> str:
     """The scoring prompt: judge THIS card against ITS project's north star.
     JSON-out so claude_json_roundtrip can parse; plain operator language for the
@@ -267,6 +353,13 @@ def score_card(
     scored = benefit is not None and cost is not None
     if not scored:
         benefit, cost = 5, 5  # neutral: surfaces mid-rank, flagged unscored
+    # A capture arrives with an authored, human-reviewed briefing — trust it
+    # over anything the LLM re-wrote this pass (respects author-at-emit). The
+    # LLM call still supplied benefit/cost so the capture ranks on the SAME
+    # scale as a mission.
+    prebrief = mission.get('prebrief')
+    if _valid_briefing(prebrief):
+        brief = {k: prebrief[k].strip() for k in ('what', 'why', 'suggest')}
     if brief is None:
         brief = {
             'what': name,
@@ -296,6 +389,9 @@ def score_card(
         # Normalized provenance for the source badge — see derive_source. The
         # endpoint passes it through; the Approvals card renders it as a chip.
         'source': derive_source(mission),
+        # 'mission' | 'capture' — the dashboard routes the one-click action to
+        # the matching endpoint family (system/missions vs missions/captures).
+        'kind': mission.get('kind') if mission.get('kind') == 'capture' else 'mission',
         'brief': brief,
     }
 
@@ -352,7 +448,9 @@ def rank(
     cards still rank via the deterministic fallback and the cap is reported.
     """
     summary = {'proposed': 0, 'retired_excluded': 0, 'stale_excluded': 0,
-               'ranked': 0, 'unmapped': 0, 'llm_scored': 0, 'llm_capped': False}
+               'captures': 0, 'mission_twins_deduped': 0, 'ranked': 0,
+               'unmapped': 0, 'llm_scored': 0, 'llm_capped': False}
+    now = datetime.now(timezone.utc)
 
     projects = load_portfolio(portfolio_path)
     if projects is None:
@@ -394,13 +492,56 @@ def rank(
     survivors = [m for m in proposed if m.get('id') not in stale_ids]
     summary['stale_excluded'] = len(proposed) - len(survivors)
 
+    # Fold in the parked-capture shelf (the higher-trust, human-parked ideas).
+    # A capture with no id is un-actionable (the dashboard routes by id) — drop
+    # it. Captures skip the staleness gate — that scorer is scoped to the
+    # auto-proposed mission pile, not curated captures.
+    capture_cards = [c for c in (capture_to_card(cap)
+                                 for cap in load_parked_captures(now)) if c['id']]
+    capture_ids = {c['id'] for c in capture_cards}
+
+    # DEDUP (against double-listing): heal_orphan_autoregister mirrors a capture
+    # into a proposed mission under a PREFIXED id — mission id
+    # `proposed-<kind>-<capId>`, task_id `<kind>-<capId>` — so exact-id matching
+    # misses it. When both a capture and its mission twin are live, keep the
+    # CAPTURE (authored briefing) and drop the machine twin: the authored
+    # version always wins, and today's behavior (twins are stale-excluded, only
+    # the capture shows) is preserved when a twin later ages out of staleness.
+    # Suffix match is on a '-' boundary so a partial token can't false-positive.
+    # The fuzzy suffix path is gated to specific ids (>= _MIN_SUFFIX_ID_LEN) so a
+    # hypothetical short/generic capture id ('fix') can't over-match and wrongly
+    # drop an unrelated mission — real capture ids are `cap-<slug>-<hash>` (34+
+    # chars), so none are excluded; a short id still dedups on EXACT match.
+    _MIN_SUFFIX_ID_LEN = 8
+    suffix_ids = {c for c in capture_ids if len(c) >= _MIN_SUFFIX_ID_LEN}
+
+    def _mirrors_a_capture(m: dict) -> bool:
+        raw = m.get('task_ids')
+        task_ids = raw if isinstance(raw, list) else []
+        refs = [r for r in (m.get('id'), *task_ids) if isinstance(r, str)]
+        for r in refs:
+            if r in capture_ids:
+                return True
+            if any(r.endswith('-' + cid) for cid in suffix_ids):
+                return True
+        return False
+
+    before = len(survivors)
+    survivors = [m for m in survivors if not _mirrors_a_capture(m)]
+    summary['mission_twins_deduped'] = before - len(survivors)
+    summary['captures'] = len(capture_cards)
+    # Captures FIRST so, if the pool ever exceeds the LLM cap, the higher-trust
+    # shelf keeps real scoring and the machine-proposed missions degrade to
+    # fallback first (not the reverse). Final display order is by rank_score.
+    pool = capture_cards + survivors
+
     the_llm = llm if llm is not None else _default_llm()
     the_risk = risk_fn if risk_fn is not None else _default_risk_fn()
 
     entries: list[dict] = []
     llm_used = 0
     capped_out = 0  # cards that WANTED an LLM call but the cap was spent
-    for m in survivors:
+    for m in pool:
         project = resolve_project(m.get('repo'), projects)
         if project is None:
             summary['unmapped'] += 1
