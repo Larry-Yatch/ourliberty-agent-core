@@ -7885,7 +7885,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-09T04:17:15.953683+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-09T04:09:36.420991+00:00"
+      "orphan_last_activity_ts": "2026-07-09T04:09:36.420991+00:00",
+      "briefing": {
+        "what": "A small safeguard the team started building to stop our system from sending you 'done' notifications about work that already wrapped up on its own.",
+        "why": "You've been pinged three times recently about items that were already finished, which wastes your attention and erodes trust in the alerts you do get.",
+        "suggest": "Let the team finish this fix, but have them show you the result before it goes live so we're sure it silences the noise without hiding anything you'd actually want to see."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-09T04:18:02.717054+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-pr-ourliberty-agent-core-887",
@@ -7902,7 +7916,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-09T04:17:15.953683+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-09T04:09:36.170919+00:00"
+      "orphan_last_activity_ts": "2026-07-09T04:09:36.170919+00:00",
+      "briefing": {
+        "what": "A piece of work the team kicked off on its own that isn't attached to any project or goal yet.",
+        "why": "Unassigned work can quietly eat time and money without moving anything the business actually cares about.",
+        "suggest": "Take a quick look to confirm it's worth continuing before anyone puts more time into it."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-09T04:18:02.717054+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
