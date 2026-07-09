@@ -58,6 +58,32 @@ os.environ.setdefault(
     'OURLIBERTY_LOG_DIR', os.path.join(_SANDBOX_AGENTS_ROOT, 'logs'),
 )
 
+# Hermetic `gh` + no real baseline-warm forks — pytest mirror of the same
+# guards in _bootstrap.engage() (2026-07-08 gh-quota flake family, PR #884
+# false BLOCK; see the full rationale there). A PATH-shimmed `gh` (exit 1,
+# fail-open — every production helper tolerates gh errors) keeps ~106 real
+# GraphQL calls per suite run off the shared account's quota and decouples
+# test outcomes from network state; REGBASELINE_WARMING=1 engages the
+# production #764 re-entrancy guard so a mocked-merge-success test can never
+# detach a REAL `git fetch` + full-suite warm. Opt out of the shim per
+# invocation with OURLIBERTY_ALLOW_REAL_GH=1; warm-fixture tests pop
+# REGBASELINE_WARMING in setUp as they already do.
+if not os.environ.get('OURLIBERTY_ALLOW_REAL_GH'):
+    _GH_SHIM_DIR = tempfile.mkdtemp(prefix='ol-test-gh-shim-')
+    with open(os.path.join(_GH_SHIM_DIR, 'gh'), 'w') as _fh:
+        _fh.write(
+            '#!/bin/sh\n'
+            'echo "hermetic-test-guard: real gh blocked during test runs'
+            ' (scripts/tests/conftest.py; set OURLIBERTY_ALLOW_REAL_GH=1'
+            ' to opt out)" >&2\n'
+            'exit 1\n'
+        )
+    os.chmod(os.path.join(_GH_SHIM_DIR, 'gh'), 0o755)
+    os.environ['PATH'] = (
+        _GH_SHIM_DIR + os.pathsep + os.environ.get('PATH', '')
+    )
+os.environ.setdefault('REGBASELINE_WARMING', '1')
+
 # The runtime tripwire's scan/stamp logic + self-checks live in the sibling
 # test module; the session fixture below imports them. Ensure this directory
 # is importable by plain module name regardless of pytest's import mode.
