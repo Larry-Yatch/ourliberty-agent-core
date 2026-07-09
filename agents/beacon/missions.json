@@ -8002,6 +8002,40 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-outbox-notifier-pending-auto-merge-queue-001",
+      "name": "Outbox Notifier Pending Auto Merge Queue 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `outbox-notifier-pending-auto-merge-queue-001`. Last activity 2026-07-09T06:55:52.57686+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "outbox-notifier-pending-auto-merge-queue-001"
+      ],
+      "repo": null,
+      "created": "2026-07-09",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-09T07:03:59.775607+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-09T06:55:52.57686+00:00"
+    },
+    {
+      "id": "proposed-fix-auto-merge-queue-stale-merged-gate-001",
+      "name": "Fix Auto Merge Queue Stale Merged Gate 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `fix-auto-merge-queue-stale-merged-gate-001`. Last activity 2026-07-09T06:50:00.507032+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "fix-auto-merge-queue-stale-merged-gate-001"
+      ],
+      "repo": null,
+      "created": "2026-07-09",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-09T07:03:59.775607+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-09T06:50:00.507032+00:00"
     }
   ]
 }
