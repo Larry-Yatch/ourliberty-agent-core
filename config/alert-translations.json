@@ -130,6 +130,12 @@
       "plain_language_summary": "A build-sequence is still `pending` with an unresolved Mirror DAG-preflight REVISION older than 30 min. Mirror sent a REVISION back through the Beacon notify path, but Beacon never amended-and-re-dispatched (mechanical DAG fix) nor escalated it to you (scope/spec problem). The sequence is wedged — no step has kicked off.",
       "recommended_action": "Open the named sequence at ~/agents/blackboard/build-sequences/<seq-id>.json and read its audit_log: the `dag-preflight-revision-routed` entry shows when Mirror's REVISION arrived. Check Beacon's inbox/session for the `notify-dag-revision-<seq-id>` task — if Beacon stalled mid-handle, resume it; if the verdict is a scope/spec problem it should have escalated, so decide the binary yourself and either amend the sequence (add the missing depends_on edge) and re-dispatch DAG-preflight, or REJECT the sequence. Runbook: runbooks/heal-pipeline-stall.md."
     },
+    "stalled-active-step": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "A build-sequence step has been stuck `dispatched` with no PR long enough to trip the stall detector — but the outbox-notifier ALREADY delivered this stall to Larry via a route=escalate DM. By the time Pulse triages the alert, the escalation is already in the Telegram thread. A second Pulse-side escalation just duplicates it, and treating it as a novel subject resets the triage tier on every emit. Surfaced here only for the digest record. Note: some of these are premature false-positives — the Forge worktree can still be actively building when the timer fires.",
+      "recommended_action": "None at the Pulse layer — the heal-pipeline-stall route=escalate DM is the primary delivery and is already in the thread. If the step is genuinely stalled, act on that DM: `retry sequence <seq_id> step <step-id>` to re-dispatch, or cancel the sequence. Producer: scripts/heal_pipeline_stall.py (stalled-active-step check)."
+    },
     "pipeline-stall:mirror-pass-unmerged": {
       "severity": "INFO",
       "tier": "FYI",
