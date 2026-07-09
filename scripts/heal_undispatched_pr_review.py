@@ -618,6 +618,16 @@ def main() -> int:
         fname = safe_write_inbox.canonical_inbox_name(f'review-{task_id}.json')
         return notifier._review_request_already_dispatched(fname, head_sha)
 
+    # gh-api-burn phase 1: back off before the `gh pr list` scan below when the
+    # shared GraphQL budget is low. Fail-open (unknown -> proceed); a broken guard
+    # never wedges the healer.
+    try:
+        import gh_budget
+        if gh_budget.should_skip('heal_undispatched_pr_review', log=log):
+            return 0
+    except Exception as e:  # noqa: BLE001
+        log(f'gh_budget guard unavailable ({type(e).__name__}); proceeding')
+
     open_prs = fetch_open_prs()
     if open_prs is None:
         log('gh unavailable this tick; no scan')

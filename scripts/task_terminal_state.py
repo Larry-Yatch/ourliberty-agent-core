@@ -361,6 +361,18 @@ def task_terminal_state(
     """
     if not task_id or not isinstance(task_id, str):
         return UNKNOWN
+    # gh-api-burn phase 1: this shared probe is called by ~10 healers each tick;
+    # when the GraphQL budget is low, back off and return UNKNOWN — the SAME
+    # indeterminate verdict this kernel already returns on any gh failure, which
+    # every consumer treats conservatively (KEEP, never falsely retire). No
+    # decision logic changes; we just decline to deepen the exhaustion. Fail-open:
+    # a budget-check error (or a missing gh_budget) proceeds to the live queries.
+    try:
+        import gh_budget
+        if gh_budget.should_skip('task_terminal_state'):
+            return UNKNOWN
+    except Exception:  # noqa: BLE001 — never let a broken guard wedge the probe
+        pass
     repo_list = list(repos) if repos is not None else default_repos()
     candidates = expand_variants(task_id, variants)
     matched_states: list[str] = []
