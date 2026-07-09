@@ -47,6 +47,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -69,6 +70,12 @@ if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
 import larry_alerts  # noqa: E402
+import task_terminal_state as tts  # noqa: E402 — shared gh-probe kernel (gh_json/classify_state)
+
+# Bounded wall-clock cap for the live-PR-state gate's `gh pr view` subprocess.
+# Matches build_sequence_advancer's GH_PR_VIEW_TIMEOUT_SEC — a gh call that runs
+# long must fail-open (None), never wedge the promotion sweep.
+GH_PR_VIEW_TIMEOUT_SEC = 30
 
 # B5: promote a held fingerprint after it has been seen open for this many
 # consecutive persistence cycles. At the Pulse 10-min cadence, 3 cycles ≈ 30 min
@@ -191,11 +198,67 @@ def read_all_records() -> list[dict]:
     return out
 
 
+# -------------------- live-PR-state gate --------------------
+
+# `auto-merge-<type>:<owner/repo>:<pr_number>` — the shape outbox_notifier emits
+# for held auto-merge alerts (scripts/outbox_notifier.py). The `<owner/repo>`
+# segment carries a `/` but no `:`, so a colon-split leaves the PR number as the
+# trailing segment and the repo as the one before it.
+_AUTO_MERGE_SUBJECT_RE = re.compile(
+    r'^auto-merge-[a-z0-9-]+:(?P<repo>[^:/\s]+/[^:/\s]+):(?P<num>\d+)$'
+)
+# Defensive: a full github.com PR URL anywhere in the subject.
+_GITHUB_PR_URL_RE = re.compile(
+    r'github\.com/(?P<repo>[^/\s]+/[^/\s]+)/pull/(?P<num>\d+)'
+)
+
+
+def extract_pr_ref(subject: Any) -> Optional[str]:
+    """Return an ``owner/repo#number`` ref for `gh pr view`, or None.
+
+    Matches ONLY the `auto-merge-*` held-alert subject shape carrying a
+    `<owner/repo>:<pr_number>` tail (and, defensively, a full github.com PR URL).
+    Any other subject — a heal fingerprint, a bare source, a non-PR alert —
+    returns None, so the live-PR-state gate is a no-op (zero gh calls) for it.
+    """
+    if not isinstance(subject, str) or not subject:
+        return None
+    m = _AUTO_MERGE_SUBJECT_RE.match(subject.strip())
+    if m is None:
+        m = _GITHUB_PR_URL_RE.search(subject)
+    if m is None:
+        return None
+    return f"{m.group('repo')}#{m.group('num')}"
+
+
+def default_pr_state(ref: str) -> Optional[str]:
+    """Live PR state for a ref via a bounded ``gh pr view``: 'OPEN' | 'MERGED' |
+    'CLOSED', or None on ANY failure (timeout, missing auth, non-zero exit,
+    unparseable output, unrecognized state).
+
+    None is the fail-open signal: the gate suppresses a promotion ONLY on a
+    positive MERGED/CLOSED result, so a flaky/slow gh call can never swallow a
+    genuine still-open escalation. Reuses the shared ``task_terminal_state``
+    probe kernel (gh_json + classify_state) — the same UNKNOWN-on-error core
+    build_sequence_advancer's merged-check rides."""
+    if not ref:
+        return None
+    data = tts.gh_json(
+        ['gh', 'pr', 'view', ref, '--json', 'state'],
+        timeout=GH_PR_VIEW_TIMEOUT_SEC,
+    )
+    if not isinstance(data, dict):
+        return None
+    state = tts.classify_state(data.get('state'))
+    return state if state != tts.UNKNOWN else None
+
+
 def compute_open_holds(
     records: list[dict],
     *,
     now: Optional[datetime] = None,
     is_silenced_fn: Callable[[str], bool] = larry_alerts.is_silenced,
+    pr_state_fn: Callable[[str], Optional[str]] = default_pr_state,
 ) -> dict[str, HoldInfo]:
     """Map of still-open held fingerprints from a full queue snapshot.
 
@@ -210,6 +273,16 @@ def compute_open_holds(
     build the distinct ``::promoted`` marker, and without one we cannot reliably
     detect our own promotion line (promote-once would break). These are
     discouraged anyway (a subject is the dedup key).
+
+    Live-PR-state gate: a hold whose subject references a PR (auto-merge-*
+    subjects) is EXCLUDED when ``pr_state_fn(ref)`` reports the PR is MERGED or
+    CLOSED — the promotion window is wide enough that a held PR often merges
+    before it fires, and a `::promoted` DM about an already-merged PR is noise.
+    The gate is FAIL-OPEN: it suppresses only on a positive MERGED/CLOSED signal;
+    a None result (gh timeout / error / unparseable) or a subject with no
+    extractable PR ref leaves the hold PROMOTABLE and issues no gh call in the
+    latter case. Suppression requires proof the PR is done, never absence of
+    proof it is open.
     """
     now = now or datetime.now(timezone.utc)
     # key -> (index, HoldInfo-ish dict) for the latest hold; and key -> latest
@@ -244,6 +317,10 @@ def compute_open_holds(
             log(f'open hold {key!r} has no subject; cannot promote-once, skipping',
                 'WARN')
             continue
+        pr_ref = extract_pr_ref(subject)
+        if pr_ref is not None and pr_state_fn(pr_ref) in (tts.MERGED, tts.CLOSED):
+            log(f'open hold {key!r} PR {pr_ref} is done; gating promotion')
+            continue  # PR already merged/closed — promoting is stale noise
         hold_dt = _parse_ts(rec.get('ts'))
         age = (now - hold_dt).total_seconds() if hold_dt else 0.0
         out[key] = HoldInfo(
@@ -310,17 +387,20 @@ def run_cycle(
     now: Optional[datetime] = None,
     append_fn: Callable[[HoldInfo, str], bool] = _default_append,
     is_silenced_fn: Callable[[str], bool] = larry_alerts.is_silenced,
+    pr_state_fn: Callable[[str], Optional[str]] = default_pr_state,
     persist: bool = True,
 ) -> dict[str, Any]:
     """One persistence cycle (B5). Promote holds open >= N cycles.
 
-    All IO seams (records, state, now, append_fn, is_silenced_fn) are injectable
-    so the whole flow is unit-testable without the filesystem. Returns a summary.
+    All IO seams (records, state, now, append_fn, is_silenced_fn, pr_state_fn)
+    are injectable so the whole flow is unit-testable without the filesystem or
+    network. Returns a summary.
     """
     now = now or datetime.now(timezone.utc)
     records = read_all_records() if records is None else records
     prior = load_state() if state is None else state
-    open_holds = compute_open_holds(records, now=now, is_silenced_fn=is_silenced_fn)
+    open_holds = compute_open_holds(
+        records, now=now, is_silenced_fn=is_silenced_fn, pr_state_fn=pr_state_fn)
 
     new_state: dict[str, Any] = {}
     promoted: list[str] = []
@@ -388,6 +468,7 @@ def run_backstop(
     now: Optional[datetime] = None,
     append_fn: Callable[[HoldInfo, str], bool] = _default_append,
     is_silenced_fn: Callable[[str], bool] = larry_alerts.is_silenced,
+    pr_state_fn: Callable[[str], Optional[str]] = default_pr_state,
     backstop_sec: float = BACKSTOP_SEC,
 ) -> dict[str, Any]:
     """Stateless 30-min backstop (B6). Promote any hold whose own ``ts`` is older
@@ -400,7 +481,8 @@ def run_backstop(
     """
     now = now or datetime.now(timezone.utc)
     records = read_all_records() if records is None else records
-    open_holds = compute_open_holds(records, now=now, is_silenced_fn=is_silenced_fn)
+    open_holds = compute_open_holds(
+        records, now=now, is_silenced_fn=is_silenced_fn, pr_state_fn=pr_state_fn)
 
     promoted: list[str] = []
     for key, hold in open_holds.items():

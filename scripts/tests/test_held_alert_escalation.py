@@ -55,10 +55,39 @@ def _never_silenced(_key):
     return False
 
 
+# Auto-merge held-alert subject shape emitted by outbox_notifier
+# (`<alert-type>:<owner/repo>:<pr_number>`), keyed under the outbox-notifier
+# source. A hold on one of these is what the live-PR-state gate acts on.
+_AM_SUBJECT = 'auto-merge-queue-stale:Larry-Yatch/ourliberty-agent-core:843'
+
+
+def _am_hold(subject=_AM_SUBJECT, *, minutes_ago=0):
+    return _hold('outbox-notifier', subject, minutes_ago=minutes_ago)
+
+
+def _pr_open(_ref):
+    return 'OPEN'
+
+
+def _pr_merged(_ref):
+    return 'MERGED'
+
+
+def _pr_closed(_ref):
+    return 'CLOSED'
+
+
+def _pr_unknown(_ref):
+    return None  # gh couldn't determine → fail-open
+
+
 class ComputeOpenHoldsTest(unittest.TestCase):
-    def _open(self, records, is_silenced_fn=_never_silenced):
+    def _open(self, records, is_silenced_fn=_never_silenced, pr_state_fn=_pr_open):
+        # Default pr_state_fn is a hermetic OPEN stub so no test ever shells out
+        # to real gh; the gate tests below inject MERGED/CLOSED/None explicitly.
         return hae.compute_open_holds(records, now=NOW,
-                                      is_silenced_fn=is_silenced_fn)
+                                      is_silenced_fn=is_silenced_fn,
+                                      pr_state_fn=pr_state_fn)
 
     def test_lone_hold_is_open(self):
         holds = self._open([_hold('heal-x', 'a')])
@@ -103,6 +132,93 @@ class ComputeOpenHoldsTest(unittest.TestCase):
     def test_age_seconds_from_record_ts(self):
         holds = self._open([_hold('heal-x', 'a', minutes_ago=42)])
         self.assertAlmostEqual(holds['heal-x:a'].age_sec, 42 * 60, delta=1)
+
+    # --- live-PR-state gate ---
+
+    def test_merged_pr_hold_gated_out(self):
+        key = f'outbox-notifier:{_AM_SUBJECT}'
+        holds = self._open([_am_hold()], pr_state_fn=_pr_merged)
+        self.assertNotIn(key, holds)
+
+    def test_closed_pr_hold_gated_out(self):
+        key = f'outbox-notifier:{_AM_SUBJECT}'
+        holds = self._open([_am_hold()], pr_state_fn=_pr_closed)
+        self.assertNotIn(key, holds)
+
+    def test_open_pr_hold_kept(self):
+        key = f'outbox-notifier:{_AM_SUBJECT}'
+        holds = self._open([_am_hold()], pr_state_fn=_pr_open)
+        self.assertIn(key, holds)
+
+    def test_unknown_pr_state_fails_open(self):
+        # gh couldn't determine (None) → the hold stays promotable.
+        key = f'outbox-notifier:{_AM_SUBJECT}'
+        holds = self._open([_am_hold()], pr_state_fn=_pr_unknown)
+        self.assertIn(key, holds)
+
+    def test_non_pr_subject_issues_no_gh_call(self):
+        # A subject with no extractable PR ref must never invoke pr_state_fn.
+        calls = []
+
+        def _spy(ref):
+            calls.append(ref)
+            return 'MERGED'
+
+        holds = self._open([_hold('heal-x', 'a')], pr_state_fn=_spy)
+        self.assertIn('heal-x:a', holds)
+        self.assertEqual(calls, [])
+
+
+class ExtractPrRefTest(unittest.TestCase):
+    def test_auto_merge_subject_tail(self):
+        self.assertEqual(
+            hae.extract_pr_ref(
+                'auto-merge-conflict:Larry-Yatch/ourliberty-agent-core:764'),
+            'Larry-Yatch/ourliberty-agent-core#764')
+
+    def test_auto_merge_deep_review_hold(self):
+        self.assertEqual(
+            hae.extract_pr_ref(
+                'auto-merge-deep-review-hold:Larry-Yatch/ourliberty-agent-core:830'),
+            'Larry-Yatch/ourliberty-agent-core#830')
+
+    def test_github_pr_url(self):
+        self.assertEqual(
+            hae.extract_pr_ref(
+                'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/843'),
+            'Larry-Yatch/ourliberty-agent-core#843')
+
+    def test_non_pr_subject_returns_none(self):
+        for subj in ('a', 'heal-x:a', 'sequence-paused:seq-42',
+                     'auto-merge-queue-corrupt', '', None, 123):
+            self.assertIsNone(hae.extract_pr_ref(subj))
+
+
+class DefaultPrStateTest(unittest.TestCase):
+    def _patch_gh_json(self, retval):
+        orig = hae.tts.gh_json
+        hae.tts.gh_json = lambda *a, **k: retval
+        self.addCleanup(lambda: setattr(hae.tts, 'gh_json', orig))
+
+    def test_open_state(self):
+        self._patch_gh_json({'state': 'OPEN'})
+        self.assertEqual(hae.default_pr_state('o/r#1'), 'OPEN')
+
+    def test_merged_state(self):
+        self._patch_gh_json({'state': 'MERGED'})
+        self.assertEqual(hae.default_pr_state('o/r#1'), 'MERGED')
+
+    def test_gh_failure_returns_none(self):
+        # gh_json returns None on timeout / non-zero exit / parse failure.
+        self._patch_gh_json(None)
+        self.assertIsNone(hae.default_pr_state('o/r#1'))
+
+    def test_unrecognized_state_returns_none(self):
+        self._patch_gh_json({'state': 'WEIRD'})
+        self.assertIsNone(hae.default_pr_state('o/r#1'))
+
+    def test_empty_ref_short_circuits(self):
+        self.assertIsNone(hae.default_pr_state(''))
 
 
 class _Recorder:
@@ -204,6 +320,65 @@ class RunBackstopTest(unittest.TestCase):
             records=[_hold('heal-x', 'a', minutes_ago=99)], now=NOW,
             append_fn=rec, is_silenced_fn=lambda k: True)
         self.assertEqual(rec.calls, [])
+
+    def test_merged_pr_hold_not_backstopped(self):
+        # B6 inherits the single-source gate: a merged-PR hold well past the
+        # backstop age is excluded from open_holds and never promoted.
+        rec = _Recorder()
+        summary = hae.run_backstop(
+            records=[_am_hold(minutes_ago=99)], now=NOW,
+            append_fn=rec, is_silenced_fn=_never_silenced,
+            pr_state_fn=_pr_merged)
+        self.assertEqual(rec.calls, [])
+        self.assertEqual(summary['promoted'], [])
+
+
+class GatePropagationTest(unittest.TestCase):
+    """Both promotion paths (B5 run_cycle, B6 run_backstop) inherit the gate."""
+
+    def test_run_cycle_gates_merged_pr(self):
+        rec = _Recorder()
+        state: dict = {}
+        # Even past N cycles, a merged-PR hold is never open, so never promoted.
+        for _ in range(hae.N_CYCLES_BEFORE_PROMOTE + 2):
+            captured = {}
+
+            def _capture(holds, path=hae.STATE_FILE):
+                captured.clear()
+                captured.update(holds)
+
+            orig = hae.write_state
+            hae.write_state = _capture
+            try:
+                hae.run_cycle(records=[_am_hold()], state=state, now=NOW,
+                              append_fn=rec, is_silenced_fn=_never_silenced,
+                              pr_state_fn=_pr_merged, persist=True)
+            finally:
+                hae.write_state = orig
+            state = captured
+        self.assertEqual(rec.calls, [])
+        self.assertEqual(state, {})
+
+    def test_run_backstop_gates_merged_pr(self):
+        rec = _Recorder()
+        summary = hae.run_backstop(
+            records=[_am_hold(minutes_ago=99)], now=NOW,
+            append_fn=rec, is_silenced_fn=_never_silenced,
+            pr_state_fn=_pr_merged)
+        self.assertEqual(rec.calls, [])
+        self.assertEqual(summary['promoted'], [])
+
+    def test_run_backstop_open_pr_still_promotes(self):
+        # Control: an OPEN-PR hold past backstop age still promotes (gate is a
+        # no-op on OPEN — only MERGED/CLOSED suppress).
+        rec = _Recorder()
+        summary = hae.run_backstop(
+            records=[_am_hold(minutes_ago=99)], now=NOW,
+            append_fn=rec, is_silenced_fn=_never_silenced,
+            pr_state_fn=_pr_open)
+        self.assertEqual([c[0] for c in rec.calls],
+                         [f'outbox-notifier:{_AM_SUBJECT}'])
+        self.assertEqual(summary['promoted'], [f'outbox-notifier:{_AM_SUBJECT}'])
 
 
 def _run_and_capture(records, prior_state, append_fn):
