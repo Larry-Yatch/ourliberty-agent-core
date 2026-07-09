@@ -7496,3 +7496,85 @@ NOMINAL ✅
 
 ---
 
+## Iteration ~4793 — 2026-07-09T15:13Z UTC (Larry /cycle chat, Tier 1)
+
+**Health:** ✅ Nominal — 0 new untriaged alerts. Key development: pr-fanout-probe-health-tier3-translation-002 approved by Larry at 15:03:37Z; Forge built PR #894; Mirror review dispatched at 15:09Z. pending=2 (down from 3).
+
+**VERIFY-BEFORE-REASSERT (from iter ~4792):**
+- **"beacon PID 927054"**: CONFIRMED ✅ — Ss, ~6h23m elapsed. [confirmed]
+- **"outbox_notifier PID 926316"**: CONFIRMED ✅ — Ss, ~6h18m elapsed. Last WARNs: 08:37:45 MDT and 08:38:45 MDT (~32 min clean at 15:10Z). [confirmed]
+- **"inbox_watcher PID 527542"**: CONFIRMED ✅ — Ssl, 10h59m elapsed. [confirmed]
+- **"zombie PID 1834248 (~41d+19h+50m+)"**: CONFIRMED ⚠️ — Ss, 41-19:50:12 elapsed (bash poll loop). [carry]
+- **"pending=3"**: UPDATED ✅ → pending=2. pr-fanout-probe-health-tier3-translation-002 RESOLVED (approved 15:03:37Z, Forge built PR #894, Mirror dispatched 15:09Z). Remaining: mirror-review-pr2-slot-aware-healers + mirror-review-pr-ourliberty-agent-core-890. [updated]
+- **"HEAD=a110a9f5=origin/main"**: UPDATED ✅ → HEAD=ce0654ba (wrapper auto-committed Pulse cycle 20260709T150747Z). On main, clean tree. [updated]
+- **"Daemon heartbeat 15:04:10Z"**: CONFIRMED ✅ — 2026-07-09T15:04:10Z (~9 min at 15:13Z, <60 min). [confirmed]
+- **"Sync last_sync=14:39:39Z"**: CONFIRMED ✅ — still 2026-07-09T14:39:39Z (~33 min at 15:13Z, within 2h). Status=no-change. [confirmed]
+- **"PR #847/854/860/874/890/891 OPEN"**: CONFIRMED ✅ (stall healer dry-run 15:09:14Z: no stalls detected). NEW: PR #894 OPEN (MERGEABLE, Mirror review in progress). [updated]
+- **"G-rule pr-fanout-probe-health-tier4-001 RE-OPENED, 2/3 post-re-open"**: UPDATED ✅ → Fix in Mirror review (PR #894 `config: add pr-fanout-probe-health translation entry`, OPEN MERGEABLE). Chain fully advancing: Larry approved → Forge built → PR #894 created → Mirror dispatched at 15:09Z. [updated]
+
+**NEW FINDINGS:**
+- [blue] **pr-fanout-probe-health-tier3-translation-002 approved + PR #894 in Mirror review** — Larry approved the Forge preflight at 15:03:37Z; outbox-notifier dispatched build-phase at 09:08 MDT (15:08Z UTC); PR #894 opened; Mirror review dispatched at 09:09 MDT (15:09Z UTC). PR state: OPEN, MERGEABLE, no reviewDecision yet. G-rule pr-fanout-probe-health-tier4-001 fix now in review. [new]
+
+**Check 0 — Alert triage:**
+- First repair-watermark call: `{"repaired": true, "old_watermark": 915, "file_length": 914, "new_watermark": 914}`. Compaction removed 1 old line. Tail (L910–L914): last entry = pr-terminal-fanout/pr-fanout-probe-health at 14:39:42Z (already delivered idx=914 in prior iters).
+- Second repair-watermark (post-approval activity): `{"repaired": false, "old_watermark": 914, "file_length": 914}`. No new untriaged alerts. NOMINAL ✅
+
+**Check 1 — Log noise:** outbox-notifier PID 926316. Last WARNs: 08:37:45 MDT (consec=1, backoff=57s) and 08:38:45 MDT (consec=2, backoff=105s). ~32 min clean at 15:10Z UTC. GH rate-limit hourly pattern continues; PR #880 exponential backoff functioning. Sub-5/hour. Latest entries: build dispatch + Mirror review dispatch for PR #894 (INFO only). NOMINAL ✅
+- **NOTE:** outbox-notifier log timestamps are MDT (UTC-6), NOT UTC. Prior journal entries saying "~6.4h clean" were computing 15:0xZ - 08:38 MDT incorrectly (treating MDT timestamp as UTC). Actual clean window is ~32 min from 14:38Z UTC. No material impact — WARN level still nominal — but carry this correction forward.
+
+**Check 2 — Telegram sweep:** Beacon PID 927054 ✅ (~6h23m, Ss). Bot log: last entry 09:03:07 MDT (15:03:07Z UTC) — Beacon replied to Larry's gh-unavailable follow-up. Larry approved pr-fanout-probe-health-tier3-translation-002 at 15:03:37Z (via dashboard or Telegram; approval_request idx=909 was delivered at 06:47 MDT). No new directives for Pulse. NOMINAL ✅
+
+**Check 3 — Pipeline stall:** DRY-RUN 15:09:14Z → `no stalls detected`. FORGE_NO_PR_SKIP × multiple (all legitimate including PR #891/890/871/873/880/892/893 etc.). NOMINAL ✅
+
+**Check 4 — Pending directives:** pending=2 (DOWN from 3 in iter ~4792).
+- Entry 0: id=mirror-review-pr2-slot-aware-healers (05:55:43Z) — PR #891 REVIEW_ESCALATE; test_outbox_notifier false-BLOCK (known flake class). `approve mirror-review-pr2-slot-aware-healers`. ⚠️ [carry]
+- Entry 1: id=mirror-review-pr-ourliberty-agent-core-890 (06:47:49Z) — PR #890 REVIEW_ESCALATE; same false-BLOCK class. `approve mirror-review-pr-ourliberty-agent-core-890`. ⚠️ [carry]
+NOMINAL ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-09T15:04:10Z (~9 min at 15:13Z, <60 min). NOMINAL ✅
+
+**Check A — Source repo:** HEAD=ce0654ba=origin/main. On main. Clean. Up-to-date. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-09T14:39:39Z (~33 min at 15:13Z, within 2h). Status=no-change. NOMINAL ✅
+**Check C — Agent liveness:** inbox_watcher PID 527542 ✅ (10h59m, Ssl). outbox_notifier PID 926316 ✅ (~6h18m, Ss). beacon PID 927054 ✅ (~6h23m, Ss). Zombie PID 1834248 ⚠️ (~41d+19h+50m+, Ss bash poll loop) [carry]. No active Forge or Mirror sessions (Mirror review for PR #894 dispatched but session not yet running or completed). Daemon heartbeat 15:04:10Z ✅. NOMINAL ✅
+**Check E — PR state:** Open PRs: #847/854/860/874/890/891 [carry] + NEW #894 (OPEN, MERGEABLE, Mirror in-flight). Stall dry-run clean (15:09:14Z). NOMINAL ✅
+
+**§5.0 — distill_detector:** no un-distilled audits; no-op. ✅
+**§5.0 — audit_due_nudge:** no committed audit baseline; no-op. ✅
+**§5.0 — audit_cadence_signal:** no post-seed decision-grade distill artifacts yet; no-op. ✅
+
+**Conditional checks — UTC Thursday 2026-07-09:**
+- **Check I:** Thursday (off-day). systemd timer handles Mon/Wed/Fri/Sun. Skip. ✅
+- **Check III:** Sunday gate. Next: 2026-07-13. Skip. ✅
+- **Check IX/X:** Monday gate. Skip. ✅
+- **Check VI/VIII:** Proposals idx=990,991 carry — awaiting Larry. [carry]
+
+**G-rule assessment:**
+- **pr-fanout-probe-health-tier4-001 [RE-OPENED, 2/3 post-re-open]**: CHAIN ADVANCING ✅ — PR #894 in Mirror review. On REVIEW_PASS + auto-merge, G-rule moves to VERIFIED. No new occurrence this iter.
+- All other G-rules unchanged from iter ~4792.
+
+**Actions taken:**
+1. Check 0: watermark repaired (915→914 compaction); second check confirmed stable at 914. ✅
+2. §5.0: all three no-ops. ✅
+3. PRIME ledger: `iter_clean` appended (15:13:04Z). ✅
+4. Tier state: `record --checks-clean false` → Tier 1 (zombie+pending carries). consecutive_clean=0. ✅
+
+**Escalations:** 0 new Pulse DMs. 2 pending APPROVAL_REQUESTs in Larry's queue (mirror-review-pr2-slot-aware-healers + mirror-review-pr-ourliberty-agent-core-890).
+
+**Standing findings (carry):**
+- [yellow] **zombie-bash-pid-1834248** — PID 1834248 (~41d+19h+50m+, Ss bash poll loop awaiting build-check-viii-pr-2b-analyzer-001.json). ask-then-do: `kill 1834248`. [carry confirmed]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07`. [carry]
+- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
+- [yellow] **APPROVAL_REQUEST mirror-review-pr2-slot-aware-healers** — PR #891 REVIEW_ESCALATE; test_outbox_notifier false-BLOCK (known flake class). `approve mirror-review-pr2-slot-aware-healers`. [carry]
+- [yellow] **APPROVAL_REQUEST mirror-review-pr-ourliberty-agent-core-890** — PR #890 REVIEW_ESCALATE; same false-BLOCK class. `approve mirror-review-pr-ourliberty-agent-core-890`. [carry]
+- [blue] **PR #847** — HELD_DEEP_REVIEW (OPEN, UNKNOWN mergeState). [carry]
+- [blue] **PR #854/860/874/890/891** — OPEN. [carry]
+- [blue] **PR #894** — OPEN, MERGEABLE, Mirror review in-flight (dispatched 15:09Z UTC). [new carry]
+- [blue] **G-rules (dispatched, vp):** sentinel-inflight-stall-tier4 (PR #854); notifier-concurrent-scan-dup (PR #847 held); ourliberty-health-subject-key-mismatch-001; forge-wip-redispatch-digest-tier4-001; no-session-revision-active-mirror-session-fp-001; forge-revision-preamble-missing-pr711-001; forge-wip-redispatch-exhausted-pr-exists-fp-001; decision-needed-approval-forge-dispatch-no-target-repo-001. [carry]
+- [blue] **G-rule 2/3:** forge-marker-task-id-mismatch-xii-v1; build-sequence-advancer-sequence-complete-tier4-001; **pr-fanout-probe-health-tier4-001 (RE-OPENED, 2/3 post-re-open, fix in Mirror review PR #894)**. [carry]
+- [blue] **G-rule 1/3:** outbox-notifier-merge-held-deep-review-tier4-001; mirror-malformed-verdict-heal-reap-path-001; forge-wip-redispatch-exhausted-genuine-no-pr-001; outbox-notifier-auto-merge-queue-stale-promoted-tier4-001. [carry]
+
+**PRIME DIRECTIVE:** ratio≈21.08 (interventions=1644, systemic_fixes=78, vp=36). `iter_clean` appended (15:13:04Z). Trend: worsening.
+**Tier end-of-iter:** Tier **1** (consecutive_clean=0; zombie+pending carries).
+
+---
+
