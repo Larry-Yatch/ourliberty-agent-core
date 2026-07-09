@@ -252,6 +252,12 @@
       "never_silence": true,
       "plain_language_summary": "The terminal-event fan-out sentinel's self-watch heartbeat is stale (>45 min = ~3 missed 15-min passes). The sentinel that reconciles out-of-band PR merges/closes across the needs-Larry + in-review surfaces has most likely crashed or wedged — phantom cards and un-cleared approvals can now accumulate silently. A dead self-watch must ALWAYS surface, so this entry is never_silence.",
       "recommended_action": "ssh larry@134.209.44.80 and run `systemctl status ourliberty-pr-terminal-fanout.service && journalctl -u ourliberty-pr-terminal-fanout.service --since '1 hour ago' | tail -100`. If wedged, `sudo systemctl start ourliberty-pr-terminal-fanout.service`. The sentinel is conservative (report-only until armed), so a brief outage is cosmetic — but a persistent one hides real terminal reconciliations."
+    },
+    "pr-fanout-probe-health": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "GH API rate-limit saturation on the terminal-event fan-out sentinel's probe path. This is a transient condition sharing the same backoff window as the outbox-notifier rate-limit WARNs — it is NOT an auth failure. The bot already DMs you directly via route=escalate when the probe path saturates, so by the time Pulse triages this the message is in your Telegram thread. Pulse journals only; a second Pulse-side escalation would just duplicate the DM.",
+      "recommended_action": "None at the Pulse layer — the bot's route=escalate DM is the primary delivery and is already in your thread. Only investigate if the GH API error rate stays elevated across many consecutive probe windows (sustained saturation, not a single transient window). Producer: the pr-terminal-fanout sentinel probe path."
     }
   },
   "dispatch-branch-cleanup": {
