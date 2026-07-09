@@ -133,6 +133,63 @@ def resolve_project(repo: Any, projects: list[dict]) -> Optional[dict]:
 
 # ---------------- LLM benefit/cost scoring ----------------
 
+# ---------------- provenance (the source badge contract) ----------------
+#
+# The normalized provenance vocabulary — ONE closed enum every surface renders
+# as a badge, so Larry has "where did this come from" context at a glance. The
+# raw provenance lives in different shapes per producer (a mission's
+# `proposed_by` string, a capture's `origin.source` dict); this is the ONE
+# place that normalizes them. New producers (pulse/medic, slice 9) stamp a
+# native `source` and just pass through — they add one value here + one badge
+# row on the dashboard, and nothing else changes. That single seam is what
+# makes the badge backbone, not a per-surface label sniff.
+SOURCE_YOU = 'you'            # Larry parked it (a desktop-chat capture)
+SOURCE_BEACON = 'beacon'      # an agent proposed it
+SOURCE_FOLLOWUP = 'follow-up'  # a loose end from finished work (closeout author)
+SOURCE_AUTO = 'auto'          # machine-scraped from an orphaned task (low signal)
+SOURCE_PULSE = 'pulse'        # a health check found it (slice 9)
+SOURCE_MEDIC = 'medic'        # above Medic's automation authority (slice 9)
+SOURCE_UNKNOWN = 'unknown'    # provenance not resolvable — never guessed
+
+_SOURCES = frozenset({
+    SOURCE_YOU, SOURCE_BEACON, SOURCE_FOLLOWUP, SOURCE_AUTO,
+    SOURCE_PULSE, SOURCE_MEDIC, SOURCE_UNKNOWN,
+})
+
+_PROPOSED_BY_SOURCE = {
+    'heal_orphan_autoregister': SOURCE_AUTO,
+    'closeout': SOURCE_FOLLOWUP,
+    'beacon': SOURCE_BEACON,
+    'retrospective-author': SOURCE_BEACON,
+}
+
+
+def derive_source(card: Any) -> str:
+    """One card's normalized provenance → the closed SOURCE vocabulary.
+
+    Precedence: a producer's own stamped `source` wins when it's a known enum
+    value (slice-9 pulse/medic set it natively → pass through). Else map the
+    legacy fields — a mission's `proposed_by`, or a capture's `origin.source`
+    (desktop-chat = Larry → 'you'; any other agent origin → 'beacon'). Anything
+    unresolved → 'unknown', never guessed. Never raises."""
+    if not isinstance(card, dict):
+        return SOURCE_UNKNOWN
+    native = card.get('source')
+    if isinstance(native, str) and native in _SOURCES:
+        return native
+    pb = card.get('proposed_by')
+    if isinstance(pb, str) and pb in _PROPOSED_BY_SOURCE:
+        return _PROPOSED_BY_SOURCE[pb]
+    origin = card.get('origin')
+    if isinstance(origin, dict):
+        osrc = origin.get('source')
+        if osrc == 'desktop-chat':
+            return SOURCE_YOU
+        if isinstance(osrc, str) and osrc:
+            return SOURCE_BEACON
+    return SOURCE_UNKNOWN
+
+
 def build_rank_prompt(mission: dict, project: dict) -> str:
     """The scoring prompt: judge THIS card against ITS project's north star.
     JSON-out so claude_json_roundtrip can parse; plain operator language for the
@@ -236,6 +293,9 @@ def score_card(
         'rank_score': rank_score,
         'scored': scored,
         'risk': risk,
+        # Normalized provenance for the source badge — see derive_source. The
+        # endpoint passes it through; the Approvals card renders it as a chip.
+        'source': derive_source(mission),
         'brief': brief,
     }
 
