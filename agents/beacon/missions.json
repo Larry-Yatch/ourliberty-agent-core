@@ -7951,7 +7951,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-09T04:47:19.794026+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-09T04:34:06.624785+00:00"
+      "orphan_last_activity_ts": "2026-07-09T04:34:06.624785+00:00",
+      "briefing": {
+        "what": "The team started building a safeguard that keeps outgoing customer notifications from getting stuck or firing too fast when the system is under heavy load.",
+        "why": "If notifications stall or flood, customers get silence or spam at the worst moments, which erodes trust in the product.",
+        "suggest": "Worth finishing, but have the team confirm the plan and show it working before it goes live."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-09T04:48:07.067566+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
