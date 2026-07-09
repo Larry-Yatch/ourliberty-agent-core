@@ -73,6 +73,14 @@ POLL_INTERVAL_SEC = 5
 DEFAULT_TIMEOUT_SEC = 14400  # 4h; matches HANDSHAKE-SCHEMA default
 FALLBACK_MODEL = "claude-sonnet-4-6"
 REQUEUE_MAX = 3
+# Subdir under each agent inbox where a review slot atomically parks the task
+# it claimed (spec §3.2). Dotfile so scan_inbox skips it (claimed != queued).
+CLAIMED_SUBDIR = ".claimed"
+# A task still parked in .claimed/<slot>/ older than one full session ceiling
+# belongs to a slot whose process died mid-flight; sweep_claimed_orphans
+# re-queues it on the next boot (spec §3.2). A live slot completes within the
+# ceiling (run_claude's own timeout), so this never races a task in flight.
+CLAIM_ORPHAN_CEILING_SEC = DEFAULT_TIMEOUT_SEC
 
 # Phase D3 commit 4b: logical target_repo name → canonical filesystem path.
 # Worktrees are spawned via `git worktree add` from the canonical. The agent's
@@ -224,6 +232,71 @@ def move_to(path: Path, dest_dir: Path) -> Path:
     return dest
 
 
+def _slot_identity(agent: str, slot: int) -> str:
+    """Dispatch-lease identity for a review slot (spec §3.1).
+
+    Slot 0 keeps the legacy spelling ``inbox:<agent>`` so every healer/tool that
+    greps for it (e.g. ``inbox:mirror``) keeps working during rollout; higher
+    slots get an ``:<n>`` suffix. dispatch_lease keys everything off this string,
+    so one holder per slot with TTL/heartbeat/PID-guard semantics unchanged.
+    """
+    return f"inbox:{agent}" if slot == 0 else f"inbox:{agent}:{slot}"
+
+
+def _claimed_dir(agent: str, slot: int) -> Path:
+    return INBOXES_ROOT / agent / CLAIMED_SUBDIR / str(slot)
+
+
+def _agent_for_task_file(task_file: Path) -> str:
+    """Resolve the owning agent from a task-file path, tolerating the
+    ``.claimed/<slot>/`` relocation (spec §3.2). An unclaimed task lives at
+    ``inboxes/<agent>/<name>.json`` (agent = parent); a claimed task lives at
+    ``inboxes/<agent>/.claimed/<slot>/<name>.json`` (agent is three levels up).
+    Used by write_invalid so a claimed task still lands in the RIGHT agent's
+    ``.invalid`` dir instead of one named after the slot number."""
+    parent = task_file.parent
+    if parent.parent.name == CLAIMED_SUBDIR:
+        return parent.parent.parent.name
+    return parent.name
+
+
+def _claim_task(agent: str, task_file: Path, slot: int) -> Path | None:
+    """Atomically claim ``task_file`` for this slot via ``os.rename`` into
+    ``.claimed/<slot>/`` (spec §3.2, the new multi-consumer primitive).
+
+    Same-filesystem rename is atomic, so exactly one of two slots scanning the
+    same inbox wins; the loser's source path is already gone and ``os.rename``
+    raises FileNotFoundError → return None so the caller skips to the next task.
+    No lock needed. Returns the claimed path on success."""
+    dest_dir = _claimed_dir(agent, slot)
+    try:
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest = dest_dir / task_file.name
+        os.rename(task_file, dest)
+        return dest
+    except OSError:
+        # FileNotFoundError => another slot claimed it first (expected race);
+        # any other OSError => this slot does not own the task either. Skip it.
+        return None
+
+
+def _unclaim_task(agent: str, claimed_file: Path) -> None:
+    """Return a claimed task to the live inbox (spec §3.2 deferral safety).
+
+    process_task's transient-defer paths — rotation gate, TIER_HOLD, and the
+    worktree-setup bump_requeue rewrite — leave the task file in place on the
+    contract that the next 5s poll re-sees it ("delay one poll, never drop").
+    But a claimed file lives under ``.claimed/<slot>/`` where scan_inbox can't
+    look, and the orphan sweep only runs at startup — so without un-claiming, a
+    deferred claim is stranded until the watcher restarts. The caller detects a
+    deferral as "the claimed file still exists after process_task returned"
+    (every terminal path archives/invalidates it, so it is already gone)."""
+    try:
+        move_to(claimed_file, INBOXES_ROOT / agent)
+    except OSError as e:
+        log(f"[{agent}] un-claim of {claimed_file} failed: {e}")
+
+
 def _archive_dir(agent: str, *, lost_result: bool = False) -> Path:
     """The archive destination for a processed task envelope.
 
@@ -241,7 +314,7 @@ def _archive_dir(agent: str, *, lost_result: bool = False) -> Path:
 
 
 def write_invalid(task_file: Path, reason: str) -> None:
-    agent = task_file.parent.name
+    agent = _agent_for_task_file(task_file)
     dest = move_to(task_file, INBOXES_ROOT / agent / ".invalid")
     try:
         dest.with_suffix(dest.suffix + ".reason").write_text(f"{now_iso()}\n{reason}\n")
@@ -343,6 +416,82 @@ def reap_orphans_on_startup() -> int:
     if reaped:
         log(f"reap_orphans: total {reaped} orphan(s) marked as forfeit")
     return reaped
+
+
+def sweep_claimed_orphans(ceiling_sec: int = CLAIM_ORPHAN_CEILING_SEC) -> int:
+    """Re-queue tasks stranded in ``.claimed/<slot>/`` by a slot that died
+    mid-flight (spec §3.2). Run at startup, BEFORE reap_orphans_on_startup, so
+    the in-flight registry is still intact for the paid-work check below.
+
+    A task is claimed (renamed out of the live inbox) BEFORE run_claude spawns.
+    Two death windows:
+      * died AFTER the LLM spawned → an in-flight registry entry exists for the
+        task_id. Re-queuing would re-dispatch PAID work and double-bill, which
+        this module forbids (see reap_orphans_on_startup). Archive it under the
+        lost-result marker instead; reap_orphans forfeits the registry entry.
+      * died BEFORE the LLM spawned → no registry entry, no spend. Re-queue it
+        to the live inbox so it dispatches exactly once more.
+
+    The ceiling guard skips tasks younger than one session ceiling so a live
+    slot's in-progress claim is never yanked out from under it.
+    """
+    if not INBOXES_ROOT.exists():
+        return 0
+    now = time.time()
+    requeued = 0
+    for agent in AGENTS:
+        claimed_root = INBOXES_ROOT / agent / CLAIMED_SUBDIR
+        if not claimed_root.exists():
+            continue
+        for slot_dir in sorted(claimed_root.iterdir()):
+            if not slot_dir.is_dir():
+                continue
+            for f in sorted(slot_dir.glob("*.json")):
+                try:
+                    age = now - f.stat().st_mtime
+                except OSError:
+                    continue
+                if age < ceiling_sec:
+                    continue  # may still be in flight within the session ceiling
+                task_id = None
+                try:
+                    task_id = (json.loads(f.read_text()) or {}).get("task_id")
+                except (OSError, json.JSONDecodeError, AttributeError):
+                    pass
+                task_id = task_id or f.stem
+                if (IN_FLIGHT_DIR / f"{task_id}.json").exists():
+                    # Paid run in flight/completed — never re-dispatch.
+                    try:
+                        move_to(f, _archive_dir(agent, lost_result=True))
+                        log(f"[{agent}] claimed-orphan {f.name} has a live in-flight "
+                            f"entry (paid); archived lost-result, NOT re-queued")
+                    except OSError as e:
+                        log(f"[{agent}] claimed-orphan archive failed for {f}: {e}")
+                    continue
+                try:
+                    dest = move_to(f, INBOXES_ROOT / agent)
+                    requeued += 1
+                    log(f"[{agent}] re-queued orphaned claim {f.name} -> {dest.name} "
+                        f"(slot={slot_dir.name}, age={int(age)}s >= "
+                        f"ceiling {ceiling_sec}s)")
+                except OSError as e:
+                    log(f"[{agent}] re-queue of orphaned claim {f} failed: {e}")
+    if requeued:
+        log(f"sweep_claimed_orphans: re-queued {requeued} orphaned claim(s)")
+    return requeued
+
+
+def _review_slots_for(agent: str, models_config: dict) -> int:
+    """Number of concurrent watcher threads for ``agent`` (spec §3.3). Read from
+    the per-agent ``review_slots`` key in agent-models.json; absent or malformed
+    => 1 (inert, behavior identical to today). Only mirror sets it; the key is
+    honored generically for every agent."""
+    block = models_config.get("agents", {}).get(agent, {})
+    try:
+        n = int(block.get("review_slots", 1))
+    except (TypeError, ValueError):
+        n = 1
+    return max(1, n)
 
 
 def _record_outbox_cost(agent: str, task_id: str, outbox: dict) -> None:
@@ -1222,8 +1371,16 @@ def _rotation_gate_block_reason(task: dict) -> str | None:
     return "tier-pool-unavailable"
 
 
-def agent_loop(agent: str, models_config: dict) -> None:
-    log(f"[{agent}] loop started")
+def agent_loop(agent: str, models_config: dict, slot: int = 0,
+               total_slots: int = 1) -> None:
+    log(f"[{agent}] loop started (slot={slot} of {total_slots})")
+    # With one slot the single lease serializes the whole loop, so scan ->
+    # process needs no per-task claim (behavior identical to pre-slot). With
+    # >1 slot the leases are per-slot (they no longer serialize each other), so
+    # two threads can scan the same task file — the atomic claim (spec §3.2) is
+    # what guarantees exactly one slot processes it.
+    claim_enabled = total_slots > 1
+    identity = _slot_identity(agent, slot)
     while not _shutdown.is_set():
         if _emergency_halt_active():
             log(f"[{agent}] EMERGENCY_HALT detected at {EMERGENCY_HALT_FILE}; shutting down")
@@ -1248,7 +1405,6 @@ def agent_loop(agent: str, models_config: dict) -> None:
             _shutdown.wait(POLL_INTERVAL_SEC)
             continue
 
-        identity = f"inbox:{agent}"
         for task_file in tasks:
             if _shutdown.is_set() or _emergency_halt_active():
                 break
@@ -1261,11 +1417,27 @@ def agent_loop(agent: str, models_config: dict) -> None:
             hb = dispatch_lease.Heartbeat(identity, nonce) if nonce else None
             if hb:
                 hb.start()
+            target = None
             try:
-                process_task(agent, task_file, models_config)
+                target = task_file
+                if claim_enabled:
+                    target = _claim_task(agent, task_file, slot)
+                    if target is None:
+                        # Another slot claimed this task first; try the next one
+                        # (the finally block releases the lease before continue).
+                        continue
+                process_task(agent, target, models_config)
             except Exception as e:
                 log(f"[{agent}] unexpected error on {task_file.name}: {e!r}")
             finally:
+                # A claimed task still present here means process_task took a
+                # transient-defer path (rotation gate / TIER_HOLD / worktree
+                # bump_requeue) and expects the next poll to re-see it — but it
+                # is parked under .claimed/<slot>/ where scan_inbox can't. Move
+                # it back to the live inbox so the defer contract holds instead
+                # of stranding it until restart. Terminal paths already moved it.
+                if claim_enabled and target is not None and target.exists():
+                    _unclaim_task(agent, target)
                 if hb:
                     hb.stop()
                 dispatch_lease.release(identity, nonce)
@@ -1284,6 +1456,14 @@ def _install_signals() -> None:
 
 def main() -> int:
     ensure_dirs()
+
+    # Re-queue tasks stranded in .claimed/<slot>/ by a slot that died mid-flight
+    # (spec §3.2). MUST run before reap_orphans_on_startup: it consults the
+    # in-flight registry to avoid re-dispatching paid work, and reap_orphans
+    # deletes those registry entries.
+    swept_claims = sweep_claimed_orphans()
+    if swept_claims:
+        log(f"startup: re-queued {swept_claims} orphaned claim(s)")
 
     # Reap any in-flight registry entries from a prior boot (Phase D2.5 Call C:
     # adopt-if-alive, mark-failed-if-dead, never re-dispatch).
@@ -1306,9 +1486,17 @@ def main() -> int:
 
     threads = []
     for a in AGENTS:
-        t = threading.Thread(target=agent_loop, args=(a, models_config), name=f"loop-{a}")
-        t.start()
-        threads.append(t)
+        slots = _review_slots_for(a, models_config)
+        if slots > 1:
+            log(f"[{a}] review_slots={slots}; spawning {slots} concurrent loops")
+        for slot in range(slots):
+            t = threading.Thread(
+                target=agent_loop,
+                args=(a, models_config, slot, slots),
+                name=f"loop-{a}-s{slot}",
+            )
+            t.start()
+            threads.append(t)
 
     for t in threads:
         t.join()
