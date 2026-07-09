@@ -1,0 +1,16 @@
+[Unit]
+Description=Run heal_dashboard_api_sha_drift every 3 minutes
+
+[Timer]
+# 3-min cadence bounds the stale-process window: a deploy race (restart lands
+# just before the merge commit) is detected and corrected within ~3 min rather
+# than lingering indefinitely. The RESTART_COOLDOWN_SEC (15 min) in the healer
+# caps each unit to one restart per window, so a fast tick only speeds
+# DETECTION — no restart storms. The tick is a cheap `git rev-parse` + one
+# loopback HTTP GET.
+OnBootSec=3min
+OnUnitActiveSec=3min
+Unit=ourliberty-heal-dashboard-api-sha-drift.service
+
+[Install]
+WantedBy=timers.target

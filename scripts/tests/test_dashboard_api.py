@@ -776,5 +776,47 @@ class SystemStateLogReaderTest(unittest.TestCase):
             self.assertEqual(da._state_log_json_path(), target)
 
 
+# ==================== git SHA on /api/system/health ====================
+
+class SystemHealthGitShaTest(unittest.TestCase):
+    """The dashboard-api process reports the git SHA it loaded so a drift
+    healer can catch a stale process (dashboard-api-deploy-race-001)."""
+
+    def test_read_git_sha_env_override_wins(self):
+        with mock.patch.dict(
+            os.environ, {'OURLIBERTY_PROCESS_GIT_SHA': '  deadbeefcafe  '}
+        ):
+            self.assertEqual(da._read_git_sha(Path('/nonexistent')), 'deadbeefcafe')
+
+    def test_read_git_sha_bad_repo_returns_none(self):
+        # No env override, and a path that is not a git repo → None, no raise.
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop('OURLIBERTY_PROCESS_GIT_SHA', None)
+            self.assertIsNone(da._read_git_sha(Path(tempfile.mkdtemp())))
+
+    def test_reader_emits_process_sha_captured_at_import(self):
+        # The reader must report the SHA captured at IMPORT (_PROCESS_GIT_SHA),
+        # not a live git call — otherwise it would always match HEAD and never
+        # reveal drift.
+        with mock.patch.object(da, '_PROCESS_GIT_SHA', 'a' * 40):
+            out = da._reader_system_health()
+        self.assertEqual(out['git_sha'], 'a' * 40)
+
+    def test_reader_sha_null_degrades_cleanly(self):
+        with mock.patch.object(da, '_PROCESS_GIT_SHA', None):
+            out = da._reader_system_health()
+        self.assertIsNone(out['git_sha'])
+
+    def test_route_returns_git_sha(self):
+        tmp = Path(tempfile.mkdtemp(prefix='dash-sha-'))
+        _fresh_root(tmp)
+        c = _client(tmp, self)
+        with mock.patch.object(da, '_PROCESS_GIT_SHA', 'b' * 40):
+            r = c.get('/api/system/health', headers=AUTH)
+        self.assertEqual(r.status_code, 200)
+        body = r.json()
+        self.assertEqual(body['git_sha'], 'b' * 40)
+
+
 if __name__ == '__main__':
     unittest.main()
