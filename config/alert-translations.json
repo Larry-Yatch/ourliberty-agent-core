@@ -295,6 +295,12 @@
     }
   },
   "outbox-notifier": {
+    "auto-merge-queue-stale": {
+      "severity": "WARNING",
+      "tier": "FYI",
+      "plain_language_summary": "A PR has been waiting in the auto-merge queue for over 24h because it is held behind a blocking PR that has not merged yet. The outbox-notifier already DMs Larry directly via route=escalate the moment this fires, so by the time Pulse triages the second-seen occurrence the message is already in the Telegram thread; a Pulse-side re-escalation would only duplicate that DM. The raw subject carries the queue detail and PR number after colons (auto-merge-queue-stale:...:PR_NUM, plus a ::promoted variant when the same hold is re-flagged); this bare prefix key matches both variants via the prefix-strip lookup rule. A genuinely-waiting hold, not a corruption — distinct from auto-merge-queue-corrupt, and distinct from the already-merged-PR re-queue case.",
+      "recommended_action": "None at the Pulse layer — the outbox-notifier route=escalate DM already delivered the actionable alert to Larry's thread on first emit. If the PR stays stuck, clear the blocking PR ahead of it in the queue (~/agents/blackboard/auto-merge-queue.json) so the held PR can merge. Producer: scripts/outbox_notifier.py; audit trail in ~/agents/logs/outbox-notifier.log."
+    },
     "auto-merge-queue-corrupt": {
       "severity": "URGENT",
       "tier": "NOW",
