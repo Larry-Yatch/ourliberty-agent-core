@@ -334,6 +334,12 @@
     }
   },
   "watchdog": {
+    "ourliberty-outbox-notifier:recovered": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "Watchdog caught outbox-notifier in the brief inactive/failed gap of heal-stale-daemon-code's ~90s restart window, started it, and surfaced this benign recovery. The service was already coming back on its own; watchdog's independent liveness poll simply raced the healer's restart. A timing-window artifact, not a genuine outage. This `:recovered` subject is deliberately distinct from the bare `ourliberty-outbox-notifier` critical down alert, which stays unmatched and escalating.",
+      "recommended_action": "None — the service self-recovers within the restart window; surfaced for the digest record only. NOTE: this silences ONLY the `:recovered` subject. A genuine `ourliberty-outbox-notifier` down (auto-restart failed) carries the bare subject, is unmatched here, and still escalates."
+    },
     "bots:pulse:tmux": {
       "severity": "INFO",
       "tier": "FYI",

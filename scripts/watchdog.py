@@ -311,11 +311,16 @@ def _check_auto_restart(service_name: str, friendly: str) -> dict:
     if _attempt_start(service_name):
         log(f'{friendly} recovered')
         _reset_flap_streak(service_name)
-        # Surface the recovery event so Larry knows watchdog acted.
+        # Surface the recovery event so Larry knows watchdog acted. The
+        # `:recovered` subject suffix keeps this benign restart-window alert
+        # distinct from the genuine down alert below (identical bare subjects
+        # would let a single translation silence both — Gate 1 in
+        # alert_triage_state ignores severity). Mirrors the bot-reconcile
+        # `bots:{short}:recovered` vs `:down` split.
         larry_alerts.append_alert(
             source='watchdog',
             severity='info',
-            subject=service_name,
+            subject=f'{service_name}:recovered',
             message=f'{friendly} was down; watchdog auto-restarted it.',
         )
         return {'status': 'recovered', 'action': 'started'}
