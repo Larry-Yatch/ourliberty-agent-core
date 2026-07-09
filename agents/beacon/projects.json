@@ -1028,6 +1028,66 @@
         "kind": "mission",
         "mission_id": "govern-loop-assessor"
       }
+    },
+    {
+      "id": "the-full-browser-done-gate-live-status-rollup-st",
+      "title": "The full browser done-gate \u2014 live status, rollup, stuck badge, click-through, graceful degrade, no-new-ping, and the P4 enriched completion DM \u2014 still needs to be confirmed live on the board, since it couldn't run from the build sandbox.",
+      "north_star_ref": null,
+      "repo": "ourliberty-dashboard",
+      "state": "active",
+      "phases": [
+        {
+          "id": "the-full-browser-done-gate-live-status-rollup-st",
+          "title": "The full browser done-gate \u2014 live status, rollup, stuck badge, click-through, graceful degrade, no-new-ping, and the P4 enriched completion DM \u2014 still needs to be confirmed live on the board, since it couldn't run from the build sandbox.",
+          "desired_end_state": "Loose end from the \"P5 \u2014 DAG status on cards\" closeout: The full browser done-gate \u2014 live status, rollup, stuck badge, click-through, graceful degrade, no-new-ping, and the P4 enriched completion DM \u2014 still needs to be confirmed live on the board, since it couldn't run from the build sandbox.",
+          "lifecycle_state": "brainstorm",
+          "order": 0,
+          "spec_ref": null,
+          "sequence_ref": null,
+          "created_at": "2026-07-09T16:08:37.136454+00:00",
+          "updated_at": "2026-07-09T16:14:49.986736+00:00",
+          "brainstorm": {
+            "is_ai_draft": true,
+            "draft": {
+              "end_state": "When this phase is done, the browser-facing done-gate has been exercised live on the real board and confirmed working, not just assumed from sandbox tests. Specifically: cards show live status; the rollup reflects the true aggregate state; a stuck item shows the stuck badge; clicking a card takes you through to the right place; when a data source is missing or slow the board degrades gracefully instead of breaking; no spurious or duplicate pings fire; and the enriched completion DM arrives with the fuller detail it was designed to carry. Each of these has been seen with human eyes on the live board and signed off.",
+              "why_now": "This is a leftover from closing out the prior phase that put DAG status on cards. The functionality was built, but the final confirmation couldn't be done from the build sandbox \u2014 the sandbox can't drive or observe the live board, so the done-gate was never actually watched running end to end in the real environment. Until someone confirms it live, the prior phase isn't truly finished; it's carrying an unverified claim. This phase exists to close that gap and let the earlier work be marked genuinely done.",
+              "scope": "IN: verifying, on the live board, the full set of behaviors already built \u2014 live status on cards, the rollup, the stuck badge, click-through, graceful degradation when inputs are missing or degraded, suppression of new/duplicate pings, and the enriched completion DM. IN: fixing whatever small breakage that live verification surfaces, since a thing that fails verification isn't done. OUT: adding new board features, redesigning the status model, or expanding what the completion DM contains beyond what was already built. OUT: reworking the sandbox itself. If verification reveals something needs more than a small fix, that becomes its own follow-up rather than growing this phase.",
+              "constraints_reuse": "This is assembly and confirmation, not greenfield \u2014 every behavior in scope already has an implementation from the prior phase; nothing here should be rebuilt from scratch. Reuse the existing status, rollup, badge, click-through, degradation, ping-suppression, and completion-DM code as-is and only touch it if live verification proves it broken. Must not break: the existing board for everyone already relying on it, and the current ping/DM behavior \u2014 the guardrail against new or duplicate pings is itself one of the things being verified, so verification must not itself trigger noise. Open question: exactly which live board/environment the operator wants this confirmed against, since the blocker was that the sandbox couldn't stand in for it.",
+              "options_decision": "The core fork is how to get a live environment the done-gate can actually run in, given the sandbox couldn't. Option A: verify directly against the real production board with real data \u2014 highest fidelity, closest to the actual done-gate, but risks generating real pings/DMs and touching live state during testing. Option B: stand up or use a staging/mirror of the board that can be driven safely \u2014 lower risk of side effects, but costs setup effort and may not perfectly reproduce the live behavior that the sandbox already failed to reproduce. A second fork is depth: a quick manual walk-through of each behavior once, versus a repeatable scripted check that can be re-run. Recommendation: verify against the live board (Option A) with ping/DM side effects deliberately routed or suppressed during the run, doing a careful one-time manual walk-through first, and only investing in a repeatable check if the manual pass reveals flakiness \u2014 this is a confirmation task, so favor fidelity over building new test scaffolding.",
+              "risks_guardrails": "Risk: verification itself fires real pings or completion DMs to people. Guardrail: run against a controlled item or route/suppress outbound notifications during the check, and confirm the no-new-ping behavior explicitly as part of the run. Risk: the live environment differs from the sandbox in ways that made this un-runnable before, so the same blocker recurs. Guardrail: confirm up front that the chosen environment can actually drive and observe the board before starting the checklist. Risk: a behavior 'looks' fine but a subtle case (graceful degrade, stuck badge) isn't really exercised. Guardrail: deliberately create the failure/stuck/missing-input conditions rather than waiting for them to occur naturally. Risk: scope creep from small fixes turning into redesign. Guardrail: fixes are limited to making the existing behavior pass; anything larger is spun out.",
+              "done_gate": "It's done when each of these has been observed on the live board and recorded: live status renders correctly on cards; the rollup matches the true underlying state; a deliberately stuck item shows the stuck badge; click-through from a card lands in the right destination; with an input removed or degraded the board still renders sensibly instead of erroring; a full run produces no new or duplicate pings; and the enriched completion DM is received with its fuller detail intact. Tests: a live walk-through covering each behavior with the failure/stuck/missing-input cases forced on purpose; a check that outbound notifications during the run match the no-new-ping expectation; and confirmation that the completion DM content matches the enriched format. Open question for the operator: whether a signed-off manual walk-through is sufficient, or a repeatable automated check is required before this is called done.",
+              "breakdown": "Step 1: pick and confirm the live environment the done-gate can actually run and be observed in, resolving the original sandbox blocker. Step 2: prepare the run so it won't cause unwanted side effects \u2014 decide how pings/DMs are suppressed or routed for the test. Step 3: verify the read-side behaviors \u2014 live status, rollup, click-through \u2014 on real cards. Step 4: force the edge conditions and verify the stuck badge and graceful degradation. Step 5: verify the notification-side behaviors \u2014 no new/duplicate pings, and the enriched completion DM arriving correctly. Step 6: fix any small breakage surfaced, re-verify the affected behavior, and record sign-off; spin out anything larger as a separate follow-up."
+            },
+            "decisions": [
+              "Verify against the real live board, or stand up a safer staging/mirror first?",
+              "Is a signed-off manual walk-through enough to call it done, or is a repeatable automated check required?",
+              "How should pings and completion DMs be handled during the run \u2014 fully suppressed, routed to you, or allowed on a throwaway item?",
+              "If verification surfaces more than a small fix, confirm that spins out as a separate follow-up rather than expanding this phase."
+            ],
+            "decisions_overflow": false,
+            "handoff": {
+              "spec_target_path": "agents/beacon/specs/the-full-browser-done-gate-live-status-rollup-st.md",
+              "target_repo": "ourliberty-dashboard",
+              "north_star_ref": null,
+              "prior_closeout_summary": null,
+              "directive": "Work with Larry to finalize this brainstorm and author the spec at agents/beacon/specs/the-full-browser-done-gate-live-status-rollup-st.md in ourliberty-dashboard; he will mark it Ready to spec."
+            }
+          },
+          "brainstorm_provenance": {
+            "by": "beacon",
+            "model": "claude-opus-4-8",
+            "at": "2026-07-09T16:14:49.986736+00:00",
+            "from_state": "brainstorm"
+          }
+        }
+      ],
+      "one_off": true,
+      "created_at": "2026-07-09T16:08:37.136454+00:00",
+      "updated_at": "2026-07-09T16:08:37.136454+00:00",
+      "promoted_from": {
+        "kind": "mission",
+        "mission_id": "the-full-browser-done-gate-live-status-rollup-stuck-badge-click-through-graceful-degrade-no-new-ping-and-the-p4-enriched-completion-dm-still-needs-to-be-confirmed-live-on-the-board-since-it-couldn-t-run-from-the-build-sandbox"
+      }
     }
   ]
 }
