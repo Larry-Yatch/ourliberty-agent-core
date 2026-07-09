@@ -6044,3 +6044,91 @@ NOMINAL ✅
 
 ---
 
+## Iteration ~4775 — 2026-07-09T12:50Z UTC (Larry /cycle chat, Tier 1)
+
+**Health:** ✅ Nominal — 1 new alert L910 (approval_request for pr-fanout-probe-health-tier3-translation-002, Tier-3 silenced). Pending count rises to 3 (new Forge preflight awaiting Larry approval). All mandatory checks otherwise clean.
+
+**VERIFY-BEFORE-REASSERT (from iter ~4774):**
+- **"beacon PID 927054"**: CONFIRMED ✅ — Ss, ~3h58m+ elapsed. [confirmed]
+- **"outbox_notifier PID 926316"**: CONFIRMED ✅ — Ss, ~3h58m+ elapsed. Last WARN: 06:36:21 MDT (12:36:21Z UTC, consecutive=3 253s backoff). Resumed; delivered alerts at 12:42Z and 12:47Z. [confirmed]
+- **"inbox_watcher PID 527542"**: CONFIRMED ✅ — Ssl, 08:39:16 elapsed. [confirmed]
+- **"zombie PID 1834248 (~41d+17h+30m+)"**: CONFIRMED ⚠️ — Ss, 41-17:30:29 elapsed (bash poll loop awaiting build-check-viii-pr-2b-analyzer-001.json). [carry]
+- **"pending=2 (mirror-review-pr2-slot-aware-healers + mirror-review-pr-ourliberty-agent-core-890)"**: UPDATED ⚠️ → pending=3; new entry pr-fanout-probe-health-tier3-translation-002 added at 12:46:21Z. [updated]
+- **"HEAD=bf285f53=origin/main"**: UPDATED ✅ → HEAD=0195904a=origin/main ("Pulse cycle 20260709T124749Z" — wrapper auto-commit from iter ~4774). On main. Clean. Up-to-date. [updated]
+- **"Daemon heartbeat 12:32:20Z"**: UPDATED ✅ → 2026-07-09T12:42:20Z (~8 min at 12:50Z, <60 min). [updated]
+- **"Sync last_sync=12:39:21Z"**: CONFIRMED ✅ — still 2026-07-09T12:39:21Z (~11 min at 12:50Z, within 2h). [confirmed]
+- **"PR #847/891/890/874/860/854 OPEN"**: CONFIRMED ✅ (stall healer dry-run 12:48:57Z: no stalls detected). [carry]
+- **"G-rule pr-fanout-probe-health-tier4-001 RE-OPENED"**: UPDATED ✅ — Beacon processed direction-ask-002 within ~1 min of dispatch; generated APPROVAL_REQUEST pr-fanout-probe-health-tier3-translation-002 (Forge preflight: add translation entry to config/alert-translations.json). DM delivered to Larry at 12:47:38Z UTC. Chain moving. [updated]
+
+**NEW FINDINGS:**
+
+**[yellow] New pending APPROVAL_REQUEST: pr-fanout-probe-health-tier3-translation-002**
+- Beacon built the Forge preflight from direction-ask-002 (dispatched iter ~4774). Spec: add `source=pr-terminal-fanout, subject=pr-fanout-probe-health` → FYI/INFO entry to config/alert-translations.json so the GH API rate-limit saturation signal stops surfacing as Tier-4 novel.
+- L910 (`kind=approval_request` from outbox-notifier, ts=12:46:21Z) is the delivery confirmation → Tier-3 (known-pattern match). Silenced. outbox-notifier already DM'd Larry via chat_id=7998341473 at 12:47:38Z.
+- Larry action: `approve pr-fanout-probe-health-tier3-translation-002` → Forge builds the config PR → translation goes live → G-rule closed. ⚠️ [new]
+
+**Check 0 — Alert triage:**
+- repair-watermark: `{"repaired": false, "old_watermark": 909, "file_length": 910}`. 1 new alert (line 910).
+- Line 910: `source=outbox-notifier, kind=approval_request, approval_id=pr-fanout-probe-health-tier3-translation-002` → Tier-3 (known-pattern match). Silenced. ✅
+- Watermark advanced to 910. NOMINAL ✅
+
+**Check 1 — Log noise:** outbox-notifier PID 926316. Last WARN: 06:36:21 MDT (12:36:21Z UTC, consecutive=3 253s backoff — GH rate-limit). Resumed and delivered at 12:42Z + 12:47Z. No new WARNs. NOMINAL ✅
+
+**Check 2 — Telegram sweep:** Beacon PID 927054 ✅ (Ss, ~3h58m+). Bot log last entry: `[06:47:38 MDT] approval_request idx=909 delivered (approval_id=pr-fanout-probe-health-tier3-translation-002)` = 12:47:38Z UTC. No new Larry directives. pending=3. NOMINAL ✅
+
+**Check 3 — Pipeline stall:** DRY-RUN 12:48:57Z → `no stalls detected`. FORGE_NO_PR_SKIP × multiple (all legitimate). NOMINAL ✅
+
+**Check 4 — Pending directives:** pending=3.
+- Entry 0: id=mirror-review-pr2-slot-aware-healers (05:55:43Z) — PR #891 REVIEW_ESCALATE; test_outbox_notifier false-BLOCK (known flake). `approve mirror-review-pr2-slot-aware-healers`. ⚠️ [carry]
+- Entry 1: id=mirror-review-pr-ourliberty-agent-core-890 (06:47:49Z) — PR #890 REVIEW_ESCALATE; same false-BLOCK class. `approve mirror-review-pr-ourliberty-agent-core-890`. ⚠️ [carry]
+- Entry 2: id=pr-fanout-probe-health-tier3-translation-002 (12:46:21Z) — Forge preflight for G-rule fix. `approve pr-fanout-probe-health-tier3-translation-002`. ⚠️ [new]
+NOMINAL ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-09T12:42:20Z (~8 min at 12:50Z, <60 min). NOMINAL ✅
+
+**Check A — Source repo:** HEAD=0195904a=origin/main. On main. Clean. Up-to-date. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-09T12:39:21Z (~11 min at 12:50Z, within 2h). Status=no-change. NOMINAL ✅
+**Check C — Agent liveness:** inbox_watcher PID 527542 ✅ (08:39:16, Ssl). outbox_notifier PID 926316 ✅ (~3h58m, Ss; idle). beacon PID 927054 ✅ (~3h58m, Ss). Zombie PID 1834248 ⚠️ (~41d+17h+30m+, Ss bash poll loop) [carry]. No active Forge or Mirror sessions. Daemon heartbeat 12:42:20Z ✅. NOMINAL ✅
+**Check E — PR state:** Open PRs: #847/891/890/874/860/854. Stall dry-run clean. NOMINAL ✅
+
+**§5.0 — distill_detector:** no un-distilled audits; no-op. ✅
+**§5.0 — audit_due_nudge:** no committed audit baseline; no-op. ✅
+
+**Conditional checks — UTC Thursday 2026-07-09:**
+- **Check I:** Thursday (off-day). systemd timer handles Mon/Wed/Fri/Sun. Skip. ✅
+- **Check III:** Sunday gate. Next: 2026-07-13. Skip. ✅
+- **Check IX/X:** Monday gate. Skip. ✅
+- **Check VI/VIII:** Proposals idx=990,991 carry — awaiting Larry. [carry]
+
+**G-rule assessment:**
+- pr-fanout-probe-health-tier4-001: Chain advancing ✅ — Beacon processed direction-ask-002 (→ Forge preflight created; APPROVAL_REQUEST delivered to Larry at 12:47Z). No new pr-fanout-probe-health alert this iter. G-rule still 1/3 post-re-open (occurrences, not dispatches).
+- All other G-rules unchanged from iter ~4774.
+
+**Actions taken:**
+1. Check 0: 1 new alert triaged (L910 → Tier-3, silenced). Watermark advanced to 910. ✅
+2. §5.0: both no-ops. ✅
+3. PRIME ledger: `iter_clean` appended (12:50:48Z). ✅
+4. Tier state: `record --checks-clean false` → Tier 1 (zombie+pending carries). consecutive_clean=0. last_signal_at=12:50:49Z. ✅
+
+**Escalations:** 0 new Pulse DMs (outbox-notifier already DM'd Larry for pr-fanout-probe-health-tier3-translation-002 at 12:47:38Z). 3 pending APPROVAL_REQUESTs in Larry's Telegram queue.
+
+**Standing findings (carry):**
+- [yellow] **zombie-bash-pid-1834248** — PID 1834248 (~41d+17h+30m+, Ss bash poll loop awaiting build-check-viii-pr-2b-analyzer-001.json). ask-then-do: `kill 1834248`. [carry confirmed]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07`. [carry]
+- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
+- [yellow] **APPROVAL_REQUEST mirror-review-pr2-slot-aware-healers** — PR #891 REVIEW_ESCALATE; test_outbox_notifier false-BLOCK (known flake class). `approve mirror-review-pr2-slot-aware-healers`. [carry]
+- [yellow] **APPROVAL_REQUEST mirror-review-pr-ourliberty-agent-core-890** — PR #890 REVIEW_ESCALATE; same false-BLOCK class. `approve mirror-review-pr-ourliberty-agent-core-890`. [carry]
+- [yellow] **APPROVAL_REQUEST pr-fanout-probe-health-tier3-translation-002** — Forge preflight for G-rule fix (add translation entry). `approve pr-fanout-probe-health-tier3-translation-002`. [new this iter]
+- [blue] **PR #847** — HELD_DEEP_REVIEW (OPEN, UNKNOWN mergeState). Resolution: Larry approves deep review or abandons.
+- [blue] **PR #891/890/874/860/854** — OPEN [carry]
+- [blue] **G-rules (dispatched, vp):** sentinel-inflight-stall-tier4 (PR #854); notifier-concurrent-scan-dup (PR #847 held); ourliberty-health-subject-key-mismatch-001; forge-wip-redispatch-digest-tier4-001; no-session-revision-active-mirror-session-fp-001; forge-revision-preamble-missing-pr711-001; forge-wip-redispatch-exhausted-pr-exists-fp-001; decision-needed-approval-forge-dispatch-no-target-repo-001. [carry]
+- [blue] **G-rule 2/3:** forge-marker-task-id-mismatch-xii-v1; build-sequence-advancer-sequence-complete-tier4-001. [carry]
+- [blue] **G-rule 1/3:** outbox-notifier-merge-held-deep-review-tier4-001; mirror-malformed-verdict-heal-reap-path-001; forge-wip-redispatch-exhausted-genuine-no-pr-001; outbox-notifier-auto-merge-queue-stale-promoted-tier4-001. [carry]
+- [blue] **G-rule COMPLETE ✅:** dispatch-branch-cleanup-gh-unavailable-001 (CLOSED ✅ iter ~4768). [carry]
+- [blue] **G-rule pr-fanout-probe-health-tier4-001** — RE-OPENED (1/3 post-re-open); chain advancing (Forge preflight in Larry's queue). [updated]
+
+**PRIME DIRECTIVE:** ratio≈21.06 (interventions=1643, systemic_fixes=78, vp=36). `iter_clean` appended (12:50:48Z). Trend: worsening.
+**Tier end-of-iter:** Tier **1** (consecutive_clean=0; zombie+pending carries).
+
+---
+

@@ -4,6 +4,87 @@
 
 ---
 
+## Iteration ~4815 — 2026-07-09T18:00Z UTC (Larry /cycle chat, Tier 1)
+
+**Health:** ✅ Nominal — 0 new alerts. PR #896 pipeline advancing: REVIEW_REVISION round 0 received, revision-1 dispatched to Forge, Mirror re-review round 1 in progress. notifier-concurrent-scan-dup occ #7 (known, fix in PR #847). Zombie + pending carries unchanged.
+
+**VERIFY-BEFORE-REASSERT (from iter ~4814):**
+- **"beacon PID 927054"**: CONFIRMED ✅ — Ss, 9h05m+ elapsed. [confirmed]
+- **"outbox_notifier PID 926316"**: CONFIRMED ✅ — Ss, 9h05m+ elapsed. Last log 11:55:27 MDT (17:55:27Z) — dup review-request for PR #896 rev1 (notifier-concurrent-scan-dup #7). [confirmed/updated]
+- **"inbox_watcher PID 527542"**: CONFIRMED ✅ — Ssl, 13h46m+ elapsed. [confirmed]
+- **"zombie PID 1834248 (~41d+22h+30m+)"**: CONFIRMED ⚠️ — Ss, 41d-22:37:36 elapsed (bash poll loop). [carry, time updated]
+- **"pending=2 (mirror-review-pr2-slot-aware-healers + mirror-review-pr-ourliberty-agent-core-890)"**: CONFIRMED ✅ — unchanged (~13h now). [confirmed]
+- **"HEAD=ecc75873=origin/main"**: UPDATED ✅ → HEAD=d442b1bd ("Pulse cycle 20260709T175223Z"). On main, up to date with origin/main. Beacon wrote agents/beacon/projects.json at 17:53:40Z (dirty — Beacon activity, expected). [updated]
+- **"Daemon heartbeat 17:45:36Z"**: UPDATED ✅ → 2026-07-09T17:55:37Z (~4 min at 18:00Z, <60 min). [updated]
+- **"Sync last_sync=17:40:16Z (no-change)"**: CONFIRMED — still 17:40:16Z (~20 min at 18:00Z, within 2h). [confirmed]
+- **"PR #847 HELD_DEEP_REVIEW; PR #854/860/874/890/891 OPEN"**: NOT RE-VERIFIED — GH rate-limit conditions persist. [carry unverified]
+- **"PR #896 in Mirror review since 17:25:22Z"**: RESOLVED/UPDATED ✅ → Mirror returned REVIEW_REVISION at 17:50:36Z (sha=0c526bc00ef9). Revision-1 dispatched to Forge at 17:50:38Z (fresh cold start, $2.56 at dispatch). Mirror re-review-rerun (round=1) dispatched at 17:51:45Z. Dup review-request dispatched at 17:55:27Z (notifier-concurrent-scan-dup occ #7). [updated → pipeline advancing]
+
+**NEW FINDINGS:**
+- [blue] **PR #896 REVIEW_REVISION (round 0) → pipeline advancing**: Mirror flagged PR #896 at 17:50:36Z. Revision-1 dispatched to Forge 17:50:38Z (cost=$2.56 at dispatch, fresh Forge session). Mirror re-review-rerun (round=1, file=review-...-rev1.json) dispatched 17:51:45Z. Watch for Forge revision-1 completion → PR update → Mirror round-1 verdict. [new/informational]
+- [blue] **notifier-concurrent-scan-dup occ #7 (PR #896 rev1)**: At 17:55:27Z, outbox-notifier dispatched a duplicate round-0 review-request (file=review-gh-api-burn-phase1-measure-and-backoff-001.json, no -rev1 suffix) for PR #896 alongside the correct round-1 re-review at 17:51:45Z. Mirror inbox now has both tasks. Fix in PR #847 (HELD_DEEP_REVIEW). Known pattern, no action beyond journal note. Occurrence #7 post-dispatch. [new/known-G-rule]
+- [observation] **agents/beacon/projects.json dirty**: Beacon added new project "routing-approvals-escalations-on-a-null-chat-id" at 17:53:40Z (null-chat-id routing gap tracking). Tree dirty since then. Expected Beacon inter-cycle activity; will be committed by next run_cycle.sh wrapper fire. Not a working-copy discipline escalation. [observation]
+
+**Check 0 — Alert triage:**
+- repair-watermark (run ×2 to catch late-arriving alerts): `{"repaired": false, "old_watermark": 925, "file_length": 925}`. 0 new alerts.
+- Watermark: 925. NOMINAL ✅
+
+**Check 1 — Log noise:** outbox-notifier last entry 11:55:27 MDT (17:55:27Z) — dup review-request for PR #896 (notifier-concurrent-scan-dup #7). Prior entries: MIRROR_REVIEW_STATUS failure posted (17:50:36Z), revision-1 dispatched (17:50:38Z), re-review-rerun dispatched (17:51:45Z). No new WARN entries outside GH rate-limit backoffs from earlier (resolved ~17:43Z). Sub-5/hour WARN rate. Process PID 926316 alive (Ss, 9h05m+). NOMINAL ✅
+
+**Check 2 — Telegram sweep:** Beacon PID 927054 ✅ (Ss, 9h05m+). Bot log last entry 11:43:52 MDT (17:43:52Z) — alert idx=924 delivered (heal-wedged-review-sessions). No new Larry directives since "Yes then add a timer" at 10:34:34 MDT. NOMINAL ✅
+
+**Check 3 — Pipeline stall:** DRY-RUN 17:56:39Z → `no stalls detected`. FORGE_NO_PR_SKIP ×17 (all legitimate: pr_exists, pr_task_id_closed_or_merged, sibling_pr_title_shipped). NOMINAL ✅
+
+**Check 4 — Pending directives:** pending=2 (UNCHANGED — ~13h now).
+- Entry 0: id=mirror-review-pr2-slot-aware-healers (05:55:43Z) — PR #891 REVIEW_ESCALATE; test_outbox_notifier false-BLOCK (known flake class). `approve mirror-review-pr2-slot-aware-healers`. ⚠️ [carry]
+- Entry 1: id=mirror-review-pr-ourliberty-agent-core-890 (06:47:49Z) — PR #890 REVIEW_ESCALATE; same false-BLOCK class. `approve mirror-review-pr-ourliberty-agent-core-890`. ⚠️ [carry]
+NOMINAL ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-09T17:55:37Z (~4 min at 18:00Z, <60 min). NOMINAL ✅
+
+**Check A — Source repo:** HEAD=d442b1bd=origin/main. On main. Up to date. agents/beacon/projects.json modified (Beacon activity 17:53:40Z) — expected, not an escalation. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-09T17:40:16Z (~20 min at 18:00Z). Status=no-change. Within 2h. NOMINAL ✅
+**Check C — Agent liveness:** inbox_watcher PID 527542 ✅ (13h46m+, Ssl). outbox_notifier PID 926316 ✅ (9h05m+, Ss). beacon PID 927054 ✅ (9h05m+, Ss). Zombie PID 1834248 ⚠️ (~41d+22h+37m, Ss bash poll loop) [carry]. Daemon heartbeat 17:55:37Z ✅. NOMINAL ✅
+**Check E — PR state:** PR #896 — REVIEW_REVISION round 0 at 17:50:36Z; revision-1 dispatched to Forge 17:50:38Z; Mirror re-review (round=1) dispatched 17:51:45Z; dup round-0 review in Mirror inbox (notifier-concurrent-scan-dup #7). Pipeline advancing — watch for Forge rev1 completion. PR #847/854/860/874/890/891 — unverified (GH rate-limit). Stall dry-run clean. NOMINAL ✅
+
+**§5.0:** distill_detector: no-op ✅. audit_due_nudge: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks — UTC Thursday 2026-07-09:**
+- Check I: Thursday (off-day). systemd timer handles Mon/Wed/Fri/Sun. Skip. ✅
+- Check III: Sunday gate. Next: 2026-07-13. Skip. ✅
+- Check IX/X: Monday gate. Skip. ✅
+- Check VI/VIII: Proposals idx=990,991 carry — awaiting Larry. [carry]
+
+**G-rule assessment:**
+- notifier-concurrent-scan-dup (PR #847 held): occ #7 confirmed (PR #896 rev1 at 17:55:27Z). Fix in PR #847 HELD_DEEP_REVIEW — no new action; occurrence noted. [carry/occ updated]
+- All other G-rule statuses carry unchanged from iter ~4814.
+
+**Actions taken:**
+1. Check 0: repair-watermark no-op ×2 (file_length=925=watermark, 0 new alerts). ✅
+2. §5.0: all three no-ops. ✅
+3. PRIME ledger: `iter_clean` appended at 18:00Z. ✅
+4. Tier state: `record --checks-clean false` → Tier 1 (zombie+pending carries). consecutive_clean=0. ✅
+
+**Escalations:** 0 new Pulse DMs. 2 pending APPROVAL_REQUESTs in Larry's queue unchanged (~13h+; need `approve` commands). PR #896 revision-1 in Forge build; Mirror re-review round 1 queued.
+
+**Standing findings (carry):**
+- [yellow] **zombie-bash-pid-1834248** — PID 1834248 (~41d+22h+37m, Ss bash poll loop). ask-then-do: `kill 1834248`. [carry confirmed]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07`. [carry]
+- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
+- [yellow] **APPROVAL_REQUEST mirror-review-pr2-slot-aware-healers** — PR #891 REVIEW_ESCALATE; test_outbox_notifier false-BLOCK. `approve mirror-review-pr2-slot-aware-healers`. [carry]
+- [yellow] **APPROVAL_REQUEST mirror-review-pr-ourliberty-agent-core-890** — PR #890 REVIEW_ESCALATE; same false-BLOCK class. `approve mirror-review-pr-ourliberty-agent-core-890`. [carry]
+- [blue] **PR #896** — revision-1 dispatched to Forge (17:50:38Z); Mirror re-review round 1 in Mirror inbox (rev1.json); dup round-0 also in inbox (notifier-concurrent-scan-dup #7). Watch for Forge rev1 → PR update → Mirror round-1 verdict → auto-merge eligibility. [carry/updated]
+- [blue] **PR #847** — HELD_DEEP_REVIEW (OPEN). [carry unverified — GH rate-limit]
+- [blue] **PR #854/860/874/890/891** — OPEN (UNKNOWN mergeStateStatus — GH rate-limit artifact). [carry unverified]
+- [blue] **G-rules (dispatched, vp):** sentinel-inflight-stall-tier4 (PR #854); notifier-concurrent-scan-dup (PR #847 held, occ #7); ourliberty-health-subject-key-mismatch-001; forge-wip-redispatch-digest-tier4-001; no-session-revision-active-mirror-session-fp-001; forge-revision-preamble-missing-pr711-001; forge-wip-redispatch-exhausted-pr-exists-fp-001; decision-needed-approval-forge-dispatch-no-target-repo-001. [carry]
+- [blue] **G-rule 2/3:** forge-marker-task-id-mismatch-xii-v1; build-sequence-advancer-sequence-complete-tier4-001; outbox-notifier-auto-merge-queue-stale-promoted-tier4-001. [carry]
+- [blue] **G-rule 1/3:** outbox-notifier-merge-held-deep-review-tier4-001; mirror-malformed-verdict-heal-reap-path-001; forge-wip-redispatch-exhausted-genuine-no-pr-001. [carry]
+
+**PRIME DIRECTIVE:** ratio≈20.81 (interventions=1644, systemic_fixes=79, vp=36); `iter_clean` appended (18:00Z). Trend: stable.
+**Tier end-of-iter:** Tier **1** (consecutive_clean=0; zombie+pending carries).
+
+---
+
 ## Iteration ~4814 — 2026-07-09T17:50Z UTC (Larry /cycle chat, Tier 1)
 
 **Health:** ✅ Nominal — 0 new alerts. PR #896 Mirror review in-flight (~25 min). Zombie + pending carries unchanged.
@@ -3137,94 +3218,6 @@ NOMINAL ✅
 - [blue] **G-rule COMPLETE ✅:** dispatch-branch-cleanup-gh-unavailable-001 (CLOSED ✅ iter ~4768). [carry]
 
 **PRIME DIRECTIVE:** ratio≈21.06 (interventions=1643, systemic_fixes=78, vp=36). `iter_clean` appended (12:55:41Z). Trend: worsening.
-**Tier end-of-iter:** Tier **1** (consecutive_clean=0; zombie+pending carries).
-
----
-
-## Iteration ~4775 — 2026-07-09T12:50Z UTC (Larry /cycle chat, Tier 1)
-
-**Health:** ✅ Nominal — 1 new alert L910 (approval_request for pr-fanout-probe-health-tier3-translation-002, Tier-3 silenced). Pending count rises to 3 (new Forge preflight awaiting Larry approval). All mandatory checks otherwise clean.
-
-**VERIFY-BEFORE-REASSERT (from iter ~4774):**
-- **"beacon PID 927054"**: CONFIRMED ✅ — Ss, ~3h58m+ elapsed. [confirmed]
-- **"outbox_notifier PID 926316"**: CONFIRMED ✅ — Ss, ~3h58m+ elapsed. Last WARN: 06:36:21 MDT (12:36:21Z UTC, consecutive=3 253s backoff). Resumed; delivered alerts at 12:42Z and 12:47Z. [confirmed]
-- **"inbox_watcher PID 527542"**: CONFIRMED ✅ — Ssl, 08:39:16 elapsed. [confirmed]
-- **"zombie PID 1834248 (~41d+17h+30m+)"**: CONFIRMED ⚠️ — Ss, 41-17:30:29 elapsed (bash poll loop awaiting build-check-viii-pr-2b-analyzer-001.json). [carry]
-- **"pending=2 (mirror-review-pr2-slot-aware-healers + mirror-review-pr-ourliberty-agent-core-890)"**: UPDATED ⚠️ → pending=3; new entry pr-fanout-probe-health-tier3-translation-002 added at 12:46:21Z. [updated]
-- **"HEAD=bf285f53=origin/main"**: UPDATED ✅ → HEAD=0195904a=origin/main ("Pulse cycle 20260709T124749Z" — wrapper auto-commit from iter ~4774). On main. Clean. Up-to-date. [updated]
-- **"Daemon heartbeat 12:32:20Z"**: UPDATED ✅ → 2026-07-09T12:42:20Z (~8 min at 12:50Z, <60 min). [updated]
-- **"Sync last_sync=12:39:21Z"**: CONFIRMED ✅ — still 2026-07-09T12:39:21Z (~11 min at 12:50Z, within 2h). [confirmed]
-- **"PR #847/891/890/874/860/854 OPEN"**: CONFIRMED ✅ (stall healer dry-run 12:48:57Z: no stalls detected). [carry]
-- **"G-rule pr-fanout-probe-health-tier4-001 RE-OPENED"**: UPDATED ✅ — Beacon processed direction-ask-002 within ~1 min of dispatch; generated APPROVAL_REQUEST pr-fanout-probe-health-tier3-translation-002 (Forge preflight: add translation entry to config/alert-translations.json). DM delivered to Larry at 12:47:38Z UTC. Chain moving. [updated]
-
-**NEW FINDINGS:**
-
-**[yellow] New pending APPROVAL_REQUEST: pr-fanout-probe-health-tier3-translation-002**
-- Beacon built the Forge preflight from direction-ask-002 (dispatched iter ~4774). Spec: add `source=pr-terminal-fanout, subject=pr-fanout-probe-health` → FYI/INFO entry to config/alert-translations.json so the GH API rate-limit saturation signal stops surfacing as Tier-4 novel.
-- L910 (`kind=approval_request` from outbox-notifier, ts=12:46:21Z) is the delivery confirmation → Tier-3 (known-pattern match). Silenced. outbox-notifier already DM'd Larry via chat_id=7998341473 at 12:47:38Z.
-- Larry action: `approve pr-fanout-probe-health-tier3-translation-002` → Forge builds the config PR → translation goes live → G-rule closed. ⚠️ [new]
-
-**Check 0 — Alert triage:**
-- repair-watermark: `{"repaired": false, "old_watermark": 909, "file_length": 910}`. 1 new alert (line 910).
-- Line 910: `source=outbox-notifier, kind=approval_request, approval_id=pr-fanout-probe-health-tier3-translation-002` → Tier-3 (known-pattern match). Silenced. ✅
-- Watermark advanced to 910. NOMINAL ✅
-
-**Check 1 — Log noise:** outbox-notifier PID 926316. Last WARN: 06:36:21 MDT (12:36:21Z UTC, consecutive=3 253s backoff — GH rate-limit). Resumed and delivered at 12:42Z + 12:47Z. No new WARNs. NOMINAL ✅
-
-**Check 2 — Telegram sweep:** Beacon PID 927054 ✅ (Ss, ~3h58m+). Bot log last entry: `[06:47:38 MDT] approval_request idx=909 delivered (approval_id=pr-fanout-probe-health-tier3-translation-002)` = 12:47:38Z UTC. No new Larry directives. pending=3. NOMINAL ✅
-
-**Check 3 — Pipeline stall:** DRY-RUN 12:48:57Z → `no stalls detected`. FORGE_NO_PR_SKIP × multiple (all legitimate). NOMINAL ✅
-
-**Check 4 — Pending directives:** pending=3.
-- Entry 0: id=mirror-review-pr2-slot-aware-healers (05:55:43Z) — PR #891 REVIEW_ESCALATE; test_outbox_notifier false-BLOCK (known flake). `approve mirror-review-pr2-slot-aware-healers`. ⚠️ [carry]
-- Entry 1: id=mirror-review-pr-ourliberty-agent-core-890 (06:47:49Z) — PR #890 REVIEW_ESCALATE; same false-BLOCK class. `approve mirror-review-pr-ourliberty-agent-core-890`. ⚠️ [carry]
-- Entry 2: id=pr-fanout-probe-health-tier3-translation-002 (12:46:21Z) — Forge preflight for G-rule fix. `approve pr-fanout-probe-health-tier3-translation-002`. ⚠️ [new]
-NOMINAL ✅
-
-**Check 5 — Stale daemon code:** heartbeat=2026-07-09T12:42:20Z (~8 min at 12:50Z, <60 min). NOMINAL ✅
-
-**Check A — Source repo:** HEAD=0195904a=origin/main. On main. Clean. Up-to-date. NOMINAL ✅
-**Check B — Sync health:** last_sync=2026-07-09T12:39:21Z (~11 min at 12:50Z, within 2h). Status=no-change. NOMINAL ✅
-**Check C — Agent liveness:** inbox_watcher PID 527542 ✅ (08:39:16, Ssl). outbox_notifier PID 926316 ✅ (~3h58m, Ss; idle). beacon PID 927054 ✅ (~3h58m, Ss). Zombie PID 1834248 ⚠️ (~41d+17h+30m+, Ss bash poll loop) [carry]. No active Forge or Mirror sessions. Daemon heartbeat 12:42:20Z ✅. NOMINAL ✅
-**Check E — PR state:** Open PRs: #847/891/890/874/860/854. Stall dry-run clean. NOMINAL ✅
-
-**§5.0 — distill_detector:** no un-distilled audits; no-op. ✅
-**§5.0 — audit_due_nudge:** no committed audit baseline; no-op. ✅
-
-**Conditional checks — UTC Thursday 2026-07-09:**
-- **Check I:** Thursday (off-day). systemd timer handles Mon/Wed/Fri/Sun. Skip. ✅
-- **Check III:** Sunday gate. Next: 2026-07-13. Skip. ✅
-- **Check IX/X:** Monday gate. Skip. ✅
-- **Check VI/VIII:** Proposals idx=990,991 carry — awaiting Larry. [carry]
-
-**G-rule assessment:**
-- pr-fanout-probe-health-tier4-001: Chain advancing ✅ — Beacon processed direction-ask-002 (→ Forge preflight created; APPROVAL_REQUEST delivered to Larry at 12:47Z). No new pr-fanout-probe-health alert this iter. G-rule still 1/3 post-re-open (occurrences, not dispatches).
-- All other G-rules unchanged from iter ~4774.
-
-**Actions taken:**
-1. Check 0: 1 new alert triaged (L910 → Tier-3, silenced). Watermark advanced to 910. ✅
-2. §5.0: both no-ops. ✅
-3. PRIME ledger: `iter_clean` appended (12:50:48Z). ✅
-4. Tier state: `record --checks-clean false` → Tier 1 (zombie+pending carries). consecutive_clean=0. last_signal_at=12:50:49Z. ✅
-
-**Escalations:** 0 new Pulse DMs (outbox-notifier already DM'd Larry for pr-fanout-probe-health-tier3-translation-002 at 12:47:38Z). 3 pending APPROVAL_REQUESTs in Larry's Telegram queue.
-
-**Standing findings (carry):**
-- [yellow] **zombie-bash-pid-1834248** — PID 1834248 (~41d+17h+30m+, Ss bash poll loop awaiting build-check-viii-pr-2b-analyzer-001.json). ask-then-do: `kill 1834248`. [carry confirmed]
-- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07`. [carry]
-- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
-- [yellow] **APPROVAL_REQUEST mirror-review-pr2-slot-aware-healers** — PR #891 REVIEW_ESCALATE; test_outbox_notifier false-BLOCK (known flake class). `approve mirror-review-pr2-slot-aware-healers`. [carry]
-- [yellow] **APPROVAL_REQUEST mirror-review-pr-ourliberty-agent-core-890** — PR #890 REVIEW_ESCALATE; same false-BLOCK class. `approve mirror-review-pr-ourliberty-agent-core-890`. [carry]
-- [yellow] **APPROVAL_REQUEST pr-fanout-probe-health-tier3-translation-002** — Forge preflight for G-rule fix (add translation entry). `approve pr-fanout-probe-health-tier3-translation-002`. [new this iter]
-- [blue] **PR #847** — HELD_DEEP_REVIEW (OPEN, UNKNOWN mergeState). Resolution: Larry approves deep review or abandons.
-- [blue] **PR #891/890/874/860/854** — OPEN [carry]
-- [blue] **G-rules (dispatched, vp):** sentinel-inflight-stall-tier4 (PR #854); notifier-concurrent-scan-dup (PR #847 held); ourliberty-health-subject-key-mismatch-001; forge-wip-redispatch-digest-tier4-001; no-session-revision-active-mirror-session-fp-001; forge-revision-preamble-missing-pr711-001; forge-wip-redispatch-exhausted-pr-exists-fp-001; decision-needed-approval-forge-dispatch-no-target-repo-001. [carry]
-- [blue] **G-rule 2/3:** forge-marker-task-id-mismatch-xii-v1; build-sequence-advancer-sequence-complete-tier4-001. [carry]
-- [blue] **G-rule 1/3:** outbox-notifier-merge-held-deep-review-tier4-001; mirror-malformed-verdict-heal-reap-path-001; forge-wip-redispatch-exhausted-genuine-no-pr-001; outbox-notifier-auto-merge-queue-stale-promoted-tier4-001. [carry]
-- [blue] **G-rule COMPLETE ✅:** dispatch-branch-cleanup-gh-unavailable-001 (CLOSED ✅ iter ~4768). [carry]
-- [blue] **G-rule pr-fanout-probe-health-tier4-001** — RE-OPENED (1/3 post-re-open); chain advancing (Forge preflight in Larry's queue). [updated]
-
-**PRIME DIRECTIVE:** ratio≈21.06 (interventions=1643, systemic_fixes=78, vp=36). `iter_clean` appended (12:50:48Z). Trend: worsening.
 **Tier end-of-iter:** Tier **1** (consecutive_clean=0; zombie+pending carries).
 
 ---
