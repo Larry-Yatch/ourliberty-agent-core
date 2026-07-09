@@ -354,6 +354,21 @@ def _sensitive_carveout_rule(repos: list[str]) -> dict[str, Any]:
     }
 
 
+def _suite_guardian_rule() -> dict[str, Any]:
+    # Stage-2 prerequisite artifact (spec main-suite-green-guardian.md D3 / L4):
+    # the guardian's auto-filed fix tasks touch ONLY `scripts/tests/**`, so a
+    # `source: 'suite-guardian'` dispatch whose changed_files stay inside that
+    # allow-list auto-approves. Fix scope is ALSO enforced mechanically by the
+    # outbox_notifier diff gate (SHA-bound, fail-closed) — this rule is the
+    # policy-layer half. Present only at balanced+loose (under `conservative`
+    # the guardian is pinned <= Stage 1 by the dial map, so it never auto-files).
+    return {
+        'source': 'suite-guardian', 'target': 'forge',
+        'file_patterns': ['scripts/tests/**'],
+        'action': 'auto_approve',
+    }
+
+
 def _pulse_sensitive_carveout() -> dict[str, Any]:
     # The pulse-auto-dispatch lane (rule below) auto-approves on `target: *` with
     # no path carve-out — so a sensitive pulse dispatch would slip through (#8).
@@ -386,6 +401,7 @@ def policy_for_level(level: str) -> dict[str, Any]:
             _pulse_sensitive_carveout(),
             pulse,
             _sensitive_carveout_rule(repos),
+            _suite_guardian_rule(),
             {'source': 'beacon', 'target': 'forge', 'repos': repos,
              'action': 'auto_approve'},
         ]
@@ -394,6 +410,7 @@ def policy_for_level(level: str) -> dict[str, Any]:
             _pulse_sensitive_carveout(),
             pulse,
             _sensitive_carveout_rule(_LOOSE_REPOS),
+            _suite_guardian_rule(),
             {'source': 'beacon', 'target': 'forge', 'repos': list(_LOOSE_REPOS),
              'action': 'auto_approve'},
         ]
@@ -445,6 +462,15 @@ def summarize_policy(policy: dict[str, Any]) -> dict[str, Any]:
         'gates': list(POLICY_GATES),
         'degraded': bool(policy.get('_error')),
     }
+
+
+def current_autonomy_level() -> str:
+    """The live autonomy-dial position ('conservative'|'balanced'|'loose').
+    Reads the effective policy (override → runtime → repo) through the same
+    fail-closed loader `evaluate` uses, so a degraded/missing policy reads as
+    'conservative' (the safe floor). Consumed by the suite-guardian stage
+    machine to cap the effective stage: conservative→1, balanced→2, loose→3."""
+    return summarize_policy(load_policy())['level']
 
 
 def _self_test() -> int:

@@ -64,6 +64,7 @@ from typing import Callable, Optional
 import atomic_io
 import regression_baseline_cache as baseline_cache
 import suite_guardian_ledger as ledger
+import suite_guardian_stage as stage
 import test_regression_check as trc
 
 
@@ -565,6 +566,20 @@ def run_guardian(
         meta['last_run_result'] = RUN_GREEN if not red_set else RUN_RED
         meta['completed_runs'] = completed_runs_before + 1
         meta['last_run_at'] = now_iso
+
+        # L8/D4 payoff clock: increment the zero-red streak when no NON-PARKED red
+        # remains (reds - parked == 0, L9), reset on any live red. The L8 gate-
+        # tightening card fires at L8_ZERO_RED_RUNS consecutive such runs (main()).
+        try:
+            parked_ids = {r['test_id'] for r in ledger.list_by_status(ledger.RESOLVED)
+                          if r.get('resolution') == 'parked'}
+        except Exception:  # noqa: BLE001 — a ledger hiccup must not wedge the run
+            parked_ids = set()
+        if red_set - parked_ids:
+            meta['zero_red_streak'] = 0
+        else:
+            meta['zero_red_streak'] = int(meta.get('zero_red_streak', 0)) + 1
+
         save_registry(registry_path, registry)
 
         return {
@@ -896,6 +911,8 @@ def run_proposal_cycle(
     deps: Optional[ProposalDeps] = None,
     now: Optional[datetime] = None,
     chat_id: int = 0,
+    effective_stage: int = 1,
+    current_run: Optional[int] = None,
 ) -> dict:
     """Drive the propose->approve->dispatch loop for one guardian run. Reads the
     registry + ledger, reconciles prior decisions, resolves/ages-out obligations,
@@ -950,7 +967,7 @@ def run_proposal_cycle(
         present = bool(deps.poison_present(row.get('poison_test_name')))
         if ledger.record_observation(
             row['test_id'], green_streak=green_streak, poison_present=present,
-            now=n, path=lp,
+            now=n, path=lp, current_run=current_run,
         ):
             summary['resolved'].append(row['test_id'])
 
@@ -967,7 +984,9 @@ def run_proposal_cycle(
             test_id=tid, classification=cls, poison_test_name_=pname,
             prompt=prompt, now=n,
         )
-        if fix_task_id and ledger.mark_dispatched(tid, fix_task_id, now=n, path=lp):
+        if fix_task_id and ledger.mark_dispatched(
+            tid, fix_task_id, now=n, path=lp, filed_stage=effective_stage,
+        ):
             summary['dispatched'].append(tid)
 
     # 6. New proposals -> ONE pending entry per run (L1) + one approval_request.
@@ -980,6 +999,15 @@ def run_proposal_cycle(
                 item['test_id'], run_task_id=run_task_id,
                 poison_test_name=item['poison_test_name'], now=n, path=lp,
             )
+            # Stage 2+ (auto-file): the guardian approves its own proposal so the
+            # serial drain files the fix PR without a Larry decision. Stage 1
+            # still routes through the pending-approval entry below (propose-only).
+            # The config `stage` ceiling already gates this (effective_stage is
+            # min(config, dial, penalty) — L3), so no separate opt-in is needed.
+            if effective_stage >= 2:
+                ledger.set_decision(
+                    item['test_id'], ledger.DEC_APPROVED, now=n, path=lp,
+                )
             proposals.append(item)
             summary['proposed'].append(item['test_id'])
         # Dedup the surfaced decision: emit at most once per run id (a same-day
@@ -1037,6 +1065,83 @@ def run_proposal_cycle(
     return summary
 
 
+def _unstable_count(registry: dict) -> int:
+    """Tests that flip-flopped classification into the terminal ``unstable`` state
+    (flip_count >= 2). The 0->1 graduation gate requires zero (spec D3)."""
+    return sum(
+        1 for e in registry.get('tests', {}).values()
+        if e.get('classification') == CLS_UNSTABLE
+    )
+
+
+def _run_stage_maintenance(
+    repo_root: Path,
+    *,
+    registry_path=None,
+    ledger_path=None,
+    chat_id: int = 0,
+    now: Optional[datetime] = None,
+) -> None:
+    """Post-cycle stage bookkeeping (D3+D4), all best-effort so nothing wedges the
+    nightly timer: close matured 14-run graduation windows, emit a graduation card
+    when the guardian has EARNED the next stage (Check-V — never self-promotes),
+    and file the one-time L8 gate-tightening card. Evidence is scoped past the L10
+    downgrade floor and the graduation card cites any standing downgrade cause."""
+    rp = Path(registry_path) if registry_path else default_registry_path()
+    lp = Path(ledger_path) if ledger_path else ledger.default_ledger_path()
+    registry = load_registry(rp)
+    meta = registry.get('_meta', {})
+    completed_runs = int(meta.get('completed_runs', 0))
+
+    # 1. Close matured graduation windows (only CLOSED windows count, spec D3).
+    try:
+        ledger.close_windows(completed_runs, path=lp)
+    except Exception as exc:  # noqa: BLE001
+        print(f'main_suite_guardian: close_windows failed: {exc}', file=sys.stderr)
+
+    # 2. Graduation evidence, scoped past the L10 evidence-reset floor.
+    try:
+        st = stage.load_stage_state()
+        floor = stage.evidence_floor_run(st)
+        config_stage, _ = stage.read_config_stage(repo_root)
+        candidate = stage.evaluate_graduation(
+            config_stage=config_stage,
+            dial_level=stage.current_dial_level(),
+            completed_runs=completed_runs,
+            flip_flop_count=_unstable_count(registry),
+            closed_windows=ledger.count_closed_windows(since_run=floor, path=lp),
+            auto_filed_closed_windows=ledger.count_closed_windows(
+                since_run=floor, auto_filed=True, path=lp),
+            same_leak_regressions=ledger.count_same_leak_regressions(
+                since_run=floor, path=lp),
+            scope_violations=ledger.count_scope_violations(since_run=floor, path=lp),
+        )
+        if candidate is not None:
+            stage.emit_graduation(
+                candidate, penalty_cause=st.get('penalty_cause'), chat_id=chat_id,
+            )
+    except Exception as exc:  # noqa: BLE001
+        print(f'main_suite_guardian: graduation eval failed: {exc}',
+              file=sys.stderr)
+
+    # 3. One-time L8 gate-tightening card (D4) once reds - parked == 0 has held.
+    try:
+        streak = int(meta.get('zero_red_streak', 0))
+        parked = sorted(
+            r['test_id'] for r in ledger.list_by_status(ledger.RESOLVED, path=lp)
+            if r.get('resolution') == 'parked'
+        )
+        stage.maybe_emit_l8_card(
+            zero_red_streak=streak,
+            evidence={'zero_red_runs': streak, 'completed_runs': completed_runs},
+            parked=parked,
+            chat_id=chat_id,
+            now=now,
+        )
+    except Exception as exc:  # noqa: BLE001
+        print(f'main_suite_guardian: L8 card eval failed: {exc}', file=sys.stderr)
+
+
 # --- CLI ---------------------------------------------------------------------
 
 def _default_mode(repo_root: Path) -> str:
@@ -1075,18 +1180,35 @@ def main(argv: Optional[list] = None) -> int:
         print(f'main_suite_guardian: run failed: {exc}', file=sys.stderr)
         return 2
 
-    # In propose mode a conclusive run drives the propose->approve->dispatch loop
-    # (D2). Shadow mode detects + records only. A skipped/inconclusive run carries
+    # Effective autonomy stage = min(config grant, dial max, downgrade penalty)
+    # — the single gate on how much the guardian may do this cycle (L3/L10). An
+    # unreadable config yields Stage 0 (shadow), so this can only ever be MORE
+    # conservative than `mode`.
+    try:
+        eff_stage = stage.effective_stage(repo_root)
+    except Exception as exc:  # noqa: BLE001 — stage read must never wedge the timer
+        print(f'main_suite_guardian: stage read failed: {exc}', file=sys.stderr)
+        eff_stage = 0
+    result['effective_stage'] = eff_stage
+
+    # Propose->approve->dispatch loop (D2) runs at Stage 1+ on a conclusive run.
+    # Stage 0 (shadow) detects + records only; a skipped/inconclusive run carries
     # no per-test verdict, so there is nothing to propose or drain this cycle.
-    if mode == 'propose' and result.get('status') in (RUN_GREEN, RUN_RED):
+    if eff_stage >= 1 and result.get('status') in (RUN_GREEN, RUN_RED):
+        registry = load_registry(
+            Path(args.registry) if args.registry else default_registry_path())
+        current_run = int(registry.get('_meta', {}).get('completed_runs', 0))
         try:
             proposal = run_proposal_cycle(
                 repo_root, result, registry_path=args.registry,
+                effective_stage=eff_stage, current_run=current_run,
             )
             result['proposal'] = proposal
         except Exception as exc:  # noqa: BLE001 — the loop must never wedge the timer
             print(f'main_suite_guardian: proposal cycle failed: {exc}',
                   file=sys.stderr)
+        # Post-cycle stage bookkeeping (window closing, graduation, L8 card).
+        _run_stage_maintenance(repo_root, registry_path=args.registry)
 
     print(json.dumps(result, indent=2, sort_keys=True))
     return 0

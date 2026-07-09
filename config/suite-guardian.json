@@ -1,5 +1,7 @@
 {
   "_comment": "Main-Suite Green Guardian stage authority (spec main-suite-green-guardian.md L3). This repo file is the ONLY stage source; the registry never stores stage. On an unreadable/malformed file the guardian falls back to Stage 0 / shadow. Effective stage = min(this stage, what the live trust-policy dial permits) — the dial always wins (conservative->1, balanced->2, loose->3). Graduation flips `stage` via a config-only PR (Check-V pattern); never guardian-self-written. Added to config/deep-review-paths.json so any change is human-reviewed.",
+  "_stage_epoch_comment": "Monotonic counter bumped by every graduation config PR (scripts/suite_guardian_stage.py apply-graduation). A deliberate human graduation always changes this even when re-promoting to the same stage number, so the config diff is never empty AND the guardian can detect the graduation to clear a stale automatic downgrade penalty (L10 evidence-reset supersession). NEVER guardian-self-written.",
   "stage": 0,
+  "stage_epoch": 0,
   "mode": "shadow"
 }

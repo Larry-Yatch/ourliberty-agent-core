@@ -291,21 +291,25 @@ class ShippedDefaultPolicyTest(unittest.TestCase):
         policy = tp.load_policy(repo_default)
         self.assertEqual(policy['default_action'], 'force_ask')
 
-        # Four rules, first-match-wins order. Each force_ask carve-out MUST stay
+        # Five rules, first-match-wins order. Each force_ask carve-out MUST stay
         # ordered before its broad auto_approve sibling:
         #   0: pulse-auto-dispatch sensitive-intent carve-out -> force_ask (#658, 2026-06-23)
         #   1: pulse-auto-dispatch                            -> auto_approve (2026-06-22)
         #   2: beacon->forge agent-core sensitive paths       -> force_ask (carve-out)
-        #   3: beacon->forge agent-core                       -> auto_approve (gate)
-        self.assertEqual(len(policy['rules']), 4)
+        #   3: suite-guardian->forge scripts/tests/**         -> auto_approve (PR-3 L4)
+        #   4: beacon->forge agent-core                       -> auto_approve (gate)
+        self.assertEqual(len(policy['rules']), 5)
         self.assertEqual(policy['rules'][0]['source'], 'pulse-auto-dispatch')
         self.assertEqual(policy['rules'][0]['action'], 'force_ask')
         self.assertEqual(policy['rules'][1]['source'], 'pulse-auto-dispatch')
         self.assertEqual(policy['rules'][1]['action'], 'auto_approve')
         self.assertEqual(policy['rules'][2]['source'], 'beacon')
         self.assertEqual(policy['rules'][2]['action'], 'force_ask')
-        self.assertEqual(policy['rules'][3]['source'], 'beacon')
+        self.assertEqual(policy['rules'][3]['source'], 'suite-guardian')
         self.assertEqual(policy['rules'][3]['action'], 'auto_approve')
+        self.assertEqual(policy['rules'][3]['file_patterns'], ['scripts/tests/**'])
+        self.assertEqual(policy['rules'][4]['source'], 'beacon')
+        self.assertEqual(policy['rules'][4]['action'], 'auto_approve')
 
         def ev(**task):
             action, _ = tp.evaluate(task, policy)
@@ -324,6 +328,19 @@ class ShippedDefaultPolicyTest(unittest.TestCase):
         self.assertEqual(ev(source='beacon', target_agent='forge',
                             target_repo='ourliberty-agent-core',
                             changed_files=['scripts/inbox_watcher.py']), 'auto_approve')
+
+        # PR-3 L4: a suite-guardian fix declaring a scripts/tests/** file
+        # auto-approves at the POLICY layer. This rule is any-match on declared
+        # files (the permissive half); the mechanical SHA-bound diff gate in
+        # outbox_notifier is what enforces ALL-files-in-scope at merge time. A
+        # suite-guardian dispatch touching NO test file matches no rule -> the
+        # default force_ask.
+        self.assertEqual(ev(source='suite-guardian', target_agent='forge',
+                            changed_files=['scripts/tests/test_x.py']),
+                         'auto_approve')
+        self.assertEqual(ev(source='suite-guardian', target_agent='forge',
+                            changed_files=['scripts/outbox_notifier.py']),
+                         'force_ask')
 
         # Sensitive-path revisions still ask (carve-out bites when files known).
         for f in ('config/agent-models.json', 'systemd/x.service',

@@ -9496,6 +9496,155 @@ def _defer_held_revalidation(
     }
 
 
+# --- L4 guardian-fix scope gate (spec main-suite-green-guardian.md L4) --------
+#
+# The Main-Suite Green Guardian's fix PRs must touch ONLY `scripts/tests/**`.
+# This is enforced MECHANICALLY (against the ACTUAL diff at the current head SHA,
+# not the self-declared changed_files trust-policy matches), re-checked
+# immediately pre-merge in the same merge-eligibility seam as the deep-review
+# hold. A guardian-lane PR is identified by the ledger `fix_task_id` join — the
+# task_id equals a ledger row's fix_task_id — NOT by a label. Fail-closed on any
+# fetch failure (can't confirm the diff -> hold). A violation blocks the merge,
+# stamps the ledger scope-violation (a hard graduation disqualifier), drives a
+# Stage-0 downgrade (L10), and escalates.
+
+_GUARDIAN_FIX_SCOPE_PREFIX = 'scripts/tests/'
+
+
+def _guardian_fix_ledger_row(task_id: str) -> Optional[dict[str, Any]]:
+    """Return the guardian ledger row whose `fix_task_id` == ``task_id`` (the L4
+    identity join), or None if this PR is not a guardian-lane fix. Fail-safe: any
+    ledger read error returns None (not a guardian fix -> gate doesn't apply)."""
+    if not task_id:
+        return None
+    try:
+        import suite_guardian_ledger as _sgl
+        for row in _sgl.list_by_status(_sgl.OPEN) + _sgl.list_by_status(_sgl.RESOLVED):
+            if row.get('fix_task_id') == task_id:
+                return row
+    except Exception:  # noqa: BLE001 — a ledger hiccup must not wedge the merge
+        return None
+    return None
+
+
+def _guardian_completed_runs() -> int:
+    """Best-effort read of the guardian's completed-run count from the registry
+    `_meta` (the evidence-reset floor for an L10 downgrade). 0 on any error."""
+    try:
+        import main_suite_guardian as _msg
+        reg = json.loads(_msg.default_registry_path().read_text('utf-8'))
+        val = (reg.get('_meta') or {}).get('completed_runs')
+        return int(val) if isinstance(val, int) else 0
+    except Exception:  # noqa: BLE001
+        return 0
+
+
+def _l4_guardian_scope_gate(
+    repo_coords: str,
+    pr_number: int,
+    task_id: str,
+    pr_url: str,
+    chat_id: Optional[int],
+) -> Optional[dict[str, Any]]:
+    """The L4 pre-merge scope gate. Returns a merge-outcome dict when the PR must
+    be HELD (fail-closed fetch failure or a genuine scope violation), or None when
+    the gate does not apply (not a guardian fix) or the diff is clean. Never
+    raises."""
+    row = _guardian_fix_ledger_row(task_id)
+    if row is None:
+        return None  # not a guardian-lane fix — gate does not apply
+    test_id = row.get('test_id') or task_id
+
+    # SHA-bind: resolve the CURRENT head, then read the diff at that head. A miss
+    # on either fetch is fail-closed (we cannot confirm the diff is in-scope).
+    head_sha = _gh_pr_head_sha(repo_coords, pr_number)
+    if not head_sha:
+        log(
+            f'AUTO_MERGE_HELD_SCOPE_FAIL_CLOSED task={task_id} pr={pr_url} '
+            f'reason=head-sha-unresolved (guardian fix; cannot bind diff to a '
+            f'head SHA — holding) agent=forge',
+            'WARN',
+        )
+        return {
+            'merge_outcome': 'held_scope_fail_closed',
+            'merge_reason': (
+                'guardian fix: head SHA unresolved; cannot confirm scope — held'
+            ),
+            'pr_number': pr_number,
+            'repo_coords': repo_coords,
+        }
+    changed = _gh_pr_changed_files(repo_coords, pr_number)
+    if changed is None:
+        log(
+            f'AUTO_MERGE_HELD_SCOPE_FAIL_CLOSED task={task_id} pr={pr_url} '
+            f'head={head_sha} reason=changed-files-unreadable (guardian fix; '
+            f'holding) agent=forge',
+            'WARN',
+        )
+        return {
+            'merge_outcome': 'held_scope_fail_closed',
+            'merge_reason': (
+                'guardian fix: changed files unreadable; cannot confirm scope — held'
+            ),
+            'pr_number': pr_number,
+            'repo_coords': repo_coords,
+        }
+
+    out_of_scope = [f for f in changed
+                    if not f.startswith(_GUARDIAN_FIX_SCOPE_PREFIX)]
+    if not out_of_scope:
+        return None  # clean — every path under scripts/tests/**
+
+    # Genuine scope violation. Block, stamp the ledger, downgrade (L10), escalate.
+    log(
+        f'AUTO_MERGE_HELD_SCOPE_VIOLATION task={task_id} pr={pr_url} '
+        f'head={head_sha} out_of_scope={out_of_scope[:10]} (guardian fix touched '
+        f'paths outside {_GUARDIAN_FIX_SCOPE_PREFIX}** — blocked, Stage-0 '
+        f'downgrade) agent=forge',
+        'WARN',
+    )
+    try:
+        import suite_guardian_ledger as _sgl
+        _sgl.mark_scope_violation(test_id)
+    except Exception as e:  # noqa: BLE001
+        log(f'L4 gate: ledger scope-violation stamp failed for {test_id}: '
+            f'{type(e).__name__}: {e}', 'WARN')
+    try:
+        import suite_guardian_stage as _sgs
+        _sgs.apply_downgrade(
+            cause=_sgs.CAUSE_SCOPE_VIOLATION,
+            current_stage=int(row.get('filed_stage') or 0),
+            run_seq=_guardian_completed_runs(),
+        )
+    except Exception as e:  # noqa: BLE001
+        log(f'L4 gate: Stage-0 downgrade failed for {test_id}: '
+            f'{type(e).__name__}: {e}', 'WARN')
+    try:
+        import larry_alerts as _la
+        _la.append_notification(
+            'suite-guardian',
+            'scope-violation',
+            f'🛑 Guardian fix PR {pr_url} touched paths outside '
+            f'{_GUARDIAN_FIX_SCOPE_PREFIX}** ({", ".join(out_of_scope[:5])}). '
+            f'Merge blocked; guardian autonomy reset to Stage 0 (L10).',
+            chat_id or 0,
+            task_id=task_id,
+        )
+    except Exception as e:  # noqa: BLE001
+        log(f'L4 gate: escalation DM failed: {type(e).__name__}: {e}', 'WARN')
+
+    _queue_remove_pr(pr_number, repo_coords)
+    return {
+        'merge_outcome': 'held_scope_violation',
+        'merge_reason': (
+            f'guardian fix touched paths outside {_GUARDIAN_FIX_SCOPE_PREFIX}**; '
+            f'merge blocked + Stage-0 downgrade (L4/L10)'
+        ),
+        'pr_number': pr_number,
+        'repo_coords': repo_coords,
+    }
+
+
 def _attempt_auto_merge_with_gates(
     pr_url: str,
     repo_coords: str,
@@ -9744,6 +9893,16 @@ def _attempt_auto_merge_with_gates(
             # Block (DM already fired) or defer (entry re-queued) — either
             # way, do NOT fire the merge on the stale approval.
             return revalidation
+
+    # L4 guardian-fix scope gate (spec main-suite-green-guardian.md L4). Sits in
+    # the same merge-eligibility chokepoint as the deep-review hold below, just
+    # before the merge fires, so every merge-fire caller re-checks the ACTUAL diff
+    # at the current head SHA. Applies ONLY to guardian-lane fixes (ledger
+    # fix_task_id join); a no-op for every other PR. Fail-closed, and a violation
+    # blocks + downgrades + escalates inside the helper.
+    _l4 = _l4_guardian_scope_gate(repo_coords, pr_number, task_id, pr_url, chat_id)
+    if _l4 is not None:
+        return _l4
 
     # Deep-review hold (merge-gate-deep-review-hold). Placed here — after every
     # mergeability/freshness gate and just before the merge fires — so it is the
