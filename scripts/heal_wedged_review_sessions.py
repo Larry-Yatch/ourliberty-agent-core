@@ -115,6 +115,17 @@ Self-protection
 Zero LLM / `claude` subprocess calls — pure /proc reads, file greps, signals,
 and `git worktree`. A reaper that spun up a model to decide would defeat
 its own purpose and burn the very slot it is trying to free.
+
+Two-slot audit (mirror-two-slot-review spec §4 PR2)
+---------------------------------------------------
+Slot-safe as-is. This reaper classifies and reaps per `claude` PROCESS, keyed
+on (pid, cwd=`wt-mirror-*` / `wt-forge-*`) and that session's own JSONL — it
+never reads the `inbox:mirror` lease or assumes ONE Mirror session. N concurrent
+review slots are N distinct worktree sessions with distinct pids/cwds/JSONLs, so
+each is evaluated and reaped independently; killing a wedged slot-1 review never
+touches a healthy slot-0 review. The confidence ladder / verify_pending store is
+keyed on session_id, so per-slot streaks don't cross-contaminate. Nothing here
+changed for two slots; this note records the audit.
 """
 
 from __future__ import annotations

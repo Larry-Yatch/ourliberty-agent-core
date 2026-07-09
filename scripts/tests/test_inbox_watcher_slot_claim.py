@@ -283,6 +283,32 @@ class SweepClaimedOrphansTest(_InboxTmpBase):
         self.assertEqual(inbox_watcher.sweep_claimed_orphans(), 0)
         self.assertTrue(claimed.exists())  # left in place; may still be in flight
 
+    def test_two_same_head_paid_orphans_get_distinct_markers(self):
+        # Two slots' paid orphans for the SAME PR head (distinct task files)
+        # must each land as their OWN lost-result marker — a shared filename
+        # would clobber one verdict-loss record with the other (§4 PR2 / §5
+        # lost-verdict class: no shared marker filename across slots).
+        head = "deadbeefcafe0001"
+        for i in (0, 1):
+            claimed = self._claim_with_age(
+                "mirror", f"paid-same-head-{i}", slot=i,
+                age_sec=inbox_watcher.CLAIM_ORPHAN_CEILING_SEC + 60,
+                task={"task_id": f"paid-same-head-{i}",
+                      "head_sha": head, "prompt": "x"},
+            )
+            (self.in_flight / f"paid-same-head-{i}.json").write_text(json.dumps({
+                "task_stem": f"paid-same-head-{i}", "agent_id": "mirror",
+                "pid": os.getpid(),
+            }))
+            self.assertFalse((self.inboxes / "mirror" / f"paid-same-head-{i}.json").exists())
+            del claimed
+        inbox_watcher.sweep_claimed_orphans()
+        lost = (self.inboxes / "mirror" / ".archive"
+                / inbox_watcher.safe_write_inbox.LOST_RESULT_SUBDIR)
+        markers = sorted(p.name for p in lost.glob("paid-same-head-*.json"))
+        # Both preserved as distinct markers; neither clobbered the other.
+        self.assertEqual(len(markers), 2, markers)
+
     def test_paid_orphan_archived_not_requeued(self):
         # A stranded claim WITH a live in-flight registry entry means the LLM
         # already spawned (paid). Never re-dispatch — archive under lost-result.
@@ -302,6 +328,134 @@ class SweepClaimedOrphansTest(_InboxTmpBase):
         lost = (self.inboxes / "mirror" / ".archive"
                 / inbox_watcher.safe_write_inbox.LOST_RESULT_SUBDIR)
         self.assertTrue(any(lost.glob("paid-1*.json")))
+
+
+class SameHeadGuardTest(_InboxTmpBase):
+    """No two review slots review one PR head CONCURRENTLY (§4 PR2). The atomic
+    file-claim only stops two slots grabbing the SAME file; two DISTINCT
+    review-requests for one head would still land on two slots. The head-lease
+    (`review-head:<agent>:<sha>`) is the race-free arbiter: a slot that cannot
+    acquire it defers its claim (returns the task to the inbox) instead of
+    running a duplicate concurrent review of the identical diff."""
+
+    def _run_one_pass(self, *, head_acquires, task):
+        inbox_watcher._shutdown.clear()
+        self._write_task("mirror", "rev-1", task)
+        processed: list = []
+        seen_identities: list[str] = []
+
+        def process(agent, task_file, cfg):
+            processed.append(task_file)
+            inbox_watcher._shutdown.set()
+
+        def acquire(identity, *a, **k):
+            seen_identities.append(identity)
+            if identity.startswith("review-head:"):
+                if not head_acquires:
+                    # Simulate a sibling slot already holding this head; also
+                    # release the loop so the single pass terminates.
+                    inbox_watcher._shutdown.set()
+                    return {"acquired": False, "nonce": None}
+                return {"acquired": True, "nonce": "hn"}
+            return {"acquired": True, "nonce": None}
+
+        patches = [
+            mock.patch.object(inbox_watcher, "process_task", side_effect=process),
+            mock.patch.object(inbox_watcher.dispatch_lease, "try_acquire",
+                              side_effect=acquire),
+            mock.patch.object(inbox_watcher.dispatch_lease, "release"),
+            mock.patch.object(inbox_watcher.dispatch_lease, "Heartbeat",
+                              return_value=mock.MagicMock()),
+        ]
+        for p in patches:
+            p.start()
+        try:
+            inbox_watcher.agent_loop("mirror", {}, slot=1, total_slots=2)
+        finally:
+            for p in patches:
+                p.stop()
+            inbox_watcher._shutdown.clear()
+        return processed, seen_identities
+
+    def test_defers_when_head_lease_unavailable(self):
+        processed, ids = self._run_one_pass(
+            head_acquires=False,
+            task={"task_id": "rev-1", "head_sha": "abc123def456", "prompt": "x"},
+        )
+        # The duplicate concurrent review is NOT run.
+        self.assertEqual(processed, [])
+        # The head-lease was consulted with the namespaced identity.
+        self.assertIn("review-head:mirror:abc123def456", ids)
+        # Deferred (returned to the live inbox), not stranded or invalidated —
+        # it runs as a benign serial re-review once the winner frees the head.
+        self.assertTrue((self.inboxes / "mirror" / "rev-1.json").exists())
+        claimed = self.inboxes / "mirror" / ".claimed" / "1"
+        self.assertEqual(
+            list(claimed.glob("*.json")) if claimed.exists() else [], []
+        )
+
+    def test_processes_when_head_lease_free(self):
+        processed, ids = self._run_one_pass(
+            head_acquires=True,
+            task={"task_id": "rev-1", "head_sha": "abc123def456", "prompt": "x"},
+        )
+        self.assertEqual(len(processed), 1)  # the review ran
+        self.assertIn("review-head:mirror:abc123def456", ids)
+
+    def test_no_head_sha_skips_guard(self):
+        # A task without head_sha (non-review / pre-head-recording envelope)
+        # never touches the head-lease — the guard is review-specific.
+        processed, ids = self._run_one_pass(
+            head_acquires=True,
+            task={"task_id": "rev-1", "prompt": "x"},
+        )
+        self.assertEqual(len(processed), 1)
+        self.assertFalse(any(i.startswith("review-head:") for i in ids))
+
+
+class TaskHeadShaTest(unittest.TestCase):
+    """`_task_head_sha` reads top-level first, then the chain-envelope
+    `context` nesting, and fails safe to None (no guard) on anything else."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix="head-sha-test-"))
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+
+    def _f(self, body) -> Path:
+        p = self.tmp / "t.json"
+        p.write_text(body if isinstance(body, str) else json.dumps(body))
+        return p
+
+    def test_top_level(self):
+        self.assertEqual(
+            inbox_watcher._task_head_sha(self._f({"head_sha": "aa11"})), "aa11")
+
+    def test_nested_context(self):
+        self.assertEqual(
+            inbox_watcher._task_head_sha(self._f({"context": {"head_sha": "bb22"}})),
+            "bb22")
+
+    def test_absent_and_malformed_are_none(self):
+        self.assertIsNone(inbox_watcher._task_head_sha(self._f({"task_id": "x"})))
+        self.assertIsNone(inbox_watcher._task_head_sha(self._f("not json{")))
+        self.assertIsNone(inbox_watcher._task_head_sha(self._f({"head_sha": ""})))
+        self.assertIsNone(inbox_watcher._task_head_sha(self.tmp / "missing.json"))
+
+
+class HeadLeaseIdentityTest(unittest.TestCase):
+    """The head-lease lives in its OWN namespace, distinct from the per-slot
+    inbox leases, so head arbitration never collides with slot arbitration."""
+
+    def test_namespaced_and_distinct_from_slot_leases(self):
+        hid = inbox_watcher._head_lease_identity("mirror", "cafe1234")
+        self.assertEqual(hid, "review-head:mirror:cafe1234")
+        self.assertNotEqual(hid, inbox_watcher._slot_identity("mirror", 0))
+        self.assertNotEqual(hid, inbox_watcher._slot_identity("mirror", 1))
+        # A distinct dispatch-lease file, so holding a head never blocks a slot.
+        self.assertNotEqual(
+            dispatch_lease._lease_path(hid),
+            dispatch_lease._lease_path(inbox_watcher._slot_identity("mirror", 1)),
+        )
 
 
 if __name__ == "__main__":

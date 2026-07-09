@@ -89,6 +89,21 @@ class DurationParsingTest(unittest.TestCase):
         durs = h.collect_review_durations(self.rows, self.window_start, self.now)
         self.assertEqual(sorted(durs), [600.0, 1200.0])
 
+    def test_concurrent_slots_both_counted(self):
+        # mirror-two-slot-review §4 PR2 audit: two review slots produce two cost
+        # rows with OVERLAPPING wall-clock (same ts). Because each row carries
+        # its OWN duration_sec (never a gap between consecutive rows), both are
+        # sampled independently — concurrency does not distort the distribution.
+        overlap = _iso(self.now - timedelta(hours=2))
+        rows = [
+            {'agent': 'mirror', 'task_id': 'pr-800-review',
+             'duration_sec': 900, 'ts': overlap},   # slot 0
+            {'agent': 'mirror', 'task_id': 'pr-801-review',
+             'duration_sec': 1500, 'ts': overlap},  # slot 1, same instant
+        ]
+        durs = h.collect_review_durations(rows, self.window_start, self.now)
+        self.assertEqual(sorted(durs), [900.0, 1500.0])
+
     def test_is_mirror_review_row_predicate(self):
         self.assertTrue(h.is_mirror_review_row(
             {'agent': 'mirror', 'task_id': 'pr-9-review', 'duration_sec': 1}))

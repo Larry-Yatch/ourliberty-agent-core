@@ -56,6 +56,14 @@ div-by-zero), HEADROOM_LOW cannot fire when there are no samples, and the
 recommendation degrades to "no change". An empty window still emits a terse
 "ceiling OK" digest so the absence of a problem is observable.
 
+Two-slot audit (mirror-two-slot-review spec §4 PR2): slot-safe as-is. Each
+review emits its OWN costs.jsonl row with its OWN duration_sec, so N concurrent
+review slots simply produce N rows with overlapping timestamps — the duration
+distribution samples per-review wall-clock, never a gap between consecutive
+rows, so concurrency cannot distort it. is_mirror_review_row filters on
+agent/task_id, NOT on any single-lease/slot assumption; the ceiling is
+correctly sized against the full population of both slots' reviews.
+
 Config: config/review-ceiling-fit-rules.json (window_days, headroom_low_ratio,
 recommend_multiplier, enabled). A missing/malformed file falls back to the
 DEFAULTS baked in below.

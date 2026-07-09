@@ -385,7 +385,16 @@ def _stall_dm_message(stall: dict[str, Any]) -> str:
     PR opened held the slot for ~3.9h while 8 tasks queued behind it). That is a
     HELD SLOT, not a credentials problem — the stall copy names it explicitly so
     a slot-occupied queue is not mis-read as a Tier 2 OAuth expiry (the salient
-    but wrong default, given how prominent the tier2-fallback alert family is)."""
+    but wrong default, given how prominent the tier2-fallback alert family is).
+
+    Two-slot audit (mirror-two-slot-review spec §4 PR2): the single-build-slot
+    copy is deliberately gated on ``agent == 'forge'`` and left as-is — Forge is
+    NOT slot-scaled, so its one-slot framing stays correct. Mirror, which does
+    scale to N review slots, gets the plain (slot-agnostic) inbox-stall copy.
+    scan_stale_leases globs every ``*.lease`` and reports it by its recorded
+    ``identity``, so a stale slot lease (``inbox:mirror:1``) or a stale
+    head-lease (``review-head:mirror:<sha>``) surfaces generically with no
+    per-slot enumeration needed."""
     kind = stall.get('kind', '?')
     agent = stall.get('agent', '?')
     file = stall.get('file', '?')
