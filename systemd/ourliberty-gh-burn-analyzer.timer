@@ -1,0 +1,12 @@
+[Unit]
+Description=Analyze the GitHub burn samples daily; ping Larry once to authorize the phase-2 durable fix (gh-api-burn phase 1)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/gh_burn_analyzer.py
+
+[Timer]
+OnCalendar=*-*-* 07:00:00 America/Denver
+Persistent=true
+RandomizedDelaySec=120
+Unit=ourliberty-gh-burn-analyzer.service
+
+[Install]
+WantedBy=timers.target

@@ -281,8 +281,11 @@ def merged_pr_heads(repo: Path) -> Optional[set[str]]:
     """Head ref names of MERGED PRs for ``repo``. None on any gh failure so the
     caller treats "merged" as indeterminate (→ KEEP) rather than empty."""
     try:
+        # --limit 100 (was 1000): this merged-history query only needs recent
+        # merged heads to decide retirement, and the full 1000-deep page is one
+        # of the priciest GraphQL calls in the chain (gh-api-burn phase 1).
         res = subprocess.run(
-            ['gh', 'pr', 'list', '--state', 'merged', '--limit', '1000',
+            ['gh', 'pr', 'list', '--state', 'merged', '--limit', '100',
              '--json', 'headRefName'],
             cwd=str(repo), capture_output=True, text=True,
             timeout=GH_TIMEOUT_SEC, env=_gh_env(),

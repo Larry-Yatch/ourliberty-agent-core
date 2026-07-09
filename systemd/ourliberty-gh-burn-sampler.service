@@ -1,0 +1,40 @@
+[Unit]
+Description=Ourliberty GitHub burn sampler — appends one FREE rate_limit reading to ~/agents/logs/gh-api-burn.jsonl (gh-api-burn phase 1 measurement)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/gh_burn_sampler.py
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+WorkingDirectory=/home/larry/agent-core
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/gh_burn_sampler.py
+
+TimeoutStartSec=60
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-gh-burn-sampler
+
+# Memory cap: one free gh api call + a single jsonl append, never needs more than 128M.
+MemoryMax=128M
+MemoryHigh=64M
+
+# Hardening — matches calibrate-tier-budget pattern.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/larry/agents /home/larry/agent-core /home/larry/.claude /home/larry/.claude.json /home/larry/.local /home/larry/.cache /tmp
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

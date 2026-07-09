@@ -413,9 +413,15 @@ def _gh_pr_heads(repo: Path, state: str) -> Optional[set[str]]:
     from the local checkout's origin). Returns None on any gh failure so the
     caller can distinguish 'no such PRs' (empty set) from 'gh unavailable'
     (None) — the open-PR query treats None as a hard stop."""
+    # OPEN is the one irreversible signal (deleting an open-PR head is the
+    # failure mode this healer avoids) — keep its full 1000-deep page. The
+    # merged/closed history queries only need recent heads and are the priciest
+    # GraphQL calls, so cap them at 100 to cut the rate-limit burn (gh-api-burn
+    # phase 1). Behavior of the open query is unchanged.
+    limit = '1000' if state == 'open' else '100'
     try:
         res = subprocess.run(
-            ['gh', 'pr', 'list', '--state', state, '--limit', '1000',
+            ['gh', 'pr', 'list', '--state', state, '--limit', limit,
              '--json', 'headRefName'],
             cwd=str(repo), capture_output=True, text=True,
             timeout=GH_TIMEOUT_SEC, env=_gh_env(),

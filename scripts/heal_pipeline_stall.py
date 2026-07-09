@@ -3499,6 +3499,16 @@ def run(dry_run: bool = False) -> int:
         return 0
     if not dry_run:
         heartbeat()
+    # gh-api-burn phase 1: back off before firing the open/merged/closed PR
+    # queries below when the shared GraphQL budget is low, so this healer stops
+    # deepening the exhaustion instead of failing mid-run. Fail-open (unknown
+    # budget -> proceed); a broken guard never wedges the healer.
+    try:
+        import gh_budget
+        if gh_budget.should_skip('heal_pipeline_stall', log=log):
+            return 0
+    except Exception as e:  # noqa: BLE001
+        log(f'gh_budget guard unavailable ({type(e).__name__}); proceeding', 'WARN')
     state = load_state()
     try:
         notifier_lines = _read_recent_log_lines(OUTBOX_NOTIFIER_LOG, LOG_LOOKBACK_HOURS)

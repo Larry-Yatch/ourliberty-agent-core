@@ -1,0 +1,16 @@
+[Unit]
+Description=Sample the GitHub GraphQL/REST rate-limit budget every 5 minutes (gh-api-burn phase 1 measurement)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/gh_burn_sampler.py
+
+[Timer]
+# First fire 5 min after boot, then every 5 min. The reading is FREE (gh api
+# rate_limit doesn't consume the budget), so a tight cadence is safe.
+OnBootSec=5min
+OnUnitActiveSec=5min
+RandomizedDelaySec=30s
+AccuracySec=15s
+Unit=ourliberty-gh-burn-sampler.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target

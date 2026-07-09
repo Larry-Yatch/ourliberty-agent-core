@@ -742,6 +742,16 @@ def main() -> int:
             f'(dry_run={dry_run})')
         return 0
 
+    # gh-api-burn phase 1: back off before the per-repo `gh pr list` queries
+    # below when the shared GraphQL budget is low. Fail-open (unknown -> proceed);
+    # a broken guard never wedges the healer.
+    try:
+        import gh_budget
+        if gh_budget.should_skip('heal_pr_auto_merge', log=log):
+            return 0
+    except Exception as e:  # noqa: BLE001
+        log(f'gh_budget guard unavailable ({type(e).__name__}); proceeding')
+
     counts = {
         'merged': 0, 'rerun': 0, 'budget-exhausted': 0,
         'dry-run-candidate': 0, 'no-mirror-pass': 0,
