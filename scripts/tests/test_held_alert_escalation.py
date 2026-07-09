@@ -220,6 +220,43 @@ class DefaultPrStateTest(unittest.TestCase):
     def test_empty_ref_short_circuits(self):
         self.assertIsNone(hae.default_pr_state(''))
 
+    def test_gh_args_use_number_and_repo_flag(self):
+        # Regression guard: gh reads a bare `owner/repo#number` positional as a
+        # BRANCH and exits 1, fail-opening the gate on every hold. The number
+        # must go positionally and the repo via `--repo`.
+        captured = {}
+
+        def _spy(args, **kw):
+            captured['args'] = list(args)
+            return {'state': 'MERGED'}
+
+        orig = hae.tts.gh_json
+        hae.tts.gh_json = _spy
+        self.addCleanup(lambda: setattr(hae.tts, 'gh_json', orig))
+        result = hae.default_pr_state('Larry-Yatch/ourliberty-agent-core#843')
+        self.assertEqual(result, 'MERGED')
+        args = captured['args']
+        self.assertIn('843', args)
+        self.assertIn('--repo', args)
+        self.assertEqual(args[args.index('--repo') + 1],
+                         'Larry-Yatch/ourliberty-agent-core')
+        # The broken bare-ref form must NOT appear anywhere in the call.
+        self.assertNotIn('Larry-Yatch/ourliberty-agent-core#843', args)
+
+    def test_malformed_ref_no_gh_call(self):
+        # A ref with no '#' never shells out (short-circuits to None fail-open).
+        calls = []
+
+        def _spy(args, **kw):
+            calls.append(args)
+            return {'state': 'MERGED'}
+
+        orig = hae.tts.gh_json
+        hae.tts.gh_json = _spy
+        self.addCleanup(lambda: setattr(hae.tts, 'gh_json', orig))
+        self.assertIsNone(hae.default_pr_state('owner/repo-no-hash'))
+        self.assertEqual(calls, [])
+
 
 class _Recorder:
     def __init__(self, ok=True):

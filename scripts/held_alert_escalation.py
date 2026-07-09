@@ -214,12 +214,16 @@ _GITHUB_PR_URL_RE = re.compile(
 
 
 def extract_pr_ref(subject: Any) -> Optional[str]:
-    """Return an ``owner/repo#number`` ref for `gh pr view`, or None.
+    """Return an ``owner/repo#number`` ref, or None.
 
     Matches ONLY the `auto-merge-*` held-alert subject shape carrying a
     `<owner/repo>:<pr_number>` tail (and, defensively, a full github.com PR URL).
     Any other subject — a heal fingerprint, a bare source, a non-PR alert —
     returns None, so the live-PR-state gate is a no-op (zero gh calls) for it.
+
+    Note the ref is NOT passed positionally to `gh pr view` (gh reads a bare
+    ``owner/repo#number`` as a *branch* name and exits 1); ``default_pr_state``
+    splits it back into ``<number> --repo <owner/repo>``.
     """
     if not isinstance(subject, str) or not subject:
         return None
@@ -232,19 +236,28 @@ def extract_pr_ref(subject: Any) -> Optional[str]:
 
 
 def default_pr_state(ref: str) -> Optional[str]:
-    """Live PR state for a ref via a bounded ``gh pr view``: 'OPEN' | 'MERGED' |
-    'CLOSED', or None on ANY failure (timeout, missing auth, non-zero exit,
-    unparseable output, unrecognized state).
+    """Live PR state for an ``owner/repo#number`` ref via a bounded
+    ``gh pr view``: 'OPEN' | 'MERGED' | 'CLOSED', or None on ANY failure
+    (malformed ref, timeout, missing auth, non-zero exit, unparseable output,
+    unrecognized state).
+
+    The ref is split into ``gh pr view <number> --repo <owner/repo>`` — passing
+    the bare ``owner/repo#number`` positionally makes gh treat it as a branch
+    name and exit 1 (verified against merged PR #843), which would fail-open the
+    gate on every hold and defeat its purpose.
 
     None is the fail-open signal: the gate suppresses a promotion ONLY on a
     positive MERGED/CLOSED result, so a flaky/slow gh call can never swallow a
     genuine still-open escalation. Reuses the shared ``task_terminal_state``
     probe kernel (gh_json + classify_state) — the same UNKNOWN-on-error core
     build_sequence_advancer's merged-check rides."""
-    if not ref:
+    if not ref or '#' not in ref:
+        return None
+    repo, _, number = ref.rpartition('#')
+    if not repo or not number:
         return None
     data = tts.gh_json(
-        ['gh', 'pr', 'view', ref, '--json', 'state'],
+        ['gh', 'pr', 'view', number, '--repo', repo, '--json', 'state'],
         timeout=GH_PR_VIEW_TIMEOUT_SEC,
     )
     if not isinstance(data, dict):
