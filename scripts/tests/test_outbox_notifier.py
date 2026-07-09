@@ -10357,6 +10357,50 @@ class ReviewPassDmAwaitsMergeOutcomeTest(unittest.TestCase):
         self.assertNotIn('FAILED', body)
         self.assertIn(self.SUMMARY, body)
 
+    # ---- watchdog merged/closed suppression gate (Pass 3) ----
+    def _seed_stale_entry(self, pr_number):
+        """Queue one entry whose queued_at is far past any watchdog
+        threshold, so Pass 3's age check always passes."""
+        from datetime import datetime, timedelta, timezone
+        old = (datetime.now(timezone.utc) - timedelta(days=400)).isoformat()
+        entry = {
+            'pr_number': pr_number,
+            'repo': self.REPO_COORDS,
+            'pr_url': f'{self.PR_URL.rsplit("/", 1)[0]}/{pr_number}',
+            'task_id': 'stale-watchdog',
+            'summary': self.SUMMARY,
+            'queued_at': old,
+            'reply_chat_id': self.CHAT_ID,
+        }
+        on._save_auto_merge_queue([entry])
+
+    def test_watchdog_merged_entry_suppressed_and_removed(self):
+        """A stale-aged entry whose OWN PR is MERGED/CLOSED fires NO
+        auto_merge_queue_stale DM and is dropped from the queue — a merged
+        PR is not stale."""
+        self._seed_stale_entry(883)
+        # PR #883 resolves MERGED/CLOSED (is_open is False).
+        self._is_open_responses[883] = False
+        with mock.patch.object(on, '_dm_larry_queue_stale') as dm:
+            on._auto_merge_queue_sweep()
+            self.assertEqual(dm.call_count, 0)
+        # Entry removed; queue empty.
+        self.assertEqual(on._load_auto_merge_queue(), [])
+
+    def test_watchdog_open_entry_still_dms_once_and_retained(self):
+        """A stale-aged entry whose OWN PR is still OPEN fires exactly one
+        watchdog DM (existing one-shot behavior) and is retained."""
+        self._seed_stale_entry(884)
+        # PR #884 is genuinely OPEN (default stub → True).
+        self._is_open_responses[884] = True
+        with mock.patch.object(on, '_dm_larry_queue_stale') as dm:
+            on._auto_merge_queue_sweep()
+            self.assertEqual(dm.call_count, 1)
+        remaining = on._load_auto_merge_queue()
+        self.assertEqual(len(remaining), 1)
+        self.assertEqual(remaining[0].get('pr_number'), 884)
+        self.assertTrue(remaining[0].get('watchdog_dm_sent'))
+
 
 class ReviewPassNotifyGitHubTruthTest(unittest.TestCase):
     """false-success-notify-fix (2026-06-11) — the Mirror REVIEW_PASS
