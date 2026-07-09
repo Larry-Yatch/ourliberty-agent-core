@@ -1088,6 +1088,65 @@
         "kind": "mission",
         "mission_id": "the-full-browser-done-gate-live-status-rollup-stuck-badge-click-through-graceful-degrade-no-new-ping-and-the-p4-enriched-completion-dm-still-needs-to-be-confirmed-live-on-the-board-since-it-couldn-t-run-from-the-build-sandbox"
       }
+    },
+    {
+      "id": "routing-approvals-escalations-on-a-null-chat-id",
+      "title": "Routing: approvals/escalations on a null chat-id",
+      "north_star_ref": null,
+      "repo": "ourliberty-agent-core",
+      "state": "active",
+      "phases": [
+        {
+          "id": "routing-approvals-escalations-on-a-null-chat-id",
+          "title": "Routing: approvals/escalations on a null chat-id",
+          "desired_end_state": "Beacon aggravator #3. A null reply_chat_id currently FALLS BACK to Larry default chat (so it reaches the phone) BUT the dashboard needs-you tab can still miss it \u2014 a decision that needs Larry is not reliably visible on the board. REVISIT WHEN: soon, small fix, after the stall-dedup. WHAT TO DO: ensure an approval/escalation with a null or invalid chat-id still surfaces on the dashboard needs-you tab (not only the phone fallback); audit the routing path for any silent drop; add a regression test.",
+          "lifecycle_state": "brainstorm",
+          "order": 0,
+          "spec_ref": null,
+          "sequence_ref": null,
+          "created_at": "2026-07-09T17:53:40.749545+00:00",
+          "updated_at": "2026-07-09T17:55:37.192090+00:00",
+          "brainstorm": {
+            "is_ai_draft": true,
+            "draft": {
+              "end_state": "When this phase is done, any approval or escalation that needs Larry's decision reliably shows up on the dashboard needs-you tab, even when it carries a null or invalid chat-id. The phone fallback keeps working as it does today, and the dashboard becomes a dependable second surface so no decision is visible only on the phone. There is no path where a needs-you item can be routed to the phone but silently miss the board.",
+              "why_now": "Today a decision with a null chat-id still reaches Larry's phone via the default-chat fallback, but it can be missing from the dashboard needs-you tab \u2014 so the board is not a trustworthy view of what actually needs him. That gap means Larry can't rely on the dashboard alone and has to trust the phone as the sole source of truth. It's flagged as a recurring aggravator, and it's a small, well-understood fix that's ready to take on now that the stall-dedup work ahead of it is clearing.",
+              "scope": "IN: guaranteeing that an approval/escalation with a null or invalid chat-id surfaces on the dashboard needs-you tab; auditing the routing path for any point where such an item can be silently dropped instead of surfaced; and adding a regression test that locks the behavior in. OUT: changing or removing the existing phone/default-chat fallback (it stays as-is); redesigning the dashboard or the needs-you tab; broader routing rewrites; and any change to how items with a valid chat-id are handled.",
+              "constraints_reuse": "This is assembly, not greenfield: reuse the existing default-chat fallback that already gets null-chat items to the phone, and the existing dashboard needs-you tab and its data source \u2014 the goal is to make sure the null-chat case feeds that surface, not to build a new one. What must not break: the working phone fallback must keep delivering; items that already carry a valid chat-id must route exactly as they do today; and the dashboard must not start showing duplicates or items that don't genuinely need Larry.",
+              "options_decision": "The core fork is where to guarantee the dashboard surfacing. Option A: ensure the needs-you record is written at the point the null-chat item is detected, right alongside the existing phone fallback, so both surfaces are fed from one place \u2014 simplest and keeps the two surfaces in lockstep, but assumes that detection point sees every relevant item. Option B: guarantee surfacing further downstream at the dashboard's own data source, so anything needing Larry lands on the board regardless of how it was routed \u2014 more robust against unknown drop points, but touches more of the path and risks divergence from the phone fallback. A second, smaller fork is scope of the audit: fix only the known null-chat drop, or sweep the whole routing path for any silent-drop sibling while we're here. Recommendation: pair Option A with a targeted audit \u2014 fix the surfacing at the detection point next to the existing fallback for tight coupling of the two surfaces, and audit the path for other silent drops so we catch siblings without expanding into a rewrite.",
+              "risks_guardrails": "Risk: the fix surfaces the item on the dashboard but double-notifies or creates a duplicate needs-you entry alongside the phone push \u2014 guardrail: the regression test asserts exactly one needs-you item per decision across both surfaces. Risk: an unknown silent-drop point elsewhere in the routing path means some null-chat items still never reach the board \u2014 guardrail: the audit walks the full path and each identified branch either surfaces or is explicitly and testably accounted for. Risk: touching routing regresses the currently-working phone fallback or the valid-chat-id path \u2014 guardrail: tests cover null-chat, invalid-chat, and valid-chat cases so existing behavior is pinned. Risk: the board starts showing items that don't truly need Larry, eroding trust in the tab \u2014 guardrail: only genuine approval/escalation items that need a decision are surfaced, verified against real cases.",
+              "done_gate": "Done means: an approval or escalation with a null or invalid chat-id appears on the dashboard needs-you tab AND still reaches the phone via the existing fallback, with no silent-drop path remaining in the audited routing. Checkable via a regression test that feeds a null/invalid chat-id decision through the routing path and asserts it lands on the needs-you surface exactly once, plus tests confirming valid-chat-id items and the phone fallback are unchanged. The audit is captured as a checked list of routing branches, each either surfacing the item or explicitly accounted for.",
+              "breakdown": "First, audit the routing path end-to-end for every point where an approval/escalation with a null or invalid chat-id can be handled, marking where each currently goes and where any silent drop occurs. Second, make the change so a null/invalid chat-id item is surfaced on the dashboard needs-you tab alongside the existing phone fallback, without disturbing the valid-chat-id path. Third, add regression tests covering null, invalid, and valid chat-id cases and asserting single-surfacing plus an intact phone fallback. Fourth, verify against a real needs-you case that the item shows on the board and the phone, then confirm no duplicates."
+            },
+            "decisions": [
+              "Where to guarantee the dashboard surfacing: at the detection point next to the existing phone fallback (simplest, surfaces coupled) vs. at the dashboard's own data source (more robust, touches more).",
+              "Audit scope: fix only the known null-chat drop, or sweep the whole routing path for any other silent-drop siblings while we're in here.",
+              "Confirm the phone/default-chat fallback stays untouched and this phase only adds the dashboard surface, rather than reworking how null-chat items route overall."
+            ],
+            "decisions_overflow": false,
+            "handoff": {
+              "spec_target_path": "agents/beacon/specs/routing-approvals-escalations-on-a-null-chat-id.md",
+              "target_repo": "ourliberty-agent-core",
+              "north_star_ref": null,
+              "prior_closeout_summary": null,
+              "directive": "Work with Larry to finalize this brainstorm and author the spec at agents/beacon/specs/routing-approvals-escalations-on-a-null-chat-id.md in ourliberty-agent-core; he will mark it Ready to spec."
+            }
+          },
+          "brainstorm_provenance": {
+            "by": "beacon",
+            "model": "claude-opus-4-8",
+            "at": "2026-07-09T17:55:37.192090+00:00",
+            "from_state": "brainstorm"
+          }
+        }
+      ],
+      "one_off": true,
+      "created_at": "2026-07-09T17:53:40.749545+00:00",
+      "updated_at": "2026-07-09T17:53:40.749545+00:00",
+      "promoted_from": {
+        "kind": "mission",
+        "mission_id": "routing-approvals-escalations-on-a-null-chat-id"
+      }
     }
   ]
 }
