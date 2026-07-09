@@ -193,6 +193,63 @@ class ClaimAtomicityTest(_InboxTmpBase):
         self.assertEqual(inbox_watcher.scan_inbox("mirror"), [])
 
 
+class DeferredClaimUnclaimTest(_InboxTmpBase):
+    """A claimed task hitting a transient-defer path is returned to the inbox,
+    not stranded under .claimed/<slot>/ until restart (Mirror rev-1 finding)."""
+
+    def _run_one_pass(self, agent: str, slot: int, total_slots: int,
+                      process_side_effect) -> None:
+        inbox_watcher._shutdown.clear()
+        patches = [
+            mock.patch.object(inbox_watcher, "process_task",
+                              side_effect=process_side_effect),
+            mock.patch.object(inbox_watcher.dispatch_lease, "try_acquire",
+                              return_value={"acquired": True, "nonce": None}),
+            mock.patch.object(inbox_watcher.dispatch_lease, "release"),
+        ]
+        for p in patches:
+            p.start()
+        try:
+            inbox_watcher.agent_loop(agent, {}, slot=slot, total_slots=total_slots)
+        finally:
+            for p in patches:
+                p.stop()
+            inbox_watcher._shutdown.clear()
+
+    def test_deferred_task_returned_to_inbox(self):
+        self._write_task("mirror", "defer-1")
+
+        def deferring_process(agent, task_file, cfg):
+            # Simulate rotation-gate / TIER_HOLD: leave the file in place and
+            # stop the loop after this one task.
+            inbox_watcher._shutdown.set()
+
+        self._run_one_pass("mirror", slot=1, total_slots=2, process_side_effect=deferring_process)
+
+        # Back in the live inbox where the next poll can re-see it.
+        self.assertTrue((self.inboxes / "mirror" / "defer-1.json").exists())
+        # Not stranded under .claimed/<slot>/.
+        claimed = self.inboxes / "mirror" / ".claimed" / "1"
+        self.assertEqual(
+            list(claimed.glob("*.json")) if claimed.exists() else [], []
+        )
+
+    def test_terminal_task_not_returned_to_inbox(self):
+        # When process_task takes a terminal path (archives the file), the claim
+        # is already gone and must NOT be resurrected into the inbox.
+        self._write_task("mirror", "done-1")
+
+        def archiving_process(agent, task_file, cfg):
+            inbox_watcher.move_to(task_file, self.inboxes / agent / ".archive")
+            inbox_watcher._shutdown.set()
+
+        self._run_one_pass("mirror", slot=1, total_slots=2, process_side_effect=archiving_process)
+
+        self.assertFalse((self.inboxes / "mirror" / "done-1.json").exists())
+        archived = list((self.inboxes / "mirror" / ".archive").glob("done-1*.json"))
+        self.assertEqual(len(archived), 1)
+
+
 class SweepClaimedOrphansTest(_InboxTmpBase):
     """Startup sweep re-queues stranded claims once, never re-bills paid work."""
 

@@ -280,6 +280,23 @@ def _claim_task(agent: str, task_file: Path, slot: int) -> Path | None:
         return None
 
 
+def _unclaim_task(agent: str, claimed_file: Path) -> None:
+    """Return a claimed task to the live inbox (spec §3.2 deferral safety).
+
+    process_task's transient-defer paths — rotation gate, TIER_HOLD, and the
+    worktree-setup bump_requeue rewrite — leave the task file in place on the
+    contract that the next 5s poll re-sees it ("delay one poll, never drop").
+    But a claimed file lives under ``.claimed/<slot>/`` where scan_inbox can't
+    look, and the orphan sweep only runs at startup — so without un-claiming, a
+    deferred claim is stranded until the watcher restarts. The caller detects a
+    deferral as "the claimed file still exists after process_task returned"
+    (every terminal path archives/invalidates it, so it is already gone)."""
+    try:
+        move_to(claimed_file, INBOXES_ROOT / agent)
+    except OSError as e:
+        log(f"[{agent}] un-claim of {claimed_file} failed: {e}")
+
+
 def _archive_dir(agent: str, *, lost_result: bool = False) -> Path:
     """The archive destination for a processed task envelope.
 
@@ -1400,6 +1417,7 @@ def agent_loop(agent: str, models_config: dict, slot: int = 0,
             hb = dispatch_lease.Heartbeat(identity, nonce) if nonce else None
             if hb:
                 hb.start()
+            target = None
             try:
                 target = task_file
                 if claim_enabled:
@@ -1412,6 +1430,14 @@ def agent_loop(agent: str, models_config: dict, slot: int = 0,
             except Exception as e:
                 log(f"[{agent}] unexpected error on {task_file.name}: {e!r}")
             finally:
+                # A claimed task still present here means process_task took a
+                # transient-defer path (rotation gate / TIER_HOLD / worktree
+                # bump_requeue) and expects the next poll to re-see it — but it
+                # is parked under .claimed/<slot>/ where scan_inbox can't. Move
+                # it back to the live inbox so the defer contract holds instead
+                # of stranding it until restart. Terminal paths already moved it.
+                if claim_enabled and target is not None and target.exists():
+                    _unclaim_task(agent, target)
                 if hb:
                     hb.stop()
                 dispatch_lease.release(identity, nonce)
