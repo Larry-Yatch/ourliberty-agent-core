@@ -1,0 +1,11 @@
+[Unit]
+Description=Run the Ourliberty system resource watcher every 5 minutes
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=5min
+Persistent=true
+Unit=ourliberty-system-resource-watch.service
+
+[Install]
+WantedBy=timers.target

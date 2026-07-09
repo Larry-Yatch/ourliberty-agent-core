@@ -503,6 +503,25 @@ class SystemCgroupStatsResponse(BaseModel):
     cpu_system_usec: int
 
 
+class SystemHealthResponse(BaseModel):
+    """Honest box-level resource health — the signals that actually mean
+    trouble (memory pressure, real used memory, load-vs-cores, biggest
+    consumer named), plus a green/warning/critical verdict. Replaces the
+    misleading single-cgroup cache-inclusive gauge as the headline signal;
+    the raw cgroup numbers remain available at /api/system/cgroup-stats as a
+    detail. Verdict logic lives in scripts/system_resource_health.py so the
+    gauge and the resource watcher can never disagree."""
+    captured_at: str
+    level: str                     # 'green' | 'warning' | 'critical'
+    headline: str
+    reasons: list[str]
+    suggested_actions: list[str]
+    memory_pressure: Optional[dict[str, float]]
+    meminfo: Optional[dict[str, int]]
+    loadavg: Optional[dict[str, float]]
+    top_process: Optional[dict[str, Any]]
+
+
 class SystemWorktree(BaseModel):
     name: str
     agent: Optional[str]
@@ -2209,6 +2228,33 @@ def _reader_system_cgroup_stats(
         'memory_events_high': int(events_kv.get('high', '0')),
         'cpu_user_usec': int(cpu_kv.get('user_usec', '0')),
         'cpu_system_usec': int(cpu_kv.get('system_usec', '0')),
+    }
+
+
+def _reader_system_health(
+    proc_root: Path = Path('/proc'),
+    config_path: Optional[Path] = None,
+) -> dict[str, Any]:
+    """Honest box-level resource verdict + raw signals. Delegates to the shared
+    system_resource_health module (single source of truth shared with the
+    resource watcher). Never raises: a missing signal degrades to null rather
+    than a 5xx — a health endpoint must not itself go down."""
+    import system_resource_health as srh  # lazy, per module-load sys.path
+    if config_path is None:
+        config_path = _repo_root() / 'config' / 'system_health_thresholds.json'
+    snap = srh.collect(proc_root=proc_root, config_path=config_path)
+    verdict = snap['verdict']
+    signals = snap['signals']
+    return {
+        'captured_at': _now_utc_iso(datetime.now(timezone.utc)),
+        'level': verdict['level'],
+        'headline': verdict['headline'],
+        'reasons': verdict['reasons'],
+        'suggested_actions': verdict['suggested_actions'],
+        'memory_pressure': signals.get('memory_pressure'),
+        'meminfo': signals.get('meminfo'),
+        'loadavg': signals.get('loadavg'),
+        'top_process': signals.get('top_process'),
     }
 
 
@@ -9738,6 +9784,18 @@ def get_system_cgroup_stats() -> dict[str, Any]:
                 ),
             },
         )
+
+
+@app.get(
+    '/api/system/health',
+    response_model=SystemHealthResponse,
+    dependencies=[Depends(_require_token)],
+)
+def get_system_health() -> dict[str, Any]:
+    # Honest box-level verdict + raw signals. Never 503s on a missing signal —
+    # the reader degrades individual signals to null and still returns a
+    # verdict, so the gauge shows *something true* rather than a stale lie.
+    return _reader_system_health()
 
 
 @app.get(
