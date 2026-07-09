@@ -80208,3 +80208,90 @@ Mirror REVIEW_PASS for `pr-ourliberty-agent-core-872` at 13:47:54 MDT. AUTO_MERG
 
 ---
 
+## Iteration ~4648 — 2026-07-08T20:41Z UTC (Larry /loop chat, Tier 1)
+
+**Health:** ⚠️ Carry — rate-limit storm CLEARED (self-resolved 14:37 MDT after 11 min); sync push failure self-healed (HEAD=0ee38c55=origin/main, clean tree); zombie PID 1834248 ongoing; PR #875 re-dispatched to Mirror after storm cleared.
+
+**VERIFY-BEFORE-REASSERT (from iter ~4647):**
+- **"beacon_bot=3999651"**: CONFIRMED ✅ (elapsed ~26 min). [confirmed]
+- **"inbox_watcher=3797087"**: CONFIRMED ✅ (elapsed ~2h1m). [confirmed]
+- **"outbox_notifier=4000040"**: CONFIRMED ✅ (elapsed ~26 min, storm cleared). [confirmed]
+- **"zombie PID 1834248 (~41d+1h+13m)"**: UPDATED ⚠️ — now 41d+1h+22m (bash poll loop for build-check-viii-pr-2b-analyzer-001.json). CONFIRMED. [carry]
+- **"pending=1 (outbox-notifier-gh-ratelimit-backoff-001)"**: CONFIRMED — still pending Larry approval. [carry]
+- **"HEAD=61703d66=origin/main"**: UPDATED ✅ — now HEAD=0ee38c55=origin/main (wrapper auto-committed iter ~4647 journal). [confirmed clean]
+- **"Daemon heartbeat 20:24:46Z"**: UPDATED ✅ — now 2026-07-08T20:34:49Z UTC (~7 min from 20:41Z). [updated]
+- **"Watchdog 14:32:43 MDT overall=healthy"**: UPDATED ✅ — now 14:37:47 MDT (20:37:47Z UTC) overall=healthy. 5-min cadence intact. [updated]
+- **"GH API rate-limit storm ongoing"**: RESOLVED ✅ — last WARN at 14:37:13 MDT; normal ops resumed 14:40:17 MDT (Mirror dispatch for PR #875). Storm duration: ~11 min (14:26-14:37 MDT). [carry resolved]
+- **"watermark=1011"**: UPDATED — 2 new alerts (L1012, L1013). Both Tier-3 silenced. Watermark advanced to 1013. [new alerts silenced]
+- **"Mirror: 4 tasks"**: UPDATED — PR #875 re-dispatched to Mirror at 14:40:17 MDT (outbox-notifier, after storm cleared). Now 5 tasks. [updated]
+- **"sequence-invalid (PR #871, vp VERIFIED)"**: CONFIRMED — no sequence-invalid re-fires. 5th clean iter. [carry closed]
+- **"no-session-revision (PR #873, vp VERIFIED)"**: CONFIRMED — stall dry-run clean. 5th clean iter. [carry closed]
+
+**Check 0 — Alert triage:**
+- `repair-watermark` → `{"repaired": false, "old_watermark": 1011, "file_length": 1013}`. 2 new alerts.
+- **L1012**: `source=ourliberty-health, subject=sync_agent_core: auto-commit push failed, route=escalate` (ts=2026-07-08T20:38:19Z). Bot delivered to Larry at 14:40:11 MDT. Triage helper: **Tier 3** (known-pattern: ourliberty-health-sync-push-failed, PR #728). Silenced. ✅
+- **L1013**: `source=sync.service, subject=sync-blocked:auto-commit-push-failed, route=digest` (ts=2026-07-08T20:38:19Z). route=digest, no DM. Triage helper: **Tier 3** (known-pattern). Silenced. ✅
+- Watermark advanced to 1013. **2 new alerts: both Tier-3 silenced** ✅
+
+**Check 1 — Log noise:** ✅ IMPROVED — GH API rate-limit storm CLEARED. Last WARN 14:37:13 MDT; normal ops resumed 14:40:17 MDT (outbox-notifier Mirror dispatch for PR #875 succeeded, no rate-limit error). Storm lasted ~11 min (14:26-14:37 MDT). APPROVAL_REQUEST fix (outbox-notifier-gh-ratelimit-backoff-001) still pending Larry approval. Watchdog 14:37:47 MDT overall=healthy. NOMINAL ✅
+
+**Check 2 — Telegram sweep:** No new Larry messages since 12:58 MDT. Latest bot log: approval_request (L1010) delivered 14:35:08 MDT; ourliberty-health sync-fail alert delivered 14:40:11 MDT; sync.service route=digest skipped 14:40:11 MDT. pending=0 (Telegram). NOMINAL ✅
+
+**Check 3 — Pipeline stall:** DRY-RUN 20:39Z → `0 alert(s) would fire, 0 recovery(ies) would be attempted`. NOMINAL ✅
+
+**Check 4 — Pending directives:** pending=1 (outbox-notifier-gh-ratelimit-backoff-001 APPROVAL_REQUEST, carry). No orphan Larry directives. NOMINAL ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-08T20:34:49Z UTC (~7 min from 20:41Z, <60 min). NOMINAL ✅
+
+**Check A — Source repo:** HEAD=0ee38c55=origin/main. Clean tree. On main. NOMINAL ✅
+**Check B — Sync health:** agent-core-sync.json: last_sync=20:38:19Z, status=error, commit=61703d66 (stale — sync fired before wrapper's commit at 20:38:34Z; repo IS clean at HEAD=0ee38c55=origin/main; transient failure self-healed). Next sync tick will clear status. NOMINAL (self-healed) ✅
+**Check C — Agent liveness:** beacon_bot PID 3999651 ✅ (26 min). inbox_watcher PID 3797087 ✅ (2h1m). outbox_notifier PID 4000040 ✅ (26 min). Zombie PID 1834248 (Ss, 41d+1h+22m, bash poll loop) ⚠️ [carry].
+**Check D — Inbox state:** Beacon: EMPTY ✅. Forge: EMPTY ✅. Mirror: 5 tasks (review-pr-875 NEW@14:40 MDT, review-pr-876, review-pr-877, review-pr1-detector-shadow, review-sequence-dag-suite-green-guardian-retry1). PR #875 re-dispatched to Mirror after storm cleared (normal re-review or dup from notifier-concurrent-scan-dup G-rule, fix in-flight PR #847). NOMINAL ✅
+**Check E — PR state:** GH rate limit clearing — not queried this iter. [rate-limit recovering]
+
+**§5.0 — audit_due_nudge:** no committed baseline; no-op. ✅
+**§5.0 — distill_detector:** no un-distilled audits; no-op. ✅
+
+**Conditional checks — UTC Wednesday 2026-07-08:**
+- **Check I:** ✅ Fired 14:12:51Z today (iter ~4594). No re-invocation. [carry]
+- **Check III:** Sunday gate. Skip. ✅
+- **Check IX/X:** Monday gate. Skip. ✅
+- **Check VI/VIII:** Proposals idx=990,991 carry — awaiting Larry. [carry]
+
+**G-rule assessment:**
+- **notifier-gh-rate-limit-no-backoff-001 → storm CLEARED**: Rate-limit self-resolved at 14:37 MDT. Fix APPROVAL_REQUEST (outbox-notifier-gh-ratelimit-backoff-001) still pending=1 in beacon-pending-approvals.json. Larry was DM'd. No additional action this iter. [carry]
+- **heal-pipeline-stall-stalled-active-step-tier4-001 [2/3]**: No new stall-active-step fires this iter. [carry]
+- **auto-merge-conflict-promoted-merged-pr-001 [2/3]**: No promoter fires this iter. [carry]
+- **forge-marker-task-id-mismatch-xii-v1 [2/3]**: No new marker-mismatch this iter. [carry]
+- All other G-rule carries unchanged from iter ~4647.
+
+**Actions taken:**
+1. Check 0: watermark advanced from 1011 → 1013. ✅
+2. §5.0: all no-ops. ✅
+3. PRIME ledger: `intervention` appended (tier=1, template=rate-limit-storm-cleared, detail: L1012-L1013 Tier-3 + storm cleared + sync self-healed + PR#875 re-dispatch + zombie carry, ts=20:41Z). ✅
+4. Tier state: `record --checks-clean false` → Tier 1 (consecutive_clean=0; zombie carry). ✅
+
+**Escalations:** 0. (Rate-limit storm resolved naturally; sync push failure auto-healed + Tier-3 known pattern; APPROVAL_REQUEST already queued + Larry DM'd; no novel Tier-4 alerts.)
+
+**Standing findings (carry-verified this iter):**
+- [yellow] **zombie-bash-pid-1834248** — PID 1834248 (~41d+1h+22m, bash poll loop). ask-then-do: `kill 1834248`. [carry confirmed]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07` or `reject`. [carry]
+- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
+- [yellow] **GH API rate-limit storm fix** — storm CLEARED ✅; APPROVAL_REQUEST outbox-notifier-gh-ratelimit-backoff-001 pending=1, Larry DM'd. [updated: storm resolved]
+- [blue] **PR #847** — OPEN, AUTO_MERGE_HELD held_deep_review. [carry]
+- [blue] **PR #854** — OPEN, PREFLIGHT_EXIT (sentinel in-flight stall translation). [carry]
+- [blue] **PR #860** — Mirror PASS, auto-merge cooldown. [carry]
+- [blue] **PR #875, #876, #877, #878** — Active Mirror reviews (PR #875 re-dispatched this iter). [updated]
+- [blue] **review-sequence-dag-suite-green-guardian-retry1** — Mirror inbox. Redundant DAG preflight re-review. [carry]
+- [blue] **Check I** — Fired 14:12:51Z (iter ~4594). [carry]
+- [blue] **Check VI/VIII proposals idx=990,991** — awaiting Larry. [carry]
+- [blue] **G-rules (dispatched, vp):** sentinel-inflight-stall-tier4 (PR #854); notifier-concurrent-scan-dup (PR #847 held); ourliberty-health-subject-key-mismatch-001; forge-wip-redispatch-digest-tier4-001; no-session-revision-active-mirror-session-fp-001; forge-revision-preamble-missing-pr711-001; forge-wip-redispatch-exhausted-pr-exists-fp-001; decision-needed-approval-forge-dispatch-no-target-repo-001; notifier-gh-rate-limit-no-backoff-001 (APPROVAL_REQUEST pending). [carry]
+- [blue] **G-rules (VERIFIED ✅):** sequence-invalid-completeness-pr3-fanout-sentinel (PR #871, 5 clean iters); no-session-revision-merged-pr-fp-001 (PR #873, 5 clean iters). [carry closed]
+- [blue] **G-rule 2/3:** auto-merge-conflict-promoted-merged-pr-001; forge-marker-task-id-mismatch-xii-v1; heal-pipeline-stall-stalled-active-step-tier4-001. [carry]
+- [blue] **G-rule 1/3:** outbox-notifier-merge-held-deep-review-tier4-001; build-sequence-advancer-sequence-complete-tier4-001; mirror-malformed-verdict-heal-reap-path-001. [carry]
+
+**PRIME DIRECTIVE:** ratio≈21.68 (interventions=1605, systemic_fixes=74, vp=31; trend: worsening). Intervention appended (rate-limit-storm-cleared + L1012-L1013-Tier3 + sync-self-healed + PR#875-re-dispatch + zombie-carry, ts=20:43Z).
+**Tier end-of-iter:** Tier **1** (consecutive_clean=0; zombie carry).
+
+---
+
