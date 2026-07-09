@@ -7869,6 +7869,40 @@
       "retired_by": "heal_orphan_autoregister",
       "retired_at": "2026-07-08T22:15:17.879710+00:00",
       "retired_reason": "orphan-terminal"
+    },
+    {
+      "id": "proposed-promoter-pr-state-gate-001",
+      "name": "Promoter PR State Gate 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `promoter-pr-state-gate-001`. Last activity 2026-07-09T04:09:36.420991+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "promoter-pr-state-gate-001"
+      ],
+      "repo": null,
+      "created": "2026-07-09",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-09T04:17:15.953683+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-09T04:09:36.420991+00:00"
+    },
+    {
+      "id": "proposed-pr-ourliberty-agent-core-887",
+      "name": "PR Ourliberty Agent Core 887",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pr-ourliberty-agent-core-887`. Last activity 2026-07-09T04:09:36.170919+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pr-ourliberty-agent-core-887"
+      ],
+      "repo": null,
+      "created": "2026-07-09",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-09T04:17:15.953683+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-09T04:09:36.170919+00:00"
     }
   ]
 }
