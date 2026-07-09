@@ -3668,3 +3668,83 @@ NOMINAL ✅
 
 ---
 
+## Iteration ~4745 — 2026-07-09T08:45Z UTC (Larry /cycle chat, Tier 1)
+
+**Health:** ⚠️ Check 3 — PR #893 mirror_pass_unmerged stall imminent. All other checks nominal. Zombie + 2 pending APPROVAL_REQUESTs carry unchanged.
+
+**VERIFY-BEFORE-REASSERT (from iter ~4744):**
+- **"beacon PID 870960"**: CONFIRMED ✅ — Ss, 52:42 elapsed at 08:44Z. [confirmed]
+- **"outbox_notifier PID 870241"**: CONFIRMED ✅ — Ss, 52:49 elapsed at 08:44Z. [confirmed]
+- **"inbox_watcher PID 527542"**: CONFIRMED ✅ — Ssl, 04:32:31 elapsed. [confirmed]
+- **"zombie PID 1834248 (~41d+13h+17m+)"**: CONFIRMED ⚠️ — now ~41d+13h+24m+ (Ss bash poll loop). [carry]
+- **"pending=2 (mirror-review-pr2-slot-aware-healers + mirror-review-pr-ourliberty-agent-core-890)"**: CONFIRMED ✅ — still pending=2, same entries (05:55:43Z + 06:47:49Z). [carry]
+- **"HEAD=ad991976=origin/main"**: UPDATED ✅ → HEAD=0cd88f59=origin/main ("Pulse cycle 20260709T084118Z"). On main. Clean. [updated]
+- **"Daemon heartbeat 08:29:32Z"**: UPDATED ✅ → 2026-07-09T08:40:16Z (~5 min at 08:45Z, <60 min). NOMINAL. [updated]
+- **"Sync last_sync=07:39:18Z"**: UPDATED ✅ → 08:39:19Z (~6 min at 08:45Z, within 2h). NOMINAL. [updated]
+- **"PR #893 OPEN (Mirror PASS, AUTO_MERGE_HELD blocker=#847)"**: CONFIRMED ✅ — still OPEN. Mirror PASS since 08:01Z (~44 min now); AUTO_MERGE_HELD blocker=#847 intact; stall cooldown now expired → stall alert imminent. [carry + new]
+- **"PR #891/890 APPROVAL_REQUEST pending"**: CONFIRMED ✅ [carry]
+- **"PR #847/874/860/854 OPEN"**: CONFIRMED ✅ (FORGE_NO_PR_SKIP entries for all active branches). [carry]
+
+**NEW FINDINGS:**
+
+**Check 3 — Pipeline stall (new):** DRY-RUN at 08:42:25Z → `1 alert(s) would fire, 1 recovery(ies)`. Finding: `mirror_pass_unmerged:fix-auto-merge-queue-stale-merged-gate-001` (PR #893). Mirror PASS at 08:01Z (~44 min elapsed); stall cooldown expired. AUTO_MERGE_HELD blocker=#847 (`notifier-concurrent-scan-dup-review-dispatch-001`, held_deep_review) prevents merge. Stall healer will deliver `pipeline-stall:mirror-pass-unmerged:PR#893` alert to Larry via standard path in the next outbox-notifier scan (GH rate-limit backoff clearing now). No Pulse action — stall healer handles delivery. Root cause: PR #847 remains unresolved (HELD_DEEP_REVIEW). Larry needs to either approve PR #847 or progress the deep review to unblock PR #893. Prior iters (4743–4744) showed 0 stalls: at iter ~4743 (08:26Z) only 25 min had elapsed; at iter ~4744 (08:36Z) the stall healer hit the GH rate limit and fell back gracefully with 0 stalls. This iter's rate-limit backoff (PR #880, hit #4 at 08:38Z, 288s) cleared in time for the 08:42Z dry-run to complete successfully.
+
+**Check 0 — Alert triage:**
+- repair-watermark: `{"repaired": false, "old_watermark": 1063, "file_length": 1063}`. 0 new alerts. NOMINAL ✅
+
+**Check 1 — Log noise:** Outbox-notifier (PID 870241, started 01:49 MDT / 07:49Z). Rate-limit WARNs continued: hit #4 at 02:38:29 MDT (08:38Z), backing off 288s (next attempt ~08:43Z). Pattern: consecutive WARNs #1-#4 since 02:31 MDT with PR #880 exponential backoff working (63s→113s→242s→288s). Last INFO at 02:01:23 MDT (08:01:23Z): `AUTO_MERGE_HELD PR #893 blocker=#847` (expected). Rate-limit streak (4 consecutive) is new; prior iters saw 3. PR #880 fix still handling; WARN demotes per WARN-vs-INFO calibration (within-tolerance retry). NOMINAL ✅
+
+**Check 2 — Telegram sweep:** Beacon PID 870960 ✅ (Ss, 52:42 elapsed). Bot log last delivery: 01:59:30 MDT (07:59:30Z): `wedged-review-reaped` (Tier-3 closure). No Larry incoming directives in last 5h. pending=2 (unchanged). NOMINAL ✅
+
+**Check 3 — Pipeline stall:** See NEW FINDINGS above. `1 alert(s) would fire` (PR #893 mirror_pass_unmerged). Stall healer handles delivery. ⚠️ tier-reset
+
+**Check 4 — Pending directives:** pending=2 (unchanged from iter ~4744).
+- Entry 0: `mirror-review-pr2-slot-aware-healers` (05:55:43Z) — PR #891 REVIEW_ESCALATE; 21 test_outbox_notifier failures (known false-BLOCK — MEMORY: flaky_outbox_notifier_gate_falseblock). `approve mirror-review-pr2-slot-aware-healers`. ⚠️ [carry]
+- Entry 1: `mirror-review-pr-ourliberty-agent-core-890` (06:47:49Z) — PR #890 Mirror REVIEW_ESCALATE; diff clean, same false-BLOCK class. `approve mirror-review-pr-ourliberty-agent-core-890`. ⚠️ [carry]
+NOMINAL ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-09T08:40:16Z (~5 min at 08:45Z, <60 min). NOMINAL ✅
+
+**Check A — Source repo:** HEAD=0cd88f59=origin/main. On main. Clean. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-09T08:39:19Z (~6 min at 08:45Z, within 2h). Status=no-change. NOMINAL ✅
+**Check C — Agent liveness:** inbox_watcher PID 527542 ✅ (04:32:31). beacon PID 870960 ✅ (52:42). outbox_notifier PID 870241 ✅ (52:49). Zombie PID 1834248 ⚠️ (~41d+13h+24m+, Ss bash poll loop) [carry]. No active Forge or Mirror sessions. Daemon heartbeat 08:40:16Z ✅. NOMINAL ✅
+**Check E — PR state:** PR #893 OPEN (Mirror PASS 08:01Z, AUTO_MERGE_HELD blocker=#847; stall alert imminent). PRs #891/890/874/860/854/847 OPEN [carry]. No clean+green unblocked PRs awaiting Pulse intervention. ⚠️ (stall imminence)
+
+**§5.0 — audit_due_nudge:** no committed baseline; no-op. ✅
+**§5.0 — distill_detector:** no un-distilled audits; no-op. ✅
+
+**Conditional checks — UTC Thursday 2026-07-09:**
+- **Check I:** Thursday (off-day). systemd timer handles Mon/Wed/Fri/Sun. Skip. ✅
+- **Check III:** Sunday gate. Next: 2026-07-13. Skip. ✅
+- **Check IX/X:** Monday gate. Skip. ✅
+- **Check VI/VIII:** Proposals idx=990,991 carry — awaiting Larry. [carry, unconfirmed]
+
+**Observation — GH rate-limit breadth escalating:** outbox-notifier hit #4 consecutive rate-limit errors (63s→113s→242s→288s backoff chain). First time seeing 4 consecutive hits in a single session; prior iters saw 3. The stall healer's own gh pr list call (08:42Z) succeeded (separate call path), but the pr-state-recheck loop for PR #854/847 is fully rate-limited. Watching for escalation to 5+ consecutive before flagging as new G-rule candidate.
+
+**G-rule assessment:**
+- **`outbox-notifier-auto-merge-queue-stale-merged-pr-001`** — PR #893 stall now active (cooldown expired). Stall healer delivery will fire in next scan. [carry + escalated]
+- All other G-rules: unchanged from iter ~4744.
+
+**Actions taken:**
+1. Check 0: repair-watermark no-op; 0 new alerts. ✅
+2. §5.0: both no-ops. ✅
+3. PRIME ledger: `iter_clean` appended (Check 3 stall noted; no Pulse action; stall healer handles). ✅
+4. Tier state: `record --checks-clean false` → Tier 1 (Check 3 finding + zombie+pending carries). consecutive_clean=0. ✅
+
+**Escalations:** 0 new escalations from Pulse. Stall alert for PR #893 will be delivered by stall healer independently. 2 pending APPROVAL_REQUESTs already in Larry's Telegram queue.
+
+**Standing findings (carry):**
+- [yellow] **zombie-bash-pid-1834248** — PID 1834248 (~41d+13h+24m+, Ss bash poll loop awaiting build-check-viii-pr-2b-analyzer-001.json). ask-then-do: `kill 1834248`. [carry confirmed]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07`. [carry]
+- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
+- [yellow] **APPROVAL_REQUEST mirror-review-pr2-slot-aware-healers** — PR #891 REVIEW_ESCALATE; 21 test_outbox_notifier flakes (known false-BLOCK). `approve mirror-review-pr2-slot-aware-healers`. [carry]
+- [yellow] **APPROVAL_REQUEST mirror-review-pr-ourliberty-agent-core-890** — PR #890 diff clean; same false-BLOCK class. `approve mirror-review-pr-ourliberty-agent-core-890`. [carry]
+- [yellow] **PR #893 stall** — Mirror PASS 08:01Z, AUTO_MERGE_HELD blocker=#847 (held_deep_review). Stall alert imminent via stall healer. Unblocks when PR #847 resolves.
+- [blue] **PR #847** — HELD_DEEP_REVIEW (blocker for PR #893). Resolution path: Larry approves deep review or abandons.
+- [blue] **PR #891/890/874/860/854** — OPEN [carry]
+
+**PRIME DIRECTIVE:** ratio≈21.58 (interventions≈1640, systemic_fixes=76, vp=36). `iter_clean` appended.
+**Tier end-of-iter:** Tier **1** (consecutive_clean=0; Check 3 stall finding + zombie+pending carries).
+
+---
+
