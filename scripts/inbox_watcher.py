@@ -62,6 +62,12 @@ OUTBOXES_ROOT = AGENTS_ROOT / "outboxes"
 BLACKBOARD = AGENTS_ROOT / "blackboard"
 LOG_FILE = AGENTS_ROOT / "logs" / "inbox_watcher.log"
 COSTS_FILE = BLACKBOARD / "costs.jsonl"
+# Local durable ledger of Mirror review queue-wait samples (spec §4 PR3). Each
+# review-start appends {ts, task_id, pr_url, review_slot, queue_wait_sec}; the
+# sibling gauge (mirror_queue_wait_gauge.py) reads THIS file (not Supabase) to
+# decide whether burst queue-wait warrants a third slot. The chain_events row is
+# the dashboard/analytics copy; this jsonl is the self-firing signal source.
+MIRROR_QUEUE_WAIT_LEDGER = BLACKBOARD / "mirror-queue-wait.jsonl"
 EMERGENCY_HALT_FILE = BLACKBOARD / "EMERGENCY_HALT"
 IN_FLIGHT_DIR = AGENTS_ROOT / "state" / "in-flight"
 AGENT_CORE = HOME / "agent-core"
@@ -537,6 +543,79 @@ def _review_slots_for(agent: str, models_config: dict) -> int:
     return max(1, n)
 
 
+def _pr_created_at(pr_url: str) -> datetime | None:
+    """PR-open timestamp via ``gh pr view <url> --json createdAt`` (spec §4 PR3
+    queue-wait anchor). Best-effort: any failure (gh missing, auth, network,
+    unparseable) returns None so the caller emits no sample rather than blocking
+    the review. Short timeout — this runs on the review's hot path."""
+    if not pr_url:
+        return None
+    import subprocess  # local: keep module import surface unchanged
+    try:
+        proc = subprocess.run(
+            ["gh", "pr", "view", pr_url, "--json", "createdAt",
+             "-q", ".createdAt"],
+            capture_output=True, text=True, timeout=20, check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if proc.returncode != 0:
+        return None
+    raw = (proc.stdout or "").strip()
+    if not raw:
+        return None
+    try:
+        # gh emits RFC-3339 with a trailing Z; normalize to +00:00 for fromisoformat.
+        return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def emit_review_queue_wait(task_id: str, pr_url: str | None, slot: int) -> None:
+    """Record the PR-open → review-start queue-wait for one Mirror review (spec
+    §4 PR3). Two sinks, both best-effort and non-raising:
+
+      1. Local jsonl ledger (``MIRROR_QUEUE_WAIT_LEDGER``) — the self-firing
+         source the sibling gauge reads.
+      2. A ``review_queue_wait`` chain_event — the dashboard/analytics copy.
+
+    A missing/unresolvable PR-open time (gh failed, no pr_url) means no sample:
+    we never fabricate a queue-wait, and the review proceeds regardless."""
+    created = _pr_created_at(pr_url) if pr_url else None
+    if created is None:
+        return
+    now = datetime.now(timezone.utc)
+    queue_wait_sec = max(0.0, (now - created).total_seconds())
+    sample = {
+        "ts": now.isoformat(),
+        "task_id": task_id,
+        "pr_url": pr_url,
+        "review_slot": slot,
+        "queue_wait_sec": round(queue_wait_sec, 1),
+    }
+    try:
+        BLACKBOARD.mkdir(parents=True, exist_ok=True)
+        with open(MIRROR_QUEUE_WAIT_LEDGER, "a", encoding="utf-8") as fh:
+            fh.write(json.dumps(sample) + "\n")
+    except OSError as e:
+        log(f"[mirror] queue-wait ledger append failed for {task_id}: {e}")
+    try:
+        import chain_event_emit  # local: avoids Supabase client init at import
+        chain_event_emit.emit_event(
+            event_type="review_queue_wait",
+            agent="mirror",
+            task_id=task_id,
+            payload={
+                "review_slot": slot,
+                "queue_wait_sec": round(queue_wait_sec, 1),
+            },
+            pr_url=pr_url,
+        )
+    except Exception as e:  # noqa: BLE001 — daemon-never-wedge
+        log(f"[mirror] queue-wait chain_event emit raised for {task_id}: "
+            f"{type(e).__name__}: {e}")
+
+
 def _record_outbox_cost(agent: str, task_id: str, outbox: dict) -> None:
     """Append the paid run's cost row to costs.jsonl (best-effort via
     append_cost). Called on BOTH the success path and the outbox-write-failure
@@ -860,7 +939,8 @@ def _mirror_marker_self_validate(
     return output_text, session_id
 
 
-def process_task(agent: str, task_file: Path, models_config: dict) -> None:
+def process_task(agent: str, task_file: Path, models_config: dict,
+                 slot: int = 0) -> None:
     try:
         task = json.loads(task_file.read_text())
     except (OSError, json.JSONDecodeError) as e:
@@ -1122,6 +1202,17 @@ def process_task(agent: str, task_file: Path, models_config: dict) -> None:
 
     log(f"[{agent}] start task={task_id} model={model} timeout={timeout}s"
         + (f" resume={resume_session_id[:12]}..." if resume_session_id else ""))
+
+    # Two-slot observability (spec §4 PR3). For a Mirror review, stamp the slot
+    # onto run_claude's start-line (review_slot=<n>, alongside the existing
+    # dispatch_tier=<t>) and emit the PR-open → review-start queue-wait so the
+    # burst-latency success metric (§8) and the sibling gauge (§4 "or sibling
+    # gauge") have real samples. Best-effort: never blocks or fails the review.
+    is_review_dispatch = agent == "mirror" and task.get("phase") == "review"
+    review_slot = slot if is_review_dispatch else None
+    if is_review_dispatch:
+        emit_review_queue_wait(task_id, task.get("pr_url"), slot)
+
     meta: dict = {}
     try:
         success, output_text, session_id = agent_runner.run_claude(
@@ -1136,6 +1227,7 @@ def process_task(agent: str, task_file: Path, models_config: dict) -> None:
             out_meta=meta,
             expected_agent=agent,
             phase=task.get("phase"),
+            review_slot=review_slot,
         )
     except Exception as e:
         log(f"[{agent}] agent_runner.run_claude raised on {task_file.name}: {e!r}")
@@ -1494,7 +1586,7 @@ def agent_loop(agent: str, models_config: dict, slot: int = 0,
                                    if head_nonce else None)
                         if head_hb:
                             head_hb.start()
-                process_task(agent, target, models_config)
+                process_task(agent, target, models_config, slot=slot)
             except Exception as e:
                 log(f"[{agent}] unexpected error on {task_file.name}: {e!r}")
             finally:

@@ -138,6 +138,13 @@ KNOWN_EVENT_TYPES: frozenset[str] = frozenset({
     # (the shipper never produces it); listed here so emit_event admits it and
     # the audit healer does not flag it as unknown.
     'review_obsolete',
+    # mirror-two-slot-review §4 PR3: inbox_watcher.emit_review_queue_wait
+    # push-emits one row per Mirror review at review-start, carrying the
+    # PR-open → review-start queue_wait_sec and the review_slot. Feeds the
+    # burst-latency success metric (§8) and the sibling gauge's "need slot 3?"
+    # decision. Push-only (the shipper never produces it); listed here so
+    # emit_event admits it and the weekly audit healer does not flag it.
+    'review_queue_wait',
     # N4 promotion rule (approvals-queue-rework.md L6): scripts/promote_alerts.py
     # push-emits one of these for each escalation that crosses the needs-CEO-
     # attention bar. The dashboard's NeedsAttentionCard on /live queries this

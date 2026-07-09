@@ -219,7 +219,7 @@ class DeferredClaimUnclaimTest(_InboxTmpBase):
     def test_deferred_task_returned_to_inbox(self):
         self._write_task("mirror", "defer-1")
 
-        def deferring_process(agent, task_file, cfg):
+        def deferring_process(agent, task_file, cfg, slot=0):
             # Simulate rotation-gate / TIER_HOLD: leave the file in place and
             # stop the loop after this one task.
             inbox_watcher._shutdown.set()
@@ -239,7 +239,7 @@ class DeferredClaimUnclaimTest(_InboxTmpBase):
         # is already gone and must NOT be resurrected into the inbox.
         self._write_task("mirror", "done-1")
 
-        def archiving_process(agent, task_file, cfg):
+        def archiving_process(agent, task_file, cfg, slot=0):
             inbox_watcher.move_to(task_file, self.inboxes / agent / ".archive")
             inbox_watcher._shutdown.set()
 
@@ -344,7 +344,7 @@ class SameHeadGuardTest(_InboxTmpBase):
         processed: list = []
         seen_identities: list[str] = []
 
-        def process(agent, task_file, cfg):
+        def process(agent, task_file, cfg, slot=0):
             processed.append(task_file)
             inbox_watcher._shutdown.set()
 
@@ -455,6 +455,99 @@ class HeadLeaseIdentityTest(unittest.TestCase):
         self.assertNotEqual(
             dispatch_lease._lease_path(hid),
             dispatch_lease._lease_path(inbox_watcher._slot_identity("mirror", 1)),
+        )
+
+
+class EmitReviewQueueWaitTest(unittest.TestCase):
+    """PR3 observability: review-start queue-wait is recorded to the local
+    ledger AND emitted as a review_queue_wait chain_event, best-effort, and a
+    missing PR-open time yields NO sample (never fabricated)."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix="qw-emit-test-"))
+        self.ledger = self.tmp / "blackboard" / "mirror-queue-wait.jsonl"
+        self._patches = [
+            mock.patch.object(inbox_watcher, "BLACKBOARD", self.tmp / "blackboard"),
+            mock.patch.object(inbox_watcher, "MIRROR_QUEUE_WAIT_LEDGER", self.ledger),
+            mock.patch.object(inbox_watcher, "LOG_FILE", self.tmp / "watcher.log"),
+        ]
+        for p in self._patches:
+            p.start()
+
+    def tearDown(self):
+        for p in self._patches:
+            p.stop()
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def test_sample_written_and_event_emitted(self):
+        import datetime as _dt
+        # PR opened 30 min before review-start → queue_wait ~1800s.
+        created = _dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(seconds=1800)
+        captured = {}
+
+        def _fake_emit(**kwargs):
+            captured.update(kwargs)
+            return True
+
+        fake_cee = mock.MagicMock()
+        fake_cee.emit_event.side_effect = _fake_emit
+        with mock.patch.object(inbox_watcher, "_pr_created_at", return_value=created), \
+                mock.patch.dict(sys.modules, {"chain_event_emit": fake_cee}):
+            inbox_watcher.emit_review_queue_wait("task-abc", "https://x/pull/9", 1)
+
+        rows = [json.loads(l) for l in self.ledger.read_text().splitlines() if l.strip()]
+        self.assertEqual(len(rows), 1)
+        row = rows[0]
+        self.assertEqual(row["task_id"], "task-abc")
+        self.assertEqual(row["pr_url"], "https://x/pull/9")
+        self.assertEqual(row["review_slot"], 1)
+        self.assertGreaterEqual(row["queue_wait_sec"], 1700)
+        self.assertLessEqual(row["queue_wait_sec"], 1900)
+        # Chain event carries the canonical type + slot.
+        self.assertEqual(captured.get("event_type"), "review_queue_wait")
+        self.assertEqual(captured.get("agent"), "mirror")
+        self.assertEqual(captured.get("payload", {}).get("review_slot"), 1)
+
+    def test_no_pr_open_time_emits_nothing(self):
+        fake_cee = mock.MagicMock()
+        with mock.patch.object(inbox_watcher, "_pr_created_at", return_value=None), \
+                mock.patch.dict(sys.modules, {"chain_event_emit": fake_cee}):
+            inbox_watcher.emit_review_queue_wait("task-abc", "https://x/pull/9", 0)
+        self.assertFalse(self.ledger.exists())
+        fake_cee.emit_event.assert_not_called()
+
+    def test_missing_pr_url_short_circuits(self):
+        # No pr_url → _pr_created_at never consulted, no ledger, no event.
+        fake_cee = mock.MagicMock()
+        with mock.patch.object(inbox_watcher, "_pr_created_at") as pca, \
+                mock.patch.dict(sys.modules, {"chain_event_emit": fake_cee}):
+            inbox_watcher.emit_review_queue_wait("task-abc", None, 0)
+            pca.assert_not_called()
+        self.assertFalse(self.ledger.exists())
+        fake_cee.emit_event.assert_not_called()
+
+
+class ReviewQueueWaitEventTypeRegisteredTest(unittest.TestCase):
+    """emit_event drops any type absent from KNOWN_EVENT_TYPES, so PR3's new
+    type MUST be registered or every queue-wait row silently vanishes."""
+
+    def test_registered(self):
+        import chain_event_shipper
+        self.assertIn("review_queue_wait", chain_event_shipper.KNOWN_EVENT_TYPES)
+
+
+class ActivationConfigTest(unittest.TestCase):
+    """PR3 activation guard: the shipped config sets mirror review_slots=2. A
+    rollback/typo that drops it back to 1 must fail this test loudly."""
+
+    def test_mirror_review_slots_is_two(self):
+        # Read the REPO-local config (this checkout), not the deployed
+        # ~/agent-core copy MODELS_FILE points at — the activation lives here.
+        cfg_path = _REPO_SCRIPTS.parent / "config" / "agent-models.json"
+        cfg = json.loads(cfg_path.read_text())
+        self.assertEqual(
+            cfg["agents"]["mirror"].get("review_slots"), 2,
+            "mirror review_slots must be 2 (mirror-two-slot-review §4 PR3 activation)",
         )
 
 

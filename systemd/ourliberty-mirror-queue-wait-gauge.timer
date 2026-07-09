@@ -1,0 +1,12 @@
+[Unit]
+Description=Run mirror_queue_wait_gauge hourly (third-review-slot readiness signal)
+
+[Timer]
+OnBootSec=20min
+OnUnitActiveSec=1h
+RandomizedDelaySec=180
+Unit=ourliberty-mirror-queue-wait-gauge.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target

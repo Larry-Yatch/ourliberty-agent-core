@@ -32,8 +32,9 @@
       "inbox_model": "claude-opus-4-8",
       "fallback_model": "claude-sonnet-4-6",
       "worktree_enabled": true,
+      "review_slots": 2,
       "allowed_repos": ["ourliberty-agent-core", "ourliberty-dashboard", "ourliberty-graph"],
-      "note": "Opus for actual reviews. Sonnet acceptable for chat / status queries. worktree_enabled: review dispatches go into a per-task worktree (~/agent-worktrees/wt-mirror-<task_id>/) so Mirror can gh pr checkout the branch and run tests against the PR. allowed_repos gates target_repo on inbox writes (same shape as Forge)."
+      "note": "Opus for actual reviews. Sonnet acceptable for chat / status queries. worktree_enabled: review dispatches go into a per-task worktree (~/agent-worktrees/wt-mirror-<task_id>/) so Mirror can gh pr checkout the branch and run tests against the PR. allowed_repos gates target_repo on inbox writes (same shape as Forge). review_slots=2 (mirror-two-slot-review-spec §4 PR3): spawns two concurrent review watcher threads consuming the one mirror inbox; the slot plumbing landed inert in PR1/PR2. Rollback = set to 1 (or delete the key) + restart the watcher (spec §6.4)."
     },
     "pulse": {
       "name": "Pulse",
