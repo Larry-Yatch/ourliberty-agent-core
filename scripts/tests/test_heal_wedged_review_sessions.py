@@ -194,6 +194,38 @@ class TestCase1AutoReap(unittest.TestCase):
         self.assertEqual(rec.killed, [])
 
 
+# ---------------------- two-slot per-session reap ----------------------
+
+class TestTwoSlotPerSessionReap(unittest.TestCase):
+    """mirror-two-slot-review §4 PR2: with N review slots, each wedged review is
+    an independent (pid, cwd) session — the reaper acts per-PROCESS, never off a
+    shared `inbox:mirror` lease, so concurrent Mirror reviews are classified and
+    reaped independently and one slot's reap never disturbs a healthy sibling."""
+
+    def test_two_concurrent_mirror_sessions_reaped_independently(self):
+        rec = _Recorder()
+        c0 = _cand(pid=5000, tier='mirror', name='review-pr-1-a',
+                   marker=True, idle=600, session_id='sess-0')
+        c1 = _cand(pid=5001, tier='mirror', name='review-pr-2-b',
+                   marker=True, idle=600, session_id='sess-1')
+        summary = _run(rec, [c0, c1], h.ConfidenceState())
+        self.assertEqual(summary['case1_reaped'], 2)
+        self.assertEqual(sorted(rec.killed), [5000, 5001])
+        self.assertEqual(sorted(rec.removed), sorted([c0.cwd, c1.cwd]))
+
+    def test_healthy_sibling_untouched_when_one_slot_reaped(self):
+        # One provably-done-past-grace review + one still-active review: only the
+        # wedged session is reaped; the active sibling slot is left running.
+        rec = _Recorder()
+        wedged = _cand(pid=6000, tier='mirror', name='review-pr-3-a',
+                       marker=True, idle=600, session_id='wedged')
+        active = _cand(pid=6001, tier='mirror', name='review-pr-4-b',
+                       marker=True, idle=120, session_id='active')
+        _run(rec, [wedged, active], h.ConfidenceState())
+        self.assertEqual(rec.killed, [6000])
+        self.assertNotIn(6001, rec.killed)
+
+
 # ---------------------- Case 2 alert-only ----------------------
 
 class TestCase2AlertOnly(unittest.TestCase):

@@ -297,6 +297,49 @@ def _unclaim_task(agent: str, claimed_file: Path) -> None:
         log(f"[{agent}] un-claim of {claimed_file} failed: {e}")
 
 
+def _task_head_sha(task_file: Path) -> str | None:
+    """The PR head SHA a task targets, or None (spec §4 PR2 same-head guard).
+
+    Mirrors outbox_notifier._recorded_review_head_sha: top-level ``head_sha``
+    first, then nested under ``context`` (chain-envelope shape). Only Mirror
+    review-requests carry it; Forge builds and pre-head-recording envelopes
+    return None (→ no same-head guard applies, which is correct — the guard is
+    only about two review slots landing on one diff). Unreadable/malformed
+    fails safe to None (no guard) rather than raising in the claim path."""
+    try:
+        data = json.loads(task_file.read_text())
+    except (OSError, json.JSONDecodeError, ValueError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    v = data.get("head_sha")
+    if isinstance(v, str) and v:
+        return v
+    ctx = data.get("context")
+    if isinstance(ctx, dict):
+        v = ctx.get("head_sha")
+        if isinstance(v, str) and v:
+            return v
+    return None
+
+
+def _head_lease_identity(agent: str, head_sha: str) -> str:
+    """Dispatch-lease identity that serializes review of ONE PR head across all
+    slots (spec §4 PR2). Distinct namespace from the per-slot inbox leases
+    (``inbox:<agent>[:<n>]``) so it never collides with slot arbitration.
+
+    The atomic file-claim already stops two slots grabbing the SAME task file;
+    this closes the residual gap where two DISTINCT review-requests for one head
+    (a re-dispatch racing the original, a reconcile sweep, a lost-result
+    re-queue) get claimed by two slots and reviewed CONCURRENTLY — 2× Opus burn
+    on an identical diff plus racing verdicts. dispatch_lease gives a race-free
+    single holder with TTL + PID-guard, so exactly one slot reviews a given head
+    at a time regardless of claim interleaving; the loser defers and runs the
+    (benign, pre-existing) serial re-review after the winner frees the head —
+    never a concurrent double-review."""
+    return f"review-head:{agent}:{head_sha}"
+
+
 def _archive_dir(agent: str, *, lost_result: bool = False) -> Path:
     """The archive destination for a processed task envelope.
 
@@ -1418,6 +1461,9 @@ def agent_loop(agent: str, models_config: dict, slot: int = 0,
             if hb:
                 hb.start()
             target = None
+            head_identity = None
+            head_nonce = None
+            head_hb = None
             try:
                 target = task_file
                 if claim_enabled:
@@ -1426,6 +1472,28 @@ def agent_loop(agent: str, models_config: dict, slot: int = 0,
                         # Another slot claimed this task first; try the next one
                         # (the finally block releases the lease before continue).
                         continue
+                    # Same-head concurrent-review guard (spec §4 PR2): serialize
+                    # review of one PR head across slots via a race-free
+                    # head-lease. If another slot already holds this head, defer
+                    # (un-claim → next poll) so the two never review one diff at
+                    # once. Only Mirror review tasks carry head_sha; others skip.
+                    head = _task_head_sha(target)
+                    if head:
+                        head_identity = _head_lease_identity(agent, head)
+                        head_acq = dispatch_lease.try_acquire(head_identity)
+                        if not head_acq.get("acquired"):
+                            log(f"[{agent}] slot {slot}: head {head[:12]} already "
+                                f"under review by another slot; deferring "
+                                f"{target.name}")
+                            _unclaim_task(agent, target)
+                            target = None
+                            head_identity = None
+                            continue
+                        head_nonce = head_acq.get("nonce")
+                        head_hb = (dispatch_lease.Heartbeat(head_identity, head_nonce)
+                                   if head_nonce else None)
+                        if head_hb:
+                            head_hb.start()
                 process_task(agent, target, models_config)
             except Exception as e:
                 log(f"[{agent}] unexpected error on {task_file.name}: {e!r}")
@@ -1438,6 +1506,10 @@ def agent_loop(agent: str, models_config: dict, slot: int = 0,
                 # of stranding it until restart. Terminal paths already moved it.
                 if claim_enabled and target is not None and target.exists():
                     _unclaim_task(agent, target)
+                if head_hb:
+                    head_hb.stop()
+                if head_identity is not None:
+                    dispatch_lease.release(head_identity, head_nonce)
                 if hb:
                     hb.stop()
                 dispatch_lease.release(identity, nonce)

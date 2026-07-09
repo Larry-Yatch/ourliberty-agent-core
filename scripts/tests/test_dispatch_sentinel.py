@@ -508,6 +508,34 @@ try:
 except ImportError:
     import _chokepoint_optout
 
+
+class TwoSlotStallMessageTest(unittest.TestCase):
+    """mirror-two-slot-review §4 PR2 audit: the 'single build slot' copy is
+    Forge-scoped (Forge is not slot-scaled); Mirror gets the slot-agnostic copy;
+    stale-lease messages render whatever identity is recorded, so slot leases
+    (inbox:mirror:1) and head-leases (review-head:mirror:<sha>) surface with no
+    per-slot enumeration. Pure over `_stall_dm_message` — no I/O."""
+
+    def test_forge_inbox_stall_names_single_slot(self):
+        msg = ds._stall_dm_message(
+            {'kind': 'inbox-stall', 'agent': 'forge', 'file': 'b.json',
+             'age_hours': 4})
+        self.assertIn('single build slot', msg)
+
+    def test_mirror_inbox_stall_omits_single_slot_copy(self):
+        msg = ds._stall_dm_message(
+            {'kind': 'inbox-stall', 'agent': 'mirror', 'file': 'r.json',
+             'age_hours': 4})
+        self.assertNotIn('single build slot', msg)
+
+    def test_stale_lease_renders_slot_and_head_identities(self):
+        for identity in ('inbox:mirror:1', 'review-head:mirror:cafe1234'):
+            msg = ds._stall_dm_message(
+                {'kind': 'stale-lease', 'agent': 'mirror',
+                 'identity': identity, 'age_hours': 1})
+            self.assertIn(identity, msg)
+
+
 _CHOKEPOINT_SAVED_SENTINEL = None
 
 
