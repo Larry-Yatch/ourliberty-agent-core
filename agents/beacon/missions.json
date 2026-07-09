@@ -8002,7 +8002,11 @@
         "at": "2026-07-09T06:18:20.630127+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-09T21:10:20.136881+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-outbox-notifier-pending-auto-merge-queue-001",
