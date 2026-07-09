@@ -1322,7 +1322,8 @@
         "at": "2026-07-01T05:12:49.475001+00:00",
         "from_state": "parked"
       },
-      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
+      "aging": true
     },
     {
       "id": "cap-test-isolation-seal-ship-corrected-l2-bounded-fa-5c57",
