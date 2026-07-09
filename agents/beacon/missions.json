@@ -7930,7 +7930,28 @@
         "at": "2026-07-09T04:18:02.717054+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-09T04:47:19.794026+00:00",
+      "retired_reason": "orphan-terminal"
+    },
+    {
+      "id": "proposed-direction-ask-outbox-notifier-auto-merge-rate-limit-orphan-3of3-001",
+      "name": "Direction Ask Outbox Notifier Auto Merge Rate Limit Orphan 3of3 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `direction-ask-outbox-notifier-auto-merge-rate-limit-orphan-3of3-001`. Last activity 2026-07-09T04:34:06.624785+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "direction-ask-outbox-notifier-auto-merge-rate-limit-orphan-3of3-001"
+      ],
+      "repo": null,
+      "created": "2026-07-09",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-09T04:47:19.794026+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-09T04:34:06.624785+00:00"
     }
   ]
 }
