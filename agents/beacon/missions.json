@@ -5497,7 +5497,10 @@
         "at": "2026-06-25T14:50:52.249097+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-07-09T00:01:19.901008+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-card-message-cap-investigate-retry-clarification-cost-sources-7995",
@@ -5528,7 +5531,10 @@
         "at": "2026-06-25T17:23:18.555199+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-07-09T00:01:19.901008+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-redispatch-mirror-pr703-stuck-review-001",
@@ -5559,7 +5565,10 @@
         "at": "2026-06-25T18:03:43.809679+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-07-09T00:01:19.901008+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-board-new-mission-confirm-placeholder-001-retry1",
@@ -5590,7 +5599,10 @@
         "at": "2026-06-25T18:24:10.143435+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-07-09T00:01:19.901008+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-board-new-mission-confirm-placeholder-001",
@@ -5621,7 +5633,10 @@
         "at": "2026-06-25T18:24:10.143435+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-07-09T00:01:19.901008+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-pulse-direction-ask-forge-wip-redispatch-digest-tier3-001",
@@ -5652,7 +5667,10 @@
         "at": "2026-06-25T18:34:15.986900+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-07-09T00:01:19.901008+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "the-new-escalation-signal-file-was-added-as-the-primary-source-while-the-older-pulse-escalations-file-is-still-read-in-parallel-for-back-compatibility-leaving-a-legacy-path-that-will-eventually-need-retiring",
@@ -5678,7 +5696,10 @@
         "model": "claude-opus-4-8",
         "at": "2026-06-25T20:35:19.955198+00:00",
         "from_state": "proposed"
-      }
+      },
+      "needs_decision": true,
+      "needs_decision_since": "2026-07-09T00:01:19.901008+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "the-steering-endpoint-and-proxy-accept-a-retry-action-but-the-dashboard-only-surfaces-resume-skip-cancel-buttons-so-the-retry-path-is-wired-up-without-a-way-to-trigger-it-from-the-ui",
@@ -5704,7 +5725,10 @@
         "model": "claude-opus-4-8",
         "at": "2026-06-25T20:35:19.955198+00:00",
         "from_state": "proposed"
-      }
+      },
+      "needs_decision": true,
+      "needs_decision_since": "2026-07-09T00:01:19.901008+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "the-stuck-dispatched-threshold-is-fixed-at-15-minutes-as-a-hardcoded-module-constant-so-adjusting-how-long-a-step-waits-before-flagging-larry-requires-a-code-change",
@@ -5730,7 +5754,10 @@
         "model": "claude-opus-4-8",
         "at": "2026-06-25T20:35:19.955198+00:00",
         "from_state": "proposed"
-      }
+      },
+      "needs_decision": true,
+      "needs_decision_since": "2026-07-09T00:01:19.901008+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-pr-ourliberty-agent-core-708",
