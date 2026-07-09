@@ -1,0 +1,34 @@
+[Unit]
+Description=Ourliberty system resource watcher — honest box-level memory/CPU/pressure health; DMs Larry + tops the Approvals queue on real trouble
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/system_resource_watch.py
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+WorkingDirectory=/home/larry/agent-core
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/system_resource_watch.py
+
+TimeoutStartSec=120
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-resource-watch
+
+# Hardening (mirrors ourliberty-agent-core-health.service). Reads /proc +
+# config; writes only the blackboard state file + alert queue under agents/.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/larry/agents
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true

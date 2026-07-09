@@ -1,0 +1,15 @@
+{
+  "_meta": {
+    "owner": "system-resource-watch",
+    "tweak_via": "edit this file + commit; the /api/system/health endpoint and the system-resource-watch timer both read it on next invocation (no reload)",
+    "rationale": "Honest box-level resource-health thresholds. warning = 'getting tight, worth a look'; critical = 'real trouble, DM Larry + top of Approvals'. Deliberately quiet on the reclaimable-page-cache false class that made the old single-cgroup gauge cry wolf (see scripts/system_resource_health.py header). Defaults live in DEFAULT_THRESHOLDS; only override keys you want to change."
+  },
+  "psi_some_avg60_warning": 5.0,
+  "psi_some_avg60_critical": 20.0,
+  "mem_used_frac_warning": 0.85,
+  "mem_used_frac_critical": 0.92,
+  "swap_used_frac_warning": 0.25,
+  "swap_used_frac_critical": 0.50,
+  "load_per_core_warning": 2.0,
+  "load_per_core_critical": 4.0
+}
