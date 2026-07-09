@@ -407,6 +407,14 @@ _gh_backoff_until: float = 0.0
 _gh_consecutive_rate_limit: int = 0
 _gh_backoff_skip_logged: bool = False
 
+# The exist_reason string `_pr_url_existence_state` returns when it declines to
+# shell out because a rate-limit backoff window is open. Hoisted to a module
+# constant so the return site and the enqueue predicate in `process_outbox`
+# agree without a fragile magic-string coupling: the pending-auto-merge enqueue
+# fires ONLY when exist_reason equals this exact value (a genuine 404 / timeout
+# returns a different string and must keep today's skip-without-enqueue path).
+_GH_BACKOFF_EXIST_REASON = 'gh rate-limit backoff active'
+
 
 def _gh_is_rate_limit_error(returncode: int, stderr: Optional[str]) -> bool:
     """True iff a *completed* `gh` call is the GitHub rate-limit signature.
@@ -571,6 +579,31 @@ _COST_BUDGET_DMED_TASKS: set[str] = set()
 # unverified PRs) and DMs Larry once with the parse error.
 AUTO_MERGE_QUEUE_FILE = AGENTS_ROOT / 'state' / 'auto-merge-queue.json'
 AUTO_MERGE_QUEUE_VERSION = 1
+
+# outbox-notifier-pending-auto-merge-queue-001 — a SEPARATE durable queue for
+# REVIEW_PASS auto-merges that could not fire because the gh rate-limit backoff
+# window was open when the marker was processed. Without this, that PR orphans
+# forever: the REVIEW_PASS marker doesn't re-arrive, the healer only retries
+# `outcome=failed` (not `skipped`), and this path never enters the serializer
+# queue. Entries here are re-attempted by `_pending_auto_merge_sweep` once the
+# backoff window clears.
+#
+# Corruption posture is FAIL-SOFT (WARN + no-op sweep), NOT the serializer
+# queue's fail-closed sentinel. Rationale: the serializer queue fail-closes
+# because merging while blind to file-overlap is dangerous; THIS queue only
+# retries already-Mirror-approved merges, so a corrupt file costs at most
+# "Pulse runs `gh pr merge` manually" — the same fallback that exists today.
+PENDING_AUTO_MERGE_QUEUE_FILE = (
+    AGENTS_ROOT / 'state' / 'outbox-notifier-pending-auto-merges.json'
+)
+PENDING_AUTO_MERGE_QUEUE_VERSION = 1
+# Bounded-attempt safety valve: after this many post-backoff retries fail to
+# resolve an entry, DM Larry once (actionable) and dequeue so the queue can
+# neither grow unbounded nor loop silently forever.
+_PENDING_AUTO_MERGE_MAX_ATTEMPTS = 5
+# One-shot in-process guard so a corrupt queue file DMs Larry at most once per
+# daemon lifetime (the sweep still no-ops every poll; we just don't spam).
+_PENDING_AUTO_MERGE_CORRUPT_DMED = False
 
 # review-dispatch-post-auto-merge-held — a PR parked in AUTO_MERGE_HELD_DEEP_REVIEW
 # (PASS'd Mirror, critical-path, awaiting a human `/code-review high`) is pulled
@@ -6197,7 +6230,7 @@ def _pr_url_existence_state(
     same cost as the existing `_AUTO_MERGE_FN_OVERRIDE`-less failure path).
     """
     if _gh_backoff_skip('pr-url-existence'):
-        return None, 'gh rate-limit backoff active'
+        return None, _GH_BACKOFF_EXIST_REASON
     try:
         proc = subprocess.run(
             ['gh', 'pr', 'view', str(pr_number),
@@ -8165,6 +8198,138 @@ def _queue_remove_pr(pr_number: int, repo_coords: str) -> Optional[dict[str, Any
         kept.append(e)
     if removed is not None:
         _save_auto_merge_queue(kept)
+    return removed
+
+
+def _load_pending_auto_merge_queue() -> list[dict[str, Any]]:
+    """Read the pending-auto-merge retry queue. Returns [] on missing file.
+
+    outbox-notifier-pending-auto-merge-queue-001. FAIL-SOFT (unlike the
+    serializer queue's fail-closed sentinel): on an unreadable/corrupt/
+    structurally-wrong file, log one WARN line, DM Larry at most once per
+    daemon lifetime, and treat the queue as empty. Losing this file only
+    degrades to the pre-fix behavior (Pulse runs `gh pr merge` manually) —
+    never to a wrong merge — so a corrupt file must never wedge the daemon
+    or refuse other work.
+    """
+    global _PENDING_AUTO_MERGE_CORRUPT_DMED
+    if not PENDING_AUTO_MERGE_QUEUE_FILE.exists():
+        return []
+    try:
+        data = json.loads(
+            PENDING_AUTO_MERGE_QUEUE_FILE.read_text(encoding='utf-8'),
+        )
+    except (OSError, ValueError, json.JSONDecodeError) as e:
+        log(
+            f'PENDING_AUTO_MERGE_QUEUE_CORRUPT at '
+            f'{PENDING_AUTO_MERGE_QUEUE_FILE}: {type(e).__name__}: {e}; '
+            f'treating as empty (pending auto-merges not retried until the '
+            f'file is repaired — Pulse can merge manually meanwhile)',
+            'WARN',
+        )
+        if not _PENDING_AUTO_MERGE_CORRUPT_DMED:
+            _PENDING_AUTO_MERGE_CORRUPT_DMED = True
+            try:
+                larry_alerts.append_alert(
+                    source='outbox-notifier',
+                    severity='warning',
+                    message=(
+                        f'Pending-auto-merge retry queue is corrupt at '
+                        f'{PENDING_AUTO_MERGE_QUEUE_FILE}: '
+                        f'{type(e).__name__}: {e}. Rate-limit-skipped '
+                        f'auto-merges will NOT be retried until you repair '
+                        f'the file; merge any orphaned PRs manually with '
+                        f'`gh pr merge <n> --auto --squash` meanwhile.'
+                    ),
+                    subject='pending-auto-merge-queue-corrupt',
+                    suggested_action=(
+                        f'cat {PENDING_AUTO_MERGE_QUEUE_FILE} ; '
+                        f'mv {PENDING_AUTO_MERGE_QUEUE_FILE} '
+                        f'{PENDING_AUTO_MERGE_QUEUE_FILE}.broken'
+                    ),
+                )
+            except Exception:  # noqa: BLE001 — daemon-never-wedge on DM failure
+                pass
+        return []
+    if not isinstance(data, dict):
+        log(
+            f'PENDING_AUTO_MERGE_QUEUE_MALFORMED at '
+            f'{PENDING_AUTO_MERGE_QUEUE_FILE}: top-level is '
+            f'{type(data).__name__}, expected object; treating as empty',
+            'WARN',
+        )
+        return []
+    entries = data.get('entries')
+    if not isinstance(entries, list):
+        return []
+    return [e for e in entries if isinstance(e, dict)]
+
+
+def _save_pending_auto_merge_queue(entries: list[dict[str, Any]]) -> None:
+    """Atomically persist the pending-auto-merge queue (full list)."""
+    payload = {
+        'version': PENDING_AUTO_MERGE_QUEUE_VERSION,
+        'entries': entries,
+    }
+    _atomic_write_json(PENDING_AUTO_MERGE_QUEUE_FILE, payload)
+
+
+def _enqueue_pending_auto_merge(
+    *,
+    task_id: str,
+    pr_url: str,
+    repo: str,
+    pr_number: int,
+    summary: str,
+    reply_chat_id: Optional[int],
+    changed_files: Optional[list[str]],
+) -> bool:
+    """Append a pending-auto-merge entry, deduped on (repo, pr_number).
+
+    Returns True when a new entry was written, False when an entry for the
+    same (repo, pr_number) already existed (resume-after-crash / double-
+    process safety). Fail-soft: a corrupt queue reads as empty, so the
+    enqueue still lands (the corrupt file was already reported once by the
+    load helper).
+    """
+    entries = _load_pending_auto_merge_queue()
+    for e in entries:
+        if e.get('repo') == repo and e.get('pr_number') == pr_number:
+            return False
+    entries.append({
+        'task_id': task_id,
+        'pr_url': pr_url,
+        'repo': repo,
+        'pr_number': pr_number,
+        'summary': summary,
+        'reply_chat_id': reply_chat_id,
+        'changed_files': changed_files,
+        'queued_at': datetime.now(timezone.utc).isoformat(),
+        'retry_attempts': 0,
+        'last_attempt_at': None,
+    })
+    _save_pending_auto_merge_queue(entries)
+    return True
+
+
+def _dequeue_pending_auto_merge(
+    repo: str, pr_number: int,
+) -> Optional[dict[str, Any]]:
+    """Remove the entry matching (repo, pr_number). Returns it, or None."""
+    entries = _load_pending_auto_merge_queue()
+    kept: list[dict[str, Any]] = []
+    removed: Optional[dict[str, Any]] = None
+    for e in entries:
+        if (
+            removed is None
+            and e.get('repo') == repo
+            and e.get('pr_number') == pr_number
+        ):
+            removed = e
+            continue
+        kept.append(e)
+    if removed is not None:
+        _save_pending_auto_merge_queue(kept)
     return removed
 
 
@@ -10178,6 +10343,189 @@ def _auto_merge_queue_sweep() -> None:
         _save_auto_merge_queue(entries)
 
 
+def _bump_pending_auto_merge_attempt(repo: str, pr_number: int) -> None:
+    """Increment retry_attempts + stamp last_attempt_at for one entry.
+
+    Self-contained load→mutate→save keyed on (repo, pr_number) so it never
+    clobbers a concurrent dequeue of a different entry in the same sweep.
+    """
+    entries = _load_pending_auto_merge_queue()
+    changed = False
+    for e in entries:
+        if e.get('repo') == repo and e.get('pr_number') == pr_number:
+            e['retry_attempts'] = (e.get('retry_attempts') or 0) + 1
+            e['last_attempt_at'] = datetime.now(timezone.utc).isoformat()
+            changed = True
+            break
+    if changed:
+        _save_pending_auto_merge_queue(entries)
+
+
+def _dm_larry_pending_auto_merge_exhausted(entry: dict[str, Any]) -> None:
+    """Actionable one-shot DM: a queued auto-merge exhausted its retries.
+
+    This is the ONLY alert this feature emits on the failure path — fired
+    exactly once (the entry is dequeued immediately after), consistent with
+    the actionable-only alert discipline (alert only when auto-remediation
+    has genuinely failed).
+    """
+    pr_url = entry.get('pr_url') or '?'
+    pr_number = entry.get('pr_number')
+    repo = entry.get('repo') or '?'
+    task_id = entry.get('task_id') or '?'
+    attempts = entry.get('retry_attempts') or 0
+    chat_id = entry.get('reply_chat_id')
+    body = (
+        f'PR {pr_url} (task `{task_id}`) still not auto-merged after '
+        f'{attempts} retries post-backoff; the rate-limit-retry queue is '
+        f'giving up. Merge it manually: '
+        f'`gh pr merge {pr_number} --repo {repo} --auto --squash`.'
+    )
+    if isinstance(chat_id, int):
+        try:
+            larry_alerts.append_notification(
+                source='outbox-notifier',
+                intent='pending_auto_merge_exhausted',
+                message=body,
+                chat_id=chat_id,
+                task_id=task_id,
+            )
+            return
+        except Exception:  # noqa: BLE001 — daemon-never-wedge on DM failure
+            pass
+    try:
+        larry_alerts.append_alert(
+            source='outbox-notifier',
+            severity='warning',
+            message=body,
+            subject=f'pending-auto-merge-exhausted:{repo}:{pr_number}',
+        )
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def _pending_auto_merge_sweep() -> None:
+    """Per-scan retry of auto-merges skipped during a rate-limit backoff.
+
+    outbox-notifier-pending-auto-merge-queue-001. Companion to
+    `_auto_merge_queue_sweep`, invoked right after it in the main loop under
+    the same daemon-never-wedge guard.
+
+    Order of checks per entry (once backoff has cleared):
+      - retry_attempts past the cap → DM Larry once + dequeue (safety valve).
+      - re-validate ground truth via `_pr_url_existence_state`:
+          * (None, backoff-reason) — window re-armed mid-sweep; leave, move on.
+          * (None, other reason)   — transient failure; bump attempts, leave.
+          * MERGED / CLOSED        — terminal out-of-band; dequeue cleanly.
+          * OPEN                   — merge via the same gated path the review-
+                                     pass uses; on merged/already_merged
+                                     dequeue + fire the suppressed closing DM,
+                                     else bump attempts and leave.
+
+    Cheap early-out when the queue is empty (one stat). No-op while the
+    backoff window is still open (don't burn a retry re-hitting the limit).
+    Fail-soft: a corrupt queue reads as empty and this sweep no-ops.
+    """
+    entries = _load_pending_auto_merge_queue()
+    if not entries:
+        return
+    if _gh_backoff_active():
+        # Window still open — re-validating would just re-skip. Wait for it
+        # to clear; the entries stay put untouched.
+        return
+    for entry in list(entries):
+        repo = entry.get('repo')
+        pr_number = entry.get('pr_number')
+        if not isinstance(repo, str) or not isinstance(pr_number, int):
+            # Malformed entry — drop it so it can't wedge the sweep forever.
+            log(
+                f'AUTO_MERGE_PENDING_DROP_MALFORMED entry={entry!r}',
+                'WARN',
+            )
+            entries2 = [
+                e for e in _load_pending_auto_merge_queue()
+                if e is not entry
+            ]
+            _save_pending_auto_merge_queue(entries2)
+            continue
+
+        if (entry.get('retry_attempts') or 0) > _PENDING_AUTO_MERGE_MAX_ATTEMPTS:
+            _dm_larry_pending_auto_merge_exhausted(entry)
+            _dequeue_pending_auto_merge(repo, pr_number)
+            log(
+                f'AUTO_MERGE_PENDING_EXHAUSTED pr={entry.get("pr_url")} '
+                f'task={entry.get("task_id")} '
+                f'attempts={entry.get("retry_attempts")}',
+                'WARN',
+            )
+            continue
+
+        state, reason = _pr_url_existence_state(repo, pr_number)
+        if state is None:
+            if reason == _GH_BACKOFF_EXIST_REASON:
+                # Window re-armed between the top-of-sweep check and now —
+                # leave the entry untouched and stop the sweep (all further
+                # entries would re-skip too).
+                return
+            # Transient non-backoff failure (timeout / gh blip). Bump and
+            # leave in queue for the next sweep.
+            _bump_pending_auto_merge_attempt(repo, pr_number)
+            log(
+                f'AUTO_MERGE_PENDING_RETRY_TRANSIENT pr={entry.get("pr_url")} '
+                f'task={entry.get("task_id")} reason={reason}',
+                'WARN',
+            )
+            continue
+
+        if state in ('MERGED', 'CLOSED'):
+            # Reached a terminal state out-of-band (Pulse merged it manually,
+            # or it was closed). Clean resolution — dequeue, no merge attempt,
+            # no duplicate DM.
+            _dequeue_pending_auto_merge(repo, pr_number)
+            log(
+                f'AUTO_MERGE_PENDING_TERMINAL pr={entry.get("pr_url")} '
+                f'task={entry.get("task_id")} state={state}',
+            )
+            continue
+
+        if state != 'OPEN':
+            # Unknown state string — treat as transient, don't merge blind.
+            _bump_pending_auto_merge_attempt(repo, pr_number)
+            continue
+
+        # OPEN — attempt the merge via the SAME gated path the review-pass uses.
+        changed_files = entry.get('changed_files')
+        if not isinstance(changed_files, list):
+            changed_files = None
+        result = _attempt_auto_merge_with_gates(
+            pr_url=entry.get('pr_url') or '',
+            repo_coords=repo,
+            pr_number=pr_number,
+            task_id=entry.get('task_id') or 'unknown',
+            summary=entry.get('summary') or '',
+            chat_id=entry.get('reply_chat_id'),
+            changed_files=changed_files,
+        )
+        outcome = result.get('merge_outcome')
+        if outcome in ('merged', 'already_merged'):
+            _dequeue_pending_auto_merge(repo, pr_number)
+            log(
+                f'AUTO_MERGE_PENDING_MERGED pr={entry.get("pr_url")} '
+                f'task={entry.get("task_id")} outcome={outcome}',
+            )
+            # Fire the closing DM the original skip suppressed — same as the
+            # serializer sweep's UNKNOWN-retry pass.
+            _fire_review_pass_outcome_dm(entry, result)
+        else:
+            # Transient failed / held* / deferred — bump and leave in queue.
+            _bump_pending_auto_merge_attempt(repo, pr_number)
+            log(
+                f'AUTO_MERGE_PENDING_RETRY_HELD pr={entry.get("pr_url")} '
+                f'task={entry.get("task_id")} outcome={outcome}',
+                'WARN',
+            )
+
+
 def _trip_emergency_halt(
     data: dict[str, Any],
     payload: dict[str, Any],
@@ -11537,6 +11885,47 @@ def _run_review_pass_auto_merge(
                 f'({exist_reason}) agent=forge',
                 'WARN',
             )
+            # outbox-notifier-pending-auto-merge-queue-001. A `None` state has
+            # two very different causes that collapse to the same skip here:
+            #   - rate-limit backoff active — the PR is (probably) fine; we
+            #     just couldn't confirm it because the backoff window was open.
+            #     The REVIEW_PASS marker won't re-arrive and the outbox is
+            #     about to archive, so WITHOUT a durable record this merge
+            #     orphans forever. Enqueue it (deduped) for the sweep to retry
+            #     once the window clears.
+            #   - genuine 404 / timeout / parse-error — a real, likely-
+            #     permanent ground-truth violation. Those MUST keep today's
+            #     skip-without-enqueue behavior (a 404 must never enter a retry
+            #     loop). The predicate is exact-match on the backoff reason.
+            if exist_reason == _GH_BACKOFF_EXIST_REASON:
+                enqueue_changed_files = data.get('changed_files')
+                if not isinstance(enqueue_changed_files, list):
+                    enqueue_changed_files = None
+                try:
+                    newly_queued = _enqueue_pending_auto_merge(
+                        task_id=data.get('task_id') or 'unknown',
+                        pr_url=pr_url,
+                        repo=shape_repo,
+                        pr_number=shape_pr_number,
+                        summary=(
+                            payload.get('summary')
+                            if isinstance(payload, dict) else ''
+                        ) or '',
+                        reply_chat_id=data.get('reply_chat_id'),
+                        changed_files=enqueue_changed_files,
+                    )
+                    if newly_queued:
+                        log(
+                            f'AUTO_MERGE_PENDING_ENQUEUE pr={pr_url} '
+                            f'task={data.get("task_id", "?")} '
+                            f'reason=rate-limit-backoff',
+                        )
+                except Exception as e:  # noqa: BLE001 — never wedge on enqueue
+                    log(
+                        f'AUTO_MERGE_PENDING_ENQUEUE failed for pr={pr_url}: '
+                        f'{type(e).__name__}: {e}',
+                        'WARN',
+                    )
             return _skip(
                 'skipped_not_found',
                 f'pr not found / unreachable: {exist_reason}',
@@ -12934,6 +13323,19 @@ def main_loop() -> int:
         except Exception as e:  # noqa: BLE001
             log(
                 f'auto-merge queue sweep error: {type(e).__name__}: {e}',
+                'ERROR',
+            )
+
+        # outbox-notifier-pending-auto-merge-queue-001 — retry auto-merges that
+        # were skipped because a rate-limit backoff window was open when their
+        # REVIEW_PASS was processed. Cheap when the queue is empty (one stat)
+        # and a no-op while the backoff window is still active. Same daemon-
+        # never-wedge guard as the serializer sweep above.
+        try:
+            _pending_auto_merge_sweep()
+        except Exception as e:  # noqa: BLE001
+            log(
+                f'pending auto-merge sweep error: {type(e).__name__}: {e}',
                 'ERROR',
             )
 

@@ -23,7 +23,9 @@ try:  # engage the test sandbox before any production import reads env/paths
 except ImportError:
     import _bootstrap  # noqa: F401
 
+import json
 import sys
+import tempfile
 import types
 import unittest
 from pathlib import Path
@@ -268,6 +270,264 @@ class GhRateLimitBackoffTest(unittest.TestCase):
         self.assertEqual(result['merge_outcome'], 'failed')
         self.assertIn('backoff', result['merge_reason'])
         self.assertEqual(result['pr_number'], 9)
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# outbox-notifier-pending-auto-merge-queue-001 — durable retry of auto-merges
+# that were skipped because a rate-limit backoff window was open when the
+# REVIEW_PASS was processed. Without this, the PR orphans forever (the marker
+# doesn't re-arrive, the healer only retries `failed`, the serializer queue is
+# never entered). The enqueue is scoped TIGHTLY to the backoff reason: a genuine
+# 404 / timeout keeps today's skip-without-enqueue behavior.
+# ═══════════════════════════════════════════════════════════════════════════
+
+_AGENT_CORE_PR = 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/42'
+_AGENT_CORE_REPO = 'Larry-Yatch/ourliberty-agent-core'
+
+
+class _PendingQueueTestBase(unittest.TestCase):
+    """Shared setup: deterministic backoff clock + a tmpdir-rerouted pending
+    queue file so nothing touches ~/agents or hits real gh."""
+
+    def setUp(self):
+        self.clock = _FakeClock()
+        self._saved_clock = on._gh_backoff_clock
+        self._saved_jitter = on._gh_backoff_jitter
+        on._gh_backoff_clock = self.clock.now
+        on._gh_backoff_jitter = lambda lo, hi: 0.0
+        on._gh_backoff_until = 0.0
+        on._gh_consecutive_rate_limit = 0
+        on._gh_backoff_skip_logged = False
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self._saved_queue_file = on.PENDING_AUTO_MERGE_QUEUE_FILE
+        on.PENDING_AUTO_MERGE_QUEUE_FILE = (
+            Path(self._tmp.name) / 'state' / 'pending-auto-merges.json'
+        )
+        self._saved_corrupt_dmed = on._PENDING_AUTO_MERGE_CORRUPT_DMED
+        on._PENDING_AUTO_MERGE_CORRUPT_DMED = False
+
+    def tearDown(self):
+        on._gh_backoff_clock = self._saved_clock
+        on._gh_backoff_jitter = self._saved_jitter
+        on._gh_backoff_until = 0.0
+        on._gh_consecutive_rate_limit = 0
+        on._gh_backoff_skip_logged = False
+        on.PENDING_AUTO_MERGE_QUEUE_FILE = self._saved_queue_file
+        on._PENDING_AUTO_MERGE_CORRUPT_DMED = self._saved_corrupt_dmed
+
+
+class PendingAutoMergeEnqueueTest(_PendingQueueTestBase):
+    """The enqueue predicate at the `pr_state is None` skip branch — driven
+    through the real `_run_review_pass_auto_merge` with a mocked existence
+    check (so no gh shell-out) and no `_AUTO_MERGE_FN_OVERRIDE` (production
+    default), so the existence-check bypass is not taken."""
+
+    def _run_pass(self, exist_return, *, changed_files=('scripts/x.py',),
+                  reply_chat_id=555, task_id='orphan-1'):
+        data = {
+            'task_id': task_id,
+            'reply_chat_id': reply_chat_id,
+            'changed_files': (
+                list(changed_files) if changed_files is not None else None
+            ),
+            'pr_url': _AGENT_CORE_PR,
+        }
+        marker_decision = {
+            'payload': {'pr_url': _AGENT_CORE_PR, 'summary': 'did the thing'},
+            'intent_kwargs': {},
+        }
+        with mock.patch.object(on, '_pr_url_existence_state',
+                               return_value=exist_return), \
+             mock.patch.object(on, '_sequence_cancelled', return_value=False):
+            return on._run_review_pass_auto_merge(
+                data, marker_decision, Path(self._tmp.name) / 'ob.json',
+            )
+
+    def test_enqueue_on_ratelimit_skip(self):
+        ret = self._run_pass((None, on._GH_BACKOFF_EXIST_REASON))
+        self.assertEqual(ret, 'auto-merge-skipped')
+        entries = on._load_pending_auto_merge_queue()
+        self.assertEqual(len(entries), 1)
+        e = entries[0]
+        self.assertEqual(e['repo'], _AGENT_CORE_REPO)
+        self.assertEqual(e['pr_number'], 42)
+        self.assertEqual(e['pr_url'], _AGENT_CORE_PR)
+        self.assertEqual(e['task_id'], 'orphan-1')
+        self.assertEqual(e['summary'], 'did the thing')
+        self.assertEqual(e['reply_chat_id'], 555)
+        self.assertEqual(e['changed_files'], ['scripts/x.py'])
+        self.assertEqual(e['retry_attempts'], 0)
+        self.assertIsNone(e['last_attempt_at'])
+        self.assertIn('queued_at', e)
+
+    def test_no_enqueue_on_genuine_404(self):
+        ret = self._run_pass(
+            (None, 'gh exit=1: HTTP 404: This PR could not be found'),
+        )
+        self.assertEqual(ret, 'auto-merge-skipped')
+        self.assertEqual(on._load_pending_auto_merge_queue(), [])
+
+    def test_enqueue_dedup(self):
+        self._run_pass((None, on._GH_BACKOFF_EXIST_REASON))
+        self._run_pass((None, on._GH_BACKOFF_EXIST_REASON))
+        self.assertEqual(len(on._load_pending_auto_merge_queue()), 1)
+
+
+class PendingAutoMergeSweepTest(_PendingQueueTestBase):
+    """The per-scan retry sweep."""
+
+    def _seed(self, **over):
+        entry = {
+            'task_id': 'orphan-1',
+            'pr_url': _AGENT_CORE_PR,
+            'repo': _AGENT_CORE_REPO,
+            'pr_number': 42,
+            'summary': 'did the thing',
+            'reply_chat_id': 555,
+            'changed_files': ['scripts/x.py'],
+            'queued_at': '2026-07-09T00:00:00+00:00',
+            'retry_attempts': 0,
+            'last_attempt_at': None,
+        }
+        entry.update(over)
+        on._save_pending_auto_merge_queue([entry])
+
+    def test_sweep_noop_while_backoff_active(self):
+        self._seed()
+        on._gh_backoff_until = self.clock.now() + 100  # window still open
+        with mock.patch.object(on, '_attempt_auto_merge_with_gates') as merge, \
+             mock.patch.object(on, '_pr_url_existence_state') as exist:
+            on._pending_auto_merge_sweep()
+        merge.assert_not_called()
+        exist.assert_not_called()
+        self.assertEqual(len(on._load_pending_auto_merge_queue()), 1)
+
+    def test_sweep_merges_after_backoff_clears(self):
+        self._seed()
+        on._gh_backoff_until = 0.0  # window cleared
+        merged = {
+            'merge_outcome': 'merged', 'merge_reason': 'squash-merged',
+            'pr_number': 42, 'repo_coords': _AGENT_CORE_REPO,
+        }
+        with mock.patch.object(on, '_pr_url_existence_state',
+                               return_value=('OPEN', 'ok')), \
+             mock.patch.object(on, '_attempt_auto_merge_with_gates',
+                               return_value=merged) as merge, \
+             mock.patch.object(on, '_fire_review_pass_outcome_dm') as dm:
+            on._pending_auto_merge_sweep()
+        merge.assert_called_once()
+        dm.assert_called_once()
+        self.assertEqual(on._load_pending_auto_merge_queue(), [])
+
+    def test_sweep_dequeues_terminal(self):
+        self._seed()
+        on._gh_backoff_until = 0.0
+        with mock.patch.object(on, '_pr_url_existence_state',
+                               return_value=('MERGED', 'ok')), \
+             mock.patch.object(on, '_attempt_auto_merge_with_gates') as merge, \
+             mock.patch.object(on, '_fire_review_pass_outcome_dm') as dm:
+            on._pending_auto_merge_sweep()
+        merge.assert_not_called()
+        dm.assert_not_called()  # no duplicate DM on clean out-of-band merge
+        self.assertEqual(on._load_pending_auto_merge_queue(), [])
+
+    def test_sweep_attempt_cap_dms_and_dequeues(self):
+        self._seed(retry_attempts=on._PENDING_AUTO_MERGE_MAX_ATTEMPTS + 1)
+        on._gh_backoff_until = 0.0
+        with mock.patch.object(
+                on, '_dm_larry_pending_auto_merge_exhausted') as dm, \
+             mock.patch.object(on, '_attempt_auto_merge_with_gates') as merge, \
+             mock.patch.object(on, '_pr_url_existence_state') as exist:
+            on._pending_auto_merge_sweep()
+        dm.assert_called_once()
+        merge.assert_not_called()
+        exist.assert_not_called()  # cap check short-circuits before ground-truth
+        self.assertEqual(on._load_pending_auto_merge_queue(), [])
+
+    def test_sweep_transient_non_backoff_bumps_and_keeps(self):
+        self._seed()
+        on._gh_backoff_until = 0.0
+        with mock.patch.object(on, '_pr_url_existence_state',
+                               return_value=(None, 'timeout after 10s')), \
+             mock.patch.object(on, '_attempt_auto_merge_with_gates') as merge:
+            on._pending_auto_merge_sweep()
+        merge.assert_not_called()
+        entries = on._load_pending_auto_merge_queue()
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(entries[0]['retry_attempts'], 1)
+        self.assertIsNotNone(entries[0]['last_attempt_at'])
+
+    def test_sweep_reraised_backoff_leaves_entry(self):
+        self._seed()
+        on._gh_backoff_until = 0.0  # clears the top-of-sweep guard
+        with mock.patch.object(
+                on, '_pr_url_existence_state',
+                return_value=(None, on._GH_BACKOFF_EXIST_REASON)), \
+             mock.patch.object(on, '_attempt_auto_merge_with_gates') as merge:
+            on._pending_auto_merge_sweep()
+        merge.assert_not_called()
+        entries = on._load_pending_auto_merge_queue()
+        self.assertEqual(len(entries), 1)
+        self.assertEqual(entries[0]['retry_attempts'], 0)  # untouched
+
+    def test_corrupt_queue_fails_soft(self):
+        on.PENDING_AUTO_MERGE_QUEUE_FILE.parent.mkdir(
+            parents=True, exist_ok=True,
+        )
+        on.PENDING_AUTO_MERGE_QUEUE_FILE.write_text(
+            '{ this is not valid json', encoding='utf-8',
+        )
+        on._gh_backoff_until = 0.0
+        with mock.patch.object(on, '_attempt_auto_merge_with_gates') as merge, \
+             mock.patch.object(on, 'log') as log_fn, \
+             mock.patch.object(on.larry_alerts, 'append_alert') as alert:
+            on._pending_auto_merge_sweep()  # must not raise
+        merge.assert_not_called()
+        warned = [
+            c for c in log_fn.call_args_list
+            if 'PENDING_AUTO_MERGE_QUEUE_CORRUPT' in c.args[0]
+        ]
+        self.assertTrue(warned)
+        alert.assert_called_once()
+
+    def test_empty_queue_cheap_noop(self):
+        self.assertFalse(on.PENDING_AUTO_MERGE_QUEUE_FILE.exists())
+        on._gh_backoff_until = 0.0
+        with mock.patch.object(on, '_pr_url_existence_state') as exist, \
+             mock.patch.object(on, '_attempt_auto_merge_with_gates') as merge:
+            on._pending_auto_merge_sweep()
+        exist.assert_not_called()
+        merge.assert_not_called()
+
+
+class PendingAutoMergeQueueHelpersTest(_PendingQueueTestBase):
+    """Direct coverage of the queue file schema + helper round-trips."""
+
+    def test_enqueue_writes_versioned_dict_wrapper(self):
+        on._enqueue_pending_auto_merge(
+            task_id='t', pr_url=_AGENT_CORE_PR, repo=_AGENT_CORE_REPO,
+            pr_number=7, summary='s', reply_chat_id=None, changed_files=None,
+        )
+        raw = json.loads(
+            on.PENDING_AUTO_MERGE_QUEUE_FILE.read_text(encoding='utf-8'),
+        )
+        self.assertEqual(raw['version'], on.PENDING_AUTO_MERGE_QUEUE_VERSION)
+        self.assertEqual(len(raw['entries']), 1)
+
+    def test_dequeue_removes_matching_entry(self):
+        on._enqueue_pending_auto_merge(
+            task_id='t', pr_url=_AGENT_CORE_PR, repo=_AGENT_CORE_REPO,
+            pr_number=7, summary='s', reply_chat_id=None, changed_files=None,
+        )
+        removed = on._dequeue_pending_auto_merge(_AGENT_CORE_REPO, 7)
+        self.assertIsNotNone(removed)
+        self.assertEqual(on._load_pending_auto_merge_queue(), [])
+        # Second dequeue of the same key is a clean no-op.
+        self.assertIsNone(on._dequeue_pending_auto_merge(_AGENT_CORE_REPO, 7))
+
+    def test_absent_file_reads_empty(self):
+        self.assertEqual(on._load_pending_auto_merge_queue(), [])
 
 
 if __name__ == '__main__':
