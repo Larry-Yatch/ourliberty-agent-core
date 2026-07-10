@@ -8520,7 +8520,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-10T23:35:16.161092+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-10T23:27:47.486823+00:00"
+      "orphan_last_activity_ts": "2026-07-10T23:27:47.486823+00:00",
+      "briefing": {
+        "what": "A piece of work the team picked up on its own that isn't attached to any project goal yet.",
+        "why": "It's been sitting in review and cycling through repeated passes, so it's tying up time without a clear payoff to the business.",
+        "suggest": "Have someone confirm what it's for and whether it's worth finishing before it consumes more review effort \u2014 worth a quick look rather than an automatic yes."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-10T23:43:27.637396+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
