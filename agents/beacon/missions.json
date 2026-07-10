@@ -8262,7 +8262,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-10T07:15:18.244245+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-06T17:38:21.234596+00:00"
+      "orphan_last_activity_ts": "2026-07-06T17:38:21.234596+00:00",
+      "briefing": {
+        "what": "A team member started polishing a piece of your customer dashboard that isn't yet attached to any active project.",
+        "why": "Loose work that isn't tied to a goal can quietly eat time and ship changes nobody asked for, so it's worth a quick look before it goes further.",
+        "suggest": "Take a short look to confirm it's worth finishing and give it a home in a real project \u2014 or set it aside if it's not a priority right now."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-10T07:23:55.660235+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
