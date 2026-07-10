@@ -667,6 +667,106 @@ class HappyPathTest(_LarryActionBase):
         )
 
 
+# ---------- dashboard-decline resolves the pending-approvals store ----------
+
+class DeclineResolvesPendingStoreTest(_LarryActionBase):
+    """Regression for the 2026-06-28 pending-pop gap, fixed by Approval-Sync
+    Phase 2 (PR #781) + 2.1 (PR #790): a dashboard Decline (action=reject on an
+    approval_request source event) must not only write the Beacon reject
+    envelope — it must also RESOLVE the matching beacon-pending-approvals entry
+    (pop it from `pending` into `history` with status=='rejected') via the
+    resolve_decision fan-out's P-leg.
+
+    The sibling HappyPathTest.test_reject_writes_beacon_envelope_with_comment
+    asserts only the envelope + audit row and never seeds a pending entry, so it
+    does NOT cover the pop. This class does: it seeds a pending entry whose id
+    equals the source event's task_id (== source_task_id == the fan-out's
+    fan_entry_id for a decision-type row), POSTs reject, and asserts the
+    pending->history transition.
+
+    ISOLATION: beacon_approval_handler resolves PENDING_APPROVALS_PATH (and its
+    file-lock sidecar, via file_lock.sidecar_lock_path) from the module global at
+    CALL time in load_state/save_state/state_lock. We repoint that global at a
+    per-test tmp file in setUp and restore it in tearDown, so BOTH the store and
+    its lock are scoped to tmp for the whole test — the fan-out's real P-leg
+    (bah.resolve) runs against tmp, never any shared/production pending file.
+    """
+
+    def setUp(self):
+        super().setUp()
+        import beacon_approval_handler as bah
+        self._bah = bah
+        self._orig_pending_path = bah.PENDING_APPROVALS_PATH
+        bah.PENDING_APPROVALS_PATH = self.tmp / 'state' / 'beacon-pending-approvals.json'
+
+    def tearDown(self):
+        # Restore the module global FIRST so a failed assertion never leaks the
+        # tmp path into a sibling test.
+        self._bah.PENDING_APPROVALS_PATH = self._orig_pending_path
+        super().tearDown()
+
+    def test_decline_pops_pending_entry_to_history_rejected(self):
+        bah = self._bah
+        task_id = 'task-decline-pending-1'
+
+        # Seed the pending-approvals entry (in the tmp-scoped store) whose id
+        # matches the source event's task_id — the join the P-leg pops on.
+        bah.add_pending(
+            {
+                'task_id': task_id,
+                'summary': 'Forge should X.',
+                'target_agent': 'forge',
+                'prompt': 'Forge should X.',
+            },
+            chat_id=424242,
+        )
+        # Sanity: the write landed in the tmp store, not anywhere else.
+        self.assertTrue(bah.PENDING_APPROVALS_PATH.exists())
+        self.assertIn(self.tmp, bah.PENDING_APPROVALS_PATH.parents)
+        seeded = bah.load_state()
+        self.assertEqual([e['id'] for e in seeded['pending']], [task_id])
+
+        # Seed the approval_request chain_event the dashboard acts on. Its
+        # task_id equals the pending entry id, so the handler's fan_entry_id
+        # (= source_task_id for a decision-type row) addresses that entry.
+        self._seed(
+            event_id='ev-decline-1',
+            task_id=task_id,
+            event_type='approval_request',
+            payload={
+                'proposing_agent': 'beacon',
+                'target_agent': 'forge',
+                'prompt': 'Forge should X.',
+            },
+            read_at=None,
+        )
+
+        r = self.c.post(
+            '/api/larry/action',
+            headers=AUTH,
+            json={'source_event_id': 'ev-decline-1', 'action': 'reject',
+                  'comment': 'wrong approach'},
+        )
+        self.assertEqual(r.status_code, 200, r.text)
+
+        # The load-bearing assertion: the entry moved pending -> history with
+        # status='rejected'. Reverting the resolve_decision fan-out in
+        # dashboard_api leaves the entry in `pending` and this fails.
+        state = bah.load_state()
+        self.assertNotIn(
+            task_id, [e['id'] for e in state.get('pending', [])],
+            'declined entry must no longer be pending',
+        )
+        matched = [e for e in state.get('history', []) if e.get('id') == task_id]
+        self.assertEqual(len(matched), 1, 'declined entry must be in history exactly once')
+        self.assertEqual(matched[0]['status'], 'rejected')
+
+        # Isolation is provably scoped to tmp: the store the fan-out resolved
+        # against is under this test's tmp dir, so no shared/production
+        # pending-approvals file was touched.
+        self.assertIn(self.tmp, bah.PENDING_APPROVALS_PATH.parents)
+
+
 # ---------- #10 atomic-claim (TOCTOU) ----------
 
 class AtomicClaimConcurrencyTest(_LarryActionBase):
