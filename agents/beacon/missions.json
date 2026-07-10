@@ -8315,7 +8315,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-10T15:48:09.000455+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-10T15:36:12.869596+00:00"
+      "orphan_last_activity_ts": "2026-07-10T15:36:12.869596+00:00",
+      "briefing": {
+        "what": "The team started work to keep our main system's safety checks running smoothly, but it isn't attached to any active project yet.",
+        "why": "Loose, unassigned work can quietly stall or drift, tying up the team's time on something no one is clearly waiting on.",
+        "suggest": "Have someone confirm whether this is still needed and either fold it into a real project or set it aside before it consumes more effort."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-10T15:49:18.763878+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-pr-ourliberty-agent-core-905",
@@ -8332,7 +8346,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-10T15:48:09.000455+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-10T15:35:50.780949+00:00"
+      "orphan_last_activity_ts": "2026-07-10T15:35:50.780949+00:00",
+      "briefing": {
+        "what": "A piece of new work your team started on their own that hasn't been tied to a specific project goal yet.",
+        "why": "It's been sitting waiting for your sign-off, and unclaimed work like this can quietly stall or drift without a clear purpose.",
+        "suggest": "Take a quick look and either connect it to a current priority or set it aside \u2014 but check what it's for before waving it through."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-10T15:49:18.763878+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
