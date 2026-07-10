@@ -11498,3 +11498,83 @@ NOMINAL ✅
 
 ---
 
+## Iteration ~4842 — 2026-07-09T21:24Z UTC (Larry /cycle chat, Tier 1)
+
+**Health:** ✅ Nominal — 0 new alerts; inbox_watcher PID updated (routine heal-stale-daemon-code restart at 21:17Z); PR list narrowed to 4 open (#847/#854/#860/#874); Larry active Beacon chat (DAG question 21:19Z); zombie + pending carry unchanged.
+
+**VERIFY-BEFORE-REASSERT (from iter ~4841):**
+- **"beacon PID 1592338"**: CONFIRMED ✅ — Ss, ~13:58 elapsed. [alive]
+- **"outbox_notifier PID 1592524"**: CONFIRMED ✅ — Ss, ~13:53 elapsed. No WARNs since 21:07Z restart (~14 min clean). [alive, quiet]
+- **"inbox_watcher PID 1414370"**: UPDATED → NEW PID **1606096** (Ssl, started 21:17Z UTC). Heal-stale-daemon-code restart confirmed by heartbeat at 21:17:20Z. [routine restart, alive]
+- **"zombie PID 1834248 (~42d+01:55:38)"**: CONFIRMED ⚠️ — Ss, 42-02:02:55 elapsed. [carry, time updated]
+- **"pending=1 (silence-auto-merge-queue-stale-001)"**: CONFIRMED ✅ — still 1 entry. No Larry approval yet. [confirmed]
+- **"HEAD=63c64029=origin/main"**: UPDATED ✅ → HEAD=8fd7c069 ("Pulse cycle 20260709T211941Z") = origin/main. Clean, up to date. [wrapper commit]
+- **"Sync last_sync=21:13:03Z status=error"**: CARRY — still status=error (sync push race). Git HEAD=origin/main. Self-heals. [carry]
+- **"Daemon heartbeat 21:07:09Z"**: UPDATED ✅ → 2026-07-09T21:17:20Z (~7 min at 21:24Z). [fresh restart]
+- **"gh-burn timers not installed"**: CARRY ⚠️ [carry]
+- **"PR #854/#847/#860/#874 OPEN (UNKNOWN)"**: UPDATED — 4 PRs confirmed open: #847 UNKNOWN (HELD), #854 UNKNOWN (no labels), #860 UNKNOWN (no labels), #874 UNKNOWN (auto-review label). PR #895 + #897 confirmed MERGED. [updated]
+- **"PR #891 MERGED ✅"**: CONFIRMED — stall checker pr2-slot-aware-healers pr_exists (#891). [stable]
+
+**NEW FINDINGS:**
+1. **inbox_watcher PID 1414370 → 1606096** — heal-stale-daemon-code restarted at ~21:17Z UTC (heartbeat=21:17:20Z). Routine stale-code restart (gh_budget.py change wave). New process alive and stable. ✅
+2. **Larry ↔ Beacon active at 21:19Z** — Larry asked "why does the build sequence section show a DAG sequence mid flight but the team is idle?" Beacon responded 21:21:39Z. No Pulse action. ✅ [blue]
+3. **PR #895 + #897 MERGED** — #895 (chore/missions, 356ecf02) and #897 (watchdog recovered, af0d768d) now confirmed MERGED. Current open: #847, #854, #860, #874 only. ✅
+
+**Check 0 — Alert triage:**
+- repair-watermark: `{"repaired": false, "old_watermark": 948, "file_length": 948}`. 0 new alerts.
+- NOMINAL ✅
+
+**Check 1 — Log noise:** outbox-notifier quiet since 21:07:25Z restart — last entries are SIGTERM/restart/INFO only. No WARNs (~14 min clean at 21:21Z). NOMINAL ✅
+
+**Check 2 — Telegram sweep:** Beacon PID 1592338 ✅ (Ss, ~13:58 elapsed). Bot log: last deliveries idx=946/947 sync alerts at 21:17:26Z; Larry message 21:19:52Z (DAG question); Beacon responded 21:21:39Z. No new Larry directives for Pulse. NOMINAL ✅
+
+**Check 3 — Pipeline stall:** DRY-RUN 21:21:31Z → `no stalls detected`. FORGE_NO_PR_SKIP ×15 (pr_exists ×13, pr_task_id_closed_or_merged ×2). NOMINAL ✅
+
+**Check 4 — Pending directives:** pending=1 (UNCHANGED).
+- Entry 0: id=silence-auto-merge-queue-stale-001 (21:07:53Z) — APPROVAL_REQUEST, iter ~4839 dispatch. `approve silence-auto-merge-queue-stale-001`. ⚠️ [carry]
+NOMINAL ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-09T21:17:20Z (~7 min at 21:24Z, <60 min). NOMINAL ✅
+
+**Check A — Source repo:** HEAD=8fd7c069=origin/main. On main. Clean. Up-to-date. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-09T21:13:03Z (~11 min at 21:24Z). Status=error (push race, carry). Git repo clean/up-to-date. Self-heals. CARRY NOMINAL ✅
+**Check C — Agent liveness:** inbox_watcher PID 1606096 ✅ (Ssl, new ~21:17Z). beacon PID 1592338 ✅ (Ss, ~13:58). outbox_notifier PID 1592524 ✅ (Ss, ~13:53). Zombie 1834248 ⚠️ (~42d+02:02:55, bash poll loop) [carry]. NOMINAL ✅
+**Check E — PR state:** 4 open PRs: #847 (HELD, UNKNOWN), #854 (OPEN, no labels), #860 (OPEN, no labels), #874 (OPEN, auto-review label, stale >24h behind #847). Stall dry-run clean. CARRY NOMINAL ✅
+
+**§5.0:** distill_detector: no-op ✅. audit_due_nudge: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks — UTC Thursday 2026-07-09:**
+- Check I: Thursday (off-day). systemd timer handles Mon/Wed/Fri/Sun. Skip. ✅
+- Check III: Sunday gate. Next: 2026-07-13. Skip. ✅
+- Check IX/X: Monday gate. Skip. ✅
+- Check VI/VIII: Proposals idx=990,991 carry — awaiting Larry. [carry]
+
+**G-rule assessment:** No new G-rule occurrences this iter. All statuses carry unchanged from iter ~4841.
+
+**Actions taken:**
+1. Check 0: watermark stable at 948. 0 new alerts. ✅
+2. §5.0: all three no-ops. ✅
+3. PRIME ledger: `iter_clean` appended at 21:24:29Z. ✅
+4. Tier state: `record --checks-clean false` → Tier 1 (zombie+pending carry; consecutive_clean=0). ✅
+
+**Escalations:** 0 new Pulse DMs this iter.
+
+**Standing findings (carry):**
+- [yellow] **zombie-bash-pid-1834248** — PID 1834248 (~42d+02:02:55, Ss bash poll loop). ask-then-do: `kill 1834248`. [carry confirmed]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07`. [carry]
+- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
+- [yellow] **APPROVAL_REQUEST silence-auto-merge-queue-stale-001** — Tier-3 translation for auto-merge-queue-stale alerts. `approve silence-auto-merge-queue-stale-001`. [carry]
+- [yellow] **gh-burn timers not installed** — `sudo systemctl enable --now ourliberty-gh-burn-sampler.timer && sudo systemctl enable --now ourliberty-gh-burn-analyzer.timer`. Larry DM'd (idx=935). [carry]
+- [blue] **PR #847** — OPEN (HELD_DEEP_REVIEW). Blocking #874 auto-merge queue. [carry]
+- [blue] **PR #854** — OPEN (no labels). Sentinel-inflight-stall translation fix. Needs `auto-review` label for Mirror dispatch. [carry]
+- [blue] **PR #860** — OPEN (no labels). [carry]
+- [blue] **PR #874** — OPEN (auto-review label, stale >24h behind #847). [carry]
+- [blue] **G-rules (dispatched, vp):** sentinel-inflight-stall-tier4 (PR #854); notifier-concurrent-scan-dup (PR #847); ourliberty-health-subject-key-mismatch-001; forge-wip-redispatch-digest-tier4-001; no-session-revision-active-mirror-session-fp-001; forge-revision-preamble-missing-pr711-001; forge-wip-redispatch-exhausted-pr-exists-fp-001; decision-needed-approval-forge-dispatch-no-target-repo-001; auto-merge-queue-stale-promoted-tier3-translation (DISPATCHED ✅, vp). [carry]
+- [blue] **G-rule 2/3:** forge-marker-task-id-mismatch-xii-v1; build-sequence-advancer-sequence-complete-tier4-001. [carry]
+- [blue] **G-rule 1/3:** outbox-notifier-merge-held-deep-review-tier4-001; mirror-malformed-verdict-heal-reap-path-001; forge-wip-redispatch-exhausted-genuine-no-pr-001. [carry]
+
+**PRIME DIRECTIVE:** ratio=20.33 (interventions=1647, systemic_fixes=81, vp=37); `iter_clean` appended (21:24:29Z).
+**Tier end-of-iter:** Tier **1** (consecutive_clean=0; zombie+pending carries).
+
+---
+
