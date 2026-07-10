@@ -216,9 +216,9 @@ PR #800 (`fix(heal): re-restart stale daemon on fresh deploy inside cooldown win
 
 ---
 
-## G-rule outbox-notifier-merge-held-deep-review-tier4-001 — 2/3 (updated iter ~4869)
+## G-rule outbox-notifier-merge-held-deep-review-tier4-001 → DISPATCHED ✅ (iter ~5002)
 
-**Rule:** `source=outbox-notifier, kind=notification, intent=merge_held_deep_review` alerts classify Tier-4 (novel, no translation match). These are delivery confirmations — outbox-notifier already DMed Larry when it fires this notification; Pulse's triage should silence (Tier-3) rather than prompt a duplicate DM. Fix: add `source=outbox-notifier, intent=merge_held_deep_review` → Tier-3 entry to `config/alert-translations.json`. Dispatch to Beacon at 3/3. Occurrences: iter ~4558 (1/3, L974, PR #847); iter ~4869 (2/3, L978, PR #904 HELD_DEEP_REVIEW at 04:26:01Z UTC).
+**Rule:** `source=outbox-notifier, kind=notification, intent=merge_held_deep_review` alerts classify Tier-4 (novel, no translation match). These are delivery confirmations — outbox-notifier already DMed Larry when it fires this notification; Pulse's triage should silence (Tier-3) rather than prompt a duplicate DM. Fix: add `source=outbox-notifier, intent=merge_held_deep_review` → Tier-3 entry to `config/alert-translations.json`. Direction-ask `direction-ask-outbox-notifier-merge-held-deep-review-tier3-3of3-001` dispatched to Beacon inbox at iter ~5002 (3/3). verification_pending (Forge config-only PR). Occurrences: iter ~4558 (1/3, L974, PR #847); iter ~4869 (2/3, L978, PR #904 HELD_DEEP_REVIEW at 04:26:01Z UTC); iter ~5002 (3/3, L962, PR #917 locked_update RMW critical-path).
 
 ---
 
@@ -520,9 +520,9 @@ PR #894 ("config: add pr-fanout-probe-health translation entry") MERGED 2026-07-
 
 ---
 
-## G-rule forge-wip-redispatch-exhausted-genuine-no-pr-001 — 1/3 (new, iter ~4657)
+## G-rule forge-wip-redispatch-exhausted-genuine-no-pr-001 — 2/3 (updated iter ~5002)
 
-**Rule:** forge-wip-redispatch fires EXHAUSTED for tasks where NO PR exists on the build branch AND retry1 also died WIP-only. Distinct from `forge-wip-redispatch-exhausted-pr-exists-fp-001` (FP when PR already exists). Here there is no PR at all — the task genuinely fails to land any commits. Bot delivers route=escalate to Larry. Pulse journals only, no duplicate DM. First occurrence: iter ~4657 (review-sequence-dag-suite-green-guardian, branch mirror/review-sequence-dag-suite-green-guardian-retry1). Related to Larry's question at 12:58 MDT about whether the suite-green-guardian dag sequence was running. Dispatch to Beacon at 3/3.
+**Rule:** forge-wip-redispatch fires EXHAUSTED for tasks where NO PR exists on the build branch AND retry1 also died WIP-only. Distinct from `forge-wip-redispatch-exhausted-pr-exists-fp-001` (FP when PR already exists). Here there is no PR at all — the task genuinely fails to land any commits. Bot delivers route=escalate to Larry. Pulse journals only, no duplicate DM. Dispatch to Beacon at 3/3. Occurrences: iter ~4657 (1/3, review-sequence-dag-suite-green-guardian); iter ~5002 (2/3, dag-preflight-spec-gauntlet-gate-001 — branch mirror/dag-preflight-spec-gauntlet-gate-001-retry1, spec-gauntlet sequence may be blocked).
 
 ---
 
@@ -580,8 +580,14 @@ PR #909 (`chore(alerts): Tier-3 silence sentinel stale-lease duplicate re-escala
 
 ---
 
-## Status snapshot — updated 2026-07-10T23:23Z UTC (Iter ~5001, **Tier 3**, consecutive_clean=3)
+## G-rule heal-pipeline-stall-unrouted-deep-review-required-fp-001 — 1/3 (new, iter ~5002)
 
-**Iter ~5001 summary (2026-07-10T23:23Z):** 7 new alerts (L954-L960): 5× Tier-3 silence, 2× Tier-4 bot-handled (forge-wip-redispatch digest, auto-merge-conflict:874 escalated). PR #914 MERGED (b5183499) — deep-review-gate live; 4 deep-review-holds surfaced on Approvals tab (PRs #823, #830, #833, #904). beacon→PID 3300205, outbox-notifier→PID 3299133 (heal-stale-daemon-code restart 23:13Z). PR #919 Mirror REVIEW_PASS AUTO_MERGE_HELD (blocker=#874). PR #874 Mirror review dispatched 17:15 MDT. PR #916 (gg-s1-foundations) revision-1 to Forge in progress. PR #847 state unverified (GH rate-limited). Zombie PID 1834248 (43d+04:00h). pending=5 (1 stale #914, 4 new deep-review-holds). **ACTIVE G-rules:** heal-daemon-restart-manifest-drift-regenerated-tier4 [DISPATCHED ✅, APPROVAL_REQUEST delivered 16:54 MDT]; notifier-concurrent-scan-dup [PR #847 fix live, vp]; heal-undispatched-pr-review-claimed-race-fp-001 [PR #912 MERGED ✅, vp]; mirror-queue-wait-gauge-tier4-001 [1/3]; build-sequence-advancer-sequence-complete-tier4-001 [2/3]; forge-marker-task-id-mismatch-xii-v1 [2/3]; outbox-notifier-merge-held-deep-review-tier4-001 [2/3]; outbox-notifier-merge-conflict-manual-rebase-tier4-001 [**2/3** ← iter ~5001]; mirror-malformed-verdict-heal-reap-path-001 [1/3]; forge-wip-redispatch-exhausted-genuine-no-pr-001 [1/3]; heal-unregistered-approval-null-chat-id-001 [1/3]; inbox-watcher-tier-pool-all-unavailable-tier4-001 [1/3]; ourliberty-health-subject-key-mismatch-001 [3/3, vp]; forge-revision-preamble-missing-pr711-001 [vp]; forge-wip-redispatch-digest-tier4-001 [vp]; forge-wip-redispatch-exhausted-pr-exists-fp-001 [APPROVAL_REQUEST QUEUED iter ~3279, vp]; RECONCILE_MISSING_REVIEW-.claimed-blindspot [1/3].
+**Rule:** `heal_pipeline_stall.py` dry-run fires `unrouted_open_pr:<N>` for PRs labeled `deep-review-required`. These PRs intentionally have no auto-review dispatched — the standard Mirror route is suppressed by the label, and the PR is held for manual `/code-review high` before merging. Fix: stall-healer should check for `deep-review-required` label before flagging a PR as "unrouted". Dispatch to Beacon at 3/3 for code fix in `scripts/heal_pipeline_stall.py`. First occurrence: iter ~5002 (PR #918, fix/mirror-queued-revsibling-dedup, dry-run finding).
+
+---
+
+## Status snapshot — updated 2026-07-10T23:52Z UTC (Iter ~5002, **Tier 1**, consecutive_clean=0)
+
+**Iter ~5002 summary (2026-07-10T23:52Z):** 7 new alerts (L961-L967): 3× Tier-3 silence, 4× Tier-4. PR #847 MERGED ✅ (blocker for #913 cleared). PR #874 Mirror REVIEW_PASS but now held by new PR #918 (deep-review-required, fix/mirror-queued-revsibling-dedup). PR #917 new HELD_DEEP_REVIEW (locked_update RMW). PR #913 (delegate-tracking) now free to auto-merge. dag-preflight-spec-gauntlet-gate-001 EXHAUSTED (2/3). rebase-pr874 forge session wedge-reaped + retry1 auto-dispatched. Zombie PID 1834248 (43d+04:29h). pending=6. Tier reset 3→1. **ACTIVE G-rules:** outbox-notifier-merge-held-deep-review-tier4-001 [**3/3 DISPATCHED ✅** ← iter ~5002, vp]; heal-daemon-restart-manifest-drift-regenerated-tier4 [DISPATCHED ✅, APPROVAL_REQUEST delivered]; notifier-concurrent-scan-dup [PR #847 MERGED ✅, vp]; heal-undispatched-pr-review-claimed-race-fp-001 [PR #912 MERGED ✅, vp]; mirror-queue-wait-gauge-tier4-001 [1/3]; build-sequence-advancer-sequence-complete-tier4-001 [2/3]; forge-marker-task-id-mismatch-xii-v1 [2/3]; outbox-notifier-merge-conflict-manual-rebase-tier4-001 [2/3]; forge-wip-redispatch-exhausted-genuine-no-pr-001 [**2/3** ← iter ~5002]; mirror-malformed-verdict-heal-reap-path-001 [1/3]; heal-unregistered-approval-null-chat-id-001 [1/3]; inbox-watcher-tier-pool-all-unavailable-tier4-001 [1/3]; heal-pipeline-stall-unrouted-deep-review-required-fp-001 [**NEW 1/3** ← iter ~5002]; ourliberty-health-subject-key-mismatch-001 [3/3, vp]; forge-revision-preamble-missing-pr711-001 [vp]; forge-wip-redispatch-digest-tier4-001 [vp]; forge-wip-redispatch-exhausted-pr-exists-fp-001 [APPROVAL_REQUEST QUEUED, vp]; RECONCILE_MISSING_REVIEW-.claimed-blindspot [1/3].
 
 
