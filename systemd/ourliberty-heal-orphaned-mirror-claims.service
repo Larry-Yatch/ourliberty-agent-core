@@ -1,0 +1,18 @@
+[Unit]
+Description=Self-healing healer — archive orphaned Mirror review-claim files (.claimed/<slot>/ stranded by a mid-flight watcher death) so the slot unblocks
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/heal_orphaned_mirror_claims.py
+After=network.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/heal_orphaned_mirror_claims.py
+TimeoutStartSec=120
+Nice=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-heal-orphaned-mirror-claims

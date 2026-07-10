@@ -1,0 +1,10 @@
+[Unit]
+Description=Run heal_orphaned_mirror_claims every 10 minutes
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=10min
+Unit=ourliberty-heal-orphaned-mirror-claims.service
+
+[Install]
+WantedBy=timers.target
