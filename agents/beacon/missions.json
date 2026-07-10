@@ -5965,7 +5965,10 @@
         "at": "2026-06-26T07:41:42.770884+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-07-10T00:11:46.503045+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-heal-stall-mirror-active-suppression-001",
@@ -6032,7 +6035,10 @@
         "at": "2026-06-26T08:42:00.043442+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-07-10T00:11:46.503045+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-fix-wedged-reaper-spares-active-build-worktree-002",
@@ -6120,7 +6126,10 @@
         "at": "2026-06-26T20:19:20.030608+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-07-10T00:11:46.503045+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-silence-ourliberty-health-sync-push-failed-001",
@@ -6256,7 +6265,10 @@
         "at": "2026-06-26T23:20:22.197269+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-07-10T00:11:46.503045+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-direction-ask-auto-restart-failed-tier3-translation-001",
@@ -6287,7 +6299,10 @@
         "at": "2026-06-26T23:20:22.197269+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-07-10T00:11:46.503045+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-mirror-marker-self-validate-gate-001",
@@ -6353,7 +6368,10 @@
         "at": "2026-06-26T23:40:39.916046+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-07-10T00:11:46.503045+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "notifier-auto-retraction-stale-red-alerts-never-clear",
