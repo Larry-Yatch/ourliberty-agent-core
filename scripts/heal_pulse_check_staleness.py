@@ -76,6 +76,15 @@ def artifact_globs_for(check_id: str) -> list[str]:
         f'pulse-check-{check_id}-proposals/check-{check_id}-*.json',
     ]
 
+# A runner that fires on schedule but keeps skipping without running (e.g. the
+# main-suite-guardian bounded-waiting on the regbaseline-warm single-flight lock
+# and never acquiring it) emits a deferral signal instead of a success heartbeat.
+# A FRESH deferral is 'alive but deferred' — the timer IS firing — so a single
+# contended night must not read as gone-dark. But this many CONSECUTIVE deferred
+# firings with zero completed runs is genuine starvation and still escalates,
+# with an accurate lock-contention diagnosis rather than the scheduler-gap text.
+STARVATION_DEFERRAL_THRESHOLD = 3
+
 CONFIG_FILE = (
     Path(__file__).resolve().parent.parent / 'config' / 'pulse-check-cadence.json'
 )
@@ -229,6 +238,84 @@ def latest_signal_ts(check_id: str, bb: Path) -> tuple[Optional[float], str]:
     return ts, source
 
 
+def read_deferral(check_id: str, bb: Path) -> tuple[Optional[float], int]:
+    """Newest deferral signal for a check: (ts_epoch_or_None, consecutive_count).
+
+    The deferral file (blackboard/pulse-check-<id>.deferred) is written by a
+    runner that fired on schedule but skipped WITHOUT running (lock contention).
+    ts falls back to file mtime; a missing/malformed file reads as (None, 0)."""
+    path = bb / f'pulse-check-{check_id}.deferred'
+    try:
+        obj = json.loads(path.read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return None, 0
+    if not isinstance(obj, dict):
+        return None, 0
+    count = obj.get('consecutive')
+    count = count if isinstance(count, int) and count >= 0 else 0
+    ts_raw = obj.get('ts')
+    ts: Optional[float] = None
+    if ts_raw:
+        try:
+            ts = datetime.fromisoformat(ts_raw).timestamp()
+        except (ValueError, TypeError):
+            ts = None
+    if ts is None:
+        try:
+            ts = path.stat().st_mtime
+        except OSError:
+            ts = None
+    return ts, count
+
+
+def deferral_verdict(
+    check_id: str,
+    entry: dict,
+    bb: Path,
+    now: float,
+    threshold: float,
+) -> tuple[bool, Optional[dict]]:
+    """Decide whether a fresh deferral explains a stale/absent success signal.
+
+    Returns (applies, result):
+      * applies=False           -> no fresh deferral; caller runs its normal
+                                    gone-dark path.
+      * applies=True, result=None -> alive-but-deferred (under the starvation
+                                    threshold): suppress the gone-dark alarm.
+      * applies=True, result=<alert> -> starvation escalation with an accurate
+                                    lock-contention diagnosis.
+    ``threshold`` is the check's cadence+grace window in seconds: a deferral
+    older than that is itself stale and no longer vouches for liveness."""
+    ts, consecutive = read_deferral(check_id, bb)
+    if ts is None or (now - ts) > threshold:
+        return False, None
+    if consecutive >= STARVATION_DEFERRAL_THRESHOLD:
+        label = entry.get('label', check_id)
+        return True, {
+            'key': f'pulse-check-stale:{check_id}',
+            'subject': f'pulse-check-stale:{check_id}',
+            'message': (
+                f'Pulse check {check_id} ({label}) has been DEFERRED '
+                f'{consecutive} consecutive firings with no completed run: it '
+                'fires on schedule each night but cannot acquire the '
+                'regbaseline-warm single-flight lock within its bounded wait, so '
+                'it is starving on lock contention. The timer IS invoking it — '
+                'the guardian just never gets to run its green-guard.'
+            ),
+            'suggested_action': (
+                'This is lock contention, NOT a scheduler gap. Check whether the '
+                'regression-baseline warmer is holding '
+                '/home/larry/agents/state/ol-regbaseline-warm.lock across the '
+                '03:30 UTC window (journalctl -u ourliberty-main-suite-guardian '
+                'and the regbaseline warmer). Fix by staggering the warmer off '
+                'the guardian window or widening LOCK_WAIT_SEC in '
+                'scripts/run_main_suite_guardian.sh. Logs: '
+                '~/agents/logs/main-suite-guardian.log.'
+            ),
+        }
+    return True, None
+
+
 def discover_heartbeat_ids(bb: Path) -> set[str]:
     """Check ids that have a heartbeat file on disk (catches a check added to
     the fleet but never registered in the cadence config)."""
@@ -313,6 +400,13 @@ def evaluate_check(
         )
         if warming_up:
             return None
+        # A fresh deferral means the runner IS firing (it just can't acquire its
+        # single-flight lock), so the silence is not a dead check — suppress
+        # unless it has starved for STARVATION_DEFERRAL_THRESHOLD firings.
+        applies, deferred_alert = deferral_verdict(
+            check_id, entry, bb, now, threshold)
+        if applies:
+            return deferred_alert
         return {
             'key': f'pulse-check-stale:{check_id}',
             'subject': f'pulse-check-stale:{check_id}',
@@ -322,16 +416,20 @@ def evaluate_check(
                 f'{cadence_h:g}h cadence + {grace_h:g}h grace window — it has '
                 'most likely never run, or stops before its first heartbeat.'
             ),
-            'suggested_action': (
-                f'Run python3 ~/agent-core/scripts/pulse_check_{check_id}.py '
-                'and confirm it exits 0; check why the Pulse /cycle is not '
-                'invoking it.'
-            ),
+            'suggested_action': _timer_remediation(check_id, entry),
         }
 
     age = now - ts
     if age <= threshold:
         return None
+
+    # Success signal is stale. Before declaring the runner dead, consult its
+    # deferral signal: a runner that keeps firing but skipping on lock contention
+    # is alive-but-deferred (no gone-dark alarm) until it truly starves.
+    applies, deferred_alert = deferral_verdict(
+        check_id, entry, bb, now, threshold)
+    if applies:
+        return deferred_alert
 
     age_h = age / 3600.0
     return {
@@ -341,16 +439,30 @@ def evaluate_check(
             f'Pulse check {check_id} ({label}) has gone stale: last success '
             f'signal ({source}) is {age_h:.1f}h old, past the '
             f'{cadence_h:g}h cadence + {grace_h:g}h grace. The check has '
-            'silently stopped firing — its invoker is most likely not calling '
-            'it.'
+            'silently stopped firing — its scheduler is most likely not '
+            'invoking it.'
         ),
-        'suggested_action': (
-            f'Run python3 ~/agent-core/scripts/pulse_check_{check_id}.py to '
-            'confirm the check itself is healthy (it usually is — the failure '
-            'is in the scheduler), then check why the Pulse /cycle stopped '
-            'invoking it. Logs: ~/agents/logs/pulse-check-*.log.'
-        ),
+        'suggested_action': _timer_remediation(check_id, entry),
     }
+
+
+def _timer_remediation(check_id: str, entry: dict) -> str:
+    """Remediation text for a dark time-cadenced check. Every Pulse check now
+    fires from its own systemd timer (agent /cycle invocation was retired
+    2026-07-07), so the diagnosis points at the timer/service unit — NOT at 'the
+    Pulse /cycle'. ``entry['firing']`` names the unit in the cadence config."""
+    firing = entry.get('firing')
+    unit_hint = (
+        f'the systemd timer/service that fires it ({firing})' if firing
+        else 'the systemd timer/service that fires it'
+    )
+    return (
+        f'This check fires from a systemd timer (agent-invoked scheduling is '
+        f'retired), so the failure is in the timer, not a missed invocation. '
+        f'Confirm {unit_hint} is enabled and firing (systemctl status + '
+        'journalctl -u the unit), and that its runner exits 0. Logs: '
+        '~/agents/logs/ (pulse-check-*.log or the runner-specific log).'
+    )
 
 
 def evaluate_all(

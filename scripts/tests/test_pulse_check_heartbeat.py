@@ -69,6 +69,52 @@ class HeartbeatEmitTest(unittest.TestCase):
             hb.agents_root = lambda: blocker  # blackboard dir mkdir will fail
             self.assertFalse(hb.emit_heartbeat('ix'))
 
+    def test_emit_deferral_increments_consecutive(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            self._point_root(td)
+            self.assertTrue(hb.emit_deferral('main-suite-guardian'))
+            path = hb.deferral_path('main-suite-guardian')
+            obj = json.loads(path.read_text())
+            self.assertEqual(obj['check'], 'main-suite-guardian')
+            self.assertEqual(obj['consecutive'], 1)
+            self.assertIn('ts', obj)
+            # A second deferral without an intervening success bumps the streak.
+            self.assertTrue(hb.emit_deferral('main-suite-guardian'))
+            self.assertEqual(
+                json.loads(path.read_text())['consecutive'], 2)
+            self.assertEqual(
+                list(path.parent.glob('*.tmp')), [],
+                'atomic write left a .tmp file behind',
+            )
+
+    def test_emit_heartbeat_clears_deferral_streak(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            self._point_root(td)
+            hb.emit_deferral('main-suite-guardian')
+            hb.emit_deferral('main-suite-guardian')  # consecutive == 2
+            self.assertTrue(hb.deferral_path('main-suite-guardian').exists())
+            # A completed run resets the streak by removing the deferral file.
+            self.assertTrue(hb.emit_heartbeat('main-suite-guardian'))
+            self.assertFalse(hb.deferral_path('main-suite-guardian').exists())
+            # A subsequent deferral therefore starts counting from 1 again.
+            hb.emit_deferral('main-suite-guardian')
+            self.assertEqual(
+                json.loads(
+                    hb.deferral_path('main-suite-guardian').read_text()
+                )['consecutive'],
+                1,
+            )
+
+    def test_emit_deferral_never_raises_on_bad_root(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            blocker = Path(td) / 'afile'
+            blocker.write_text('x')
+            hb.agents_root = lambda: blocker
+            self.assertFalse(hb.emit_deferral('main-suite-guardian'))
+
 
 class _FakeAlerts:
     def __init__(self):

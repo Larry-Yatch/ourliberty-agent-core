@@ -37,6 +37,15 @@ LOCK_FILE="/home/larry/agents/state/ol-regbaseline-warm.lock"
 HARD_KILL_SEC=10800
 HEARTBEAT_ID="main-suite-guardian"
 
+# Bounded wait for the single-flight lock. A warm often holds the lock at the
+# 03:30 UTC firing; rather than instantly skipping the night (which stranded the
+# green-guard AND emitted no liveness), WAIT up to this long for the warmer to
+# release, then run normally. 1800s (30 min) sits in the nightly slack and,
+# stacked on the 5400s in-process cap, stays under the service
+# TimeoutStartSec=10800. Single-flight still holds: we wait for the lock, never
+# bypass it. Only if the lock is STILL held after the full wait do we defer.
+LOCK_WAIT_SEC=1800
+
 mkdir -p "$LOG_DIR" "$(dirname "$LOCK_FILE")"
 
 log() {
@@ -82,8 +91,17 @@ import pulse_check_heartbeat as h; h.emit_heartbeat('${HEARTBEAT_ID}')" \
 }
 
 exec 9>"$LOCK_FILE"
-if ! flock -n 9; then
-    log "another suite-scale run holds ${LOCK_FILE}; skipping the night (single-flight)"
+if ! flock -w "$LOCK_WAIT_SEC" 9; then
+    # A warm held the lock for the ENTIRE wait window. This is a legitimate
+    # deferral, not a dead runner: emit the deferred/alive signal (NOT the
+    # success heartbeat) so the staleness healer knows the timer IS firing and
+    # does not false-alarm 'gone dark' on a single contended night, while the
+    # consecutive-deferral counter still lets it escalate a genuinely starved
+    # guardian with an accurate lock-contention diagnosis.
+    log "another suite-scale run held ${LOCK_FILE} for the full ${LOCK_WAIT_SEC}s wait; deferring the night (single-flight)"
+    python3 -c "import sys; sys.path.insert(0, '${REPO_DIR}/scripts'); \
+import pulse_check_heartbeat as h; h.emit_deferral('${HEARTBEAT_ID}')" \
+        2>>"$LOG_FILE" || log "deferral signal emit failed (non-fatal)"
     exit 0
 fi
 

@@ -61,6 +61,16 @@ def _write_artifact(bb: Path, rel: str, age_hours: float) -> Path:
     return path
 
 
+def _write_deferral(bb: Path, check_id: str, age_hours: float,
+                    consecutive: int) -> Path:
+    bb.mkdir(parents=True, exist_ok=True)
+    ts = datetime.fromtimestamp(NOW - age_hours * HOUR, tz=timezone.utc)
+    path = bb / f'pulse-check-{check_id}.deferred'
+    path.write_text(json.dumps(
+        {'ts': ts.isoformat(), 'check': check_id, 'consecutive': consecutive}))
+    return path
+
+
 class StalenessMathTest(unittest.TestCase):
     def setUp(self):
         self._td = tempfile.TemporaryDirectory()
@@ -131,6 +141,125 @@ class StalenessMathTest(unittest.TestCase):
         self.assertIsNotNone(alert)
         self.assertEqual(alert['subject'], 'pulse-check-stale:x')
         self.assertIn('never', alert['message'].lower())
+
+
+class DeferralLivenessTest(unittest.TestCase):
+    """A runner that fires on schedule but skips on lock contention emits a
+    deferral signal, not a success heartbeat. A fresh deferral is alive-but-
+    deferred (no gone-dark alarm) until it has starved for
+    STARVATION_DEFERRAL_THRESHOLD consecutive firings."""
+
+    GUARDIAN = 'main-suite-guardian'
+    ENTRY = {'cadence_hours': 24, 'grace_hours': 6,
+             'label': 'Main-suite green guardian',
+             'firing': 'Nightly 03:30 UTC (systemd timer: '
+                       'ourliberty-main-suite-guardian)'}
+
+    def setUp(self):
+        self._td = tempfile.TemporaryDirectory()
+        self.bb = Path(self._td.name) / 'blackboard'
+        self.bb.mkdir(parents=True)
+
+    def tearDown(self):
+        self._td.cleanup()
+
+    def test_fresh_deferral_suppresses_gone_dark_on_stale_success(self):
+        # Success heartbeat is stale (50h > 30h threshold), but a fresh deferral
+        # under the starvation threshold says the runner is alive-but-deferred.
+        _write_heartbeat(self.bb, self.GUARDIAN, age_hours=50)
+        _write_deferral(self.bb, self.GUARDIAN, age_hours=1, consecutive=2)
+        self.assertIsNone(
+            w.evaluate_check(self.GUARDIAN, self.ENTRY, self.bb, NOW))
+
+    def test_fresh_deferral_suppresses_never_signalled(self):
+        # No success signal ever + past warm-up, but a fresh deferral under the
+        # threshold => still alive-but-deferred, no 'never emitted' alarm.
+        _write_deferral(self.bb, self.GUARDIAN, age_hours=1, consecutive=2)
+        self.assertIsNone(
+            w.evaluate_check(self.GUARDIAN, self.ENTRY, self.bb, NOW,
+                             monitoring_since=NOW - 500 * HOUR))
+
+    def test_starvation_escalates_with_lock_contention_text(self):
+        # N consecutive deferrals, zero completed runs => escalate, but with an
+        # accurate lock-contention diagnosis, NOT the '/cycle' scheduler text.
+        _write_deferral(self.bb, self.GUARDIAN, age_hours=1,
+                        consecutive=w.STARVATION_DEFERRAL_THRESHOLD)
+        alert = w.evaluate_check(self.GUARDIAN, self.ENTRY, self.bb, NOW,
+                                 monitoring_since=NOW - 500 * HOUR)
+        self.assertIsNotNone(alert)
+        self.assertEqual(alert['subject'], f'pulse-check-stale:{self.GUARDIAN}')
+        self.assertIn('DEFERRED', alert['message'])
+        self.assertIn('lock contention', alert['suggested_action'])
+        self.assertIn('ol-regbaseline-warm.lock', alert['suggested_action'])
+        self.assertNotIn('/cycle', alert['suggested_action'])
+
+    def test_starvation_escalates_when_success_is_stale(self):
+        # Same starvation, reached via the stale-success branch rather than the
+        # never-signalled branch.
+        _write_heartbeat(self.bb, self.GUARDIAN, age_hours=100)
+        _write_deferral(self.bb, self.GUARDIAN, age_hours=1,
+                        consecutive=w.STARVATION_DEFERRAL_THRESHOLD + 2)
+        alert = w.evaluate_check(self.GUARDIAN, self.ENTRY, self.bb, NOW)
+        self.assertIsNotNone(alert)
+        self.assertIn('DEFERRED', alert['message'])
+        self.assertNotIn('/cycle', alert['suggested_action'])
+
+    def test_stale_deferral_does_not_vouch_for_liveness(self):
+        # A deferral older than cadence+grace is itself stale: it no longer
+        # proves the runner is firing, so the normal gone-dark alarm applies.
+        _write_heartbeat(self.bb, self.GUARDIAN, age_hours=50)
+        _write_deferral(self.bb, self.GUARDIAN, age_hours=50, consecutive=1)
+        alert = w.evaluate_check(self.GUARDIAN, self.ENTRY, self.bb, NOW)
+        self.assertIsNotNone(alert)
+        self.assertEqual(alert['subject'], f'pulse-check-stale:{self.GUARDIAN}')
+        # The stale-success path, not the starvation path.
+        self.assertNotIn('DEFERRED', alert['message'])
+
+    def test_read_deferral_mtime_fallback(self):
+        path = self.bb / f'pulse-check-{self.GUARDIAN}.deferred'
+        path.write_text(json.dumps({'consecutive': 4}))  # no ts field
+        os.utime(path, (NOW - 3 * HOUR, NOW - 3 * HOUR))
+        ts, consecutive = w.read_deferral(self.GUARDIAN, self.bb)
+        self.assertEqual(consecutive, 4)
+        self.assertAlmostEqual(ts, NOW - 3 * HOUR, delta=2)
+
+    def test_missing_deferral_reads_zero(self):
+        ts, consecutive = w.read_deferral(self.GUARDIAN, self.bb)
+        self.assertIsNone(ts)
+        self.assertEqual(consecutive, 0)
+
+
+class TimerRemediationTest(unittest.TestCase):
+    """Every Pulse check now fires from a systemd timer (agent /cycle retired
+    2026-07-07), so a gone-dark remediation must not send Larry chasing the
+    Pulse /cycle."""
+
+    def setUp(self):
+        self._td = tempfile.TemporaryDirectory()
+        self.bb = Path(self._td.name) / 'blackboard'
+        self.bb.mkdir(parents=True)
+
+    def tearDown(self):
+        self._td.cleanup()
+
+    def test_stale_success_remediation_points_at_timer_not_cycle(self):
+        _write_heartbeat(self.bb, 'ix', age_hours=300)
+        entry = {'cadence_hours': 168, 'grace_hours': 36, 'label': 'Friction',
+                 'firing': 'Weekly Monday (systemd timer: '
+                           'ourliberty-pulse-check-ix)'}
+        alert = w.evaluate_check('ix', entry, self.bb, NOW)
+        self.assertIsNotNone(alert)
+        self.assertNotIn('/cycle', alert['suggested_action'])
+        self.assertIn('systemd timer', alert['suggested_action'])
+        self.assertIn('ourliberty-pulse-check-ix', alert['suggested_action'])
+
+    def test_never_signalled_remediation_points_at_timer_not_cycle(self):
+        entry = {'cadence_hours': 168, 'grace_hours': 36}
+        alert = w.evaluate_check('x', entry, self.bb, NOW,
+                                 monitoring_since=NOW - 205 * HOUR)
+        self.assertIsNotNone(alert)
+        self.assertNotIn('/cycle', alert['suggested_action'])
+        self.assertIn('systemd timer', alert['suggested_action'])
 
 
 class BootstrapFallbackTest(unittest.TestCase):

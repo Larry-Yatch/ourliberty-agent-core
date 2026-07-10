@@ -44,11 +44,61 @@ def heartbeat_path(check_id: str) -> Path:
     return agents_root() / 'blackboard' / f'pulse-check-{check_id}.heartbeat'
 
 
+def deferral_path(check_id: str) -> Path:
+    return agents_root() / 'blackboard' / f'pulse-check-{check_id}.deferred'
+
+
 def emit_heartbeat(check_id: str, *, now: Optional[datetime] = None) -> bool:
-    """Write the success heartbeat for a check. Atomic; never raises."""
+    """Write the success heartbeat for a check. Atomic; never raises.
+
+    A completed run also clears any deferral streak: a success proves the runner
+    is not starved, so the consecutive-deferral counter must not persist past it.
+    """
     ts = (now or datetime.now(timezone.utc)).isoformat()
     payload = json.dumps({'ts': ts, 'check': check_id}, ensure_ascii=False)
     path = heartbeat_path(check_id)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_name(path.name + '.tmp')
+        tmp.write_text(payload + '\n', encoding='utf-8')
+        os.replace(tmp, path)
+    except OSError:
+        return False
+    try:
+        deferral_path(check_id).unlink()
+    except OSError:
+        pass
+    return True
+
+
+def _read_consecutive_deferrals(path: Path) -> int:
+    """Prior consecutive-deferral count from the deferral file; 0 if absent."""
+    try:
+        obj = json.loads(path.read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return 0
+    count = obj.get('consecutive') if isinstance(obj, dict) else None
+    return count if isinstance(count, int) and count >= 0 else 0
+
+
+def emit_deferral(check_id: str, *, now: Optional[datetime] = None) -> bool:
+    """Record a legitimate deferral: the runner fired on schedule but could not
+    acquire its single-flight lock within the bounded wait, so it skipped WITHOUT
+    running. Atomic; never raises.
+
+    This is a distinct liveness class from the success heartbeat: it tells the
+    staleness watcher the runner IS firing (so a single contended night is not a
+    gone-dark alarm), while a monotonically incrementing consecutive counter lets
+    the watcher escalate a genuinely starved runner (N nights deferred, zero
+    completed runs). A completed run clears the streak (see emit_heartbeat).
+    """
+    ts = (now or datetime.now(timezone.utc)).isoformat()
+    path = deferral_path(check_id)
+    consecutive = _read_consecutive_deferrals(path) + 1
+    payload = json.dumps(
+        {'ts': ts, 'check': check_id, 'consecutive': consecutive},
+        ensure_ascii=False,
+    )
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         tmp = path.with_name(path.name + '.tmp')
