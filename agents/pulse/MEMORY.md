@@ -261,9 +261,9 @@ PR #728 (chore(alerts): Tier-3 silence ourliberty-health-sync-push-failed duplic
 
 ---
 
-## G-rule sentinel-inflight-stall-tier4 — DISPATCHED ✅ (iter ~4474, 3/3)
+## G-rule sentinel-inflight-stall-tier4 → COMPLETE ✅ (PR #854, iter ~4977)
 
-**Rule:** `source=sentinel, subject^=in-flight-stall:` alerts classify Tier-4 (novel, no translation match). Fired when Mirror OR Forge in-flight session exceeds 60-min threshold. Sentinel message says heal_wedged_review_sessions auto-recovers; kill PID unblocks sooner. outbox-notifier delivers route=escalate DM to Larry; Pulse suppresses duplicate DM (journal-note only). Fix dispatched at 3/3 (iter ~4474): direction-ask-sentinel-inflight-stall-tier4-translation-001 to Beacon inbox — add `source=sentinel, subject^=in-flight-stall:` → Tier-3 (or Tier-2 if Forge stalls don't auto-recover). Occurrences: iter ~2892 (1/3, Mirror PR #717, 1.13h); iter ~2964 (2/3, Mirror 1.13h); iter ~4474 (3/3, Forge xiv-v1 1.18h+). verification_pending.
+PR #854 (`feat(alerts): Tier-3 translation for sentinel in-flight-stall (mirror+forge)`) MERGED 2026-07-10T11:52Z MDT (2eb608ac). `config/alert-translations.json` now has `sentinel.in-flight-stall` entry (Tier-3). Translation verified live (grep: `sentinel keys: ['inbox-stall', 'in-flight-stall']`). systemic_fix appended to PRIME ledger 18:07:19Z UTC. Moving to Completed G-rules. Dispatched iter ~4474; dispatched PR #854 path. First occurrence iter ~2892.
 
 ---
 
@@ -532,9 +532,9 @@ PR #899 (`config(alerts): silence Pulse re-triage of outbox-notifier auto-merge-
 
 ---
 
-## G-rule heal-undispatched-pr-review-claimed-race-fp-001 — 2/3 (updated iter ~4960)
+## G-rule heal-undispatched-pr-review-claimed-race-fp-001 → DISPATCHED ✅ (iter ~4977, 3/3)
 
-**Rule:** `source=heal-undispatched-pr-review, subject^=undispatched-pr-review:` alerts with "backstop review dispatch did not take" fire as a FALSE POSITIVE when the outbox-notifier dispatches the review AND inbox_watcher claims it (moves to `.claimed/`) in the ~2-second window before the healer checks the inbox to verify "dispatch took". The healer checks the inbox only (not `.claimed/`), concludes the file is absent, fires a critical escalation. PR is actually being reviewed normally. Fix: PR #874 (`fix(heal-undispatched-pr-review): consult pipeline ground truth before declaring a PR orphaned`) addresses the broader FP class; the `.claimed/` race is a specific sub-case where Mirror claims the task before the healer verifies. Dispatch to Beacon at 3/3. Occurrences: iter ~4864 (PR #903, review in `.claimed/0/` 2s after dispatch, healer fired critical alert 03:55:37Z UTC); iter ~4960 (PR #905 feat/medic-recurrence-gauge-distinct-days, review in `.claimed/1/` at 15:35:48Z UTC, healer fired critical alert 15:35:50Z UTC — 2s race confirmed; Pulse sent compensating FP note to pulse-escalations.json #26).
+**Rule:** `source=heal-undispatched-pr-review, subject^=undispatched-pr-review:` alerts fire as FALSE POSITIVE when outbox-notifier dispatches review AND inbox_watcher claims it (to `.claimed/`) in the ~2-3 second window before the healer verifies. Healer checks inbox only (not `.claimed/`), concludes absent, fires critical alert. Dispatched to Beacon at 3/3: `direction-ask-heal-undispatched-pr-review-claimed-race-3of3-001.json`. Fix spec: add `.claimed/<N>/` check in `heal_undispatched_pr_review.py` before firing critical alert. Occurrences: iter ~4864 (PR #903, 2s race); iter ~4960 (PR #905, 2s race); iter ~4977 (PR #910, 3s race). verification_pending.
 
 ---
 
@@ -544,9 +544,9 @@ PR #899 (`config(alerts): silence Pulse re-triage of outbox-notifier auto-merge-
 
 ---
 
-## G-rule medic-escalation-recurrence-gauge-tier4-001 — 1/3 (new, iter ~4881)
+## G-rule medic-escalation-recurrence-gauge-tier4-001 → COMPLETE ✅ (PR #905, iter ~4977)
 
-**Rule:** `source=medic-escalation-recurrence-gauge` alerts classify Tier-4 (novel, no translation match). This gauge fires when a recurring Medic escalation exceeds the 3×/7d threshold, signaling readiness to un-park a parked fanout build. `heal-systemd-install-drift` auto-installed the service/timer at iter ~4881. First alert: fingerprint `heal-pipeline-stall:pipeline-stall:no-session-revision:notifier-concurrent-scan-dup-review-dispatch-001` is live (root fix is PR #847 HELD_DEEP_REVIEW). Fix: add `source=medic-escalation-recurrence-gauge` → Tier-3 entry in `config/alert-translations.json` so Pulse silences the duplicate (outbox-notifier already DMs Larry via route=escalate). Dispatch to Beacon at 3/3. First occurrence iter ~4881 (L984, 06:00:05Z UTC).
+PR #905 (`fix(operator): medic-recurrence gauge — require >=2 distinct days + add alert translation`) MERGED 2026-07-10T11:52Z MDT. `medic-escalation-recurrence-gauge` Tier-3 entry verified live in `config/alert-translations.json`. systemic_fix appended to PRIME ledger 18:07:20Z. First occurrence iter ~4881. Moving to Completed G-rules.
 
 ---
 
@@ -574,8 +574,14 @@ PR #906 (`fix(main-suite-guardian): bounded-wait on the single-flight lock + acc
 
 ---
 
-## Status snapshot — updated 2026-07-10T17:42Z UTC (Iter ~4976, **Tier 2**)
+## G-rule outbox-notifier-merge-conflict-manual-rebase-tier4-001 — 1/3 (new, iter ~4977)
 
-**Iter ~4976 summary (2026-07-10T17:42Z):** 0 new alerts (watermark=927=file_length). Check 3 skipped (GraphQL budget 408/5000, resets 17:51Z). All other checks nominal. beacon PID 2734739 / outbox-notifier PID 2734978 / inbox_watcher PID 2672329 all alive. PRIME: iter_clean. **Tier 1→2 de-escalated** (consecutive_clean=3 → reset to 0). **ACTIVE G-rules:** sentinel-stale-lease-tier4-001 [DISPATCHED ✅, PR #909 MIRROR_PASS ×2 HELD #854, near-complete]; mirror-queue-wait-gauge-tier4-001 [1/3]; sentinel-inflight-stall-tier4 [VP, PR #854 HELD_DEEP_REVIEW]; build-sequence-advancer-sequence-complete-tier4-001 [2/3]; forge-marker-task-id-mismatch-xii-v1 [2/3]; outbox-notifier-merge-held-deep-review-tier4-001 [2/3]; heal-undispatched-pr-review-claimed-race-fp-001 [2/3]; mirror-malformed-verdict-heal-reap-path-001 [1/3]; forge-wip-redispatch-exhausted-genuine-no-pr-001 [1/3]; heal-unregistered-approval-null-chat-id-001 [1/3]; medic-escalation-recurrence-gauge-tier4-001 [1/3]; ourliberty-health-subject-key-mismatch-001 [3/3, vp]; forge-revision-preamble-missing-pr711-001 [VP]; forge-wip-redispatch-digest-tier4-001 [vp]; sentinel-stale-lease-tier4-001 G-rule body dispatched ✅ monitoring.
+**Rule:** `source=outbox-notifier, intent=merge_conflict_manual_rebase` alerts classify Tier-4 (novel, no translation match). Fires when outbox-notifier detects a HELD PR has developed a conflict with main after its blocker merged. Bot DMs Larry with rebase instructions; Pulse should silence (Tier-3) rather than double-DM. Fix at 3/3: add `source=outbox-notifier, intent=merge_conflict_manual_rebase` → Tier-3 entry in `config/alert-translations.json`. First occurrence iter ~4977 (L928, PR #909 CONFLICTING after PR #854 merged, 17:52:06Z UTC). Note: outbox-notifier already DMs Larry — Pulse DM is always duplicate noise for this intent.
+
+---
+
+## Status snapshot — updated 2026-07-10T18:07Z UTC (Iter ~4977, **Tier 1**)
+
+**Iter ~4977 summary (2026-07-10T18:07Z):** 2 new alerts (L928 merge_conflict_manual_rebase, L929 undispatched-pr-review FP). PR #854 MERGED ✅ + PR #905 MERGED ✅ (both unblocked from #854 hold). PR #909 CONFLICTING (Beacon dispatch sent for Forge rebase). PR #910 NEW (review in .claimed/1/). pipeline stall dry-run: 1 stall `mirror_pass_unmerged:#909`. **Tier 2→1 reset** (signal). G-rules COMPLETE: sentinel-inflight-stall-tier4 ✅, medic-escalation-recurrence-gauge-tier4-001 ✅. G-rule 3/3 DISPATCHED: heal-undispatched-pr-review-claimed-race-fp-001. beacon PID 2734739 / outbox-notifier PID 2734978 / inbox_watcher PID 2672329 all alive. zombie PID 1834248 (42d+ bash poll loop, carry). **ACTIVE G-rules:** sentinel-stale-lease-tier4-001 [DISPATCHED ✅, PR #909 CONFLICTING; monitoring]; mirror-queue-wait-gauge-tier4-001 [1/3]; build-sequence-advancer-sequence-complete-tier4-001 [2/3]; forge-marker-task-id-mismatch-xii-v1 [2/3]; outbox-notifier-merge-held-deep-review-tier4-001 [2/3]; heal-undispatched-pr-review-claimed-race-fp-001 [DISPATCHED ✅, vp]; mirror-malformed-verdict-heal-reap-path-001 [1/3]; forge-wip-redispatch-exhausted-genuine-no-pr-001 [1/3]; heal-unregistered-approval-null-chat-id-001 [1/3]; ourliberty-health-subject-key-mismatch-001 [3/3, vp]; forge-revision-preamble-missing-pr711-001 [VP]; forge-wip-redispatch-digest-tier4-001 [vp]; outbox-notifier-merge-conflict-manual-rebase-tier4-001 [1/3, new]; notifier-concurrent-scan-dup (PR #847 HELD_DEEP_REVIEW); sentinel-inflight-stall-tier4 [COMPLETE ✅]; medic-escalation-recurrence-gauge-tier4-001 [COMPLETE ✅].
 
 
