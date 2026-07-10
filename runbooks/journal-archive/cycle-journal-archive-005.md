@@ -11578,3 +11578,86 @@ NOMINAL ✅
 
 ---
 
+## Iteration ~4843 — 2026-07-09T21:30Z UTC (Larry /cycle chat, Tier 1)
+
+**Health:** ✅ Nominal — watermark-rotation-gap auto-repaired (948→947, compaction -1 line); 0 new alerts; GH rate-limit burst at 21:27Z (self-resolving, resets 21:44Z); Check 3 skipped (graphql 0/5000); pending=0 (improved — silence-auto-merge-queue-stale-001 approved + in Forge build); pr3-activation in Forge build phase; all agents alive; zombie carry.
+
+**VERIFY-BEFORE-REASSERT (from iter ~4842):**
+- **"beacon PID 1592338"**: CONFIRMED ✅ — Ss, ~21:05 elapsed. [alive]
+- **"outbox_notifier PID 1592524"**: CONFIRMED ✅ — Ss, ~21:00 elapsed. New WARN burst at 15:27:45–15:28:55 MDT (21:27–21:28Z). [alive, GH rate-limit recurrence]
+- **"inbox_watcher PID 1606096"**: CONFIRMED ✅ — Ssl, ~11:01 elapsed. [alive, stable]
+- **"zombie PID 1834248 (~42d+02:02:55)"**: CONFIRMED ⚠️ — Ss, 42-02:10:02 elapsed. [carry, time updated]
+- **"pending=1 (silence-auto-merge-queue-stale-001)"**: UPDATED → **pending=0**. silence-auto-merge-queue-stale-001 approved + dispatched to Forge build phase (15:29:51 MDT). [cleared ✅]
+- **"HEAD=8fd7c069=origin/main"**: UPDATED ✅ → HEAD=da9b61d2 ("Pulse cycle 20260709T212728Z") = origin/main. On main, clean. [confirmed]
+- **"Sync last_sync=21:13:03Z status=error"**: CARRY — still status=error (sync push race). Git HEAD=origin/main. Self-heals. [carry]
+- **"Daemon heartbeat 21:17:20Z"**: UPDATED ✅ → 2026-07-09T21:27:20Z (~3 min at 21:30Z). [fresh]
+- **"gh-burn timers not installed"**: CARRY ⚠️ [carry]
+- **"PR #847/#854/#860/#874 OPEN"**: CARRY — GH rate-limit prevented gh pr list. Stall checker skipped (graphql 0/5000, resets 21:44Z). Last clean stall dry-run: iter ~4842 21:21:31Z. [carry, unable to verify this iter]
+
+**NEW FINDINGS:**
+1. **Watermark-rotation-gap auto-repaired** — repair-watermark: `{"repaired": true, "old_watermark": 948, "file_length": 947, "new_watermark": 947}`. File shrank 948→947 lines (compaction removed 1 early alert). Watermark reset to 947=file_length. 0 new alerts post-repair. Auto-handled per spec. ✅
+2. **GH rate-limit burst at 21:27:45Z** — outbox-notifier WARN #1 (66s backoff) and #2 (111s backoff) on pr-state-recheck for #847. GH graphql budget at 0/5000, resets 21:44:36Z. PR #880 exponential backoff active and working. Self-resolves. [blue]
+3. **Check 3 skipped** — heal_pipeline_stall.py self-gated: `GraphQL budget low (graphql 0/5000, resets 2026-07-09T21:44:36+00:00), min=500`. Last clean dry-run: iter ~4842 21:21:31Z (no stalls). Unable to verify this iter. [blue]
+4. **pending=0** — silence-auto-merge-queue-stale-001 approved by Larry and dispatched to Forge build phase (Forge PROCEED marker at 15:29:50 MDT, build dispatched 15:29:51 MDT = 21:29:51Z UTC). Pending queue cleared. ✅ [improvement]
+5. **pr3-activation in Forge build phase** (21:28:35Z UTC) — Larry's "i merged pr2 unblock pr3" (21:23:13Z) triggered Beacon to dispatch headless-approval-request for pr3-activation (21:25:46Z); Forge PROCEED marker at 21:28:35Z; build phase active. PR3 of mirror-two-slot series now building. ✅ [pipeline progress]
+
+**Check 0 — Alert triage:**
+- repair-watermark: `{"repaired": true, "old_watermark": 948, "file_length": 947, "new_watermark": 947}` — watermark-rotation-gap auto-repaired.
+- Journal note: `Check 0: watermark-rotation-gap auto-repaired: 948→947` (compaction -1 line).
+- Post-repair: watermark=947=file_length. 0 new alerts.
+- NOMINAL ✅
+
+**Check 1 — Log noise:** outbox-notifier WARN burst at 15:27:45–15:28:55 MDT (21:27–21:28Z UTC) — GH rate-limit #1 (66s) and #2 (111s) on pr-state-recheck #847. Backoffs expire ~21:31–21:30Z. PR #880 exponential backoff working. Self-resolving. NOMINAL (known pattern) ✅
+
+**Check 2 — Telegram sweep:** Beacon PID 1592338 ✅ (Ss, ~21:05 elapsed). Bot log: Larry "i merged pr2 unblock pr3" at 15:23:13 MDT; Beacon dispatched pr3-activation; silence-auto-merge-queue-stale-001 forwarded to Forge build (15:29:51 MDT). No new Larry directives for Pulse. NOMINAL ✅
+
+**Check 3 — Pipeline stall:** SKIPPED — GraphQL budget 0/5000, resets 21:44:36Z UTC. Healer correctly self-gated. Last clean: iter ~4842 21:21Z "no stalls detected" (FORGE_NO_PR_SKIP ×15). UNABLE TO VERIFY (budget gate) ⚠️
+
+**Check 4 — Pending directives:** pending=0 (improved from 1). silence-auto-merge-queue-stale-001 cleared; in Forge build phase. NOMINAL ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-09T21:27:20Z (~3 min at 21:30Z, <60 min). NOMINAL ✅
+
+**Check A — Source repo:** HEAD=da9b61d2=origin/main. On main. Clean. Up-to-date. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-09T21:13:03Z (~17 min at 21:30Z). Status=error (push race, carry). Git repo clean/up-to-date. Self-heals. CARRY NOMINAL ✅
+**Check C — Agent liveness:** inbox_watcher PID 1606096 ✅ (Ssl, ~11:01). beacon PID 1592338 ✅ (Ss, ~21:05). outbox_notifier PID 1592524 ✅ (Ss, ~21:00). Zombie 1834248 ⚠️ (~42d+02:10:02, bash poll loop) [carry]. NOMINAL ✅
+**Check E — PR state:** GH rate-limit prevented gh pr list. Carry: #847 (HELD), #854 (no labels), #860 (no labels), #874 (auto-review). Stall checker skipped (budget gate). CARRY UNABLE TO VERIFY ⚠️
+
+**§5.0:** distill_detector: no-op ✅. audit_due_nudge: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks — UTC Thursday 2026-07-09:**
+- Check I: Thursday (off-day). systemd timer handles Mon/Wed/Fri/Sun. Skip. ✅
+- Check III: Sunday gate. Next: 2026-07-13. Skip. ✅
+- Check IX/X: Monday gate. Skip. ✅
+- Check VI/VIII: Proposals idx=990,991 carry — awaiting Larry. [carry]
+
+**G-rule assessment:**
+- `outbox-notifier-auto-merge-queue-stale-promoted-tier4-001` — now in Forge build phase (silence-auto-merge-queue-stale-001). Advancing toward verification_pending resolution. No new G-rule occurrences. All other statuses carry unchanged from iter ~4842.
+
+**Actions taken:**
+1. Check 0: watermark-rotation-gap auto-repaired (948→947). 0 new alerts. ✅
+2. §5.0: all three no-ops. ✅
+3. PRIME ledger: `iter_clean` appended. ✅
+4. Tier state: `record --checks-clean false` → Tier 1 (zombie carry; GH rate-limit; Check 3/E unable to verify; consecutive_clean=0). ✅
+
+**Escalations:** 0 new Pulse DMs this iter.
+
+**Standing findings (carry):**
+- [yellow] **zombie-bash-pid-1834248** — PID 1834248 (~42d+02:10:02, Ss bash poll loop). ask-then-do: `kill 1834248`. [carry confirmed]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07`. [carry]
+- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
+- [yellow] **gh-burn timers not installed** — `sudo systemctl enable --now ourliberty-gh-burn-sampler.timer && sudo systemctl enable --now ourliberty-gh-burn-analyzer.timer`. Larry DM'd (idx=935). [carry]
+- [blue] **PR #847** — OPEN (HELD_DEEP_REVIEW). fix(notifier): guard duplicate Mirror review dispatch. Blocking #874 in auto-merge queue. [carry]
+- [blue] **PR #854** — OPEN (no labels). sentinel-inflight-stall-tier4 fix. Needs `auto-review` label. [carry]
+- [blue] **PR #860** — OPEN (no labels). [carry]
+- [blue] **PR #874** — OPEN (auto-review, stale >24h behind #847). [carry]
+- [blue] **Forge builds active** — pr3-activation (mirror-two-slot PR3) + silence-auto-merge-queue-stale-001 (Tier-3 translation). Both in build phase since ~21:28–21:29Z. [new/active]
+- [blue] **GH rate-limit** — 0/5000 graphql, resets 21:44:36Z. PR #880 backoff active. [self-resolving]
+- [blue] **G-rules (dispatched, vp):** sentinel-inflight-stall-tier4 (PR #854); notifier-concurrent-scan-dup (PR #847); ourliberty-health-subject-key-mismatch-001; forge-wip-redispatch-digest-tier4-001; no-session-revision-active-mirror-session-fp-001; forge-revision-preamble-missing-pr711-001; forge-wip-redispatch-exhausted-pr-exists-fp-001; decision-needed-approval-forge-dispatch-no-target-repo-001; auto-merge-queue-stale-promoted-tier3-translation (DISPATCHED ✅, Forge building). [carry]
+- [blue] **G-rule 2/3:** forge-marker-task-id-mismatch-xii-v1; build-sequence-advancer-sequence-complete-tier4-001. [carry]
+- [blue] **G-rule 1/3:** outbox-notifier-merge-held-deep-review-tier4-001; mirror-malformed-verdict-heal-reap-path-001; forge-wip-redispatch-exhausted-genuine-no-pr-001. [carry]
+
+**PRIME DIRECTIVE:** ratio=20.33 (interventions=1647, systemic_fixes=81, vp=37, trend=worsening); `iter_clean` appended.
+**Tier end-of-iter:** Tier **1** (consecutive_clean=0; zombie + Check 3/E budget gate carries).
+
+---
+
