@@ -9020,6 +9020,17 @@ def _find_overlap_blocker(
     the merge order. Including them would create a cycle (PR-A and PR-B
     blocking each other) when A's gates run after B was queued behind A.
 
+    Skip-dirty-blocker (auto-merge-serializer-skip-dirty-blocker-001): a
+    candidate blocker whose own mergeable state is confirmed CONFLICTING
+    can never win the merge race as-is (it needs a rebase regardless), so
+    holding a clean PR behind it is pure loss — it wedges the whole
+    overlap chain indefinitely. Such blockers are SKIPPED (logged as
+    AUTO_MERGE_BLOCKER_SKIP_DIRTY) and the PR is evaluated against the
+    remaining overlapping candidates. A blocker reporting UNKNOWN
+    (GitHub still recomputing) is NOT skipped — it keeps holding, matching
+    Gate 2's conservative UNKNOWN-defers treatment, so we never race a
+    merge while mergeability is still being computed.
+
     Cross-repo isolation: a PR in repo A never blocks a PR in repo B —
     `repo` field comparison is strict.
 
@@ -9065,7 +9076,20 @@ def _find_overlap_blocker(
     if not candidates:
         return None
     candidates.sort(key=lambda x: (x[0], x[1]))
-    return candidates[0][1]
+    for _created_at, pr in candidates:
+        # Skip-dirty-blocker: a CONFIRMED-CONFLICTING blocker can't merge
+        # as-is, so gating a mergeable PR behind it just wedges the chain.
+        # UNKNOWN keeps holding (conservative — don't race a still-computing
+        # mergeability). Only a positive 'conflicting' is skipped.
+        if _gh_pr_mergeable_status(repo_coords, pr) == 'conflicting':
+            log(
+                f'AUTO_MERGE_BLOCKER_SKIP_DIRTY pr=#{self_pr_number} '
+                f'skipped_blocker=#{pr} (blocker CONFLICTING; not gating a '
+                f'mergeable PR behind an unmergeable one)',
+            )
+            continue
+        return pr
+    return None
 
 
 def _format_overlap_files(files: Optional[list[str]], limit: int = 3) -> str:

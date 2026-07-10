@@ -880,6 +880,61 @@ class FindOverlapBlockerTest(SerializerTestBase):
         blocker = self.on._find_overlap_blocker(999, REPO, [FILE])
         self.assertIsNone(blocker)
 
+    def test_conflicting_blocker_skipped(self):
+        # A lone CONFLICTING overlapping blocker can never merge as-is, so
+        # it must NOT wedge a clean PR behind it — skip it, return None.
+        FILE = 'scripts/outbox_notifier.py'
+        self.gh.open_prs[REPO] = [
+            {'number': 874, 'createdAt': '2026-07-09T09:00:00Z',
+             'headRefName': 'dirty'},
+        ]
+        self.gh.pr_files[(REPO, 874)] = [FILE]
+        self.gh.pr_mergeable[(REPO, 874)] = 'CONFLICTING'
+        blocker = self.on._find_overlap_blocker(913, REPO, [FILE])
+        self.assertIsNone(blocker)
+
+    def test_mergeable_blocker_still_held(self):
+        # Serialization unchanged: a MERGEABLE overlapping blocker still gates.
+        FILE = 'scripts/outbox_notifier.py'
+        self.gh.open_prs[REPO] = [
+            {'number': 874, 'createdAt': '2026-07-09T09:00:00Z',
+             'headRefName': 'clean'},
+        ]
+        self.gh.pr_files[(REPO, 874)] = [FILE]
+        self.gh.pr_mergeable[(REPO, 874)] = 'MERGEABLE'
+        blocker = self.on._find_overlap_blocker(913, REPO, [FILE])
+        self.assertEqual(blocker, 874)
+
+    def test_unknown_blocker_still_held(self):
+        # Conservative: UNKNOWN (GitHub still computing) is NOT skipped —
+        # keep holding rather than race a still-computing mergeability.
+        FILE = 'scripts/outbox_notifier.py'
+        self.gh.open_prs[REPO] = [
+            {'number': 874, 'createdAt': '2026-07-09T09:00:00Z',
+             'headRefName': 'computing'},
+        ]
+        self.gh.pr_files[(REPO, 874)] = [FILE]
+        self.gh.pr_mergeable[(REPO, 874)] = 'UNKNOWN'
+        blocker = self.on._find_overlap_blocker(913, REPO, [FILE])
+        self.assertEqual(blocker, 874)
+
+    def test_mixed_blockers_holds_behind_mergeable_only(self):
+        # Two overlapping blockers: the older is CONFLICTING (skipped), the
+        # newer is MERGEABLE — hold behind the MERGEABLE one only.
+        FILE = 'scripts/outbox_notifier.py'
+        self.gh.open_prs[REPO] = [
+            {'number': 874, 'createdAt': '2026-07-09T09:00:00Z',
+             'headRefName': 'dirty'},
+            {'number': 900, 'createdAt': '2026-07-10T09:00:00Z',
+             'headRefName': 'clean'},
+        ]
+        self.gh.pr_files[(REPO, 874)] = [FILE]
+        self.gh.pr_files[(REPO, 900)] = [FILE]
+        self.gh.pr_mergeable[(REPO, 874)] = 'CONFLICTING'
+        self.gh.pr_mergeable[(REPO, 900)] = 'MERGEABLE'
+        blocker = self.on._find_overlap_blocker(913, REPO, [FILE])
+        self.assertEqual(blocker, 900)
+
 
 class ReleaseRegressionGateRunnerTest(unittest.TestCase):
     """fix-auto-merge-freshness-revalidation — the PRODUCTION regression
