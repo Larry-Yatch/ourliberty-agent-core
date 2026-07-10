@@ -124,6 +124,37 @@ def _systemctl(args: list[str]) -> tuple[int, str]:
         return -1, ''
 
 
+# The alert this healer emits (source:subject) — the retraction is keyed on the
+# SAME cooldown key so it retracts exactly its own stale red, nothing else.
+ALERT_SOURCE = 'heal-build-sequence-advancer-heartbeat'
+ALERT_SUBJECT = 'build-sequence-advancer-stale'
+
+
+def _retract_standdown() -> int:
+    """Positive-clear retraction: the heartbeat was just observed FRESH, so the
+    daemon recovered. Retract any stale 🔴 this healer emitted for it and emit
+    one closure stand-down (auditable, never silent). Keyed on this healer's own
+    `source:subject`. Best-effort — swallow any error so it can never break the
+    tick, mirroring the alert path's fire-and-forget posture."""
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import larry_alerts as la  # noqa: E402
+        removed = la.retract_with_standdown(
+            f'{ALERT_SOURCE}:{ALERT_SUBJECT}',
+            standdown_message=(
+                'build_sequence_advancer heartbeat is fresh again — the daemon '
+                'has recovered. Standing down the earlier stale-heartbeat alert.'
+            ),
+        )
+        if removed:
+            log(f'retracted {removed} stale advancer-heartbeat alert line(s) '
+                f'(heartbeat fresh again)')
+        return removed
+    except Exception as e:  # noqa: BLE001
+        log(f'_retract_standdown failed: {type(e).__name__}: {e}', 'WARN')
+        return 0
+
+
 def intentionally_off() -> tuple[bool, str]:
     """True iff the advancer is DELIBERATELY not running -- the activation
     gate is closed, or the timer is disabled/masked. All probes are
@@ -175,6 +206,13 @@ def main() -> int:
     stale, age, reason = check_staleness()
     if not stale:
         log(f'tick: advancer heartbeat fresh ({int(age)}s)')
+        # POSITIVE-CLEAR ONLY: retract our own stale red solely on a positively
+        # observed fresh heartbeat (reason == 'fresh'), NEVER on a degraded /
+        # unreadable probe. check_staleness returns is_stale=True on every error
+        # path, so a degraded read never reaches this branch — but gate on the
+        # positive sentinel explicitly so the invariant is local and testable.
+        if reason == 'fresh':
+            _retract_standdown()
         return 0
 
     # A stale heartbeat is only a fault if the daemon is supposed to be
