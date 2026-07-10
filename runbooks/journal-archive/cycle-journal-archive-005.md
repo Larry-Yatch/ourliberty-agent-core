@@ -11661,3 +11661,79 @@ NOMINAL ✅
 
 ---
 
+## Iteration ~4844 — 2026-07-09T21:35Z UTC (Larry /cycle chat, Tier 1)
+
+**Health:** ✅ Nominal — 0 new alerts; GH rate-limit escalated to hit #4 (21:34:42Z, 292s backoff, resets 21:44:36Z, self-resolving); Check 3/E unable to verify (budget gate); pending=0; Forge builds in-flight (pr3-activation + silence-auto-merge-queue-stale-001, unverifiable via GH); all agents alive; zombie carry.
+
+**VERIFY-BEFORE-REASSERT (from iter ~4843):**
+- **"beacon PID 1592338"**: CONFIRMED ✅ — Ss, ~27:08 elapsed. [alive]
+- **"outbox_notifier PID 1592524"**: CONFIRMED alive — GH rate-limit burst escalated: hit #3 at 15:30:51 MDT (21:30:51Z, 226s), hit #4 at 15:34:42 MDT (21:34:42Z, 292s backoff). PR #880 exponential backoff working. Resets 21:44:36Z. [alive, rate-limited]
+- **"inbox_watcher PID 1606096"**: CONFIRMED ✅ — Ssl, ~17:04 elapsed. [stable]
+- **"zombie PID 1834248 (~42d+02:10:02)"**: CONFIRMED ⚠️ — Ss, 42-02:16:05 elapsed. [carry, time updated]
+- **"pending=0"**: CONFIRMED ✅ — still 0. Forge builds for pr3-activation + silence-auto-merge-queue-stale-001 dispatched ~21:29Z; unable to verify via GH (rate limit). [carry]
+- **"HEAD=da9b61d2=origin/main"**: UPDATED ✅ → HEAD=232b8ba9 ("Pulse cycle 20260709T213330Z") = origin/main. Clean. [wrapper commit]
+- **"Sync last_sync=21:13:03Z status=error"**: CARRY — still status=error (~22 min at 21:35Z, within 2h). Git repo clean/up-to-date. Self-heals. [carry]
+- **"Daemon heartbeat 21:27:20Z"**: CONFIRMED ✅ — ~8 min at 21:35Z. <60 min. [fresh]
+- **"gh-burn timers not installed"**: CARRY ⚠️ [carry]
+- **"PR #847/#854/#860/#874 OPEN"**: CARRY — GH rate-limit prevents gh pr list + stall checker self-gated. [unable to verify]
+
+**NEW FINDINGS:**
+1. **GH rate-limit escalated to hit #4** — 15:34:42 MDT (21:34:42Z): consecutive=4, backoff=292s on `gh pr view 847` merge-state recheck. All 4 hits in current notifier session (started 21:07:25Z post-restart). Graphql budget 0/5000, reset at 21:44:36Z UTC (~9 min at time of check). PR #880 exponential backoff working correctly. Self-resolves. [blue]
+
+**Check 0 — Alert triage:**
+- repair-watermark: `{"repaired": false, "old_watermark": 947, "file_length": 947}`. 0 new alerts.
+- NOMINAL ✅
+
+**Check 1 — Log noise:** outbox-notifier WARN burst escalated to hit #4 (292s backoff) at 15:34:42 MDT (21:34:42Z). All hits on `gh pr view 847` (merge-state recheck). PR #880 exponential backoff active and growing correctly (66s→111s→226s→292s). Graphql budget 0/5000, resets 21:44:36Z UTC. Self-resolving after reset. NOMINAL (known pattern) ✅
+
+**Check 2 — Telegram sweep:** Beacon PID 1592338 ✅ (Ss, ~27:08). Bot log: last Larry message "i merged pr2 unblock pr3" at 15:23:13 MDT (21:23Z); Beacon replied 15:24:25 MDT. No new Larry directives for Pulse. NOMINAL ✅
+
+**Check 3 — Pipeline stall:** SKIPPED — GraphQL budget 0/5000, resets 21:44:36Z. Healer self-gated at 21:34:52Z. Last clean: iter ~4842 21:21:31Z ("no stalls detected", FORGE_NO_PR_SKIP ×15). UNABLE TO VERIFY (budget gate) ⚠️
+
+**Check 4 — Pending directives:** pending=0. NOMINAL ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-09T21:27:20Z (~8 min at 21:35Z, <60 min). NOMINAL ✅
+
+**Check A — Source repo:** HEAD=232b8ba9=origin/main. On main. Clean. Up-to-date. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-09T21:13:03Z (~22 min at 21:35Z). Status=error (push race, carry). Within 2h. Self-heals. CARRY NOMINAL ✅
+**Check C — Agent liveness:** beacon PID 1592338 ✅ (Ss, ~27:08). outbox_notifier PID 1592524 ✅ (Ss, ~27:03; rate-limited, backoff active). inbox_watcher PID 1606096 ✅ (Ssl, ~17:04). Zombie PID 1834248 ⚠️ (~42d+02:16:05, bash poll loop) [carry]. NOMINAL ✅
+**Check E — PR state:** GH rate-limit prevents gh pr list. Carry: #847 (HELD), #854 (no labels), #860 (no labels), #874 (auto-review). Stall checker self-gated. CARRY UNABLE TO VERIFY ⚠️
+
+**§5.0:** distill_detector: no-op ✅. audit_due_nudge: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks — UTC Thursday 2026-07-09:**
+- Check I: Thursday (off-day). systemd timer handles Mon/Wed/Fri/Sun. Skip. ✅
+- Check III: Sunday gate. Next: 2026-07-13. Skip. ✅
+- Check IX/X: Monday gate. Skip. ✅
+- Check VI/VIII: Proposals idx=990,991 carry — awaiting Larry. [carry]
+
+**G-rule assessment:** No new G-rule occurrences this iter. GH rate-limit hit #4 is part of the ongoing PR #847 HELD_DEEP_REVIEW merge-state polling pattern — PR #880 backoff working; self-resolves at 21:44:36Z. All other G-rule statuses carry unchanged from iter ~4843.
+
+**Actions taken:**
+1. Check 0: watermark stable at 947. 0 new alerts. ✅
+2. §5.0: all three no-ops. ✅
+3. PRIME ledger: `iter_clean` appended. ✅
+4. Tier state: `record --checks-clean false` → Tier 1 (zombie carry; Check 3/E budget gate; consecutive_clean=0). ✅
+
+**Escalations:** 0 new Pulse DMs this iter.
+
+**Standing findings (carry):**
+- [yellow] **zombie-bash-pid-1834248** — PID 1834248 (~42d+02:16:05, Ss bash poll loop). ask-then-do: `kill 1834248`. [carry confirmed]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07`. [carry]
+- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
+- [yellow] **gh-burn timers not installed** — `sudo systemctl enable --now ourliberty-gh-burn-sampler.timer && sudo systemctl enable --now ourliberty-gh-burn-analyzer.timer`. Larry DM'd (idx=935). [carry]
+- [blue] **GH rate-limit** — hit #4 at 21:34:42Z (292s backoff). Reset at 21:44:36Z UTC. PR #880 exponential backoff working. Self-resolving. [carry]
+- [blue] **PR #847** — OPEN (HELD_DEEP_REVIEW). Blocking #874 auto-merge queue. Root cause of repeated GH rate-limit hits (merge-state recheck). [carry]
+- [blue] **PR #854** — OPEN (no labels). sentinel-inflight-stall-tier4 fix. Needs `auto-review` label. [carry]
+- [blue] **PR #860** — OPEN (no labels). [carry]
+- [blue] **PR #874** — OPEN (auto-review, stale >24h behind #847). [carry]
+- [blue] **Forge builds in-flight** — pr3-activation (mirror-two-slot PR3) + silence-auto-merge-queue-stale-001 (Tier-3 translation). Dispatched ~21:29Z; unverifiable via GH (rate limit). [carry]
+- [blue] **G-rules (dispatched, vp):** sentinel-inflight-stall-tier4 (PR #854); notifier-concurrent-scan-dup (PR #847); ourliberty-health-subject-key-mismatch-001; forge-wip-redispatch-digest-tier4-001; no-session-revision-active-mirror-session-fp-001; forge-revision-preamble-missing-pr711-001; forge-wip-redispatch-exhausted-pr-exists-fp-001; decision-needed-approval-forge-dispatch-no-target-repo-001; auto-merge-queue-stale-promoted-tier3-translation (DISPATCHED ✅, Forge building). [carry]
+- [blue] **G-rule 2/3:** forge-marker-task-id-mismatch-xii-v1; build-sequence-advancer-sequence-complete-tier4-001. [carry]
+- [blue] **G-rule 1/3:** outbox-notifier-merge-held-deep-review-tier4-001; mirror-malformed-verdict-heal-reap-path-001; forge-wip-redispatch-exhausted-genuine-no-pr-001. [carry]
+
+**PRIME DIRECTIVE:** ratio=20.33 (interventions=1647, systemic_fixes=81, vp=37, trend=worsening); `iter_clean` appended.
+**Tier end-of-iter:** Tier **1** (consecutive_clean=0; zombie + Check 3/E budget gate carries).
+
+---
+
