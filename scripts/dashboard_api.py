@@ -4806,10 +4806,78 @@ def _parked_spawned_task_ids(captures: list[dict[str, Any]]) -> list[str]:
     return out
 
 
+def _open_delegate_approvals(
+    origin_task_ids: list[str],
+    agents_root: Optional[Path] = None,
+) -> dict[str, dict[str, Any]]:
+    """Delegate-tracking read side: map a delegate origin task_id
+    (`delegate-<cid>`) → the still-OPEN pending approval it spawned.
+
+    Reads `beacon-pending-approvals.json` — the authoritative open-approval store
+    (`add_pending` appends a `status='pending'` entry stamped with
+    `origin_task_id`; `resolve` removes it on approve/reject). For each id in
+    `origin_task_ids` that has a pending entry, returns the approval id +
+    created_at so a parked delegated card can surface "Waiting on your approval"
+    with a link.
+
+    Fail-safe: empty input, a missing/unreadable store, or no matches all degrade
+    to {} — the derive never raises; a card simply shows no needs-you chip."""
+    if not origin_task_ids:
+        return {}
+    root = agents_root or _agents_root()
+    try:
+        data = json.loads(_beacon_pending_approvals_path(root).read_text())
+    except (OSError, json.JSONDecodeError, ValueError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    wanted = set(origin_task_ids)
+    out: dict[str, dict[str, Any]] = {}
+    for entry in (data.get('pending') or []):
+        if not isinstance(entry, dict) or entry.get('status') != 'pending':
+            continue
+        origin = entry.get('origin_task_id')
+        if not isinstance(origin, str) or origin not in wanted:
+            continue
+        # First pending per origin wins (a re-delegate collapses onto one).
+        out.setdefault(origin, {
+            'approval_id': entry.get('id'),
+            'created_at': entry.get('created_at'),
+        })
+    return out
+
+
+def _delegation_needs_you_field(
+    cap: dict[str, Any],
+    open_delegate_approvals: Optional[dict[str, dict[str, Any]]],
+) -> dict[str, Any]:
+    """Delegate-tracking: if this parked card was delegated (`spawned.kind ==
+    'delegate'`) and its origin id has a still-OPEN approval, surface a
+    `delegation_needs_you` ref so the card can show "Waiting on your approval"
+    linking to it. Neutral `None` for a non-delegate card or when no open
+    approval joins — never a misleading claim."""
+    if not open_delegate_approvals:
+        return {'delegation_needs_you': None}
+    spawned = cap.get('spawned')
+    if not isinstance(spawned, dict) or spawned.get('kind') != 'delegate':
+        return {'delegation_needs_you': None}
+    tid = spawned.get('task_id')
+    if not isinstance(tid, str):
+        return {'delegation_needs_you': None}
+    hit = open_delegate_approvals.get(tid)
+    if not hit:
+        return {'delegation_needs_you': None}
+    return {'delegation_needs_you': {
+        'approval_id': hit.get('approval_id'),
+        'created_at': hit.get('created_at'),
+    }}
+
+
 def _parked_from_captures(
     captures: list[dict[str, Any]],
     now: datetime,
     events_by_task_id: Optional[dict[str, list[dict[str, Any]]]] = None,
+    open_delegate_approvals: Optional[dict[str, dict[str, Any]]] = None,
 ) -> list[dict[str, Any]]:
     """Build the `parked[]` array (§ 3.3) from captures.json. Only state=='parked'
     captures; `aging` is the GC healer's persisted flag (Phase 1 — never
@@ -4845,6 +4913,7 @@ def _parked_from_captures(
         }
         entry.update(_meaning_layer_fields(cap))
         entry.update(_spawned_fields(cap, events_by_task_id))
+        entry.update(_delegation_needs_you_field(cap, open_delegate_approvals))
         out.append(entry)
     return out
 
@@ -5147,6 +5216,7 @@ def _build_derived_response(
     promoted_mission_ids: Optional[set[str]] = None,
     promoted_orphan_task_ids: Optional[set[str]] = None,
     collapsed_task_ids: Optional[set[str]] = None,
+    open_delegate_approvals: Optional[dict[str, dict[str, Any]]] = None,
 ) -> dict[str, Any]:
     """Pure derive: build the full /api/missions/derived response (pre-filter).
 
@@ -5234,7 +5304,8 @@ def _build_derived_response(
             pr_state=pr_state_by_url.get(o.get('pr_url')),
         ))
 
-    parked = _parked_from_captures(captures, now, events_by_task_id)
+    parked = _parked_from_captures(
+        captures, now, events_by_task_id, open_delegate_approvals)
     return {
         'schema_version': 1,
         'missions': missions,
@@ -5374,11 +5445,16 @@ def _handle_missions_derived(
     # Phase S (S2): also fetch chain_events for the work spawned by parked
     # captures so the parked lane can surface its derived phase via the same
     # derive. Union with the registered mission task_ids → one query.
+    parked_spawned_ids = _parked_spawned_task_ids(captures)
     fetch_ids = list(registered)
-    for tid in _parked_spawned_task_ids(captures):
+    for tid in parked_spawned_ids:
         if tid not in seen:
             seen.add(tid)
             fetch_ids.append(tid)
+
+    # Delegate-tracking: which parked-delegated cards have a still-open approval
+    # waiting on Larry (join by the `origin_task_id` the approval handler stamps).
+    open_delegate_approvals = _open_delegate_approvals(parked_spawned_ids)
 
     events_by_task_id = _fetch_events_for_task_ids(supabase_client, fetch_ids)
     recent_events = _fetch_recent_chain_events(
@@ -5420,6 +5496,7 @@ def _handle_missions_derived(
         promoted_mission_ids=promoted_mission_ids,
         promoted_orphan_task_ids=promoted_orphan_task_ids,
         collapsed_task_ids=collapsed_task_ids,
+        open_delegate_approvals=open_delegate_approvals,
     )
     response = _apply_derived_filters(
         response, repo=repo, task_id=task_id, now=now,

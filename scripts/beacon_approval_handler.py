@@ -507,6 +507,7 @@ def add_pending(
     state: Optional[dict[str, Any]] = None,
     replan_count: int = 0,
     max_replans: Optional[int] = None,
+    origin_task_id: Optional[str] = None,
 ) -> dict[str, Any]:
     """Add a pending-approval entry. Returns the entry dict written.
 
@@ -516,6 +517,13 @@ def add_pending(
     visible at a glance. When non-zero, `dispatch_approved` writes them to
     the next task envelope so the loop budget propagates through the next
     Forge dispatch.
+
+    Delegate-tracking: `origin_task_id` is the ORIGIN envelope task_id (e.g.
+    `delegate-<cid>`) that triggered this approval — stamped ADDITIVELY so the
+    dashboard can join a parked delegated card to its still-open approval. It is
+    read-only for the dashboard; `dispatch_approved` NEVER consults it and the
+    marker's own `entry['id']` (Beacon's fresh id, the Forge envelope id) is
+    left untouched.
     """
     own = state is None
     with _state_txn(own):
@@ -531,6 +539,12 @@ def add_pending(
             'reminders_sent': [],
             'queued_during_pause': queued_during_pause,
         }
+        # Delegate-tracking join key. Only when the origin is DISTINCT from the
+        # marker id (a delegated card's `delegate-<cid>` differs from Beacon's
+        # fresh marker id; a plain pulse dispatch where they coincide gets no
+        # redundant self-reference).
+        if origin_task_id and origin_task_id != entry['id']:
+            entry['origin_task_id'] = origin_task_id
         # Change A: stamp the canonical cross-store join key so the resolve
         # fan-out (decision_resolve.resolve_decision) can match this pending
         # entry against the C/E/A stores by key. Derived from the task_id (and
