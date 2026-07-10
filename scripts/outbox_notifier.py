@@ -4442,6 +4442,7 @@ REVIEW_REDISPATCH_MAX_ATTEMPTS = 3
 
 def _review_request_already_dispatched(
     review_filename: str, current_head_sha: Optional[str] = None,
+    *, task_id: Optional[str] = None,
 ) -> bool:
     """True if a review-request with this filename is already in Mirror's
     inbox, its `.archive/`, or its `.invalid/`.
@@ -4478,11 +4479,37 @@ def _review_request_already_dispatched(
     lost-result marker replaces it deliberately. Only the marked class
     re-dispatches — a PLAIN archived same-head envelope still dedups forever
     (fail CLOSED: naming drift, retention, or any unforeseen state keeps the
-    old at-most-one-dispatch guarantee rather than looping paid reviews)."""
+    old at-most-one-dispatch guarantee rather than looping paid reviews).
+
+    Cross-round anti-storm (notifier-concurrent-scan-dup-review-dispatch,
+    builder-push head-churn case): when `task_id` is given, a LIVE queued review
+    for the same task under a DIFFERENT round name — round-0 `review-<task_id>.json`
+    vs `review-<task_id>-rev{N}.json` vs `review-<task_id>-replan{N}...` — also
+    counts as already-dispatched. This closes the window the revision-in-flight
+    flag cannot: that flag is cleared at re-review DISPATCH, so between a queued
+    `-rev{N}` re-review and its completion it gives no cover, and a reconcile
+    sweep that saw Forge's pushed head would otherwise dispatch a duplicate
+    round-0 alongside the still-queued re-review. Head-agnostic on purpose — a
+    queued review picks up the PR's current head when Mirror runs it. LIVE inbox
+    ONLY: an archived sibling is a PAST review (the head-aware block below owns
+    that); a live one is Mirror actively working the task — never pile on."""
     mirror_inbox = safe_write_inbox.INBOXES_ROOT / 'mirror'
     # A live in-flight review blocks regardless of head (anti-storm).
     if (mirror_inbox / review_filename).exists():
         return True
+    # A live review for this task under ANY round name blocks too (see docstring).
+    # glob.escape prefilters by name (so a metachar task_id can't widen the scan);
+    # the regex then admits ONLY this task's real round names —
+    # review-<id>.json / -replan<N> / -rev<N> / -replan<N>-rev<N> — so a DIFFERENT
+    # task whose id merely extends this one cannot be mistaken for a sibling
+    # (neither 'a-b' via the hyphen, NOR 'a-rev9-foo' via a numeric round suffix).
+    if task_id:
+        _sibling_re = re.compile(
+            rf'^review-{re.escape(task_id)}(-replan\d+)?(-rev\d+)?\.json$'
+        )
+        for _p in mirror_inbox.glob(f'review-{glob.escape(task_id)}*.json'):
+            if _p.is_file() and _sibling_re.match(_p.name):
+                return True
     if current_head_sha is None:
         # Back-compat: pure existence in archive / .invalid.
         return (
@@ -4766,7 +4793,9 @@ def _dispatch_mirror_review(
     # head doesn't block re-review of new commits; replan rounds keep the
     # existence check (their filename already carries the round suffix).
     _dedup_head = review_head_sha if replan_count == 0 else None
-    if _review_request_already_dispatched(review_filename, _dedup_head):
+    if _review_request_already_dispatched(
+        review_filename, _dedup_head, task_id=task_id,
+    ):
         log(
             f'review-request already dispatched for task {task_id} '
             f'(file or archive or .invalid present); skipping duplicate write'
@@ -4883,7 +4912,11 @@ def _reconcile_missed_mirror_reviews() -> None:
         # — a missed FIRST dispatch is the failure shape this sweep heals;
         # replan re-reviews are dispatched/keyed elsewhere.
         review_filename = safe_write_inbox.canonical_inbox_name(f'review-{task_id}.json')
-        if _review_request_already_dispatched(review_filename):
+        # Pass task_id so a live queued re-review (`-rev{N}`/`-replan{N}`) for this
+        # task blocks a duplicate round-0 dispatch — the builder-push head-churn
+        # window the revision-in-flight flag can't cover (flag cleared at re-review
+        # dispatch). See _review_request_already_dispatched.
+        if _review_request_already_dispatched(review_filename, task_id=task_id):
             continue
 
         # Don't review merged/closed PRs. Only reached for genuine misses

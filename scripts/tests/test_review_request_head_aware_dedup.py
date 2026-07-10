@@ -258,5 +258,85 @@ class TestDiedVerdictlessRedispatch(_DedupBase):
         self.assertFalse(self._check('h1'))
 
 
+class TestCrossRoundAntiStorm(_DedupBase):
+    """Cross-round live-review anti-storm (notifier-concurrent-scan-dup-review-
+    dispatch, builder-push head-churn case). When `task_id` is passed, a LIVE
+    queued review for the same task under a DIFFERENT round name must block a
+    fresh dispatch — the window the revision-in-flight flag can't cover because
+    it is cleared at re-review DISPATCH, before the queued re-review runs.
+    """
+
+    def test_live_revN_sibling_blocks_round0_dispatch(self):
+        # The reported window: a queued rev1 re-review sits in Mirror's inbox
+        # while a reconcile sweep tries to dispatch a fresh round-0 for the same
+        # task at the pushed head. It must be suppressed.
+        self._write('', 'review-t-rev1.json', head_sha='pushedhead')
+        self.assertTrue(
+            ob._review_request_already_dispatched(
+                'review-t.json', 'pushedhead', task_id='t'))
+
+    def test_live_round0_blocks_revN_dispatch(self):
+        # Reverse direction: a live round-0 review blocks a rev dispatch too.
+        self._write('', 'review-t.json', head_sha='h')
+        self.assertTrue(
+            ob._review_request_already_dispatched(
+                'review-t-rev2.json', None, task_id='t'))
+
+    def test_live_replan_sibling_blocks(self):
+        self._write('', 'review-t-replan1.json', head_sha='h')
+        self.assertTrue(
+            ob._review_request_already_dispatched(
+                'review-t.json', None, task_id='t'))
+
+    def test_without_task_id_sibling_does_not_block(self):
+        # Back-compat: callers that don't pass task_id keep the exact-name-only
+        # behavior — a rev sibling does NOT block (no cross-round awareness).
+        self._write('', 'review-t-rev1.json', head_sha='h')
+        self.assertFalse(
+            ob._review_request_already_dispatched('review-t.json', 'h'))
+
+    def test_archived_sibling_does_not_trigger_anti_storm(self):
+        # LIVE-only: an ARCHIVED rev sibling is a PAST review, not Mirror
+        # actively working — it must not block a needed round-0 re-review at a
+        # new head (that path is owned by the head-aware archive check, which
+        # keys on the round-0 name, not the sibling).
+        self._write('.archive', 'review-t-rev1.json', head_sha='oldhead')
+        self.assertFalse(
+            ob._review_request_already_dispatched(
+                'review-t.json', 'newhead', task_id='t'))
+
+    def test_no_prefix_collision_with_extending_sibling_task(self):
+        # task_id 'a' must not be blocked by a live round-0 of the DIFFERENT
+        # task 'a-b' (`review-a-b.json`) — it is not a rev/replan sibling of 'a'.
+        self._write('', 'review-a-b.json', head_sha='h')
+        self.assertFalse(
+            ob._review_request_already_dispatched(
+                'review-a.json', None, task_id='a'))
+
+    def test_no_collision_with_numeric_round_suffix_extending_task(self):
+        # The nastier boundary: a DIFFERENT task whose id extends the base with a
+        # literal `-rev<n>`/`-replan<n>` (e.g. 'x-rev9-foo') must NOT be mistaken
+        # for task 'x''s round sibling. The precise round-suffix regex excludes
+        # `review-x-rev9-foo.json` because trailing chars follow the digits.
+        self._write('', 'review-x-rev9-foo.json', head_sha='h')
+        self._write('', 'review-x-replan2-bar.json', head_sha='h')
+        self.assertFalse(
+            ob._review_request_already_dispatched(
+                'review-x.json', None, task_id='x'))
+        # ...but task 'x''s own real replan+rev sibling still blocks.
+        self._write('', 'review-x-replan2-rev1.json', head_sha='h')
+        self.assertTrue(
+            ob._review_request_already_dispatched(
+                'review-x.json', None, task_id='x'))
+
+    def test_glob_metacharacter_task_id_matches_own_sibling(self):
+        # A task_id with glob metacharacters must still match its own live rev
+        # sibling (glob.escape), not silently fail open.
+        self._write('', 'review-cpu[high]-rev1.json', head_sha='h')
+        self.assertTrue(
+            ob._review_request_already_dispatched(
+                'review-cpu[high].json', None, task_id='cpu[high]'))
+
+
 if __name__ == '__main__':
     unittest.main()
