@@ -59,6 +59,13 @@ def _rebase_worker(ledger_file: str, base: int, count: int) -> None:
         rol.open_obligation(f'task-{i}', pr_url=f'https://x/{i}')
 
 
+def _revision_worker(ledger_file: str, base: int, count: int) -> None:
+    import revision_in_flight_ledger as ril
+    ril.LEDGER_FILE = Path(ledger_file)
+    for i in range(base, base + count):
+        ril.mark_in_flight(f'task-{i}', head_sha=f'sha{i}')
+
+
 def _guardian_worker(ledger_file: str, base: int, count: int) -> None:
     import suite_guardian_ledger as sgl
     p = Path(ledger_file)
@@ -100,6 +107,11 @@ class LedgerConcurrencyTest(unittest.TestCase):
 
     def test_rebase_obligation_no_lost_updates(self):
         ok = _run(_rebase_worker, self.ledger)
+        self.assertEqual(ok, _N_PROCS)
+        self._assert_all_rows()
+
+    def test_revision_in_flight_no_lost_updates(self):
+        ok = _run(_revision_worker, self.ledger)
         self.assertEqual(ok, _N_PROCS)
         self._assert_all_rows()
 

@@ -189,15 +189,19 @@ def mark_in_flight(
     n = _now(now)
     ttl = ttl_seconds if isinstance(ttl_seconds, int) else _DEFAULT_TTL_SECONDS
     try:
-        state = _load()
-        state[task_id] = {
-            'task_id': task_id,
-            'head_sha': head_sha if isinstance(head_sha, str) and head_sha else None,
-            'round': int(round_num) if isinstance(round_num, int) else 1,
-            'pr_url': pr_url if isinstance(pr_url, str) and pr_url else None,
-            'set_at': _iso(n),
-        }
-        _save(state, n, ttl)
+        # Serialize load→mutate→write so a concurrent scan (e.g. a notifier
+        # restart-rescan) can't clobber this mark with a stale copy — a dropped
+        # mark is exactly the duplicate-review dispatch this ledger prevents.
+        with atomic_io.locked_update(LEDGER_FILE):
+            state = _load()
+            state[task_id] = {
+                'task_id': task_id,
+                'head_sha': head_sha if isinstance(head_sha, str) and head_sha else None,
+                'round': int(round_num) if isinstance(round_num, int) else 1,
+                'pr_url': pr_url if isinstance(pr_url, str) and pr_url else None,
+                'set_at': _iso(n),
+            }
+            _save(state, n, ttl)
     except OSError:
         # Best-effort durability; the dispatch proceeds regardless.
         pass
@@ -215,12 +219,15 @@ def clear(task_id: str, now: Optional[datetime] = None,
     n = _now(now)
     ttl = ttl_seconds if isinstance(ttl_seconds, int) else _DEFAULT_TTL_SECONDS
     try:
-        state = _load()
-        if task_id not in state:
-            return False
-        del state[task_id]
-        _save(state, n, ttl)
-        return True
+        # Serialize load→mutate→write: a dropped clear leaves a stale in-flight
+        # flag that suppresses a legit re-review until the TTL expires.
+        with atomic_io.locked_update(LEDGER_FILE):
+            state = _load()
+            if task_id not in state:
+                return False
+            del state[task_id]
+            _save(state, n, ttl)
+            return True
     except OSError:
         return False
 
