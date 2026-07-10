@@ -8299,6 +8299,40 @@
       "retired_at": "2026-07-10T09:30:35.698074+00:00",
       "retired_reason": "orphan-terminal",
       "retired_signal": "pr_merged:#871"
+    },
+    {
+      "id": "proposed-main-suite-guardian-decollide-liveness-001",
+      "name": "Main Suite Guardian Decollide Liveness 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `main-suite-guardian-decollide-liveness-001`. Last activity 2026-07-10T15:36:12.869596+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "main-suite-guardian-decollide-liveness-001"
+      ],
+      "repo": null,
+      "created": "2026-07-10",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-10T15:48:09.000455+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-10T15:36:12.869596+00:00"
+    },
+    {
+      "id": "proposed-pr-ourliberty-agent-core-905",
+      "name": "PR Ourliberty Agent Core 905",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pr-ourliberty-agent-core-905`. Last activity 2026-07-10T15:35:50.780949+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pr-ourliberty-agent-core-905"
+      ],
+      "repo": null,
+      "created": "2026-07-10",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-10T15:48:09.000455+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-10T15:35:50.780949+00:00"
     }
   ]
 }
