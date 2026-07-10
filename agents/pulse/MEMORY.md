@@ -120,9 +120,9 @@
 
 ---
 
-## G-rule heal-daemon-restart-manifest-drift-regenerated-tier4 — 2/3 (new, iter ~2620; updated iter ~2662)
+## G-rule heal-daemon-restart-manifest-drift-regenerated-tier4 — DISPATCHED ✅ (iter ~5000)
 
-**Rule:** `source=heal-daemon-restart-manifest-drift, subject=regenerated` alerts classify Tier-4 (novel) — no translation match. Routine healer auto-commit actions, should be Tier-3. Occurrences: iter ~2620, iter ~2662 (L1077). Dispatch to Beacon at 3/3 to add `config/alert-translations.json` entry.
+**Rule:** `source=heal-daemon-restart-manifest-drift, subject=regenerated` alerts classify Tier-4 (novel) — no translation match. Routine healer auto-commit actions, should be Tier-3. Occurrences: iter ~2620 (1/3), iter ~2662 (L1077, 2/3), iter ~5000 (L950, 3/3, 2026-07-10T22:32:52Z UTC). Direction-ask `direction-ask-heal-daemon-manifest-drift-tier3-3of3-001` dispatched to Beacon inbox iter ~5000. verification_pending (Forge config-only PR to add Tier-3 entry to `config/alert-translations.json`).
 
 ---
 
@@ -580,8 +580,8 @@ PR #909 (`chore(alerts): Tier-3 silence sentinel stale-lease duplicate re-escala
 
 ---
 
-## Status snapshot — updated 2026-07-10T22:19Z UTC (Iter ~4999, **Tier 3**, consecutive_clean=1)
+## Status snapshot — updated 2026-07-10T22:50Z UTC (Iter ~5000, **Tier 3**, consecutive_clean=2)
 
-**Iter ~4999 summary (2026-07-10T22:19Z):** 3 new Tier-3 alerts (L946 heal-dashboard-api-sha-drift; L947 doorbell; L948 outbox-notifier mirror-dag-pass) all auto-silenced. PR #915 auto-merged (21:47Z). spec-gauntlet-gate-001 sequence now active (Larry "go" 16:15 MDT; Mirror DAG-preflight PASS 22:15Z). pending=1 (mirror-review-deep-review-held-surface-on-tab-001; doorbell delivered to Larry). 5 open PRs (#914 deep-review-passed HELD #847; #913 HELD #847; #874, #860, #847 deep-review-required). Zombie PID 1834248 (43d+02:57h). **ACTIVE G-rules:** heal-undispatched-pr-review-claimed-race-fp-001 [PR #912 MERGED ✅, vp]; mirror-queue-wait-gauge-tier4-001 [1/3]; build-sequence-advancer-sequence-complete-tier4-001 [2/3]; forge-marker-task-id-mismatch-xii-v1 [2/3]; outbox-notifier-merge-held-deep-review-tier4-001 [2/3]; outbox-notifier-merge-conflict-manual-rebase-tier4-001 [1/3]; mirror-malformed-verdict-heal-reap-path-001 [1/3]; forge-wip-redispatch-exhausted-genuine-no-pr-001 [1/3]; heal-unregistered-approval-null-chat-id-001 [1/3]; inbox-watcher-tier-pool-all-unavailable-tier4-001 [1/3]; ourliberty-health-subject-key-mismatch-001 [3/3, vp]; forge-revision-preamble-missing-pr711-001 [vp]; forge-wip-redispatch-digest-tier4-001 [vp]; forge-wip-redispatch-exhausted-pr-exists-fp-001 [APPROVAL_REQUEST QUEUED iter ~3279, vp]; notifier-concurrent-scan-dup (PR #847, 13th occ, fix in-flight); RECONCILE_MISSING_REVIEW-.claimed-blindspot [1/3]; sentinel-stale-lease-tier4-001 [COMPLETE ✅].
+**Iter ~5000 summary (2026-07-10T22:50Z):** 5 new alerts (L949-L953): 4× Tier-3 silence, 1× Tier-4 (L950 heal-daemon-manifest-drift → G-rule 3/3 DISPATCHED). PR #847 fix deployed 22:31Z UTC (5c09dbe7); beacon→PID 3202962, outbox-notifier→PID 3202983. PR #916 spec-gauntlet step 1 (`gg-s1-foundations`) Mirror REVIEW_REVISION; revision-1 to Forge. PR #919 (`auto-merge-serializer-skip-dirty-blocker-001`) new Forge PR, Mirror review dispatched. PR #874 rebase in-flight. GH rate limit transient (resets 22:51Z). pending=1 (mirror-review-deep-review-held-surface-on-tab-001). Zombie PID 1834248 (43d+03:27h). **ACTIVE G-rules:** heal-daemon-restart-manifest-drift-regenerated-tier4 [DISPATCHED ✅, vp]; notifier-concurrent-scan-dup [PR #847 fix live, vp]; heal-undispatched-pr-review-claimed-race-fp-001 [PR #912 MERGED ✅, vp]; mirror-queue-wait-gauge-tier4-001 [1/3]; build-sequence-advancer-sequence-complete-tier4-001 [2/3]; forge-marker-task-id-mismatch-xii-v1 [2/3]; outbox-notifier-merge-held-deep-review-tier4-001 [2/3]; outbox-notifier-merge-conflict-manual-rebase-tier4-001 [1/3]; mirror-malformed-verdict-heal-reap-path-001 [1/3]; forge-wip-redispatch-exhausted-genuine-no-pr-001 [1/3]; heal-unregistered-approval-null-chat-id-001 [1/3]; inbox-watcher-tier-pool-all-unavailable-tier4-001 [1/3]; ourliberty-health-subject-key-mismatch-001 [3/3, vp]; forge-revision-preamble-missing-pr711-001 [vp]; forge-wip-redispatch-digest-tier4-001 [vp]; forge-wip-redispatch-exhausted-pr-exists-fp-001 [APPROVAL_REQUEST QUEUED iter ~3279, vp]; RECONCILE_MISSING_REVIEW-.claimed-blindspot [1/3].
 
 
