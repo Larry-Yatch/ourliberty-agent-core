@@ -862,7 +862,8 @@ class PromoteRaceTest(unittest.TestCase):
              mock.patch.object(h, 'save_promoted'), \
              mock.patch.object(h, 'reconcile_retire', return_value=([], {})), \
              mock.patch.object(h, 'evaluate', return_value=[payload]), \
-             mock.patch.object(h, '_chat_id', return_value=None), \
+             mock.patch.object(h, '_chat_id', return_value=4242), \
+             mock.patch.object(h, 'doorbell_counts', return_value=(0, 0)), \
              mock.patch.object(h, 'emit_approval_event', return_value=True), \
              mock.patch.object(approval, 'state_lock',
                                return_value=contextlib.nullcontext()), \
@@ -1296,7 +1297,9 @@ class ForLarryMainIntegrationTest(unittest.TestCase):
              mock.patch.object(h, 'save_promoted', new=save_promoted), \
              mock.patch.object(h, 'reconcile_retire',
                                side_effect=lambda led, *a, **k: ([], led)), \
-             mock.patch.object(h, '_chat_id', return_value=None), \
+             mock.patch.object(h, '_chat_id', return_value=4242), \
+             mock.patch.object(h, 'doorbell_counts', return_value=(0, 0)), \
+             mock.patch('for_larry_escalations.clear', return_value=True), \
              mock.patch.object(h, 'emit_approval_event', return_value=True), \
              mock.patch.object(approval, 'state_lock',
                                return_value=contextlib.nullcontext()), \
@@ -1338,6 +1341,210 @@ class ForLarryMainIntegrationTest(unittest.TestCase):
             {'pending': [], 'history': []},
             promoted={key: {'task_id': 'x', 'promoted_at': _ts(0)}})
         add_pending.assert_not_called()
+
+
+# ===================================================================
+# doorbell<->tab reconciler invariant (doorbell-tab-approval-reconciler-001):
+# idempotency (defect 1), null-chat (defect 2), resolve-on-promote (defect 3),
+# verify-rendered / repair-failure alert (defect 4), doorbell reconcile (A).
+# ===================================================================
+
+class HealerTaskRegisteredTest(unittest.TestCase):
+    """Defect 1: the healer registers a for-larry card under its OWN deterministic
+    `unreg-approval-<hash>` task_id, NOT the hyphen decision id — so
+    is_forlarry_registered alone misses it and the card re-promotes every tick.
+    `_healer_task_registered` is the belt-and-suspenders guard: it recognizes the
+    healer's own promoted task_id already sitting in pending/history."""
+
+    def _state_with_entry(self, entry_id):
+        return {'pending': [{'id': entry_id}], 'history': []}
+
+    def test_true_when_own_task_id_in_pending(self):
+        key = h.forlarry_dedup_key(FORLARRY_DECISION_RECORD['id'])
+        task_id = h.derive_task_id(key)
+        self.assertTrue(
+            h._healer_task_registered(task_id, self._state_with_entry(task_id)))
+
+    def test_true_when_own_task_id_in_history(self):
+        key = h.forlarry_dedup_key(FORLARRY_DECISION_RECORD['id'])
+        task_id = h.derive_task_id(key)
+        state = {'pending': [],
+                 'history': [{'id': task_id, 'status': 'approved'}]}
+        self.assertTrue(h._healer_task_registered(task_id, state))
+
+    def test_false_when_absent(self):
+        key = h.forlarry_dedup_key(FORLARRY_DECISION_RECORD['id'])
+        task_id = h.derive_task_id(key)
+        self.assertFalse(
+            h._healer_task_registered(task_id, {'pending': [], 'history': []}))
+
+    def test_evaluate_for_larry_skips_when_own_task_registered(self):
+        # The regression: the hyphen id is NOT in state (Beacon never registered
+        # it), but the healer's OWN card from a prior tick IS. Must not re-promote.
+        key = h.forlarry_dedup_key(FORLARRY_DECISION_RECORD['id'])
+        task_id = h.derive_task_id(key)
+        state = self._state_with_entry(task_id)
+        out = h.evaluate_for_larry(
+            [FORLARRY_DECISION_RECORD], FORLARRY_HEURISTICS, state, {})
+        self.assertEqual(out, [])
+
+
+class PrimaryChatIdTest(unittest.TestCase):
+    """Defect 2: chat resolution. _primary_chat_id is the LOWEST allowed chat
+    (the #812 null-chat fix); _chat_id honors the explicit override first, then
+    falls back to it, and is None only when neither exists."""
+
+    def test_primary_picks_lowest_allowed(self):
+        with mock.patch.dict(
+                os.environ, {'TELEGRAM_ALLOWED_CHAT_IDS': '900, 100, 500'}):
+            self.assertEqual(h._primary_chat_id(), 100)
+
+    def test_primary_none_when_unset(self):
+        with mock.patch.dict(os.environ, {'TELEGRAM_ALLOWED_CHAT_IDS': ''}):
+            self.assertIsNone(h._primary_chat_id())
+
+    def test_primary_ignores_garbage_tokens(self):
+        with mock.patch.dict(
+                os.environ, {'TELEGRAM_ALLOWED_CHAT_IDS': 'x, 42, y'}):
+            self.assertEqual(h._primary_chat_id(), 42)
+
+    def test_chat_id_override_wins(self):
+        with mock.patch.dict(
+                os.environ,
+                {'OURLIBERTY_APPROVAL_HEALER_CHAT_ID': '7',
+                 'TELEGRAM_ALLOWED_CHAT_IDS': '100'}):
+            self.assertEqual(h._chat_id(), 7)
+
+    def test_chat_id_falls_back_to_primary(self):
+        with mock.patch.dict(
+                os.environ,
+                {'OURLIBERTY_APPROVAL_HEALER_CHAT_ID': '',
+                 'TELEGRAM_ALLOWED_CHAT_IDS': '100, 50'}):
+            self.assertEqual(h._chat_id(), 50)
+
+    def test_chat_id_none_when_nothing_resolvable(self):
+        with mock.patch.dict(
+                os.environ,
+                {'OURLIBERTY_APPROVAL_HEALER_CHAT_ID': '',
+                 'TELEGRAM_ALLOWED_CHAT_IDS': ''}):
+            self.assertIsNone(h._chat_id())
+
+
+class DoorbellCountsTest(unittest.TestCase):
+    """Behavior A: reconcile against the SAME State Log snapshot the doorbell
+    counts. doorbell_counts delegates to doorbell_notifier.load_waiting and never
+    raises — an unreadable snapshot is no signal (None), not a crash."""
+
+    def test_reads_load_waiting_counts(self):
+        import doorbell_notifier as dbell
+        with mock.patch.object(
+                dbell, 'load_waiting',
+                return_value={'pending_approvals': 2, 'escalations': 3}):
+            self.assertEqual(h.doorbell_counts(), (2, 3))
+
+    def test_negative_and_missing_coerce_to_zero(self):
+        import doorbell_notifier as dbell
+        with mock.patch.object(
+                dbell, 'load_waiting', return_value={'pending_approvals': -1}):
+            self.assertEqual(h.doorbell_counts(), (0, 0))
+
+    def test_unreadable_snapshot_is_none(self):
+        import doorbell_notifier as dbell
+        with mock.patch.object(
+                dbell, 'load_waiting', side_effect=RuntimeError('boom')):
+            self.assertIsNone(h.doorbell_counts())
+
+    def test_reconcile_log_never_alerts(self):
+        # The reconcile heartbeat is observability only (actionable-only, F):
+        # it must not fan out to the self-failure alert path.
+        with mock.patch.object(h, 'doorbell_counts', return_value=(1, 1)), \
+             mock.patch.object(h, '_emit_self_failure') as fail:
+            h._log_doorbell_reconcile(
+                promoted_count=1, repair_failures=0, retired=0)
+        fail.assert_not_called()
+
+
+class ReconcilerMainTest(unittest.TestCase):
+    """End-to-end through main() for the reconciler invariant: null-chat skip
+    (defect 2), resolve-on-promote (defect 3), and verify-rendered / repair-
+    failure alert (defect 4), all sharing one hermetic driver."""
+
+    def _drive(self, *, records, chat_id, emit=True, fresh=None,
+               snapshot=None, promoted=None):
+        import contextlib
+        snapshot = snapshot or {'pending': [], 'history': []}
+        fresh = fresh if fresh is not None else {'pending': [], 'history': []}
+        add_pending = mock.MagicMock(
+            side_effect=lambda p, **kw: {'id': p['task_id']})
+        save_promoted = mock.MagicMock()
+        self_fail = mock.MagicMock()
+        fle_clear = mock.MagicMock(return_value=True)
+        with mock.patch.object(h, 'kill_switch',
+                               return_value=Path('/nonexistent/kill-switch')), \
+             mock.patch.object(h, 'heartbeat'), \
+             mock.patch.object(h, 'log'), \
+             mock.patch.object(h, 'load_heuristics',
+                               return_value=FORLARRY_HEURISTICS), \
+             mock.patch.object(h, 'read_alerts', return_value=[]), \
+             mock.patch.object(h, 'read_for_larry_records',
+                               return_value=records), \
+             mock.patch.object(h, 'load_beacon_outbox_markers',
+                               return_value=[]), \
+             mock.patch.object(h, 'load_promoted', return_value=promoted or {}), \
+             mock.patch.object(h, 'save_promoted', new=save_promoted), \
+             mock.patch.object(h, 'reconcile_retire',
+                               side_effect=lambda led, *a, **k: ([], led)), \
+             mock.patch.object(h, '_chat_id', return_value=chat_id), \
+             mock.patch.object(h, 'doorbell_counts', return_value=(0, 0)), \
+             mock.patch.object(h, '_emit_self_failure', new=self_fail), \
+             mock.patch('for_larry_escalations.clear', new=fle_clear), \
+             mock.patch.object(h, 'emit_approval_event', return_value=emit), \
+             mock.patch.object(approval, 'state_lock',
+                               return_value=contextlib.nullcontext()), \
+             mock.patch.object(approval, 'save_state'), \
+             mock.patch.object(approval, 'add_pending', new=add_pending), \
+             mock.patch.object(approval, 'load_state',
+                               side_effect=[snapshot, fresh]):
+            rc = h.main()
+        return {'rc': rc, 'add_pending': add_pending,
+                'save_promoted': save_promoted, 'self_fail': self_fail,
+                'fle_clear': fle_clear}
+
+    # --- defect 2: null chat ---
+    def test_null_chat_skips_and_alerts(self):
+        r = self._drive(records=[FORLARRY_DECISION_RECORD], chat_id=None)
+        self.assertEqual(r['rc'], 1)
+        r['add_pending'].assert_not_called()      # never registers null-chat
+        self.assertEqual(r['self_fail'].call_count, 1)  # actionable alert (F)
+
+    # --- defect 3: resolve source escalation on confirmed render ---
+    def test_confirmed_render_resolves_source_record(self):
+        r = self._drive(records=[FORLARRY_DECISION_RECORD], chat_id=4242,
+                        emit=True)
+        self.assertEqual(r['rc'], 0)
+        r['add_pending'].assert_called_once()
+        r['fle_clear'].assert_called_once_with(FORLARRY_DECISION_RECORD['id'])
+        r['self_fail'].assert_not_called()        # happy path: no nag (F)
+
+    # --- defect 4: unconfirmed render is a repair-failure, not silent ok ---
+    def test_failed_render_alerts_and_does_not_resolve(self):
+        r = self._drive(records=[FORLARRY_DECISION_RECORD], chat_id=4242,
+                        emit=False)
+        self.assertEqual(r['rc'], 0)
+        r['add_pending'].assert_called_once()     # pending entry still written
+        r['fle_clear'].assert_not_called()        # source stays open (counted)
+        self.assertEqual(r['self_fail'].call_count, 1)  # exactly one alert
+        # nothing recorded in the ledger for an unconfirmed render
+        ledger = r['save_promoted'].call_args[0][0]
+        self.assertNotIn(
+            h.forlarry_dedup_key(FORLARRY_DECISION_RECORD['id']), ledger)
+
+    # --- happy path with nothing to promote: reconcile heartbeat, no alert ---
+    def test_clean_tick_no_promotions_no_alert(self):
+        r = self._drive(records=[], chat_id=4242)
+        self.assertEqual(r['rc'], 0)
+        r['add_pending'].assert_not_called()
+        r['self_fail'].assert_not_called()
 
 
 if __name__ == '__main__':

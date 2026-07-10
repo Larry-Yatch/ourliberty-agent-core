@@ -161,18 +161,38 @@ def log_file() -> Path:
     return agents_root() / 'logs' / 'heal-unregistered-approval.log'
 
 
+def _primary_chat_id() -> Optional[int]:
+    """Larry's primary Telegram chat — the lowest id in TELEGRAM_ALLOWED_CHAT_IDS
+    (mirrors doorbell_notifier / outbox_notifier / pulse_check _primary_chat_id).
+    None only when the allow-list is unset/empty."""
+    raw = os.environ.get('TELEGRAM_ALLOWED_CHAT_IDS', '')
+    ids = []
+    for tok in raw.replace(',', ' ').split():
+        try:
+            ids.append(int(tok))
+        except ValueError:
+            continue
+    return min(ids) if ids else None
+
+
 def _chat_id() -> Optional[int]:
-    """Chat id stamped on the promoted pending entry. Tab resolution flows
-    through the chain_event (Supabase), not this field, so it is non-critical;
-    an env override lets the promoted ask still reach a Telegram thread if set.
+    """Chat id stamped on a promoted pending entry so the promoted ask carries a
+    real recipient (the DM path) instead of chat_id=None.
+
+    An explicit override (OURLIBERTY_APPROVAL_HEALER_CHAT_ID) wins; otherwise
+    fall back to Larry's primary allowed chat via _primary_chat_id() — the #812
+    null-chat fix pattern — so a daemon-originated promotion never registers a
+    chat_id=None approval. Returns None ONLY when NEITHER an override NOR any
+    allowed chat exists; main() then SKIPS the promotion (with an actionable
+    alert) rather than register a broken null-chat row.
     """
     raw = os.environ.get('OURLIBERTY_APPROVAL_HEALER_CHAT_ID')
-    if not raw:
-        return None
-    try:
-        return int(raw)
-    except ValueError:
-        return None
+    if raw:
+        try:
+            return int(raw)
+        except ValueError:
+            pass
+    return _primary_chat_id()
 
 
 def log(msg: str, level: str = 'INFO') -> None:
@@ -1102,6 +1122,23 @@ def forlarry_dedup_key(record_id: str) -> str:
     return FORLARRY_LEDGER_PREFIX + record_id
 
 
+def _healer_task_registered(task_id: str, state: dict[str, Any]) -> bool:
+    """True if the healer's OWN deterministic promoted task_id is already an entry
+    id in pending or history.
+
+    Idempotency backstop for for-Larry promotions (defect 1): a for-Larry card is
+    registered under the derived `unreg-approval-<hash>` id, NOT the hyphen
+    decision-approval id, so is_forlarry_registered can never see the healer's own
+    registration. The promoted ledger can also be churned by the retire pass. With
+    the source record left OPEN (before the resolve-on-promote fix) that combined
+    to re-promote the SAME record every tick (the sentinel-every-15-min defect).
+    The derived task_id is stable over the dedup_key, so matching it here holds
+    across ticks even when the ledger entry is gone — the healer never re-appends a
+    card it already registered."""
+    ids, _ = registered_identities(state)
+    return task_id in ids
+
+
 def build_for_larry_approval_payload(
     record: dict[str, Any], dedup_key: str,
 ) -> dict[str, Any]:
@@ -1175,7 +1212,14 @@ def evaluate_for_larry(
         dedup_key = forlarry_dedup_key(record_id)
         if dedup_key in promoted or dedup_key in seen:
             continue
-        if is_forlarry_registered(forlarry_norm_id(record_id), state):
+        # Idempotency (defect 1): skip when a matching approval already stands —
+        # EITHER the hyphen decision approval Beacon's own no-session path
+        # registers, OR this healer's OWN deterministic promoted approval. The
+        # latter guard is what stops the sentinel-every-15-min re-promotion: the
+        # retire pass can drop the ledger entry and is_forlarry_registered can't
+        # see the `unreg-approval-<hash>` id the healer registers under.
+        if is_forlarry_registered(forlarry_norm_id(record_id), state) or \
+                _healer_task_registered(derive_task_id(dedup_key), state):
             continue
         payload = build_for_larry_approval_payload(record, dedup_key)
         payload['_source_ts'] = record.get('ts') or record.get('updated_at')
@@ -1326,6 +1370,56 @@ def _emit_self_failure(message: str, suggested_action: str) -> None:
         log(f'self-failure alert emit failed: {type(e).__name__}: {e}', 'WARN')
 
 
+# -------------------- doorbell invariant reconcile (behavior A) -------------
+
+def doorbell_counts() -> Optional[tuple[int, int]]:
+    """(pending_approvals, escalations) the DOORBELL would count, read from the
+    SAME State Log `waiting_on_larry` snapshot doorbell_notifier reads.
+
+    The doorbell ('N items need your call') and the Approvals tab are fed by
+    different paths; this healer enforces the invariant that every doorbell-
+    counted item has a live, rendered approval_request on the tab. Measuring
+    against the doorbell's OWN source of truth (not a re-derivation) is what makes
+    the reconcile faithful. Returns None when the snapshot is unreadable/absent
+    (no signal — never nags on a broken snapshot). Never raises."""
+    try:
+        import doorbell_notifier as dbell  # noqa: E402
+        waiting = dbell.load_waiting()
+    except Exception as e:  # noqa: BLE001
+        log(f'doorbell snapshot read failed: {type(e).__name__}: {e}', 'WARN')
+        return None
+    if not isinstance(waiting, dict):
+        return None
+
+    def _n(v: Any) -> int:
+        return v if isinstance(v, int) and v > 0 else 0
+
+    return _n(waiting.get('pending_approvals')), _n(waiting.get('escalations'))
+
+
+def _log_doorbell_reconcile(
+    *, promoted_count: int, repair_failures: int, retired: int,
+) -> None:
+    """Reconcile heartbeat: log the doorbell's needs-your-call counts (from the
+    State Log snapshot) alongside this tick's repair outcome.
+
+    Actionable-only: NO alert fires here. A genuine unrepairable gap has already
+    alerted via the null-chat / repair-failure paths; this line is observability
+    so the doorbell total and the tab-repair activity can be reconciled from the
+    log without a routine 'reconciled N items' nag."""
+    counts = doorbell_counts()
+    if counts is None:
+        log(f'reconcile: doorbell snapshot unavailable; '
+            f'promoted={promoted_count} repair_failures={repair_failures} '
+            f'retired={retired}')
+        return
+    approvals, escalations = counts
+    log(f'reconcile: doorbell counts {approvals} approval(s) + {escalations} '
+        f'escalation(s) = {approvals + escalations} needs-your-call; this tick '
+        f'promoted={promoted_count} repair_failures={repair_failures} '
+        f'retired={retired}')
+
+
 def main() -> int:
     if kill_switch().exists():
         log('KILL_SWITCH active; exiting')
@@ -1433,12 +1527,47 @@ def main() -> int:
     if not to_promote:
         if ledger_changed:
             save_promoted(promoted)
+        _log_doorbell_reconcile(
+            promoted_count=0, repair_failures=0, retired=len(retired))
         log(f'tick: scanned {len(alerts)} alert(s) + '
             f'{len(for_larry_records)} for-larry record(s); nothing to promote; '
             f'retired {len(retired)}')
         return 0
 
+    # NULL-CHAT FALLBACK (defect 2): resolve a real recipient BEFORE registering
+    # anything. _chat_id() falls back to _primary_chat_id() (lowest allowed chat);
+    # only when NEITHER an override NOR any allowed chat exists is it None. In that
+    # case we must NOT register chat_id=None approvals (they never reach the DM
+    # path and the card renders broken) — skip the whole promote batch and raise
+    # ONE actionable alert (auto-repair genuinely failed; F).
     chat_id = _chat_id()
+    if chat_id is None:
+        if ledger_changed:
+            save_promoted(promoted)
+        log(f'no chat resolvable (OURLIBERTY_APPROVAL_HEALER_CHAT_ID unset and '
+            f'TELEGRAM_ALLOWED_CHAT_IDS empty); skipping {len(to_promote)} '
+            f'promotion(s) rather than register null-chat approvals', 'ERROR')
+        _emit_self_failure(
+            message=(
+                f'{HEALER_SOURCE} could not promote {len(to_promote)} stranded '
+                'needs-your-call item(s) to the Approvals tab: no Telegram chat '
+                'is resolvable (OURLIBERTY_APPROVAL_HEALER_CHAT_ID unset and '
+                'TELEGRAM_ALLOWED_CHAT_IDS empty), so registering them would '
+                'create broken chat_id=None approvals. They stay counted by the '
+                'doorbell but are NOT on the tab until a chat is configured.'
+            ),
+            suggested_action=(
+                'Set TELEGRAM_ALLOWED_CHAT_IDS (or '
+                'OURLIBERTY_APPROVAL_HEALER_CHAT_ID) in the healer environment, '
+                'then re-run '
+                'python3 ~/agent-core/scripts/heal_unregistered_approval.py.'
+            ),
+        )
+        _log_doorbell_reconcile(
+            promoted_count=0, repair_failures=len(to_promote),
+            retired=len(retired))
+        return 1
+
     promoted_count = 0
     # Seam audit L2 (symmetric twin of the retire pass / PR-E2 #48): evaluate()'s
     # is_already_registered check ran against the lock-free `state` snapshot
@@ -1459,10 +1588,13 @@ def main() -> int:
             task_id = payload['task_id']
             # For-larry payloads carry a colon/hyphen-normalized id; their
             # concurrency re-check must use the same normalized match the
-            # for-larry dedup uses, NOT the alert subject-substring guard.
+            # for-larry dedup uses (plus the healer's-own-task_id guard so a
+            # churned ledger can't slip a duplicate through), NOT the alert
+            # subject-substring guard.
             norm_id = payload.get('_forlarry_norm_id')
             if norm_id:
-                already = is_forlarry_registered(norm_id, fresh)
+                already = is_forlarry_registered(norm_id, fresh) or \
+                    _healer_task_registered(task_id, fresh)
             else:
                 already = is_already_registered(subject, task_id, fresh)
             if already:
@@ -1485,34 +1617,56 @@ def main() -> int:
             registered.append({
                 'payload': p, 'source_ts': source_ts,
                 'identity': identity, 'subject': subject, 'task_id': task_id,
+                # For-larry payloads carry the norm-id marker; the raw record id
+                # (subject) is what for_larry_escalations.clear() resolves on a
+                # CONFIRMED render (defect 3). None for larry-alert-sourced cards.
+                'forlarry_record_id': subject if norm_id else None,
             })
         approval.save_state(fresh)
 
-    # Slow side OUTSIDE the lock: the chain_event tab-feed upsert + ledger record.
+    # Slow side OUTSIDE the lock: the chain_event tab-feed upsert. VERIFY RENDERED,
+    # NOT JUST WRITTEN (defect 4): treat a promotion as successful ONLY when the
+    # tab render is CONFIRMED — a non-null chat (guaranteed above) AND
+    # emit_approval_event returning True. On a confirmed render, resolve the source
+    # for-Larry escalation (defect 3) so the same underlying item stops being
+    # double-counted (once as escalation, once as the promoted approval). On a
+    # failed/again-unrendered write, do NOT resolve the source and do NOT record
+    # the ledger — surface it as a repair-failure (F), never a silent 'ok'.
+    repair_failures: list[str] = []
     for item in registered:
         task_id = item['task_id']
         identity = item['identity']
         try:
             emitted = emit_approval_event(item['payload'], item['source_ts'])
         except Exception as e:  # noqa: BLE001
-            log(f'tab-write failed for {task_id}: {type(e).__name__}: {e}', 'ERROR')
-            _emit_self_failure(
-                message=(
-                    f'{HEALER_SOURCE} registered a promoted approval_request '
-                    f'({task_id}) in Beacon state but the Approvals-tab write '
-                    f'failed: {type(e).__name__}: {e}.'
-                ),
-                suggested_action=(
-                    'Check ~/agents/logs/heal-unregistered-approval.log; the '
-                    'card is pending but may not show on the tab until re-emit.'
-                ),
-            )
+            log(f'tab-write raised for {task_id}: {type(e).__name__}: {e}',
+                'ERROR')
             emitted = False
-        # Record the promotion regardless of the chain_event upsert result:
-        # add_pending already registered it in Beacon's state, and the
-        # event_id is deterministic over the source ts, so a retry would
-        # upsert the same row. Recording prevents a duplicate pending entry on
-        # the next tick if Supabase was briefly down. Keyed on the decision
+        if not emitted:
+            # The pending entry exists but the tab row is NOT confirmed. Leave the
+            # source escalation OPEN (still doorbell-counted, so the item is not
+            # silently lost) and do NOT record the ledger. The evaluate_for_larry
+            # task_id guard prevents a duplicate re-append next tick; the
+            # aggregated alert below makes this actionable.
+            repair_failures.append(task_id)
+            log(f'promote-repair-failure {task_id}: tab render NOT confirmed '
+                f'(chain_event upsert failed) from identity={identity!r}', 'WARN')
+            continue
+        # CONFIRMED RENDER. Resolve the source for-Larry escalation so the
+        # doorbell counts this item once (as the promoted approval) instead of
+        # twice (escalation + approval) — defect 3.
+        rec_id = item.get('forlarry_record_id')
+        if rec_id:
+            try:
+                import for_larry_escalations as fle  # noqa: E402
+                cleared = fle.clear(rec_id)
+                log(f'resolve-on-promote: for-larry record {rec_id!r} '
+                    f'{"cleared" if cleared else "already resolved"} for '
+                    f'{task_id}')
+            except Exception as e:  # noqa: BLE001
+                log(f'resolve-on-promote failed for {rec_id!r}: '
+                    f'{type(e).__name__}: {e}', 'WARN')
+        # Record the promotion only on a CONFIRMED render. Keyed on the decision
         # identity; the entry carries task_id + subject so the retire pass can
         # later resolve + clear it without re-deriving from the raw alert.
         promoted[identity] = {
@@ -1521,13 +1675,32 @@ def main() -> int:
             'promoted_at': datetime.now(timezone.utc).isoformat(),
         }
         promoted_count += 1
-        log(f'promoted {task_id} (tab-write={"ok" if emitted else "deferred"}) '
-            f'from decision identity={identity!r}',
-            'WARN' if not emitted else 'INFO')
+        log(f'promoted {task_id} (tab-write=ok) from decision '
+            f'identity={identity!r}')
 
     save_promoted(promoted)
+    # ACTIONABLE-ONLY (F): one aggregated alert when the tab render could not be
+    # confirmed for one or more cards; nothing on the happy path.
+    if repair_failures:
+        _emit_self_failure(
+            message=(
+                f'{HEALER_SOURCE} registered {len(repair_failures)} promoted '
+                'approval_request(s) in Beacon state but could NOT confirm the '
+                'Approvals-tab render (chain_event upsert failed): '
+                f'{", ".join(repair_failures)}. These needs-your-call items are '
+                'counted by the doorbell but may not show on the tab.'
+            ),
+            suggested_action=(
+                'Check ~/agents/logs/heal-unregistered-approval.log and Supabase '
+                'chain_events connectivity, then re-run '
+                'python3 ~/agent-core/scripts/heal_unregistered_approval.py.'
+            ),
+        )
+    _log_doorbell_reconcile(
+        promoted_count=promoted_count, repair_failures=len(repair_failures),
+        retired=len(retired))
     log(f'done: promoted {promoted_count} direction-ask(s); '
-        f'retired {len(retired)}')
+        f'retired {len(retired)}; repair-failures {len(repair_failures)}')
     return 0
 
 
