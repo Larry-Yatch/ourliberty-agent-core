@@ -8112,7 +8112,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-10T03:28:18.713084+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-10T03:28:03.334164+00:00"
+      "orphan_last_activity_ts": "2026-07-10T03:28:03.334164+00:00",
+      "briefing": {
+        "what": "The team started building a way for the alert system to automatically clear its own red warnings once the underlying problem is actually fixed, tested first on two pilot health checks.",
+        "why": "It cuts down on stale alarms that keep flashing after an issue is already resolved, so you spend less time chasing false alerts and can trust that a red flag means a real, current problem.",
+        "suggest": "Let it move forward as a small, contained pilot on the two checks, but keep it limited to only clearing alerts when a problem is genuinely resolved before rolling it out more widely."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-10T03:31:21.145894+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-heal-unregistered-approval-forlarry-scan-001",
@@ -8129,7 +8143,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-10T03:28:18.713084+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-10T03:26:33.830295+00:00"
+      "orphan_last_activity_ts": "2026-07-10T03:26:33.830295+00:00",
+      "briefing": {
+        "what": "The team started a fix to make sure approval requests aren't slipping through unnoticed, but it isn't attached to any active initiative yet.",
+        "why": "If approvals go missing, decisions that need your sign-off can stall silently \u2014 this keeps that from happening.",
+        "suggest": "Worth a quick look before it goes further; confirm it's still needed and give it a clear home, or set it aside if it's already handled."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-10T03:31:21.145894+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-card-message-notifier-auto-retraction-stale-red-alerts-never-clear",
@@ -8146,7 +8174,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-10T03:28:18.713084+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-10T03:24:39.814584+00:00"
+      "orphan_last_activity_ts": "2026-07-10T03:24:39.814584+00:00",
+      "briefing": {
+        "what": "The team started building a way to automatically clear out old red warning alerts that currently stick around on your board even after the problem is resolved.",
+        "why": "Stale alerts that never go away train everyone to ignore the warning system, so real problems can slip by unnoticed.",
+        "suggest": "Worth doing, but have someone confirm it only clears alerts that are truly resolved before you give it the green light."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-10T03:31:21.145894+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-land-pr854-sentinel-stall-flaky-gate-001",
@@ -8163,7 +8205,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-10T03:28:18.713084+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-10T03:20:59.300357+00:00"
+      "orphan_last_activity_ts": "2026-07-10T03:20:59.300357+00:00",
+      "briefing": {
+        "what": "A finished improvement to how the team handles a stuck-message situation is ready and has already passed an independent quality check.",
+        "why": "It's being held up only by unrelated, already-known testing hiccups \u2014 not by any real problem with the work itself \u2014 so it's sitting idle when it could be delivering value.",
+        "suggest": "Give it the green light to ship, but have the team confirm those testing hiccups are the only thing holding it back before it goes out."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-10T03:31:21.145894+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
