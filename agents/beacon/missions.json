@@ -8453,7 +8453,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-10T21:34:23.507701+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-10T21:32:38.067613+00:00"
+      "orphan_last_activity_ts": "2026-07-10T21:32:38.067613+00:00",
+      "briefing": {
+        "what": "Some finished work is waiting on a final sign-off, but those requests are getting stuck in a back room where you never see them.",
+        "why": "Because they're invisible to you, they sit untouched for days and hold up other work that's waiting behind them.",
+        "suggest": "Let's bring each of these waiting items onto your approvals list so you can quickly give a yes or hand it off \u2014 worth a look before we flip it on."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-10T21:42:19.024677+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
