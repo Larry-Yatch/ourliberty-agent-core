@@ -8391,7 +8391,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-10T18:18:35.865067+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-10T18:12:02.897+00:00"
+      "orphan_last_activity_ts": "2026-07-10T18:12:02.897+00:00",
+      "briefing": {
+        "what": "A small housekeeping update is waiting for your go-ahead to get back in sync after a recent related change bumped it out of line.",
+        "why": "It quiets a low-level internal alert that would otherwise keep crying wolf, keeping your team's attention on real problems.",
+        "suggest": "Give it a quick approval to clear \u2014 it's routine, though worth a glance since it touches shared settings."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-10T18:20:16.950433+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-direction-ask-pr909-rebase-sentinel-stale-lease-001",
@@ -8408,7 +8422,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-10T18:18:35.865067+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-10T18:12:02.113569+00:00"
+      "orphan_last_activity_ts": "2026-07-10T18:12:02.113569+00:00",
+      "briefing": {
+        "what": "Some work the team kicked off on its own that isn't attached to any project yet, so its purpose and payoff aren't clear.",
+        "why": "Unassigned work can quietly eat time and effort without moving anything the business actually cares about.",
+        "suggest": "Before it goes further, have someone confirm what it's for and whether it's worth continuing \u2014 hold off on investing more until that's clear."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-10T18:20:16.950433+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
