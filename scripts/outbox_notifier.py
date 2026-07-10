@@ -8724,6 +8724,271 @@ def _deep_review_required(
     return not stamped
 
 
+# ----- deep-review-held-surface-on-tab (deep-review-held-surface-on-tab-001) --
+# The merge gate HOLDS critical-path PRs that PASS'd Mirror but lack the
+# `deep-review-passed` stamp, persisting them in DEEP_REVIEW_HELD_FILE — but
+# nothing surfaced them to Larry, so held PRs sat parked for days (PR #847
+# blocked #913; a whole backlog #823/#830/#833/#847/#904 sat unseen). This
+# reconcile pass closes the gap: every held entry gets exactly one live,
+# non-null-chat binary approval_request on the Approvals tab. APPROVE
+# mechanically stamps `deep-review-passed` — Larry's approval IS the
+# deep-review sign-off — so the EXISTING merge gate releases the PR on its next
+# sweep; REJECT is a no-op on the label and the PR stays held. A held entry
+# that clears (PR merged, or a new head so the key changed) resolves its
+# approval off the tab. Reuses the existing add_pending / emit_event / resolve
+# / _primary_chat_id machinery + the held-file reader — no parallel store, no
+# new daemon. Runs on the notifier's throttled reconcile cadence beside
+# _reconcile_missed_mirror_reviews.
+def _deep_review_hold_approval_id(
+    pr_number: int, head_sha: Optional[str],
+) -> str:
+    """Stable approval id for a held PR at a given head. Head-scoped so an
+    UNCHANGED held head is idempotent (same id → find_by_id_any_state dedups)
+    while a NEW head (genuine revision) yields a FRESH id → a new approval."""
+    head8 = (head_sha or '')[:8]
+    return f'deep-review-hold-pr{pr_number}' + (f'-{head8}' if head8 else '')
+
+
+def _deep_review_hold_trigger_files(
+    repo_coords: str, pr_number: int,
+) -> list[str]:
+    """The critical-path files on the PR that triggered the hold (fnmatch
+    against `_load_deep_review_paths()`). Best-effort: [] if the files can't be
+    fetched (the approval summary still names the PR); a label-only hold with no
+    matching files also yields []."""
+    files = _gh_pr_changed_files(repo_coords, pr_number)
+    if not files:
+        return []
+    paths = _load_deep_review_paths()
+    return [f for f in files if any(fnmatch.fnmatch(f, g) for g in paths)]
+
+
+def _surface_deep_review_hold_approval(
+    repo_coords: str,
+    pr_number: int,
+    pr_url: str,
+    task_id: str,
+    head_sha: Optional[str],
+    approval_id: str,
+) -> None:
+    """Register ONE binary approval_request for a held PR (add_pending durable
+    store + emit_event tab feed), mirroring `_emit_no_session_decision_approval`.
+
+    NEVER registers a null-chat approval (respects the #812 null-chat fix): if
+    `_primary_chat_id()` is None (TELEGRAM_ALLOWED_CHAT_IDS unset) we SKIP —
+    the next reconcile tick retries once the allow-list is readable, rather than
+    dropping a chat_id=None row the DM can never reach."""
+    chat_id = _primary_chat_id()
+    if not isinstance(chat_id, int):
+        log(
+            f'deep-review-hold surface skipped for pr={pr_url}: no primary '
+            f'chat id (TELEGRAM_ALLOWED_CHAT_IDS unset); retry next tick',
+            'WARN',
+        )
+        return
+    trigger_files = _deep_review_hold_trigger_files(repo_coords, pr_number)
+    files_line = (
+        'Critical-path files: ' + ', '.join(trigger_files) + '\n'
+        if trigger_files else ''
+    )
+    summary = (
+        f'Deep-review hold: PR #{pr_number} ({pr_url}) PASSED Mirror but is a '
+        f'critical-path change held for a human deep review before merge.\n'
+        f'{files_line}'
+        f'APPROVE = authorize the critical-path merge (your approval IS the '
+        f'deep-review sign-off; the gate stamps `deep-review-passed` and '
+        f'auto-merges on its next sweep). REJECT = keep holding (run '
+        f'`/code-review high` or merge manually).'
+    )
+    payload = {
+        'task_id': approval_id,
+        'summary': summary,
+        'target_agent': 'beacon',
+        'prompt': summary,
+        'pr_url': pr_url,
+    }
+    try:
+        approval.add_pending(payload, chat_id=chat_id)
+    except Exception as e:  # noqa: BLE001 — best-effort durable store
+        log(
+            f'deep-review-hold add_pending failed (pr={pr_url}): '
+            f'{type(e).__name__}: {e}',
+            'WARN',
+        )
+        return
+    try:
+        chain_event_emit.emit_event(
+            **approval.build_approval_request_chain_event(payload)
+        )
+    except Exception as e:  # noqa: BLE001 — best-effort tab feed (Supabase)
+        log(
+            f'deep-review-hold emit_event failed (pr={pr_url}): '
+            f'{type(e).__name__}: {e}',
+            'WARN',
+        )
+    log(
+        f'deep-review-hold surfaced approval={approval_id} pr={pr_url} '
+        f'(critical-path change held for deep review)'
+    )
+
+
+def _alert_deep_review_label_failure(
+    repo_coords: str, pr_number: int, pr_url: str, detail: str,
+) -> None:
+    """One actionable repair alert when the approve→label stamp fails, so an
+    approved hold never silently stays parked. Subject-deduped: the warning
+    cooldown collapses repeated failures across ticks to a single DM."""
+    try:
+        larry_alerts.append_alert(
+            source='outbox-notifier',
+            severity='warning',
+            message=(
+                f'Deep-review hold APPROVED for PR {pr_url} but applying the '
+                f'`{_DEEP_REVIEW_PASSED_LABEL}` label failed: {detail}.\n'
+                f'The PR stays held until the label lands. Apply it manually: '
+                f'gh pr edit {pr_number} --repo {repo_coords} '
+                f'--add-label {_DEEP_REVIEW_PASSED_LABEL}'
+            ),
+            subject=f'deep-review-hold-label-apply:{repo_coords}:{pr_number}',
+            route='escalate',
+        )
+    except Exception:  # noqa: BLE001 — daemon-never-wedge
+        pass
+
+
+def _apply_deep_review_pass_label(
+    repo_coords: str, pr_number: int, pr_url: str, task_id: str,
+) -> None:
+    """Mechanically stamp `deep-review-passed` on an APPROVED held PR so the
+    EXISTING merge gate releases it on its next sweep — the approve action is
+    done in the notifier, NOT by a downstream LLM turn (mechanical-recovery
+    discipline).
+
+    Idempotent: if the label is already present (a prior tick applied it, or
+    the merge simply hasn't fired yet) this is a no-op with no gh write and no
+    alert — so re-runs are silent on the happy path. On a gh failure, surface
+    exactly one actionable repair-failure alert; never silently drop the
+    approve."""
+    labels = _gh_pr_labels(repo_coords, pr_number)
+    if labels is not None and _DEEP_REVIEW_PASSED_LABEL in labels:
+        return
+    try:
+        proc = subprocess.run(
+            ['gh', 'pr', 'edit', str(pr_number), '--repo', repo_coords,
+             '--add-label', _DEEP_REVIEW_PASSED_LABEL],
+            capture_output=True, text=True, timeout=_AUTO_MERGE_TIMEOUT_S,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
+        _alert_deep_review_label_failure(
+            repo_coords, pr_number, pr_url, f'{type(e).__name__}: {e}',
+        )
+        return
+    if proc.returncode != 0:
+        _alert_deep_review_label_failure(
+            repo_coords, pr_number, pr_url,
+            (proc.stderr or '').strip()[:200] or f'exit {proc.returncode}',
+        )
+        return
+    log(
+        f'deep-review-hold APPROVED → stamped `{_DEEP_REVIEW_PASSED_LABEL}` on '
+        f'pr={pr_url}; existing gate will auto-merge on its next sweep',
+    )
+
+
+def _resolve_cleared_deep_review_approvals(
+    live_ids: dict[str, dict[str, Any]],
+) -> None:
+    """Resolve any still-PENDING deep-review-hold approval whose held entry has
+    CLEARED from the file (PR merged, or a new head so the old key is gone), so
+    it leaves the tab — never leave a stale approval for a since-merged or
+    since-revised PR.
+
+    Resolved to 'approved' when the PR carries the `deep-review-passed` stamp
+    (Larry authorized it and it has since merged), else 'expired' (merged/closed
+    by another path, or superseded by a new head). Idempotent: an approval that
+    is still held at this head (id in `live_ids`) or already resolved (in
+    history, not pending) is left untouched."""
+    try:
+        pending = approval.load_state().get('pending', [])
+    except Exception as e:  # noqa: BLE001 — reconcile must never wedge the loop
+        log(
+            f'deep-review-hold resolve-on-clear load_state failed: '
+            f'{type(e).__name__}: {e}',
+            'WARN',
+        )
+        return
+    for entry in list(pending):
+        approval_id = entry.get('id')
+        if not isinstance(approval_id, str):
+            continue
+        if not approval_id.startswith('deep-review-hold-pr'):
+            continue
+        if approval_id in live_ids:
+            continue  # still held at this head — leave the approval live
+        payload = entry.get('dispatch_payload') or {}
+        pr_url = payload.get('pr_url') or ''
+        parsed = _parse_pr_url(pr_url) if pr_url else None
+        status = 'expired'
+        if parsed is not None:
+            repo_coords, pr_number = parsed
+            labels = _gh_pr_labels(repo_coords, pr_number)
+            if labels is not None and _DEEP_REVIEW_PASSED_LABEL in labels:
+                status = 'approved'
+        try:
+            resolved = approval.resolve(
+                approval_id, status,
+                note='deep-review hold cleared (PR merged or head advanced)',
+            )
+        except Exception as e:  # noqa: BLE001 — reconcile must never wedge
+            log(
+                f'deep-review-hold resolve failed (approval={approval_id}): '
+                f'{type(e).__name__}: {e}',
+                'WARN',
+            )
+            continue
+        if resolved is not None:
+            log(
+                f'deep-review-hold approval={approval_id} resolved {status} '
+                f'(held entry cleared)'
+            )
+
+
+def _reconcile_deep_review_held_approvals() -> None:
+    """Reconcile `DEEP_REVIEW_HELD_FILE` against the Approvals tab.
+
+    For each held entry:
+      - no known approval → SURFACE one binary approval_request (backlog + new
+        holds both surface here — the pass is over the whole `held` list);
+      - approval resolved 'approved' by Larry → mechanically stamp
+        `deep-review-passed` so the existing gate auto-merges (idempotent);
+      - approval pending/rejected → leave it (pending = awaiting Larry; rejected
+        = keep holding, no re-surface).
+    Then RESOLVE any pending deep-review-hold approval whose held entry has
+    cleared (merged / new head) so it leaves the tab.
+
+    Idempotent + actionable-only: at most one live approval per PR+head; re-runs
+    are no-ops; no routine 'surfaced N held PRs' nag."""
+    live_ids: dict[str, dict[str, Any]] = {}
+    for entry in _load_deep_review_held():
+        repo = entry.get('repo')
+        pr_number = entry.get('pr_number')
+        if not isinstance(repo, str) or not isinstance(pr_number, int):
+            continue
+        pr_url = entry.get('pr_url') or ''
+        head_sha = entry.get('head_sha')
+        task_id = entry.get('task_id') or 'unknown'
+        approval_id = _deep_review_hold_approval_id(pr_number, head_sha)
+        live_ids[approval_id] = entry
+        existing = approval.find_by_id_any_state(approval_id)
+        if existing is None:
+            _surface_deep_review_hold_approval(
+                repo, pr_number, pr_url, task_id, head_sha, approval_id,
+            )
+        elif existing.get('status') == 'approved':
+            _apply_deep_review_pass_label(repo, pr_number, pr_url, task_id)
+    _resolve_cleared_deep_review_approvals(live_ids)
+
+
 def _gh_pr_mergeable_status(repo_coords: str, pr_number: int) -> str:
     """Return 'mergeable' / 'conflicting' / 'unknown'.
 
@@ -13450,6 +13715,19 @@ def main_loop() -> int:
             except Exception as e:  # noqa: BLE001
                 log(
                     f'reconcile sweep error: {type(e).__name__}: {e}',
+                    'ERROR',
+                )
+            # deep-review-held-surface-on-tab-001 — surface every deep-review-
+            # held PR onto the Approvals tab as an actionable binary approval,
+            # mechanically release approved holds via the `deep-review-passed`
+            # stamp, and resolve approvals whose held entry has cleared. Same
+            # throttle + daemon-never-wedge guard as the reconcile above.
+            try:
+                _reconcile_deep_review_held_approvals()
+            except Exception as e:  # noqa: BLE001
+                log(
+                    f'deep-review-held approvals reconcile error: '
+                    f'{type(e).__name__}: {e}',
                     'ERROR',
                 )
 
