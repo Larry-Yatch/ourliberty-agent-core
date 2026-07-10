@@ -2,7 +2,8 @@
   "_schema": {
     "version": 1,
     "purpose": "Conservative heuristic that heal_unregistered_approval.py uses to decide which larry-alerts.jsonl escalations are APPROVAL-CLASS direction-asks that should be promoted onto the dashboard Approvals tab. An alert qualifies when route == 'escalate' AND it carries a decision signal: its suggested_action matches one of suggested_action_prefixes (case-insensitive, at the start, word-boundary) OR its message/subject contains one of decision_phrases (case-insensitive substring). Favor catching a real decision over silence: a false positive is a dismissible tab card; a false negative is the stranded-direction-ask bug this healer kills. Edit this file (no code change) to widen/narrow the net.",
-    "tuning_notes": "Keep prefixes/phrases SPECIFIC to decisions Larry must direct. Routine infra escalations (install-drift, tier2-probe, pipeline-stall) deliberately do NOT match — their suggested_action starts with operator commands ('On the droplet', 'Re-auth', 'Check ...'), not a decision verb."
+    "tuning_notes": "Keep prefixes/phrases SPECIFIC to decisions Larry must direct. Routine infra escalations (install-drift, tier2-probe, pipeline-stall) deliberately do NOT match — their suggested_action starts with operator commands ('On the droplet', 'Re-auth', 'Check ...'), not a decision verb.",
+    "for_larry_decision_sources_note": "Second scan source (blackboard/for-larry-escalations.json): the `source` values whose OPEN records are a genuine binary DECISION for Larry (approve = formalize/act, reject = dismiss). Only Mirror review escalates qualify by default; a record must also carry the matching `<source>:` id prefix. Action-needed / FYI records from other sources are NOT promoted."
   },
   "scan_window_hours": 24,
   "suggested_action_prefixes": [
@@ -16,5 +17,8 @@
     "needs your call",
     "your direction",
     "which option"
+  ],
+  "for_larry_decision_sources": [
+    "mirror-review"
   ]
 }

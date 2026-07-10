@@ -33,6 +33,17 @@ This healer is the ENFORCEMENT NET behind the emission guidance. Each run it:
   5. HEARTBEATS each run; on its own failure emits a larry-alert (it is itself
      covered by the daemon-liveness watchers).
 
+SECOND SCAN SOURCE (blackboard/for-larry-escalations.json): a session-less
+Mirror review escalate that never got an APPROVAL_REQUEST marker still lands as
+an OPEN record in the for-Larry "needs you" feed — visible in the Telegram
+stream but never on the Approvals tab, and the larry-alerts scan never sees it
+(the 2026-07-08 PR #854 blind spot). Alongside the alert scan, each tick also
+promotes every OPEN, DECISION-class for-Larry record (source=='mirror-review')
+that has no matching registered approval, reusing the SAME add_pending / emit /
+dedup machinery (a namespaced ledger key + colon/hyphen id normalization keep
+the two sources from colliding or double-registering). The larry-alerts scan
+behavior is unchanged.
+
 Stdlib + the existing chain_event_emit / beacon_approval_handler helpers only.
 """
 from __future__ import annotations
@@ -74,6 +85,14 @@ DEFAULT_RESOLUTION_PHRASES = (
     'resolved', 'merged', 'shipped', 'closed', 'landed',
     'no longer needed', 'already done', 'superseded',
 )
+# Second scan source (blackboard/for-larry-escalations.json): the `source`
+# values whose OPEN records are a genuine binary DECISION for Larry (approve =
+# formalize/act, reject = dismiss) rather than an action-needed/FYI item. Kept
+# CONSERVATIVE — only Mirror review escalates qualify by default. Config-driven
+# via `for_larry_decision_sources` in the heuristics file (no code change to
+# widen/narrow). A record also has to carry the `<source>:` id prefix the
+# no-session router writes, so a mislabeled row can't slip through.
+DEFAULT_FORLARRY_DECISION_SOURCES = ('mirror-review',)
 
 # Source label stamped on promoted approvals + self-failure alerts.
 HEALER_SOURCE = 'heal-unregistered-approval'
@@ -82,6 +101,11 @@ HEALER_SOURCE = 'heal-unregistered-approval'
 # registrations recognizable and lets the dedup hold even if the state file is
 # lost (the deterministic id already lives in pending/history).
 PROMOTED_TASK_PREFIX = 'unreg-approval'
+
+# Namespace prefix for for-larry-escalations dedup-ledger keys, so a promoted
+# for-Larry record id can never collide with a promoted larry-alert identity in
+# the shared state/heal-unregistered-approval-promoted.json ledger.
+FORLARRY_LEDGER_PREFIX = 'forlarry:'
 
 # Per-tick cap on archived Beacon outboxes parsed during marker recovery, so an
 # unpruned outbox archive can't make the scan unbounded. Only in-window files
@@ -187,6 +211,7 @@ def load_heuristics(path: Optional[Path] = None) -> dict[str, Any]:
         'suggested_action_prefixes': list(DEFAULT_SUGGESTED_ACTION_PREFIXES),
         'decision_phrases': list(DEFAULT_DECISION_PHRASES),
         'resolution_phrases': list(DEFAULT_RESOLUTION_PHRASES),
+        'for_larry_decision_sources': list(DEFAULT_FORLARRY_DECISION_SOURCES),
     }
     cfg_path = path or CONFIG_FILE
     try:
@@ -214,6 +239,11 @@ def load_heuristics(path: Optional[Path] = None) -> dict[str, Any]:
         clean = [p for p in res_phrases if isinstance(p, str) and p.strip()]
         if clean:
             out['resolution_phrases'] = clean
+    fl_sources = data.get('for_larry_decision_sources')
+    if isinstance(fl_sources, list):
+        clean = [s for s in fl_sources if isinstance(s, str) and s.strip()]
+        if clean:
+            out['for_larry_decision_sources'] = clean
     return out
 
 
@@ -998,6 +1028,162 @@ def evaluate(
     return out
 
 
+# -------------------- for-larry-escalations scan (second source) -----------
+#
+# The Approvals tab is fed only by approval_request chain_events. A session-less
+# Mirror review escalate that never got an APPROVAL_REQUEST marker still lands as
+# an OPEN record in blackboard/for-larry-escalations.json (the "needs you" feed)
+# — visible in the Telegram/needs-you stream but never on the Approvals tab, and
+# the larry-alerts scan above never sees it. This second source closes that blind
+# spot: promote each OPEN, DECISION-class for-Larry record that has no matching
+# registered approval, reusing the SAME add_pending/emit/dedup machinery.
+
+
+def read_for_larry_records() -> list[dict[str, Any]]:
+    """Return the OPEN for-Larry records (fail-safe: [] on any import/read
+    error). Delegates to for_larry_escalations.list_open so the feed's own
+    reader + schema stay the single source of truth."""
+    try:
+        import for_larry_escalations as fle  # noqa: E402
+        return fle.list_open()
+    except Exception as e:  # noqa: BLE001 — a bad feed read must never crash the tick
+        log(f'for-larry feed read failed: {type(e).__name__}: {e}', 'WARN')
+        return []
+
+
+def is_forlarry_decision_class(
+    record: dict[str, Any], heuristics: dict[str, Any],
+) -> bool:
+    """Conservative DECISION-class test for a for-Larry record. True only when
+    the record is OPEN (resolved is not True) AND its source is a configured
+    decision source (default: mirror-review) AND its id carries the matching
+    `<source>:` prefix the no-session router writes. Action-needed / FYI records
+    from other sources never qualify — a false positive is a dismissible tab
+    card, but action-needed items are not binary decisions and must not promote.
+    """
+    if record.get('resolved') is True:
+        return False
+    sources = heuristics.get('for_larry_decision_sources') or list(
+        DEFAULT_FORLARRY_DECISION_SOURCES)
+    source = record.get('source')
+    if source not in sources:
+        return False
+    rec_id = record.get('id')
+    if not isinstance(rec_id, str) or not rec_id:
+        return False
+    return rec_id.startswith(str(source) + ':')
+
+
+def forlarry_norm_id(record_id: str) -> str:
+    """Normalize a for-Larry record id to the id shape a registered decision
+    approval uses, so the two dedup against each other. The feed writes
+    `mirror-review:<task>` (COLON, _no_session_record_id); a decision approval
+    registered via _emit_no_session_decision_approval uses
+    `mirror-review-<task>[-<head8>]` (HYPHEN). Swap only the FIRST ':' so the
+    task portion (which itself never contains ':') is untouched."""
+    return record_id.replace(':', '-', 1)
+
+
+def is_forlarry_registered(norm_id: str, state: dict[str, Any]) -> bool:
+    """True if a decision approval for this for-Larry record is already on the
+    tab. Matches the normalized id exactly (bare form) OR as a `<norm_id>-`
+    prefix (the `-<head8>` variant). Uses the same `-`-delimited boundary as
+    outbox_notifier._reconcile_no_session_decision_on_merge, so PR #42 never
+    false-matches PR #421."""
+    if not norm_id:
+        return False
+    ids, _haystacks = registered_identities(state)
+    return any(i == norm_id or i.startswith(norm_id + '-') for i in ids)
+
+
+def forlarry_dedup_key(record_id: str) -> str:
+    """Namespaced dedup-ledger key for a for-Larry record (kept distinct from
+    larry-alert identities in the shared promoted ledger)."""
+    return FORLARRY_LEDGER_PREFIX + record_id
+
+
+def build_for_larry_approval_payload(
+    record: dict[str, Any], dedup_key: str,
+) -> dict[str, Any]:
+    """Build the approval_request payload for a stranded for-Larry decision
+    record. target_agent is always 'beacon': on approve/reject the dashboard
+    routes Larry's choice back to Beacon to formalize (act) or dismiss. Mirrors
+    build_approval_payload's dedup/ledger/retire keys (deterministic task_id,
+    promoted_from_alert, _subject, origin, bare_approvable=False) so the shared
+    promote batch handles it identically; `_forlarry_norm_id` lets the batch's
+    concurrency re-check use the colon/hyphen-aware match."""
+    record_id = record.get('id') or dedup_key
+    task_id = derive_task_id(dedup_key)
+    pr_url = record.get('pr_url')
+    headline = str(record.get('headline') or '').strip()
+    context = str(record.get('context') or '').strip()
+    task_label = record_id.split(':', 1)[1] if ':' in record_id else record_id
+    summary = (
+        f'Stranded Mirror review escalation for `{task_label}` needs your '
+        'direction (promoted from the for-Larry feed; no APPROVAL_REQUEST was '
+        'ever registered, so it never reached the Approvals tab). '
+        'Approve = formalize and act on it; Reject = dismiss.'
+        + (f'\nPR: {pr_url}' if pr_url else '')
+    )
+    prompt = (
+        'This Mirror review escalation was written to the for-Larry needs-you '
+        'feed (blackboard/for-larry-escalations.json) but never emitted as an '
+        f'APPROVAL_REQUEST marker, so it never reached the Approvals tab; '
+        f'{HEALER_SOURCE} promoted it.\n\n'
+        f'Record id: {record_id}\n'
+        + (f'Headline: {headline}\n' if headline else '')
+        + (f'Context: {context}\n' if context else '')
+        + (f'PR: {pr_url}\n' if pr_url else '')
+        + '\nApprove = formalize this stranded Mirror escalation and act on it; '
+        'Reject = dismiss it. Both route back to Beacon.'
+    )
+    return {
+        'task_id': task_id,
+        'summary': summary,
+        'target_agent': 'beacon',
+        'prompt': prompt,
+        'task_type': 'direction-ask',
+        'promoted_from_alert': dedup_key,
+        'origin': HEALER_SOURCE,
+        'bare_approvable': False,
+        # Transient helper keys (stripped before add_pending): the record id is
+        # recorded in the promoted ledger; the normalized id lets the promote
+        # batch's concurrency re-check dedup against a hyphen approval Beacon may
+        # register between this tick's snapshot and the locked append.
+        '_subject': record_id,
+        '_forlarry_norm_id': forlarry_norm_id(str(record_id)),
+    }
+
+
+def evaluate_for_larry(
+    records: list[dict[str, Any]],
+    heuristics: dict[str, Any],
+    state: dict[str, Any],
+    promoted: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Return the approval payloads to register from the for-Larry feed this
+    tick. A record is promoted iff: OPEN + DECISION-class, not already promoted
+    (namespaced ledger key), and not already registered as a decision approval
+    (colon/hyphen-normalized match against pending+history). Pure — no I/O;
+    main() does the registration + persistence via the shared promote batch."""
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for record in records:
+        if not is_forlarry_decision_class(record, heuristics):
+            continue
+        record_id = str(record.get('id'))
+        dedup_key = forlarry_dedup_key(record_id)
+        if dedup_key in promoted or dedup_key in seen:
+            continue
+        if is_forlarry_registered(forlarry_norm_id(record_id), state):
+            continue
+        payload = build_for_larry_approval_payload(record, dedup_key)
+        payload['_source_ts'] = record.get('ts') or record.get('updated_at')
+        out.append(payload)
+        seen.add(dedup_key)
+    return out
+
+
 # -------------------- retire-on-resolution (decision 3) --------------------
 
 def _ledger_entry_fields(key: str, value: Any) -> tuple[str, str, Optional[str]]:
@@ -1094,6 +1280,7 @@ def _strip_helper_keys(payload: dict[str, Any]) -> Optional[str]:
     """
     source_ts = payload.pop('_source_ts', None)
     payload.pop('_subject', None)
+    payload.pop('_forlarry_norm_id', None)
     return source_ts
 
 
@@ -1229,10 +1416,25 @@ def main() -> int:
         )
         return 1
 
+    # --- SECOND SOURCE: for-larry-escalations (stranded Mirror decisions) ---
+    # Additive: the larry-alerts scan above is untouched. Read the OPEN for-Larry
+    # records and promote the DECISION-class ones with no matching registered
+    # approval, folding them into the same to_promote batch so the shared locked
+    # add_pending/emit/ledger machinery below handles both sources uniformly.
+    for_larry_records = read_for_larry_records()
+    try:
+        to_promote_for_larry = evaluate_for_larry(
+            for_larry_records, heuristics, state, promoted)
+    except Exception as e:  # noqa: BLE001
+        log(f'for-larry evaluate failed: {type(e).__name__}: {e}', 'ERROR')
+        to_promote_for_larry = []
+    to_promote = to_promote + to_promote_for_larry
+
     if not to_promote:
         if ledger_changed:
             save_promoted(promoted)
-        log(f'tick: scanned {len(alerts)} alert(s); nothing to promote; '
+        log(f'tick: scanned {len(alerts)} alert(s) + '
+            f'{len(for_larry_records)} for-larry record(s); nothing to promote; '
             f'retired {len(retired)}')
         return 0
 
@@ -1255,12 +1457,20 @@ def main() -> int:
             identity = payload.get('promoted_from_alert', '')
             subject = payload.get('_subject', identity)
             task_id = payload['task_id']
-            if is_already_registered(subject, task_id, fresh):
+            # For-larry payloads carry a colon/hyphen-normalized id; their
+            # concurrency re-check must use the same normalized match the
+            # for-larry dedup uses, NOT the alert subject-substring guard.
+            norm_id = payload.get('_forlarry_norm_id')
+            if norm_id:
+                already = is_forlarry_registered(norm_id, fresh)
+            else:
+                already = is_already_registered(subject, task_id, fresh)
+            if already:
                 # Beacon (or a concurrent healer) registered this decision after
                 # our snapshot; appending now would double the card. Skip — the
                 # real entry stands. Recording nothing in the promoted ledger is
-                # safe: the now-present entry makes is_already_registered short-
-                # circuit on the next tick too.
+                # safe: the now-present entry makes the re-check short-circuit on
+                # the next tick too.
                 log(f'promote-skip: {task_id} registered concurrently '
                     f'(identity={identity!r}); not duplicating the card')
                 continue
