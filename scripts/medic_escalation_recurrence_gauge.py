@@ -29,6 +29,7 @@ THE FIRING RULE (and why each clause is necessary)
 --------------------------------------------------
 FIRE for a fingerprint when, over the recent window:
     count(escalated, this fingerprint, last WINDOW_DAYS) >= MIN_RECUR
+    AND  those escalations span >= MIN_DISTINCT_DAYS calendar days
     AND  most-recent escalation of it is within FRESH_DAYS
 
   - COUNT-over-days (not the 2h-recency RECUR gate the sibling
@@ -39,6 +40,13 @@ FIRE for a fingerprint when, over the recent window:
   - MIN_RECUR (3): a one-off must NEVER trigger the fan-out, and two could be
     coincidence. Three distinct escalations of the *same* fingerprint in a week
     is a genuine recurring pager, not noise.
+  - MIN_DISTINCT_DAYS (2): count alone can't tell "3 pages across 3 days" from
+    "3 pages in one 2-hour burst". The latter is a single stuck event that
+    re-escalates on the hourly medic cadence until it clears (e.g. a notifier
+    restart double-fire) — one incident, not a recurrence, and not worth building
+    the general fan-out for. Requiring the escalations to span >= 2 calendar days
+    keeps the genuine across-days recurrer (the 16x-over-a-fortnight shape that
+    motivated the fan-out) while dropping the single-burst false-positive.
   - FRESH_DAYS (2): the freshness clause is the whole reason this gauge exists
     rather than a raw 2-week count. On 2026-07-09 the two fingerprints that had
     ~16x and ~7x over a trailing fortnight had ALREADY STOPPED (last fired
@@ -115,6 +123,13 @@ WINDOW_DAYS = _env_int('OURLIBERTY_MEDIC_RECUR_WINDOW_DAYS', 7)
 # "recurring". 3 => a one-off (1) and a coincidence (2) never fire. Env:
 # OURLIBERTY_MEDIC_RECUR_MIN_COUNT.
 MIN_RECUR = _env_int('OURLIBERTY_MEDIC_RECUR_MIN_COUNT', 3)
+
+# The escalations must also span at least this many DISTINCT calendar days, so a
+# single stuck event that re-escalates hourly for a few hours (a burst) does not
+# trip the gauge — only a fingerprint paging across days does. 2 => the fan-out
+# is a recurring-across-days problem, not a one-incident burst. Env:
+# OURLIBERTY_MEDIC_RECUR_MIN_DAYS.
+MIN_DISTINCT_DAYS = _env_int('OURLIBERTY_MEDIC_RECUR_MIN_DAYS', 2)
 
 # The most-recent escalation of a qualifying fingerprint must be within this many
 # days, or it's a dying/dead burst (already root-caused) and must NOT fire. This
@@ -238,22 +253,33 @@ def load_escalations(now: Optional[datetime] = None) -> dict[str, list[datetime]
 
 def qualifying(escalations: dict[str, list[datetime]],
                now: Optional[datetime] = None) -> dict[str, dict[str, Any]]:
-    """Fingerprints that meet BOTH the count and freshness gates.
+    """Fingerprints that meet the count, spread, and freshness gates.
 
-    Returns {fingerprint: {'count': n, 'last': datetime, 'first': datetime}}
-    for each fingerprint with count >= MIN_RECUR AND most-recent within
-    FRESH_DAYS. A fingerprint with a fat count but a stale most-recent (a dying
-    burst) is deliberately excluded."""
+    Returns {fingerprint: {'count': n, 'days': d, 'last': datetime,
+    'first': datetime}} for each fingerprint with count >= MIN_RECUR AND
+    escalations spanning >= MIN_DISTINCT_DAYS calendar days AND most-recent
+    within FRESH_DAYS.
+
+    - A fat count with a stale most-recent (a dying burst) is excluded (freshness).
+    - A fat count confined to ONE day (a single stuck event that re-escalated
+      hourly for a few hours — e.g. a restart double-fire) is excluded (spread).
+      The fan-out is worth building for a fingerprint that pages ACROSS days, not
+      for one incident that triple-fired in one burst; the count gate alone can't
+      tell them apart, so the distinct-day span is the discriminator."""
     now = now or datetime.now(timezone.utc)
     fresh_cutoff = now - timedelta(days=FRESH_DAYS)
     out: dict[str, dict[str, Any]] = {}
     for fp, times in escalations.items():
         if len(times) < MIN_RECUR:
             continue
+        distinct_days = len({t.date() for t in times})
+        if distinct_days < MIN_DISTINCT_DAYS:
+            continue  # a single-day burst, not a recurrence-across-days
         last = max(times)
         if last < fresh_cutoff:
             continue  # recurring historically, but the burst is dead — not live
-        out[fp] = {'count': len(times), 'last': last, 'first': min(times)}
+        out[fp] = {'count': len(times), 'days': distinct_days,
+                   'last': last, 'first': min(times)}
     return out
 
 
@@ -299,8 +325,9 @@ def _render_alert(fp: str, meta: dict[str, Any],
         f'one self-retracting board card instead of N repeat pages.\n'
         f'\n'
         f'Fingerprint: {fp}\n'
-        f'  {meta["count"]}x escalated in the last {WINDOW_DAYS}d '
-        f'(>= {MIN_RECUR}), most recent {age_h:.0f}h ago (<= {FRESH_DAYS}d).\n'
+        f'  {meta["count"]}x escalated across {meta["days"]} day(s) in the last '
+        f'{WINDOW_DAYS}d (>= {MIN_RECUR} over >= {MIN_DISTINCT_DAYS} days), most '
+        f'recent {age_h:.0f}h ago (<= {FRESH_DAYS}d).\n'
         f'\n'
         f'This is the un-park trigger for the parked "recurring-escalation -> one '
         f'card" fan-out (a Slice 9 reconciler extension). The build is spec\'d and '
@@ -408,16 +435,17 @@ def _status_text(now: Optional[datetime] = None) -> str:
         'medic-escalation-recurrence-gauge status',
         f'  window            : last {WINDOW_DAYS}d',
         f'  min recurrence    : >= {MIN_RECUR} escalations',
+        f'  min spread        : >= {MIN_DISTINCT_DAYS} distinct days',
         f'  freshness         : most-recent <= {FRESH_DAYS}d',
         f'  distinct escalated: {len(escalations)} fingerprint(s) in window',
         '',
-        'qualifying (count + fresh):',
+        'qualifying (count + spread + fresh):',
     ]
     if quals:
         for fp in sorted(quals, key=lambda k: -quals[k]['count']):
             m = quals[fp]
             age_h = (now - m['last']).total_seconds() / 3600.0
-            lines.append(f'  {m["count"]}x  last={age_h:.0f}h ago  {fp}')
+            lines.append(f'  {m["count"]}x/{m["days"]}d  last={age_h:.0f}h ago  {fp}')
     else:
         lines.append('  (none)')
     lines += [

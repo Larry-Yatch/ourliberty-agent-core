@@ -54,6 +54,14 @@
       "recommended_action": "ssh larry@134.209.44.80 and run: `sudo systemctl restart ourliberty-dashboard-api.service && systemctl status ourliberty-dashboard-api.service`. Inspect the restart error in the alert body for the failure cause. Producer: scripts/heal_dashboard_api_sha_drift.py."
     }
   },
+  "medic-escalation-recurrence-gauge": {
+    "medic-escalation-fanout-readiness": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "plain_language_summary": "A Medic escalation fingerprint recurred enough to be worth attention: it escalated >=3 times across >=2 distinct days with a fresh most-recent hit. This gauge is the un-park trigger for the parked \"recurring-escalation -> one self-retracting board card\" fan-out; it only rings for a genuine across-days recurrer (a single same-day burst is deliberately ignored). No automatic action is taken — it is a readiness signal.",
+      "recommended_action": "Decide whether to un-park + build the medic-escalation fan-out (spec: agents/beacon/specs/medic-escalation-recurrence-fanout.md), OR — if only this one fingerprint is loud — root-cause that specific failure directly, which is often faster than the general fan-out. Silent below threshold; will not re-fire for this fingerprint for 7 days."
+    }
+  },
   "medic": {
     "medic-silenced-needs-fix": {
       "severity": "WARNING",
