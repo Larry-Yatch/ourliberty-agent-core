@@ -68,46 +68,43 @@ class LedgerTestCase(unittest.TestCase):
         rifl.mark_in_flight('t1', head_sha=None, now=T0)
         self.assertIsNone(rifl.get('t1')['head_sha'])
 
-    # -------------------- guard: suppress --------------------
+    # -------------------- guard: suppress on presence --------------------
 
-    def test_is_in_flight_same_head_suppresses(self):
+    def test_is_in_flight_flag_present_suppresses(self):
         rifl.mark_in_flight('t1', head_sha=HEAD_A, now=T0)
-        self.assertTrue(
-            rifl.is_in_flight('t1', current_head_sha=HEAD_A, now=T0)
-        )
+        self.assertTrue(rifl.is_in_flight('t1', now=T0))
 
     def test_is_in_flight_no_row_returns_false(self):
-        self.assertFalse(
-            rifl.is_in_flight('nope', current_head_sha=HEAD_A, now=T0)
-        )
+        self.assertFalse(rifl.is_in_flight('nope', now=T0))
 
     def test_is_in_flight_empty_task_id_returns_false(self):
-        self.assertFalse(rifl.is_in_flight('', current_head_sha=HEAD_A, now=T0))
+        self.assertFalse(rifl.is_in_flight('', now=T0))
 
-    def test_is_in_flight_unknown_current_head_suppresses_conservatively(self):
-        # current head can't be resolved (gh hiccup) — suppress to keep the
-        # duplicate-dispatch window closed; reconcile retries + TTL bound it.
+    def test_is_in_flight_suppresses_regardless_of_head(self):
+        # The guard no longer compares PR heads: Forge advances the head
+        # (WIP checkpoint + incremental commits) WHILE the revision is still in
+        # flight, so a head change is NOT evidence the revision landed. The
+        # flag's presence (bounded by TTL) is the sole signal; the legitimate
+        # post-landing re-review is let through by the rerun path CLEARING the
+        # flag, not by a head compare here. A flag set with no head, or one
+        # whose head later differs, both still suppress.
         rifl.mark_in_flight('t1', head_sha=HEAD_A, now=T0)
-        self.assertTrue(
-            rifl.is_in_flight('t1', current_head_sha=None, now=T0)
-        )
+        self.assertTrue(rifl.is_in_flight('t1', now=T0))
+        rifl.mark_in_flight('t2', head_sha=None, now=T0)
+        self.assertTrue(rifl.is_in_flight('t2', now=T0))
 
-    def test_is_in_flight_unknown_recorded_head_suppresses_conservatively(self):
-        rifl.mark_in_flight('t1', head_sha=None, now=T0)
-        self.assertTrue(
-            rifl.is_in_flight('t1', current_head_sha=HEAD_A, now=T0)
-        )
+    # -------------------- sentinel task_id --------------------
 
-    # -------------------- guard: new-head re-review passes through --------------------
-
-    def test_is_in_flight_new_head_lets_re_review_through(self):
-        # Design question (1): a landed revision produces a NEW head — the
-        # re-review at that head must NOT be suppressed, even before the rerun
-        # clear fires.
-        rifl.mark_in_flight('t1', head_sha=HEAD_A, now=T0)
-        self.assertFalse(
-            rifl.is_in_flight('t1', current_head_sha=HEAD_B, now=T0)
-        )
+    def test_unknown_sentinel_never_marks_or_suppresses(self):
+        # 'unknown' is the missing-task_id placeholder callers pass as
+        # `data.get('task_id') or 'unknown'`. If honoured as a real key, every
+        # task-id-less PR would share ONE flag and cross-suppress each other.
+        # mark/is_in_flight/clear/get must all treat it as "no identity".
+        rifl.mark_in_flight('unknown', head_sha=HEAD_A, now=T0)
+        self.assertEqual(rifl._load(), {})           # nothing written
+        self.assertFalse(rifl.is_in_flight('unknown', now=T0))
+        self.assertFalse(rifl.clear('unknown'))
+        self.assertIsNone(rifl.get('unknown'))
 
     # -------------------- clear --------------------
 
@@ -115,9 +112,7 @@ class LedgerTestCase(unittest.TestCase):
         rifl.mark_in_flight('t1', head_sha=HEAD_A, now=T0)
         self.assertTrue(rifl.clear('t1'))
         self.assertIsNone(rifl.get('t1'))
-        self.assertFalse(
-            rifl.is_in_flight('t1', current_head_sha=HEAD_A, now=T0)
-        )
+        self.assertFalse(rifl.is_in_flight('t1', now=T0))
 
     def test_clear_absent_row_returns_false(self):
         self.assertFalse(rifl.clear('nope'))
@@ -145,29 +140,19 @@ class LedgerTestCase(unittest.TestCase):
     def test_is_in_flight_ttl_lapsed_returns_false(self):
         rifl.mark_in_flight('t1', head_sha=HEAD_A, now=T0)
         past_ttl = T0 + timedelta(seconds=rifl._DEFAULT_TTL_SECONDS + 60)
-        self.assertFalse(
-            rifl.is_in_flight('t1', current_head_sha=HEAD_A, now=past_ttl)
-        )
+        self.assertFalse(rifl.is_in_flight('t1', now=past_ttl))
 
     def test_is_in_flight_within_ttl_still_suppresses(self):
         rifl.mark_in_flight('t1', head_sha=HEAD_A, now=T0)
         within = T0 + timedelta(seconds=rifl._DEFAULT_TTL_SECONDS - 60)
-        self.assertTrue(
-            rifl.is_in_flight('t1', current_head_sha=HEAD_A, now=within)
-        )
+        self.assertTrue(rifl.is_in_flight('t1', now=within))
 
     def test_custom_ttl_seconds_param(self):
         rifl.mark_in_flight('t1', head_sha=HEAD_A, now=T0, ttl_seconds=100)
         at_90 = T0 + timedelta(seconds=90)
         at_110 = T0 + timedelta(seconds=110)
-        self.assertTrue(
-            rifl.is_in_flight('t1', current_head_sha=HEAD_A, now=at_90,
-                              ttl_seconds=100)
-        )
-        self.assertFalse(
-            rifl.is_in_flight('t1', current_head_sha=HEAD_A, now=at_110,
-                              ttl_seconds=100)
-        )
+        self.assertTrue(rifl.is_in_flight('t1', now=at_90, ttl_seconds=100))
+        self.assertFalse(rifl.is_in_flight('t1', now=at_110, ttl_seconds=100))
 
     def test_save_prunes_ttl_lapsed_rows(self):
         rifl.mark_in_flight('old', head_sha=HEAD_A, now=T0)
@@ -184,9 +169,7 @@ class LedgerTestCase(unittest.TestCase):
         rifl.LEDGER_FILE.parent.mkdir(parents=True, exist_ok=True)
         rifl.LEDGER_FILE.write_text('{ not valid json')
         self.assertEqual(rifl._load(), {})
-        self.assertFalse(
-            rifl.is_in_flight('t1', current_head_sha=HEAD_A, now=T0)
-        )
+        self.assertFalse(rifl.is_in_flight('t1', now=T0))
 
     def test_load_non_dict_returns_empty(self):
         rifl.LEDGER_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -199,25 +182,23 @@ class LedgerTestCase(unittest.TestCase):
             '{"t1": {"task_id": "t1", "head_sha": "aaaaaaaaaaaa", '
             '"set_at": "not-a-date"}}'
         )
-        self.assertFalse(
-            rifl.is_in_flight('t1', current_head_sha=HEAD_A, now=T0)
-        )
+        self.assertFalse(rifl.is_in_flight('t1', now=T0))
 
     # -------------------- lifecycle integration --------------------
 
     def test_full_lifecycle_set_suppress_clear_flow(self):
         # set (revision dispatched at HEAD_A)
         rifl.mark_in_flight('t1', head_sha=HEAD_A, round_num=1, now=T0)
-        # concurrent reconcile scan at the same head → suppressed
-        self.assertTrue(
-            rifl.is_in_flight('t1', current_head_sha=HEAD_A, now=T0)
-        )
-        # Forge pushes revision (new head) + rerun path clears the flag
+        # concurrent reconcile scan → suppressed while in flight
+        self.assertTrue(rifl.is_in_flight('t1', now=T0))
+        # a mid-revision push advances the head — STILL suppressed (no head
+        # compare); the revision is not done yet.
+        rifl.mark_in_flight('t1', head_sha=HEAD_B, round_num=1, now=T0)
+        self.assertTrue(rifl.is_in_flight('t1', now=T0))
+        # Forge finishes → rerun path clears the flag
         self.assertTrue(rifl.clear('t1'))
-        # subsequent review at the new head flows normally
-        self.assertFalse(
-            rifl.is_in_flight('t1', current_head_sha=HEAD_B, now=T0)
-        )
+        # subsequent review flows normally
+        self.assertFalse(rifl.is_in_flight('t1', now=T0))
 
 
 if __name__ == '__main__':

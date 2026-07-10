@@ -4431,26 +4431,28 @@ def _dispatch_mirror_review(
         review_base['head_sha'] = review_head_sha
     # Revision-in-flight suppression (notifier-concurrent-scan-dup-review-dispatch-001).
     # When Mirror emitted REVIEW_REVISION, _dispatch_revision_to_forge wrote a
-    # revision task to Forge and set a durable flag; the PR stays OPEN at the
-    # same head while Forge works. In that window the concurrent reconcile sweep
-    # can read the PR as "needs review" (round-0 review file archived, PR still
-    # open) and re-enter here — spawning a DUPLICATE review of a PR mid-revision.
-    # The legitimate re-review AFTER Forge pushes is dispatched by
-    # _dispatch_mirror_review_rerun (which clears the flag), never here. Suppress
-    # only when the revision is in flight AT THIS SAME head: a landed revision
-    # produces a NEW head, so the guard lets that re-review through (head compare
-    # inside is_in_flight). A TTL bounds a crashed-mid-revision Forge so the
-    # reconcile net can still recover the PR once it lapses. This is an ADDITIONAL
-    # guard alongside the round-0 head_sha dedup, not a replacement.
-    if revision_in_flight_ledger.is_in_flight(
-        task_id, current_head_sha=review_head_sha,
-    ):
+    # revision task to Forge and set a durable flag; the PR stays OPEN while
+    # Forge works. In that window the concurrent reconcile sweep can read the PR
+    # as "needs review" (round-0 review file archived, PR still open) and
+    # re-enter here — spawning a DUPLICATE review of a PR mid-revision. The
+    # legitimate re-review AFTER Forge pushes is dispatched by
+    # _dispatch_mirror_review_rerun (which clears the flag), never here.
+    #
+    # Suppress purely on the flag's presence (bounded by its TTL) — NOT on head
+    # equality. Forge advances the PR head repeatedly while the revision is still
+    # in flight (a [WIP][session-start] checkpoint + incremental commits), so a
+    # head compare would treat a mid-revision push as a "landed revision" and let
+    # the concurrent scan through — reopening the very window this guards. The
+    # landed-revision re-review is owned by the rerun clear; the TTL bounds a
+    # crashed/dead-lettered Forge so the reconcile net can still recover the PR.
+    # This is an ADDITIONAL guard alongside the round-0 head_sha dedup.
+    if revision_in_flight_ledger.is_in_flight(task_id):
         log(
             f'MIRROR_REVIEW_SUPPRESSED_REVISION_IN_FLIGHT task={task_id} '
             f'pr={pr_url} head={review_head_sha} — a Forge revision is in '
-            f'flight for this PR at this head; not dispatching a duplicate '
-            f'review (the legitimate re-review fires via '
-            f'_dispatch_mirror_review_rerun once Forge pushes)',
+            f'flight for this PR; not dispatching a duplicate review (the '
+            f'legitimate re-review fires via _dispatch_mirror_review_rerun '
+            f'once Forge pushes)',
             'INFO',
         )
         return
@@ -5142,6 +5144,27 @@ def _dispatch_revision_to_forge(
             round_num=next_count,
         )
 
+    def _mark_revision_in_flight() -> None:
+        # Raise the revision-in-flight flag so the guard in
+        # _dispatch_mirror_review suppresses a concurrent reconcile-scan
+        # duplicate review while Forge revises. Suppression is presence-based
+        # (bounded by the ledger TTL); head_sha is recorded for inspection only,
+        # NOT to gate the guard (Forge advances the head mid-revision, so head
+        # equality is not a proxy for "in flight" — see revision_in_flight_ledger).
+        # Called on BOTH the fresh-dispatch success branch AND the idempotency
+        # early-return: the revision file already existing means a revision IS in
+        # flight, and a prior dispatch may have crashed after writing the inbox
+        # file but before raising the flag — this re-raises it either way.
+        # Idempotent + fail-safe (never raises). Cold-start revisions write a
+        # real Forge task, so they set the flag too.
+        # (notifier-concurrent-scan-dup-review-dispatch-001)
+        revision_in_flight_ledger.mark_in_flight(
+            task_id,
+            head_sha=data.get('head_sha'),
+            pr_url=pr_url,
+            round_num=next_count,
+        )
+
     if (
         (forge_inbox / revision_filename).exists()
         or (forge_inbox / '.archive' / revision_filename).exists()
@@ -5151,6 +5174,10 @@ def _dispatch_revision_to_forge(
             f'revision-{next_count} already dispatched for task {task_id} '
             f'(file or archive or .invalid present); skipping duplicate write'
         )
+        # A revision file already present means a revision IS in flight — re-raise
+        # the guard flag in case a prior dispatch crashed before setting it, so a
+        # concurrent reconcile scan in this window is still suppressed.
+        _mark_revision_in_flight()
         if cold_start:
             _open_cold_start_obligation()
         return
@@ -5175,20 +5202,10 @@ def _dispatch_revision_to_forge(
             f'revision-{next_count} dispatched forge <- beacon '
             f'(task={task_id}, file={dest.name}, {resume_note})'
         )
-        # Set the revision-in-flight flag ONLY after the revision task actually
-        # landed in Forge's inbox (this success branch — not the DM-to-Larry or
-        # missing-target_repo early-returns, which write no Forge task). Keyed on
-        # the PR head the revision targets so the guard in _dispatch_mirror_review
-        # suppresses a concurrent reconcile-scan duplicate review at THIS head,
-        # while letting the legitimate new-head re-review through. Cold-start
-        # revisions write a real (fresh) Forge task, so they set the flag too.
-        # (notifier-concurrent-scan-dup-review-dispatch-001)
-        revision_in_flight_ledger.mark_in_flight(
-            task_id,
-            head_sha=data.get('head_sha'),
-            pr_url=pr_url,
-            round_num=next_count,
-        )
+        # Raise the revision-in-flight flag now the revision task has landed in
+        # Forge's inbox (this success branch — not the DM-to-Larry or
+        # missing-target_repo early-returns, which write no Forge task).
+        _mark_revision_in_flight()
         if cold_start:
             _open_cold_start_obligation()
     except (

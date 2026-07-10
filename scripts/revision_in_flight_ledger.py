@@ -15,18 +15,31 @@ by ``_dispatch_mirror_review_rerun``, never by ``_dispatch_mirror_review``.
 This ledger is a durable, ``task_id``-keyed flag set AFTER a revision task is
 successfully written to Forge's inbox. A guard at the top of
 ``_dispatch_mirror_review`` consults it and suppresses a first/reconcile review
-dispatch while a revision is in flight AT THE SAME HEAD. The flag is cleared by
+dispatch while a revision is in flight. The flag is cleared by
 ``_dispatch_mirror_review_rerun`` (the legitimate post-revision re-review) and on
 terminal PR verdicts (merged/closed/pass/escalate). A staleness TTL ensures a
 Forge that crashes mid-revision does not strand the PR forever: once the TTL
 lapses, reviews flow again so the reconcile net can recover the PR.
+
+SUPPRESSION KEYS ON THE FLAG, NOT ON THE PR HEAD. An earlier design suppressed
+only while the recorded head still matched the PR's current head, on the theory
+that "a landed revision produces a new head, so let the new-head re-review
+through." That theory is false in this system: a revision advances the PR head
+REPEATEDLY while it is still in flight — Forge pushes a ``[WIP][session-start]``
+checkpoint (``worktree_manager``) and incremental work commits before the
+revision is done. Head equality is therefore not a proxy for "in flight", and
+keying suppression on it reopened the exact duplicate-dispatch window this
+ledger exists to close (a mid-revision push looked like a landed revision and
+let a concurrent reconcile scan through). The landed-revision re-review is owned
+by the rerun clear + terminal clears; the TTL bounds the crash/dead-letter case.
+``head_sha`` is retained on the row for inspection/debugging only.
 
 State file: ``~/agents/state/revision-in-flight-ledger.json`` — one JSON object
 keyed by ``task_id``. Per-row schema::
 
     {
       "task_id": "<str>",
-      "head_sha": "<str>|null",   # PR head the revision was dispatched against
+      "head_sha": "<str>|null",   # head the revision was dispatched against (diagnostic)
       "round": <int>,             # revision round dispatched
       "pr_url": "<str>|null",
       "set_at": <iso8601>         # when the flag was (re)set — drives the TTL
@@ -74,6 +87,22 @@ _DEFAULT_TTL_SECONDS = int(
 # Hard cap on total rows so a pathological loop can't grow the file unbounded.
 # Oldest-by-set_at rows are dropped first.
 _MAX_ROWS = 500
+
+# Placeholder task_ids that are NOT real identities. Callers derive the key as
+# ``data.get('task_id') or 'unknown'``, so a task-id-less envelope keys on the
+# literal 'unknown'. If we honoured that key, every task-id-less PR would share
+# ONE flag and one PR's in-flight revision would suppress an UNRELATED PR's
+# review until the TTL lapsed. Treat these as "no identity": mark/clear/guard
+# all no-op, so a task-id-less PR simply falls back to the round-0 head_sha
+# dedup instead of a cross-PR-colliding flag.
+_SENTINEL_TASK_IDS = frozenset({'', 'unknown'})
+
+
+def _is_real_task_id(task_id: Any) -> bool:
+    """True when ``task_id`` is a usable per-PR identity (not empty / a shared
+    placeholder). Guards every public entry point so the sentinel never becomes
+    a cross-PR collision key."""
+    return isinstance(task_id, str) and task_id not in _SENTINEL_TASK_IDS
 
 
 # -------------------- time --------------------
@@ -155,7 +184,7 @@ def mark_in_flight(
     Idempotent: re-marking bumps ``head_sha`` / ``round`` / ``set_at`` (a later
     revision round is a fresh in-flight window). Never raises — a ledger write
     failure must not block the dispatch it accompanies."""
-    if not task_id:
+    if not _is_real_task_id(task_id):
         return
     n = _now(now)
     ttl = ttl_seconds if isinstance(ttl_seconds, int) else _DEFAULT_TTL_SECONDS
@@ -181,7 +210,7 @@ def clear(task_id: str, now: Optional[datetime] = None,
 
     Called by the legitimate re-review path (``_dispatch_mirror_review_rerun``)
     and on terminal PR verdicts (merged/closed/pass/escalate)."""
-    if not task_id:
+    if not _is_real_task_id(task_id):
         return False
     n = _now(now)
     ttl = ttl_seconds if isinstance(ttl_seconds, int) else _DEFAULT_TTL_SECONDS
@@ -199,31 +228,31 @@ def clear(task_id: str, now: Optional[datetime] = None,
 def is_in_flight(
     task_id: str,
     *,
-    current_head_sha: Optional[str] = None,
     now: Optional[datetime] = None,
     ttl_seconds: Optional[int] = None,
 ) -> bool:
     """Guard predicate: is a Forge revision in flight for ``task_id`` such that a
-    NEW ``_dispatch_mirror_review`` should be suppressed?
+    NEW ``_dispatch_mirror_review`` (first-review / reconcile path) should be
+    suppressed?
 
-    Returns True (suppress) iff a flag exists, is within the TTL, AND the PR has
-    NOT advanced past the recorded in-flight head:
+    Returns True (suppress) iff a flag exists and is within the TTL:
 
       - No row / unparseable ``set_at`` / row older than the TTL → False (let
-        reviews flow; a crashed-mid-revision Forge un-strands once the TTL
-        lapses so the reconcile net can recover the PR).
-      - Recorded head and ``current_head_sha`` are both known and DIFFER → the
-        revision has landed (new head) → False, so the legitimate new-head
-        re-review is never suppressed. This is the guard's answer to design
-        question (1): the flag keys on ``task_id`` but the head comparison lets
-        a new-head re-review through even before the rerun clear fires.
-      - Heads match, or either head is unknown → True (suppress). The
-        either-unknown case is conservative on purpose: a gh hiccup that hides
-        the current head should not open the duplicate-dispatch window the flag
-        exists to close; the reconcile sweep retries and the TTL bounds it.
+        reviews flow; a crashed- or dead-lettered-mid-revision Forge un-strands
+        once the TTL lapses so the reconcile net can recover the PR).
+      - Otherwise → True (suppress).
+
+    Deliberately does NOT compare PR head SHAs. A revision advances the PR head
+    repeatedly WHILE it is still in flight (Forge's ``[WIP][session-start]``
+    checkpoint + incremental work commits), so head equality is not a proxy for
+    "in flight" — see the module docstring. The legitimate re-review after a
+    revision genuinely lands is dispatched by ``_dispatch_mirror_review_rerun``,
+    which clears the flag first; terminal verdicts also clear it. This guard
+    only has to answer "is a revision still in flight", and the flag's presence
+    (bounded by the TTL) is that answer.
 
     Never raises."""
-    if not task_id:
+    if not _is_real_task_id(task_id):
         return False
     n = _now(now)
     ttl = ttl_seconds if isinstance(ttl_seconds, int) else _DEFAULT_TTL_SECONDS
@@ -235,19 +264,12 @@ def is_in_flight(
         return False
     if set_at < n - timedelta(seconds=ttl):
         return False  # TTL lapsed
-    recorded_head = row.get('head_sha')
-    if (
-        isinstance(recorded_head, str) and recorded_head
-        and isinstance(current_head_sha, str) and current_head_sha
-        and recorded_head != current_head_sha
-    ):
-        return False  # PR advanced past the in-flight head — revision landed
     return True
 
 
 def get(task_id: str) -> Optional[dict[str, Any]]:
     """Return the row for ``task_id`` (raw, no TTL filtering), or None."""
-    if not task_id:
+    if not _is_real_task_id(task_id):
         return None
     return _load().get(task_id)
 
