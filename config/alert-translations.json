@@ -678,6 +678,12 @@
       "tier": "FYI",
       "plain_language_summary": "Sentinel detected an in-flight agent session (Mirror or Forge) registered longer than its stale threshold. For review-tier sessions this is almost always a session that wedged AFTER its work was in hand. The wedged-session reaper (heal_wedged_review_sessions) auto-recovers it: CASE 1 (terminal marker present) reaps within marker_grace (~5 min); CASE 2 (silent, no marker) is deterministically hard-reaped at hard_silent_grace_seconds (60 min), which covers both wt-mirror-* and wt-forge-* worktrees. No action is required -- the reaper frees the slot on its own.",
       "recommended_action": "None required -- the wedged-session reaper (heal_wedged_review_sessions) auto-recovers both Mirror and Forge in-flight stalls within its grace window. To unblock the queue sooner, you may kill the wedged pid named in the technical-detail footer. Producer: scripts/dispatch_sentinel.py (scan_in_flight); reaper: scripts/heal_wedged_review_sessions.py."
+    },
+    "stale-lease": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "Sentinel found a dispatch lease whose heartbeat stopped without a reclaim. Expected right after a service-restart deploy: the old inbox_watcher PIDs die, their held leases cross the 15m renewal gap, and Sentinel fires -- but the new inbox_watcher acquires fresh leases and continues normally, so the stale lease self-resolves. Covers both review-head:<sha> head-leases and inbox:<slot> slot-leases via the longest-prefix lookup.",
+      "recommended_action": "None. Stale leases from dead PIDs self-clear when the new process acquires fresh leases. The outbox-notifier already delivers a route=escalate DM if genuine action is needed; this entry silences the duplicate Pulse secondary re-escalation to the digest. Investigate only if the SAME lease identity keeps re-firing across many cycles (that would mean no process is reclaiming it). G-rule: sentinel-stale-lease-tier4-001."
     }
   },
   "heal-pulse-check-staleness": {
