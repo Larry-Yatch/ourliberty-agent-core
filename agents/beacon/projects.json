@@ -1147,6 +1147,65 @@
         "kind": "mission",
         "mission_id": "routing-approvals-escalations-on-a-null-chat-id"
       }
+    },
+    {
+      "id": "dashboard-decline-does-not-clear-the-approval-ba",
+      "title": "Dashboard decline does not clear the approval backend",
+      "north_star_ref": null,
+      "repo": "ourliberty-agent-core",
+      "state": "active",
+      "phases": [
+        {
+          "id": "dashboard-decline-does-not-clear-the-approval-ba",
+          "title": "Dashboard decline does not clear the approval backend",
+          "desired_end_state": "BUG confirmed live 2026-06-28: declining an approval on the dashboard Approvals tab clears the TAB but does NOT persist to the canonical store (~/agents/state/beacon-pending-approvals.json). The decline fires a larry-reject-<hash> inbox task, Beacon processes it (archived), but the pending entry is never removed -> it stays status=pending. Where-We-Are reads the store pending count, so it keeps showing a stale N-decisions-needed after the operator already declined. heal_stale_approvals does NOT clear them (no recognized resolved event). REPRO: 4 approvals declined 2026-06-28 stayed pending until manually cleared via beacon_approval_handler.resolve(id, rejected). WHAT TO DO: make the decline path actually resolve the store entry -- either the dashboard reject endpoint calls beacon_approval_handler.resolve(id, rejected) directly, or the larry-reject task processing must call it. VERIFY: decline on dashboard -> beacon-pending-approvals.json pending drops AND Where-We-Are count drops with no manual reconcile. REVISIT WHEN: soon -- operator-facing, recurs on every decline.",
+          "lifecycle_state": "brainstorm",
+          "order": 0,
+          "spec_ref": null,
+          "sequence_ref": null,
+          "created_at": "2026-07-10T03:30:11.438197+00:00",
+          "updated_at": "2026-07-10T03:31:20.215706+00:00",
+          "brainstorm": {
+            "is_ai_draft": true,
+            "draft": {
+              "end_state": "When this phase is done, declining an approval on the dashboard Approvals tab fully clears that decision everywhere at once. The entry is removed from the canonical pending store, so the pending count drops immediately. The Where-We-Are view no longer shows a stale count of decisions still needing attention after the operator has already declined. No manual reconciliation step is ever required to finish a decline.",
+              "why_now": "This is a live, operator-facing bug confirmed on 2026-06-28: four approvals declined on the dashboard that day stayed marked pending until they were cleared by hand. It recurs on every single decline, so the noise and the manual cleanup compound over time. The dashboard tab visually clears, which hides the problem and makes the stale count look like a mystery. The existing automatic cleanup for stale approvals does not catch these, because it never sees a recognized resolved event, so nothing self-heals today.",
+              "scope": "IN: making the dashboard decline path actually resolve the pending entry in the canonical store so its status stops being pending, and confirming the Where-We-Are count reflects that without manual work. IN: whichever single point in the decline flow is the right place to trigger that resolution. OUT: changing how the dashboard tab itself renders or clears, changing the approve/accept path, redesigning the approvals data model, and reworking the stale-approval auto-healer beyond what is needed for this specific decline case.",
+              "constraints_reuse": "This is assembly, not greenfield. There is already a handler routine that resolves a pending entry as rejected \u2014 the same one used to clear the four stuck approvals by hand on 2026-06-28 \u2014 and the fix should route through it rather than introducing a new resolution mechanism. The canonical pending store remains the single source of truth that the Where-We-Are count reads from. Must not break: the approve/accept path, the tab-clearing behavior the operator already sees, and the inbox task that today records the decline as archived. Whatever change is made should leave a resolved signal that the existing cleanup logic can also recognize going forward.",
+              "options_decision": "There are two real forks for where the resolution gets triggered. Option A: the dashboard reject endpoint calls the resolve routine directly at the moment of decline \u2014 simplest, most immediate, keeps the fix in one place, but only covers declines that originate from the dashboard. Option B: the decline task processing calls the resolve routine when it handles the reject \u2014 this covers any path that files a reject task, not just the dashboard, so it fixes the class of bug rather than one entry point, but it is slightly further from the operator's click and depends on that task always firing. Recommendation: Option B, resolving inside the reject-task processing, because it fixes every decline source and is the same code path that already archives the task; if there is any risk the task does not always run, pair it with the direct endpoint call as a belt-and-suspenders.",
+              "risks_guardrails": "Risk: the resolve fires but targets the wrong entry, clearing an approval the operator did not decline \u2014 guardrail: resolve strictly by the specific decision's identifier carried on the decline, and verify the pending count drops by exactly one. Risk: double-resolution if both the endpoint and the task call resolve \u2014 guardrail: make resolve idempotent so a second call on an already-resolved entry is a safe no-op. Risk: the fix clears the store but the Where-We-Are count still reads stale from a cache or separate read \u2014 guardrail: verify end-to-end that the displayed count drops, not just the file. Risk: regressing the approve path while touching shared handling \u2014 guardrail: leave accept behavior untouched and covered by its existing checks.",
+              "done_gate": "Done means: decline an approval on the dashboard, and without any manual step the pending entry in the canonical store leaves pending status (count drops) AND the Where-We-Are count drops to match. A regression test reproduces the 2026-06-28 scenario \u2014 decline through the real path and assert the store no longer lists that entry as pending. Confirm the approve path and the tab-clearing behavior still work. Confirm no manual resolve call is needed to reach the correct count.",
+              "breakdown": "First, pin down exactly where in the decline flow the resolution should hook \u2014 the dashboard reject endpoint, the reject-task processing, or both \u2014 and confirm the decision identifier is available at that point. Second, wire the chosen point to call the existing resolve-as-rejected routine, keeping it idempotent. Third, ensure the resulting resolved signal is one the existing stale-approval cleanup can also recognize, so future edge cases self-heal. Fourth, add a regression test that mirrors the confirmed repro. Fifth, verify end-to-end that a real dashboard decline drops both the store pending count and the Where-We-Are count with no manual reconcile."
+            },
+            "decisions": [
+              "Trigger the resolve at the dashboard endpoint (dashboard-only, simplest) or in the reject-task processing (covers every decline source) \u2014 or both for safety.",
+              "Whether fixing this one decline path is enough, or the stale-approval auto-healer should also be taught to recognize these resolved declines.",
+              "How much belt-and-suspenders you want: single trigger point, or redundant resolution accepting the idempotency cost."
+            ],
+            "decisions_overflow": false,
+            "handoff": {
+              "spec_target_path": "agents/beacon/specs/dashboard-decline-does-not-clear-the-approval-ba.md",
+              "target_repo": "ourliberty-agent-core",
+              "north_star_ref": null,
+              "prior_closeout_summary": null,
+              "directive": "Work with Larry to finalize this brainstorm and author the spec at agents/beacon/specs/dashboard-decline-does-not-clear-the-approval-ba.md in ourliberty-agent-core; he will mark it Ready to spec."
+            }
+          },
+          "brainstorm_provenance": {
+            "by": "beacon",
+            "model": "claude-opus-4-8",
+            "at": "2026-07-10T03:31:20.215706+00:00",
+            "from_state": "brainstorm"
+          }
+        }
+      ],
+      "one_off": true,
+      "created_at": "2026-07-10T03:30:11.438197+00:00",
+      "updated_at": "2026-07-10T03:30:11.438197+00:00",
+      "promoted_from": {
+        "kind": "mission",
+        "mission_id": "dashboard-decline-does-not-clear-the-approval-backend"
+      }
     }
   ]
 }
