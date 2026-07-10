@@ -8224,6 +8224,45 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-pr-fanout-probe-health",
+      "name": "PR Fanout Probe Health",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pr-fanout-probe-health`. Last activity 2026-07-08T21:24:21.461794+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pr-fanout-probe-health"
+      ],
+      "repo": null,
+      "created": "2026-07-10",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-10T07:15:18.244245+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-08T21:24:21.461794+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-10T07:15:18.244245+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#894"
+    },
+    {
+      "id": "proposed-mirror-review-pr-ourliberty-dashboard-114",
+      "name": "Mirror Review PR Ourliberty Dashboard 114",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `mirror-review-pr-ourliberty-dashboard-114`. Last activity 2026-07-06T17:38:21.234596+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "mirror-review-pr-ourliberty-dashboard-114"
+      ],
+      "repo": null,
+      "created": "2026-07-10",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-10T07:15:18.244245+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-06T17:38:21.234596+00:00"
     }
   ]
 }
