@@ -234,6 +234,12 @@ class _Base(_TokenSetMixin, unittest.TestCase):
         self._orig_agents_root = da._agents_root
         self._orig_worktrees_root = da._worktrees_root
         self._orig_get_client = da._get_larry_action_supabase_client
+        # The mirror done-today merged badge calls _resolve_orphan_pr_states
+        # (a live GitHub GraphQL read) through the endpoint. Stub it out by
+        # default so no test touches the network; the merged-badge test class
+        # overrides this with a canned mapping.
+        self._orig_pr_state_resolver = da._resolve_orphan_pr_states
+        da._resolve_orphan_pr_states = lambda _urls: {}  # type: ignore[assignment]
         self.tmp = Path(tempfile.mkdtemp(prefix='dash-agent-queue-'))
         self.agents_root = _build_agents_root(self.tmp / 'agents')
         self.worktrees_root = _build_worktrees_root(self.tmp)
@@ -242,6 +248,7 @@ class _Base(_TokenSetMixin, unittest.TestCase):
         da._agents_root = self._orig_agents_root  # type: ignore[assignment]
         da._worktrees_root = self._orig_worktrees_root  # type: ignore[assignment]
         da._get_larry_action_supabase_client = self._orig_get_client  # type: ignore[assignment]
+        da._resolve_orphan_pr_states = self._orig_pr_state_resolver  # type: ignore[assignment]
 
 
 # ==================== auth ====================
@@ -936,8 +943,11 @@ class WorkerDoneTodayLaneTest(_Base):
         # Exact worker done-item key set — no builder `reason` field.
         self.assertEqual(
             set(done[0]),
-            {'task_id', 'outcome', 'at', 'message', 'verdict', 'pr_url'},
+            {'task_id', 'outcome', 'at', 'message', 'verdict', 'pr_url',
+             'pr_state'},
         )
+        # Non-mirror workers never look up merge state.
+        self.assertIsNone(by_task['jobS']['pr_state'])
         # Non-mirror workers never emit review verdicts: fields stay None.
         self.assertIsNone(by_task['jobS']['verdict'])
         # sorted by `at` desc: jobF (now) is newest.
@@ -1014,6 +1024,108 @@ class WorkerDoneTodayLaneTest(_Base):
                   params={'agent': 'pulse'})
         msg = r.json()['done_today'][0]['message']
         self.assertEqual(len(msg), da._WORKER_DONE_MESSAGE_MAXLEN)
+
+
+# ============ mirror done-today merged/not-merged badge ============
+#
+# A review_pass card gets a live GitHub state (MERGED | OPEN | CLOSED) so the
+# operator can spot a PR that passed review but never landed. The lookup runs
+# ONLY for review_pass cards carrying a pr_url; revision/escalate cards and
+# non-mirror workers stay pr_state=None. Fail-safe: a resolver error → None.
+
+class MirrorDoneMergeBadgeTest(_Base):
+    PR = 'https://github.com/x/y/pull/841'
+    PR2 = 'https://github.com/x/y/pull/842'
+
+    def _ev(self, event_type, ts, task_id='pr-841', pr_url=None, payload=None):
+        return {'agent': 'mirror', 'task_id': task_id,
+                'event_type': event_type, 'pr_url': pr_url,
+                'ts': ts.isoformat(), 'payload': payload}
+
+    def _run(self, rows, resolver):
+        da._resolve_orphan_pr_states = resolver  # type: ignore[assignment]
+        c = _client(self.agents_root, self.worktrees_root,
+                    _ChainEventsClient(rows))
+        r = c.get('/api/system/agent-queue', headers=AUTH,
+                  params={'agent': 'mirror'})
+        self.assertEqual(r.status_code, 200)
+        return {d['task_id']: d for d in r.json()['done_today']}
+
+    def test_review_pass_card_gets_live_state(self):
+        now = _today_noon()
+        rows = [
+            self._ev('review_pass', now, task_id='pr-841', pr_url=self.PR),
+            self._ev('session_done', now, task_id='pr-841', pr_url=self.PR,
+                     payload={'success': True, 'message': 'passed'}),
+        ]
+        by_task = self._run(rows, lambda urls: {self.PR: 'MERGED'})
+        self.assertEqual(by_task['pr-841']['verdict'], 'review_pass')
+        self.assertEqual(by_task['pr-841']['pr_state'], 'MERGED')
+
+    def test_passed_but_not_merged_open_and_closed(self):
+        # The whole point: a passed PR still OPEN, and one CLOSED unmerged.
+        now = _today_noon()
+        rows = [
+            self._ev('review_pass', now, task_id='pr-841', pr_url=self.PR),
+            self._ev('session_done', now, task_id='pr-841', pr_url=self.PR,
+                     payload={'success': True}),
+            self._ev('review_pass', now - timedelta(minutes=5),
+                     task_id='pr-842', pr_url=self.PR2),
+            self._ev('session_done', now - timedelta(minutes=5),
+                     task_id='pr-842', pr_url=self.PR2,
+                     payload={'success': True}),
+        ]
+        by_task = self._run(
+            rows, lambda urls: {self.PR: 'OPEN', self.PR2: 'CLOSED'})
+        self.assertEqual(by_task['pr-841']['pr_state'], 'OPEN')
+        self.assertEqual(by_task['pr-842']['pr_state'], 'CLOSED')
+
+    def test_revision_card_gets_no_lookup(self):
+        # A revision card is not expected to merge — no badge, and its url is
+        # never handed to the resolver.
+        now = _today_noon()
+        seen: list[list[str]] = []
+
+        def resolver(urls):
+            seen.append(list(urls))
+            return {u: 'MERGED' for u in urls}
+
+        rows = [
+            self._ev('review_revision', now, task_id='pr-841', pr_url=self.PR),
+            self._ev('session_done', now, task_id='pr-841', pr_url=self.PR,
+                     payload={'success': True}),
+        ]
+        by_task = self._run(rows, resolver)
+        self.assertEqual(by_task['pr-841']['verdict'], 'review_revision')
+        self.assertIsNone(by_task['pr-841']['pr_state'])
+        # The revision url must not have been looked up at all.
+        self.assertEqual(seen, [])
+
+    def test_unresolved_url_stays_none(self):
+        # Resolver returns nothing for the url (degraded / not found) → None,
+        # not a crash and not a stale value.
+        now = _today_noon()
+        rows = [
+            self._ev('review_pass', now, task_id='pr-841', pr_url=self.PR),
+            self._ev('session_done', now, task_id='pr-841', pr_url=self.PR,
+                     payload={'success': True}),
+        ]
+        by_task = self._run(rows, lambda urls: {})
+        self.assertIsNone(by_task['pr-841']['pr_state'])
+
+    def test_resolver_raises_is_fail_safe(self):
+        now = _today_noon()
+
+        def boom(_urls):
+            raise RuntimeError('github down')
+
+        rows = [
+            self._ev('review_pass', now, task_id='pr-841', pr_url=self.PR),
+            self._ev('session_done', now, task_id='pr-841', pr_url=self.PR,
+                     payload={'success': True}),
+        ]
+        by_task = self._run(rows, boom)
+        self.assertIsNone(by_task['pr-841']['pr_state'])
 
 
 # ==================== supabase-None degradation ====================

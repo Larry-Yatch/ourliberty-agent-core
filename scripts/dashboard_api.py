@@ -649,6 +649,15 @@ class WorkerDoneItem(BaseModel):
     # sessions with no verdict event today.
     verdict: Optional[str] = None
     pr_url: Optional[str] = None
+    # Mirror only: the live GitHub state ('MERGED' | 'OPEN' | 'CLOSED') of the
+    # reviewed PR, looked up at read time for cards whose verdict was
+    # review_pass — so the Done-today lane distinguishes a PR that PASSED
+    # review AND landed (MERGED) from one that passed but hasn't merged yet
+    # (OPEN) or was closed without merging (CLOSED). None when: no PR, the
+    # verdict wasn't review_pass (a revision/escalate card isn't expected to
+    # merge, so it carries no badge), or the bounded GitHub lookup degraded
+    # (no token / timeout / error) — the lane never blocks on GitHub.
+    pr_state: Optional[str] = None
 
 
 class AgentQueueResponse(BaseModel):
@@ -3077,12 +3086,53 @@ def _derive_worker_done_today(
     return [item for _dt, item in merged]
 
 
+# Only a review_pass card carries a merge expectation: the PR was approved, so
+# the operator wants to know whether it actually LANDED. A revision / escalate
+# card is *supposed* not to be merged, so it gets no lookup and no badge
+# (pr_state stays None) — which also bounds the GitHub fan-out to the passed
+# set.
+_WORKER_DONE_MERGE_VERDICT = 'review_pass'
+
+
+def _stamp_worker_done_pr_state(
+    done_items: list[dict[str, Any]],
+    pr_state_resolver: Callable[[list[str]], dict[str, str]],
+) -> None:
+    """Attach live GitHub `pr_state` to review-passed WORKER done cards.
+
+    Mutates `done_items` in place. Collects the pr_urls of cards whose verdict
+    was review_pass (`_WORKER_DONE_MERGE_VERDICT`), resolves them in one
+    bounded/batched call via `pr_state_resolver` (the same missions-tab
+    `_resolve_orphan_pr_states` — one GraphQL call per repo, ≤200 lookups, wall-
+    clock capped), and stamps each card's `pr_state` with 'MERGED' | 'OPEN' |
+    'CLOSED'. FAIL-SAFE: a resolver that raises or returns nothing leaves
+    pr_state None (exactly as if GitHub were unreachable) — the lane never
+    blocks on the lookup.
+    """
+    urls = [
+        d['pr_url'] for d in done_items
+        if d.get('verdict') == _WORKER_DONE_MERGE_VERDICT and d.get('pr_url')
+    ]
+    if not urls:
+        return
+    try:
+        states = pr_state_resolver(urls) or {}
+    except Exception:  # noqa: BLE001 — fail-safe: never break the lane
+        states = {}
+    for d in done_items:
+        if d.get('verdict') == _WORKER_DONE_MERGE_VERDICT and d.get('pr_url'):
+            d['pr_state'] = states.get(d['pr_url'])
+
+
 def _reader_agent_queue(
     agents_root: Path,
     worktrees_root: Path,
     agent: str,
     supabase_client: Any,
     now: Optional[datetime] = None,
+    pr_state_resolver: Optional[
+        Callable[[list[str]], dict[str, str]]
+    ] = None,
 ) -> dict[str, Any]:
     """Assemble one agent's dispatch lifecycle, routed by archetype.
 
@@ -3157,6 +3207,12 @@ def _reader_agent_queue(
         }
 
     rows = _fetch_chain_events_for_agent(supabase_client, agent)
+    done_today = _derive_worker_done_today(rows or [], agent, now=now)
+    # Live merged/not-merged badge for review-passed cards (mirror). Skipped
+    # when no resolver is injected (direct callers / older tests) so the pure
+    # event-derive path stays untouched.
+    if pr_state_resolver is not None:
+        _stamp_worker_done_pr_state(done_today, pr_state_resolver)
     return {
         'agent': agent,
         'archetype': archetype,
@@ -3164,7 +3220,7 @@ def _reader_agent_queue(
         'building': [],
         'in_review': [],
         'active': _reader_agent_queue_active(agents_root, agent, now=now),
-        'done_today': _derive_worker_done_today(rows or [], agent, now=now),
+        'done_today': done_today,
         'captured_at': _now_utc_iso(now),
     }
 
@@ -10004,6 +10060,10 @@ def get_system_agent_queue(
     client = _get_larry_action_supabase_client()
     return _reader_agent_queue(
         _agents_root(), _worktrees_root(), agent, client,
+        # Worker done-today cards that passed review get a live merged/not-
+        # merged badge via the same bounded GitHub PR-state read the missions
+        # tab uses; ignored for builders. Fail-safe (degrades to no badge).
+        pr_state_resolver=_resolve_orphan_pr_states,
     )
 
 
