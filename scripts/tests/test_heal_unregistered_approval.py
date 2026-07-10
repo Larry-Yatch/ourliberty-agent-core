@@ -1088,5 +1088,257 @@ class EvaluateWithMarkerLookupTest(unittest.TestCase):
         self.assertEqual(len(with_marker), 1)  # exactly one clean card
 
 
+# ---- for-larry-escalations second scan source (the PR #854 blind spot) ----
+
+# The real 2026-07-08 stranded record: a session-less Mirror REVIEW_ESCALATE on
+# PR #854 that landed as an OPEN for-Larry record but never got an
+# APPROVAL_REQUEST, so it never reached the Approvals tab.
+FORLARRY_TASK = 'sentinel-in-flight-stall-translation-001'
+FORLARRY_DECISION_RECORD = {
+    'id': f'mirror-review:{FORLARRY_TASK}',
+    'source': 'mirror-review',
+    'headline': f'Session-less PR needs you: `{FORLARRY_TASK}`',
+    'context': (
+        'Mirror wants changes but the auto-fix loop cannot proceed. Go unstick '
+        'it: re-dispatch a Forge build or close the PR. '
+        'PR: https://github.com/Larry-Yatch/ourliberty-agent-core/pull/854'
+    ),
+    'severity': 'warning',
+    'pr_url': 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/854',
+    'head_sha': 'abc12345',
+    'dedup_identity': (
+        'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/854@abc12345'
+    ),
+    'decision_key': None,
+    'for_larry': True,
+    'resolved': False,
+    'ts': _ts(6),
+    'updated_at': _ts(6),
+}
+
+# The hyphen-id decision approval _emit_no_session_decision_approval would
+# register for the SAME record (bare form, no head8 suffix).
+FORLARRY_HYPHEN_APPROVAL_ID = f'mirror-review-{FORLARRY_TASK}'
+
+FORLARRY_HEURISTICS = dict(
+    DEFAULT_HEURISTICS, for_larry_decision_sources=['mirror-review'])
+
+
+class ForLarryDecisionClassTest(unittest.TestCase):
+    def test_open_mirror_review_record_is_decision_class(self):
+        self.assertTrue(
+            h.is_forlarry_decision_class(FORLARRY_DECISION_RECORD, FORLARRY_HEURISTICS))
+
+    def test_resolved_record_is_not_decision_class(self):
+        rec = dict(FORLARRY_DECISION_RECORD, resolved=True)
+        self.assertFalse(h.is_forlarry_decision_class(rec, FORLARRY_HEURISTICS))
+
+    def test_non_decision_source_is_not_decision_class(self):
+        # An action-needed / FYI record from another source must never promote.
+        rec = dict(FORLARRY_DECISION_RECORD,
+                   id='ops-alert:disk-low', source='ops-alert')
+        self.assertFalse(h.is_forlarry_decision_class(rec, FORLARRY_HEURISTICS))
+
+    def test_source_without_matching_id_prefix_is_not_decision_class(self):
+        # source is decision-class but the id lacks the '<source>:' prefix.
+        rec = dict(FORLARRY_DECISION_RECORD, id='weird-id-no-prefix')
+        self.assertFalse(h.is_forlarry_decision_class(rec, FORLARRY_HEURISTICS))
+
+    def test_predicate_falls_back_to_default_sources(self):
+        # heuristics without the key → built-in default (mirror-review) applies.
+        self.assertTrue(
+            h.is_forlarry_decision_class(FORLARRY_DECISION_RECORD, DEFAULT_HEURISTICS))
+
+
+class ForLarryNormalizationTest(unittest.TestCase):
+    def test_colon_id_normalizes_to_hyphen(self):
+        self.assertEqual(
+            h.forlarry_norm_id(FORLARRY_DECISION_RECORD['id']),
+            FORLARRY_HYPHEN_APPROVAL_ID)
+
+    def test_registered_matches_bare_hyphen_id(self):
+        state = {'pending': [{'id': FORLARRY_HYPHEN_APPROVAL_ID}], 'history': []}
+        self.assertTrue(
+            h.is_forlarry_registered(FORLARRY_HYPHEN_APPROVAL_ID, state))
+
+    def test_registered_matches_head8_suffix_variant(self):
+        state = {'pending': [
+            {'id': FORLARRY_HYPHEN_APPROVAL_ID + '-deadbeef'}], 'history': []}
+        self.assertTrue(
+            h.is_forlarry_registered(FORLARRY_HYPHEN_APPROVAL_ID, state))
+
+    def test_registered_in_history_also_matches(self):
+        state = {'pending': [], 'history': [
+            {'id': FORLARRY_HYPHEN_APPROVAL_ID, 'status': 'approved'}]}
+        self.assertTrue(
+            h.is_forlarry_registered(FORLARRY_HYPHEN_APPROVAL_ID, state))
+
+    def test_unrelated_id_does_not_match(self):
+        # PR #42's approval must not match PR #421's normalized id (delimiter).
+        state = {'pending': [
+            {'id': FORLARRY_HYPHEN_APPROVAL_ID + '9'}], 'history': []}
+        self.assertFalse(
+            h.is_forlarry_registered(FORLARRY_HYPHEN_APPROVAL_ID, state))
+
+
+class BuildForLarryPayloadTest(unittest.TestCase):
+    def test_payload_targets_beacon_with_required_fields(self):
+        key = h.forlarry_dedup_key(FORLARRY_DECISION_RECORD['id'])
+        payload = h.build_for_larry_approval_payload(FORLARRY_DECISION_RECORD, key)
+        self.assertEqual(payload['target_agent'], 'beacon')
+        self.assertEqual(payload['task_id'], h.derive_task_id(key))
+        self.assertEqual(payload['promoted_from_alert'], key)
+        self.assertEqual(payload['origin'], h.HEALER_SOURCE)
+        self.assertFalse(payload['bare_approvable'])
+        for field in approval.REQUIRED_FIELDS['approval_request']:
+            self.assertIn(field, payload)
+        # the queue owner agrees this healer card is not operator-dispatchable
+        self.assertFalse(
+            approval._is_operator_dispatchable({'dispatch_payload': payload}))
+
+    def test_payload_carries_pr_link_and_normalized_id(self):
+        key = h.forlarry_dedup_key(FORLARRY_DECISION_RECORD['id'])
+        payload = h.build_for_larry_approval_payload(FORLARRY_DECISION_RECORD, key)
+        self.assertIn('pull/854', payload['summary'])
+        self.assertEqual(payload['_subject'], FORLARRY_DECISION_RECORD['id'])
+        self.assertEqual(payload['_forlarry_norm_id'], FORLARRY_HYPHEN_APPROVAL_ID)
+
+
+class EvaluateForLarryTest(unittest.TestCase):
+    def _empty_state(self):
+        return {'pending': [], 'history': []}
+
+    def test_open_decision_record_promoted(self):
+        # criterion: open decision-class record, no matching approval -> promote.
+        out = h.evaluate_for_larry(
+            [FORLARRY_DECISION_RECORD], FORLARRY_HEURISTICS,
+            self._empty_state(), {})
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0]['target_agent'], 'beacon')
+        self.assertEqual(
+            out[0]['promoted_from_alert'],
+            h.forlarry_dedup_key(FORLARRY_DECISION_RECORD['id']))
+
+    def test_matching_hyphen_approval_dedups(self):
+        # criterion: a record that DID get an approval (hyphen id) -> no promote.
+        state = {'pending': [{'id': FORLARRY_HYPHEN_APPROVAL_ID}], 'history': []}
+        out = h.evaluate_for_larry(
+            [FORLARRY_DECISION_RECORD], FORLARRY_HEURISTICS, state, {})
+        self.assertEqual(out, [])
+
+    def test_matching_hyphen_approval_with_head8_dedups(self):
+        state = {'pending': [
+            {'id': FORLARRY_HYPHEN_APPROVAL_ID + '-abc12345'}], 'history': []}
+        out = h.evaluate_for_larry(
+            [FORLARRY_DECISION_RECORD], FORLARRY_HEURISTICS, state, {})
+        self.assertEqual(out, [])
+
+    def test_resolved_record_skipped(self):
+        # criterion: resolved=True -> no promote.
+        rec = dict(FORLARRY_DECISION_RECORD, resolved=True)
+        out = h.evaluate_for_larry(
+            [rec], FORLARRY_HEURISTICS, self._empty_state(), {})
+        self.assertEqual(out, [])
+
+    def test_action_needed_record_skipped(self):
+        # criterion: non-decision (other source) -> no promote.
+        rec = dict(FORLARRY_DECISION_RECORD,
+                   id='ops-alert:disk-low', source='ops-alert')
+        out = h.evaluate_for_larry(
+            [rec], FORLARRY_HEURISTICS, self._empty_state(), {})
+        self.assertEqual(out, [])
+
+    def test_already_promoted_skipped(self):
+        # criterion: promoted-ledger dedup (namespaced key) -> idempotent re-run.
+        key = h.forlarry_dedup_key(FORLARRY_DECISION_RECORD['id'])
+        out = h.evaluate_for_larry(
+            [FORLARRY_DECISION_RECORD], FORLARRY_HEURISTICS,
+            self._empty_state(), {key: {'task_id': 'x', 'promoted_at': _ts(0)}})
+        self.assertEqual(out, [])
+
+    def test_duplicate_records_same_tick_promoted_once(self):
+        out = h.evaluate_for_larry(
+            [FORLARRY_DECISION_RECORD, dict(FORLARRY_DECISION_RECORD)],
+            FORLARRY_HEURISTICS, self._empty_state(), {})
+        self.assertEqual(len(out), 1)
+
+
+class ForLarryConfigTest(unittest.TestCase):
+    def test_shipped_config_lists_mirror_review(self):
+        cfg = h.load_heuristics()  # the real config file
+        self.assertIn('mirror-review', cfg['for_larry_decision_sources'])
+
+    def test_missing_config_falls_back_to_default_sources(self):
+        cfg = h.load_heuristics(Path('/nonexistent/heuristics.json'))
+        self.assertEqual(cfg['for_larry_decision_sources'],
+                         list(h.DEFAULT_FORLARRY_DECISION_SOURCES))
+
+
+class ForLarryMainIntegrationTest(unittest.TestCase):
+    """The second source, end-to-end through main(): a stranded for-Larry
+    decision record is promoted via the SAME locked add_pending/emit/ledger
+    machinery, and recorded under a namespaced ledger key."""
+
+    def _drive_main(self, records, snapshot_state, fresh_state, promoted=None):
+        import contextlib
+        add_pending = mock.MagicMock(side_effect=lambda p, **kw: {'id': p['task_id']})
+        save_promoted = mock.MagicMock()
+        with mock.patch.object(h, 'kill_switch',
+                               return_value=Path('/nonexistent/kill-switch')), \
+             mock.patch.object(h, 'heartbeat'), \
+             mock.patch.object(h, 'log'), \
+             mock.patch.object(h, 'load_heuristics',
+                               return_value=FORLARRY_HEURISTICS), \
+             mock.patch.object(h, 'read_alerts', return_value=[]), \
+             mock.patch.object(h, 'read_for_larry_records', return_value=records), \
+             mock.patch.object(h, 'load_beacon_outbox_markers', return_value=[]), \
+             mock.patch.object(h, 'load_promoted', return_value=promoted or {}), \
+             mock.patch.object(h, 'save_promoted', new=save_promoted), \
+             mock.patch.object(h, 'reconcile_retire',
+                               side_effect=lambda led, *a, **k: ([], led)), \
+             mock.patch.object(h, '_chat_id', return_value=None), \
+             mock.patch.object(h, 'emit_approval_event', return_value=True), \
+             mock.patch.object(approval, 'state_lock',
+                               return_value=contextlib.nullcontext()), \
+             mock.patch.object(approval, 'save_state'), \
+             mock.patch.object(approval, 'add_pending', new=add_pending), \
+             mock.patch.object(approval, 'load_state',
+                               side_effect=[snapshot_state, fresh_state]):
+            rc = h.main()
+        self.assertEqual(rc, 0)
+        return add_pending, save_promoted
+
+    def test_stranded_record_promoted_and_ledgered(self):
+        add_pending, save_promoted = self._drive_main(
+            [FORLARRY_DECISION_RECORD],
+            {'pending': [], 'history': []},
+            {'pending': [], 'history': []})
+        self.assertEqual(add_pending.call_count, 1)
+        appended = add_pending.call_args[0][0]
+        self.assertEqual(appended['target_agent'], 'beacon')
+        self.assertNotIn('_forlarry_norm_id', appended)  # helper key stripped
+        # recorded under the namespaced ledger key
+        ledger = save_promoted.call_args[0][0]
+        self.assertIn(
+            h.forlarry_dedup_key(FORLARRY_DECISION_RECORD['id']), ledger)
+
+    def test_already_registered_hyphen_approval_not_duplicated(self):
+        # Beacon already registered the hyphen decision approval -> no append.
+        add_pending, _ = self._drive_main(
+            [FORLARRY_DECISION_RECORD],
+            {'pending': [{'id': FORLARRY_HYPHEN_APPROVAL_ID}], 'history': []},
+            {'pending': [{'id': FORLARRY_HYPHEN_APPROVAL_ID}], 'history': []})
+        add_pending.assert_not_called()
+
+    def test_idempotent_when_ledger_already_has_record(self):
+        key = h.forlarry_dedup_key(FORLARRY_DECISION_RECORD['id'])
+        add_pending, _ = self._drive_main(
+            [FORLARRY_DECISION_RECORD],
+            {'pending': [], 'history': []},
+            {'pending': [], 'history': []},
+            promoted={key: {'task_id': 'x', 'promoted_at': _ts(0)}})
+        add_pending.assert_not_called()
+
+
 if __name__ == '__main__':
     unittest.main()
