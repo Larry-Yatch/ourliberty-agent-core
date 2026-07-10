@@ -1,0 +1,12 @@
+[Unit]
+Description=Run medic_escalation_recurrence_gauge daily (recurring-escalation fan-out un-park trigger)
+
+[Timer]
+OnBootSec=30min
+OnCalendar=*-*-* 15:20:00
+RandomizedDelaySec=600
+Unit=ourliberty-medic-escalation-recurrence-gauge.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target

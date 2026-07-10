@@ -1,0 +1,41 @@
+[Unit]
+Description=Medic escalation-recurrence gauge — DM Larry when a Medic escalation fingerprint keeps re-paging (un-park trigger for the recurring-escalation fan-out)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/medic_escalation_recurrence_gauge.py
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+WorkingDirectory=/home/larry/agent-core
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/medic_escalation_recurrence_gauge.py --once
+
+TimeoutStartSec=60
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-medic-escalation-recurrence-gauge
+
+# Memory cap: pure read of one small jsonl ledger + arithmetic; never needs more than 128M.
+MemoryMax=128M
+MemoryHigh=64M
+
+# Hardening — matches mirror-queue-wait-gauge / readiness-trip-wire pattern.
+# Read-only everywhere except the gauge's own state file + log under ~/agents.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/larry/agents /tmp
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target
