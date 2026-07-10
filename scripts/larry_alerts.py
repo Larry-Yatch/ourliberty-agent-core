@@ -676,6 +676,55 @@ def resolve_alert(
     return len(removed)
 
 
+def retract_with_standdown(
+    key: str,
+    standdown_message: str,
+    subject: Optional[str] = None,
+) -> int:
+    """Retract a pending red alert AND emit a visible closure stand-down for it.
+
+    `resolve_alert` silently removes the stale escalate line(s), but it cannot
+    un-send the 🔴 DM already on Larry's phone. A retraction of something Larry
+    actually SAW must itself be visible — otherwise a wrongful retraction is an
+    invisible event (the red simply vanishes with no trail to dispute). This
+    helper makes every real retraction AUDITABLE: it removes the line(s) via
+    `resolve_alert(key)`, and ONLY when that removed >= 1 pending escalate line
+    (proof a real 🔴 had been delivered) appends exactly one closure stand-down
+    line via `append_alert(severity='info', route='closure', ...)`.
+
+    On a 0-removal no-match — the drift never paged, so there is nothing to
+    stand down — it appends nothing and returns 0. This mirrors the
+    install-drift exemplar (`heal_systemd_install_drift`: retract, then a
+    one-line closure DM gated on `removed`), generalized so any positive-clear
+    detector can adopt it.
+
+    `key` is the `source:subject` cooldown key handed to `resolve_alert`.
+    `subject` is the closure line's own dedup suffix (defaults to `key` so the
+    closure is scoped to the same incident). Returns the number of lines
+    removed (0 = no-op). Never raises — fire-and-forget, matching
+    `resolve_alert` and `append_alert`.
+    """
+    try:
+        removed = resolve_alert(key)
+        if removed:
+            # A real 🔴 was in the queue and is now retracted. Emit one closure
+            # stand-down so the alert Larry saw visibly closes (and a wrongful
+            # retraction surfaces as a disputable DM, never a silent vanish).
+            append_alert(
+                source='alert-retraction',
+                severity='info',
+                message=standdown_message,
+                subject=subject if subject is not None else key,
+                route='closure',
+            )
+        return removed
+    except Exception:
+        # resolve_alert / append_alert are both contractually no-raise, so this
+        # is defense in depth — but the fire-and-forget contract must hold hard,
+        # never propagating into a caller's clear-branch tick.
+        return 0
+
+
 def resolve_alert_by_decision_key(
     key: str,
     consumer_offset_files: Optional[list] = None,
