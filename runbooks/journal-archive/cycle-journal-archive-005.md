@@ -9394,3 +9394,94 @@ NOMINAL ✅
 
 ---
 
+## Iteration ~4816 — 2026-07-09T18:09Z UTC (Larry /cycle chat, Tier 1)
+
+**Health:** ⚠️ Active — PR #896 MERGED and pulled (always-fix); 8-service heal-stale restart wave; watchdog outbox-notifier critical (restart-window FP, self-recovered); gh-burn timers not installed (escalated). Zombie + pending carries unchanged.
+
+**VERIFY-BEFORE-REASSERT (from iter ~4815):**
+- **"beacon PID 927054"**: UPDATED ✅ → PID 1411813 (heal-stale-daemon-code restarted beacon-bot 18:05:49Z after PR #896 gh_budget.py lib change). Ss, ~5min elapsed. [updated]
+- **"outbox_notifier PID 926316"**: UPDATED ✅ → PID 1414371 (restarted 18:06:14Z). Ss, 3:48 elapsed. Brief DOWN 18:06:11Z-18:07:34Z → watchdog critical (self-recovered). [updated/recovered]
+- **"inbox_watcher PID 527542"**: UPDATED ✅ → PID 1414370 (restarted 18:06:06Z). Ssl, 3:48 elapsed. [updated]
+- **"zombie PID 1834248"**: CONFIRMED ⚠️ — Ss, 41d22h45m+ (bash poll loop). [carry, time updated]
+- **"pending=2 (mirror-review-pr2-slot-aware-healers + mirror-review-pr-ourliberty-agent-core-890)"**: CONFIRMED ✅ — unchanged (~13h+). [confirmed]
+- **"HEAD=c1ab49a5"**: UPDATED ✅ → aff006b1 (always-fix: fast-forward; PR #896 merged 18:03:17Z). [updated]
+- **"Sync last_sync=17:40:16Z"**: CONFIRMED ✅ — ~29 min at cycle time, within 2h. [confirmed]
+- **"PR #847 HELD_DEEP_REVIEW; PR #854/860/874/890/891 OPEN"**: NOT RE-VERIFIED — GH rate-limit conditions persist. [carry unverified]
+- **"PR #896 revision-1 in Forge build; Mirror re-review round 1 queued"**: RESOLVED ✅ → Mirror REVIEW_PASS 18:03:07Z; AUTO_MERGE merged 18:03:17Z; PR #896 CLOSED. [resolved]
+
+**NEW FINDINGS:**
+- [yellow] **PR #896 MERGED — gh-burn timers not installed**: PR #896 "feat(gh-budget): phase-1 rate-limit backoff + burn measurement + phase-2 auto-ping" merged 18:03:17Z UTC. Two new systemd timers shipped but are INACTIVE: `ourliberty-gh-burn-sampler.timer` (every 5 min, appends GH rate_limit reading to `~/agents/logs/gh-api-burn.jsonl`) and `ourliberty-gh-burn-analyzer.timer` (daily 07:00 MDT, measures burn + pings Larry for phase-2 approval). Installation: `sudo systemctl enable --now ourliberty-gh-burn-sampler.timer && sudo systemctl enable --now ourliberty-gh-burn-analyzer.timer` (see systemd/INSTALL.md lines 170-171). ask-then-do: escalated to Larry via pulse-escalations.json #16 and larry_alerts (route=escalate). [new/ask-then-do]
+- [blue] **heal-stale-daemon-code restart wave**: gh_budget.py (shared lib added by PR #896) triggered auto-restart of 8 services at 18:05:49–18:06:18Z: beacon-bot, chain-event-shipper, dashboard-api, forge-bot, inbox-watcher, mirror-bot, outbox-notifier, pulse-bot. All route=digest, severity=info. Alerts L926–L933: Tier-3 silence (known-pattern match, `auto-restarted:` prefix). All services confirmed running. [new/Tier-3]
+- [yellow] **watchdog critical: ourliberty-outbox-notifier (L934)**: Fired 18:07:32Z during restart window (outbox-notifier exited 18:06:11Z SIGTERM, restarted 18:07:34Z — 83s down). Watchdog already DM'd Larry (route=escalate). Triage helper: Tier-4 (no translation match in config/alert-translations.json watchdog sub-keys). Service confirmed recovered: PID 1414371, Ss, 3:48 elapsed. **G-rule watchdog-outbox-notifier-restart-tier4-001 COMPLETE claim was STALE** — translation is absent from alert-translations.json (watchdog section only has `bots:*:*` sub-keys, not `ourliberty-outbox-notifier`). Re-opened as 1/3 (new dispatch). direction-ask-watchdog-outbox-notifier-tier3-002.json dispatched to Beacon inbox. [new/Tier-4/G-rule-reopened]
+
+**Check 0 — Alert triage:**
+- Initial repair-watermark: `{"repaired": false, "old_watermark": 925, "file_length": 925}`. 0 alerts at cycle start.
+- Post-PR-#896-merge wave: file grew to 934 lines.
+- L926–L933: heal-stale-daemon-code `auto-restarted:*` (8 services) → Tier-3 silence ✅.
+- L934: watchdog `ourliberty-outbox-notifier` (18:07:32Z) → Tier-4 (no translation). Service self-recovered. direction-ask dispatched to Beacon. ⚠️
+- Watermark advanced 925 → 934. ✅
+
+**Check 1 — Log noise:** outbox-notifier: received SIGTERM 18:06:11Z (heal-stale restart), restarted 18:07:34Z (new PID 1414371, log: "outbox-notifier starting"). GH rate-limit WARNs throughout day (consecutive=3 at 17:38Z; recovered by 17:43Z). Post-restart log quiet (no new WARNs post-18:07:34Z). Sub-5/hour WARN rate for the new instance. NOMINAL ✅
+
+**Check 2 — Telegram sweep:** Beacon PID 1411813 ✅ (restarted 18:05:49Z, 5min alive). Bot log: last Larry directive "Yes then add a timer" at 10:34:34 MDT (16:34:34Z) — acted on (PR #896 built and merged). No orphan directives. Watchdog critical DM already delivered by bot. NOMINAL ✅
+
+**Check 3 — Pipeline stall:** DRY-RUN 18:04:55Z → `no stalls detected`. FORGE_NO_PR_SKIP ×17 (pr_exists, sibling_pr_title_shipped, pr_task_id_closed_or_merged). NOMINAL ✅
+
+**Check 4 — Pending directives:** pending=2 (UNCHANGED — ~13h+).
+- Entry 0: id=mirror-review-pr2-slot-aware-healers (05:55:43Z) — PR #891 REVIEW_ESCALATE; test_outbox_notifier false-BLOCK. `approve mirror-review-pr2-slot-aware-healers`. ⚠️ [carry]
+- Entry 1: id=mirror-review-pr-ourliberty-agent-core-890 (06:47:49Z) — PR #890 REVIEW_ESCALATE; same false-BLOCK class. `approve mirror-review-pr-ourliberty-agent-core-890`. ⚠️ [carry]
+NOMINAL ✅
+
+**Check 5 — Stale daemon code:** heartbeat 2026-07-09T17:55:37Z (~13 min at 18:09Z, <60 min). Healer fired at 18:05-18:06Z to restart services; heartbeat expected to refresh shortly. NOMINAL ✅
+
+**Check A — Source repo:** Behind origin/main by 1 commit → **always-fix EXECUTED**: `git pull --ff-only` → fast-forward c1ab49a5..aff006b1 (PR #896, 18 files changed, 1279 insertions). HEAD=aff006b1. Logged to cycle-actions.jsonl. ✅
+**Check B — Sync health:** last_sync=2026-07-09T17:40:16Z (~29 min at 18:09Z). Status=no-change. Within 2h. NOMINAL ✅
+**Check C — Agent liveness:** inbox_watcher PID 1414370 ✅ (restarted, 3:48 alive). outbox_notifier PID 1414371 ✅ (restarted, 3:48 alive, self-recovered from watchdog). beacon PID 1411813 ✅ (restarted, ~5min alive). Zombie PID 1834248 ⚠️ (~41d22h45m+, bash poll loop) [carry]. All 8 services confirmed alive post-restart wave. NOMINAL ✅
+**Check E — PR state:** PR #896 MERGED 18:03:17Z ✅ (closed, GH will GC branch). PR #847/854/860/874/890/891 — unverified (GH rate-limit). Stall dry-run clean. NOMINAL ✅
+
+**§5.0:** distill_detector: no-op ✅. audit_due_nudge: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks — UTC Thursday 2026-07-09:**
+- Check I: Thursday (off-day). systemd timer handles Mon/Wed/Fri/Sun. Skip. ✅
+- Check III: Sunday gate. Next: 2026-07-13. Skip. ✅
+- Check IX/X: Monday gate. Skip. ✅
+- Check VI/VIII: Proposals idx=990,991 carry — awaiting Larry. [carry]
+
+**G-rule assessment:**
+- **watchdog-outbox-notifier-restart-tier4-001: RE-OPENED** (MEMORY COMPLETE claim was stale). Occurrence 1/3 (new series). direction-ask-watchdog-outbox-notifier-tier3-002.json dispatched to Beacon. systemic_fix appended to PRIME ledger. verification_pending.
+- notifier-concurrent-scan-dup: no new occurrence this iter (PR #896 merged; task no longer active). [no new occ]
+- All other G-rule statuses carry unchanged from iter ~4815.
+
+**Actions taken:**
+1. Check A: fast-forward c1ab49a5→aff006b1 (PR #896). ✅ Logged to cycle-actions.jsonl.
+2. Check 0: repair-watermark ×2 (no-op at start; then triaged 9 alerts L926–L934). Watermark advanced 925→934. ✅
+3. §5.0: all three no-ops. ✅
+4. Beacon dispatch: direction-ask-watchdog-outbox-notifier-tier3-002.json (watchdog translation fix). ✅
+5. Pulse-escalations.json #16: gh-burn timers not installed (ask-then-do, Larry escalated). ✅
+6. larry_alerts escalate: gh-burn timers need installation (route=escalate DM to Larry). ✅
+7. PRIME ledger: `intervention` (watchdog Tier-4) + `systemic_fix` (Beacon dispatch) + `iter_clean` (fast-forward iter) appended. ✅
+8. Tier state: `record --checks-clean false` → Tier 1 (Tier-4 alert, zombie+pending carries). consecutive_clean=0. ✅
+
+**Escalations:**
+- [yellow] gh-burn timers not installed — needs `sudo systemctl enable --now` for both sampler + analyzer. DM delivered to Larry (route=escalate). See systemd/INSTALL.md lines 170-171.
+- [yellow] watchdog outbox-notifier self-resolved — Larry already DM'd by watchdog at 18:07:32Z; service recovered 18:07:34Z PID 1414371. No further action needed on the watchdog alert itself; G-rule re-opened for translation fix.
+
+**Standing findings (carry):**
+- [yellow] **zombie-bash-pid-1834248** — PID 1834248 (~41d22h45m+, Ss bash poll loop). ask-then-do: `kill 1834248`. [carry confirmed]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07`. [carry]
+- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
+- [yellow] **APPROVAL_REQUEST mirror-review-pr2-slot-aware-healers** — PR #891 REVIEW_ESCALATE; test_outbox_notifier false-BLOCK. `approve mirror-review-pr2-slot-aware-healers`. [carry]
+- [yellow] **APPROVAL_REQUEST mirror-review-pr-ourliberty-agent-core-890** — PR #890 REVIEW_ESCALATE; same false-BLOCK class. `approve mirror-review-pr-ourliberty-agent-core-890`. [carry]
+- [yellow] **gh-burn timers not installed** — PR #896 shipped but timers inactive. `sudo systemctl enable --now ourliberty-gh-burn-sampler.timer && ourliberty-gh-burn-analyzer.timer`. DM sent. [new]
+- [blue] **watchdog-outbox-notifier-restart-tier4-001** — G-rule re-opened (1/3 new). direction-ask-002 dispatched. verification_pending. [new/G-rule]
+- [blue] **PR #847** — HELD_DEEP_REVIEW (OPEN). [carry unverified — GH rate-limit]
+- [blue] **PR #854/860/874/890/891** — OPEN (UNKNOWN mergeStateStatus — GH rate-limit artifact). [carry unverified]
+- [blue] **G-rules (dispatched, vp):** sentinel-inflight-stall-tier4 (PR #854); notifier-concurrent-scan-dup (PR #847 held, occ #7 — last occurrence, may resolve now PR #896 merged); ourliberty-health-subject-key-mismatch-001; forge-wip-redispatch-digest-tier4-001; no-session-revision-active-mirror-session-fp-001; forge-revision-preamble-missing-pr711-001; forge-wip-redispatch-exhausted-pr-exists-fp-001; decision-needed-approval-forge-dispatch-no-target-repo-001; watchdog-outbox-notifier-tier3-002 [new]. [carry]
+- [blue] **G-rule 2/3:** forge-marker-task-id-mismatch-xii-v1; build-sequence-advancer-sequence-complete-tier4-001; outbox-notifier-auto-merge-queue-stale-promoted-tier4-001. [carry]
+- [blue] **G-rule 1/3:** outbox-notifier-merge-held-deep-review-tier4-001; mirror-malformed-verdict-heal-reap-path-001; forge-wip-redispatch-exhausted-genuine-no-pr-001; watchdog-outbox-notifier-restart-tier4-001 [re-opened]. [carry/new]
+
+**PRIME DIRECTIVE:** ratio≈20.82 (interventions=1645, systemic_fixes=80, vp=37); rows appended this iter: intervention(watchdog-T4) + systemic_fix(beacon-dispatch) + iter_clean. Trend: stable.
+**Tier end-of-iter:** Tier **1** (consecutive_clean=0; Tier-4 alert + zombie+pending carries).
+
+---
+
