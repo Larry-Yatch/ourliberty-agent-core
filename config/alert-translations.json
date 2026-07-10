@@ -664,6 +664,12 @@
       "tier": "FYI",
       "plain_language_summary": "Sentinel detected an inbox task waiting longer than the stale threshold. This is expected during Tier 2 OAuth expiry -- agent processing is blocked and tasks accumulate. Beacon-bot delivers the DM, but no new action is needed beyond what is already pending.",
       "recommended_action": "None. The task is waiting because agent processing is OAuth-blocked. Root cause: restore Tier 2 OAuth per docs/runbooks/restore-larry-personal-claude-oauth-tier2.md. Tasks will process automatically once OAuth is restored."
+    },
+    "in-flight-stall": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "Sentinel detected an in-flight agent session (Mirror or Forge) registered longer than its stale threshold. For review-tier sessions this is almost always a session that wedged AFTER its work was in hand. The wedged-session reaper (heal_wedged_review_sessions) auto-recovers it: CASE 1 (terminal marker present) reaps within marker_grace (~5 min); CASE 2 (silent, no marker) is deterministically hard-reaped at hard_silent_grace_seconds (60 min), which covers both wt-mirror-* and wt-forge-* worktrees. No action is required -- the reaper frees the slot on its own.",
+      "recommended_action": "None required -- the wedged-session reaper (heal_wedged_review_sessions) auto-recovers both Mirror and Forge in-flight stalls within its grace window. To unblock the queue sooner, you may kill the wedged pid named in the technical-detail footer. Producer: scripts/dispatch_sentinel.py (scan_in_flight); reaper: scripts/heal_wedged_review_sessions.py."
     }
   },
   "heal-pulse-check-staleness": {
