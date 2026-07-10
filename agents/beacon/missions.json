@@ -8375,6 +8375,40 @@
       "retired_by": "heal_orphan_autoregister",
       "retired_at": "2026-07-10T18:03:21.831846+00:00",
       "retired_reason": "orphan-terminal"
+    },
+    {
+      "id": "proposed-rebase-pr909-sentinel-stale-lease-001",
+      "name": "Rebase Pr909 Sentinel Stale Lease 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `rebase-pr909-sentinel-stale-lease-001`. Last activity 2026-07-10T18:12:02.897+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "rebase-pr909-sentinel-stale-lease-001"
+      ],
+      "repo": null,
+      "created": "2026-07-10",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-10T18:18:35.865067+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-10T18:12:02.897+00:00"
+    },
+    {
+      "id": "proposed-direction-ask-pr909-rebase-sentinel-stale-lease-001",
+      "name": "Direction Ask Pr909 Rebase Sentinel Stale Lease 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `direction-ask-pr909-rebase-sentinel-stale-lease-001`. Last activity 2026-07-10T18:12:02.113569+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "direction-ask-pr909-rebase-sentinel-stale-lease-001"
+      ],
+      "repo": null,
+      "created": "2026-07-10",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-10T18:18:35.865067+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-10T18:12:02.113569+00:00"
     }
   ]
 }
