@@ -27,12 +27,15 @@ Medic escalations are a large share of the 1063-alerts/14d, 97%-unactioned toil 
 
 A fingerprint proposes a card when, over the recent window:
 
-    count(outcome='escalated', this fingerprint, last 7d) >= 3   AND   most-recent escalation within 2d
+    count(outcome='escalated', this fingerprint, last 7d) >= 3
+      AND those escalations span >= 2 distinct calendar days
+      AND most-recent escalation within 2d
 
 - **Count-over-7d ≥ 3:** proves durability across the slow ~daily escalation cadence. 1 = one-off (never), 2 = coincidence (never), 3 = genuine recurrer.
+- **Spread ≥ 2 distinct days:** count alone can't tell "3 pages across 3 days" from "3 pages in one 2-hour burst" — a single stuck event that re-escalates hourly until it clears (e.g. a notifier restart double-fire) is one incident, not a recurrence, and not worth the general fan-out. Added 2026-07-10 after the gauge's first live fire was exactly this shape (the 2026-07-08 `notifier-concurrent-scan-dup-review` burst: 3 escalations in ~2h on one day). The across-days recurrer that motivated the fan-out (16× over a fortnight) easily clears this.
 - **Freshness ≤ 2d:** the clause that separates a live recurrer from a trailing-edge corpse (the §1 trap). A fat count with a stale most-recent hit is a dead/dying burst — excluded.
 
-Thresholds are the shipped gauge's env-overridable constants (`OURLIBERTY_MEDIC_RECUR_WINDOW_DAYS` / `_MIN_COUNT` / `_FRESH_DAYS`); the fan-out MUST read the same values so trigger and action agree.
+Thresholds are the shipped gauge's env-overridable constants (`OURLIBERTY_MEDIC_RECUR_WINDOW_DAYS` / `_MIN_COUNT` / `_MIN_DAYS` / `_FRESH_DAYS`); the fan-out MUST read the same values so trigger and action agree.
 
 **Enforcement:** the shipped gauge `scripts/medic_escalation_recurrence_gauge.py` implements this exact gate (`qualifying()`), unit-tested in `scripts/tests/test_medic_escalation_recurrence_gauge.py` (one-off/coincidence never qualify; dead-burst excluded; fresh recurrer fires). The fan-out build reuses the same constants.
 
@@ -68,7 +71,7 @@ Thresholds are the shipped gauge's env-overridable constants (`OURLIBERTY_MEDIC_
 ## 9. Open questions / risks
 
 1. **Label choice** (shared `medic-proposal` vs distinct `medic-escalation`) — a UI/badge preference (values), decide at build. Distinct gives a cleaner board filter but costs the two `dashboard_api.py` allowlist edits.
-2. **First-fire on an in-flight fix.** As of 2026-07-09 the gauge would fire once on `notifier-concurrent-scan-dup-review-dispatch-001` (3×/7d, ~42h) whose root fix is already in flight (memory `notifier-restart-dup-review-dispatch`). Correct positive; it self-clears once the fix lands. Not a reason to raise the threshold — it's the gauge working.
+2. **First-fire was a single-day burst — resolved by the spread gate.** On 2026-07-10 the gauge's first live fire was `notifier-concurrent-scan-dup-review-dispatch-001` (3 escalations, but all in a ~2h window on 2026-07-08 — one stuck event re-escalating hourly, not an across-days recurrer). This drove the §4 **≥2-distinct-days** clause; the gauge now correctly stays silent on that shape (verified: qualifying → none against the live ledger).
 
 ## 10. References
 
@@ -80,4 +83,5 @@ Thresholds are the shipped gauge's env-overridable constants (`OURLIBERTY_MEDIC_
 
 ## Changelog
 
-- 2026-07-09 — Drafted + PARKED ship-ready by Larry-session Claude. Fan-out deferred (signal at low tide); un-park trigger gauge shipped live in the same PR.
+- 2026-07-09 — Drafted + PARKED ship-ready by Larry-session Claude. Fan-out deferred (signal at low tide); un-park trigger gauge shipped live in the same PR (#903).
+- 2026-07-10 — Added the §4 **≥2-distinct-days** spread clause after the gauge's first live fire was a single-day burst; added the config/alert-translations.json entry so the DM renders plain-language. Gauge follow-up PR.

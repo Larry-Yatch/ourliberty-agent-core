@@ -157,10 +157,25 @@ class QualifyingTest(_GaugeTmpBase):
         quals = gauge.qualifying(self._esc([0.5, 1.5]), now=NOW)
         self.assertEqual(quals, {})
 
-    def test_three_fresh_qualifies(self):
-        quals = gauge.qualifying(self._esc([0.2, 1.0, 2.5]), now=NOW)
+    def test_three_fresh_across_days_qualifies(self):
+        quals = gauge.qualifying(self._esc([0.2, 1.0, 2.5]), now=NOW)  # 3 days
         self.assertIn("fp", quals)
         self.assertEqual(quals["fp"]["count"], 3)
+        self.assertEqual(quals["fp"]["days"], 3)
+
+    def test_single_day_burst_excluded(self):
+        # 3 escalations all on ONE day (a stuck event re-escalating hourly) —
+        # count passes and it's fresh, but the spread gate excludes it: one
+        # incident, not a recurrence-across-days. The real 2026-07-08 notifier
+        # burst shape that motivated this gate.
+        quals = gauge.qualifying(self._esc([0.05, 0.10, 0.15]), now=NOW)
+        self.assertEqual(quals, {}, "a single-day burst must not qualify")
+
+    def test_two_distinct_days_qualifies(self):
+        # 3 escalations spanning exactly MIN_DISTINCT_DAYS calendar days => fires.
+        quals = gauge.qualifying(self._esc([0.1, 0.2, 1.1]), now=NOW)  # Jul9,Jul9,Jul8
+        self.assertIn("fp", quals)
+        self.assertEqual(quals["fp"]["days"], 2)
 
     def test_fat_but_dead_burst_excluded(self):
         # 5 escalations, all 5-9 days ago in a 7d window? No — put them just
@@ -176,8 +191,8 @@ class QualifyingTest(_GaugeTmpBase):
         self.assertEqual(quals["fp"]["count"], 4)
 
     def test_boundary_min_recur_exact(self):
-        # Exactly MIN_RECUR fresh hits qualifies (>= not >).
-        ages = [0.1 * i for i in range(gauge.MIN_RECUR)]
+        # Exactly MIN_RECUR fresh hits, one per day (meets count AND spread).
+        ages = [0.1 + i for i in range(gauge.MIN_RECUR)]
         quals = gauge.qualifying(self._esc(ages), now=NOW)
         self.assertIn("fp", quals)
 
@@ -301,7 +316,8 @@ class RunOnceTest(_GaugeTmpBase):
             return True
 
         fake = types.SimpleNamespace(append_alert=_fake_append)
-        meta = {"count": 3, "last": NOW, "first": NOW - timedelta(days=2)}
+        meta = {"count": 3, "days": 2, "last": NOW,
+                "first": NOW - timedelta(days=2)}
         with mock.patch.dict(sys.modules, {"larry_alerts": fake}):
             ok = gauge.fire("fp-xyz", meta, NOW)
         self.assertTrue(ok)
