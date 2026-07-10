@@ -630,6 +630,15 @@ class DoneItem(BaseModel):
     outcome: str
     reason: Optional[str]
     at: Optional[str]
+    # Live GitHub state ('MERGED' | 'OPEN' | 'CLOSED') for a card whose outcome
+    # is 'merged'. The builder's 'merged' outcome is really "Mirror passed the
+    # review" (review_pass), NOT a confirmed merge — so this is looked up at
+    # read time to tell a build that PASSED review AND landed (MERGED) from one
+    # that passed but hasn't merged yet (OPEN) or was closed without merging
+    # (CLOSED). None for other outcomes, no PR, or a degraded lookup (no token
+    # / timeout / error) — the lane never blocks on GitHub. `outcome` itself is
+    # unchanged for backward compatibility; the UI uses pr_state when present.
+    pr_state: Optional[str] = None
 
 
 class WorkerDoneItem(BaseModel):
@@ -3086,23 +3095,30 @@ def _derive_worker_done_today(
     return [item for _dt, item in merged]
 
 
-# Only a review_pass card carries a merge expectation: the PR was approved, so
-# the operator wants to know whether it actually LANDED. A revision / escalate
-# card is *supposed* not to be merged, so it gets no lookup and no badge
-# (pr_state stays None) — which also bounds the GitHub fan-out to the passed
-# set.
-_WORKER_DONE_MERGE_VERDICT = 'review_pass'
+# A card carries a merge expectation only once its PR was APPROVED — for the
+# WORKER (mirror) that's verdict == review_pass; for the BUILDER (forge) that's
+# outcome == 'merged' (which is really "Mirror passed the review", not a
+# confirmed merge). Only those cards get a live PR-state lookup, so a
+# not-yet-approved card carries no badge AND the GitHub fan-out is bounded to
+# the approved set.
+def _worker_wants_merge_state(item: dict[str, Any]) -> bool:
+    return item.get('verdict') == 'review_pass'
 
 
-def _stamp_worker_done_pr_state(
+def _builder_wants_merge_state(item: dict[str, Any]) -> bool:
+    return item.get('outcome') == 'merged'
+
+
+def _stamp_done_pr_state(
     done_items: list[dict[str, Any]],
     pr_state_resolver: Callable[[list[str]], dict[str, str]],
+    wants_lookup: Callable[[dict[str, Any]], bool],
 ) -> None:
-    """Attach live GitHub `pr_state` to review-passed WORKER done cards.
+    """Attach live GitHub `pr_state` to APPROVED done cards, in place.
 
-    Mutates `done_items` in place. Collects the pr_urls of cards whose verdict
-    was review_pass (`_WORKER_DONE_MERGE_VERDICT`), resolves them in one
-    bounded/batched call via `pr_state_resolver` (the same missions-tab
+    Collects the pr_urls of cards for which `wants_lookup` is true (see
+    `_worker_wants_merge_state` / `_builder_wants_merge_state`), resolves them
+    in one bounded/batched call via `pr_state_resolver` (the same missions-tab
     `_resolve_orphan_pr_states` — one GraphQL call per repo, ≤200 lookups, wall-
     clock capped), and stamps each card's `pr_state` with 'MERGED' | 'OPEN' |
     'CLOSED'. FAIL-SAFE: a resolver that raises or returns nothing leaves
@@ -3111,7 +3127,7 @@ def _stamp_worker_done_pr_state(
     """
     urls = [
         d['pr_url'] for d in done_items
-        if d.get('verdict') == _WORKER_DONE_MERGE_VERDICT and d.get('pr_url')
+        if wants_lookup(d) and d.get('pr_url')
     ]
     if not urls:
         return
@@ -3120,7 +3136,7 @@ def _stamp_worker_done_pr_state(
     except Exception:  # noqa: BLE001 — fail-safe: never break the lane
         states = {}
     for d in done_items:
-        if d.get('verdict') == _WORKER_DONE_MERGE_VERDICT and d.get('pr_url'):
+        if wants_lookup(d) and d.get('pr_url'):
             d['pr_state'] = states.get(d['pr_url'])
 
 
@@ -3193,6 +3209,16 @@ def _reader_agent_queue(
             building = [
                 b for b in building if b.get('task_id') not in in_review_ids
             ]
+        done_today = _derive_done_today(
+            rows or [], verdict_rows or [], agent, now=now,
+        )
+        # Live merge check for 'merged'-outcome cards: the builder's 'merged'
+        # is really review_pass, so verify it actually LANDED (same bounded
+        # resolver as the worker path). Skipped without an injected resolver.
+        if pr_state_resolver is not None:
+            _stamp_done_pr_state(
+                done_today, pr_state_resolver, _builder_wants_merge_state,
+            )
         return {
             'agent': agent,
             'archetype': archetype,
@@ -3200,9 +3226,7 @@ def _reader_agent_queue(
             'building': building,
             'in_review': in_review,
             'active': [],
-            'done_today': _derive_done_today(
-                rows or [], verdict_rows or [], agent, now=now,
-            ),
+            'done_today': done_today,
             'captured_at': _now_utc_iso(now),
         }
 
@@ -3212,7 +3236,9 @@ def _reader_agent_queue(
     # when no resolver is injected (direct callers / older tests) so the pure
     # event-derive path stays untouched.
     if pr_state_resolver is not None:
-        _stamp_worker_done_pr_state(done_today, pr_state_resolver)
+        _stamp_done_pr_state(
+            done_today, pr_state_resolver, _worker_wants_merge_state,
+        )
     return {
         'agent': agent,
         'archetype': archetype,

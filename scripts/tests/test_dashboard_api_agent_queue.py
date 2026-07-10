@@ -869,9 +869,12 @@ class BuilderRegressionTest(_Base):
         done = body['done_today']
         self.assertEqual(len(done), 1)
         # Exact builder done-item key set — no worker `message` field bleeds in.
+        # `pr_state` is the additive live-merge field (None here: the stub
+        # resolver returns {} and 'https://pr/m1' isn't a resolvable PR).
         self.assertEqual(set(done[0]), {'task_id', 'pr_url', 'outcome',
-                                        'reason', 'at'})
+                                        'reason', 'at', 'pr_state'})
         self.assertEqual(done[0]['outcome'], 'merged')
+        self.assertIsNone(done[0]['pr_state'])
 
 
 # ==================== worker active lane ====================
@@ -1126,6 +1129,60 @@ class MirrorDoneMergeBadgeTest(_Base):
         ]
         by_task = self._run(rows, boom)
         self.assertIsNone(by_task['pr-841']['pr_state'])
+
+
+# ============ forge (builder) done-today live merge check ============
+#
+# The builder's outcome='merged' is really review_pass — it does NOT confirm a
+# merge. Verify the same live PR-state read runs for 'merged'-outcome cards so
+# the Forge lane distinguishes truly landed from passed-but-not-landed, while
+# changes_requested / failed cards get no lookup.
+
+class ForgeDoneMergeCheckTest(_Base):
+    PR = 'https://github.com/x/y/pull/40'
+
+    def _run(self, rows, resolver):
+        da._resolve_orphan_pr_states = resolver  # type: ignore[assignment]
+        c = _client(self.agents_root, self.worktrees_root,
+                    _ChainEventsClient(rows))
+        r = c.get('/api/system/agent-queue', headers=AUTH,
+                  params={'agent': 'forge'})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.json()['archetype'], 'builder')
+        return {d['task_id']: d for d in r.json()['done_today']}
+
+    def test_merged_outcome_gets_live_state(self):
+        now = _today_noon()
+        rows = [
+            {'agent': 'forge', 'task_id': 'm1', 'event_type': 'session_start',
+             'pr_url': None, 'ts': (now - timedelta(hours=1)).isoformat()},
+            {'agent': 'mirror', 'task_id': 'm1', 'event_type': 'review_pass',
+             'pr_url': self.PR, 'ts': now.isoformat()},
+        ]
+        by_task = self._run(rows, lambda urls: {self.PR: 'OPEN'})
+        # outcome stays 'merged' (unchanged vocab); pr_state carries the truth.
+        self.assertEqual(by_task['m1']['outcome'], 'merged')
+        self.assertEqual(by_task['m1']['pr_state'], 'OPEN')
+
+    def test_non_merged_outcomes_get_no_lookup(self):
+        now = _today_noon()
+        seen: list[list[str]] = []
+
+        def resolver(urls):
+            seen.append(list(urls))
+            return {u: 'MERGED' for u in urls}
+
+        rows = [
+            {'agent': 'forge', 'task_id': 'c1', 'event_type': 'session_start',
+             'pr_url': None, 'ts': (now - timedelta(hours=1)).isoformat()},
+            {'agent': 'mirror', 'task_id': 'c1',
+             'event_type': 'review_revision', 'pr_url': self.PR,
+             'ts': now.isoformat()},
+        ]
+        by_task = self._run(rows, resolver)
+        self.assertEqual(by_task['c1']['outcome'], 'changes_requested')
+        self.assertIsNone(by_task['c1']['pr_state'])
+        self.assertEqual(seen, [])
 
 
 # ==================== supabase-None degradation ====================
