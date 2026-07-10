@@ -562,6 +562,12 @@ class _FakeNotifier:
 
 
 class _FakeSafeWriteInbox:
+    # main()'s post-dispatch verify now reads INBOXES_ROOT to locate the mirror
+    # inbox for the `.claimed/` race check. Default at a nonexistent tree so the
+    # helper finds nothing (empty `.claimed/` ⇒ False) and the existing main-flow
+    # tests keep their outcomes (e.g. a failed dispatch still escalates).
+    INBOXES_ROOT = Path('/nonexistent-test-inboxes-root')
+
     @staticmethod
     def canonical_inbox_name(name):
         return name
@@ -590,18 +596,24 @@ class TestMainDispatchFlow(unittest.TestCase):
         }
 
     def _run_main(self, *, prs, dispatch_succeeds, enabled=True, failed=None,
-                  pr_open=True):
+                  pr_open=True, inboxes_root=None):
         import os
         from unittest import mock
         fake_notifier = _FakeNotifier(dispatch_succeeds=dispatch_succeeds,
                                       pr_open=pr_open)
+        # Per-test INBOXES_ROOT override without mutating the shared fake class,
+        # so the `.claimed/` race check can be pointed at a populated tree.
+        fake_swi = _FakeSafeWriteInbox
+        if inboxes_root is not None:
+            fake_swi = type('_SWI', (_FakeSafeWriteInbox,),
+                            {'INBOXES_ROOT': Path(inboxes_root)})
         state = {'failed_prs': dict(failed or {})}
         saved = {}
         alerts: list[dict] = []
         env = {h.ENV_ENABLED: 'true' if enabled else 'false'}
         with mock.patch.dict(sys.modules, {
                     'outbox_notifier': fake_notifier,
-                    'safe_write_inbox': _FakeSafeWriteInbox,
+                    'safe_write_inbox': fake_swi,
                 }), \
                 mock.patch.dict(os.environ, env), \
                 mock.patch.object(h, 'kill_switch_active', return_value=False), \
@@ -704,6 +716,67 @@ class TestMainDispatchFlow(unittest.TestCase):
         rc, fn, saved, alerts = self._run_main(prs=prs, dispatch_succeeds=True)
         self.assertEqual(fn.dispatch_calls, [])
         self.assertEqual(alerts, [])
+
+    def test_claimed_race_dispatch_suppresses_false_positive_alert(self):
+        # The exact false-positive shape (G-rule heal-undispatched-pr-review-
+        # claimed-race-fp-001): the backstop dispatches a review, inbox_watcher
+        # relocates the task into `.claimed/<slot>/` within ~2-3s, so the shared
+        # presence predicate (modelled by dispatch_succeeds=False ⇒ nothing in
+        # the inbox root / archive / .invalid) reads it as absent. Because the
+        # task IS in a `.claimed/` slot, the dispatch must count as landed and
+        # NO critical alert may fire.
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            slot = Path(td) / 'mirror' / '.claimed' / '2'
+            slot.mkdir(parents=True)
+            (slot / 'review-harden-x-001.json').write_text('{}')
+            prs = [self._pr_realnow(412, 'forge/harden-x-001', age_minutes=60)]
+            rc, fn, saved, alerts = self._run_main(
+                prs=prs, dispatch_succeeds=False, inboxes_root=td)
+        self.assertEqual(len(fn.dispatch_calls), 1)  # it did try to dispatch
+        self.assertEqual(alerts, [])  # …but the FP page is suppressed
+        self.assertEqual(saved.get('failed_prs'), {})  # no failure-ledger entry
+
+
+class TestReviewTaskInClaimed(unittest.TestCase):
+    """Pure helper: is the review task present in any `.claimed/<slot>/`?"""
+
+    def _mirror(self):
+        import tempfile
+        self._td = tempfile.TemporaryDirectory()
+        self.addCleanup(self._td.cleanup)
+        mirror = Path(self._td.name) / 'mirror'
+        mirror.mkdir(parents=True)
+        return mirror
+
+    def test_present_in_slot_returns_true(self):
+        mirror = self._mirror()
+        slot = mirror / '.claimed' / '1'
+        slot.mkdir(parents=True)
+        (slot / 'review-pr-ourliberty-agent-core-910.json').write_text('{}')
+        self.assertTrue(h._review_task_in_claimed(
+            'review-pr-ourliberty-agent-core-910.json', mirror))
+
+    def test_present_in_slot_zero_returns_true(self):
+        mirror = self._mirror()
+        slot = mirror / '.claimed' / '0'
+        slot.mkdir(parents=True)
+        (slot / 'review-pr-ourliberty-agent-core-910.json').write_text('{}')
+        self.assertTrue(h._review_task_in_claimed(
+            'review-pr-ourliberty-agent-core-910.json', mirror))
+
+    def test_absent_from_all_slots_returns_false(self):
+        mirror = self._mirror()
+        (mirror / '.claimed' / '0').mkdir(parents=True)
+        (mirror / '.claimed' / '1').mkdir(parents=True)
+        (mirror / '.claimed' / '0' / 'review-other-999.json').write_text('{}')
+        self.assertFalse(h._review_task_in_claimed(
+            'review-pr-ourliberty-agent-core-910.json', mirror))
+
+    def test_missing_claimed_dir_returns_false_without_raising(self):
+        mirror = self._mirror()  # no `.claimed` created at all
+        self.assertFalse(h._review_task_in_claimed(
+            'review-pr-ourliberty-agent-core-910.json', mirror))
 
 
 if __name__ == '__main__':
