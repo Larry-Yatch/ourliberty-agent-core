@@ -329,6 +329,68 @@ class SweepClaimedOrphansTest(_InboxTmpBase):
                 / inbox_watcher.safe_write_inbox.LOST_RESULT_SUBDIR)
         self.assertTrue(any(lost.glob("paid-1*.json")))
 
+    def test_concluded_orphan_archived_not_requeued(self):
+        # A stranded claim whose review ALREADY concluded (a consumed verdict
+        # outbox is archived) must be ARCHIVED, never re-queued — re-queuing a
+        # concluded review pays for an Opus re-review of an already-reviewed PR
+        # (the 2026-07-10 PR #854 class).
+        claimed = self._claim_with_age(
+            "mirror", "concluded-1", slot=1,
+            age_sec=inbox_watcher.CLAIM_ORPHAN_CEILING_SEC + 60,
+            task={"task_id": "concluded-1", "prompt": "x"},
+        )
+        outbox_archive = self.outboxes / "mirror" / ".archive"
+        outbox_archive.mkdir(parents=True, exist_ok=True)
+        (outbox_archive / "concluded-1.json").write_text("{}")  # delivered verdict
+        n = inbox_watcher.sweep_claimed_orphans()
+        self.assertEqual(n, 0)  # NOT re-queued
+        self.assertFalse(claimed.exists())
+        self.assertFalse((self.inboxes / "mirror" / "concluded-1.json").exists())
+        # Archived to the plain .archive/ (NOT the lost-result marker — the
+        # verdict was delivered, not lost).
+        archive = self.inboxes / "mirror" / ".archive"
+        self.assertTrue((archive / "concluded-1.json").exists())
+        lost = archive / inbox_watcher.safe_write_inbox.LOST_RESULT_SUBDIR
+        self.assertFalse(any(lost.glob("concluded-1*.json")) if lost.exists() else False)
+
+    def test_concluded_beats_stale_inflight_entry(self):
+        # A concluded review stranded by a watcher death often ALSO leaves a
+        # stale in-flight entry from the prior boot (sweep runs before
+        # reap_orphans clears it). The concluded-check must win over the
+        # in-flight paid-orphan branch, else the review is mislabeled
+        # `lost-result` and re-dispatched for a paid re-review (#854).
+        claimed = self._claim_with_age(
+            "mirror", "concluded-stale-1", slot=0,
+            age_sec=inbox_watcher.CLAIM_ORPHAN_CEILING_SEC + 60,
+            task={"task_id": "concluded-stale-1", "prompt": "x"},
+        )
+        outbox_archive = self.outboxes / "mirror" / ".archive"
+        outbox_archive.mkdir(parents=True, exist_ok=True)
+        (outbox_archive / "concluded-stale-1.json").write_text("{}")  # verdict delivered
+        (self.in_flight / "concluded-stale-1.json").write_text(json.dumps({
+            "task_stem": "concluded-stale-1", "agent_id": "mirror", "pid": os.getpid(),
+        }))  # stale in-flight entry lingers
+        n = inbox_watcher.sweep_claimed_orphans()
+        self.assertEqual(n, 0)
+        self.assertFalse(claimed.exists())
+        # Clean .archive/ (NOT the lost-result marker → no re-dispatch).
+        archive = self.inboxes / "mirror" / ".archive"
+        self.assertTrue((archive / "concluded-stale-1.json").exists())
+        lost = archive / inbox_watcher.safe_write_inbox.LOST_RESULT_SUBDIR
+        self.assertFalse(any(lost.glob("concluded-stale-1*.json")) if lost.exists() else False)
+
+    def test_same_name_inbox_archive_marks_concluded(self):
+        # The re-dispatch case: a review request with the SAME filename already
+        # sits in .archive/ → the claim is a duplicate of a concluded review.
+        (self.inboxes / "mirror" / ".archive").mkdir(parents=True, exist_ok=True)
+        self.assertTrue(inbox_watcher._review_already_concluded(
+            "mirror", "concluded-1", "review-concluded-1.json"
+        ) is False)  # no signal yet
+        (self.inboxes / "mirror" / ".archive" / "review-concluded-1.json").write_text("{}")
+        self.assertTrue(inbox_watcher._review_already_concluded(
+            "mirror", "concluded-1", "review-concluded-1.json"
+        ))
+
 
 class SameHeadGuardTest(_InboxTmpBase):
     """No two review slots review one PR head CONCURRENTLY (§4 PR2). The atomic

@@ -45,6 +45,7 @@ import dispatch_validator  # noqa: E402
 import fixture_patterns  # noqa: E402
 from inbox_dispatch_order import order_pending, read_fast_tracked_at  # noqa: E402
 import larry_alerts  # noqa: E402
+import mirror_review_conclusion  # noqa: E402
 import mirror_review_handler  # noqa: E402
 import routing_validator  # noqa: E402
 import safe_write_inbox  # noqa: E402
@@ -467,6 +468,34 @@ def reap_orphans_on_startup() -> int:
     return reaped
 
 
+def _review_already_concluded(agent: str, task_id: str, claim_name: str) -> bool:
+    """True iff a Mirror review for this claim already ran to a delivered verdict.
+
+    Delegates to the shared mirror_review_conclusion predicate (single source of
+    truth with scripts/heal_orphaned_mirror_claims.py, so the startup-sweep
+    backstop and the timer healer can never disagree). Used by
+    sweep_claimed_orphans to ARCHIVE such an orphan instead of RE-QUEUING it:
+    re-queuing a concluded review sends it back to a slot for a PAID Opus
+    re-review of an already-reviewed PR (the 2026-07-10 PR #854 class).
+
+    Read-only; any error → False (fall through to the existing re-queue path, so
+    a hiccup here can only ever RE-QUEUE — never wrongly archive). The
+    notifier-log root is derived from INBOXES_ROOT.parent so a test that patches
+    INBOXES_ROOT never reads the real production log."""
+    try:
+        return mirror_review_conclusion.verdict_delivered(
+            outboxes_root=OUTBOXES_ROOT,
+            inboxes_root=INBOXES_ROOT,
+            notifier_log=INBOXES_ROOT.parent / "logs" / "outbox-notifier.log",
+            agent=agent,
+            task_id=task_id,
+            claim_name=claim_name,
+        )
+    except Exception as e:  # noqa: BLE001 -- never block the sweep on a probe error
+        log(f"[{agent}] concluded-check error for {task_id}: {e!r}")
+        return False
+
+
 def sweep_claimed_orphans(ceiling_sec: int = CLAIM_ORPHAN_CEILING_SEC) -> int:
     """Re-queue tasks stranded in ``.claimed/<slot>/`` by a slot that died
     mid-flight (spec §3.2). Run at startup, BEFORE reap_orphans_on_startup, so
@@ -508,8 +537,28 @@ def sweep_claimed_orphans(ceiling_sec: int = CLAIM_ORPHAN_CEILING_SEC) -> int:
                 except (OSError, json.JSONDecodeError, AttributeError):
                     pass
                 task_id = task_id or f.stem
+                # Concluded-check FIRST (before the in-flight paid-orphan branch):
+                # a review that was stranded by a mid-flight watcher death often
+                # ALSO leaves a stale in-flight entry from the prior boot (this
+                # sweep runs before reap_orphans_on_startup clears it). If the
+                # in-flight check ran first it would mark a CONCLUDED review as
+                # `lost-result`, whose marker triggers a re-dispatch — a PAID
+                # re-review of an already-reviewed PR (#854). The >ceiling age gate
+                # above already guarantees no LIVE review is here (the review
+                # session ceiling is ~35 min « the 4h ceiling), so archiving a
+                # concluded claim even with a lingering in-flight entry is safe.
+                if _review_already_concluded(agent, task_id, f.name):
+                    try:
+                        move_to(f, _archive_dir(agent))
+                        log(f"[{agent}] claimed-orphan {f.name} already concluded "
+                            f"(verdict delivered/archived); archived, NOT re-queued")
+                    except OSError as e:
+                        log(f"[{agent}] claimed-orphan concluded-archive failed "
+                            f"for {f}: {e}")
+                    continue
                 if (IN_FLIGHT_DIR / f"{task_id}.json").exists():
-                    # Paid run in flight/completed — never re-dispatch.
+                    # Paid run in flight/completed (but no delivered verdict) —
+                    # never re-dispatch; archive under the lost-result marker.
                     try:
                         move_to(f, _archive_dir(agent, lost_result=True))
                         log(f"[{agent}] claimed-orphan {f.name} has a live in-flight "

@@ -241,6 +241,7 @@
         "scripts/inbox_watcher.py",
         "scripts/larry_alerts.py",
         "scripts/log_ts.py",
+        "scripts/mirror_review_conclusion.py",
         "scripts/mirror_review_handler.py",
         "scripts/pid_identity.py",
         "scripts/pulse_check_heartbeat.py",
