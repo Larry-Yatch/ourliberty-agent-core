@@ -62,6 +62,12 @@ _PHASE2_ORPHAN_KEYS = (
     'branch',
 )
 
+# Additive "Talk to the team" collapsed-card badge keys, projected onto every
+# funnel lane (parked/suggested/orphans). Stripped before the frozen-fixture
+# parity comparisons; their presence + values are covered directly in
+# test_dashboard_api_team_reply_fields.
+_TEAM_REPLY_KEYS = ('latest_team_message_id', 'blocked_on_you')
+
 
 def _load(name: str) -> dict:
     return json.loads((FIXTURES / name).read_text())
@@ -199,7 +205,8 @@ class ParityTest(_DerivedTestBase):
         expected = _load('expected_parity.json')
         actual = self._derive()
         stripped = [
-            {k: v for k, v in o.items() if k not in _PHASE2_ORPHAN_KEYS}
+            {k: v for k, v in o.items()
+             if k not in _PHASE2_ORPHAN_KEYS and k not in _TEAM_REPLY_KEYS}
             for o in actual['orphans']
         ]
         self.assertEqual(stripped, expected['orphans'])
@@ -222,7 +229,11 @@ class Phase2FieldsTest(_DerivedTestBase):
 
     def test_parked_array_matches_expected(self) -> None:
         expected = _load('expected_phase2.json')['parked']
-        self.assertEqual(self._derive()['parked'], expected)
+        stripped = [
+            {k: v for k, v in p.items() if k not in _TEAM_REPLY_KEYS}
+            for p in self._derive()['parked']
+        ]
+        self.assertEqual(stripped, expected)
 
     def test_stalled_orphan_stays_visible_not_terminal(self) -> None:
         # The core invariant: a quiet-but-unmerged orphan is `stalled` (visible),

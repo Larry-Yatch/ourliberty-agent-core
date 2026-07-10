@@ -5345,6 +5345,27 @@ def _handle_missions_derived(
         promoted_orphan_task_ids=promoted_orphan_task_ids,
     )
 
+    # Light the funnel card's collapsed "new reply" badge across its lanes. The
+    # dashboard funnel reads the top-level `parked` / `orphans` arrays off THIS
+    # derive (not the captures endpoint), each item's team thread keyed by
+    # capture_id / task_id respectively — so one batched read over the union
+    # stamps the flat fields the FunnelCard badge reads (`latest_team_message_id`
+    # / `blocked_on_you`). An item without a thread degrades to the neutral
+    # fields. `suggested` is a planned top-level lane the derive doesn't emit yet
+    # (keyed by `id`); it's included so the projection lights up automatically the
+    # day that lane ships, and is a harmless no-op until then.
+    funnel_items = [
+        it
+        for lane in ('parked', 'suggested', 'orphans')
+        for it in (response.get(lane) or [])
+        if isinstance(it, dict)
+    ]
+    _project_team_reply_fields(
+        funnel_items,
+        lambda it: it.get('capture_id') or it.get('id') or it.get('task_id'),
+        supabase_client,
+    )
+
     # projects-v3 P3: additive "Actively working" pipeline. Built AFTER the
     # existing-board filters and injected as a NEW key, so it cannot perturb the
     # missions/orphans/parked/funnel sections. Repo filter applies (a project
@@ -5354,6 +5375,32 @@ def _handle_missions_derived(
         projects, now, sequence_status_by_id)
     if repo:
         pipeline = [p for p in pipeline if p.get('repo') == repo]
+    # projects-v3 P6.1: project the collapsed-card team-reply badge onto each
+    # phase, keyed by its composite thread ref ``project_id::phase_id`` (the key
+    # `_handle_phase_thread` / `_card_thread_messages` store the phase
+    # conversation under). Stamp each phase with its owning project id so the
+    # shared projector can build the ref, then strip that internal join key back
+    # off. One batched read; fail-safe.
+    phase_cards: list[dict[str, Any]] = []
+    for project in pipeline:
+        if not (isinstance(project, dict)
+                and isinstance(project.get('phases'), list)):
+            continue
+        for phase in project['phases']:
+            if isinstance(phase, dict):
+                phase['_project_id'] = project.get('id')
+                phase_cards.append(phase)
+
+    def _phase_thread_ref(phase: dict[str, Any]) -> Optional[str]:
+        pid = phase.get('_project_id')
+        return (
+            f"{pid}{_PHASE_REF_SEP}{phase['id']}"
+            if pid and phase.get('id') else None
+        )
+
+    _project_team_reply_fields(phase_cards, _phase_thread_ref, supabase_client)
+    for phase in phase_cards:
+        phase.pop('_project_id', None)
     response['pipeline'] = pipeline
     return response
 
@@ -6476,6 +6523,50 @@ def _project_card_doorbells(
         by_task = {}
     for cap in parked:
         cap['doorbell'] = _newest_team_doorbell(by_task.get(cap['id']) or [])
+
+
+def _team_reply_fields(
+    events: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """The FLAT per-item team-reply fields every dashboard "Talk to the team"
+    surface reads to badge a COLLAPSED card: ``latest_team_message_id`` (the
+    newest team_to_larry reply's stable event_id) and ``blocked_on_you`` (that
+    reply's needs_reply). Derived from the SAME newest-reply projection the
+    Missions doorbell uses (`_newest_team_doorbell`), just flattened to the wire
+    keys the frontend consumes (lib/funnel.ts, ChainEvent, OperatorQueueEntry,
+    PipelinePhase all read these two). No team reply → id None + blocked_on_you
+    False, so a card with no reply is never unread."""
+    doorbell = _newest_team_doorbell(events)
+    if not doorbell:
+        return {'latest_team_message_id': None, 'blocked_on_you': False}
+    return {
+        'latest_team_message_id': doorbell['latest_team_id'],
+        'blocked_on_you': doorbell['blocked'] is True,
+    }
+
+
+def _project_team_reply_fields(
+    items: list[dict[str, Any]],
+    id_of: Callable[[dict[str, Any]], Optional[str]],
+    supabase_client: Any,
+) -> None:
+    """Project the flat team-reply fields (`_team_reply_fields`) onto every item
+    in ``items`` in place, keyed by ``id_of(item)`` — the id its conversation is
+    stored under in chain_events (capture_id / mission_id / approval event_id /
+    the ``project_id::phase_id`` phase ref). ONE batched chain_events read across
+    all ids (the same `.in_` fetch the funnel doorbell uses — no per-item
+    round-trip). Fail-safe: a None client or any read error degrades every item
+    to the neutral "no reply" fields rather than 500-ing the feed."""
+    keyed = [(it, id_of(it)) for it in items if isinstance(it, dict)]
+    ids = [k for _, k in keyed if isinstance(k, str) and k]
+    by_task: dict[str, list[dict[str, Any]]] = {}
+    if ids:
+        try:
+            by_task = _fetch_events_for_task_ids(supabase_client, ids)
+        except Exception:  # noqa: BLE001 — a broken doorbell never breaks a feed
+            by_task = {}
+    for it, key in keyed:
+        it.update(_team_reply_fields(by_task.get(key or '') or []))
 
 
 def _handle_capture_thread(
@@ -10839,6 +10930,12 @@ class OperatorQueueEntry(BaseModel):
     source: str = 'unknown'     # normalized provenance (source badge)
     kind: str = 'mission'       # 'mission' | 'capture' — action routing
     brief: dict[str, str] = {}  # plain-language what/why/suggest
+    # "Talk to the team" collapsed-card badge (shared flat contract): the newest
+    # team reply's id + whether it's waiting on you, projected per request so the
+    # operator card badges a new reply while its thread is closed. Absent reply →
+    # None / False (never unread).
+    latest_team_message_id: Optional[str] = None
+    blocked_on_you: bool = False
 
 
 class OperatorQueueResponse(BaseModel):
@@ -10924,6 +11021,17 @@ def get_approvals_operator_queue() -> dict[str, Any]:
         return empty
     ranked = [row for row in (_sanitize_operator_entry(e) for e in raw)
               if row is not None]
+    # Project the collapsed-card team-reply badge onto each ranked card, keyed by
+    # its id (capture_id / mission_id — the id its thread lives under). Fail-safe:
+    # client construction OR a read error leaves every card at the neutral "no
+    # reply" fields, never a 500 — this endpoint's quiet-empty/always-200 contract
+    # stands (the projector guards the read; we guard the client build here since
+    # it runs outside it).
+    try:
+        _reply_client = _get_larry_action_supabase_client()
+    except Exception:  # noqa: BLE001 — never 500 the always-200 operator queue
+        _reply_client = None
+    _project_team_reply_fields(ranked, lambda e: e.get('id'), _reply_client)
     gen = data.get('generated_at')
     summary = data.get('summary')
     return {
