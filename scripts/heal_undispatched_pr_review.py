@@ -595,6 +595,36 @@ def emit_failed_alert(pr: dict[str, Any]) -> bool:
         return False
 
 
+def _review_task_in_claimed(review_filename: str, mirror_inbox: Path) -> bool:
+    """True iff `review_filename` sits in ANY `<mirror_inbox>/.claimed/<slot>/`.
+
+    Closes the dispatch→claim race that produced a false-positive critical page
+    (G-rule heal-undispatched-pr-review-claimed-race-fp-001, PRs #903/#905/#910):
+    the backstop writes the Mirror review task, inbox_watcher relocates it to
+    `.claimed/<slot>/<name>.json` within ~2-3s, and the shared presence predicate
+    (`outbox_notifier._review_request_already_dispatched`) — which only scans the
+    inbox root, `.archive/`, and `.invalid/` — then reads the task as absent and
+    pages "dispatch did not take" even though it plainly did. A `.claimed/` hit is
+    positive proof the dispatch landed (a task can only be claimed if it was first
+    written), so this can never mask a genuine failure.
+
+    Fully defensive: a missing `.claimed` dir, an unreadable slot, or any OSError
+    yields False and never raises — this is a timer-driven healer and must never
+    crash a tick. Performs no writes. Slot dirs (not the filename) are globbed, so
+    a task_id carrying glob metacharacters can't distort the match."""
+    try:
+        claimed_root = mirror_inbox / '.claimed'
+        for slot in claimed_root.glob('*'):
+            try:
+                if (slot / review_filename).exists():
+                    return True
+            except OSError:
+                continue
+    except OSError:
+        return False
+    return False
+
+
 # -------------------- main --------------------
 
 def main() -> int:
@@ -703,7 +733,19 @@ def main() -> int:
         # an existence-only check — recording a FAILED dispatch as success and
         # permanently suppressing the escalation below. A dispatch that
         # actually landed passes regardless (live inbox file blocks any head).
-        if _already_dispatched(pr['task_id'], pr.get('headRefOid')):
+        #
+        # ...OR the task is already in a `.claimed/<slot>/` slot: inbox_watcher
+        # relocates a claimed review to `<mirror_inbox>/.claimed/<slot>/<name>`
+        # within ~2-3s of dispatch, and `_already_dispatched` (inbox root /
+        # `.archive/` / `.invalid/` only) does not look there — so during the
+        # dispatch→claim race a landed dispatch reads as absent and pages a
+        # spurious critical alert (G-rule heal-undispatched-pr-review-claimed-
+        # race-fp-001). A `.claimed/` hit is positive proof the dispatch landed.
+        review_filename = safe_write_inbox.canonical_inbox_name(
+            f'review-{pr["task_id"]}.json')
+        mirror_inbox = safe_write_inbox.INBOXES_ROOT / 'mirror'
+        if (_already_dispatched(pr['task_id'], pr.get('headRefOid'))
+                or _review_task_in_claimed(review_filename, mirror_inbox)):
             dispatched += 1
             failed.pop(url, None)  # clear any prior failure record
             continue
