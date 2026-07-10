@@ -8126,7 +8126,12 @@
         "at": "2026-07-10T03:31:21.145894+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-10T16:18:14.719131+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#904"
     },
     {
       "id": "proposed-heal-unregistered-approval-forlarry-scan-001",
@@ -8329,7 +8334,12 @@
         "at": "2026-07-10T15:49:18.763878+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-10T16:18:14.719131+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#906"
     },
     {
       "id": "proposed-pr-ourliberty-agent-core-905",
