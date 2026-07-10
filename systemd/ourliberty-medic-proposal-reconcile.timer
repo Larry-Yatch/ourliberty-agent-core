@@ -1,0 +1,17 @@
+[Unit]
+Description=Medic-proposal feed loop — reconcile every 15 min (propose recurring not-graduated fixes, self-retract cleared ones)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/medic_proposal_reconcile.py
+
+[Timer]
+# Every 15 minutes. A not-graduated finding re-fires whenever Medic re-attempts
+# its live alert (up to every 3-min dispatcher tick), so 15 min surfaces it to the
+# board promptly without hammering the ingest API; the self-retract STALE window
+# (6h) is far larger, so a cleared condition drops off well after any flap settles
+# (propose fast, retract slow). The pass is cheap + deterministic (no claude).
+OnCalendar=*:0/15
+Persistent=true
+RandomizedDelaySec=60
+Unit=ourliberty-medic-proposal-reconcile.service
+
+[Install]
+WantedBy=timers.target

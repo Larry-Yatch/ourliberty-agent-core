@@ -30,6 +30,7 @@ import os
 import subprocess
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
@@ -55,6 +56,29 @@ def _normalize_repo(name: str) -> str:
     repo name. Base repo names contain no '.', so the prefix before the first
     '.' is canonical. Mirrors emit_desktop_session_impl._normalize_repo."""
     return name.split('.', 1)[0]
+
+
+def _read_ingest_token() -> str | None:
+    """Resolve the narrow ingest token: the token FILE first (the operator's Mac
+    holds it there), else the OL_INGEST_TOKEN / DESKTOP_INGEST_TOKEN env var (the
+    droplet services load DESKTOP_INGEST_TOKEN from .env.larry, where no token
+    file exists). Returns the token, or None with a stderr diagnostic. The env
+    fallback is what lets an in-service emit/retract authenticate on the droplet."""
+    token_file = (os.environ.get('OL_INGEST_TOKEN_FILE')
+                  or str(Path.home() / '.config' / 'ourliberty' / 'ingest-token'))
+    try:
+        token = Path(token_file).read_text(encoding='utf-8').strip()
+        if token:
+            return token
+    except Exception:  # noqa: BLE001 — absent/unreadable file -> try env
+        pass
+    token = (os.environ.get('OL_INGEST_TOKEN')
+             or os.environ.get('DESKTOP_INGEST_TOKEN') or '').strip()
+    if token:
+        return token
+    _err(f'no ingest token (file {token_file} absent/empty; no OL_INGEST_TOKEN / '
+         'DESKTOP_INGEST_TOKEN env)')
+    return None
 
 
 def emit_capture(
@@ -109,15 +133,8 @@ def emit_capture(
 
     api_url = (os.environ.get('OL_DASHBOARD_API_URL')
                or 'https://api.ourliberty.dev').rstrip('/')
-    token_file = (os.environ.get('OL_INGEST_TOKEN_FILE')
-                  or str(Path.home() / '.config' / 'ourliberty' / 'ingest-token'))
-    try:
-        token = Path(token_file).read_text(encoding='utf-8').strip()
-    except Exception:
-        _err(f'no ingest token at {token_file}')
-        return None
+    token = _read_ingest_token()
     if not token:
-        _err('empty ingest token')
         return None
 
     req = urllib.request.Request(
@@ -151,6 +168,55 @@ def emit_capture(
     if os.environ.get('OL_HOOK_DEBUG'):
         _err(f'parked {capture_id} repo={repo} branch={branch} label={label}')
     return capture_id
+
+
+def retract_capture(
+    capture_id: str, reason: str | None = None,
+) -> dict | None:
+    """Auto-retract a machine-owned proposal capture (slice 9 — Medic self-
+    retract when its condition clears). POSTs to
+    `/api/ingest/capture/{id}/retract` with the SAME narrow ingest token
+    emit_capture uses.
+
+    Returns the server's JSON result dict — `{retracted: True, ...}` on a drop,
+    or `{retracted: False, reason: ...}` for a card that moved on ('not-found',
+    'not-parked') or a machine does not own ('not-machine-retractable'). Returns
+    `None` on a transport/token error (no token, network, non-JSON) — the signal
+    to a reconciler that the outcome is UNKNOWN and it should retry, vs a dict
+    'retracted False' which is a TERMINAL 'nothing to do'. NEVER raises."""
+    capture_id = (capture_id or '').strip()
+    if not capture_id:
+        _err('no capture_id — skip retract')
+        return None
+
+    api_url = (os.environ.get('OL_DASHBOARD_API_URL')
+               or 'https://api.ourliberty.dev').rstrip('/')
+    token = _read_ingest_token()
+    if not token:
+        return None
+
+    body = json.dumps({'reason': reason}).encode('utf-8')
+    quoted = urllib.parse.quote(capture_id, safe='')
+    req = urllib.request.Request(
+        f'{api_url}/api/ingest/capture/{quoted}/retract',
+        data=body, method='POST',
+        headers={'Content-Type': 'application/json', 'X-Ingest-Token': token},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            payload = json.loads(resp.read().decode('utf-8') or '{}')
+    except urllib.error.HTTPError as exc:
+        detail = ''
+        try:
+            detail = exc.read().decode('utf-8', 'replace').strip()
+        except Exception:  # noqa: BLE001 — body read is best-effort
+            pass
+        _err(f'retract HTTP {exc.code}: {detail}')
+        return None
+    except Exception as e:  # noqa: BLE001 — retract must never crash a caller
+        _err(f'retract failed: {e}')
+        return None
+    return payload if isinstance(payload, dict) else None
 
 
 def main() -> int:
