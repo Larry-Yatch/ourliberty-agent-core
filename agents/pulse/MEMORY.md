@@ -216,9 +216,9 @@ PR #800 (`fix(heal): re-restart stale daemon on fresh deploy inside cooldown win
 
 ---
 
-## G-rule outbox-notifier-merge-held-deep-review-tier4-001 — 1/3 (new, iter ~4558)
+## G-rule outbox-notifier-merge-held-deep-review-tier4-001 — 2/3 (updated iter ~4869)
 
-**Rule:** `source=outbox-notifier, kind=notification, intent=merge_held_deep_review` alerts classify Tier-4 (novel, no translation match). These are delivery confirmations — outbox-notifier already DMed Larry when it fires this notification; Pulse's triage should silence (Tier-3) rather than prompt a duplicate DM. Fix: add `source=outbox-notifier, intent=merge_held_deep_review` → Tier-3 entry to `config/alert-translations.json`. Dispatch to Beacon at 3/3. First occurrence iter ~4558 (L974, 10:09:50Z UTC, task=notifier-concurrent-scan-dup-review-dispatch-001, PR #847).
+**Rule:** `source=outbox-notifier, kind=notification, intent=merge_held_deep_review` alerts classify Tier-4 (novel, no translation match). These are delivery confirmations — outbox-notifier already DMed Larry when it fires this notification; Pulse's triage should silence (Tier-3) rather than prompt a duplicate DM. Fix: add `source=outbox-notifier, intent=merge_held_deep_review` → Tier-3 entry to `config/alert-translations.json`. Dispatch to Beacon at 3/3. Occurrences: iter ~4558 (1/3, L974, PR #847); iter ~4869 (2/3, L978, PR #904 HELD_DEEP_REVIEW at 04:26:01Z UTC).
 
 ---
 
@@ -544,8 +544,8 @@ PR #899 (`config(alerts): silence Pulse re-triage of outbox-notifier auto-merge-
 
 ---
 
-## Status snapshot — updated 2026-07-10T04:27Z UTC (Iter ~4868, **Tier 1**)
+## Status snapshot — updated 2026-07-10T04:38Z UTC (Iter ~4869, **Tier 1**)
 
-**Iter ~4868 summary (2026-07-10T04:27Z):** 0 new alerts. Watermark=977. PR #904 Mirror REVIEW_PASS (04:25:56Z) + AUTO_MERGE_HELD_DEEP_REVIEW (04:26:01Z, expected gate — needs `/code-review high`). Repo clean (HEAD=b3a16ac6=origin/main). pending=1 `unreg-approval-f5079f4c5369` (chat_id=None — carry; Larry notified 04:10:20Z iter ~4865). Check I fires today at 14:10:53Z UTC — ~10h away. All daemons alive. Pipeline clean. PRIME: ratio=20.35 (systemic_fixes=81, vp=36); iter_clean appended. Tier 1 (consecutive_clean=0). **ACTIVE G-rules:** sentinel-inflight-stall-tier4 [VP, PR #854 OPEN]; build-sequence-advancer-sequence-complete-tier4-001 [2/3]; forge-marker-task-id-mismatch-xii-v1 [2/3]; outbox-notifier-merge-held-deep-review-tier4-001 [1/3]; mirror-malformed-verdict-heal-reap-path-001 [1/3]; forge-wip-redispatch-exhausted-genuine-no-pr-001 [1/3]; heal-undispatched-pr-review-claimed-race-fp-001 [1/3]; heal-unregistered-approval-null-chat-id-001 [1/3]; ourliberty-health-subject-key-mismatch-001 [3/3, vp]; forge-revision-preamble-missing-pr711-001 [VP]; unreviewed-merge-larry-authored-pr-001 [13+]; forge-wip-redispatch-digest-tier4-001 [vp]; notifier-concurrent-scan-dup (PR #847 HELD).
+**Iter ~4869 summary (2026-07-10T04:38Z):** 2 new alerts (L978 Tier-4 delivery-conf, L979 Tier-3 dashboard-api-sha-drift healed). Watermark=979. PR #904 HELD_DEEP_REVIEW (needs `/code-review high`). Dashboard-api auto-healed SHA drift (b3a16ac6→9d2a9cea). Repo clean (HEAD=9d2a9cea=origin/main). pending=1 `unreg-approval-f5079f4c5369` (chat_id=None — carry; Larry notified 04:10:20Z iter ~4865). Check I fires today at 14:10:53Z UTC (~9.5h). All daemons alive. Pipeline clean. PRIME: ratio=~20.35 (systemic_fixes=81, vp=36); 1 intervention appended. Tier 1 (consecutive_clean=0). **ACTIVE G-rules:** sentinel-inflight-stall-tier4 [VP, PR #854 OPEN]; build-sequence-advancer-sequence-complete-tier4-001 [2/3]; forge-marker-task-id-mismatch-xii-v1 [2/3]; outbox-notifier-merge-held-deep-review-tier4-001 [2/3]; mirror-malformed-verdict-heal-reap-path-001 [1/3]; forge-wip-redispatch-exhausted-genuine-no-pr-001 [1/3]; heal-undispatched-pr-review-claimed-race-fp-001 [1/3]; heal-unregistered-approval-null-chat-id-001 [1/3]; ourliberty-health-subject-key-mismatch-001 [3/3, vp]; forge-revision-preamble-missing-pr711-001 [VP]; unreviewed-merge-larry-authored-pr-001 [13+]; forge-wip-redispatch-digest-tier4-001 [vp]; notifier-concurrent-scan-dup (PR #847 HELD).
 
 
