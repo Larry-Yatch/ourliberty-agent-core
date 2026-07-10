@@ -222,6 +222,18 @@ KNOWN_EVENT_TYPES: frozenset[str] = frozenset({
     # shipper never produces these rows; listing the type here admits it to the
     # weekly chain-event-type audit (heal_chain_event_type_audit.py).
     'sequence_needs_you',
+    # spec-gauntlet (agents/beacon/specs/spec-gauntlet-gate.md §3.5): the
+    # antagonistic spec-review gate push-emits ONE of these per gauntlet round
+    # (agent='spec-review-runner', task_id=<spec task_id>) carrying
+    # {round, blocking_count, advisory_count, resolved_count, lens_verdicts,
+    # duration_s}, with per-round id_extra dedup. Registered here in the
+    # foundations slice BEFORE the runner ships: emit_event silently drops any
+    # unregistered type, which would void the gate's entire visibility surface
+    # (§3.5) — so the type must be admitted the moment the runner starts
+    # emitting. The shipper never produces these rows; listing the type here
+    # also admits it to the weekly chain-event-type audit
+    # (heal_chain_event_type_audit.py).
+    'spec_review_round',
 })
 
 # PII / credential redaction. Any payload field key matching one of these

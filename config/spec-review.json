@@ -1,0 +1,13 @@
+{
+    "_doc": "Repo defaults for the antagonistic spec-review gate ('spec gauntlet'). See agents/beacon/specs/spec-gauntlet-gate.md. This is the git-tracked baseline; a live override at ~/agents/spec-review.override.json (OUTSIDE the synced config/ tree so ourliberty-sync never clobbers it) wins over both this repo copy and the synced runtime snapshot. Resolution mirrors trust-policy exactly (override -> runtime -> repo) and is read FRESH on every intercept() call — no module-level cache — so flipping `enabled` in the override takes effect on the next spec with zero daemon restarts. See scripts/spec_review_config.py for the loader.",
+    "version": 1,
+    "enabled": false,
+    "max_rounds": 2,
+    "per_step_ceiling_s": 900,
+    "wall_clock_ceiling_s": 4500,
+    "gated_sites": [
+        "bot_chat",
+        "replan",
+        "pulse_auto_dispatch"
+    ]
+}
