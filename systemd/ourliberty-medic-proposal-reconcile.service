@@ -1,0 +1,40 @@
+[Unit]
+Description=Medic proposes not-graduated fixes to the board + self-retracts (operator slice 9)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/medic_proposal_reconcile.py
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+WorkingDirectory=/home/larry/agent-core
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+# Wrapper handles concurrency lock + EMERGENCY_HALT gate + logging.
+ExecStart=/usr/bin/bash /home/larry/agent-core/scripts/run_medic_proposal_reconcile.sh
+
+# A pass reads the medic ledger and emits/retracts captures over HTTP — seconds,
+# no claude spawn. Bound at 5m so a hung network call dies well before the next
+# 15-min tick rather than piling up.
+TimeoutStartSec=300
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-medic-proposal-reconcile
+
+# Hardening. No claude CLI here, so ~/.claude is NOT writable; the pass only
+# reads the ingest token (~/.config, read-only under ProtectHome) and the medic
+# ledger, and writes its dedup state + log under ~/agents.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/larry/agents /tmp
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+Nice=10

@@ -258,6 +258,13 @@ def load_parked_captures(now: datetime,
     return out
 
 
+# A machine capture's `label` -> the native provenance enum it should badge as
+# (slice 9). Medic proposes not-graduated fixes with label 'medic-proposal'; the
+# card must read as 'medic', not the generic agent-origin 'beacon'. derive_source
+# passes a native `source` through, so stamping it here is enough.
+_LABEL_SOURCE = {'medic-proposal': SOURCE_MEDIC}
+
+
 def capture_to_card(cap: dict) -> dict:
     """Normalize a capture into the mission-shaped card score_card consumes,
     carrying `kind` (dashboard routing) + `prebrief` (the authored briefing to
@@ -273,6 +280,9 @@ def capture_to_card(cap: dict) -> dict:
         'origin': origin,
         'kind': 'capture',
         'prebrief': briefing if _valid_briefing(briefing) else None,
+        # slice 9: a machine label (e.g. medic-proposal) badges natively.
+        **({'source': _LABEL_SOURCE[cap.get('label')]}
+           if cap.get('label') in _LABEL_SOURCE else {}),
     }
 
 

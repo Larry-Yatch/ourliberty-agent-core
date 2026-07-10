@@ -5559,7 +5559,13 @@ CAPTURE_ALLOWED_SOURCES = ('desktop-chat', 'telegram', 'agent')
 # lane. Same threat model as the source pin: a leaked ingest token may only
 # write KNOWN labels. V1 member: 'pulse-check-i'; a new label is one tuple
 # entry, no schema change.
-CAPTURE_ALLOWED_LABELS = ('pulse-check-i',)
+CAPTURE_ALLOWED_LABELS = ('pulse-check-i', 'medic-proposal')
+# Labels a MACHINE may auto-retract via the narrow ingest token (slice 9 —
+# Medic proposes not-graduated fixes to the board, then self-retracts when the
+# condition clears). Strict subset of the labels above: the ingest token must
+# NEVER be able to drop a human capture (desktop-chat / telegram, label=None) —
+# only cards a machine emitted and owns. A leaked token can retract only these.
+CAPTURE_MACHINE_RETRACTABLE_LABELS = ('medic-proposal',)
 # captures.json registry schema. v2 adds the optional first-class `label`
 # field on each capture record; v1 records read back as label-absent (→ None).
 CAPTURES_SCHEMA_VERSION = 2
@@ -6206,6 +6212,50 @@ def _handle_capture_promote(
         'status': 'promoted',
         'applied': True,
     }
+
+
+def _handle_capture_retract(
+    *,
+    capture_id: str,
+    captures_path: Path,
+    reason: Optional[str] = None,
+    now: Optional[datetime] = None,
+) -> dict[str, Any]:
+    """Slice 9 — the agent-callable, ingest-token twin of the dashboard `drop`.
+    A machine (Medic) that emitted a proposal capture retracts it when its
+    condition clears. Sets `state: dropped` (+ `drop_reason`) through the SAME
+    single captures.json writer as `drop`; heal_missions_card_gc version-controls
+    the delta.
+
+    Guarded to be SAFE under the narrow ingest token, which a machine holds:
+      * Retracts ONLY a card whose `label` is machine-retractable
+        (CAPTURE_MACHINE_RETRACTABLE_LABELS) — NEVER a human capture
+        (desktop-chat / telegram, label=None) even if the id matches.
+      * Retracts ONLY a still-`parked` card — a promoted/spawned/dropped card is
+        left untouched (Larry already acted on it).
+    Idempotent + fail-soft: a missing/GC'd card, a non-machine label, or a
+    non-parked state all return `retracted: False` with a reason rather than
+    raising, so a reconciler loop never crashes on a card that moved on."""
+    del now  # signature parity with _handle_capture_drop; unused here
+    with _CAPTURE_INGEST_LOCK:
+        registry = _read_captures_registry(captures_path)
+        cap = next(
+            (c for c in registry.get('captures') or []
+             if isinstance(c, dict) and c.get('id') == capture_id),
+            None,
+        )
+        if cap is None:
+            return {'retracted': False, 'reason': 'not-found'}
+        if cap.get('label') not in CAPTURE_MACHINE_RETRACTABLE_LABELS:
+            # Never let the ingest token drop a card a machine does not own.
+            return {'retracted': False, 'reason': 'not-machine-retractable'}
+        if cap.get('state') != 'parked':
+            return {'retracted': False, 'reason': 'not-parked'}
+        cap['state'] = 'dropped'
+        cap['drop_reason'] = f'auto-retract: {reason}' if reason else 'auto-retract'
+        registry['schema_version'] = CAPTURES_SCHEMA_VERSION
+        _atomic_write_captures(captures_path, registry)
+    return {'retracted': True, 'capture_id': capture_id, 'state': 'dropped'}
 
 
 def _handle_capture_drop(
@@ -10556,6 +10606,43 @@ def post_desktop_session_ingest(
         # just signals "not persisted" to anyone watching.
         response.status_code = status.HTTP_502_BAD_GATEWAY
     return result
+
+
+class CaptureRetractRequest(BaseModel):
+    # POST /api/ingest/capture/{id}/retract body (slice 9). Optional free-text
+    # reason recorded as the drop_reason for the audit trail.
+    reason: Optional[str] = None
+
+
+class CaptureRetractResponse(BaseModel):
+    # `retracted` False (with a reason) on a card that moved on / a machine does
+    # not own — never an error, so a reconciler loop is idempotent + fail-soft.
+    retracted: bool
+    reason: Optional[str] = None
+    capture_id: Optional[str] = None
+    state: Optional[str] = None
+
+
+# POST /api/ingest/capture/{capture_id}/retract — slice 9. The agent-callable
+# retract for a machine-owned proposal capture (Medic self-retract). Same narrow
+# X-Ingest-Token as emit; guarded server-side to machine-retractable, still-parked
+# cards only (a leaked token can neither drop a human capture nor a card Larry
+# already acted on). No PR — the GC healer commits the state=dropped delta.
+@app.post(
+    '/api/ingest/capture/{capture_id}/retract',
+    response_model=CaptureRetractResponse,
+    response_model_exclude_none=True,
+    dependencies=[Depends(_require_ingest_token)],
+)
+def post_capture_retract(
+    capture_id: str,
+    body: Optional[CaptureRetractRequest] = None,
+) -> dict[str, Any]:
+    return _handle_capture_retract(
+        capture_id=capture_id,
+        reason=body.reason if body else None,
+        captures_path=_captures_json_path(),
+    )
 
 
 # POST /api/ingest/capture — durable one-gesture capture. Same X-Ingest-Token
