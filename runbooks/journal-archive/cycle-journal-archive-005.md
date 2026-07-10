@@ -19654,3 +19654,76 @@ NOMINAL ✅
 
 ---
 
+## Iteration ~4984 -- 2026-07-10T19:21Z UTC (Larry /cycle, Tier 1)
+
+**Health:** Nominal -- watermark rotation-gap auto-repaired (compaction 938->936); 0 new alerts post-repair; all mandatory + additive checks nominal; carries updated (pending=0, PR 912 new).
+
+**VERIFY-BEFORE-REASSERT (from iter ~4983):**
+- beacon PID 2862981: CONFIRMED -- Ss, 01:08:34 elapsed. Active. [alive]
+- outbox-notifier PID 2863277: CONFIRMED -- Ss, 01:08:29 elapsed. Last log 13:19:25 MDT = 19:19:25Z UTC -- RECONCILE_MISSING_REVIEW (self-remediated, re-dispatched review for PR 912). [alive]
+- inbox_watcher PID 2932566: CONFIRMED -- Ssl, 16:47 elapsed. Stable. [alive]
+- zombie PID 1834248 (~43d): CONFIRMED -- Ss, 43-00:00:20 elapsed. bash poll loop for build-check-viii-pr-2b-analyzer-001.json in forge .archive/; target absent. [carry, now 43d]
+- pending=2 (heal-undispatched + rebase-pr909): UPDATED -> pending=0. Both approvals processed. PR 912 built and Mirror review dispatched. [carry resolved]
+- PR 909 CONFLICTING: CONFIRMED -- state=OPEN, mergeable=CONFLICTING/DIRTY. Needs rebase (approval delivered to Larry). [carry]
+- Check I artifact check-i-2026-07-10.json: CONFIRMED -- exists; already triaged in iter ~4983 (1 proposal, dm_route=None). [carry resolved]
+- Check XI 8/64 drifted: CONFIRMED -- artifact check-xi-20260710T102121 still latest. [carry]
+- 401/504 GH token issue: UPDATED -> last WARN at 19:19:25Z was RECONCILE_MISSING_REVIEW, not 401/504. Post-restart token appears healthy. [tentatively resolved]
+
+**NEW FINDINGS:** 1 (auto-handled).
+
+**Check 0 -- Alert triage:**
+- repair-watermark: repaired=true, old_watermark=938, file_length=936, new_watermark=936. Rotation-gap auto-repair fired (compaction removed 2 lines). Journal note per spec. No tier-reset.
+- 0 new alerts (watermark=936 = file_length=936). NOMINAL
+
+**Check 1 -- Log noise:** outbox-notifier PID 2863277 alive. Last log 13:19:25 MDT (19:19:25Z UTC): RECONCILE_MISSING_REVIEW task=heal-undispatched-pr-review-claimed-check-001 pr=912 -- self-remediated (re-dispatched review). No persistent WARN/ERROR. No 401/504 in tail (post-restart token healthy). NOMINAL
+
+**Check 2 -- Telegram sweep:** Beacon PID 2862981. Last bot log: idx=937 at 13:00:39 MDT (19:00:39Z UTC) -- wedged-review-reaped:wt-mirror-pr-ourliberty-agent-core-911. No new entries, no Larry directives. NOMINAL
+
+**Check 3 -- Pipeline stall:** DRY-RUN 19:19:14Z UTC -> 0 alerts, 0 recoveries. (3x FORGE_NO_PR_SKIP reason=pr_exists; 1x MIRROR_PASS_UNMERGED_SKIP for sentinel-stale-lease-tier3-silence-001 PR 909 in cooldown.) NOMINAL
+
+**Check 4 -- Pending directives:** pending=0. heal-undispatched-pr-review-claimed-check-001 approved -> PR 912 built + Mirror reviewing. rebase-pr909-sentinel-stale-lease-001 approved -> Larry to rebase PR 909. NOMINAL
+
+**Check 5 -- Stale daemon code:** heartbeat=2026-07-10T19:10:29Z UTC (~11min, <60min). NOMINAL
+
+**Check A -- Source repo:** HEAD=210c0560=origin/main. Branch main. Clean tree. NOMINAL
+**Check B -- Sync health:** last_sync=2026-07-10T19:16:16Z UTC (~5min ago), status=no-change. NOMINAL
+**Check C -- Agent liveness:** beacon PID 2862981; outbox_notifier PID 2863277 (post-restart healthy); inbox_watcher PID 2932566. Zombie PID 1834248 (43d) [carry]. NOMINAL
+
+**5.0:** distill_detector: no-op. audit_due_nudge: no-op.
+
+**Conditional checks -- UTC Friday 2026-07-10:**
+- Check I: Artifact check-i-2026-07-10.json exists (triaged iter ~4983: 1 proposal, dm_route=None). No new action.
+- Check XI: 8/64 drifted (12.5%, gate=10%). No new artifact (next fire 2026-07-11). [yellow, carry]
+- Check III: Sunday gate. Skip.
+- Check IV/VIII/IX/X/XII/XIV: Monday gate. Skip.
+
+**G-rule assessment:** No new occurrences this iter. PR 912 Mirror-reviewing (heal-undispatched-pr-review-claimed-race-fp-001 fix, vp). All other counts unchanged from iter ~4983.
+
+**Actions taken:**
+1. Check 0: rotation-gap auto-repair (938->936). Journal note logged.
+2. Check 0: 0 new alerts. Watermark=936 (unchanged post-repair).
+3. 5.0: distill_detector + audit_due_nudge no-ops.
+4. PRIME ledger: iter_clean appended (19:21:30Z UTC, template=nominal).
+5. Tier state: record --checks-clean false -> Tier 1, consecutive_clean=0 (carries: zombie, PR 909 conflict, Check XI drift).
+
+**Escalations:** 0 new Pulse DMs this iter.
+
+**Standing findings (carry -- updated from iter ~4983):**
+- [yellow] zombie-bash-pid-1834248 -- PID 1834248 (43d+, bash poll loop for build-check-viii-pr-2b-analyzer-001.json; target absent). ask-then-do: kill 1834248. [carry]
+- [yellow] PR 909 CONFLICTING -- DIRTY/CONFLICTING; needs rebase. Approval delivered to Larry (iter ~4983). [carry]
+- [yellow] check-xi-drift-over-gate -- 8/64 drifted (12.5%, gate=10%) on 2026-07-10. [carry, next fire 2026-07-11]
+- [yellow] check-vi-posture-proposals-2026-07-07 -- idx=990. Awaiting approve check-vi-update-2026-07-07. [carry]
+- [yellow] check-viii-deprecate-token-gate-2026-07-07 -- idx=991. Awaiting approval. [carry]
+- [blue] PR 912 -- OPEN/CLEAN; Mirror reviewing heal-undispatched-pr-review-claimed-check-001 fix. [new this iter]
+- [blue] PR 904 -- HELD_DEEP_REVIEW; needs /code-review high. [carry]
+- [blue] PR 854 -- HELD (session-less). [carry]
+- [blue] PR 847 -- HELD_DEEP_REVIEW (blocker for 874, 904 fanout). [carry]
+- [blue] PR 860 -- spec XIV-b; open. [carry]
+- [blue] G-rules (dispatched, vp): sentinel-inflight-stall-tier4 (PR 854); notifier-concurrent-scan-dup (PR 847); ourliberty-health-subject-key-mismatch-001; forge-wip-redispatch-digest-tier4-001; no-session-revision-active-mirror-session-fp-001; forge-revision-preamble-missing-pr711-001; forge-wip-redispatch-exhausted-pr-exists-fp-001; decision-needed-approval-forge-dispatch-no-target-repo-001. [carry]
+- [blue] G-rule 2/3: forge-marker-task-id-mismatch-xii-v1; build-sequence-advancer-sequence-complete-tier4-001; outbox-notifier-merge-held-deep-review-tier4-001; main-suite-guardian-skip-no-heartbeat-001. [carry]
+- [blue] G-rule 1/3: mirror-malformed-verdict-heal-reap-path-001; forge-wip-redispatch-exhausted-genuine-no-pr-001; heal-undispatched-pr-review-claimed-race-fp-001 [DISPATCHED 3/3, vp via PR 912]; heal-unregistered-approval-null-chat-id-001; sentinel-stale-lease-tier4-001 [DISPATCHED]; mirror-queue-wait-gauge-tier4-001; outbox-notifier-merge-conflict-manual-rebase-tier4-001; inbox-watcher-tier-pool-all-unavailable-tier4-001. [carry]
+
+**PRIME DIRECTIVE:** iter_clean appended (19:21:30Z UTC). Ratio trend: worsening.
+**Tier end-of-iter:** Tier **1** (consecutive_clean=0; carries: zombie, PR 909 conflict, Check XI drift).
+
+---
