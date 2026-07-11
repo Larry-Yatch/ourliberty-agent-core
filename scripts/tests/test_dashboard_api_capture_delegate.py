@@ -301,6 +301,37 @@ class DedupTest(_DelegateTestBase):
         filenames = {c['filename'] for c in self.inbox.calls}
         self.assertEqual(filenames, {'delegate-cap-1.json', 'delegate-cap-2.json'})
 
+    def test_consumed_proposal_short_circuits_to_already_delegated(self):
+        # Durable idempotency (2026-07-11 revert class): the live-inbox dedup
+        # window is only minutes — once Beacon consumed the proposal, a re-POST
+        # used to dispatch a fresh paid run. The standing spawned ref now
+        # short-circuits to the prior outcome.
+        self._seed(_cap('cap-1', spawned={
+            'kind': 'delegate',
+            'task_id': 'delegate-cap-1',
+            'stamped_at': '2026-07-09T20:05:00+00:00',
+        }))
+        r = self.client.post(_endpoint('cap-1'), headers=AUTH, json={})
+        self.assertEqual(r.status_code, 200, r.text)
+        body = r.json()
+        self.assertTrue(body['dispatched'])
+        self.assertTrue(body['already_delegated'])
+        self.assertEqual(body['delegated_at'], '2026-07-09T20:05:00+00:00')
+        self.assertEqual(self.inbox.calls, [])  # NO new proposal, no LLM spend
+
+    def test_force_redelegates_past_standing_ref(self):
+        self._seed(_cap('cap-1', spawned={
+            'kind': 'delegate',
+            'task_id': 'delegate-cap-1',
+            'stamped_at': '2026-07-09T20:05:00+00:00',
+        }))
+        r = self.client.post(_endpoint('cap-1'), headers=AUTH,
+                             json={'force': True})
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertTrue(r.json()['dispatched'])
+        self.assertNotIn('already_delegated', r.json())
+        self.assertEqual(len(self.inbox.calls), 1)  # fresh proposal written
+
 
 if __name__ == '__main__':
     unittest.main()

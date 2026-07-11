@@ -7977,6 +7977,61 @@ class BeaconBoardDelegateTest(unittest.TestCase):
         self.assertEqual(len(pending), 1)
         self.assertEqual(pending[0]['chat_id'], 12345)
 
+    # ----- delegate no-outcome backstop (2026-07-11 revert report) -----
+    # A `delegate-*` envelope whose Beacon run produced NO durable outcome must
+    # surface Beacon's verdict to Larry instead of dying in archived-no-notify.
+
+    def _no_outcome_alerts(self):
+        return [a for a in self._read_alerts()
+                if a.get('source') == 'outbox-notifier' and a.get('needs_larry')]
+
+    def test_no_marker_delegate_surfaces_needs_you_alert(self):
+        body = self._delegate_outbox(
+            marker_text='',
+            narrative_prefix=(
+                'Scoped it. Already fixed two weeks ago — dismiss the card.'),
+        )
+        f = self._write_outbox('beacon', 'beacon-bd-noout.json', body)
+        on.process_outbox(f)
+        alerts = self._no_outcome_alerts()
+        self.assertEqual(len(alerts), 1)
+        rec = alerts[0]
+        self.assertEqual(rec['route'], 'escalate')
+        self.assertEqual(
+            rec['subject'], 'delegate-cap-projects-pm-layer-data-is-stale')
+        # The message names the card and carries Beacon's verdict.
+        self.assertIn('cap-projects-pm-layer-data-is-stale', rec['message'])
+        self.assertIn('Already fixed two weeks ago', rec['message'])
+
+    def test_malformed_marker_delegate_surfaces_alert(self):
+        bad_payload = json.dumps({'task_id': 'x'})  # missing required fields
+        bad_marker = (
+            f'=== APPROVAL_REQUEST ===\n{bad_payload}\n'
+            f'=== END_APPROVAL_REQUEST ==='
+        )
+        body = self._delegate_outbox(marker_text=bad_marker)
+        f = self._write_outbox('beacon', 'beacon-bd-badout.json', body)
+        on.process_outbox(f)
+        self.assertEqual(len(self._no_outcome_alerts()), 1)
+
+    def test_no_marker_non_delegate_dashboard_stays_silent(self):
+        # The backstop is scoped to delegate-* envelopes; other dashboard
+        # results (card messages etc.) keep the silent fall-through.
+        body = self._delegate_outbox(
+            marker_text='', envelope_task_id='card-message-cap-something')
+        f = self._write_outbox('beacon', 'beacon-bd-cardmsg.json', body)
+        on.process_outbox(f)
+        self.assertEqual(self._no_outcome_alerts(), [])
+
+    def test_marker_present_no_backstop_alert(self):
+        # A durable outcome (force_ask pending approval) means no backstop —
+        # the approval flow already reaches Larry.
+        body = self._delegate_outbox()
+        f = self._write_outbox('beacon', 'beacon-bd-withmarker.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-board-delegate')
+        self.assertEqual(self._no_outcome_alerts(), [])
+
 
 # -------------------- D3.5 5c-followup-2 (audit C-1 + C-2 + Miss #3) --------------------
 

@@ -510,6 +510,25 @@ class ReconcileMissionPhasesTest(unittest.TestCase):
         self.assertEqual(by_id['m-shipped']['phase'], 'in_flight')
         self.assertNotIn('shipped_at', by_id['m-shipped'])
 
+    def test_delegated_proposed_mission_is_not_reconciled(self):
+        # PIN (delegate-tracking): a proposed mission delegated via the
+        # dashboard now carries a `spawned` delegate ref, but `proposed` stays
+        # outside RECONCILABLE_MISSION_PHASES, so the GC never flips it — even
+        # when the delegated work's PR has merged. "Done" for a delegated
+        # mission card is a KNOWN GAP: it must come from a spawned-aware
+        # completion pass (the capture S3 classify_completion analogue),
+        # not from this reconcile. This test documents that boundary so the
+        # gap-closing slice changes it deliberately, not by accident.
+        reg = {'schema_version': 1, 'missions': [{
+            'id': 'm-delegated', 'phase': 'proposed', 'task_ids': [],
+            'spawned': {'kind': 'delegate', 'task_id': 'delegate-m-delegated',
+                        'stamped_at': '2026-07-11T17:00:00+00:00'},
+        }]}
+        res = h.reconcile_mission_phases(
+            reg, self._now(), probe_fn=lambda tid: h.tts.MERGED, dry_run=False)
+        self.assertEqual(res.shipped, [])
+        self.assertEqual(reg['missions'][0]['phase'], 'proposed')
+
     def test_review_id_does_not_block_ship_and_is_not_probed(self):
         # A reconcilable mission whose only non-terminal id is review-shaped
         # ships once its PR-backed id is terminal — and the review id is never

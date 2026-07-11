@@ -11566,6 +11566,46 @@ def _primary_chat_id() -> Optional[int]:
     return min(ids) if ids else None
 
 
+def _alert_dashboard_delegate_no_outcome(data: dict[str, Any]) -> None:
+    """Delegate-tracking backstop (2026-07-11 revert report): a dashboard
+    Delegate envelope (`delegate-<card_id>`) whose Beacon run concluded WITHOUT
+    a durable outcome — no APPROVAL_REQUEST marker (a prose verdict like
+    "already fixed, dismiss the card"), a malformed marker, or a timed-out /
+    forfeited run. The beacon+source='dashboard' branch is the only
+    APPROVAL_REQUEST producer with no marker-error cascade, so before this
+    alert the paid answer to Larry's explicit click fell through to the
+    dashboard dead-end (`archived-no-notify`) and the card silently looked
+    un-delegated. Surface Beacon's verdict where Larry decides: needs-you feed
+    (needs_larry=True) + DM (route='escalate') — this is the direct answer to
+    an operator action, not healer toil. Cooldown keys on the envelope task_id
+    so a re-processed outbox can't double-DM. Fire-and-forget — never raises."""
+    task_id = str(data.get('task_id') or '')
+    card_id = task_id[len('delegate-'):] or task_id
+    snippet = ' '.join(str(data.get('result') or '(no result text)').split())
+    if len(snippet) > 400:
+        snippet = snippet[:400] + '…'
+    try:
+        larry_alerts.append_alert(
+            source='outbox-notifier',
+            severity='info',
+            route='escalate',
+            needs_larry=True,
+            subject=task_id,
+            task_id=task_id,
+            message=(
+                f'Your "Delegate to team" on card `{card_id}` ended without a '
+                'dispatch or approval — nothing was handed to the team. '
+                f"Beacon's verdict: {snippet}"
+            ),
+        )
+    except Exception as e:  # noqa: BLE001 — surfacing must never break routing
+        log(
+            f'delegate no-outcome alert failed for {task_id}: '
+            f'{type(e).__name__}: {e}',
+            'WARN',
+        )
+
+
 def _route_beacon_pulse_auto_dispatch_approval(
     data: dict[str, Any],
     *,
@@ -13037,7 +13077,11 @@ def process_outbox(outbox_file: Path) -> str:
     #     whose task_id legitimately differs from the `delegate-{capture_id}`
     #     envelope task_id (mirrors the direction-ask + headless paths).
     # A markerless / non-Forge dashboard result returns False and falls through
-    # to default routing unchanged.
+    # to default routing unchanged — except that a declined `delegate-*`
+    # envelope first surfaces Beacon's verdict to Larry (see
+    # _alert_dashboard_delegate_no_outcome): for dashboard-source the default
+    # route dead-ends at archived-no-notify, which silently ate "already
+    # done, dismiss the card" answers (2026-07-11 revert report).
     if agent == 'beacon' and source == 'dashboard':
         if _route_beacon_pulse_auto_dispatch_approval(
             data,
@@ -13047,6 +13091,8 @@ def process_outbox(outbox_file: Path) -> str:
         ):
             _archive_outbox(outbox_file)
             return 'notified-board-delegate'
+        if str(data.get('task_id') or '').startswith('delegate-'):
+            _alert_dashboard_delegate_no_outcome(data)
 
     # Task #17 (2026-05-19) — headless Beacon APPROVAL_REQUEST handler.
     # When Claude in a Larry-session drops a dispatch envelope into Beacon's
