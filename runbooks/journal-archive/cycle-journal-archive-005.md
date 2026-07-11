@@ -29021,3 +29021,75 @@ Watermark advanced 1026→1027. ⚠️ G-rule vp recurrence (4th)
 ---
 
 
+## Iteration ~5063 — 2026-07-11T09:09Z UTC (Larry /cycle, Tier 1)
+
+**Health:** ✅ Positive net. PR #924 MERGED (G-rule RECONCILE_MISSING_REVIEW VERIFIED ✅); pending approvals cleared to 0; sync self-healed; agents restarted cleanly with new code. Watermark auto-repair fired (1027→1026; suppression logged). Carry: zombie PID 1834248 only.
+
+**VERIFY-BEFORE-REASSERT (from iter ~5062):**
+- **"PR #924 HELD pending approval deep-review-hold-pr924-eeadc669"**: SUPERSEDED — PR #924 MERGED at 2026-07-11T08:59:37Z UTC (98f0a140). ✅
+- **"zombie PID 1834248 (43d+13h+37m)"**: CONFIRMED ✅ — stat=Ss, 43d+13h+47m (bash poll loop awaiting `/home/larry/agents/outboxes/forge/.archive/build-check-viii-pr-2b-analyzer-001.json`). [carry]
+- **"beacon PID 3888347"**: SUPERSEDED — restarted with new PID 3965718 (at 02:59 MDT = 08:59 UTC after PR #924 deploy). ✅
+- **"outbox-notifier PID 3891045"**: SUPERSEDED — restarted with new PID 3965731 (at 02:59 MDT = 08:59 UTC). deep-review-hold cleared at 02:59:46 MDT; Forge build dispatched at 03:03:52 MDT. ✅
+- **"inbox_watcher PID 3940207"**: CONFIRMED ✅ — Ssl, 01:04:38 elapsed. [carry]
+- **"HEAD=a0ec5f50=origin/main"**: SUPERSEDED — HEAD=98f0a140=origin/main (PR #924 merge commit). ✅
+- **"pending=2 approvals"**: SUPERSEDED — pending=0. Both cleared. ✅
+- **"Check B sync error 08:02:30Z"**: SUPERSEDED — last_sync=08:59:43Z status=success. Self-healed. ✅
+
+**Check 0 — Alert triage:** `repair-watermark {"repaired": true, "old_watermark": 1027, "file_length": 1026, "new_watermark": 1026}` — watermark-rotation-gap auto-repaired (1027→1026). Suppression entry appended to `~/agents/state/pulse-fixture-suppressions.jsonl`. First occurrence of this event type. No new alerts past repaired watermark. NOMINAL ✅
+
+**Check 1 — Log noise:** outbox-notifier PID 3965731 ✅ (fresh restart at 08:59 UTC). Last log entry 03:03:52 MDT (09:03:52 UTC) — COST_BUDGET + build-phase dispatch for heal-undispatched-pr-review-canonical-task-id-001. No WARNs or ERRORs since restart. NOMINAL ✅
+
+**Check 2 — Telegram sweep:** beacon_telegram_bot.py PID 3965718 ✅ (fresh restart at 08:59 UTC, elapsed 02:59 elapsed). Last bot log entry 02:45:00 MDT (from prior session, pre-restart). No unhandled Larry directives since "Yes draft the fix." (01:09:13 MDT, actioned in prior iters). NOMINAL ✅
+
+**Check 3 — Pipeline stall:** DRY-RUN (09:06:42Z UTC) → "no stalls detected." FORGE_NO_PR_SKIP valid for all known tasks including reconcile-claimed-check-001 (pr_exists match=branch pr=#924, now MERGED). NOMINAL ✅
+
+**Check 4 — Pending directives:** pending=0. Both prior carries resolved:
+- [0] deep-review-hold-pr924-eeadc669: resolved at 02:59:46 MDT (PR #924 no longer OPEN). ✅
+- [1] heal-undispatched-pr-review-canonical-task-id-001: Forge build dispatched at 03:03:52 MDT (approval actioned). ✅
+NOMINAL ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-11T08:59:54Z (~9 min at check; cadence=10 min). Within cadence. NOMINAL ✅
+
+**Check A — Source repo:** HEAD=98f0a140=origin/main ✅; clean tree ✅; on main ✅; 0 commits behind. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-11T08:59:43Z, status=success, commit=98f0a140. Self-healed. NOMINAL ✅
+**Check C — Agent liveness:** beacon PID 3965718 ✅ (new); outbox-notifier PID 3965731 ✅ (new); inbox_watcher PID 3940207 ✅. ⚠️ Zombie PID 1834248 (43d+13h+47m, bash poll loop). [carry]
+**Check E — PR/merge state:**
+- PR #924 MERGED 2026-07-11T08:59:37Z UTC (98f0a140) — reconcile-claimed-check-001 fix live. ✅
+- PR #860 [OPEN, UNKNOWN] spec XIV-b — no labels; carry.
+
+**§5.0:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅.
+
+**Conditional checks — UTC Saturday 2026-07-11 (~09:09Z):**
+- Check I: Not a firing day (Sat). Latest artifact: check-i-2026-07-10.json. ✅
+- Check XI: Timer fires ~10:21Z today (~1h12m). Latest artifact: check-xi-20260710T102121Z (attention_rate=0.125, gate=0.1, over_gate=true). No new artifact yet. [yellow carry]
+- Check III/IV/VIII/IX/X/XII/XIV: Sunday/Monday gates. Skip. ✅
+
+**G-rule assessment:**
+- **RECONCILE_MISSING_REVIEW-.claimed-blindspot → VERIFIED ✅** (iter ~5063): PR #924 merged 98f0a140 at 08:59:37Z UTC. Both code fix (PR #924: count .claimed/ reviews as already-dispatched in `_review_request_already_dispatched`) + healer (PR #928: `sweep_claimed_orphans()` + round-aware `claim_concluded()`) now fully live. Moving to Completed G-rules in MEMORY.md.
+- **forge-marker-task-id-mismatch-xii-v1**: Forge build now IN PROGRESS (build-heal-undispatched-pr-review-canonical-task-id-001.json dispatched 09:03:52 UTC). Pending Forge PR + Mirror review. [vp]
+- All other G-rule counts carry from iter ~5062.
+
+**Actions taken:**
+1. Check 0 watermark-rotation-gap suppression: appended `{"event": "watermark-rotation-gap-suppressed", "old_watermark": 1027, "new_watermark": 1026, "ts": "2026-07-11T09:09Z"}` to `~/agents/state/pulse-fixture-suppressions.jsonl`. ✅
+2. PRIME ledger: `systemic_fix` appended (09:09:19Z UTC, tier=1, template=reconcile-claimed-check-001). PR #924 verification. ✅
+3. Tier state: `record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=09:09:26Z UTC. ✅
+
+**Escalations:** 0 new DMs to Larry. PR #924 merge is positive news — no escalation needed. All outstanding carries already DM'd in prior iters.
+
+**Standing findings (carry):**
+- [yellow] **zombie-bash-pid-1834248** — 43d+13h+47m, bash poll loop awaiting absent archive file. ask-then-do: `kill 1834248`. [carry]
+- [yellow] **check-xi-drift-over-gate** — 8/64 (12.5%, gate=10%) on 2026-07-10. Check XI fires ~10:21Z today. [carry]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07`. [carry]
+- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
+- [blue] **PR #860** — spec XIV-b. [carry]
+- [blue] **Check I proposal #1** — `notify-p3a-retro-prep` ($1.91 vs $0.28 baseline, 98σ). Use `/dispatch 1`. [carry]
+- [blue] **forge-marker-task-id-mismatch-xii-v1** — Forge building heal-undispatched-pr-review-canonical-task-id-001; pending PR + Mirror review. [vp]
+- [blue] **G-rules (dispatched, vp):** ourliberty-health-subject-key-mismatch-001 [3/3, vp]; forge-revision-preamble-missing-pr711-001 [vp]; forge-wip-redispatch-digest-tier4-001 [vp]; forge-wip-redispatch-exhausted-pr-exists-fp-001 [APPROVAL_REQUEST QUEUED iter ~3279, vp]; decision-needed-approval-forge-dispatch-no-target-repo-001 [vp]; no-session-revision-active-mirror-session-fp-001 [vp].
+- [blue] **G-rule 2/3:** outbox-notifier-merge-conflict-manual-rebase-tier4-001; forge-wip-redispatch-exhausted-genuine-no-pr-001; outbox-notifier-notification-intent-review-escalate-tier4-001; outbox-notifier-auto-merge-stale-revalidation-tier4-001.
+- [blue] **G-rule 1/3:** mirror-malformed-verdict-heal-reap-path-001; heal-unregistered-approval-null-chat-id-001; mirror-queue-wait-gauge-tier4-001; inbox-watcher-tier-pool-all-unavailable-tier4-001; heal-pipeline-stall-unrouted-deep-review-required-fp-001; heal-pulse-check-staleness-single-flight-skip-fp-001; gate-parallelism-monitor-regression-data-001; pulse-rotation-check-source-tier4-001; watermark-rotation-gap [1/3 new this iter].
+
+**PRIME DIRECTIVE:** 0 new interventions; 1 new systemic_fix (reconcile-claimed-check-001 PR #924 verified); ratio=19.224 (85 systemic_fixes / 34 vp; carry — vp count persists because verification_pending rows are tracked separately).
+**Tier end-of-iter:** **Tier 1** (zombie carry; consecutive_clean=0).
+
+---
+
