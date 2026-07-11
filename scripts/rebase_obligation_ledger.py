@@ -54,7 +54,7 @@ import argparse
 import json
 import os
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Optional
 
@@ -62,7 +62,10 @@ _SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
-import atomic_io  # noqa: E402
+import atomic_io  # noqa: E402  # locked_update: serialize load→mutate→write
+import ledger_base  # noqa: E402
+# Time helpers are shared verbatim across the sibling ledgers — see ledger_base.
+from ledger_base import iso as _iso, now as _now, parse_iso as _parse_iso  # noqa: E402,F401
 
 AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', '/home/larry/agents'))
 LEDGER_FILE = AGENTS_ROOT / 'state' / 'rebase-obligation-ledger.json'
@@ -78,39 +81,14 @@ OPEN = 'open'
 RESOLVED = 'resolved'
 
 
-# -------------------- time --------------------
-
-def _now(now: Optional[datetime] = None) -> datetime:
-    return (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
-
-
-def _iso(dt: datetime) -> str:
-    return dt.astimezone(timezone.utc).isoformat()
-
-
-def _parse_iso(ts: Any) -> Optional[datetime]:
-    if not isinstance(ts, str) or not ts:
-        return None
-    try:
-        dt = datetime.fromisoformat(ts.replace('Z', '+00:00'))
-    except ValueError:
-        return None
-    return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt.astimezone(timezone.utc)
-
-
 # -------------------- load / save --------------------
+# _now / _iso / _parse_iso are imported from ledger_base (shared verbatim).
 
 def _load() -> dict[str, dict[str, Any]]:
     """Return the ledger object. Fail-safe: any read/parse error → empty dict
     (the obligation is re-opened on the next dispatch anyway; crashing would
     take down whatever daemon called us)."""
-    try:
-        data = json.loads(LEDGER_FILE.read_text())
-    except (FileNotFoundError, json.JSONDecodeError, OSError):
-        return {}
-    if not isinstance(data, dict):
-        return {}
-    return {k: v for k, v in data.items() if isinstance(v, dict)}
+    return ledger_base.load(LEDGER_FILE)
 
 
 def _prune(state: dict[str, dict[str, Any]], now: datetime) -> dict[str, dict[str, Any]]:
@@ -142,9 +120,7 @@ def _prune(state: dict[str, dict[str, Any]], now: datetime) -> dict[str, dict[st
 
 
 def _save(state: dict[str, dict[str, Any]], now: datetime) -> None:
-    pruned = _prune(state, now)
-    LEDGER_FILE.parent.mkdir(parents=True, exist_ok=True)
-    atomic_io.atomic_write_json(LEDGER_FILE, pruned, sort_keys=True)
+    ledger_base.save(LEDGER_FILE, state, lambda s: _prune(s, now))
 
 
 # -------------------- lifecycle --------------------
