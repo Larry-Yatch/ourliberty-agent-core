@@ -183,6 +183,55 @@ class RereviewDispatchTerminalGuardTest(_ReviewDispatchSandbox):
         self.assertEqual(len(self._reviews()), 1)
 
 
+class RereviewHeadRecordingTest(_ReviewDispatchSandbox):
+    """The re-review envelope records the PR's CURRENT head (the PR #865
+    triple-dispatch, 2026-07-08): rerun records used to carry no head_sha, so
+    `_recorded_review_head_sha` returned None, the head-aware dedup treated a
+    PASSed re-review as covering no head, and the undispatched-PR backstop
+    re-dispatched a duplicate review of an already-verdicted head."""
+
+    def _data(self, **extra):
+        d = {
+            'task_id': 'real-task',
+            'target_repo': 'ourliberty-agent-core',
+            'branch': 'forge/real-task',
+            'pr_url': _PR_URL,
+            'max_revisions': 3,
+        }
+        d.update(extra)
+        return d
+
+    def test_records_fresh_head_when_envelope_has_none(self):
+        with mock.patch.object(on, '_gh_pr_is_open', return_value=True), \
+                mock.patch.object(on, '_gh_pr_head_sha',
+                                  return_value='fresh9'):
+            on._dispatch_mirror_review_rerun(self._data(), 1, 'fixed it')
+        reviews = self._reviews()
+        self.assertEqual(len(reviews), 1)
+        self.assertEqual(on._recorded_review_head_sha(reviews[0]), 'fresh9')
+
+    def test_stale_envelope_head_is_replaced_by_fresh_lookup(self):
+        # The envelope's carried head predates Forge's revision push — it is
+        # NOT the head this re-review covers. The dispatch must re-resolve.
+        with mock.patch.object(on, '_gh_pr_is_open', return_value=True), \
+                mock.patch.object(on, '_gh_pr_head_sha',
+                                  return_value='fresh9'):
+            on._dispatch_mirror_review_rerun(
+                self._data(head_sha='stale-pre-revision'), 1, 'fixed it')
+        reviews = self._reviews()
+        self.assertEqual(len(reviews), 1)
+        self.assertEqual(on._recorded_review_head_sha(reviews[0]), 'fresh9')
+
+    def test_unresolvable_head_still_dispatches_without_field(self):
+        # Best-effort: a gh hiccup must not drop the re-review (prior behavior).
+        with mock.patch.object(on, '_gh_pr_is_open', return_value=True), \
+                mock.patch.object(on, '_gh_pr_head_sha', return_value=None):
+            on._dispatch_mirror_review_rerun(self._data(), 1, 'fixed it')
+        reviews = self._reviews()
+        self.assertEqual(len(reviews), 1)
+        self.assertIsNone(on._recorded_review_head_sha(reviews[0]))
+
+
 class TargetIsTerminalHelperTest(unittest.TestCase):
     """`_mirror_review_target_is_terminal` fail-open contract, in isolation."""
 
@@ -289,7 +338,12 @@ class RereviewDeepReviewHeldSuppressionTest(_ReviewDispatchSandbox):
     def test_new_head_rereview_allowed_and_clears(self):
         on._record_deep_review_held(
             _HELD_REPO, _HELD_PR, _PR_URL, 'held-task', 'oldhead000000')
-        with mock.patch.object(on, '_gh_pr_is_open', return_value=True):
+        # _gh_pr_head_sha patched: with an envelope head present, the head-
+        # recording step re-resolves the CURRENT head via gh (the envelope's
+        # predates the revision push) — keep the test gh-free.
+        with mock.patch.object(on, '_gh_pr_is_open', return_value=True), \
+                mock.patch.object(on, '_gh_pr_head_sha',
+                                  return_value='abc123'):
             on._dispatch_mirror_review_rerun(self._data('abc123'), 1, 'fixed it')
         self.assertEqual(len(self._reviews()), 1)
         self.assertIsNone(on._find_deep_review_held(_HELD_REPO, _HELD_PR))

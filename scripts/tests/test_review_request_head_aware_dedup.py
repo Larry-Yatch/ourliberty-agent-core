@@ -143,6 +143,58 @@ class TestHeadAwareDedup(_DedupBase):
         self._write('.archive', 'review-t-extra.json', head_sha='zzz')
         self.assertFalse(ob_check('review-t.json', 'zzz'))
 
+    # --- revision-round records (the PR #865 triple-dispatch, 2026-07-08) ---
+    def test_rev_round_matching_head_blocks(self):
+        # A re-review round is filed as review-t-rev<N>.json — a name the
+        # exact + `.<i>` scans never see. When it covered the current head it
+        # must count as dispatched, else the undispatched-PR backstop
+        # re-reviews an already-verdicted head.
+        self._write('.archive', 'review-t-rev1.json', head_sha='samehead')
+        self.assertTrue(self._check('samehead'))
+
+    def test_rev_round_old_head_does_not_block(self):
+        self._write('.archive', 'review-t-rev1.json', head_sha='oldhead')
+        self.assertFalse(self._check('newhead'))
+
+    def test_rev_round_without_head_does_not_block(self):
+        # Legacy rerun records carried no head at all (the exact #865 record).
+        self._write('.archive', 'review-t-rev1.json', head_sha='__omit__')
+        self.assertFalse(self._check('anyhead'))
+
+    def test_replan_round_matching_head_blocks(self):
+        self._write('.archive', 'review-t-replan2-rev1.json', head_sha='h9')
+        self.assertTrue(self._check('h9'))
+        self._write('.archive', 'review-t-replan3.json', head_sha='h10')
+        self.assertTrue(self._check('h10'))
+
+    def test_uniquified_rev_round_matched(self):
+        self._write('.archive', 'review-t-rev1.2.json', head_sha='h9')
+        self.assertTrue(self._check('h9'))
+
+    def test_rev_like_sibling_name_not_matched(self):
+        # `review-t-revamp.json` / `review-t-rev1-extra.json` are sibling task
+        # names, not task t's rounds — must not satisfy t's dedup.
+        self._write('.archive', 'review-t-revamp.json', head_sha='h9')
+        self._write('.archive', 'review-t-rev1-extra.json', head_sha='h9')
+        self.assertFalse(self._check('h9'))
+
+    def test_none_head_ignores_rev_rounds(self):
+        # Existence-only callers keep their exact prior contract.
+        self._write('.archive', 'review-t-rev1.json', head_sha='x')
+        self.assertFalse(self._check(None))
+
+    def test_live_rev_round_matching_head_blocks(self):
+        # A rev-round review queued LIVE in the inbox (recording the current
+        # head) means a review of THIS head is already pending — an inline
+        # re-process must not queue a duplicate round-0 review alongside it
+        # (the live-inbox leg was previously exact-name-only).
+        self._write('', 'review-t-rev1.json', head_sha='H2')
+        self.assertTrue(self._check('H2'))
+
+    def test_live_rev_round_other_head_does_not_block(self):
+        self._write('', 'review-t-rev1.json', head_sha='H2')
+        self.assertFalse(self._check('H3'))
+
     def test_glob_metacharacter_task_id_finds_own_variant(self):
         # A task_id with glob metacharacters (validator-permitted) must not turn
         # the variant scan into a character class — else its own uniquified
@@ -252,10 +304,64 @@ class TestDiedVerdictlessRedispatch(_DedupBase):
         # review-t-extra.json in .lost-result must not re-dispatch task t...
         self._lost(name='review-t-extra.json', head='h1')
         self.assertFalse(self._check('h1'))
-        # ...nor be miscounted toward t's cap (glob is dot-variant only).
+        # ...nor be miscounted toward t's cap (name grammar excludes it).
         for i in range(1, ob.REVIEW_REDISPATCH_MAX_ATTEMPTS + 1):
             self._lost(name=f'review-t-extra.{i}.json', head='h1')
         self.assertFalse(self._check('h1'))
+
+    # --- lost RE-REVIEW rounds are paced too (PR #865 companion, 2026-07-08) ---
+    def test_lost_rev_round_within_grace_debounces(self):
+        # A died-verdictless RE-REVIEW (`review-t-rev1.json`) recording head h1
+        # must be paced by the same debounce as round-0 — the round names were
+        # taught to the archive scan but the lost-result scan originally globbed
+        # only `review-t[.<i>].json`, so a lost rerun re-dispatched with NO
+        # debounce and never counted toward the cap.
+        self._lost(name='review-t-rev1.json', head='h1', age=60)
+        self.assertTrue(self._check('h1'))
+
+    def test_lost_rev_round_past_grace_redispatches(self):
+        self._lost(name='review-t-rev1.json', head='h1')  # STALE (past grace)
+        self.assertFalse(self._check('h1'))
+
+    def test_lost_rev_round_counts_toward_cap(self):
+        # base + rev1 + replan1-rev1 all lost at h1 == MAX_ATTEMPTS → permanent.
+        assert ob.REVIEW_REDISPATCH_MAX_ATTEMPTS == 3
+        self._lost(name='review-t.json', head='h1')
+        self._lost(name='review-t-rev1.json', head='h1')
+        self._lost(name='review-t-replan1-rev1.json', head='h1')
+        self.assertTrue(self._check('h1'))  # at cap → dedup permanently
+
+
+class TestReviewRecordNameRe(_DedupBase):
+    """The shared review-record name grammar — one source of truth for the
+    head-aware dedup (all legs) and the heal-undispatched-pr-review recency
+    scan, so they cannot disagree about which records exist (the #865 drift)."""
+
+    def _matches(self, stem, name):
+        return bool(ob.review_record_name_re(stem).fullmatch(name))
+
+    def test_matches_all_round_shapes(self):
+        for name in (
+            'review-t.json', 'review-t.2.json',
+            'review-t-rev1.json', 'review-t-rev1.3.json',
+            'review-t-replan2.json', 'review-t-replan2-rev1.json',
+            'review-t-replan2-rev1.4.json',
+        ):
+            self.assertTrue(self._matches('review-t', name), name)
+
+    def test_rejects_sibling_and_malformed(self):
+        for name in (
+            'review-t-extra.json',      # sibling task
+            'review-t-revamp.json',     # not a rev round
+            'review-textra.json',       # different stem
+            'review-t-rev.json',        # rev without digits
+            'review-t.json.bak',        # wrong suffix
+        ):
+            self.assertFalse(self._matches('review-t', name), name)
+
+    def test_metacharacter_stem_matches_only_own(self):
+        self.assertTrue(self._matches('review-cpu[hi]', 'review-cpu[hi]-rev1.json'))
+        self.assertFalse(self._matches('review-cpu[hi]', 'review-cpuh-rev1.json'))
 
 
 class TestCrossRoundAntiStorm(_DedupBase):
