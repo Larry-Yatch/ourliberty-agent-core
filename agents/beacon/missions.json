@@ -8589,6 +8589,67 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-rebase-escalation-feed-685-001",
+      "name": "Rebase Escalation Feed 685 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `rebase-escalation-feed-685-001`. Last activity 2026-06-25T00:43:27.371345+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "rebase-escalation-feed-685-001"
+      ],
+      "repo": null,
+      "created": "2026-07-11",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-11T09:24:21.700062+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-25T00:43:27.371345+00:00"
+    },
+    {
+      "id": "proposed-reconcile-675-contract-c-promote-alerts-001",
+      "name": "Reconcile 675 Contract C Promote Alerts 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `reconcile-675-contract-c-promote-alerts-001`. Last activity 2026-06-24T19:00:26.499159+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "reconcile-675-contract-c-promote-alerts-001"
+      ],
+      "repo": null,
+      "created": "2026-07-11",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-11T09:24:21.700062+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-24T19:00:26.499159+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-11T09:24:21.700062+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#679"
+    },
+    {
+      "id": "proposed-pulse-watermark-rotation-repair-001",
+      "name": "Pulse Watermark Rotation Repair 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pulse-watermark-rotation-repair-001`. Last activity 2026-06-17T10:02:56.089083+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pulse-watermark-rotation-repair-001"
+      ],
+      "repo": null,
+      "created": "2026-07-11",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-11T09:24:21.700062+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-17T10:02:56.089083+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-11T09:24:21.700062+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#561"
     }
   ]
 }
