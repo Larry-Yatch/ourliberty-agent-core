@@ -293,6 +293,94 @@ class ExhaustedEscalationTest(_Base):
         self.assertNotIn('synthetic-wip-001-retry1-retry1.json', self._inbox_files())
 
 
+class MirrorReviewSuppressionTest(_Base):
+    """A `mirror-review-pr-<repo>-<N>` task reviews EXTERNAL PR #N and emits a
+    verdict, never a PR of its own — so it always trips the WIP-only / no-PR
+    signature. When #N is already terminal the review is moot: suppress it (no
+    retry, no escalation) and record it in the ledger. Regression for the false
+    `forge-wip-redispatch` EXHAUSTED alert on merged Mirror review #931 (2026-07-11)."""
+
+    _REVIEW_STEM = 'mirror-review-pr-ourliberty-agent-core-931'
+    _REVIEW_BRANCH = 'mirror/mirror-review-pr-ourliberty-agent-core-931-retry1'
+
+    def _run_with_pr_state(self, state: str):
+        old = time.time() - 3600
+        with self._git_world([(self._REVIEW_BRANCH, old)]), \
+             mock.patch.object(h.tts, 'pr_coordinate_state',
+                               return_value=(state, None)) as probe, \
+             mock.patch.object(h.tts, 'parse_pr_coordinate',
+                               return_value=('OWNER/ourliberty-agent-core', 931)):
+            self._run()
+        return probe
+
+    def test_reviewed_pr_merged_suppresses(self):
+        probe = self._run_with_pr_state('MERGED')
+        # No retry envelope, no alert at all (neither digest nor escalate).
+        self.assertNotIn('mirror-review-pr-ourliberty-agent-core-931-retry1-retry1.json',
+                         self._inbox_files())
+        self.assertEqual(self._inbox_files(), [])
+        self.assertEqual(self._alerts.call_count, 0)
+        # Ledger records the suppression under the retry-suffix-stripped base.
+        ledger = self._ledger()
+        self.assertIn(self._REVIEW_STEM, ledger)
+        self.assertTrue(ledger[self._REVIEW_STEM]['suppressed'])
+        self.assertEqual(ledger[self._REVIEW_STEM]['suppress_reason'],
+                         'suppressed-reviewed-pr-terminal')
+        self.assertNotIn('attempts', ledger[self._REVIEW_STEM])
+        probe.assert_called_once()
+
+    def test_reviewed_pr_closed_suppresses(self):
+        self._run_with_pr_state('CLOSED')
+        self.assertEqual(self._inbox_files(), [])
+        self.assertEqual(self._alerts.call_count, 0)
+        self.assertTrue(self._ledger()[self._REVIEW_STEM]['suppressed'])
+
+    def test_reviewed_pr_open_not_redispatched_as_build(self):
+        # An OPEN reviewed PR is left to the orphaned-mirror-claims re-inject path;
+        # this build-WIP healer must not redispatch it, but also must not suppress
+        # (no ledger entry — the review may still legitimately re-run elsewhere).
+        self._run_with_pr_state('OPEN')
+        self.assertEqual(self._inbox_files(), [])
+        self.assertEqual(self._alerts.call_count, 0)
+        self.assertEqual(self._ledger(), {})
+
+    def test_reviewed_pr_unknown_gh_error_is_conservative(self):
+        # A gh failure (UNKNOWN) never suppresses and never redispatches.
+        self._run_with_pr_state('UNKNOWN')
+        self.assertEqual(self._inbox_files(), [])
+        self.assertEqual(self._alerts.call_count, 0)
+        self.assertEqual(self._ledger(), {})
+
+    def test_suppression_is_idempotent_and_skips_gh_on_later_ticks(self):
+        old = time.time() - 3600
+        with self._git_world([(self._REVIEW_BRANCH, old)]), \
+             mock.patch.object(h.tts, 'parse_pr_coordinate',
+                               return_value=('OWNER/ourliberty-agent-core', 931)), \
+             mock.patch.object(h.tts, 'pr_coordinate_state',
+                               return_value=('MERGED', None)) as probe:
+            self._run()  # tick 1: suppress + record ledger
+            self.assertTrue(self._ledger()[self._REVIEW_STEM]['suppressed'])
+            self._run()  # tick 2: ledger short-circuits BEFORE the gh probe
+        # gh probed exactly once across both ticks; no alert, no envelope ever.
+        probe.assert_called_once()
+        self.assertEqual(self._alerts.call_count, 0)
+        self.assertEqual(self._inbox_files(), [])
+
+    def test_suppressed_review_never_escalates_even_at_max_attempts(self):
+        # Even if a stray ledger entry sits at MAX, a suppressed reviewed-terminal
+        # review must not fire the 'exhausted' escalation — the mirror-review gate
+        # precedes the attempts/escalate logic.
+        self._seed_ledger({self._REVIEW_STEM: {
+            'attempts': h.MAX_AUTO_RETRIES,
+            'last_retry_task_id': 'mirror-review-pr-ourliberty-agent-core-931-retry1',
+            'escalated': False}})
+        self._run_with_pr_state('MERGED')
+        escalate_calls = [c for c in self._alerts.call_args_list
+                          if c.args and c.args[0] == 'escalate']
+        self.assertEqual(escalate_calls, [])
+        self.assertTrue(self._ledger()[self._REVIEW_STEM]['suppressed'])
+
+
 class KillSwitchTest(_Base):
     def test_kill_switch_short_circuits(self):
         self._archive_original()
@@ -317,6 +405,34 @@ class HelperUnitTest(unittest.TestCase):
         self.assertEqual(h._task_from_branch('forge/foo-001'), 'foo-001')
         self.assertEqual(h._task_from_branch('mirror/bar'), 'bar')
         self.assertIsNone(h._task_from_branch('main'))
+
+    def test_reviewed_pr_coordinate_parses_retry_suffixed_stem(self):
+        # End-to-end via the REAL parse: the retry suffix MUST be stripped first
+        # because the numeric-tail anchor rejects a non-hex `-retry1` tail.
+        with mock.patch.dict(
+                os.environ,
+                {'OURLIBERTY_TERMINAL_STATE_REPOS': 'ourliberty-agent-core'}):
+            got = h._reviewed_pr_coordinate(
+                'mirror-review-pr-ourliberty-agent-core-931-retry1')
+            self.assertIsNotNone(got)
+            repo, num = got
+            self.assertTrue(repo.endswith('/ourliberty-agent-core'))
+            self.assertEqual(num, 931)
+            # Also parses the bare (un-retried) coordinate.
+            self.assertEqual(
+                h._reviewed_pr_coordinate(
+                    'mirror-review-pr-ourliberty-agent-core-931')[1], 931)
+
+    def test_reviewed_pr_coordinate_none_for_genuine_build(self):
+        # A real forge build stem is not a mirror-review coordinate -> None, so the
+        # suppression gate never fires for genuine build failures.
+        with mock.patch.dict(
+                os.environ,
+                {'OURLIBERTY_TERMINAL_STATE_REPOS': 'ourliberty-agent-core'}):
+            self.assertIsNone(
+                h._reviewed_pr_coordinate('reconcile-hardening-mission-001'))
+            self.assertIsNone(
+                h._reviewed_pr_coordinate('reconcile-hardening-mission-001-retry1'))
 
 
 if __name__ == '__main__':
