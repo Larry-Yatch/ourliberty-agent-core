@@ -896,6 +896,11 @@ class TestKnownEventTypesContract(unittest.TestCase):
             # Feeds the burst-latency success metric (§8) and the sibling
             # gauge's "need a third slot?" decision.
             'review_queue_wait',
+            # added by spec-gauntlet foundations (spec-gauntlet-gate.md §3.5) —
+            # push-emitted per gauntlet round by the spec-review-runner; registered
+            # in the foundations slice before the runner ships so emit_event admits
+            # it and the visibility surface can't silently drop.
+            'spec_review_round',
         }
         self.assertEqual(ces.KNOWN_EVENT_TYPES, frozenset(spec_listed))
 
