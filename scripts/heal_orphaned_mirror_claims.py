@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
-"""heal_orphaned_mirror_claims.py — archive Mirror review-claim files that were
-stranded in ``.claimed/<slot>/`` after the review CONCLUDED, so the slot
-un-blocks and the next queued review gets a worker.
+"""heal_orphaned_mirror_claims.py — clear Mirror review-claim files stranded in
+``.claimed/<slot>/`` when a slot died mid-flight, so the slot un-blocks and the
+review is not silently dropped. A concluded (or PR-terminal) claim is ARCHIVED;
+a genuinely-not-concluded claim on an OPEN PR is RE-INJECTED into the live inbox
+so it re-runs automatically.
 
 Incident (2026-07-10 — sentinel-in-flight-stall-translation-001 / PR #854)
 --------------------------------------------------------------------------
@@ -28,9 +30,7 @@ trigger a paid Opus re-review of an already-reviewed PR.
 What this healer does
 ---------------------
 Every ~10 min (systemd timer), scan ``inboxes/mirror/.claimed/<slot>/
-review-*.json``. Archive a claim as an orphan — moving it to
-``inboxes/mirror/.archive/<stem>.orphan-cleared-<ts>.json`` — ONLY when it is
-provably a concluded-and-stranded review, i.e. ALL of:
+review-*.json``. A claim is a candidate only when it is provably NOT live:
 
   1. age(mtime) >= ORPHAN_CLAIM_GRACE_SEC (default 45 min, comfortably above
      the 35-min agent_runner.REVIEW_SESSION_CEILING_SECONDS review wall) — so a
@@ -43,18 +43,37 @@ provably a concluded-and-stranded review, i.e. ALL of:
      alone must never win over a live process;
   3. NO live in-flight registry entry (``state/in-flight/<task_id>.json`` with a
      signalable pid) — the per-task "paid work in flight" gate;
-  4. the review CONCLUDED — EITHER a Mirror verdict for the task_id was already
-     delivered (durable: a consumed outbox archived under
-     ``outboxes/mirror/.archive/<task_id>.json``; OR the same-named review
-     request already sits in ``inboxes/mirror/.archive/`` — the re-dispatch-of-
-     a-completed-review case; OR outbox-notifier.log recorded a
-     ``marker-notified beacon <- mirror`` for it) OR the PR (``pr_url`` in the
-     claim) is in a terminal state (MERGED / CLOSED) per ``gh pr view``.
+  4. its owning slot is not mid-dispatch (``slot_dispatch_active``) — the
+     claim→spawn window.
 
-Guards (1)–(3) prove the claim is NOT live; guard (4) proves it does not need a
-(re-)review. A claim that is stranded but NOT concluded (no verdict, PR still
-open, never ran) is deliberately LEFT for inbox_watcher.sweep_claimed_orphans to
-re-queue — archiving it would silently drop a review that never happened.
+For a candidate, the action is chosen by whether THIS review round concluded and
+by the PR's live state:
+
+  * THIS round's verdict was delivered (ROUND-AWARE — see below), OR the PR
+    (``pr_url`` in the claim) is TERMINAL (MERGED / CLOSED) → ARCHIVE the claim
+    as ``inboxes/mirror/.archive/<stem>.orphan-cleared-<ts>.json``. Both are
+    safe to drop: a re-review would be a duplicate / would review a dead PR.
+  * NOT concluded AND the PR is OPEN → RE-INJECT the claim into the live inbox
+    (``inboxes/mirror/<claim_name>``) so the running inbox_watcher re-claims and
+    re-runs it. The restarted watcher never scans ``.claimed/``, so leaving it
+    there strands the review forever and archiving would DROP it — the
+    gg-s4-silent-failure-gauge stall (PR #923, 2026-07-11).
+  * gh could not resolve the PR state (UNKNOWN), or the claim has no ``pr_url``
+    → SPARE it this tick and retry next tick. Never archive-drop a maybe-open
+    review, never re-review a maybe-terminal PR, on gh uncertainty.
+
+ROUND-AWARE conclusion (the gg-s4 fix)
+--------------------------------------
+"THIS round's verdict was delivered" is judged by
+``mirror_review_conclusion.round_verdict_delivered`` — the round's OWN archived
+review-request, keyed on the round-suffixed claim filename + the claim's
+``head_sha`` — NOT the task_id-keyed ``verdict_delivered`` the startup sweep
+uses. The verdict OUTBOX never records ``head_sha``, so a task_id-keyed signal
+cannot tell a rev-N round's verdict from round-0's; a prior round's delivered
+verdict would otherwise mask a not-concluded current round and the review would
+be wrongly archived (exactly the #923 drop). An ambiguous / missing ``head_sha``
+on an OPEN PR fails safe toward RE-INJECT (a duplicate review is cheap; a dropped
+review stalls the sequence forever).
 
 Self-protection / discipline (matches the ZERO-LLM healer constellation)
 -----------------------------------------------------------------------
@@ -244,17 +263,34 @@ def slot_dispatch_active(agent: str, slot: int) -> bool:
 
 # ==================== conclusion signals ====================
 
-def verdict_delivered(agent: str, task_id: str, claim_name: str) -> bool:
-    """True iff a Mirror verdict for this task was already delivered. Delegates to
-    the shared mirror_review_conclusion predicate (single source of truth with
-    inbox_watcher.sweep_claimed_orphans — see that module for the signals)."""
-    return mirror_review_conclusion.verdict_delivered(
-        outboxes_root=OUTBOXES_ROOT,
+def _claim_head_sha(claim: dict) -> Optional[str]:
+    """The head_sha this claim's review round is pinned to (top-level, then under
+    ``context``), or None. Mirrors mirror_review_conclusion.recorded_head_sha /
+    inbox_watcher._task_head_sha so the round identity is read the same way
+    everywhere."""
+    v = claim.get("head_sha")
+    if isinstance(v, str) and v:
+        return v
+    ctx = claim.get("context")
+    if isinstance(ctx, dict):
+        v = ctx.get("head_sha")
+        if isinstance(v, str) and v:
+            return v
+    return None
+
+
+def round_verdict_delivered(agent: str, claim_name: str,
+                            head_sha: Optional[str]) -> bool:
+    """True iff a verdict for THIS review round was already delivered. Delegates
+    to the shared ROUND-AWARE predicate (head-pinned + round-suffixed filename),
+    NOT the round-blind task_id ``verdict_delivered`` used by the startup sweep —
+    a prior round's verdict must never mask a not-concluded current round
+    (gg-s4-silent-failure-gauge, PR #923, 2026-07-11)."""
+    return mirror_review_conclusion.round_verdict_delivered(
         inboxes_root=INBOXES_ROOT,
-        notifier_log=NOTIFIER_LOG,
         agent=agent,
-        task_id=task_id,
         claim_name=claim_name,
+        head_sha=head_sha,
     )
 
 
@@ -270,13 +306,15 @@ def _claim_pr_url(claim: dict) -> Optional[str]:
     return None
 
 
-def pr_terminal(pr_url: str) -> bool:
-    """True iff the PR at ``pr_url`` is MERGED or CLOSED per a read-only
-    ``gh pr view``. Returns False on ANY gh failure or a still-OPEN PR — a
-    transient gh error must never flip an open PR into a wrongful archive
-    (fail-safe toward SPARING)."""
+def pr_state(pr_url: str) -> Optional[str]:
+    """The PR's state — ``'OPEN'`` / ``'MERGED'`` / ``'CLOSED'`` — per a
+    read-only ``gh pr view``, or None (UNKNOWN) on a missing url or ANY gh
+    failure. Tri-state so the caller can tell a confirmed-OPEN PR (safe to
+    RE-INJECT) apart from a gh error (act on NEITHER this tick): a transient gh
+    error must never flip an open PR into a wrongful archive, NOR a terminal PR
+    into a wrongful re-review — both are avoided by returning None and sparing."""
     if not pr_url:
-        return False
+        return None
     try:
         out = subprocess.run(
             ["gh", "pr", "view", pr_url, "--repo", REPO, "--json", "state"],
@@ -284,30 +322,17 @@ def pr_terminal(pr_url: str) -> bool:
         )
     except (subprocess.TimeoutExpired, OSError) as e:
         log("WARN", f"gh pr view failed for {pr_url}: {type(e).__name__}: {e}; "
-                    f"assuming not terminal")
-        return False
+                    f"state UNKNOWN")
+        return None
     if out.returncode != 0:
         log("WARN", f"gh pr view {pr_url} returned {out.returncode}: "
-                    f"{out.stderr.strip()[:200]}; assuming not terminal")
-        return False
+                    f"{out.stderr.strip()[:200]}; state UNKNOWN")
+        return None
     try:
         state = str((json.loads(out.stdout or "{}") or {}).get("state", "")).upper()
     except (json.JSONDecodeError, TypeError):
-        return False
-    return state in ("MERGED", "CLOSED")
-
-
-def claim_concluded(agent: str, claim_name: str, claim: dict) -> Optional[str]:
-    """Return a short reason string iff the claim's review is provably concluded
-    (verdict delivered OR PR terminal); else None. The reason is logged so a
-    HEALED line is auditable."""
-    task_id = claim.get("task_id") or Path(claim_name).stem
-    if verdict_delivered(agent, task_id, claim_name):
-        return "verdict-delivered"
-    pr_url = _claim_pr_url(claim)
-    if pr_url and pr_terminal(pr_url):
-        return "pr-terminal"
-    return None
+        return None
+    return state or None
 
 
 # ==================== archive action ====================
@@ -328,15 +353,46 @@ def archive_orphan(agent: str, claim_file: Path, reason: str, age_min: int) -> b
     return True
 
 
+def reinject_orphan(agent: str, claim_file: Path, age_min: int,
+                    *, ambiguous: bool = False) -> bool:
+    """Re-inject a stranded-but-NOT-concluded review claim on an OPEN PR back into
+    the LIVE inbox so the running inbox_watcher re-claims and re-runs it.
+
+    ``os.rename`` the claim to ``inboxes/<agent>/<claim_name>`` — its ORIGINAL
+    round-suffixed name. This is the missing action that the original healer
+    lacked: the restarted inbox_watcher only scans the LIVE inbox, never
+    ``.claimed/<slot>/``, so archiving would DROP the review and leaving it in
+    place would strand the owning sequence step in 'reviewing' forever. The
+    review's own round did not conclude (round-aware) and its PR is still open,
+    so a fresh review is exactly what is owed.
+
+    Idempotent: the healer scans only ``.claimed/``, so once re-injected the
+    claim is invisible on the next tick; and inbox_watcher's claim rename dedups
+    a double if one somehow races in."""
+    dest = INBOXES_ROOT / agent / claim_file.name
+    try:
+        (INBOXES_ROOT / agent).mkdir(parents=True, exist_ok=True)
+        os.rename(claim_file, dest)
+    except OSError as e:
+        log("ERROR", f"{agent}/{claim_file.name} reinject_failed: {e}")
+        return False
+    note = " head_sha=ambiguous(fail-safe)" if ambiguous else ""
+    log("HEALED",
+        f"{agent}/{claim_file.name} action=reinject-orphan-claim "
+        f"reason=not-concluded-open-pr age_min={age_min} dest={dest.name}{note} "
+        f"— re-queued to live inbox")
+    return True
+
+
 # ==================== scan ====================
 
 def scan_agent(agent: str, active_cwds: set[str], *, now: Optional[float] = None) -> tuple:
-    """Return (scanned, cleared, spared)."""
+    """Return (scanned, cleared, reinjected, spared)."""
     claimed_root = INBOXES_ROOT / agent / CLAIMED_SUBDIR
     if not claimed_root.is_dir():
-        return 0, 0, 0
+        return 0, 0, 0, 0
     now = now if now is not None else datetime.now(timezone.utc).timestamp()
-    scanned = cleared = spared = 0
+    scanned = cleared = reinjected = spared = 0
     for slot_dir in sorted(claimed_root.iterdir()):
         if not slot_dir.is_dir():
             continue
@@ -366,7 +422,7 @@ def scan_agent(agent: str, active_cwds: set[str], *, now: Optional[float] = None
                 claim = json.loads(claim_file.read_text())
             except (OSError, json.JSONDecodeError):
                 # A claim we cannot parse is NOT safe to reason about; leave it
-                # for the parse-tolerant startup sweep. Never archive blind.
+                # for the parse-tolerant startup sweep. Never act blind.
                 spared += 1
                 continue
             if not isinstance(claim, dict):
@@ -381,19 +437,40 @@ def scan_agent(agent: str, active_cwds: set[str], *, now: Optional[float] = None
             if has_live_in_flight(task_id):
                 spared += 1
                 continue
-            reason = claim_concluded(agent, claim_file.name, claim)
-            if not reason:
-                # Stranded but NOT concluded (never ran, PR still open): leave it
-                # for sweep_claimed_orphans to RE-QUEUE — archiving would drop a
-                # review that never happened.
-                spared += 1
-                continue
             age_min = int(age / 60)
-            if archive_orphan(agent, claim_file, reason, age_min):
-                cleared += 1
-            else:
-                spared += 1
-    return scanned, cleared, spared
+            head_sha = _claim_head_sha(claim)
+            # THIS round's verdict already delivered (round-aware) → safe to drop.
+            if round_verdict_delivered(agent, claim_file.name, head_sha):
+                if archive_orphan(agent, claim_file, "verdict-delivered", age_min):
+                    cleared += 1
+                else:
+                    spared += 1
+                continue
+            # Not concluded: decide on the PR's live state (one gh call).
+            state = pr_state(_claim_pr_url(claim))
+            if state in ("MERGED", "CLOSED"):
+                # PR terminal → the review is moot; archive-drop (no re-review).
+                if archive_orphan(agent, claim_file, "pr-terminal", age_min):
+                    cleared += 1
+                else:
+                    spared += 1
+                continue
+            if state == "OPEN":
+                # Stranded, NOT concluded, PR still open: RE-INJECT so the review
+                # re-runs automatically. A missing/ambiguous head_sha on an open
+                # PR still re-injects (fail-safe: a duplicate review is cheap; a
+                # dropped review stalls the sequence forever) with a logged note.
+                if reinject_orphan(agent, claim_file, age_min,
+                                   ambiguous=head_sha is None):
+                    reinjected += 1
+                else:
+                    spared += 1
+                continue
+            # state is UNKNOWN (gh error / no pr_url): act on NEITHER path this
+            # tick — never archive-drop a maybe-open review, never re-review a
+            # maybe-terminal PR. Retry next tick once gh recovers.
+            spared += 1
+    return scanned, cleared, reinjected, spared
 
 
 def main() -> int:
@@ -405,15 +482,17 @@ def main() -> int:
         log("HEARTBEAT", "inboxes root missing, nothing to do")
         return 0
     active_cwds = get_active_claude_cwds()
-    total_scanned = total_cleared = total_spared = 0
+    total_scanned = total_cleared = total_reinjected = total_spared = 0
     for agent in TARGET_AGENTS:
-        s, c, sp = scan_agent(agent, active_cwds)
+        s, c, r, sp = scan_agent(agent, active_cwds)
         total_scanned += s
         total_cleared += c
+        total_reinjected += r
         total_spared += sp
     heartbeat()
     log("HEARTBEAT",
-        f"scanned={total_scanned} cleared={total_cleared} spared={total_spared} "
+        f"scanned={total_scanned} cleared={total_cleared} "
+        f"reinjected={total_reinjected} spared={total_spared} "
         f"active_workers={len(active_cwds)} agents={','.join(TARGET_AGENTS)} "
         f"grace_sec={ORPHAN_CLAIM_GRACE_SEC}")
     return 0

@@ -40,8 +40,12 @@ via ``id_match``).
 
 from __future__ import annotations
 
+import glob
+import json
+import re
 import sys
 from pathlib import Path
+from typing import Optional
 
 _DIR = Path(__file__).resolve().parent
 if str(_DIR) not in sys.path:
@@ -135,9 +139,126 @@ def verdict_delivered(*, outboxes_root: Path, inboxes_root: Path,
                       notifier_log: Path, agent: str, task_id: str,
                       claim_name: str) -> bool:
     """True iff a Mirror verdict for this task was already delivered — any of the
-    two durable filesystem signals, falling back to the notifier log."""
+    two durable filesystem signals, falling back to the notifier log.
+
+    ROUND-BLIND: every signal is keyed on the ``task_id`` (or the exact
+    ``claim_name``), so ANY round's delivered verdict satisfies it. That is the
+    correct contract for inbox_watcher.sweep_claimed_orphans (the startup 4h
+    backstop, which only needs "was this PR ever reviewed") but is WRONG for a
+    re-review whose OWN round must be judged — see ``round_verdict_delivered``,
+    which the 10-min heal_orphaned_mirror_claims healer uses so a prior round's
+    verdict can never mask a not-concluded current round."""
     return (
         outbox_archive_has_verdict(outboxes_root, agent, task_id)
         or inbox_archive_has_same_review(inboxes_root, agent, claim_name)
         or notifier_log_marked_delivered(notifier_log, task_id)
     )
+
+
+# ==================== round-aware conclusion (head-pinned) ====================
+#
+# The task_id-keyed signals above cannot tell a rev-N round's verdict apart from
+# round-0's: the verdict OUTBOX never records head_sha (inbox_watcher._build_outbox
+# does not propagate it), so a prior round's archived verdict at
+# outboxes/mirror/.archive/<task_id>.json reads as "concluded" for a DIFFERENT
+# round's claim — the gg-s4-silent-failure-gauge drop (PR #923, 2026-07-11).
+#
+# Round-awareness therefore keys off the archived review-REQUEST records, which
+# DO carry head_sha and whose FILENAME carries the round suffix
+# (review-<task>-rev<N>.json). A round is concluded iff its own request envelope
+# was archived to a successful conclusion at THIS round's head.
+
+
+# Round-record name grammar — kept behaviourally identical to
+# outbox_notifier.review_record_name_re (a cross-module sync test pins the two so
+# they can't drift; a third divergent copy is the exact fault the PR #865
+# triple-dispatch taught). Matches every on-disk review-record filename for a
+# review-task stem ``review-<task_id>``: the base ``<stem>.json``, ``move_to()``
+# collisions ``<stem>.<i>.json``, revision rounds ``<stem>-rev<N>.json`` (+
+# ``.<i>``), replan rounds ``<stem>-replan<P>.json`` (+ ``.<i>``), and
+# replan+revision combos. ``stem`` is ``re.escape``d so a task_id carrying
+# regex/glob metacharacters matches only its own records.
+def review_record_name_re(stem: str) -> 're.Pattern[str]':
+    return re.compile(
+        re.escape(stem)
+        + r'(?:-replan\d+)?(?:-rev\d+)?(?:\.\d+)?\.json$'
+    )
+
+
+# Strip a trailing round suffix (``-replan<P>`` / ``-rev<N>`` / ``.<i>``) from a
+# review-record STEM so a round-N claim stem collapses to the task's round-0
+# stem — the anchor ``review_record_name_re`` expands back into every sibling
+# round. The on-disk suffix order is ``-replan<P>`` then ``-rev<N>`` then
+# ``.<i>``; anchored at end so only a genuine trailing suffix is removed.
+_ROUND_SUFFIX_RE = re.compile(r'(?:-replan\d+)?(?:-rev\d+)?(?:\.\d+)?$')
+
+
+def base_review_stem(stem: str) -> str:
+    return _ROUND_SUFFIX_RE.sub('', stem, count=1)
+
+
+def recorded_head_sha(path: Path) -> Optional[str]:
+    """The ``head_sha`` a review-request records (top-level, then nested under
+    ``context``), or None — mirrors outbox_notifier._recorded_review_head_sha and
+    inbox_watcher._task_head_sha. A record written before head_sha was captured
+    returns None, which the caller treats as "does not cover this head"."""
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError, ValueError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    v = data.get('head_sha')
+    if isinstance(v, str) and v:
+        return v
+    ctx = data.get('context')
+    if isinstance(ctx, dict):
+        v = ctx.get('head_sha')
+        if isinstance(v, str) and v:
+            return v
+    return None
+
+
+def round_verdict_delivered(*, inboxes_root: Path, agent: str,
+                            claim_name: str, head_sha: Optional[str]) -> bool:
+    """True iff a verdict for THIS review ROUND was already delivered — judged by
+    the round's own archived review-request, NOT by any task_id-keyed signal.
+
+    Two round-aware proofs, neither of which a PRIOR round can satisfy:
+
+      * the EXACT round-suffixed ``claim_name`` already sits in the inbox
+        ``.archive/`` — round-aware by filename, and head-agnostic so it still
+        recognises a legacy record that carries no ``head_sha``;
+      * an archived review-request for this task (ANY round shape, via
+        ``review_record_name_re`` over the round-0 base stem, incl. ``move_to()``
+        ``.<i>`` uniquified names) whose recorded ``head_sha`` == this claim's
+        ``head_sha`` — head-pinned, so round-0's verdict at an OLDER head never
+        counts as a rev-N round's conclusion.
+
+    Deliberately consults NEITHER the task_id-keyed verdict outbox nor the
+    notifier log: both are round-blind (the outbox never records head_sha), so a
+    prior round's delivered verdict would mask a not-concluded current round —
+    the exact drop this predicate exists to prevent. When ``head_sha`` is None
+    (ambiguous / legacy claim) only the exact-name proof can fire; the caller
+    fails safe toward RE-INJECT on an open PR rather than archive-drop."""
+    archive = inboxes_root / agent / ".archive"
+    try:
+        if (archive / claim_name).exists():
+            return True
+    except OSError:
+        pass
+    if not head_sha:
+        return False
+    stem = (
+        claim_name[: -len(_JSON_SUFFIX)]
+        if claim_name.endswith(_JSON_SUFFIX) else claim_name
+    )
+    base_stem = base_review_stem(stem)
+    name_re = review_record_name_re(base_stem)
+    try:
+        for p in archive.glob(f"{glob.escape(base_stem)}*.json"):
+            if name_re.fullmatch(p.name) and recorded_head_sha(p) == head_sha:
+                return True
+    except OSError:
+        pass
+    return False
