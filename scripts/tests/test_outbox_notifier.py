@@ -13703,6 +13703,46 @@ class ReviewRequestChainEventTest(unittest.TestCase):
         self.assertEqual(ev['pr_url'], self.PR)
         self.assertEqual(ev['payload']['revision_count'], 2)
 
+    def test_dispatch_carries_origin_task_id_onto_envelope_and_event(self):
+        # Delegate-tracking Slice 2a: origin_task_id rides both the written
+        # Mirror review envelope (→ Mirror's outbox → the verdict) and the
+        # review_request event (the join key the dashboard reads).
+        data = self._data()
+        data['origin_task_id'] = 'delegate-cap-x-ab12'
+        with mock.patch.object(on.chain_event_emit, 'emit_event',
+                               self._fake_emit):
+            on._dispatch_mirror_review(data, self.PR)
+        files = list((on.INBOXES_ROOT / 'mirror').glob('review-*.json'))
+        self.assertEqual(len(files), 1)
+        env = json.loads(files[0].read_text())
+        self.assertEqual(env.get('origin_task_id'), 'delegate-cap-x-ab12')
+        self.assertEqual(env.get('task_id'), 'real-rr1')  # routing id untouched
+        self.assertEqual(self.captured[0]['payload'].get('origin_task_id'),
+                         'delegate-cap-x-ab12')
+
+    def test_dispatch_omits_origin_task_id_when_absent(self):
+        with mock.patch.object(on.chain_event_emit, 'emit_event',
+                               self._fake_emit):
+            on._dispatch_mirror_review(self._data(), self.PR)
+        files = list((on.INBOXES_ROOT / 'mirror').glob('review-*.json'))
+        env = json.loads(files[0].read_text())
+        self.assertNotIn('origin_task_id', env)
+        self.assertNotIn('origin_task_id', self.captured[0]['payload'])
+
+    def test_rerun_dispatch_carries_origin_task_id(self):
+        data = self._data()
+        data['pr_url'] = self.PR
+        data['origin_task_id'] = 'delegate-cap-x-ab12'
+        with mock.patch.object(on.chain_event_emit, 'emit_event',
+                               self._fake_emit):
+            on._dispatch_mirror_review_rerun(data, 2, 'fixed the findings')
+        files = list((on.INBOXES_ROOT / 'mirror').glob('review-*.json'))
+        self.assertEqual(len(files), 1)
+        env = json.loads(files[0].read_text())
+        self.assertEqual(env.get('origin_task_id'), 'delegate-cap-x-ab12')
+        self.assertEqual(self.captured[0]['payload'].get('origin_task_id'),
+                         'delegate-cap-x-ab12')
+
     def test_idempotent_skip_does_not_emit(self):
         inbox = on.INBOXES_ROOT / 'mirror'
         inbox.mkdir(parents=True, exist_ok=True)

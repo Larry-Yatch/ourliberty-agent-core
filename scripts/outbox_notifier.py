@@ -4766,7 +4766,13 @@ def _dispatch_mirror_review(
     # round-trip (5b) loses the PR metadata when answering back to Beacon,
     # and the worktree gate rejects with "no canonical path" — same shape as
     # the 4a marker-error black hole.
-    for f_name in ('pr_title', 'pr_body', 'max_clarifications'):
+    # `origin_task_id` (delegate-tracking Slice 2a) rides the SAME pre-build
+    # base-extra path as the PR metadata: propagating it at every dispatch hop
+    # here keeps a delegated build's chain_events joinable to its card across
+    # review → revision → rebase → re-review. Only delegated chains have it (the
+    # `is not None` guard omits it otherwise), so it never touches normal work.
+    for f_name in ('pr_title', 'pr_body', 'max_clarifications',
+                   'origin_task_id'):
         if data.get(f_name) is not None:
             review_base[f_name] = data[f_name]
     # Record the PR head commit this review covers, so the round-0 dedup (and
@@ -4846,12 +4852,6 @@ def _dispatch_mirror_review(
             'max_replans': CARRY,
         },
     )
-    # Delegate-tracking Slice 2a — carry the origin envelope task_id onto the
-    # Mirror review-request (as a base extra, not a whitelisted context field —
-    # only delegated chains have it) so it rides Mirror's outbox and the
-    # review/verdict chain_events can join back to the delegated card.
-    if data.get('origin_task_id'):
-        review_task['origin_task_id'] = data['origin_task_id']
 
     # D3.5 5c-followup-2 (audit C-2): key the review-task filename by
     # replan_count when this is a replan iteration's first review. Same
@@ -5457,7 +5457,13 @@ def _dispatch_revision_to_forge(
     # Propagate the same envelope fields _dispatch_build_phase does so a
     # future REVIEW_QUESTION (deferred) round-trip would preserve PR
     # metadata. Same shape as 5a M-2 review fix.
-    for f_name in ('pr_title', 'pr_body', 'max_clarifications'):
+    # `origin_task_id` (delegate-tracking Slice 2a) rides the SAME pre-build
+    # base-extra path as the PR metadata: propagating it at every dispatch hop
+    # here keeps a delegated build's chain_events joinable to its card across
+    # review → revision → rebase → re-review. Only delegated chains have it (the
+    # `is not None` guard omits it otherwise), so it never touches normal work.
+    for f_name in ('pr_title', 'pr_body', 'max_clarifications',
+                   'origin_task_id'):
         if data.get(f_name) is not None:
             revision_base[f_name] = data[f_name]
     # Chain context (M1). forge_build_session_id (C-1 5b) is set explicitly on
@@ -5703,7 +5709,13 @@ def _dispatch_rebase_to_forge(
         rebase_base['branch'] = branch
     if head_sha:
         rebase_base['head_sha'] = head_sha
-    for f_name in ('pr_title', 'pr_body', 'max_clarifications'):
+    # `origin_task_id` (delegate-tracking Slice 2a) rides the SAME pre-build
+    # base-extra path as the PR metadata: propagating it at every dispatch hop
+    # here keeps a delegated build's chain_events joinable to its card across
+    # review → revision → rebase → re-review. Only delegated chains have it (the
+    # `is not None` guard omits it otherwise), so it never touches normal work.
+    for f_name in ('pr_title', 'pr_body', 'max_clarifications',
+                   'origin_task_id'):
         if data.get(f_name) is not None:
             rebase_base[f_name] = data[f_name]
 
@@ -6286,7 +6298,13 @@ def _dispatch_mirror_review_rerun(
     # NEXT round's REVIEW_REVISION (if any) carries findings through.
     if isinstance(data.get('previous_findings'), list):
         review_base['previous_findings'] = data['previous_findings']
-    for f_name in ('pr_title', 'pr_body', 'max_clarifications'):
+    # `origin_task_id` (delegate-tracking Slice 2a) rides the SAME pre-build
+    # base-extra path as the PR metadata: propagating it at every dispatch hop
+    # here keeps a delegated build's chain_events joinable to its card across
+    # review → revision → rebase → re-review. Only delegated chains have it (the
+    # `is not None` guard omits it otherwise), so it never touches normal work.
+    for f_name in ('pr_title', 'pr_body', 'max_clarifications',
+                   'origin_task_id'):
         if data.get(f_name) is not None:
             review_base[f_name] = data[f_name]
     # forge_build_session_id propagates forward unchanged (CARRY) so the NEXT
@@ -6306,11 +6324,6 @@ def _dispatch_mirror_review_rerun(
             'max_replans': CARRY,
         },
     )
-    # Delegate-tracking Slice 2a — keep the origin task_id riding the re-review
-    # dispatch (base extra, see _dispatch_mirror_review) so revision rounds stay
-    # joined to the card.
-    if data.get('origin_task_id'):
-        review_task['origin_task_id'] = data['origin_task_id']
 
     # Idempotency: keyed on round number so re-process on notifier crash
     # doesn't double-dispatch a re-review.
@@ -11439,6 +11452,13 @@ def _route_beacon_replan_approval(
         replan_count=next_count,
         max_replans=max_count,
         queued_during_pause=is_paused,
+        # Delegate-tracking Slice 2a — re-carry the origin task_id onto the
+        # replanned pending entry (Beacon authors a FRESH marker id on replan, so
+        # without this the escalate→replan path drops the join). `data` is
+        # Mirror's REVIEW_ESCALATE outbox, which carries origin via the
+        # review-request base-extra. add_pending stamps it only when distinct
+        # from the marker id, so non-delegated replans are unaffected.
+        origin_task_id=data.get('origin_task_id'),
     )
     chain_event_emit.emit_event(
         **approval.build_approval_request_chain_event(payload),
