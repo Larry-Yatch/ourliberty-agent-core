@@ -4,6 +4,71 @@
 
 ---
 
+## Iteration ~5083 — 2026-07-11T11:42Z UTC (Larry /cycle, Tier 1)
+
+**Health:** ✅ Nominal. All 6 mandatory checks clean. 0 new alerts (watermark 879=file_length). Zombie PID 1834248 carry.
+
+**VERIFY-BEFORE-REASSERT (from iter ~5082):**
+- **"zombie PID 1834248 (43d+16h+12m)"**: CONFIRMED ✅ — Ss, 43d+16h+22m. [carry]
+- **"beacon PID 3965718"**: CONFIRMED ✅ — Ss, running. ✅
+- **"outbox-notifier PID 3965731"**: CONFIRMED ✅ — Ss, running. ✅
+- **"inbox_watcher PID 3940207"**: CONFIRMED ✅ — Ssl, running. ✅
+- **"HEAD=3d3c6108=origin/main"**: SUPERSEDED — HEAD=24eb34a2 (wrapper commit "Pulse cycle 20260711T113351Z" from iter ~5082). ✅
+- **"pending=0 approvals"**: CONFIRMED ✅ — pending=0, history=464. ✅
+- **"sync status=no-change, last_sync=10:59:51Z"**: CONFIRMED ✅ — status=no-change, ~41 min at check, within 2h threshold. ✅
+- **"PR #860 [OPEN, UNKNOWN]"**: CONFIRMED ✅ — still OPEN, UNKNOWN, no labels. [blue carry]
+- **"Check XI attention_rate=18.8% (12/64)"**: CONFIRMED ✅ — artifact check-xi-20260711T102013Z; no new artifact until tomorrow. [yellow carry]
+
+**Check 0 — Alert triage:** `repair-watermark {"repaired": false, "old_watermark": 879, "file_length": 879}` — 0 new alerts past watermark. NOMINAL ✅
+
+**Check 1 — Log noise:** outbox-notifier PID 3965731 ✅. Last log 03:51:27 MDT (09:51:27Z UTC) — AUTO_MERGE_WORKTREE_TEARDOWN for PR #929. No WARNs/ERRORs since 02:59 MDT restart. NOMINAL ✅
+
+**Check 2 — Telegram sweep:** beacon PID 3965718 ✅. Last bot entry 04:40:36 MDT (10:40:36Z UTC) — alert idx=878 route=digest (heal-dashboard-api-sha-drift, suppressed). pending=0. Last Larry human message 01:08:20 MDT "Yes draft the fix." — actioned prior iters (PR #929 built + merged). No unhandled directives. NOMINAL ✅
+
+**Check 3 — Pipeline stall:** DRY-RUN (11:40:59Z UTC) → "no stalls detected." 20 FORGE_NO_PR_SKIP entries all valid. NOMINAL ✅
+
+**Check 4 — Pending directives:** pending=0. NOMINAL ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-11T11:31:19Z (~11 min at check; cadence=10 min). Within cadence. NOMINAL ✅
+
+**Check A — Source repo:** HEAD=24eb34a2=origin/main ✅; clean tree ✅; on main ✅; 0 commits behind/ahead. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-11T10:59:51Z (~41 min), status=no-change. Within 2h threshold. NOMINAL ✅
+**Check C — Agent liveness:** beacon PID 3965718 ✅; outbox-notifier PID 3965731 ✅; inbox_watcher PID 3940207 ✅. ⚠️ Zombie PID 1834248 (43d+16h+22m, bash poll loop awaiting absent archive file). [carry]
+**Check E — PR/merge state:**
+- PR #860 [OPEN, UNKNOWN] — spec XIV-b, no labels. [blue carry]
+
+**§5.0:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅.
+
+**Conditional checks — UTC Saturday 2026-07-11 (~11:42Z):**
+- Check XI: Latest artifact check-xi-20260711T102013Z — attention_rate=18.8% (12/64), gate=10%, over_gate=True. Already fired today (10:20Z UTC); no new artifact expected until tomorrow. [yellow carry]
+- Check I: Not a firing day (Sat). Latest artifact: check-i-2026-07-10.json. ✅
+- Check III/IV/VIII/IX/X/XII/XIV: Sunday/Monday gates. Skip. ✅
+
+**G-rule assessment:**
+- All G-rule counts carry from iter ~5082. No new occurrences this iter.
+
+**Actions taken:**
+1. PRIME ledger: `iter_clean` appended (tier=1, template=nominal, 11:42:57Z UTC). ✅
+2. Tier state: `record --checks-clean false` → tier=1, consecutive_clean=0. ✅
+
+**Escalations:** 0 new DMs. All outstanding carries already DM'd in prior iters.
+
+**Standing findings (carry):**
+- [yellow] **zombie-bash-pid-1834248** — 43d+16h+22m, bash poll loop awaiting absent archive file. ask-then-do: `kill 1834248`. [carry]
+- [yellow] **check-xi-drift-over-gate** — 12/64 (18.8%, gate=10%) on 2026-07-11. No change from iter ~5082. [carry]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07`. [carry]
+- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
+- [blue] **PR #860** — spec XIV-b, UNKNOWN. No pipeline dependency. [carry]
+- [blue] **Check I proposal #1** — `notify-p3a-retro-prep` ($1.91 vs $0.28 baseline, 98σ). Use `/dispatch 1`. [carry]
+- [blue] **G-rules (dispatched, vp):** ourliberty-health-subject-key-mismatch-001 [3/3, vp]; forge-revision-preamble-missing-pr711-001 [vp]; forge-wip-redispatch-digest-tier4-001 [vp]; forge-wip-redispatch-exhausted-pr-exists-fp-001 [APPROVAL_REQUEST QUEUED iter ~3279, vp]; decision-needed-approval-forge-dispatch-no-target-repo-001 [vp]; no-session-revision-active-mirror-session-fp-001 [vp].
+- [blue] **G-rule 2/3:** outbox-notifier-merge-conflict-manual-rebase-tier4-001; forge-wip-redispatch-exhausted-genuine-no-pr-001; outbox-notifier-notification-intent-review-escalate-tier4-001; outbox-notifier-auto-merge-stale-revalidation-tier4-001.
+- [blue] **G-rule 1/3:** mirror-malformed-verdict-heal-reap-path-001; heal-unregistered-approval-null-chat-id-001; mirror-queue-wait-gauge-tier4-001; inbox-watcher-tier-pool-all-unavailable-tier4-001; heal-pipeline-stall-unrouted-deep-review-required-fp-001; heal-pulse-check-staleness-single-flight-skip-fp-001; gate-parallelism-monitor-regression-data-001; pulse-rotation-check-source-tier4-001; watermark-rotation-gap [1/3 iter ~5063].
+
+**PRIME DIRECTIVE:** 0 new interventions; 0 new systemic_fixes; iter_clean appended. ratio=19.0 (86 systemic_fixes / 1634 interventions; 34 vp).
+**Tier end-of-iter:** **Tier 1** (zombie carry; consecutive_clean=0).
+
+---
+
 ## Iteration ~5082 — 2026-07-11T11:32Z UTC (Larry /loop /cycle, Tier 1)
 
 **Health:** ✅ Nominal. All 6 mandatory checks clean. 0 new alerts (watermark 879=file_length). Zombie PID 1834248 carry.
@@ -2740,78 +2805,6 @@ Watermark advanced 1007→1009.
 
 **PRIME DIRECTIVE:** 0 interventions; 0 new systemic_fixes; iter_clean appended. ratio=19.735 (1638+ iters / 83 systemic_fixes; 33 verification_pending; trend=worsening).
 **Tier end-of-iter:** **Tier 1** (signal: PR #923 pipeline delay + zombie PID + 6 actionable pending holds; consecutive_clean=0).
-
----
-
-## Iteration ~5043 — 2026-07-11T06:31Z UTC (Larry /loop /cycle, Tier 1)
-
-**Health:** ⚠️ Signal — PR #923 GG-S4 rev-1 review orphaned by `heal-orphaned-mirror-claims` at 06:20Z UTC; pipeline paused pending RECONCILE_MISSING_REVIEW on next outbox-notifier scan. 1 new alert (Tier-3). All agents alive. Zombie PID carry. PR #924 HELD (deep-review).
-
-**VERIFY-BEFORE-REASSERT (from iter ~5042):**
-- **"PR #923 GG-S4 — Mirror rev-1 active (.claimed/0/)"**: UPDATED ⚠️ — Both .claimed/ slots now EMPTY. `review-gg-s4-silent-failure-gauge-rev1.json` moved to inbox .archive as `review-gg-s4-silent-failure-gauge-rev1.orphan-cleared-20260711T062009Z.json`. Root cause: inbox_watcher PID 3768681 was killed by heal-stale-daemon-code restart at 05:58Z; first rev-1 session (05:17-05:19Z UTC) forfeited (`gg-s4-silent-failure-gauge.forfeit.json` exit_code=-3 "in-flight registry orphan"). `ourliberty-heal-orphaned-mirror-claims.service` (installed 06:00Z) cleared the residual .claimed/0/ orphan at 06:20:09Z UTC. Outbox-notifier RECONCILE_MISSING_REVIEW scan hasn't fired yet (~11 min since orphan cleared). Pipeline is paused; expected to self-heal on next RECONCILE scan. PR #923 is now MERGEABLE (GH computed). [updated: orphaned → self-heal pending]
-- **"PR #924 reconcile-claimed-check-001 — Mirror REVIEW_PASS; AUTO_MERGE HELD for /code-review high"**: CONFIRMED ✅ — OPEN, UNKNOWN; still held. [carry]
-- **"zombie PID 1834248 (43d+11:02:36h)"**: CONFIRMED ⚠️ — now 43d+11:07:44h; bash poll loop awaiting absent archive file `build-check-viii-pr-2b-analyzer-001.json`. [carry, growing]
-- **"pending=7 (6 effective actionable)"**: CONFIRMED ✅ — pending=7 unchanged. [carry]
-- **"outbox-notifier PID 3800436"**: CONFIRMED ✅ — Ss, 26:19 uptime at check. [carry]
-- **"beacon PID 3798931"**: CONFIRMED ✅ — Ss, 28:01 uptime at check. [carry]
-- **"inbox_watcher PID 3800433"**: CONFIRMED ✅ — Ssl, 26:19 uptime at check. [carry]
-- **"HEAD=ebd693be=origin/main"**: CONFIRMED ✅ — clean, on main. [carry]
-
-**Check 0 — Alert triage:** `repair-watermark {"repaired": false, "old_watermark": 1006, "file_length": 1007}` — 1 new alert:
-- L1007: `source=heal-dashboard-api-sha-drift, subject=dashboard-api-sha-drift-healed, route=digest` → **Tier-3** (known-pattern match). Dashboard API auto-restarted on stale code (running bad30178, on-disk HEAD ebd693be after Pulse cycle commit). Routine self-heal. Watermark advanced 1006→1007. NOMINAL ✅
-
-**Check 1 — Log noise:** outbox-notifier PID 3800436 ✅. Last meaningful entry: 00:23:54 MDT `AUTO_MERGE_HELD_DEEP_REVIEW repeat hold for PR #924` (unchanged head eeadc669, not re-notifying). Session idle since 06:23Z UTC. No new WARNs. NOMINAL ✅
-
-**Check 2 — Telegram sweep:** Beacon PID 3798931 ✅. Last bot log: 00:23:19 MDT — idx=1006 route=digest (dashboard-api-sha-drift-healed). No new Larry messages. pending=7 history=455. NOMINAL ✅
-
-**Check 3 — Pipeline stall:** DRY-RUN (06:26Z UTC) → "no stalls detected." All FORGE_NO_PR_SKIP entries valid (pr_exists, sibling_pr_title_shipped, pr_task_id_closed_or_merged). `MIRROR_PASS_UNMERGED_SKIP reconcile-claimed-check-001 reason=held_deep_review` — correct. PR #923 GG-S4 rev-1 orphaned — stall healer's cooldown window not yet expired (expected; self-heal via RECONCILE). NOMINAL (per healer) ✅
-
-**Check 4 — Pending directives:** pending=7 (unchanged). [0]=deep-review-hold-pr823, [1]=deep-review-hold-pr830, [2]=deep-review-hold-pr833, [3]=deep-review-hold-pr904, [4]=deep-review-hold-pr917 (stale — PR #917 MERGED; Beacon cleans), [5]=outbox-notifier-merge-held-deep-review-tier3-001, [6]=deep-review-hold-pr924-eeadc669. Effective actionable=6. ⚠️ Signal (carry)
-
-**Check 5 — Stale daemon code:** heartbeat=2026-07-11T06:18:02Z UTC (~8 min at check). Within 10-min cadence. NOMINAL ✅
-
-**Check A — Source repo:** HEAD=ebd693be=origin/main; clean; on main. NOMINAL ✅
-**Check B — Sync health:** last_sync=2026-07-11T05:48:38Z UTC (~38 min at check); status=error (stale push-fail artifact, already processed Tier-3 at iter ~5037); repo HEAD=origin/main clean. Effective state nominal. [carry/stale-artifact] NOMINAL ✅
-**Check C — Agent liveness:** outbox-notifier PID 3800436 ✅ (Ss); beacon PID 3798931 ✅ (Ss); inbox_watcher PID 3800433 ✅ (Ssl). ⚠️ Zombie PID 1834248 (43d+11:07:44h, bash poll loop awaiting absent archive file). [carry]
-**Check E — PR/merge state:** PR #923 [OPEN, MERGEABLE] GG-S4 rev-1 — review orphaned, pipeline paused; RECONCILE_MISSING_REVIEW pending on next notifier scan (~0-5 min out); PR #924 [OPEN, UNKNOWN] reconcile-claimed-check-001 — Mirror REVIEW_PASS; HELD for `/code-review high`; PR #860 spec XIV-b. ⚠️ Signal (PR #923 pipeline paused, expected transient)
-
-**§5.0:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅.
-
-**Conditional checks — UTC Saturday 2026-07-11 (06:31Z):**
-- Check I: Not a firing day (Sat). Latest artifact: check-i-2026-07-10.json. ✅
-- Check XI: Timer fires ~10:21Z today; current time 06:31Z, no artifact yet. ✅
-- Check III/IV/VIII/IX/X/XII/XIV: Sunday/Monday gates. Skip. ✅
-
-**Notable — PR #923 GG-S4 pipeline paused by orphan-cleared:** `ourliberty-heal-orphaned-mirror-claims.service` (installed 06:00Z 2026-07-11) detected the stale .claimed/0/ entry for GG-S4 rev-1 and cleared it at 06:20:09Z UTC. Background: review session was killed mid-run (pid=3768681, uptime ~1m15s) when heal-stale-daemon-code restarted the inbox_watcher at 05:58Z; the forfeit exit_code=-3 was written to outbox .archive at 05:19Z. The post-restart inbox_watcher (PID 3800433) held the claim (the review file was still in .claimed/0/ with no watcher alive to run it), then the orphan-claims healer cleared it. Next outbox-notifier RECONCILE_MISSING_REVIEW scan should re-dispatch the review. If not fired by iter ~5044, escalate to ask-then-do.
-
-**G-rule assessment:**
-- `RECONCILE_MISSING_REVIEW-.claimed-blindspot` [3/3 DISPATCHED ✅, vp]: 6th post-dispatch occurrence — heal-orphaned-mirror-claims cleared GG-S4 rev-1 orphan at 06:20Z; RECONCILE not yet fired. Pipeline self-heal path active. PR #924 fix (Mirror REVIEW_PASS, HELD) would close this G-rule once merged + verified. [updated: 6th post-dispatch, monitoring]
-- All other G-rule counts carry from iter ~5042. No new G-rules opened.
-
-**Actions taken:**
-1. Alert watermark advanced 1006→1007 (L1007 Tier-3; route=digest). ✅
-2. PRIME ledger: `iter_clean` appended (06:31:41Z UTC, tier=1, template=nominal). ✅
-3. Tier state: `record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=06:31:42Z UTC. ✅
-
-**Escalations:** 0 new Pulse DMs. PR #923 pipeline pause is transient (RECONCILE self-heals within 1-2 cycles).
-
-**Standing findings (carry/update):**
-- [yellow] **zombie-bash-pid-1834248** — 43d+11:07h, bash poll loop awaiting absent archive file `build-check-viii-pr-2b-analyzer-001.json`. ask-then-do: `kill 1834248`. [carry]
-- [yellow] **6 actionable items on Approvals tab** — PRs #823, #830, #833, #904 (deep-review-holds) + outbox-notifier-merge-held-deep-review-tier3-001 + deep-review-hold-pr924 (Mirror REVIEW_PASS; run `/code-review high` then `scripts/merge_reviewed_pr.sh 924`). PR #917 stale (MERGED; Beacon cleans). [carry]
-- [yellow] **check-xi-drift-over-gate** — 8/64 (12.5%, gate=10%) on 2026-07-10. Check XI fires ~10:21Z today. [carry]
-- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07`. [carry]
-- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
-- [blue] **PR #923 GG-S4** — review orphaned at 06:20Z; RECONCILE_MISSING_REVIEW self-heal expected on next notifier scan. PR now MERGEABLE. [updated: orphaned → self-heal pending]
-- [blue] **PR #924** — reconcile-claimed-check-001; Mirror REVIEW_PASS; HELD for `/code-review high`. Run it → merge to close RECONCILE G-rule. [carry]
-- [blue] **PR #860** — spec XIV-b. [carry]
-- [blue] **Check I proposal #1** — `notify-p3a-retro-prep` ($1.91 vs $0.28 baseline, 98σ). Use `/dispatch 1`. [carry]
-- [blue] **ourliberty-heal-orphaned-mirror-claims healer** — installed 06:00Z; fired its first clear at 06:20Z (GG-S4 rev-1 orphan). Working as designed. [updated: first fire confirmed]
-- [blue] **G-rules (dispatched, vp):** outbox-notifier-merge-held-deep-review-tier4-001 [3/3 DISPATCHED ✅, vp, 4th post-dispatch]; RECONCILE_MISSING_REVIEW-.claimed-blindspot [3/3 DISPATCHED ✅, vp — PR #924 Mirror PASS, HELD for deep-review; 6th post-dispatch]; ourliberty-health-subject-key-mismatch-001 [3/3, vp]; forge-revision-preamble-missing-pr711-001 [vp]; forge-wip-redispatch-digest-tier4-001 [vp]; forge-wip-redispatch-exhausted-pr-exists-fp-001 [APPROVAL_REQUEST QUEUED iter ~3279, vp]; decision-needed-approval-forge-dispatch-no-target-repo-001 [vp]; no-session-revision-active-mirror-session-fp-001 [vp]. [carry]
-- [blue] **G-rule 2/3:** forge-marker-task-id-mismatch-xii-v1; build-sequence-advancer-sequence-complete-tier4-001; outbox-notifier-merge-conflict-manual-rebase-tier4-001; forge-wip-redispatch-exhausted-genuine-no-pr-001; outbox-notifier-notification-intent-review-escalate-tier4-001; outbox-notifier-auto-merge-stale-revalidation-tier4-001. [carry]
-- [blue] **G-rule 1/3:** mirror-malformed-verdict-heal-reap-path-001; heal-unregistered-approval-null-chat-id-001; mirror-queue-wait-gauge-tier4-001; inbox-watcher-tier-pool-all-unavailable-tier4-001; heal-pipeline-stall-unrouted-deep-review-required-fp-001; heal-pulse-check-staleness-single-flight-skip-fp-001; gate-parallelism-monitor-regression-data-001; pulse-rotation-check-source-tier4-001. [carry]
-
-**PRIME DIRECTIVE:** 0 interventions; 0 new systemic_fixes; iter_clean appended. ratio=19.759 (1641+ iters / 83 systemic_fixes; 33 verification_pending; trend=worsening).
-**Tier end-of-iter:** **Tier 1** (signal: PR #923 pipeline paused + zombie PID + 6 actionable pending holds; consecutive_clean=0).
 
 ---
 
