@@ -317,22 +317,25 @@ def _snapshot_missions_by_id(registry: dict[str, Any]) -> dict[str, dict[str, An
     }
 
 
-def _merge_mission_deltas(fresh: dict[str, Any],
-                          before_by_id: dict[str, dict[str, Any]],
-                          worked: dict[str, Any]) -> tuple[int, int]:
+def _merge_mission_deltas_and_appends(
+        fresh: dict[str, Any],
+        before_by_id: dict[str, dict[str, Any]],
+        worked: dict[str, Any]) -> tuple[int, int]:
     """Apply only the work THIS tick did (``worked`` vs the read-time snapshot
     ``before_by_id``) onto a freshly re-read ``fresh`` registry, matched by
     mission ``id``. Two shapes of work:
 
     - FIELD DELTAS on entries that existed at read time (retire-with-audit
-      flags, stuck needs_decision flags) — the same field-level merge as
-      heal_missions_card_gc._merge_registry_deltas: touch only the keys we
-      changed, never an entry we didn't author onto, never an entry missing
+      flags, stuck needs_decision flags) — delegated to the canonical § 2
+      merge, heal_missions_card_gc._merge_registry_deltas: touch only the keys
+      we changed, never an entry we didn't author onto, never an entry missing
       from the fresh file;
     - APPENDS for entries this tick authored (scan_and_propose / new-mission PR
       ingest / queue drain) — absent from ``before_by_id`` AND from ``fresh``.
-      An id a concurrent writer already landed in ``fresh`` keeps the fresh
-      copy untouched (dedup — we never overwrite another writer's entry).
+      The GC merge deliberately skips these ("not present at read time"); this
+      healer authors new entries, so it appends them — unless a concurrent
+      writer already landed the same id, in which case the fresh copy stays
+      untouched (dedup — we never overwrite another writer's entry).
 
     Why not whole-file replace: the passes above can hold the read-time
     snapshot across chain_events and gh round-trips (seconds to minutes),
@@ -342,41 +345,21 @@ def _merge_mission_deltas(fresh: dict[str, Any],
     would silently lose those writes (the § 2 lost-update class).
 
     Returns (field deltas applied, new entries appended)."""
+    from heal_missions_card_gc import _merge_registry_deltas  # noqa: PLC0415
+    applied = _merge_registry_deltas(fresh, before_by_id, worked,
+                                     list_key='missions')
     missions = fresh.setdefault('missions', [])
-    fresh_by_id = {
-        m['id']: m for m in missions
-        if isinstance(m, dict) and m.get('id')
-    }
-    applied = 0
+    fresh_ids = {m['id'] for m in missions if isinstance(m, dict) and m.get('id')}
     appended = 0
     for entry in worked.get('missions', []):
         if not isinstance(entry, dict):
             continue
         mid = entry.get('id')
-        if not mid:
+        if not mid or mid in before_by_id or mid in fresh_ids:
             continue
-        before = before_by_id.get(mid)
-        if before is None:
-            # Not present at read time — an entry this tick authored. Append it
-            # unless a concurrent writer already landed the same id.
-            if mid not in fresh_by_id:
-                missions.append(entry)
-                fresh_by_id[mid] = entry
-                appended += 1
-            continue
-        set_fields = {k: v for k, v in entry.items()
-                      if k not in before or before[k] != v}
-        removed = [k for k in before if k not in entry]
-        if not set_fields and not removed:
-            continue  # untouched this tick — leave the fresh copy alone
-        target = fresh_by_id.get(mid)
-        if target is None:
-            continue  # gone from the fresh file — drop our stale delta, don't re-add
-        for k, v in set_fields.items():
-            target[k] = v
-        for k in removed:
-            target.pop(k, None)
-        applied += 1
+        missions.append(entry)
+        fresh_ids.add(mid)
+        appended += 1
     return applied, appended
 
 
@@ -1454,30 +1437,27 @@ def run_once(*, dry_run: bool,
     commit_status = 'nothing'
     if (res.proposed or res.retired or res.ingested or res.queue_drained
             or res.flagged_stuck) and not dry_run:
-        # Lost-update guard (mirrors heal_missions_card_gc's missions write
-        # path): the passes above can hold the read-time snapshot across
-        # chain_events + gh round-trips, during which a separate process (the
-        # dashboard's delegate `spawned` stamp, the GC healer's phase flips /
-        # briefings) may write missions.json. Re-read FRESH and apply only this
-        # tick's work — field deltas on pre-existing entries plus appends for
-        # the entries this tick authored — so the read→write window is
-        # sub-millisecond instead of the length of the round-trips. A malformed
-        # re-read skips the write (never clobber the file with a stale copy).
+        # § 2 lost-update guard — see _merge_mission_deltas_and_appends for the
+        # full rationale. Refuse to write when the fresh re-read is malformed OR
+        # when a registry that had entries at read time re-reads empty (a
+        # transiently missing/truncated file, e.g. mid `git pull` rewriting it):
+        # writing then would rebuild missions.json from this tick's appends
+        # alone — a wipe pushed to main. No writer ever legitimately empties it.
         try:
             fresh = read_missions_registry(mpath)
-            if fresh is None:
-                log('missions.json re-read malformed before write — skipping '
-                    'write this tick (avoids clobbering with stale)')
-                _emit_summary(res, 'commit-failed', dry_run)
-                return 0
-            merged, appended = _merge_mission_deltas(fresh, before_by_id, registry)
+            if fresh is None or (before_by_id and not fresh.get('missions')):
+                raise ValueError(
+                    're-read malformed or unexpectedly empty before write — '
+                    'refusing to clobber (retry next tick)')
+            merged, appended = _merge_mission_deltas_and_appends(
+                fresh, before_by_id, registry)
             atomic_write_missions(mpath, fresh)
-            log(f'missions.json write: merged {merged} delta(s) + appended '
-                f'{appended} mission(s) onto a fresh re-read (lost-update guard)')
         except Exception as e:  # noqa: BLE001 — fail-safe
-            log(f'missions.json write raised: {type(e).__name__}: {e}')
+            log(f'missions.json write skipped/failed: {type(e).__name__}: {e}')
             _emit_summary(res, 'commit-failed', dry_run)
             return 0
+        log(f'missions.json write: merged {merged} delta(s) + appended '
+            f'{appended} mission(s) onto a fresh re-read (lost-update guard)')
         core = repo_paths.get('ourliberty-agent-core')
         if core:
             try:

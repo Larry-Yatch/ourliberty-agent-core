@@ -1485,13 +1485,44 @@ class RunOnceLostUpdateGuardTest(unittest.TestCase):
 
     def test_entry_deleted_mid_tick_is_not_readded(self):
         # A concurrent writer deletes the entry this tick flagged — drop our
-        # stale delta rather than resurrecting the entry.
+        # stale delta rather than resurrecting the entry. (A bystander entry
+        # stays, so the empty-re-read wipe guard doesn't fire.)
         stuck = {'id': 'note-1', 'phase': 'proposed', 'task_ids': ['t-x'],
                  'proposed_by': 'closeout-author', 'created': '2026-05-01'}
-        self._write_missions([stuck])
+        self._write_missions([stuck, _mentry('bystander')])
         _write_queue(self.qd, _mentry('foo'))   # keeps the tick's write firing
+
+        def drop_note(disk):
+            disk['missions'] = [m for m in disk['missions'] if m['id'] != 'note-1']
+        rc = self._run(self._concurrent(drop_note))
+        self.assertEqual(rc, 0)
+        self.assertEqual([m['id'] for m in self._disk()['missions']],
+                         ['bystander', 'foo'])
+
+    def test_empty_fresh_reread_skips_write_never_wipes(self):
+        # A registry that HAD entries at read time re-reads empty just before
+        # the write (transiently truncated/missing file, e.g. mid `git pull`
+        # rewriting it) — refuse the write: rebuilding the file from this
+        # tick's appends alone would wipe every existing mission and push the
+        # wipe to main.
+        self._write_missions([_mentry('keep-1'), _mentry('keep-2')])
+        _write_queue(self.qd, _mentry('foo'))
         rc = self._run(self._concurrent(
-            lambda d: d['missions'].clear()))
+            lambda d: d.__setitem__('missions', [])))
+        self.assertEqual(rc, 0)
+        # the write was skipped — the truncated file was NOT replaced by an
+        # appends-only registry (no {foo}-only wipe committed)
+        self.assertEqual(self._disk()['missions'], [])
+        p = self.qd / 'foo.json'
+        self.assertTrue(p.exists())   # nothing persisted → queue file kept
+
+    def test_bootstrap_missing_file_still_writes_appends(self):
+        # First-ever tick: missions.json does not exist. The empty-re-read
+        # guard must NOT block bootstrap (nothing existed at read time, so an
+        # appends-only write is exactly right).
+        self.assertFalse(self.mfile.exists())
+        _write_queue(self.qd, _mentry('foo'))
+        rc = self._run(lambda: [])
         self.assertEqual(rc, 0)
         self.assertEqual([m['id'] for m in self._disk()['missions']], ['foo'])
 
