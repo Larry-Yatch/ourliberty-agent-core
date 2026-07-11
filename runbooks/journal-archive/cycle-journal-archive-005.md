@@ -22166,3 +22166,87 @@ NOMINAL ✅
 
 ---
 
+## Iteration ~4974 — 2026-07-10T17:30Z UTC (Larry /cycle, Tier 1)
+
+**Health:** ✅ Nominal — 1 new alert (L927 Tier-3 known-pattern, silenced); .claimed/1/ orphan reaped; all mandatory and additive checks clean.
+
+**VERIFY-BEFORE-REASSERT (from iter ~4973, 2026-07-10T17:25Z UTC):**
+- **"HEAD=06fa6103=origin/main"**: UPDATED ✅ → HEAD now ab44ef87 ("Pulse cycle 20260710T172728Z") = origin/main. [wrapper committed ✅]
+- **"outbox-notifier PID 2734978 ✅ (Ss, 0:07 elapsed)"**: CONFIRMED ✅ — Ss, 28:43 elapsed. [alive ✅]
+- **"beacon PID 2734739 ✅ (Ss, 0:02 elapsed)"**: CONFIRMED ✅ — Ss, 28:48 elapsed. [alive ✅]
+- **"inbox_watcher PID 2672329 ✅ (Ssl, 43:33)"**: CONFIRMED ✅ — Ssl, 1:06:55 elapsed. [alive ✅]
+- **"zombie PID 1834248 ⚠️ (42d+22:02, bash poll loop)"**: CONFIRMED ⚠️ — 42d+22:09:55 elapsed. [carry, growing]
+- **"pending=0"**: CONFIRMED ✅ — pending=0. [stable ✅]
+- **"sync last_sync=17:16:13Z status=no-change"**: CONFIRMED ✅ — same. [stable ✅]
+- **"daemon heartbeat 16:59:22Z UTC"**: UPDATED ✅ → 2026-07-10T17:22:19Z UTC (~8 min at check). [fresh ✅]
+- **"PR #909 MIRROR_PASS + AUTO_MERGE_HELD blocker=#854"**: CONFIRMED ✅ — UNKNOWN (HELD); second duplicate review session (eb211099) also passed at 11:27:49 MDT. [carry, G-rule occ-9 completion]
+- **"PR #905 HELD blocker=#854"**: CONFIRMED ✅ — open, HELD. [carry]
+- **"PR #854 HELD_DEEP_REVIEW"**: CONFIRMED ✅ — UNKNOWN (still HELD). [carry]
+- **".claimed/1/ slot had 2 files"**: UPDATED ✅ → now 1 file only (review-sentinel-in-flight-stall-translation-001.json, PR #854). Orphan review-main-suite-guardian-decollide-liveness-001.json **REAPED** by heal-wedged-review-sessions. [positive cleanup ✅]
+
+**NEW FINDINGS:**
+
+**L927 — outbox-notifier review-pass PR #909 (dup, Tier-3, silent) ✅:** `source=outbox-notifier, kind=notification, intent=review-pass` at 17:27:51Z UTC. Second Mirror review session (eb211099) for sentinel-stale-lease-tier3-silence-001 completed and passed at 11:27:49 MDT — downstream completion of G-rule `notifier-concurrent-scan-duplicate-review-dispatch-001` occurrence 9 (RECONCILE_MISSING_REVIEW re-dispatch at 11:03:48 MDT, iter ~4972). Both reviews passed; both fired AUTO_MERGE_HELD blocker=#854. triage helper → Tier-3 (known-pattern match, route=digest, decision=silence). No Pulse DM (routine dup; bot delivered DM to Larry at ~11:27 MDT). [no action]
+
+**.claimed/1/ orphan reaped [positive]:** review-main-suite-guardian-decollide-liveness-001.json (09:44 MDT orphan from PR #906 area, ~7.5h old) was reaped by heal-wedged-review-sessions. Slot 1 now holds only review-sentinel-in-flight-stall-translation-001.json (PR #854). Stall healer continuing to function as safety net. [positive ✅]
+
+**Check 0 — Alert triage:** repair-watermark `{"repaired": false, "old_watermark": 926, "file_length": 927}`. 1 new alert:
+- L927: `outbox-notifier/review-pass` (PR #909 dup review completion) → Tier-3 (known-pattern). silence ✅
+- Watermark→927. 0 interventions. CLEAN ✅
+
+**Check 1 — Log noise:** outbox-notifier.log last entry 11:27:51 MDT (AUTO_MERGE_HELD PR #909 second review-pass). No new WARNs. NOMINAL ✅
+
+**Check 2 — Telegram sweep:** Last bot entry 11:20:04 MDT (idx=925, review-pass PR #909 from first session). No new Larry directives since "go" at 10:59:49 MDT. NOMINAL ✅
+
+**Check 3 — Pipeline stall:** DRY-RUN 17:28Z UTC → "no stalls detected" ✅. (7× FORGE_NO_PR_SKIP: #896/#897/#898/#899/#901/#902/#904.) NOMINAL ✅
+
+**Check 4 — Pending directives:** pending=0. NOMINAL ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-10T17:22:19Z UTC (~8 min at check). NOMINAL ✅
+
+**Check A — Source repo:** HEAD=ab44ef87=origin/main; clean tree. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-10T17:16:13Z status=no-change. NOMINAL ✅
+**Check C — Agent liveness:** beacon PID 2734739 ✅ (Ss, 28:48); outbox_notifier PID 2734978 ✅ (Ss, 28:43); inbox_watcher PID 2672329 ✅ (Ssl, 1:06:55). Zombie PID 1834248 ⚠️ (42d+22:09:55, bash poll loop; target absent) [carry]. NOMINAL ✅
+**Check E/H — PR/Forge state:** 6 open PRs (#909/#905/#874/#860/#854/#847). PR #909: MIRROR_PASS (×2) + AUTO_MERGE_HELD blocker=#854. PR #905: HELD #854. PR #854: HELD_DEEP_REVIEW; .claimed/1/ single file (stall healer clean). #874/#860/#847 long-standing carries. NOMINAL ✅
+
+**§5.0:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks — UTC Friday 2026-07-10:**
+- Check I: Friday. Latest artifact check-i-2026-07-10.json (14:13Z UTC) — already triaged iter ~4965. No new artifact. ✅
+- Check XI: Daily. Latest artifact check-xi-20260710T102121 (10:21Z UTC) — already triaged iter ~4966. 8/64 drifted (12.5%). [yellow, carry]
+- Check III: Sunday gate. Skip. ✅
+- Check IV/VIII/IX/X/XII/XIV: Monday gate. Skip. ✅
+
+**G-rule assessment:**
+- `notifier-concurrent-scan-duplicate-review-dispatch-001`: L927 is the completion of occurrence 9 (second review session for PR #909 ran to completion). No new occurrence count. Fix in-flight (PR #847 HELD_DEEP_REVIEW). [carry, no new dispatch]
+- `sentinel-stale-lease-tier4-001`: PR #909 MIRROR_PASS ×2; HELD blocker=#854. Near-complete — will auto-merge when #854 clears. [progressing, near-complete]
+- All other G-rule counts unchanged from iter ~4973.
+
+**Actions taken:**
+1. Check 0: L927 Tier-3 (known-pattern; helper authoritative); watermark→927. ✅
+2. §5.0: All three no-ops. ✅
+3. PRIME ledger: `iter_clean` appended (17:30:49Z UTC). ✅
+4. Tier state: `record --checks-clean true` → Tier 1, consecutive_clean=1. ✅
+
+**Escalations:** 0 new Pulse DMs this iter.
+
+**Standing findings (carry — updated from iter ~4973):**
+- [yellow] **zombie-bash-pid-1834248** — PID 1834248 (42d+22:09:55, bash poll loop; target absent). ask-then-do: `kill 1834248`. [carry, growing]
+- [yellow] **check-xi-drift-over-gate** — 8/64 drifted (12.5%, gate=10%) on 2026-07-10. [monitoring]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07`. [carry]
+- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
+- [blue] **PR #909** — chore(alerts): Tier-3 silence sentinel stale-lease. MIRROR_PASS ✅ ×2; AUTO_MERGE_HELD blocker=#854. Will merge when #854 clears. sentinel-stale-lease-tier4-001 near-complete. [monitoring]
+- [blue] **PR #905** — MIRROR_PASS + AUTO_MERGE_HELD blocker=#854. [carry]
+- [blue] **PR #854** — feat(alerts): Tier-3 translation sentinel in-flight-stall. HELD_DEEP_REVIEW. Review file in .claimed/1/ (stall healer clean). [carry]
+- [blue] **Check I proposal #1** — [small] `notify-p3a-retro-prep`. Use `/dispatch 1` to act. [carry]
+- [blue] **PR #847, #860, #874** — long-standing carries. [carry]
+- [blue] **G-rules (dispatched, vp):** sentinel-stale-lease-tier4-001 (PR #909 MIRROR_PASS ×2, HELD, near-complete); sentinel-inflight-stall-tier4 (PR #854 HELD_DEEP_REVIEW); notifier-concurrent-scan-dup (PR #847); ourliberty-health-subject-key-mismatch-001; forge-wip-redispatch-digest-tier4-001; no-session-revision-active-mirror-session-fp-001; forge-revision-preamble-missing-pr711-001; forge-wip-redispatch-exhausted-pr-exists-fp-001; decision-needed-approval-forge-dispatch-no-target-repo-001. [carry]
+- [blue] **G-rule 2/3:** forge-marker-task-id-mismatch-xii-v1; build-sequence-advancer-sequence-complete-tier4-001; outbox-notifier-merge-held-deep-review-tier4-001; heal-undispatched-pr-review-claimed-race-fp-001. [carry]
+- [blue] **G-rule 1/3:** mirror-queue-wait-gauge-tier4-001; mirror-malformed-verdict-heal-reap-path-001; forge-wip-redispatch-exhausted-genuine-no-pr-001; heal-unregistered-approval-null-chat-id-001; medic-escalation-recurrence-gauge-tier4-001; sentinel-stale-lease-tier4-001 [G-rule body dispatched ✅; monitoring]. [carry]
+- [blue] **6 stale proposed cards** — medic-dispatcher-tier4-fix, unrouted-pr-active-mirror-fix, ourliberty-health-sync-push-failed-translation, heal-stale-daemon-auto-restart-failed, auto-restart-failed-tier3-translation, mirror-malformed-post-restart-fix. [carry]
+
+**PRIME DIRECTIVE:** 0 interventions; 0 systemic_fixes. iter_clean appended (17:30:49Z UTC). Ratio stable.
+**Tier end-of-iter:** Tier **1** (consecutive_clean=1; 2 more clean iters → de-escalate to Tier 2).
+
+---
+
