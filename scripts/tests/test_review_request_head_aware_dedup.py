@@ -337,6 +337,15 @@ class TestCrossRoundAntiStorm(_DedupBase):
             ob._review_request_already_dispatched(
                 'review-cpu[high].json', None, task_id='cpu[high]'))
 
+    def test_non_string_task_id_does_not_crash(self):
+        # task_id comes from arbitrary parsed-JSON outboxes; a non-str (e.g. a
+        # numeric id) must not raise into the reconcile sweep via re/glob.escape.
+        # It simply has no sibling to match → the exact-name behavior stands.
+        self._write('', 'review-123-rev1.json', head_sha='h')
+        self.assertFalse(
+            ob._review_request_already_dispatched(
+                'review-123.json', None, task_id=123))  # no crash, no match
+
 
 if __name__ == '__main__':
     unittest.main()

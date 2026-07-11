@@ -4503,7 +4503,10 @@ def _review_request_already_dispatched(
     # review-<id>.json / -replan<N> / -rev<N> / -replan<N>-rev<N> — so a DIFFERENT
     # task whose id merely extends this one cannot be mistaken for a sibling
     # (neither 'a-b' via the hyphen, NOR 'a-rev9-foo' via a numeric round suffix).
-    if task_id:
+    # isinstance guard: task_id comes from arbitrary parsed-JSON outboxes, so a
+    # non-str (e.g. a numeric id) must not reach re.escape/glob.escape and raise
+    # into the reconcile sweep — a non-str simply has no sibling to match.
+    if isinstance(task_id, str) and task_id:
         _sibling_re = re.compile(
             rf'^review-{re.escape(task_id)}(-replan\d+)?(-rev\d+)?\.json$'
         )
