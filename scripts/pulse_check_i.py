@@ -714,6 +714,20 @@ def _short_proposal_slug(proposal: dict[str, Any]) -> str:
     return _proposal_dedup_key(proposal)[:10]
 
 
+def _primary_chat_id() -> Optional[int]:
+    """Larry's primary Telegram chat — the lowest id in TELEGRAM_ALLOWED_CHAT_IDS
+    (mirrors heal_unregistered_approval / outbox_notifier / pulse_check_v
+    _primary_chat_id). None only when the allow-list is unset/empty."""
+    raw = os.environ.get("TELEGRAM_ALLOWED_CHAT_IDS", "")
+    ids = []
+    for tok in raw.replace(",", " ").split():
+        try:
+            ids.append(int(tok))
+        except ValueError:
+            continue
+    return min(ids) if ids else None
+
+
 def _build_dispatch_envelope(
     proposal: dict[str, Any],
     fired_at: datetime,
@@ -760,7 +774,7 @@ def _build_dispatch_envelope(
         f"emit an APPROVAL_REQUEST marker — the trust policy gates whether the "
         f"build auto-starts or asks Larry, and Mirror reviews before any merge."
     )
-    return {
+    envelope: dict[str, Any] = {
         "task_id": task_id,
         "source": "pulse-auto-dispatch",
         "target_agent": "beacon",
@@ -769,6 +783,13 @@ def _build_dispatch_envelope(
         "phase": "preflight",
         "prompt": prompt,
     }
+    # Stamp the recipient at creation so the downstream APPROVAL_REQUEST marker
+    # carries a real reply_chat_id (#812 null-chat pattern) — omit the key when
+    # unresolvable so the notifier's fallback stays intact (never stamp null).
+    reply_chat_id = _primary_chat_id()
+    if reply_chat_id is not None:
+        envelope["reply_chat_id"] = reply_chat_id
+    return envelope
 
 
 def _load_dispatch_state(path: Path) -> dict[str, dict[str, Any]]:

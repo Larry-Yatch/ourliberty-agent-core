@@ -2155,5 +2155,36 @@ class ParkAndSuppressTests(unittest.TestCase):
         self.assertTrue(titles[medium["title"]]["parked"])
 
 
+class DispatchEnvelopeChatIdTests(unittest.TestCase):
+    """#812 null-chat-at-creation fix: the pulse-auto-dispatch envelope stamps a
+    reply_chat_id from TELEGRAM_ALLOWED_CHAT_IDS so Beacon's later
+    APPROVAL_REQUEST marker carries a real recipient. The key is OMITTED (never
+    stamped null) when the allow-list is unset, preserving notifier fallback."""
+
+    def _proposal(self) -> dict:
+        return {
+            "title": "Review high-σ anomaly task `burned-task-007`",
+            "effort": "small",
+            "impact": "$9.20 task vs $1.10 baseline (3.7σ above)",
+            "rationale": "Ledger flagged this task at 3.7σ above baseline.",
+        }
+
+    def test_primary_chat_id_lowest_allowed(self):
+        with mock.patch.dict(os.environ,
+                             {"TELEGRAM_ALLOWED_CHAT_IDS": "900, 100, 500"}):
+            self.assertEqual(pci._primary_chat_id(), 100)
+
+    def test_reply_chat_id_stamped_from_allowed(self):
+        with mock.patch.dict(os.environ,
+                             {"TELEGRAM_ALLOWED_CHAT_IDS": "7998341473"}):
+            env = pci._build_dispatch_envelope(self._proposal(), FIRED_AT)
+        self.assertEqual(env["reply_chat_id"], 7998341473)
+
+    def test_reply_chat_id_omitted_when_unset(self):
+        with mock.patch.dict(os.environ, {"TELEGRAM_ALLOWED_CHAT_IDS": ""}):
+            env = pci._build_dispatch_envelope(self._proposal(), FIRED_AT)
+        self.assertNotIn("reply_chat_id", env)
+
+
 if __name__ == "__main__":
     unittest.main()
