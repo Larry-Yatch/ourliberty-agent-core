@@ -59,6 +59,18 @@ NOTIFY_SCRIPT = SCRIPTS_DIR / 'notify_larry.py'
 SYNC_STALE_HOURS = 6
 GIT_TIMEOUT = 30
 
+# De-dup with sync_agent_core.sh's auto-commit-push persistence gate
+# (auto-commit-push-fail persistence-gate + de-dup, 2026-07-11). When sync's
+# auto-commit push loses the origin/main race and rolls back, it writes
+# status='error' with a consecutive_push_failures counter and owns the (single,
+# persistence-gated) DM. This check must therefore NOT independently page for
+# that same ERROR — otherwise Larry gets two DMs for one self-healing hiccup.
+# The counter uniquely identifies the auto-commit-push class (every other
+# write_status call leaves it 0), so sync_freshness treats any errored sync
+# carrying a positive counter as healthy/self-healing and defers the DM to sync.
+# Kept in sync with PUSH_FAIL_ALERT_THRESHOLD in scripts/sync_agent_core.sh.
+PUSH_FAIL_ALERT_THRESHOLD = 3
+
 
 def log(msg: str, quiet: bool = False) -> None:
     line = f'[{datetime.now(timezone.utc).isoformat()}] {msg}'
@@ -291,6 +303,32 @@ def check_sync_freshness() -> dict:
     status = data.get('status', 'unknown')
 
     if status == 'error':
+        # De-dup guard: the auto-commit-push failure is owned by sync_agent_core.sh,
+        # which persistence-gates its own DM off the consecutive_push_failures
+        # counter. That counter is written ONLY by sync's push-fail path (every
+        # other write_status leaves it 0), so a positive value uniquely marks this
+        # class. Defer entirely — below threshold it's a self-healing race (silent),
+        # at/above threshold sync emits the single DM. Either way we must not add a
+        # second DM here. Any OTHER errored sync (wrong-branch, fast-forward-failed,
+        # validation-failed, quiescence-timeout — all counter 0) still flags below.
+        push_failures = data.get('consecutive_push_failures', 0)
+        try:
+            push_failures = int(push_failures or 0)
+        except (TypeError, ValueError):
+            push_failures = 0
+        if push_failures > 0:
+            return {
+                'ok': True,
+                'detail': (
+                    f'auto-commit-push failing {push_failures} consecutive tick(s) '
+                    f'(threshold {PUSH_FAIL_ALERT_THRESHOLD}); '
+                    + ('self-healing race — silent'
+                       if push_failures < PUSH_FAIL_ALERT_THRESHOLD
+                       else 'persistent — sync_agent_core.sh owns the single DM')
+                    + '. Deferred (dedup with sync).'
+                ),
+                'deferred_to_sync': True,
+            }
         return {
             'ok': False,
             'detail': f'last sync ERRORED {age_hours:.1f}h ago: {data.get("message", "")}',

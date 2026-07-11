@@ -106,9 +106,45 @@ emit_larry_alert_envelope() {
         --route "$route" >/dev/null 2>&1 || true
 }
 
+# Persistence gate for the auto-commit-push failure alert (auto-commit-push-fail
+# persistence-gate + de-dup, 2026-07-11). A single push that survives the rebase
+# fallback but still loses the origin/main race is a BENIGN transient: the
+# rollback restores a pushable tree and the next ~5min tick self-heals. Alerting
+# Larry on every such tick was double-noise (the line-256 alert_larry DM + the
+# health check's sync_freshness DM). We now count *consecutive* rolled-back push
+# failures in the sync state (agent-core-sync.json, via write_status) and DM only
+# once the count crosses this threshold (~3 ticks ≈ 15min), which means a real,
+# non-self-healing divergence/auth/network fault rather than a routine race. The
+# counter is the single source of truth both emitters read.
+PUSH_FAIL_ALERT_THRESHOLD="${PUSH_FAIL_ALERT_THRESHOLD:-3}"
+
+# read_consecutive_push_failures — the counter persisted by the previous tick's
+# write_status. Absent/unreadable state ⇒ 0 (fail-safe: a missing counter must
+# never fabricate a persistent-failure DM). Kept tolerant of a hand-edited or
+# partially-written file so a malformed status can't crash the sync flow.
+read_consecutive_push_failures() {
+    [ -f "$SYNC_STATUS_FILE" ] || { echo 0; return; }
+    python3 - "$SYNC_STATUS_FILE" <<'PYEOF' 2>/dev/null || echo 0
+import json, sys
+try:
+    with open(sys.argv[1]) as f:
+        data = json.load(f)
+    v = int(data.get("consecutive_push_failures", 0) or 0)
+    print(v if v >= 0 else 0)
+except Exception:
+    print(0)
+PYEOF
+}
+
+# write_status — persist the sync state. The optional 3rd arg is the
+# consecutive-push-failure counter (default 0). Every non-push-failure caller
+# omits it, so any successful/no-change/other-error tick RESETS the counter to 0
+# — that is how a self-healing race clears the persistence gate for both this
+# script and agent_core_health_check.py.
 write_status() {
     local status="$1"
     local message="$2"
+    local push_failures="${3:-0}"
     local timestamp
     timestamp="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
     mkdir -p "$(dirname "$SYNC_STATUS_FILE")"
@@ -117,6 +153,7 @@ write_status() {
   "last_sync": "$timestamp",
   "status": "$status",
   "message": "$message",
+  "consecutive_push_failures": $push_failures,
   "commit": "$(cd "$REPO_DIR" && git rev-parse HEAD 2>/dev/null || echo 'unknown')",
   "branch": "$(cd "$REPO_DIR" && git rev-parse --abbrev-ref HEAD 2>/dev/null || echo 'unknown')"
 }
@@ -252,12 +289,32 @@ if ! git diff --quiet || ! git diff --cached --quiet; then
                 # such a pathspec list aborts entirely when any entry (e.g. an
                 # absent cycle-actions.jsonl) doesn't match a tracked file.
                 git reset --mixed "$AUTO_PRE_HEAD" --quiet 2>/dev/null || true
-                write_status "error" "Auto-commit push failed; rolled back"
-                alert_larry "auto-commit push failed" "sync_agent_core.sh auto-committed Pulse runtime files but the push to origin/main failed; rolled back Pulse paths to ${AUTO_PRE_HEAD} (captures.json left live). Action: ssh ourliberty-vm, cd ${REPO_DIR}, run 'git push origin main' to debug (likely non-FF, auth, or network)."
+                # Persistence gate: count this tick against the prior tick's
+                # consecutive-failure count (reset to 0 by any success/no-change/
+                # other-error write_status). A single self-healing race stays
+                # BELOW threshold and is silent to Larry (digest only); only a
+                # streak that survives ~PUSH_FAIL_ALERT_THRESHOLD ticks — a real
+                # non-FF/auth/network fault, not a race — earns the one DM.
+                PUSH_FAIL_COUNT=$(( $(read_consecutive_push_failures) + 1 ))
+                write_status "error" "Auto-commit push failed; rolled back" "$PUSH_FAIL_COUNT"
+                if [ "$PUSH_FAIL_COUNT" -eq "$PUSH_FAIL_ALERT_THRESHOLD" ]; then
+                    # Edge trigger: fire the DM exactly on the tick the streak
+                    # crosses from transient to persistent (== threshold), so a
+                    # sync stuck for hours yields exactly ONE DM, not one per
+                    # tick. Below threshold is a self-healing race (digest only);
+                    # a later successful tick resets the counter, so a fresh
+                    # streak that re-crosses pages again. agent_core_health_
+                    # check.py's sync_freshness treats a positive-counter auto-
+                    # commit-push ERROR as healthy and defers this DM to us, so
+                    # Larry is never paged twice for the same condition.
+                    alert_larry "auto-commit push failed ${PUSH_FAIL_COUNT}x" "sync_agent_core.sh auto-committed Pulse runtime files but the push to origin/main has failed on ${PUSH_FAIL_COUNT} consecutive sync ticks (threshold ${PUSH_FAIL_ALERT_THRESHOLD}); rolled back Pulse paths to ${AUTO_PRE_HEAD} (captures.json left live). This is no longer a self-healing race. Action: ssh ourliberty-vm, cd ${REPO_DIR}, run 'git push origin main' to debug (likely non-FF, auth, or network)."
+                fi
                 # Routine self-healing transient: the rollback restored a
                 # pushable tree and sync retries the push on the next tick — no
                 # action required, so route to the digest, not a DM (fix-first).
-                emit_larry_alert_envelope "sync-blocked:auto-commit-push-failed" "ourliberty-sync.service: auto-committed Pulse runtime files but push to origin/main failed; rolled back Pulse paths to ${AUTO_PRE_HEAD:0:8} (captures.json left live). Self-heals on the next sync tick; no action needed." "digest"
+                # This digest fires EVERY failing tick as the low-noise audit
+                # trail; only the alert_larry DM above is persistence-gated.
+                emit_larry_alert_envelope "sync-blocked:auto-commit-push-failed" "ourliberty-sync.service: auto-committed Pulse runtime files but push to origin/main failed (${PUSH_FAIL_COUNT} consecutive); rolled back Pulse paths to ${AUTO_PRE_HEAD:0:8} (captures.json left live). Self-heals on the next sync tick; no action needed." "digest"
                 exit 1
             fi
         else
