@@ -6651,7 +6651,11 @@
         "at": "2026-06-29T22:56:32.070404+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-11T21:12:31.045382+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-telegram-409-burst-guard-001",
