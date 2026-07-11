@@ -4469,7 +4469,7 @@ def _review_request_already_dispatched(
     *, task_id: Optional[str] = None,
 ) -> bool:
     """True if a review-request with this filename is already in Mirror's
-    inbox, its `.archive/`, or its `.invalid/`.
+    inbox, a `.claimed/<slot>/`, its `.archive/`, or its `.invalid/`.
 
     Single source of truth for the review-request idempotency presence check
     so `_dispatch_mirror_review` (inline build-phase dispatch) and the
@@ -4522,6 +4522,30 @@ def _review_request_already_dispatched(
     # A live in-flight review blocks regardless of head (anti-storm).
     if (mirror_inbox / review_filename).exists():
         return True
+    # A review inbox_watcher has already relocated into `.claimed/<slot>/`
+    # blocks too (reconcile-claimed-check-001, sister of PR #912's
+    # heal_undispatched_pr_review._review_task_in_claimed, whose docstring named
+    # THIS predicate as carrying the identical blind spot). Closes the
+    # dispatch->claim race: inbox_watcher moves a freshly-dispatched review to
+    # `.claimed/<slot>/<name>.json` within ~2-3s, and this predicate — scanning
+    # only the inbox root, `.archive/`, and `.invalid/` — would otherwise read
+    # the review as absent, so a RECONCILE sweep landing in that window fires a
+    # duplicate Mirror review dispatch. A `.claimed/` hit is positive proof the
+    # dispatch landed (a task can only be claimed after it was first written),
+    # so this can never mask a genuine miss. Fully defensive: a missing
+    # `.claimed` dir, an unreadable slot, or any OSError yields not-present and
+    # never raises (this runs on a timer-driven sweep and must not crash a
+    # tick); performs no writes; globs slot dirs (not the filename) so a task_id
+    # carrying glob metacharacters can't distort the match.
+    try:
+        for _slot in (mirror_inbox / '.claimed').glob('*'):
+            try:
+                if (_slot / review_filename).exists():
+                    return True
+            except OSError:
+                continue
+    except OSError:
+        pass
     # A live review for this task under ANY round name blocks too (see docstring).
     # glob.escape prefilters by name (so a metachar task_id can't widen the scan);
     # the regex then admits ONLY this task's real round names —

@@ -207,6 +207,43 @@ class TestHeadAwareDedup(_DedupBase):
         self.assertFalse(check('review-cpu[high].json', 'head-C'))  # re-review
 
 
+class TestClaimedSlotDedup(_DedupBase):
+    """reconcile-claimed-check-001: a review inbox_watcher has relocated into
+    `.claimed/<slot>/` counts as already-dispatched. Closes the dispatch->claim
+    race where a RECONCILE sweep landing in the ~2-3s claim window read the
+    review as absent and fired a duplicate Mirror review dispatch. Sister of
+    PR #912's heal_undispatched_pr_review._review_task_in_claimed."""
+
+    def _check(self, head=None):
+        return ob._review_request_already_dispatched('review-t.json', head)
+
+    def test_claimed_slot_blocks_reconcile_sweep(self):
+        # The reconcile sweep calls with head=None (existence-only); a claimed
+        # review must suppress the re-dispatch.
+        self._write('.claimed/slot0', 'review-t.json', head_sha='x')
+        self.assertTrue(self._check(None))
+
+    def test_absent_everywhere_still_false(self):
+        # No live / claimed / archived / invalid copy → not dispatched.
+        (self.root / 'mirror' / '.claimed').mkdir(parents=True, exist_ok=True)
+        self.assertFalse(self._check(None))
+
+    def test_claimed_slot_blocks_head_aware_path(self):
+        # The inline _dispatch_mirror_review guard passes a head — a claimed
+        # review blocks it too (the check runs before the head-aware legs).
+        self._write('.claimed/slot3', 'review-t.json', head_sha='H1')
+        self.assertTrue(self._check('H1'))
+
+    def test_missing_claimed_dir_does_not_crash(self):
+        # No `.claimed` dir at all → not-present, no raise.
+        self.assertFalse(self._check(None))
+
+    def test_other_slot_review_does_not_match(self):
+        # A DIFFERENT task's review claimed in a slot must not block task t.
+        self._write('.claimed/slot0', 'review-other.json', head_sha='x')
+        self.assertFalse(self._check(None))
+
+
 class TestDiedVerdictlessRedispatch(_DedupBase):
     """died-verdictless-review-redispatch (post-#850).
 
