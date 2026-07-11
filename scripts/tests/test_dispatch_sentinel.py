@@ -276,6 +276,39 @@ class SentinelScansTest(_IsolatedAgentsRoot):
         self.assertIn('unknown.json', [s['file'] for s in stalls])
         self.assertTrue(f.exists(), 'UNKNOWN entry must NOT be reconciled')
 
+    def test_in_flight_legit_no_pr_suppressed_before_age_alert(self):
+        # A task whose CORRECT terminal outcome is no PR (mirror-review-*) can
+        # NEVER satisfy the terminal-PR probe, so a lingering in-flight record
+        # would age into a stall alert purely from PR-absence. The no-PR-
+        # legitimacy classifier gate suppresses that age-alert even with a live
+        # pid and an UNKNOWN terminal probe.
+        f = self._write_in_flight(
+            'mirror-review-pr-ourliberty-agent-core-931.json',
+            started_age_seconds=35 * 60, agent='mirror', model='sonnet-4.6')
+        stalls = ds.scan_in_flight(
+            time.time(),
+            pid_alive_fn=lambda pid: True,
+            terminal_state_fn=lambda task_stem: ds.tts.UNKNOWN,
+        )
+        self.assertEqual(
+            stalls, [], 'legit-no-PR review must not age-alert as a stall')
+        self.assertTrue(
+            f.exists(), 'suppressed record is left in place, not reconciled')
+
+    def test_in_flight_unknown_shape_still_nagged(self):
+        # Conservative: a plain build-shaped task the classifier can't positively
+        # call legit-no-PR (UNKNOWN) still surfaces as a genuine stall.
+        f = self._write_in_flight('reconcile-hardening-mission-001.json',
+                                   started_age_seconds=35 * 60, model='sonnet-4.6')
+        stalls = ds.scan_in_flight(
+            time.time(),
+            pid_alive_fn=lambda pid: True,
+            terminal_state_fn=lambda task_stem: ds.tts.UNKNOWN,
+        )
+        self.assertIn('reconcile-hardening-mission-001.json',
+                      [s['file'] for s in stalls])
+        self.assertTrue(f.exists())
+
     def test_pid_alive_helper(self):
         self.assertTrue(ds._pid_alive(os.getpid()))
         self.assertFalse(ds._pid_alive(None))

@@ -23,14 +23,17 @@ inbox envelope from the archived original. A durable ledger keyed by the origina
 task stem bounds auto-retries to ``MAX_AUTO_RETRIES`` (default 1); once exhausted
 it fires exactly ONE loud Larry alert and never redispatches that family again.
 
-MIRROR-REVIEW SUPPRESSION — a ``mirror/mirror-review-pr-<repo>-<N>`` branch is NOT
-a build: the task REVIEWS PR #N and emits a verdict, never a PR/commit of its own,
-so it ALWAYS trips the WIP-only / no-PR signature. When #N is already terminal
-(merged or closed) the review is moot: the healer SUPPRESSES it (no redispatch, no
-escalation) and records ``suppressed`` in the ledger so later ticks short-circuit
-before re-probing gh. An OPEN or gh-UNKNOWN reviewed PR is left alone here — a
-genuinely-dead open review is recovered by the orphaned-mirror-claims re-inject
-path, not by this build-WIP healer (Mirror review #931 false 'exhausted', 2026-07-11).
+LEGIT-NO-PR SUPPRESSION — some dispatch branches back a task whose CORRECT terminal
+outcome is no PR of its own: a ``mirror/mirror-review-pr-<repo>-<N>`` REVIEWS PR #N
+and emits a verdict, a ``dag-preflight-*`` is a review, a ``kickoff-*`` is a state
+transition. Each ALWAYS trips the WIP-only / no-PR signature. Rather than re-infer
+this per-incident, Gate 0 consults the ONE shared ``task_no_pr_legitimacy`` classifier
+by branch shape; a positive ``LEGIT_NO_PR`` SUPPRESSES the branch (no redispatch, no
+escalation) and records ``suppressed`` in the ledger so later ticks short-circuit.
+This generalizes the narrow merged/closed mirror-review guard from #938 to the whole
+legit-no-PR class (Mirror review #931 false 'exhausted', 2026-07-11). A genuinely-dead
+OPEN mirror review is still recovered by the orphaned-mirror-claims re-inject path,
+which keeps its own separate state and is unaffected by this healer's suppression.
 
 DETECTION SIGNATURE — a branch is a candidate only when ALL hold; any ambiguous
 or indeterminate signal => SKIP, never redispatch:
@@ -92,7 +95,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
 import cleanup_dispatch_branches as cdb  # noqa: E402  branch classifier + git/gh helpers
-import task_terminal_state as tts  # noqa: E402  shared PR-coordinate parse + gh state
+import task_no_pr_legitimacy as tnpl  # noqa: E402  the shared no-PR-legitimacy classifier
 from test_isolation_guard import refuse_under_test  # noqa: E402
 
 AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', '/home/larry/agents'))
@@ -177,20 +180,6 @@ def _task_from_branch(branch: str) -> Optional[str]:
         if branch.startswith(prefix):
             return branch[len(prefix):]
     return None
-
-
-def _reviewed_pr_coordinate(branch_stem: str) -> Optional[tuple[str, int]]:
-    """(qualified_repo, pr_number) of the EXTERNAL PR a mirror-review task reviews,
-    or None when the stem is not a mirror-review coordinate.
-
-    A mirror-review dispatch branch is ``mirror/mirror-review-pr-<repo>-<N>`` (with
-    an optional healer ``-retry<k>`` suffix). Such a task reviews PR #N and by
-    nature produces NO PR/commit of its own, so it ALWAYS matches the WIP-only /
-    no-PR build-failure signature — a false positive this healer must not treat as
-    an abandoned build. We strip the retry suffix first (``_ledger_base``) because
-    ``parse_pr_coordinate``'s numeric-tail anchor rejects a non-hex ``-retry<k>``
-    tail; the retry-stripped ``mirror-review-pr-<repo>-<N>`` parses cleanly."""
-    return tts.parse_pr_coordinate(_ledger_base(branch_stem))
 
 
 # ---------- archived-original lookup (source of truth for re-dispatch) ----------
@@ -373,25 +362,24 @@ def evaluate(cand: Candidate, now: float, open_heads: set[str],
     if (now - cand.committer_ts) < GRACE_SECONDS:
         return 'skip', f'too-young (<{GRACE_SECONDS}s)'
 
-    # Gate 0 (mirror-review): a `mirror-review-pr-<repo>-<N>` task REVIEWS PR #N and
-    # emits a verdict, never a PR of its own — so it always trips the WIP-only /
-    # no-PR signature below. When the reviewed PR is already terminal (merged or
-    # closed) the review is moot: suppress it (never redispatch, never escalate)
-    # and record the suppression in the ledger so later ticks short-circuit without
-    # re-probing gh. An OPEN or UNKNOWN (gh error) reviewed PR is left alone here —
-    # a genuinely-dead open review is recovered by the orphaned-mirror-claims
-    # re-inject path, not by this build-WIP healer.
-    coord = _reviewed_pr_coordinate(cand.branch_stem)
-    if coord is not None:
-        if (ledger.get(base) or {}).get('suppressed'):
-            return 'skip', 'reviewed-pr-terminal (already suppressed)'
-        pr_repo, pr_number = coord
-        state, _ = tts.pr_coordinate_state(pr_repo, pr_number)
-        if state in (tts.MERGED, tts.CLOSED):
-            return 'suppress', (f'reviewed-pr-terminal ({pr_repo}#{pr_number} '
-                                f'{state})')
-        return 'skip', (f'mirror-review of {pr_repo}#{pr_number} (state={state}) '
-                        f'— not a build-WIP candidate')
+    # Gate 0 (no-PR-legitimacy classifier): a task whose CORRECT terminal outcome
+    # is no PR of its own (a `mirror-review-pr-*` verdict, a `dag-preflight-*`
+    # review, a `kickoff-*` state transition, ...) ALWAYS trips the WIP-only /
+    # no-PR signature below. Consult the ONE shared classifier by shape — no gh
+    # probe needed — and on a positive LEGIT_NO_PR suppress it permanently (never
+    # redispatch, never escalate), recording the suppression in the ledger so later
+    # ticks short-circuit. This generalizes the narrow merged/closed mirror-review
+    # gate from #938 (identical suppress outcome for a merged review) to every
+    # legit-no-PR shape, closing the false 'exhausted' EXHAUSTED class at its root.
+    # A genuinely-dead OPEN mirror review is still recovered by the
+    # orphaned-mirror-claims re-inject path, which keeps its own separate state and
+    # is unaffected by this healer's ledger. UNKNOWN / EXPECTS_PR fall through to
+    # the existing gh-existence gates below (status-quo behavior).
+    if (ledger.get(base) or {}).get('suppressed'):
+        return 'skip', 'legit-no-pr (already suppressed)'
+    verdict, vreason = tnpl.expects_no_pr(base)
+    if verdict == tnpl.LEGIT_NO_PR:
+        return 'suppress', f'legit-no-pr ({vreason})'
 
     # Gate 3: an open or merged PR for this branch means the work is not abandoned.
     if cand.branch in open_heads:
@@ -538,19 +526,19 @@ def _do_escalate(cand: Candidate, ledger: dict) -> None:
 
 
 def _do_suppress(cand: Candidate, ledger: dict, reason: str) -> None:
-    """Record a mirror-review task whose reviewed PR is already terminal as
-    suppressed, so it never redispatches, never escalates, and later ticks
-    short-circuit before the gh probe. Deliberately carries NO ``attempts`` count
-    — the escalate path keys on attempts>=MAX, which a suppressed entry can never
-    reach, so a moot review can never contribute to an 'exhausted' alert."""
+    """Record a legit-no-PR task (per the shared classifier) as suppressed, so it
+    never redispatches, never escalates, and later ticks short-circuit at Gate 0.
+    Deliberately carries NO ``attempts`` count — the escalate path keys on
+    attempts>=MAX, which a suppressed entry can never reach, so a legit-no-PR task
+    can never contribute to an 'exhausted' alert."""
     base = _ledger_base(cand.branch_stem)
     entry = ledger.get(base) or {}
     entry['suppressed'] = True
-    entry['suppress_reason'] = 'suppressed-reviewed-pr-terminal'
+    entry['suppress_reason'] = reason
     entry['last_suppress_ts'] = datetime.now(timezone.utc).isoformat()
     entry['branch'] = cand.branch
     ledger[base] = entry
-    log('SUPPRESSED', f'{cand.branch}: {reason} — mirror-review is moot; no '
+    log('SUPPRESSED', f'{cand.branch}: {reason} — legit no-PR outcome; no '
                       f'redispatch, no escalation')
 
 

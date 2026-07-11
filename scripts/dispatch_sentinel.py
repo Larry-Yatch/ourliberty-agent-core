@@ -61,6 +61,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
 import larry_alerts  # noqa: E402
+import task_no_pr_legitimacy as tnpl  # noqa: E402 — shared no-PR-legitimacy classifier
 import task_terminal_state as tts  # noqa: E402 — shared terminal-state probe
 
 HOME = Path.home()
@@ -314,6 +315,19 @@ def scan_in_flight(
             if state in tts.TERMINAL_STATES:
                 _reconcile_in_flight(
                     reg_file, task_stem, f'terminal PR ({state})')
+                continue
+            # No-PR-legitimacy gate BEFORE age-alerting: a task whose CORRECT
+            # terminal outcome is no PR (mirror-review-*, review-sequence-dag-*,
+            # dag-preflight-*, kickoff-*, ...) can NEVER satisfy the terminal-PR
+            # probe above, so its lingering in-flight record would age into a
+            # stall alert purely from PR-absence — the exact false-alarm class
+            # this classifier unifies. A positive LEGIT_NO_PR suppresses the
+            # age-alert; EXPECTS_PR / UNKNOWN surface as before (conservative —
+            # a genuine build stuck past threshold still alerts).
+            verdict, vreason = tnpl.expects_no_pr(task_stem)
+            if verdict == tnpl.LEGIT_NO_PR:
+                log(f'in-flight scan: suppressing age-alert for {reg_file.name} '
+                    f'(task={task_stem}) — legit no-PR ({vreason})')
                 continue
         stalls.append({
             'kind': 'in-flight-stall',
