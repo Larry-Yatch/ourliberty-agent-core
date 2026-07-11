@@ -8605,7 +8605,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-11T09:24:21.700062+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-25T00:43:27.371345+00:00"
+      "orphan_last_activity_ts": "2026-06-25T00:43:27.371345+00:00",
+      "briefing": {
+        "what": "A piece of already-approved work that builds the alert feed for flagging items that need your attention has gotten stuck and can't move forward until it's brought up to date with recent changes.",
+        "why": "It's the first of three connected steps, so while it's stuck the entire effort to give you a working 'needs your attention' feed is frozen and can't progress.",
+        "suggest": "Have the team carefully update and unblock this so the feed work can resume, taking care to keep both the recent safety improvements and this new alerting capability intact."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-11T09:30:17.686978+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-reconcile-675-contract-c-promote-alerts-001",
