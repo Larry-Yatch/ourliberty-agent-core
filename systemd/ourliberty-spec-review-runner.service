@@ -1,0 +1,48 @@
+[Unit]
+Description=Ourliberty Spec-Review Runner (antagonistic spec-gauntlet engine)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/spec_review_runner.py
+After=network-online.target ourliberty-inbox-watcher.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=larry
+Group=larry
+WorkingDirectory=/home/larry/agent-core
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/spec_review_runner.py
+
+Restart=on-failure
+RestartSec=10
+# Match the notifier/bot units' burst budget so systemd's own retry envelope is
+# explicit to operators reading the unit.
+StartLimitInterval=300
+StartLimitBurst=10
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-spec-review-runner
+
+# Hardening parity with the outbox notifier, EXCEPT the resource envelope: this
+# unit spawns up to 3 concurrent `claude --print` reviewers (§3.2), so it needs
+# ~3×400MB headroom rather than the notifier's 512M cgroup — the whole reason
+# the gauntlet cannot run inside the host daemons. ReadWritePaths mirrors the
+# notifier so the runner can maintain its origin/main checkout, write its state
+# dir, and commit spec_doc revisions (sole-committer write-back, §3.4).
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/larry/agents /home/larry/agent-core /home/larry/agent-worktrees /home/larry/credentials /home/larry/.claude /home/larry/.claude.json /home/larry/.local /home/larry/.cache /home/larry/ourliberty-dashboard /home/larry/ourliberty-graph /tmp
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+MemoryMax=2G
+TasksMax=256
+
+[Install]
+WantedBy=multi-user.target
