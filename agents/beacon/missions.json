@@ -8700,7 +8700,11 @@
         "at": "2026-07-11T18:57:02.030282+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-11T20:27:19.774577+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-auto-route-externally-authored-pr-reviews-001",
@@ -8824,7 +8828,11 @@
         "at": "2026-07-11T19:57:16.263155+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-11T20:27:19.774577+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-auto-route-externally-authored-pr-reviews-001-retr-retry1",
