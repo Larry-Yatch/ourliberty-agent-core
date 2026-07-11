@@ -24627,3 +24627,85 @@ Watermark → 975.
 
 ---
 
+## Iteration ~5005 — 2026-07-11T00:21Z UTC (Larry /cycle, Tier 1)
+
+**Health:** ✅ Nominal with positive pipeline progress — PR #919 MERGED (auto-merge-serializer CONFLICTING-blocker skip live); Forge retry1 active for PR #874 rebase (PID 3405666, running tests); alert-translation preflight completed → build queued; no new alerts; all mandatory checks clean.
+
+**VERIFY-BEFORE-REASSERT (from iter ~5004):**
+- **"PR #919 — AUTO_MERGE_HELD behind #874→#918 chain"**: **MAJOR UPDATE ✅** — PR #919 **MERGED** f23e5e66 2026-07-11T00:08Z UTC. fix(auto-merge-serializer): skip CONFLICTING blockers so they can't wedge clean PRs. [resolved ✅]
+- **"PR #913 OPEN/MERGEABLE (auto-merge pending)"**: CONFIRMED OPEN/MERGEABLE ✅ — autoMerge=False (outbox-notifier restarted, hasn't re-evaluated yet). Still blocked by #874 overlap (non-CONFLICTING, so #919's fix doesn't bypass it). [carry, monitoring]
+- **"PR #874 OPEN/UNKNOWN (needs rebase retry1 pending)"**: UPDATED — PR #874 OPEN/MERGEABLE on stale head 5deca69a. Forge PID 3405666 actively building retry1 in `wt-forge-rebase-pr874-onto-main-001-retry1`, running outbox_notifier tests. Not yet force-pushed. [in-flight ✅]
+- **"PR #916 (gg-s1-foundations) — revision-1 done; Mirror re-review dispatched 00:11:37Z"**: UPDATED ⚠️ — Mirror slot 0 has `review-gg-s1-foundations-rev1.json` claimed (correct). But restarted notifier also dispatched `review-gg-s1-foundations.json` (original) at 00:15:32Z → now claimed in Mirror slot 1. G-rule `notifier-concurrent-scan-duplicate-review-dispatch-001` 10th occurrence, 1 post-PR#847. [duplicate dispatch, existing G-rule]
+- **"alert-translation-manifest-drift-regenerated-001 Forge PREFLIGHT in progress (PID 3397386)"**: UPDATED ✅ — PID 3397386 gone; preflight completed → PROCEED; `build-alert-translation-manifest-drift-regenerated-001.json` now in Forge inbox, queued behind retry1. [progressed ✅]
+- **"beacon PID 3300205 ✅"**: UPDATED — new PID 3400682 (restarted 00:14:07Z UTC by heal-stale-daemon-code). [new PID ✅]
+- **"outbox-notifier PID 3299133 ✅"**: UPDATED — new PID 3400003 (restarted 00:13:59Z UTC). [new PID ✅]
+- **"inbox_watcher PID 2932566 ✅"**: CONFIRMED ✅ — Ssl, 5h13m. [carry ✅]
+- **"zombie PID 1834248 (43d+04:51m)"**: CONFIRMED ⚠️ — 43d+04:57:22 elapsed. [carry, growing]
+- **"daemon heartbeat 2026-07-11T00:03:39Z"**: UPDATED ✅ — 2026-07-11T00:13:55Z UTC (~7 min at check). [fresh ✅]
+- **"6 items on Approvals tab"**: CONFIRMED ✅ — pending=6 unchanged. [carry]
+
+**NEW FINDINGS:**
+1. **PR #919 MERGED** (f23e5e66, 00:08Z UTC): fix(auto-merge-serializer): skip CONFLICTING blockers. The auto-merge serializer now skips blockers in CONFLICTING state, breaking the permanent-wedge class where a conflicted PR could hold an entire downstream chain indefinitely. System hardened. [major positive ✅]
+2. **Mirror duplicate dispatch: PR #916 gg-s1-foundations** (00:15:32Z UTC): restarted notifier dispatched `review-gg-s1-foundations.json` (round-0 original) to Mirror slot 1 despite rev1 being claimed in slot 0. Root cause: PR #847 durable-flag guard covers in-memory REVISION_IN_FLIGHT suppression, but the restart clears the flag window and the restarted notifier sees the original task as unprocessed. G-rule `notifier-concurrent-scan-duplicate-review-dispatch-001` → 10th occurrence. PR #847 fix live but restart bypass is a residual gap. No new dispatch needed (fix already in Forge preflight path). [blue, post-fix recurrence, note only]
+3. **alert-translation-manifest-drift-regenerated-001 preflight PROCEED**: build task queued in Forge inbox. Will be picked up after retry1 completes. [positive ✅]
+4. **Agent restarts** (heal-stale-daemon-code, ~00:13-14Z): outbox-notifier → PID 3400003; beacon → PID 3400682. Normal stale-code restart cycle. NOMINAL ✅
+
+**Check 0 — Alert triage:** repair-watermark `{"repaired": false, "old_watermark": 975, "file_length": 975}`. No new alerts. NOMINAL ✅
+
+**Check 1 — Log noise:** 2 WARNs from pre-restart notifier: `AUTO_MERGE_HELD_DEEP_REVIEW:917` (17:30 MDT, expected); `RECONCILE_MISSING_REVIEW:rebase-pr874` (17:48 MDT, self-recovered). No WARNs from restarted notifier (00:13:59Z start). Sub-threshold. NOMINAL ✅
+
+**Check 2 — Telegram sweep:** beacon PID 3400682 ✅ (00:14Z start). Last Larry message: 17:49 MDT (23:49Z) — "Yes monitor the drain and rebase any that need it." No new messages. No open untracked directives. NOMINAL ✅
+
+**Check 3 — Pipeline stall:** DRY-RUN → 0 alerts would fire. PR #918 cooldown-suppressed (G-rule 1/3). NOMINAL ✅
+
+**Check 4 — Pending directives:** pending=6 unchanged (stale [0] + PRs #823, #830, #833, #904, #917). Larry action needed on tab. NOMINAL (actionable) ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-11T00:13:55Z UTC (~7 min at check). NOMINAL ✅
+
+**Check A — Source repo:** HEAD=e67b8c2c=origin/main; main; clean. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-10T23:29:25Z (~52 min); status=no-change. Within 2h. NOMINAL ✅
+**Check C — Agent liveness:** inbox_watcher 2932566 ✅ (Ssl, 5h13m); outbox-notifier 3400003 ✅; beacon 3400682 ✅. Zombie 1834248 ⚠️ (43d+04:57m). NOMINAL ✅
+**Check E — PR/merge state:** PR #919 MERGED ✅; #874 OPEN/MERGEABLE stale head, retry1 in-flight; #913 OPEN/MERGEABLE, no autoMerge, blocked by #874; #916 OPEN (duplicate Mirror reviews in slots 0+1, both claimed); #918 OPEN (deep-review-required); #917 OPEN (deep-review-hold); #860 OPEN. NOMINAL (active pipeline) ✅
+
+**§5.0:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅.
+
+**Conditional checks — UTC Saturday 2026-07-11:**
+- Check I: Friday artifact check-i-2026-07-10.json (14:13Z) — no new artifact. ✅
+- Check XI: Daily artifact check-xi-20260710T102121 (10:21Z) — no new artifact yet. ✅
+- Check III/IV/VIII/IX/X/XII/XIV: Sunday/Monday gates. Skip. ✅
+
+**G-rule assessment:**
+- `notifier-concurrent-scan-duplicate-review-dispatch-001`: 10th occurrence (PR #916, post-restart). PR #847 live but restart path not covered. Already dispatched; no additional action this iter. [post-fix recurrence noted]
+- All other G-rule counts unchanged from iter ~5004.
+
+**Actions taken:**
+1. PRIME ledger: `iter_clean` appended (00:21:05Z UTC, tier=1, template=nominal). ✅
+2. Tier state: `record --checks-clean true` → consecutive_clean=2. ✅
+
+**Escalations:** 0 Pulse DMs this iter.
+
+**Standing findings (carry):**
+- [yellow] **zombie-bash-pid-1834248** — 43d+04:57m, bash poll loop awaiting absent archive file. ask-then-do: `kill 1834248`. [carry, growing]
+- [yellow] **PR #917 deep-review-hold** — locked_update RMW; needs `/code-review high` + `scripts/merge_reviewed_pr.sh 917`. [carry]
+- [yellow] **PR #918 deep-review-required** — fix/mirror-queued-revsibling-dedup; blocking #874→#913 chain. Deep review needed. [carry, blocking]
+- [yellow] **6 items on Approvals tab** — PRs #823, #830, #833, #904, #917 + stale [0]. Larry review needed. [carry]
+- [yellow] **check-xi-drift-over-gate** — 8/64 drifted (12.5%, gate=10%) on 2026-07-10. [carry, next XI fire today]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07`. [carry]
+- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
+- [blue] **PR #919** — MERGED ✅ (auto-merge-serializer CONFLICTING-blocker skip). [resolved this iter ✅]
+- [blue] **PR #874** — retry1 Forge build in-flight (PID 3405666, running tests). Will force-push rebased head when done. [in-flight ✅]
+- [blue] **PR #913** — MERGEABLE, no autoMerge set (notifier restart cleared evaluation). Blocked by #874 non-CONFLICTING overlap. Will unblock after #874 clears. [carry, monitoring]
+- [blue] **PR #916 (gg-s1-foundations)** — Mirror slot 0 reviewing rev1; slot 1 reviewing original (duplicate dispatch). Both will produce verdicts; rev1 verdict is authoritative. [active]
+- [blue] **alert-translation-manifest-drift-regenerated-001** — build queued in Forge inbox, behind retry1. [queued ✅]
+- [blue] **PR #860** — spec XIV-b. [carry]
+- [blue] **Orphaned .claimed/0/review-pr-911.json** — PR #911 MERGED. [carry]
+- [blue] **Check I proposal #1** — `notify-p3a-retro-prep` ($1.91 vs $0.28 baseline, 98σ). Use `/dispatch 1`. [carry]
+- [blue] **G-rules (dispatched, vp):** outbox-notifier-merge-held-deep-review-tier4-001 [3/3 DISPATCHED ✅, APPROVAL_REQUEST delivered 17:54 MDT]; heal-daemon-restart-manifest-drift-regenerated-tier4 [DISPATCHED ✅, build queued]; notifier-concurrent-scan-dup [PR #847 MERGED ✅, vp — restart bypass gap noted this iter]; heal-undispatched-pr-review-claimed-race-fp-001 [PR #912 MERGED ✅, vp]; ourliberty-health-subject-key-mismatch-001 [3/3, vp]; forge-revision-preamble-missing-pr711-001 [vp]; forge-wip-redispatch-digest-tier4-001 [vp]; forge-wip-redispatch-exhausted-pr-exists-fp-001 [APPROVAL_REQUEST QUEUED iter ~3279, vp]; decision-needed-approval-forge-dispatch-no-target-repo-001 [vp]; no-session-revision-active-mirror-session-fp-001 [vp]. [carry]
+- [blue] **G-rule 2/3:** forge-marker-task-id-mismatch-xii-v1; build-sequence-advancer-sequence-complete-tier4-001; outbox-notifier-merge-conflict-manual-rebase-tier4-001; forge-wip-redispatch-exhausted-genuine-no-pr-001; outbox-notifier-notification-intent-review-escalate-tier4-001. [carry]
+- [blue] **G-rule 1/3:** mirror-malformed-verdict-heal-reap-path-001; heal-unregistered-approval-null-chat-id-001; mirror-queue-wait-gauge-tier4-001; inbox-watcher-tier-pool-all-unavailable-tier4-001; RECONCILE_MISSING_REVIEW-.claimed-blindspot; heal-pipeline-stall-unrouted-deep-review-required-fp-001; heal-pulse-check-staleness-single-flight-skip-fp-001. [carry]
+
+**PRIME DIRECTIVE:** 0 interventions; 0 systemic_fixes; iter_clean appended. ratio=19.75 (carry).
+**Tier end-of-iter:** Tier **1** (consecutive_clean=2; 1 more clean iter needed to de-escalate to Tier 2).
+
+---
+
