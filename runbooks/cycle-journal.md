@@ -4,6 +4,70 @@
 
 ---
 
+## Iteration ~5057 — 2026-07-11T08:18Z UTC (Larry /loop /cycle, Tier 1)
+
+**Health:** ✅ Nominal carry — 0 new alerts. All checks nominal. Carries unchanged: PR #924 HELD, zombie PID 1834248, 2 pending approvals.
+
+**VERIFY-BEFORE-REASSERT (from iter ~5056):**
+- **"PR #924 HELD pending approval deep-review-hold-pr924-eeadc669"**: CONFIRMED ✅ — OPEN, label=deep-review-passed, mergeable=UNKNOWN. [carry]
+- **"zombie PID 1834248 (43d+12h+53m)"**: CONFIRMED ✅ — stat=Ss, 43d+12h+59m (bash poll loop). [carry]
+- **"beacon PID 3888347"**: CONFIRMED ✅ — Ss, 48:15 elapsed. [carry]
+- **"outbox-notifier PID 3891045"**: CONFIRMED ✅ — Ss, 46:37 elapsed; last action 01:55:03 MDT WARN (PR #927 duplicate; self-resolves). [carry]
+- **"inbox_watcher PID 3940207"**: CONFIRMED ✅ — Ssl, 16:32 elapsed. [carry]
+- **"HEAD=85790ccb=origin/main"**: UPDATED — HEAD=66a37ee2=origin/main ("Pulse cycle 20260711T081637Z" wrapper commit from iter ~5056). ✅
+
+**Check 0 — Alert triage:** `repair-watermark {"repaired": false, "old_watermark": 1025, "file_length": 1025}` — 0 new alerts. NOMINAL ✅
+
+**Check 1 — Log noise:** outbox-notifier PID 3891045 ✅. Last log entry 01:55:03 MDT (07:55Z UTC) — WARN mirror marker error for PR #927 duplicate outbox (retry 1/3; stall healer confirms RETRY_EXHAUSTED_SKIP superseded_session; self-resolved). ~23 min silent (no active tasks; expected). NOMINAL ✅
+
+**Check 2 — Telegram sweep:** Beacon PID 3888347 ✅. Last log entry 02:14:44 MDT (08:14Z UTC) — doorbell notification delivered. Last Larry human message: 01:09:13 MDT "Yes draft the fix." — actioned in prior iters. No unhandled directives. NOMINAL ✅
+
+**Check 3 — Pipeline stall:** DRY-RUN (08:17:44Z UTC) → "no stalls detected." FORGE_NO_PR_SKIP valid for #906/#908/#909/#912/#914/#916/#919/#920/#921/#922/#923/#924. MIRROR_PASS_UNMERGED_SKIP reconcile-claimed-check-001 reason=held_deep_review. RETRY_EXHAUSTED_SKIP outbox-notifier-merge-held-deep-review-tier3-001 reason=superseded_session. NOMINAL ✅
+
+**Check 4 — Pending directives:** pending=2. [0]=deep-review-hold-pr924-eeadc669 (chat_id=7998341473) [carry]. [1]=heal-undispatched-pr-review-canonical-task-id-001 (chat_id=7998341473) [carry]. ⚠️ Signal (carry)
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-11T08:09:21Z (~9 min at check; cadence=10 min). Within cadence. NOMINAL ✅
+
+**Check A — Source repo:** HEAD=66a37ee2=origin/main ✅; clean tree ✅; on main ✅; 0 commits behind. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-11T08:02:30Z (~16 min at check), status=error "Auto-commit push failed" — known PR #728 pattern (concurrent sync vs wrapper push race; self-heals next tick; repo is clean at 66a37ee2=origin/main). NOMINAL ✅ (Tier-3 known)
+**Check C — Agent liveness:** beacon PID 3888347 ✅; outbox-notifier PID 3891045 ✅; inbox_watcher PID 3940207 ✅. ⚠️ Zombie PID 1834248 (43d+12h+59m, bash poll loop). [carry]
+**Check E — PR/merge state:**
+- PR #924 [OPEN, UNKNOWN] reconcile-claimed-check-001 — label=deep-review-passed; HELD pending approval deep-review-hold-pr924-eeadc669. ⚠️ Signal [carry]
+- PR #860 [OPEN, UNKNOWN] spec XIV-b. [carry]
+
+**§5.0:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅.
+
+**Conditional checks — UTC Saturday 2026-07-11 (~08:18Z):**
+- Check I: Not a firing day (Sat). Latest artifact: check-i-2026-07-10.json. ✅
+- Check XI: Timer fires ~10:21Z today (~2h). Latest artifact: check-xi-20260710T102121Z (attention_rate=0.125, gate=0.1, over_gate=true). No new artifact yet. [yellow carry]
+- Check III/IV/VIII/IX/X/XII/XIV: Sunday/Monday gates. Skip. ✅
+
+**G-rule assessment:** No new occurrences this iter. All G-rule counts carry from iter ~5056.
+
+**Actions taken:**
+1. PRIME ledger: `iter_clean` appended (08:18:54Z UTC, tier=1, template=nominal). ✅
+2. Tier state: `record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=08:18:55Z UTC. ✅
+
+**Escalations:** 0 new DMs to Larry. No new findings warrant escalation. Outstanding carries already DM'd in prior iters.
+
+**Standing findings (carry):**
+- [yellow] **PR #924** — reconcile-claimed-check-001; label=deep-review-passed; pending approval deep-review-hold-pr924-eeadc669. Approve to release hold and merge. [carry]
+- [yellow] **pending approval [1]** — heal-undispatched-pr-review-canonical-task-id-001: Forge build plan for forge-marker-task-id-mismatch-xii-v1. Approve to authorize Forge build. [carry]
+- [yellow] **zombie-bash-pid-1834248** — 43d+12h+59m, bash poll loop. ask-then-do: `kill 1834248`. [carry]
+- [yellow] **check-xi-drift-over-gate** — 8/64 (12.5%, gate=10%) on 2026-07-10. Check XI fires ~10:21Z today. [carry]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07`. [carry]
+- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
+- [blue] **PR #860** — spec XIV-b. [carry]
+- [blue] **Check I proposal #1** — `notify-p3a-retro-prep` ($1.91 vs $0.28 baseline, 98σ). Use `/dispatch 1`. [carry]
+- [blue] **G-rules (dispatched, vp):** forge-marker-task-id-mismatch-xii-v1 [3/3 DISPATCHED ✅, build-plan pending Larry approval]; RECONCILE_MISSING_REVIEW-.claimed-blindspot [3/3 DISPATCHED ✅, vp — PR #924 HELD, PR #928 healer live]; ourliberty-health-subject-key-mismatch-001 [3/3, vp]; forge-revision-preamble-missing-pr711-001 [vp]; forge-wip-redispatch-digest-tier4-001 [vp]; forge-wip-redispatch-exhausted-pr-exists-fp-001 [APPROVAL_REQUEST QUEUED iter ~3279, vp]; decision-needed-approval-forge-dispatch-no-target-repo-001 [vp]; no-session-revision-active-mirror-session-fp-001 [vp].
+- [blue] **G-rule 2/3:** outbox-notifier-merge-conflict-manual-rebase-tier4-001; forge-wip-redispatch-exhausted-genuine-no-pr-001; outbox-notifier-notification-intent-review-escalate-tier4-001; outbox-notifier-auto-merge-stale-revalidation-tier4-001.
+- [blue] **G-rule 1/3:** mirror-malformed-verdict-heal-reap-path-001; heal-unregistered-approval-null-chat-id-001; mirror-queue-wait-gauge-tier4-001; inbox-watcher-tier-pool-all-unavailable-tier4-001; heal-pipeline-stall-unrouted-deep-review-required-fp-001; heal-pulse-check-staleness-single-flight-skip-fp-001; gate-parallelism-monitor-regression-data-001; pulse-rotation-check-source-tier4-001.
+
+**PRIME DIRECTIVE:** 0 new interventions; 0 new systemic_fixes; iter_clean appended. ratio=19.476 (84 systemic_fixes / 34 vp; carry).
+**Tier end-of-iter:** **Tier 1** (pending approvals + zombie carry; consecutive_clean=0).
+
+---
+
 ## Iteration ~5056 — 2026-07-11T08:14Z UTC (Larry /loop /cycle, Tier 1)
 
 **Health:** ✅ Nominal carry — 1 new alert (doorbell Tier-3 silence). All checks nominal. Carries: PR #924 HELD, zombie PID 1834248, 2 pending approvals. Check XI fires ~10:21Z today (over gate carry: 8/64 = 12.5% vs 10% gate).
@@ -2888,92 +2952,4 @@ Watermark advanced 988→989. ✅
 **Tier end-of-iter:** **Tier 1** (L989 Tier-4 tier-reset; consecutive_clean=0).
 
 ---
-
-## Iteration ~5017 — 2026-07-11T03:21Z UTC (Larry /loop /cycle, Tier 3→1)
-
-**Health:** ⚠️ Signal — PR #918 merged by Larry externally triggering cascade; PR #874 auto-merge HELD (stale-regression, outbox-notifier killed mid-revalidation); Larry escalation sent. Tier reset 3→1.
-
-**VERIFY-BEFORE-REASSERT (from iter ~5016):**
-- **"PR #922 (gg-s3) OPEN/MERGEABLE, AUTO_MERGE_HELD blocker=#918"**: MAJOR UPDATE ✅ — PR #918 MERGED at 03:10:41Z UTC (Larry external review). blocker shifted: PR #922 now HELD behind #874. [updated]
-- **"PR #874 OPEN/UNKNOWN, Mirror REVIEW_PASS, HELD behind #918"**: MAJOR UPDATE ⚠️ — PR #918 merged; outbox-notifier attempted auto-merge release but regression re-validation FAILED (SIGTERM exit -15 during shutdown). PR #874 now `held_stale_regression`. MERGEABLE on GitHub (no conflict). [new blocking state]
-- **"PR #918 OPEN/UNKNOWN (deep-review-required, blocking #874/#913/#922)"**: CLOSED ✅ — MERGED 7413b2d8. `fix(notifier): block duplicate review when a re-review is queued for the same task`. [resolved]
-- **"PR #913 OPEN/UNKNOWN, blocked by #874"**: CONFIRMED ✅ — MERGEABLE (deep-review-passed, still blocked by #874). [carry]
-- **"zombie PID 1834248 (43d+07:28:31)"**: CONFIRMED ⚠️ — now 43d+07:58:12. [carry, growing]
-- **"daemon heartbeat 2026-07-11T02:45:16Z"**: UPDATED ✅ — now 03:15:20Z UTC (~6 min at check). [fresh ✅]
-- **"Beacon PID 3419183 ✅; outbox-notifier PID 3421106 ✅"**: UPDATED — both restarted at 21:15:26/21:15:31 MDT (heal-stale-daemon-code picking up PR #918 code). New PIDs: outbox-notifier=3662991, beacon=3663513; inbox_watcher=3421105 unchanged. [carry]
-- **"6 items on Approvals tab"**: CONFIRMED ✅ — pending=6. [carry]
-- **"consecutive_clean=1"**: SUPERSEDED — non-clean iter this cycle; tier reset 3→1. [resolved]
-
-**NEW FINDINGS:**
-1. **PR #918 MERGED (03:10:41Z UTC)** — Larry: "918 merged after am external review" at 21:10:41 MDT. Cascade auto-merge queue released for #874 and #922. [positive ✅]
-2. **PR #874 `held_stale_regression`** (03:15:23Z UTC) — After #918 merged, GitHub's mergeable recomputed (UNKNOWN initially → then MERGEABLE). On second release attempt at 21:15:23 MDT, outbox-notifier ran regression re-validation for #874 but was simultaneously SIGTERM'd (heal-stale-daemon-code restart). Regression analysis exited -15 ("failing closed"). PR #874 released from queue with `outcome=held_stale_regression`. **PR is MERGEABLE on GitHub but auto-merge BLOCKED.** [yellow — escalation sent]
-3. **PR #922 now blocked by #874** — after notifier restart at 21:15:26 MDT, new session sees gg-s3 AUTO_MERGE_HELD behind #874 (overlap on outbox_notifier.py, beacon_telegram_bot.py, etc.). [monitoring]
-4. **Beacon responded to Larry before stale-regression event** — at 21:11:47 MDT (03:11:47Z UTC), Beacon replied: "3 of the original 5 merged (#918, #914, #919). #874 i..." (truncated). This was BEFORE the SIGTERM at 21:15:23 MDT. Larry was NOT informed of stale-regression via bot or outbox-notifier (route=hold suppressed DM). **Pulse sent [yellow] escalation.** [escalation sent]
-5. **L987 (heal-dashboard-api-sha-drift, 03:10:06Z UTC)**: Dashboard-api auto-restarted to pick up PR #918 HEAD (023a4209→7413b2d8). route=digest. Tier-3 ✅. [nominal]
-6. **L988 (outbox-notifier auto-merge-stale-revalidation:874, 03:15:23Z UTC)**: Tier-4 (novel — no translation match for `auto-merge-stale-revalidation` subject prefix). First occurrence. 1/3. [new G-rule candidate]
-
-**Check 0 — Alert triage:** `repair-watermark {"repaired": false, "old_watermark": 986, "file_length": 988}`. 2 new alerts:
-- L987: `heal-dashboard-api-sha-drift` → **Tier-3** (known pattern, route=digest). ✅
-- L988: `outbox-notifier auto-merge-stale-revalidation:874` → **Tier-4** (novel, route=hold, DM suppressed by bot). **Pulse sent [yellow] escalation.** ⚠️
-Watermark advanced 986→988. ✅
-
-**Check 1 — Log noise:** outbox-notifier log (21:15:23 MDT shutdown → 21:15:26 MDT restart → 21:16:16 MDT last entry). Critical events: `AUTO_MERGE_HELD_STALE_REGRESSION` (WARN), `outcome=held_stale_regression` for #874, `AUTO_MERGE_HELD blocker=#874` for gg-s3. Post-restart: reclassified gg-s3 Mirror REVIEW_PASS from lingering session-log scan (dup detection), gg-s3 HELD behind #874. All subsequent entries INFO-level. NOMINAL (events are expected cascade behavior) ✅
-
-**Check 2 — Telegram sweep:** New Beacon PID 3663513 (started 21:15:31 MDT) ✅ alive. Last bot log entry 21:15:31 MDT (03:15:31Z UTC) — bot restart startup. Fresh as of restart. Larry's last message: "918 merged after am external review" (21:10:41 MDT); Beacon responded (21:11:47 MDT). idx=987 route=hold skipped DM. No unread messages awaiting action. NOMINAL ✅
-
-**Check 3 — Pipeline stall:** DRY-RUN (03:17Z UTC) → "no stalls detected". NOMINAL ✅
-
-**Check 4 — Pending directives:** pending=6 (PRs #823, #830, #833, #904, #917 + outbox-notifier-merge-held-deep-review-tier3-001). No change. Larry action needed. NOMINAL (actionable) ✅
-
-**Check 5 — Stale daemon code:** heartbeat=2026-07-11T03:15:20Z UTC (~6 min at check). NOMINAL ✅
-
-**Check A — Source repo:** HEAD=7413b2d8=origin/main (PR #918 merge commit). main; clean; up to date. `git status` clean. NOMINAL ✅
-**Check B — Sync health:** last_sync=2026-07-11T03:09:33Z UTC (~12 min at check); status=no-change. Within 2h. NOMINAL ✅
-**Check C — Agent liveness:** outbox-notifier PID 3662991 ✅ (new, 2m uptime); beacon_telegram_bot PID 3663513 ✅ (new, 2m uptime); inbox_watcher PID 3421105 ✅ (Ssl, 2h50m). ⚠️ Zombie PID 1834248 (43d+07:58:12, bash Ss). NOMINAL ✅
-**Check E — PR/merge state:** PR #874 MERGEABLE (GitHub), `held_stale_regression` (notifier) — blocker for everything; PR #922 MERGEABLE, AUTO_MERGE_HELD blocker=#874; PR #913 MERGEABLE (deep-review-passed), blocked by #874 cascade; PR #917 UNKNOWN (deep-review-required); PR #860 UNKNOWN (spec XIV-b). Signal: #874 stale-regression is the active blocker. [yellow]
-
-**§5.0:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅.
-
-**Conditional checks — UTC Saturday 2026-07-11:**
-- Check I: Latest artifact check-i-2026-07-10.json (Friday fire). Saturday not a firing day. ✅
-- Check XI: Timer fire ~10:21Z today; no new artifact yet. ✅
-- Check III/IV/VIII/IX/X/XII/XIV: Sunday/Monday gates. Skip. ✅
-
-**G-rule assessment:**
-- `notifier-concurrent-scan-duplicate-review-dispatch-001`: PR #918 `fix(notifier): block duplicate review when a re-review is queued` MERGED. This is a second-layer fix building on PR #847. systemic_fix row appended to PRIME ledger. **G-rule → VERIFIED ✅** (post-PR-#918 monitoring to confirm 0 new occurrences). Moving status to VERIFIED pending clean iters.
-- `outbox-notifier-auto-merge-stale-revalidation-tier4-001` (NEW): L988 Tier-4 novel; no translation for `subject^=auto-merge-stale-revalidation:`. Fires when a SIGTERM kills notifier mid-regression-revalidation after base change. Route=hold (bot suppressed DM); Pulse escalated. **1/3. Dispatch to Beacon at 3/3** to add Tier-3 silence entry (outbox-notifier already handles revalidation retry; Pulse DM is duplicate if this is routine).
-
-**Actions taken:**
-1. Check 0: watermark advanced 986→988. L987 Tier-3 resolved. L988 Tier-4 triaged, escalation sent. ✅
-2. PRIME ledger: `intervention` appended (pr874-stale-regression-escalate, tier=1, 03:21Z UTC). ✅
-3. PRIME ledger: `systemic_fix` appended (notifier-concurrent-scan-dup-pr918-verified, tier=1, 03:21Z UTC). ✅
-4. Larry escalation: [yellow] `pr874-stale-regression-held` appended to larry-alerts.jsonl (route=escalate). ✅
-5. Tier state: `record --checks-clean false` → **tier reset 3→1** (last_signal_at=03:21:35Z UTC). ✅
-
-**Escalations:** 1 Pulse [yellow] DM this iter — PR #874 stale-regression held; Larry informed of situation and rebase command.
-
-**Standing findings (carry):**
-- [yellow] **PR #874 `held_stale_regression`** — MERGEABLE on GitHub; auto-merge BLOCKED. Outbox-notifier will retry on next sweep. If retry fails substantively: `gh pr checkout 874 && git fetch origin && git rebase origin/main && git push --force-with-lease`. [NEW ⚠️, escalation sent]
-- [yellow] **PR #922 (gg-s3) blocked by #874** — will auto-merge once #874 clears. [updated]
-- [yellow] **zombie-bash-pid-1834248** — 43d+07:58:12, bash poll loop awaiting absent archive file. ask-then-do: `kill 1834248`. [carry, growing]
-- [yellow] **PR #917 deep-review-hold** — locked_update RMW; needs `/code-review high` + `scripts/merge_reviewed_pr.sh 917`. [carry]
-- [yellow] **6 items on Approvals tab** — PRs #823, #830, #833, #904, #917 + outbox-notifier-merge-held-deep-review-tier3-001. Larry review needed. [carry]
-- [yellow] **check-xi-drift-over-gate** — 8/64 drifted (12.5%, gate=10%) on 2026-07-10. [carry, next XI fire ~10:21Z today]
-- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07`. [carry]
-- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
-- [blue] **PR #913** — MERGEABLE (deep-review-passed), blocked by #874 cascade. [monitoring]
-- [blue] **PR #860** — spec XIV-b. [carry]
-- [blue] **Orphaned .claimed/0/review-pr-911.json** — PR #911 MERGED. [carry]
-- [blue] **Check I proposal #1** — `notify-p3a-retro-prep` ($1.91 vs $0.28 baseline, 98σ). Use `/dispatch 1`. [carry]
-- [blue] **G-rules (dispatched, vp):** outbox-notifier-merge-held-deep-review-tier4-001 [3/3 DISPATCHED ✅, vp]; heal-undispatched-pr-review-claimed-race-fp-001 [PR #912 MERGED ✅, vp]; ourliberty-health-subject-key-mismatch-001 [3/3, vp]; forge-revision-preamble-missing-pr711-001 [vp]; forge-wip-redispatch-digest-tier4-001 [vp]; forge-wip-redispatch-exhausted-pr-exists-fp-001 [APPROVAL_REQUEST QUEUED iter ~3279, vp]; decision-needed-approval-forge-dispatch-no-target-repo-001 [vp]; no-session-revision-active-mirror-session-fp-001 [vp]. [carry]
-- [blue] **notifier-concurrent-scan-dup → VERIFIED ✅** (PR #918 second-layer fix merged; monitoring for 0 new occurrences). [updated]
-- [blue] **G-rule 2/3:** forge-marker-task-id-mismatch-xii-v1; build-sequence-advancer-sequence-complete-tier4-001; outbox-notifier-merge-conflict-manual-rebase-tier4-001; forge-wip-redispatch-exhausted-genuine-no-pr-001; outbox-notifier-notification-intent-review-escalate-tier4-001; RECONCILE_MISSING_REVIEW-.claimed-blindspot. [carry]
-- [blue] **G-rule 1/3:** mirror-malformed-verdict-heal-reap-path-001; heal-unregistered-approval-null-chat-id-001; mirror-queue-wait-gauge-tier4-001; inbox-watcher-tier-pool-all-unavailable-tier4-001; heal-pipeline-stall-unrouted-deep-review-required-fp-001; heal-pulse-check-staleness-single-flight-skip-fp-001; **outbox-notifier-auto-merge-stale-revalidation-tier4-001 [NEW 1/3]**. [carry]
-
-**PRIME DIRECTIVE:** 1 intervention (pr874-stale-regression); 1 systemic_fix (notifier-concurrent-scan-dup-pr918-verified). ratio carries ~19.963 (1 systemic_fix offsets 1 intervention this iter, net flat). 32 verification_pending.
-**Tier end-of-iter:** **Tier 1** (reset from Tier 3 via Tier-4 alert L988; consecutive_clean=0).
-
----
-
-
 
