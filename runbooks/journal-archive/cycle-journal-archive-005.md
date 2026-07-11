@@ -22250,3 +22250,78 @@ NOMINAL ✅
 
 ---
 
+## Iteration ~4975 — 2026-07-10T17:35Z UTC (Larry /cycle, Tier 1)
+
+**Health:** ✅ Nominal — 0 new alerts (watermark=927=file_length); all mandatory and additive checks clean.
+
+**VERIFY-BEFORE-REASSERT (from iter ~4974, 2026-07-10T17:30Z UTC):**
+- **"HEAD=ab44ef87=origin/main"**: UPDATED ✅ → HEAD now 73df09a4 ("Pulse cycle 20260710T173256Z") = origin/main. [wrapper committed ✅]
+- **"outbox-notifier PID 2734978 ✅ (Ss, 28:43)"**: CONFIRMED ✅ — Ss, 34:22 elapsed. [alive ✅]
+- **"beacon PID 2734739 ✅ (Ss, 28:48)"**: CONFIRMED ✅ — Ss, 34:27 elapsed. [alive ✅]
+- **"inbox_watcher PID 2672329 ✅ (Ssl, 1:06:55)"**: CONFIRMED ✅ — Ssl, 01:12:34 elapsed. [alive ✅]
+- **"zombie PID 1834248 ⚠️ (42d+22:09:55, bash poll loop)"**: CONFIRMED ⚠️ — 42d+22:15:33 elapsed. [carry, growing]
+- **"pending=0"**: CONFIRMED ✅ — pending=0. [stable ✅]
+- **"sync last_sync=17:16:13Z status=no-change"**: CONFIRMED ✅ — same. [stable ✅]
+- **"daemon heartbeat 17:22:19Z UTC"**: UPDATED ✅ → 2026-07-10T17:29:25Z UTC (~6 min at check). [fresh ✅]
+- **"PR #909 MIRROR_PASS ×2, AUTO_MERGE_HELD blocker=#854"**: CONFIRMED ✅ — UNKNOWN (HELD). [carry]
+- **"PR #905 HELD blocker=#854"**: CONFIRMED ✅ — open, HELD. [carry]
+- **"PR #854 HELD_DEEP_REVIEW"**: CONFIRMED ✅ — UNKNOWN (still HELD). [carry]
+- **".claimed/1/ orphan reaped"**: CONFIRMED ✅ — .claimed/1/ has 1 file (review-sentinel-in-flight-stall-translation-001.json, PR #854 only). [stable ✅]
+
+**NEW FINDINGS:** None.
+
+**Check 0 — Alert triage:** repair-watermark `{"repaired": false, "old_watermark": 927, "file_length": 927}`. 0 new alerts. Watermark=927 unchanged. CLEAN ✅
+
+**Check 1 — Log noise:** Last outbox-notifier WARN was 11:03:47 MDT (RECONCILE_MISSING_REVIEW for PR #909, prior iter). No new WARNs. NOMINAL ✅
+
+**Check 2 — Telegram sweep:** Last bot entry 10:59:49 MDT (Larry "go" → sentinel-stale-lease approval, actioned iter ~4972). No new Larry directives. NOMINAL ✅
+
+**Check 3 — Pipeline stall:** DRY-RUN 17:34Z UTC → "no stalls detected" ✅. (7× FORGE_NO_PR_SKIP: #896/#897/#898/#899/#901/#902/#904.) NOMINAL ✅
+
+**Check 4 — Pending directives:** pending=0. NOMINAL ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-10T17:29:25Z UTC (~6 min at check). NOMINAL ✅
+
+**Check A — Source repo:** HEAD=73df09a4=origin/main; clean tree. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-10T17:16:13Z status=no-change. NOMINAL ✅
+**Check C — Agent liveness:** beacon PID 2734739 ✅ (Ss, 34:27); outbox_notifier PID 2734978 ✅ (Ss, 34:22); inbox_watcher PID 2672329 ✅ (Ssl, 01:12:34). Zombie PID 1834248 ⚠️ (42d+22:15:33, bash poll loop; target absent) [carry]. NOMINAL ✅
+**Check E/H — PR/Forge state:** 6 open PRs (#909/#905/#874/#860/#854/#847). All carries from prior iters; no state changes. PR #909: MIRROR_PASS ×2 + AUTO_MERGE_HELD blocker=#854. PR #905: HELD #854. PR #854: HELD_DEEP_REVIEW; .claimed/1/ single file (stall healer clean). #874/#860/#847 long-standing carries. NOMINAL ✅
+
+**§5.0:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks — UTC Friday 2026-07-10:**
+- Check I: Friday. Latest artifact check-i-2026-07-10.json — already triaged iter ~4965. No new artifact. ✅
+- Check XI: Daily. Latest artifact check-xi-20260710T102121 — already triaged iter ~4966. 8/64 drifted (12.5%). [yellow, carry]
+- Check III: Sunday gate. Skip. ✅
+- Check IV/VIII/IX/X/XII/XIV: Monday gate. Skip. ✅
+
+**G-rule assessment:** No new occurrences this iter. All G-rule counts unchanged from iter ~4974.
+
+**Actions taken:**
+1. Check 0: repair-watermark no-op; 0 new alerts. ✅
+2. §5.0: All three no-ops. ✅
+3. PRIME ledger: `iter_clean` appended (17:35:25Z UTC). ✅
+4. Tier state: `record --checks-clean true` → Tier 1, consecutive_clean=2. ✅
+
+**Escalations:** 0 new Pulse DMs this iter.
+
+**Standing findings (carry — unchanged from iter ~4974):**
+- [yellow] **zombie-bash-pid-1834248** — PID 1834248 (42d+22:15:33, bash poll loop; target absent). ask-then-do: `kill 1834248`. [carry, growing]
+- [yellow] **check-xi-drift-over-gate** — 8/64 drifted (12.5%, gate=10%) on 2026-07-10. [monitoring]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07`. [carry]
+- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
+- [blue] **PR #909** — chore(alerts): Tier-3 silence sentinel stale-lease. MIRROR_PASS ✅ ×2; AUTO_MERGE_HELD blocker=#854. Will merge when #854 clears. [monitoring]
+- [blue] **PR #905** — MIRROR_PASS + AUTO_MERGE_HELD blocker=#854. [carry]
+- [blue] **PR #854** — feat(alerts): Tier-3 translation sentinel in-flight-stall. HELD_DEEP_REVIEW. Review file in .claimed/1/ (stall healer clean). [carry]
+- [blue] **Check I proposal #1** — [small] `notify-p3a-retro-prep`. Use `/dispatch 1` to act. [carry]
+- [blue] **PR #847, #860, #874** — long-standing carries. [carry]
+- [blue] **G-rules (dispatched, vp):** sentinel-stale-lease-tier4-001 (PR #909 MIRROR_PASS ×2, HELD, near-complete); sentinel-inflight-stall-tier4 (PR #854 HELD_DEEP_REVIEW); notifier-concurrent-scan-dup (PR #847); ourliberty-health-subject-key-mismatch-001; forge-wip-redispatch-digest-tier4-001; no-session-revision-active-mirror-session-fp-001; forge-revision-preamble-missing-pr711-001; forge-wip-redispatch-exhausted-pr-exists-fp-001; decision-needed-approval-forge-dispatch-no-target-repo-001. [carry]
+- [blue] **G-rule 2/3:** forge-marker-task-id-mismatch-xii-v1; build-sequence-advancer-sequence-complete-tier4-001; outbox-notifier-merge-held-deep-review-tier4-001; heal-undispatched-pr-review-claimed-race-fp-001. [carry]
+- [blue] **G-rule 1/3:** mirror-queue-wait-gauge-tier4-001; mirror-malformed-verdict-heal-reap-path-001; forge-wip-redispatch-exhausted-genuine-no-pr-001; heal-unregistered-approval-null-chat-id-001; medic-escalation-recurrence-gauge-tier4-001; sentinel-stale-lease-tier4-001 [G-rule body dispatched ✅; monitoring]. [carry]
+- [blue] **6 stale proposed cards** — medic-dispatcher-tier4-fix, unrouted-pr-active-mirror-fix, ourliberty-health-sync-push-failed-translation, heal-stale-daemon-auto-restart-failed, auto-restart-failed-tier3-translation, mirror-malformed-post-restart-fix. [carry]
+
+**PRIME DIRECTIVE:** 0 interventions; 0 systemic_fixes. iter_clean appended (17:35:25Z UTC). Ratio stable.
+**Tier end-of-iter:** Tier **1** (consecutive_clean=2; 1 more clean iter → de-escalate to Tier 2).
+
+---
+
