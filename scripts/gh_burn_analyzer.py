@@ -227,6 +227,20 @@ def _build_payload(artifact: dict) -> dict[str, Any]:
     }
 
 
+def _primary_chat_id() -> Optional[int]:
+    """Larry's primary Telegram chat — the lowest id in TELEGRAM_ALLOWED_CHAT_IDS
+    (mirrors heal_unregistered_approval / outbox_notifier / pulse_check
+    _primary_chat_id). None only when the allow-list is unset/empty."""
+    raw = os.environ.get('TELEGRAM_ALLOWED_CHAT_IDS', '')
+    ids = []
+    for tok in raw.replace(',', ' ').split():
+        try:
+            ids.append(int(tok))
+        except ValueError:
+            continue
+    return min(ids) if ids else None
+
+
 def _default_emit(payload: dict) -> bool:
     """Production emit wiring — mirrors main_suite_guardian's approval producer:
     register a pending-approval entry (bot DM + reminders) and write the
@@ -237,6 +251,15 @@ def _default_emit(payload: dict) -> bool:
         chat_id = int(os.environ.get('LARRY_CHAT_ID', '0') or '0')
     except ValueError:
         chat_id = 0
+    if chat_id <= 0:
+        # LARRY_CHAT_ID unset/invalid — fall back to the allow-list primary so a
+        # daemon-originated approval never registers chat_id=0 (#812 null-chat
+        # pattern). 0+WARN remains only if neither source resolves.
+        primary = _primary_chat_id()
+        if primary is not None:
+            chat_id = primary
+        else:
+            log('no LARRY_CHAT_ID or TELEGRAM_ALLOWED_CHAT_IDS; chat_id=0', 'WARN')
     try:
         import beacon_approval_handler as ah
         import chain_event_emit as ce

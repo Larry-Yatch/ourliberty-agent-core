@@ -158,5 +158,49 @@ class RunTests(unittest.TestCase):
         self.assertFalse(art['emitted'])
 
 
+class DefaultEmitChatIdTests(unittest.TestCase):
+    """chat_id resolution in _default_emit (#812 null-chat-at-creation fix):
+    LARRY_CHAT_ID wins when a valid non-zero int; otherwise fall back to the
+    TELEGRAM_ALLOWED_CHAT_IDS primary rather than registering chat_id=0."""
+
+    def _emit_and_capture(self, env):
+        captured = {}
+
+        def fake_add_pending(payload, chat_id, **kw):
+            captured['chat_id'] = chat_id
+
+        fake_ah = mock.Mock()
+        fake_ah.add_pending = fake_add_pending
+        fake_ah.build_approval_request_chain_event = lambda p: {}
+        fake_ce = mock.Mock()
+        fake_ce.emit_event = lambda **kw: True
+        with mock.patch.dict('sys.modules', {'beacon_approval_handler': fake_ah,
+                                             'chain_event_emit': fake_ce}), \
+                mock.patch.dict('os.environ', env, clear=False):
+            analyzer._default_emit({'task_id': 't'})
+        return captured
+
+    def test_primary_chat_id_lowest_allowed(self):
+        with mock.patch.dict('os.environ',
+                             {'TELEGRAM_ALLOWED_CHAT_IDS': '900, 100, 500'}):
+            self.assertEqual(analyzer._primary_chat_id(), 100)
+
+    def test_primary_chat_id_none_when_empty(self):
+        with mock.patch.dict('os.environ', {'TELEGRAM_ALLOWED_CHAT_IDS': ''}):
+            self.assertIsNone(analyzer._primary_chat_id())
+
+    def test_falls_back_to_allowed_when_larry_unset(self):
+        env = {'TELEGRAM_ALLOWED_CHAT_IDS': '7998341473'}
+        env['LARRY_CHAT_ID'] = ''
+        cap = self._emit_and_capture(env)
+        self.assertEqual(cap['chat_id'], 7998341473)
+
+    def test_larry_chat_id_takes_precedence(self):
+        env = {'LARRY_CHAT_ID': '4242',
+               'TELEGRAM_ALLOWED_CHAT_IDS': '7998341473'}
+        cap = self._emit_and_capture(env)
+        self.assertEqual(cap['chat_id'], 4242)
+
+
 if __name__ == '__main__':
     unittest.main()
