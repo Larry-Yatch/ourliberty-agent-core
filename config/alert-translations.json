@@ -346,6 +346,12 @@
       "tier": "FYI",
       "plain_language_summary": "A multi-step build sequence finished — its final step reached verified-merged and outbox-notifier emitted the completion summary. The notifier already delivers this directly to Larry via route=escalate (he gets the Telegram DM at emit time), so Pulse's Check 0 re-read of the same record would only duplicate it. The raw subject carries the sequence id after a colon (sequence-complete:<seq-id>); this bare key matches via the prefix-strip lookup rule. By-design FYI, not a failure.",
       "recommended_action": "None — by-design success confirmation that a build sequence completed. The original completion DM was already delivered via the outbox-notifier route=escalate path; this entry only silences Pulse's redundant re-read. Sequence file: ~/agents/blackboard/build-sequences/<seq-id>.json; completion detail in ~/agents/logs/outbox-notifier.log under SEQUENCE_COMPLETE lines."
+    },
+    "merge_held_deep_review": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "A critical-path PR (approval/resolve fan-out or the trust/merge machinery itself) PASS'd Mirror but reached auto-merge WITHOUT the deep-review-passed stamp, so outbox-notifier HELD the merge rather than squash-merging it, and DMed Larry directly via append_notification (intent=merge_held_deep_review). That DM routes Larry to run /code-review high on the held PR and then merge via scripts/merge_reviewed_pr.sh <PR>. The DM is already in Larry's Telegram thread by the time Pulse triages the record, so a Pulse-side re-escalation would only duplicate it, and treating each hold as novel resets the triage tier on every emit. The alert carries the pattern in intent (subject is None), so this matches via the intent fallback. By-design hold notification, not a Pulse-actionable failure.",
+      "recommended_action": "None at the Pulse layer -- the outbox-notifier append_notification DM (intent=merge_held_deep_review) already delivered the actionable hold to Larry's thread on emit. The actual action lives in that DM: run /code-review high on the held PR, then merge via scripts/merge_reviewed_pr.sh <PR>. Producer: scripts/outbox_notifier.py (_dm_larry_held_deep_review, ~L9493); audit trail in ~/agents/logs/outbox-notifier.log under AUTO_MERGE_HELD_DEEP_REVIEW lines."
     }
   },
   "heal-wedged-review-sessions": {
