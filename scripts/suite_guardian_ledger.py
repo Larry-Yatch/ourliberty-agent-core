@@ -62,12 +62,13 @@ ledger, never an exception into the nightly guardian timer.
 from __future__ import annotations
 
 import argparse
+import functools
 import json
 import os
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 _SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(_SCRIPTS_DIR) not in sys.path:
@@ -83,6 +84,35 @@ def _agents_root() -> Path:
 
 def default_ledger_path() -> Path:
     return _agents_root() / 'state' / 'suite-guardian-ledger.json'
+
+
+def _serialized(fn: Callable) -> Callable:
+    """Hold the cross-process RMW lock for the whole mutator call.
+
+    Every write below is a load→mutate→``_save`` on the same file; ``_save``'s
+    ``atomic_write_json`` makes the *swap* atomic but does not serialize the
+    surrounding read-modify-write, so two writers (e.g. main_suite_guardian and
+    an outbox_notifier restart-rescan) can lost-update each other. This
+    decorator resolves the target path exactly as each body does
+    (``path or default_ledger_path()``) and takes ``atomic_io.locked_update``
+    around the call, so all writers of a given ledger file contend on one lock.
+
+    This takes the lock OUTSIDE the mutator's own ``try/except OSError``, so it
+    relies on ``locked_update`` NEVER raising on acquisition: it swallows both a
+    wedged-peer timeout AND a transient sidecar ``OSError`` (EROFS/ENOSPC/EMFILE),
+    degrading to an unserialized run. That preserves every mutator's "never
+    raises" contract — a lock hiccup can't abort the nightly guardian cycle.
+
+    NB: none of the wrapped mutators calls another, so the per-call lock never
+    reenters; if one ever does, the bounded ``locked_update`` timeout degrades
+    to unserialized rather than self-deadlocking.
+    """
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        p = kwargs.get('path') or default_ledger_path()
+        with atomic_io.locked_update(p):
+            return fn(*args, **kwargs)
+    return wrapper
 
 
 # An approved obligation with no fix-PR activity for this long is a verdictless
@@ -185,6 +215,7 @@ def _touch(row: dict[str, Any], now: datetime) -> None:
 
 # -------------------- lifecycle --------------------
 
+@_serialized
 def open_proposal(
     test_id: str,
     *,
@@ -247,6 +278,7 @@ def open_proposal(
         return None
 
 
+@_serialized
 def set_decision(
     test_id: str,
     decision: str,
@@ -279,6 +311,7 @@ def set_decision(
         return False
 
 
+@_serialized
 def mark_dispatched(
     test_id: str,
     fix_task_id: str,
@@ -310,6 +343,7 @@ def mark_dispatched(
         return False
 
 
+@_serialized
 def record_fix_pr(
     test_id: str,
     *,
@@ -339,6 +373,7 @@ def record_fix_pr(
         return False
 
 
+@_serialized
 def record_observation(
     test_id: str,
     *,
@@ -379,6 +414,7 @@ def record_observation(
         return False
 
 
+@_serialized
 def resolve(
     test_id: str,
     *,
@@ -409,6 +445,7 @@ def resolve(
         return False
 
 
+@_serialized
 def mark_scope_violation(
     test_id: str,
     *,
@@ -435,6 +472,7 @@ def mark_scope_violation(
         return False
 
 
+@_serialized
 def close_windows(
     current_run: int,
     *,
@@ -472,6 +510,7 @@ def close_windows(
     return closed
 
 
+@_serialized
 def mark_regressed(
     test_id: str,
     *,
@@ -501,6 +540,7 @@ def mark_regressed(
         return False
 
 
+@_serialized
 def age_out_abandoned(
     now: Optional[datetime] = None,
     *,

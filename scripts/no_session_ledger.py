@@ -168,25 +168,28 @@ def open_obligation(
         return
     n = _now(now)
     try:
-        state = _load()
-        existing = state.get(task_id)
-        opened_at = (existing or {}).get('opened_at') if isinstance(existing, dict) else None
-        if not isinstance(opened_at, str) or not opened_at:
-            opened_at = _iso(n)
-        state[task_id] = {
-            'task_id': task_id,
-            'pr_url': pr_url,
-            'branch': branch,
-            'target_repo': target_repo,
-            'head_sha': head_sha,
-            'round': int(round_num) if isinstance(round_num, int) else 1,
-            'status': OPEN,
-            'opened_at': opened_at,
-            'last_dispatch_at': _iso(n),
-            'resolved_at': None,
-            'resolution': None,
-        }
-        _save(state, n)
+        # Serialize the whole load→mutate→write so an overlapping writer (e.g. a
+        # notifier restart-rescan) can't clobber this open with a stale copy.
+        with atomic_io.locked_update(LEDGER_FILE):
+            state = _load()
+            existing = state.get(task_id)
+            opened_at = (existing or {}).get('opened_at') if isinstance(existing, dict) else None
+            if not isinstance(opened_at, str) or not opened_at:
+                opened_at = _iso(n)
+            state[task_id] = {
+                'task_id': task_id,
+                'pr_url': pr_url,
+                'branch': branch,
+                'target_repo': target_repo,
+                'head_sha': head_sha,
+                'round': int(round_num) if isinstance(round_num, int) else 1,
+                'status': OPEN,
+                'opened_at': opened_at,
+                'last_dispatch_at': _iso(n),
+                'resolved_at': None,
+                'resolution': None,
+            }
+            _save(state, n)
     except OSError:
         # Best-effort durability; the dispatch proceeds regardless.
         pass
@@ -205,16 +208,19 @@ def resolve_obligation(
         return False
     n = _now(now)
     try:
-        state = _load()
-        row = state.get(task_id)
-        if not isinstance(row, dict) or row.get('status') != OPEN:
-            return False
-        row['status'] = RESOLVED
-        row['resolved_at'] = _iso(n)
-        row['resolution'] = resolution
-        state[task_id] = row
-        _save(state, n)
-        return True
+        # Serialize load→mutate→write: a dropped resolve would leave a stale OPEN
+        # flag suppressing a legit review until its TTL.
+        with atomic_io.locked_update(LEDGER_FILE):
+            state = _load()
+            row = state.get(task_id)
+            if not isinstance(row, dict) or row.get('status') != OPEN:
+                return False
+            row['status'] = RESOLVED
+            row['resolved_at'] = _iso(n)
+            row['resolution'] = resolution
+            state[task_id] = row
+            _save(state, n)
+            return True
     except OSError:
         return False
 
