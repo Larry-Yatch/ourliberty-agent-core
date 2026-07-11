@@ -34,6 +34,14 @@
       "recommended_action": "None at the Pulse layer — the doorbell notifier chat_id DM is the primary delivery and is already in your thread. Producer: scripts/doorbell_notifier.py; payload carries intent=doorbell + chat_id (subject is None, so this matches via the intent fallback)."
     }
   },
+  "heal-daemon-restart-manifest-drift": {
+    "regenerated": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "The daemon-restart manifest drifted from the live import closure, and the healer auto-regenerated and auto-committed it. No action needed — a routine self-heal surfaced for the record only.",
+      "recommended_action": "None — the manifest was regenerated and committed automatically. Self-healed; details appear in the daily digest. Producer: the heal-daemon-restart-manifest-drift healer."
+    }
+  },
   "heal-dashboard-api-sha-drift": {
     "dashboard-api-sha-drift-stuck": {
       "severity": "URGENT",
