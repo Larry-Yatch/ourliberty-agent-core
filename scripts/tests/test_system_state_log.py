@@ -145,6 +145,58 @@ class BuildSnapshotTest(unittest.TestCase):
         self.assertEqual(snap['as_of'], _NOW.isoformat())
 
 
+class BulkTerminalStatesSnapshotTest(unittest.TestCase):
+    """gh-api-burn phase 2: _bulk_terminal_states now reads the shared cached
+    snapshot (gh_pr_snapshot.all_prs) instead of shelling `gh pr list` per repo.
+    The reduce (match+classify+combine per task id) is unchanged; these tests
+    inject at the snapshot seam."""
+
+    def _pr(self, state, *, branch='', title='', number=1):
+        return {'number': number, 'state': state, 'title': title,
+                'headRefName': branch, 'url': f'https://x/pull/{number}'}
+
+    def test_reduces_each_task_against_the_snapshot(self):
+        import gh_pr_snapshot
+        prs = [
+            self._pr('MERGED', branch='forge/tsr-demo-task-alpha', number=1),
+            self._pr('OPEN', branch='forge/tsr-demo-task-beta', number=2),
+        ]
+        with mock.patch.object(gh_pr_snapshot, 'all_prs', return_value=prs):
+            out = ssl._bulk_terminal_states(
+                ['tsr-demo-task-alpha', 'tsr-demo-task-beta', 'tsr-demo-missing'],
+                repos=['owner/repo'],
+            )
+        self.assertEqual(out['tsr-demo-task-alpha'], tts.MERGED)
+        self.assertEqual(out['tsr-demo-task-beta'], tts.OPEN)
+        # No matching PR -> UNKNOWN (KEEP; conservative posture preserved).
+        self.assertEqual(out['tsr-demo-missing'], tts.UNKNOWN)
+
+    def test_snapshot_read_failure_leaves_all_unknown(self):
+        import gh_pr_snapshot
+        with mock.patch.object(gh_pr_snapshot, 'all_prs', return_value=[]):
+            out = ssl._bulk_terminal_states(
+                ['tsr-demo-task-alpha'], repos=['owner/repo'])
+        self.assertEqual(out['tsr-demo-task-alpha'], tts.UNKNOWN)
+
+    def test_reads_snapshot_once_per_repo_not_per_task(self):
+        import gh_pr_snapshot
+        with mock.patch.object(gh_pr_snapshot, 'all_prs',
+                               return_value=[]) as m:
+            ssl._bulk_terminal_states(
+                ['a-task-one', 'a-task-two', 'a-task-three'],
+                repos=['owner/a', 'owner/b'],
+            )
+        # One read per repo (2), independent of the 3 task ids.
+        self.assertEqual(m.call_count, 2)
+
+    def test_empty_task_ids_short_circuits(self):
+        import gh_pr_snapshot
+        with mock.patch.object(gh_pr_snapshot, 'all_prs',
+                               side_effect=AssertionError('must not read')) as m:
+            self.assertEqual(ssl._bulk_terminal_states([]), {})
+        m.assert_not_called()
+
+
 class FallbackNarrativeTest(unittest.TestCase):
     def test_idle_system_nonempty(self):
         snap = ssl.build_snapshot(

@@ -54,9 +54,11 @@ def _pr(state, *, title='', branch='', number=1):
 
 
 def _state_with(prs):
-    """Run task_terminal_state against a single repo with gh_json stubbed to
-    return `prs`."""
-    with mock.patch.object(tts, 'gh_json', return_value=prs):
+    """Run task_terminal_state against a single repo with the shared-snapshot
+    read (`_snapshot_all_prs`) stubbed to return `prs`. gh-api-burn phase 2: the
+    kernel reads the cached snapshot instead of shelling `gh pr list`, so tests
+    inject at that seam."""
+    with mock.patch.object(tts, '_snapshot_all_prs', return_value=prs):
         return tts.task_terminal_state(TASK, repos=REPO)
 
 
@@ -81,8 +83,9 @@ class FourStatesTest(unittest.TestCase):
         self.assertEqual(_state_with(prs), tts.UNKNOWN)
 
     def test_unknown_on_gh_failure(self):
-        # gh_json returns None for every repo (timeout / auth / missing gh).
-        with mock.patch.object(tts, 'gh_json', return_value=None):
+        # The snapshot read yields [] for every repo (missing/stale snapshot,
+        # failed fallback) -> no matches -> indeterminate -> KEEP.
+        with mock.patch.object(tts, '_snapshot_all_prs', return_value=[]):
             self.assertEqual(
                 tts.task_terminal_state(TASK, repos=REPO), tts.UNKNOWN)
 
@@ -113,7 +116,7 @@ class VariantMatchTest(unittest.TestCase):
 
     def test_matches_caller_supplied_variant(self):
         prs = [_pr('MERGED', branch='forge/totally-different-slug')]
-        with mock.patch.object(tts, 'gh_json', return_value=prs):
+        with mock.patch.object(tts, '_snapshot_all_prs', return_value=prs):
             state = tts.task_terminal_state(
                 TASK, variants=['totally-different-slug'], repos=REPO)
         self.assertEqual(state, tts.MERGED)
@@ -142,7 +145,7 @@ class ConservativePostureTest(unittest.TestCase):
         # An id below MATCH_MIN_LEN must not produce a terminal verdict off a
         # coincidental substring -> UNKNOWN (KEEP).
         prs = [_pr('MERGED', title='feat(api): unrelated', branch='forge/api')]
-        with mock.patch.object(tts, 'gh_json', return_value=prs):
+        with mock.patch.object(tts, '_snapshot_all_prs', return_value=prs):
             self.assertEqual(
                 tts.task_terminal_state('api', repos=REPO), tts.UNKNOWN)
 
@@ -152,9 +155,10 @@ class ConservativePostureTest(unittest.TestCase):
         self.assertEqual(_state_with(prs), tts.UNKNOWN)
 
     def test_one_repo_failure_does_not_mask_terminal_in_another(self):
-        # First repo errors (None), second returns the merged PR.
+        # First repo's snapshot read yields [] (missing entry), second returns the
+        # merged PR. The snapshot reader degrades to [] (not None) on failure.
         good = [_pr('MERGED', branch=f'forge/{TASK}')]
-        with mock.patch.object(tts, 'gh_json', side_effect=[None, good]):
+        with mock.patch.object(tts, '_snapshot_all_prs', side_effect=[[], good]):
             state = tts.task_terminal_state(
                 TASK, repos=['owner/a', 'owner/b'])
         self.assertEqual(state, tts.MERGED)
@@ -245,7 +249,7 @@ class WrapperPrefixMatchTest(unittest.TestCase):
     def test_mirror_review_id_matches_merged_pr_by_stem(self):
         prs = [_pr('MERGED', branch='forge/p3a-retro-prep',
                    title='feat: P3a retrospective Stage A')]
-        with mock.patch.object(tts, 'gh_json', return_value=prs):
+        with mock.patch.object(tts, '_snapshot_all_prs', return_value=prs):
             state = tts.task_terminal_state(
                 'mirror-review-p3a-retro-prep', repos=['x'])
         self.assertEqual(state, tts.MERGED)
@@ -372,8 +376,12 @@ class CoordinateNotWiredIntoCanonicalProbeTest(unittest.TestCase):
         def fake_gh(args, timeout=None):
             if 'view' in args:
                 raise AssertionError('task_terminal_state must not gh-pr-view')
-            return []  # pr list: no token match
-        with mock.patch.object(tts, 'gh_json', side_effect=fake_gh):
+            return []
+        # Snapshot has no token-matching PR for this coordinate id; and if the
+        # coordinate leg were (wrongly) wired in it would gh-pr-view -> the guard
+        # above fires. It must stay UNKNOWN via the token search alone.
+        with mock.patch.object(tts, '_snapshot_all_prs', return_value=[]), \
+                mock.patch.object(tts, 'gh_json', side_effect=fake_gh):
             self.assertEqual(
                 tts.task_terminal_state(WRAPPED_COORD_ID, repos=COORD_REPOS),
                 tts.UNKNOWN)

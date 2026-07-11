@@ -157,9 +157,11 @@ class ShouldSkipTests(unittest.TestCase):
 
 
 class KernelGuardTests(unittest.TestCase):
-    """The shared task_terminal_state probe must back off (return UNKNOWN)
-    without firing its gh query when the budget is low, and proceed when healthy.
-    This is the highest-leverage guard (covers the ~10 healers that share it)."""
+    """The shared task_terminal_state probe now sources PR state from the
+    phase-2 shared snapshot (gh_pr_snapshot.all_prs) instead of firing its own
+    gh query. The gh_budget backoff moved into the reader's live-fallback path;
+    the kernel itself no longer calls gh directly. This is the highest-leverage
+    consumer (covers the ~10 healers that share it)."""
 
     def setUp(self):
         gh_budget._reset_cache()
@@ -167,21 +169,19 @@ class KernelGuardTests(unittest.TestCase):
         import task_terminal_state as tts
         self.tts = tts
 
-    def test_returns_unknown_without_gh_when_budget_low(self):
+    def test_kernel_does_not_fire_gh_directly(self):
         gh = mock.Mock(return_value=[])
+        snap = mock.Mock(return_value=[])
         with mock.patch.object(self.tts, 'gh_json', gh), \
-                mock.patch('gh_budget.budget_ok', return_value=False):
-            result = self.tts.task_terminal_state('some-task-id',
-                                                  repos=['owner/repo'])
-        self.assertEqual(result, self.tts.UNKNOWN)
-        gh.assert_not_called()  # backed off before spending any GraphQL points
-
-    def test_proceeds_and_queries_gh_when_healthy(self):
-        gh = mock.Mock(return_value=[])
-        with mock.patch.object(self.tts, 'gh_json', gh), \
-                mock.patch('gh_budget.budget_ok', return_value=True):
+                mock.patch.object(self.tts, '_snapshot_all_prs', snap):
             self.tts.task_terminal_state('some-task-id', repos=['owner/repo'])
-        gh.assert_called()  # healthy budget -> unchanged behavior
+        gh.assert_not_called()  # phase-2: no direct GraphQL burn from the kernel
+
+    def test_consults_shared_snapshot_source(self):
+        snap = mock.Mock(return_value=[])
+        with mock.patch.object(self.tts, '_snapshot_all_prs', snap):
+            self.tts.task_terminal_state('some-task-id', repos=['owner/repo'])
+        snap.assert_called()  # kernel reads the shared cached snapshot
 
 
 if __name__ == '__main__':
