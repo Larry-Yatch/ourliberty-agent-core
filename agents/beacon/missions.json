@@ -8810,7 +8810,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-11T19:57:16.385239+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-11T19:55:22.59223+00:00"
+      "orphan_last_activity_ts": "2026-07-11T19:55:22.59223+00:00",
+      "briefing": {
+        "what": "A piece of work the team has finished and is now waiting for your sign-off before it goes live.",
+        "why": "It's been sitting in the review line, so it can't deliver any value until someone gives it a look.",
+        "suggest": "Have someone give it a careful once-over this week before approving, since it isn't tied to a clear goal yet."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-11T19:57:16.263155+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
