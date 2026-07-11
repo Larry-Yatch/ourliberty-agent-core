@@ -29427,3 +29427,71 @@ NOMINAL ✅
 
 ---
 
+## Iteration ~5069 — 2026-07-11T09:57Z UTC (Larry /cycle, Tier 1)
+
+**Health:** ✅ Nominal. All 6 mandatory checks clean. **MAJOR POSITIVE: PR #929 MERGED 09:51:25Z UTC — G-rule forge-marker-task-id-mismatch-xii-v1 → COMPLETE ✅.** 1 Tier-3 alert silenced. Zombie PID 1834248 carry only.
+
+**VERIFY-BEFORE-REASSERT (from iter ~5068):**
+- **"zombie PID 1834248 (43d+14h+27m)"**: CONFIRMED ✅ — stat=Ss, 43d+14h+37m. [carry]
+- **"beacon PID 3965718"**: CONFIRMED ✅ — Ss, 56:34 elapsed. ✅
+- **"outbox-notifier PID 3965731"**: CONFIRMED ✅ — Ss, 56:33 elapsed; last log 03:55:12 MDT (09:55:12 UTC). ✅
+- **"inbox_watcher PID 3940207"**: CONFIRMED ✅ — Ssl, 01:55:16 elapsed. ✅
+- **"HEAD=c63d551f=origin/main"**: SUPERSEDED — HEAD=e662f0f8 (PR #929 squash-merge + chore/missions commit). ✅
+- **"pending=0 approvals"**: CONFIRMED ✅
+- **"sync status=success"**: CONFIRMED ✅ — last_sync=08:59:43Z (~58 min at check, within 2h threshold). ✅
+- **"PR #929 OPEN, Mirror review dispatched at 09:30Z UTC"**: SUPERSEDED — PR #929 MERGED 09:51:25Z UTC (Mirror REVIEW_PASS + auto-merge squash). ✅ ← G-rule forge-marker-task-id-mismatch-xii-v1 COMPLETE
+
+**Check 0 — Alert triage:** `repair-watermark {"repaired": false, "old_watermark": 876, "file_length": 877}` — 1 new alert at line 877: `source=outbox-notifier, kind=notification, intent=review-pass` for heal-undispatched-pr-review-canonical-task-id-001 / PR #929 completion DM. triage-alert returned Tier-3 (known-pattern match: outbox-notifier/review-pass). Watermark advanced 876→877. NOMINAL ✅
+
+**Check 1 — Log noise:** outbox-notifier PID 3965731 ✅. Last log 03:55:12 MDT (09:55:12 UTC) — PR #929 completion DM delivered. AUTO_MERGE at 03:51:26 MDT (squash + delete-branch). No WARNs/ERRORs since 02:59 MDT restart. NOMINAL ✅
+
+**Check 2 — Telegram sweep:** beacon PID 3965718 ✅ (56:34 elapsed). Last bot out: 03:55:12 MDT (09:55:12 UTC) — PR #929 review-pass DM. Last Larry human message: 01:08:20 MDT "Yes draft the fix." — actioned (heal-undispatched-pr-review-canonical-task-id-001 → PR #929 built + merged). No unhandled directives. NOMINAL ✅
+
+**Check 3 — Pipeline stall:** DRY-RUN (09:56:24Z UTC) → "no stalls detected." 20 FORGE_NO_PR_SKIP entries all valid. NOMINAL ✅
+
+**Check 4 — Pending directives:** pending=0. NOMINAL ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-11T09:50:20Z (~7 min at check; cadence=10 min). Within cadence. NOMINAL ✅
+
+**Check A — Source repo:** HEAD=e662f0f8=origin/main ✅; clean tree ✅; on main ✅; 0 commits behind. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-11T08:59:43Z (~58 min), status=success, commit=98f0a140. Within 2h threshold. NOMINAL ✅
+**Check C — Agent liveness:** beacon PID 3965718 ✅; outbox-notifier PID 3965731 ✅; inbox_watcher PID 3940207 ✅. ⚠️ Zombie PID 1834248 (43d+14h+37m, bash poll loop). [carry]
+**Check E — PR/merge state:**
+- PR #929 MERGED 2026-07-11T09:51:25Z UTC — fix(heal-undispatched-pr-review): canonical task_id resolution via build-outbox PR-URL match. Mirror REVIEW_PASS all 4 success criteria + regression gate PASS. Auto-merged squash + branch deleted. G-rule forge-marker-task-id-mismatch-xii-v1 → COMPLETE ✅
+- PR #860 [OPEN, UNKNOWN] — spec XIV-b. [carry blue]
+
+**§5.0:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅.
+
+**Conditional checks — UTC Saturday 2026-07-11 (~09:57Z):**
+- Check I: Not a firing day (Sat). Latest artifact: check-i-2026-07-10.json. ✅
+- Check XI: Timer fires ~10:21Z today (~24 min). Latest artifact: check-xi-20260710T102121Z (attention_rate=0.125, gate=0.1, over_gate=true). No new artifact yet. [yellow carry]
+- Check III/IV/VIII/IX/X/XII/XIV: Sunday/Monday gates. Skip. ✅
+
+**G-rule assessment:**
+- **forge-marker-task-id-mismatch-xii-v1 → COMPLETE ✅**: PR #929 MERGED 09:51:25Z UTC. systemic_fix appended to PRIME ledger 09:59:41Z UTC.
+- All other G-rule counts carry from iter ~5068. No new occurrences.
+
+**Actions taken:**
+1. Check 0: Tier-3 silence for outbox-notifier-review-pass-pr929 (known-pattern). Watermark advanced 876→877. ✅
+2. PRIME ledger: `systemic_fix` appended for forge-marker-task-id-mismatch-xii-v1 (PR #929, tier=1, 09:59:41Z UTC). ✅
+3. PRIME ledger: `iter_clean` appended (09:59:43Z UTC, tier=1, template=nominal). ✅
+4. Tier state: `record --checks-clean false` → tier=1, consecutive_clean=0. ✅
+
+**Escalations:** 0 new DMs. All outstanding carries already DM'd in prior iters.
+
+**Standing findings (carry):**
+- [yellow] **zombie-bash-pid-1834248** — 43d+14h+37m, bash poll loop awaiting absent archive file. ask-then-do: `kill 1834248`. [carry]
+- [yellow] **check-xi-drift-over-gate** — 8/64 (12.5%, gate=10%) on 2026-07-10. Check XI fires ~10:21Z today. [carry]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07`. [carry]
+- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
+- [blue] **PR #860** — spec XIV-b. [carry]
+- [blue] **Check I proposal #1** — `notify-p3a-retro-prep` ($1.91 vs $0.28 baseline, 98σ). Use `/dispatch 1`. [carry]
+- [blue] **G-rules (dispatched, vp):** ourliberty-health-subject-key-mismatch-001 [3/3, vp]; forge-revision-preamble-missing-pr711-001 [vp]; forge-wip-redispatch-digest-tier4-001 [vp]; forge-wip-redispatch-exhausted-pr-exists-fp-001 [APPROVAL_REQUEST QUEUED iter ~3279, vp]; decision-needed-approval-forge-dispatch-no-target-repo-001 [vp]; no-session-revision-active-mirror-session-fp-001 [vp].
+- [blue] **G-rule 2/3:** outbox-notifier-merge-conflict-manual-rebase-tier4-001; forge-wip-redispatch-exhausted-genuine-no-pr-001; outbox-notifier-notification-intent-review-escalate-tier4-001; outbox-notifier-auto-merge-stale-revalidation-tier4-001.
+- [blue] **G-rule 1/3:** mirror-malformed-verdict-heal-reap-path-001; heal-unregistered-approval-null-chat-id-001; mirror-queue-wait-gauge-tier4-001; inbox-watcher-tier-pool-all-unavailable-tier4-001; heal-pipeline-stall-unrouted-deep-review-required-fp-001; heal-pulse-check-staleness-single-flight-skip-fp-001; gate-parallelism-monitor-regression-data-001; pulse-rotation-check-source-tier4-001; watermark-rotation-gap [1/3 iter ~5063].
+
+**PRIME DIRECTIVE:** 0 new interventions; 1 new systemic_fix (forge-marker-task-id-mismatch-xii-v1 / PR #929); iter_clean appended. ratio=19.0 (86 systemic_fixes / 1634 interventions; 34 vp).
+**Tier end-of-iter:** **Tier 1** (zombie carry; consecutive_clean=0).
+
+---
+
