@@ -8670,6 +8670,40 @@
       "retired_at": "2026-07-11T09:24:21.700062+00:00",
       "retired_reason": "orphan-terminal",
       "retired_signal": "pr_merged:#561"
+    },
+    {
+      "id": "proposed-gh-burn-phase2-shared-open-pr-snapshot-001",
+      "name": "GH Burn Phase2 Shared Open PR Snapshot 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `gh-burn-phase2-shared-open-pr-snapshot-001`. Last activity 2026-07-11T18:53:42.371386+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "gh-burn-phase2-shared-open-pr-snapshot-001"
+      ],
+      "repo": null,
+      "created": "2026-07-11",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-11T18:57:01.615459+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-11T18:53:42.371386+00:00"
+    },
+    {
+      "id": "proposed-auto-route-externally-authored-pr-reviews-001",
+      "name": "Auto Route Externally Authored PR Reviews 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `auto-route-externally-authored-pr-reviews-001`. Last activity 2026-07-11T18:49:50.565811+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "auto-route-externally-authored-pr-reviews-001"
+      ],
+      "repo": null,
+      "created": "2026-07-11",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-11T18:57:01.615459+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-11T18:49:50.565811+00:00"
     }
   ]
 }
