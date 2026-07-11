@@ -381,6 +381,129 @@ class MirrorReviewSuppressionTest(_Base):
         self.assertTrue(self._ledger()[self._REVIEW_STEM]['suppressed'])
 
 
+class RejectSuppressionTest(_Base):
+    """A Forge task REJECTED at preflight ('no buildable delta — already fully
+    implemented') legitimately produces NO PR — its `[WIP][session-start]`-only
+    branch trips the abandoned-build signature but must NOT be retried (each retry
+    re-rejects, never terminating). Regression for the 2026-07-11
+    auto-route-externally-authored-pr-reviews-001 retry loop. The reject is read
+    from the durable `preflight_reject` chain_event via `_task_family_rejected`."""
+
+    def _run_with_rejected(self, rejected: bool):
+        self._archive_original()
+        old = time.time() - 3600
+        with self._git_world([('forge/synthetic-wip-001', old)]), \
+             mock.patch.object(h, '_task_family_rejected',
+                               return_value=rejected) as probe:
+            self._run()
+        return probe
+
+    def test_rejected_task_suppresses(self):
+        probe = self._run_with_rejected(True)
+        # No retry envelope, no alert at all (neither digest nor escalate).
+        self.assertEqual(self._inbox_files(), [])
+        self.assertEqual(self._alerts.call_count, 0)
+        # Ledger records the suppression under the base stem, no attempts count.
+        ledger = self._ledger()
+        self.assertTrue(ledger['synthetic-wip-001']['suppressed'])
+        self.assertEqual(ledger['synthetic-wip-001']['suppress_reason'],
+                         'suppressed-task-rejected')
+        self.assertNotIn('attempts', ledger['synthetic-wip-001'])
+        probe.assert_called()
+
+    def test_genuine_build_failure_still_redispatches(self):
+        # A proceeded-then-died build has NO preflight_reject -> recovered exactly
+        # as today: one retry envelope, one digest alert, ledger attempts=1.
+        self._run_with_rejected(False)
+        self.assertIn('synthetic-wip-001-retry1.json', self._inbox_files())
+        routes = [c.args[0] for c in self._alerts.call_args_list]
+        self.assertEqual(routes, ['digest'])
+        ledger = self._ledger()
+        self.assertEqual(ledger['synthetic-wip-001']['attempts'], 1)
+        self.assertNotIn('suppressed', ledger['synthetic-wip-001'])
+
+    def test_suppression_is_idempotent_and_skips_requery(self):
+        self._archive_original()
+        old = time.time() - 3600
+        with self._git_world([('forge/synthetic-wip-001', old)]), \
+             mock.patch.object(h, '_task_family_rejected',
+                               return_value=True) as probe:
+            self._run()  # tick 1: suppress + record ledger
+            self.assertTrue(self._ledger()['synthetic-wip-001']['suppressed'])
+            self._run()  # tick 2: already-suppressed gate short-circuits
+        # Reject signal probed exactly once; no alert, no envelope ever.
+        probe.assert_called_once()
+        self.assertEqual(self._alerts.call_count, 0)
+        self.assertEqual(self._inbox_files(), [])
+
+    def test_suppressed_rejected_never_escalates_even_at_max_attempts(self):
+        # A suppressed entry sitting at MAX must not fire the 'exhausted'
+        # escalation — the already-suppressed gate precedes the attempts logic and
+        # short-circuits BEFORE re-querying the reject signal.
+        self._archive_original()
+        self._seed_ledger({'synthetic-wip-001': {
+            'suppressed': True,
+            'suppress_reason': 'suppressed-task-rejected',
+            'attempts': h.MAX_AUTO_RETRIES,
+            'escalated': False}})
+        old = time.time() - 3600
+        with self._git_world([('forge/synthetic-wip-001', old)]), \
+             mock.patch.object(h, '_task_family_rejected',
+                               return_value=True) as probe:
+            self._run()
+        escalate_calls = [c for c in self._alerts.call_args_list
+                          if c.args and c.args[0] == 'escalate']
+        self.assertEqual(escalate_calls, [])
+        self.assertEqual(self._alerts.call_count, 0)
+        probe.assert_not_called()
+
+
+class RejectSignalHelperTest(_Base):
+    def test_chain_events_no_env_returns_none(self):
+        # Missing Supabase env -> None (failsafe: caller preserves redispatch).
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop('SUPABASE_URL', None)
+            os.environ.pop('SUPABASE_SERVICE_ROLE_KEY', None)
+            self.assertIsNone(
+                h._chain_events_has_preflight_reject({'foo-001'}))
+
+    def test_chain_events_empty_ids_returns_false(self):
+        self.assertFalse(h._chain_events_has_preflight_reject(set()))
+        self.assertFalse(h._chain_events_has_preflight_reject({''}))
+
+    def test_task_family_rejected_false_when_query_none(self):
+        # Infra failure (None) -> not rejected -> genuine recovery preserved.
+        with mock.patch.object(h, '_chain_events_has_preflight_reject',
+                               return_value=None):
+            self.assertFalse(
+                h._task_family_rejected('forge', 'foo-001', 'foo-001'))
+
+    def test_task_family_rejected_includes_archived_original_id(self):
+        # The archived original's REAL task_id joins the probe set (branch stems
+        # can diverge from it under worktree sanitization/truncation).
+        self._archive_original()
+        captured: dict = {}
+
+        def _fake(ids):
+            captured['ids'] = set(ids)
+            return True
+
+        with mock.patch.object(h, '_chain_events_has_preflight_reject',
+                               side_effect=_fake):
+            got = h._task_family_rejected(
+                'forge', 'synthetic-wip-001', 'synthetic-wip-001')
+        self.assertTrue(got)
+        self.assertIn('synthetic-wip-001', captured['ids'])
+
+    def test_resolve_original_task_id(self):
+        self._archive_original()
+        self.assertEqual(
+            h._resolve_original_task_id('forge', 'synthetic-wip-001'),
+            'synthetic-wip-001')
+        self.assertIsNone(
+            h._resolve_original_task_id('forge', 'no-such-branch-stem'))
+
+
 class KillSwitchTest(_Base):
     def test_kill_switch_short_circuits(self):
         self._archive_original()

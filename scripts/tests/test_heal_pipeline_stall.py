@@ -594,6 +594,37 @@ class TestCheckForgeBuiltNoPr(_TempAgentsRootMixin, unittest.TestCase):
         self.assertEqual(len(alerts), 1)
         self.assertIn(task, alerts[0]['message'])
 
+    # ----- Reconciliation step 2b: durable preflight_reject chain_event -----
+    # A Forge task REJECTED at preflight ('no buildable delta') legitimately opens
+    # NO PR — `no PR` is the CORRECT outcome, not a stall. Covers the phase=='build'
+    # redispatch that step 2's archived-outbox read (phase=='preflight' only)
+    # misses (2026-07-11 auto-route-...-retry1 false URGENT).
+
+    def test_skips_when_chain_event_preflight_reject(self) -> None:
+        task = 'auto-route-externally-authored-pr-reviews-001-retry1'
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        with patch.object(self.hps, '_forge_task_rejected', return_value=True):
+            alerts = self.hps.check_forge_built_no_pr(lines, [], [], {})
+        self.assertEqual(alerts, [])
+
+    def test_genuine_build_without_reject_still_alerts(self) -> None:
+        """A proceeded-then-died build has NO preflight_reject chain_event, so the
+        build-gap alert still fires exactly as today (byte-for-byte recovery)."""
+        task = 'genuine-build-crash-001'
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        with patch.object(self.hps, '_forge_task_rejected', return_value=False):
+            alerts = self.hps.check_forge_built_no_pr(lines, [], [], {})
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(alerts[0]['key'], 'forge_built_no_pr:genuine-build-crash-001')
+
+    def test_forge_task_rejected_false_without_supabase_env(self) -> None:
+        with patch.dict(os.environ, {}, clear=True):
+            self.assertFalse(self.hps._forge_task_rejected('any-task-001'))
+
+    def test_forge_task_rejected_false_for_unknown_or_empty(self) -> None:
+        self.assertFalse(self.hps._forge_task_rejected('unknown'))
+        self.assertFalse(self.hps._forge_task_rejected(''))
+
     def test_skips_when_pr_merged_on_other_tracked_repo(self) -> None:
         """A merged PR in the dashboard repo (not agent-core) still
         means Forge's work shipped — both tracked repos must be checked."""

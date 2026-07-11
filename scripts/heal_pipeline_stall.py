@@ -766,6 +766,49 @@ def _get_chain_events_for_task(task_id: str,
         return None
 
 
+def _forge_task_rejected(task_id: str) -> bool:
+    """True if chain_events records a Forge ``preflight_reject`` for ``task_id``.
+
+    ``preflight_reject`` is the durable per-task terminal signal the outbox
+    notifier emits for a Forge preflight REJECT / no-buildable-delta (a
+    budget-exhausted clarify folds into the same event type). A rejected task
+    legitimately opens NO PR — `no PR` is the CORRECT outcome, not a stall.
+
+    Unlike ``_resolution_signal_present`` this queries WITHOUT a ``ts > since``
+    lower bound: the reject fires at (or just before) the same ``[forge] done``
+    line whose timestamp is the caller's cutoff, so a ``ts >`` filter would miss
+    it. Returns False on ANY infrastructure failure (missing Supabase env, import
+    error, query exception) so the existing build-gap alert stays the failsafe —
+    mirroring ``_get_chain_events_for_task``'s None-is-no-signal contract. Lazy
+    ``get_supabase_client`` import keeps tests mock-friendly."""
+    if not task_id or task_id == 'unknown':
+        return False
+    url = os.environ.get('SUPABASE_URL')
+    key = os.environ.get('SUPABASE_SERVICE_ROLE_KEY')
+    if not url or not key:
+        return False
+    try:
+        from supabase_factory import get_supabase_client  # type: ignore
+        client = get_supabase_client(url, key)
+        res = (
+            client.table('chain_events')
+                  .select('event_type,task_id')
+                  .eq('task_id', task_id)
+                  .eq('event_type', 'preflight_reject')
+                  .limit(1)
+                  .execute()
+        )
+        rows = getattr(res, 'data', None) or []
+        return len(rows) > 0
+    except Exception as e:
+        log(
+            f'preflight_reject query failed for task={task_id}: '
+            f'{type(e).__name__}: {e}',
+            'WARN',
+        )
+        return False
+
+
 def _gh_pr_state(pr_url: str) -> Optional[str]:
     """Return the PR's GitHub state ('OPEN' / 'MERGED' / 'CLOSED'), or None on
     ANY gh transport / non-zero exit / JSON error. The None-vs-state distinction
@@ -1793,6 +1836,25 @@ def check_forge_built_no_pr(watcher_lines: list[str], open_prs: list[dict],
                 f'FORGE_NO_PR_SKIP task={task} reason={reason} '
                 f'marker={preflight_marker!r} '
                 f'archive={FORGE_OUTBOX_ARCHIVE / (task + ".json")}',
+                'INFO',
+            )
+            seen_tasks.add(task)
+            continue
+        # Reconciliation step 2b: chain_events records a durable Forge
+        # `preflight_reject` for this task — the notifier's per-task terminal
+        # signal for a preflight REJECT / no-buildable-delta (a budget-exhausted
+        # clarify folds into the same event type). A rejected task legitimately
+        # opens NO PR, so `no PR` is the CORRECT outcome, not a stall. This
+        # complements step 2's archived-outbox read, which only recognizes the
+        # phase=='preflight' shape and misses a phase=='build' redispatch that
+        # Forge re-rejected for still having no buildable delta — the 2026-07-11
+        # `auto-route-...-retry1` forge-no-pr false URGENT. A genuine
+        # proceeded-then-died build emits `preflight_proceed` (not
+        # `preflight_reject`), so it still alerts exactly as today. Fail-safe:
+        # `_forge_task_rejected` returns False on any Supabase failure.
+        if _forge_task_rejected(task):
+            log(
+                f'FORGE_NO_PR_SKIP task={task} reason=preflight_reject_chain_event',
                 'INFO',
             )
             seen_tasks.add(task)

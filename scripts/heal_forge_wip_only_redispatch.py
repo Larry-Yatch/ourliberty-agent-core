@@ -32,6 +32,22 @@ before re-probing gh. An OPEN or gh-UNKNOWN reviewed PR is left alone here — a
 genuinely-dead open review is recovered by the orphaned-mirror-claims re-inject
 path, not by this build-WIP healer (Mirror review #931 false 'exhausted', 2026-07-11).
 
+REJECT / NO-DELTA SUPPRESSION — a task Forge REJECTED at preflight ('no buildable
+delta — already fully implemented') legitimately produces NO PR: its
+``forge/<task>`` branch carries only the ``[WIP][session-start]`` checkpoint, so it
+too trips the WIP-only / no-PR signature. Redispatching it is futile and never
+terminates — every retry re-rejects (still no delta), leaving another WIP-only
+branch (2026-07-11 ``auto-route-externally-authored-pr-reviews-001`` retry loop).
+A rejected task is DONE, not a failed build: when the family's Forge dispatch
+concluded with a durable ``preflight_reject`` chain_event (the notifier's per-task
+terminal signal — ``outbox_notifier._emit_preflight_outcome_chain_event``; a
+budget-exhausted clarify folds into the same type), the healer SUPPRESSES it (no
+redispatch, no exhausted escalation) and records ``suppressed-task-rejected`` in
+the ledger so later ticks short-circuit before re-querying chain_events. The
+distinction from a genuine proceeded-then-died build is the terminal signal: a
+build that PROCEEDED emits ``preflight_proceed`` (never ``preflight_reject``), so
+its abandoned WIP-only branch is recovered/escalated exactly as before.
+
 DETECTION SIGNATURE — a branch is a candidate only when ALL hold; any ambiguous
 or indeterminate signal => SKIP, never redispatch:
   1. WIP-only: the branch tip adds NOTHING over its merge-base with origin/main
@@ -193,7 +209,88 @@ def _reviewed_pr_coordinate(branch_stem: str) -> Optional[tuple[str, int]]:
     return tts.parse_pr_coordinate(_ledger_base(branch_stem))
 
 
+# ---------- reject / no-delta terminal-signal lookup ----------
+
+
+def _chain_events_has_preflight_reject(task_ids: set[str]) -> Optional[bool]:
+    """True if chain_events records a Forge ``preflight_reject`` for ANY id in
+    ``task_ids``; False if reachable and none found; None on infrastructure
+    failure (missing Supabase env, import error, query exception).
+
+    ``preflight_reject`` is the durable per-task terminal signal the outbox
+    notifier emits for a Forge preflight REJECT / no-buildable-delta (a
+    budget-exhausted clarify folds into the same event type) — keyed on
+    ``task_id``. Reusing it satisfies the 'do not invent a parallel reject store'
+    constraint. None is the FAILSAFE: the caller then behaves exactly as today
+    (redispatch bounded by the ledger to MAX_AUTO_RETRIES + one escalation), so a
+    transient Supabase outage costs at most the normal one retry, never an
+    unbounded loop. Lazy import mirrors the heal_pipeline_stall canonical
+    pattern — keeps tests mock-friendly and avoids a hard SDK dependency at
+    module load."""
+    ids = sorted(t for t in task_ids if t)
+    if not ids:
+        return False
+    url = os.environ.get('SUPABASE_URL')
+    key = os.environ.get('SUPABASE_SERVICE_ROLE_KEY')
+    if not url or not key:
+        return None
+    try:
+        from supabase_factory import get_supabase_client  # type: ignore
+        client = get_supabase_client(url, key)
+        res = (
+            client.table('chain_events')
+                  .select('event_type,task_id')
+                  .in_('task_id', ids)
+                  .eq('event_type', 'preflight_reject')
+                  .limit(1)
+                  .execute()
+        )
+        rows = getattr(res, 'data', None) or []
+        return len(rows) > 0
+    except Exception as exc:  # noqa: BLE001 — best-effort; None preserves behavior
+        log('WARN', f'chain_events preflight_reject query failed for {ids}: '
+                    f'{type(exc).__name__}: {exc}')
+        return None
+
+
+def _task_family_rejected(agent: str, branch_stem: str, base: str) -> bool:
+    """True if this task family's Forge dispatch concluded with a preflight
+    REJECT / no-buildable-delta (a ``preflight_reject`` chain_event).
+
+    Probes the branch's sanitized stem, the retry-stripped ``base``, AND the
+    archived original's REAL ``task_id`` — the dispatch branch carries the
+    WORKTREE-sanitized stem (lowercased, non-alnum -> '-', truncated to 50),
+    which can diverge from the true id the notifier keyed the event on, so we
+    recover that id from the archived envelope. False on infrastructure failure
+    (``_chain_events_has_preflight_reject`` returns None) so genuine build-failure
+    recovery stays the failsafe."""
+    candidates = {branch_stem, base}
+    original_id = _resolve_original_task_id(agent, branch_stem)
+    if original_id:
+        candidates.add(original_id)
+        candidates.add(_ledger_base(original_id))
+    return bool(_chain_events_has_preflight_reject(candidates))
+
+
 # ---------- archived-original lookup (source of truth for re-dispatch) ----------
+
+
+def _resolve_original_task_id(agent: str, branch_stem: str) -> Optional[str]:
+    """The real (un-sanitized) ``task_id`` of the archived original for a
+    candidate branch, or None. Recovered from the archived envelope's ``task_id``
+    field because branch sanitization can diverge from the true id the notifier
+    keyed the ``preflight_reject`` chain_event on."""
+    path = _find_archived_original(agent, branch_stem)
+    if path is None:
+        return None
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    tid = data.get('task_id')
+    return str(tid) if tid else None
 
 
 def _find_archived_original(agent: str, branch_stem: str) -> Optional[Path]:
@@ -393,6 +490,15 @@ def evaluate(cand: Candidate, now: float, open_heads: set[str],
         return 'skip', (f'mirror-review of {pr_repo}#{pr_number} (state={state}) '
                         f'— not a build-WIP candidate')
 
+    # Gate 0b (already-suppressed): a family already recorded as a terminal
+    # reject/no-delta (or, defensively, any other suppressed reason) short-
+    # circuits here so later ticks never re-query chain_events — idempotent
+    # suppression. Mirror-review suppressions returned above (coord != None), so
+    # only a reject-suppressed forge build reaches this line.
+    if (ledger.get(base) or {}).get('suppressed'):
+        reason = (ledger.get(base) or {}).get('suppress_reason', 'suppressed')
+        return 'skip', f'already suppressed ({reason})'
+
     # Gate 3: an open or merged PR for this branch means the work is not abandoned.
     if cand.branch in open_heads:
         return 'skip', 'open-PR head'
@@ -407,6 +513,17 @@ def evaluate(cand: Candidate, now: float, open_heads: set[str],
     root = _family_root(cand.branch_stem)
     if root in _live_inbox_family_roots(cand.agent):
         return 'skip', 'already-requeued (live inbox family member)'
+
+    # Gate 6 (reject / no-delta terminal): this branch passed every abandoned-
+    # build gate (WIP-only, no PR, no live session, not requeued) — but if the
+    # family's Forge dispatch concluded with a preflight REJECT, `no PR` is the
+    # CORRECT terminal outcome, not a failed build. Retrying re-rejects forever
+    # (2026-07-11 auto-route-... loop). Suppress permanently; a genuine
+    # proceeded-then-died build emits `preflight_proceed` (never
+    # `preflight_reject`) and falls through to redispatch unchanged.
+    if _task_family_rejected(cand.agent, cand.branch_stem, base):
+        return ('suppress-rejected',
+                'family concluded with a Forge preflight REJECT (no buildable delta)')
 
     # Ledger: bound auto-retries per family.
     entry = ledger.get(base) or {}
@@ -537,21 +654,27 @@ def _do_escalate(cand: Candidate, ledger: dict) -> None:
                 subject=base)
 
 
-def _do_suppress(cand: Candidate, ledger: dict, reason: str) -> None:
-    """Record a mirror-review task whose reviewed PR is already terminal as
-    suppressed, so it never redispatches, never escalates, and later ticks
-    short-circuit before the gh probe. Deliberately carries NO ``attempts`` count
-    — the escalate path keys on attempts>=MAX, which a suppressed entry can never
-    reach, so a moot review can never contribute to an 'exhausted' alert."""
+def _do_suppress(cand: Candidate, ledger: dict, reason: str,
+                 suppress_reason: str) -> None:
+    """Record a task whose no-PR outcome is TERMINAL-BY-DESIGN as suppressed, so
+    it never redispatches, never escalates, and later ticks short-circuit before
+    any re-probe. Two classes use this:
+      * ``suppressed-reviewed-pr-terminal`` — a mirror-review whose reviewed PR is
+        already merged/closed (the review is moot); and
+      * ``suppressed-task-rejected`` — a Forge dispatch that concluded with a
+        preflight REJECT / no-buildable-delta (a rejected task is DONE, not a
+        failed build).
+    Deliberately carries NO ``attempts`` count — the escalate path keys on
+    attempts>=MAX, which a suppressed entry can never reach, so a suppressed task
+    can never contribute to an 'exhausted' alert."""
     base = _ledger_base(cand.branch_stem)
     entry = ledger.get(base) or {}
     entry['suppressed'] = True
-    entry['suppress_reason'] = 'suppressed-reviewed-pr-terminal'
+    entry['suppress_reason'] = suppress_reason
     entry['last_suppress_ts'] = datetime.now(timezone.utc).isoformat()
     entry['branch'] = cand.branch
     ledger[base] = entry
-    log('SUPPRESSED', f'{cand.branch}: {reason} — mirror-review is moot; no '
-                      f'redispatch, no escalation')
+    log('SUPPRESSED', f'{cand.branch}: {reason} — no redispatch, no escalation')
 
 
 def sweep_repo(repo: Path, ledger: dict, now: float) -> SweepCounts:
@@ -587,7 +710,11 @@ def sweep_repo(repo: Path, ledger: dict, now: float) -> SweepCounts:
             counts.escalated += 1
             acted_bases.add(base)
         elif action == 'suppress':
-            _do_suppress(cand, ledger, reason)
+            _do_suppress(cand, ledger, reason, 'suppressed-reviewed-pr-terminal')
+            counts.suppressed += 1
+            acted_bases.add(base)
+        elif action == 'suppress-rejected':
+            _do_suppress(cand, ledger, reason, 'suppressed-task-rejected')
             counts.suppressed += 1
             acted_bases.add(base)
         else:
