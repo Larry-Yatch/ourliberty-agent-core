@@ -368,6 +368,19 @@ class TestParseLogLine(unittest.TestCase):
             base + 'pr=https://example/pr/1 outcome=merged agent=forge\n')
         self.assertEqual(merged.event_id, replay.event_id)
 
+    def test_review_request_keyword_absent(self):
+        # forge-queue-in-review-lane: review_request is push-emitted with a
+        # load-bearing origin_task_id join key (delegate-tracking Slice 2a). A
+        # REVIEW_REQUEST log keyword would ship a SECOND, origin_task_id-less
+        # copy that can't dedup against the push (log ts != push ts) — so the
+        # keyword must NOT exist and such a line must NOT ship.
+        self.assertNotIn('REVIEW_REQUEST', ces._LOG_EVENT_KEYWORDS)
+        line = (
+            '[2026-06-11 00:00:23] [notifier] [INFO] REVIEW_REQUEST '
+            'task=abc pr=https://example/pr/1 agent=forge\n'
+        )
+        self.assertIsNone(ces.parse_log_line(line))
+
     def test_non_event_line_returns_none(self):
         line = '[2026-06-11 00:00:23] [notifier] [INFO] random log no keyword\n'
         self.assertIsNone(ces.parse_log_line(line))
