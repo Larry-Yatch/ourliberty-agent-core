@@ -234,6 +234,17 @@ KNOWN_EVENT_TYPES: frozenset[str] = frozenset({
     # also admits it to the weekly chain-event-type audit
     # (heal_chain_event_type_audit.py).
     'spec_review_round',
+    # spec-gauntlet silent-failure gauge (spec-gauntlet-gate.md §3.5): the
+    # trailing gauge (scripts/spec_review_silent_failure_gauge.py) push-emits ONE
+    # of these (agent='spec-review', task_id=<tail gauntlet task_id>) when the
+    # trailing run of gauntlets ending errored/incomplete crosses MIN_STREAK —
+    # the fail-open blind spot where a persistently broken gate degrades into an
+    # invisible permanent no-op. Info surface ONLY (no DM, no needs_attention),
+    # per the alert default-deny north star; this chain_event IS the surface, so
+    # the type must be admitted or emit_event would silently drop it and void the
+    # gauge. The shipper never produces these rows; listing the type here also
+    # admits it to the weekly chain-event-type audit (heal_chain_event_type_audit.py).
+    'spec_review_silent_failure',
 })
 
 # PII / credential redaction. Any payload field key matching one of these
