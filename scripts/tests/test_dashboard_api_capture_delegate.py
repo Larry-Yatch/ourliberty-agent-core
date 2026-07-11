@@ -301,6 +301,63 @@ class DedupTest(_DelegateTestBase):
         filenames = {c['filename'] for c in self.inbox.calls}
         self.assertEqual(filenames, {'delegate-cap-1.json', 'delegate-cap-2.json'})
 
+    _STANDING_REF = {
+        'kind': 'delegate',
+        'task_id': 'delegate-cap-1',
+        'stamped_at': '2026-07-09T20:05:00+00:00',
+    }
+
+    def _with_evidence(self, evidence):
+        """Patch the outcome-evidence lookup for one request (the sandbox has
+        no pending-approvals store, so the real lookup always returns None)."""
+        orig = da._delegation_outcome_evidence
+        da._delegation_outcome_evidence = lambda tid, agents_root=None: evidence
+        self.addCleanup(
+            lambda: setattr(da, '_delegation_outcome_evidence', orig))
+
+    def test_consumed_proposal_with_evidence_short_circuits(self):
+        # Durable idempotency (2026-07-11 revert class): the live-inbox dedup
+        # window is only minutes — once Beacon consumed the proposal AND the
+        # run left durable evidence (open/approved approval), a re-POST returns
+        # the prior outcome instead of a fresh paid run. dispatched is honestly
+        # False — nothing new was handed to the team.
+        self._seed(_cap('cap-1', spawned=dict(self._STANDING_REF)))
+        self._with_evidence({'status': 'open', 'approval_id': 'scoped-001',
+                             'created_at': '2026-07-09T20:10:00+00:00'})
+        r = self.client.post(_endpoint('cap-1'), headers=AUTH, json={})
+        self.assertEqual(r.status_code, 200, r.text)
+        body = r.json()
+        self.assertFalse(body['dispatched'])
+        self.assertTrue(body['already_delegated'])
+        self.assertEqual(body['delegated_at'], '2026-07-09T20:05:00+00:00')
+        self.assertEqual(body['approval_id'], 'scoped-001')
+        self.assertEqual(self.inbox.calls, [])  # NO new proposal, no LLM spend
+
+    def test_no_outcome_evidence_redelegates(self):
+        # A prior run that left NO durable trace must not wedge the card —
+        # the re-click re-delegates (matching the no-outcome alert's advice).
+        self._seed(_cap('cap-1', spawned=dict(self._STANDING_REF)))
+        self._with_evidence(None)
+        r = self.client.post(_endpoint('cap-1'), headers=AUTH, json={})
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertTrue(r.json()['dispatched'])
+        self.assertEqual(len(self.inbox.calls), 1)  # fresh proposal written
+
+    def test_force_redelegates_and_refreshes_stamp(self):
+        self._seed(_cap('cap-1', spawned=dict(self._STANDING_REF)))
+        self._with_evidence({'status': 'open', 'approval_id': 'scoped-001',
+                             'created_at': '2026-07-09T20:10:00+00:00'})
+        r = self.client.post(_endpoint('cap-1'), headers=AUTH,
+                             json={'force': True})
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertTrue(r.json()['dispatched'])
+        self.assertNotIn('already_delegated', r.json())
+        self.assertEqual(len(self.inbox.calls), 1)  # fresh proposal written
+        # delegated_at now reports the FORCED dispatch, not the first click.
+        cap = next(c for c in self._read_local()['captures'] if c['id'] == 'cap-1')
+        self.assertNotEqual(cap['spawned']['stamped_at'],
+                            self._STANDING_REF['stamped_at'])
+
 
 if __name__ == '__main__':
     unittest.main()

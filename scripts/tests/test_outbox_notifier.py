@@ -7977,6 +7977,101 @@ class BeaconBoardDelegateTest(unittest.TestCase):
         self.assertEqual(len(pending), 1)
         self.assertEqual(pending[0]['chat_id'], 12345)
 
+    # ----- delegate no-outcome backstop (2026-07-11 revert report) -----
+    # A `delegate-*` envelope whose Beacon run produced NO durable outcome must
+    # surface Beacon's verdict to Larry instead of dying in archived-no-notify.
+
+    def _no_outcome_alerts(self):
+        return [a for a in self._read_alerts()
+                if a.get('source') == 'outbox-notifier' and a.get('needs_larry')]
+
+    def test_no_marker_delegate_surfaces_needs_you_alert(self):
+        body = self._delegate_outbox(
+            marker_text='',
+            narrative_prefix=(
+                'Scoped it. Already fixed two weeks ago — dismiss the card.'),
+        )
+        f = self._write_outbox('beacon', 'beacon-bd-noout.json', body)
+        on.process_outbox(f)
+        alerts = self._no_outcome_alerts()
+        self.assertEqual(len(alerts), 1)
+        rec = alerts[0]
+        self.assertEqual(rec['route'], 'escalate')
+        # Cooldown subject = task_id + verdict digest (so a NEW verdict for
+        # the same card isn't suppressed by an earlier one's cooldown).
+        self.assertTrue(rec['subject'].startswith(
+            'delegate-cap-projects-pm-layer-data-is-stale:'))
+        # The message names the card and carries Beacon's verdict.
+        self.assertIn('cap-projects-pm-layer-data-is-stale', rec['message'])
+        self.assertIn('Already fixed two weeks ago', rec['message'])
+
+    def test_malformed_marker_delegate_surfaces_alert(self):
+        bad_payload = json.dumps({'task_id': 'x'})  # missing required fields
+        bad_marker = (
+            f'=== APPROVAL_REQUEST ===\n{bad_payload}\n'
+            f'=== END_APPROVAL_REQUEST ==='
+        )
+        body = self._delegate_outbox(marker_text=bad_marker)
+        f = self._write_outbox('beacon', 'beacon-bd-badout.json', body)
+        on.process_outbox(f)
+        self.assertEqual(len(self._no_outcome_alerts()), 1)
+
+    def test_no_marker_non_delegate_dashboard_stays_silent(self):
+        # The backstop is scoped to delegate-* envelopes; other dashboard
+        # results (card messages etc.) keep the silent fall-through.
+        body = self._delegate_outbox(
+            marker_text='', envelope_task_id='card-message-cap-something')
+        f = self._write_outbox('beacon', 'beacon-bd-cardmsg.json', body)
+        on.process_outbox(f)
+        self.assertEqual(self._no_outcome_alerts(), [])
+
+    def test_marker_present_no_backstop_alert(self):
+        # A durable outcome (force_ask pending approval) means no backstop —
+        # the approval flow already reaches Larry.
+        body = self._delegate_outbox()
+        f = self._write_outbox('beacon', 'beacon-bd-withmarker.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-board-delegate')
+        self.assertEqual(self._no_outcome_alerts(), [])
+
+    def test_valid_marker_notifier_side_decline_no_alert(self):
+        # The route declines for a NOTIFIER-side reason (no reply chat and no
+        # fallback chat configured) even though Beacon emitted a well-formed
+        # proposal. The backstop must NOT misdiagnose that as "nothing was
+        # handed to the team".
+        os.environ.pop('TELEGRAM_ALLOWED_CHAT_IDS', None)
+        body = self._delegate_outbox()
+        f = self._write_outbox('beacon', 'beacon-bd-decline.json', body)
+        result = on.process_outbox(f)
+        self.assertNotEqual(result, 'notified-board-delegate')
+        self.assertEqual(self._no_outcome_alerts(), [])
+
+    def test_forfeit_outbox_without_source_alerts(self):
+        # A watcher-restart forfeit (reap_orphans) writes NO `source` field, so
+        # process_outbox exits at the no-source guard — the forfeit leg of the
+        # backstop must still surface the died-verdictless delegate.
+        body = self._delegate_outbox(
+            marker_text='', narrative_prefix='(forfeit: watcher restarted)')
+        body.pop('source', None)
+        f = self._write_outbox('beacon', 'beacon-bd-forfeit.json', body)
+        result = on.process_outbox(f)
+        self.assertEqual(result, 'archived-no-notify')
+        self.assertEqual(len(self._no_outcome_alerts()), 1)
+
+    def test_distinct_second_verdict_not_cooldown_suppressed(self):
+        # The cooldown key carries a digest of the verdict text: a re-processed
+        # IDENTICAL outbox dedups, but a NEW verdict for the same card (e.g.
+        # after a force re-delegation) still alerts inside the 6h window.
+        first = self._delegate_outbox(
+            marker_text='', narrative_prefix='First verdict: already fixed.')
+        f1 = self._write_outbox('beacon', 'beacon-bd-v1.json', first)
+        on.process_outbox(f1)
+        second = self._delegate_outbox(
+            marker_text='', narrative_prefix='Second verdict: cannot repro.')
+        f2 = self._write_outbox('beacon', 'beacon-bd-v2.json', second)
+        on.process_outbox(f2)
+        self.assertEqual(len(self._no_outcome_alerts()), 2)
+
 
 # -------------------- D3.5 5c-followup-2 (audit C-1 + C-2 + Miss #3) --------------------
 

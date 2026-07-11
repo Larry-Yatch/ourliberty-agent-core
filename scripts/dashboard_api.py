@@ -985,6 +985,10 @@ class CaptureDelegateRequest(BaseModel):
     # POST /api/missions/captures/{id}/delegate body (delegate-fix spec § 2).
     # Optional — defaults to the capture's recommended_action, else "delegate".
     action: Optional[str] = None  # delegate | promote | drop | snooze
+    # A card that already carries a delegate `spawned` ref short-circuits to
+    # `already_delegated` instead of dispatching a fresh Beacon run; `force`
+    # overrides that and re-delegates deliberately.
+    force: Optional[bool] = None
 
 
 class CaptureDelegateResponse(BaseModel):
@@ -992,9 +996,16 @@ class CaptureDelegateResponse(BaseModel):
     # in Beacon's inbox. `dispatched` is True on both a fresh proposal and a
     # dedup-collapse onto an already-open one; `deduped` distinguishes the two.
     # `pr_url` is reserved for a future action that routes PR-backed (§ 2).
+    # `already_delegated` marks the durable-idempotency short-circuit: the card
+    # was delegated before (its `spawned` ref stands), so no new proposal was
+    # written; `delegated_at`/`approval_id` carry what is known of that prior
+    # delegation so the confirmation can be honest about it.
     dispatched: bool
     deduped: Optional[bool] = None
     pr_url: Optional[str] = None
+    already_delegated: Optional[bool] = None
+    delegated_at: Optional[str] = None
+    approval_id: Optional[str] = None
 
 
 class MissionActionRequest(BaseModel):
@@ -1208,15 +1219,21 @@ class MissionDelegateRequest(BaseModel):
     # POST /api/system/missions/{id}/delegate body (Contract B). Optional —
     # defaults to "delegate".
     action: Optional[str] = None  # delegate | promote | drop | snooze
+    # Same durable-idempotency override as CaptureDelegateRequest.force.
+    force: Optional[bool] = None
 
 
 class MissionDelegateResponse(BaseModel):
     # The delegate proposal (a human-approval-gate APPROVAL_REQUEST) was dropped
     # in Beacon's inbox. `dispatched` is True on both a fresh proposal and a
-    # dedup-collapse; `deduped` distinguishes the two.
+    # dedup-collapse; `deduped` distinguishes the two. `already_delegated` /
+    # `delegated_at` / `approval_id`: see CaptureDelegateResponse.
     dispatched: bool
     deduped: Optional[bool] = None
     pr_url: Optional[str] = None
+    already_delegated: Optional[bool] = None
+    delegated_at: Optional[str] = None
+    approval_id: Optional[str] = None
 
 
 # ---- /api/larry/* response + request models (E4.4e PR-B2) ----
@@ -7148,16 +7165,46 @@ def _handle_approval_message(
 _DELEGATE_DEFAULT_ACTION = 'delegate'
 
 
+def _spawned_delegate_ref_matches(existing: Any, task_id: str) -> bool:
+    """The ONE definition of delegate-spawned identity (kind + task_id),
+    shared by the stamp helpers' idempotency checks and both handlers'
+    short-circuit guards so the four sites can never drift."""
+    return (isinstance(existing, dict)
+            and existing.get('kind') == 'delegate'
+            and existing.get('task_id') == task_id)
+
+
+def _apply_spawned_stamp(
+    item: dict[str, Any], spawned: dict[str, Any], *, overwrite: bool,
+) -> bool:
+    """Shared stamp discipline for both registries. Returns True iff the item
+    was mutated (caller writes the file). Rules:
+      - same delegate identity + not overwrite → idempotent no-op (a deduped
+        re-POST never churns `stamped_at`);
+      - same identity + overwrite → replace the ref (a REAL re-dispatch
+        refreshes `stamped_at` and clears any GC-stamped outcome/failure
+        fields from the prior run — `delegated_at` stays honest);
+      - a DIFFERENT-kind existing ref (e.g. a future 'project' ref) is NEVER
+        clobbered — that would destroy the other work's join key, the exact
+        vanishing-card class this project exists to stop."""
+    existing = item.get('spawned')
+    if isinstance(existing, dict) and existing.get('kind') not in (None, spawned.get('kind')):
+        return False
+    if _spawned_delegate_ref_matches(existing, spawned.get('task_id')) and not overwrite:
+        return False
+    item['spawned'] = spawned
+    return True
+
+
 def _stamp_spawned_on_capture(
     captures_path: Path, capture_id: str, spawned: dict[str, Any],
+    *, overwrite: bool = False,
 ) -> None:
     """Phase S (S1): stamp the `spawned` ref onto a capture under the shared
     capture-ingest lock — the SAME single committer / writer path (_read +
     _atomic_write_captures) the ingest, snooze, drop, and promote flows use, so
     captures.json keeps exactly one writer. The capture's `state` is untouched
-    (a delegated card stays parked). Idempotent: a re-stamp with the same
-    spawned identity (task_id + kind) is a no-op — no rewrite — so a deduped
-    re-POST never thrashes the file or churns `stamped_at`."""
+    (a delegated card stays parked). Stamp semantics: `_apply_spawned_stamp`."""
     with _CAPTURE_INGEST_LOCK:
         registry = _read_captures_registry(captures_path)
         cap = next(
@@ -7167,14 +7214,107 @@ def _stamp_spawned_on_capture(
         )
         if cap is None:
             return
-        existing = cap.get('spawned')
-        if (isinstance(existing, dict)
-                and existing.get('task_id') == spawned.get('task_id')
-                and existing.get('kind') == spawned.get('kind')):
+        if not _apply_spawned_stamp(cap, spawned, overwrite=overwrite):
             return
-        cap['spawned'] = spawned
         registry['schema_version'] = CAPTURES_SCHEMA_VERSION
         _atomic_write_captures(captures_path, registry)
+
+
+def _stamp_spawned_on_mission(
+    missions_path: Path, mission_id: str, spawned: dict[str, Any],
+    *, overwrite: bool = False,
+) -> None:
+    """Mission twin of `_stamp_spawned_on_capture`: stamp the `spawned` ref (the
+    join key back to the work a Delegate click created — `delegate-<mission_id>`)
+    onto the mission entry. The mission's `phase` is untouched (a delegated
+    mission stays proposed — the stamp is additive, not a state transition).
+    Serialized under `_NEW_MISSION_LOCK` — the SAME in-process lock every other
+    local missions.json writer takes (confirm_shipped, the queue drain), so two
+    dashboard threads can never lose each other's write.
+    Local-write + healer-commit, the same durability model as captures:
+    heal_missions_card_gc version-controls the delta on its next tick, and its
+    pre-write lost-update guard merges only its OWN field deltas onto a fresh
+    re-read, so this stamp survives a concurrent GC sweep. KNOWN residual
+    hazard (pre-existing, tracked as a follow-up): heal_orphan_autoregister
+    whole-file-writes missions.json from a snapshot it can hold across gh
+    round-trips, which can drop any concurrent delta — this stamp included.
+    Stamp semantics: `_apply_spawned_stamp`."""
+    with _NEW_MISSION_LOCK:
+        registry = _read_missions_registry(missions_path)
+        mission = next(
+            (m for m in registry.get('missions') or []
+             if isinstance(m, dict) and m.get('id') == mission_id),
+            None,
+        )
+        if mission is None:
+            return
+        if not _apply_spawned_stamp(mission, spawned, overwrite=overwrite):
+            return
+        _atomic_write_json(missions_path, registry)
+
+
+def _delegation_outcome_evidence(
+    task_id: str, agents_root: Optional[Path] = None,
+) -> Optional[dict[str, Any]]:
+    """Did a prior delegation of this card leave a DURABLE trace? Scans the
+    pending-approvals store (the same origin_task_id join #913 established) for:
+      - a still-OPEN pending entry → {'status': 'open', ...} (parked on Larry);
+      - an APPROVED history entry → {'status': 'resolved', ...} (work was
+        dispatched — the build trail is the 2b read side's job).
+    A REJECTED history entry is NOT evidence (policy said no; a re-click means
+    retry). None → the prior run concluded with no durable outcome (the
+    2026-07-11 prose-verdict class) OR the store is unreadable — both fall open
+    to re-delegate, matching pre-fix behavior and the no-outcome alert's advice."""
+    root = agents_root or _agents_root()
+    try:
+        data = json.loads(_beacon_pending_approvals_path(root).read_text())
+    except (OSError, json.JSONDecodeError, ValueError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    for entry in (data.get('pending') or []):
+        if (isinstance(entry, dict)
+                and entry.get('origin_task_id') == task_id
+                and entry.get('status') == 'pending'):
+            return {'status': 'open', 'approval_id': entry.get('id'),
+                    'created_at': entry.get('created_at')}
+    for entry in reversed(data.get('history') or []):
+        if (isinstance(entry, dict)
+                and entry.get('origin_task_id') == task_id
+                and entry.get('status') == 'approved'):
+            return {'status': 'resolved', 'approval_id': entry.get('id'),
+                    'created_at': entry.get('created_at')}
+    return None
+
+
+def _already_delegated_short_circuit(
+    existing_spawned: Any, task_id: str, *, force: bool,
+) -> Optional[dict[str, Any]]:
+    """Durable-idempotency guard shared by both Delegate handlers. Short-circuit
+    ONLY when re-dispatching would waste a paid Beacon run on a question the
+    team demonstrably took: the card carries the standing delegate ref, the
+    prior run left durable outcome evidence (open or approved approval), and
+    the spawned work hasn't been flagged failed/closed by the GC (a re-click on
+    a failed delegation is a RETRY and must go through). `force=True` always
+    goes through. Returns the short-circuit response dict, or None to proceed
+    with a fresh dispatch. `dispatched` is honestly False here — nothing new
+    was handed to the team; `already_delegated`/`delegated_at`/`approval_id`
+    carry what is known of the standing delegation."""
+    if force:
+        return None
+    if not _spawned_delegate_ref_matches(existing_spawned, task_id):
+        return None
+    if existing_spawned.get('outcome') or existing_spawned.get('failure_signaled'):
+        return None
+    evidence = _delegation_outcome_evidence(task_id)
+    if evidence is None:
+        return None
+    return {
+        'dispatched': False,
+        'already_delegated': True,
+        'delegated_at': existing_spawned.get('stamped_at'),
+        'approval_id': evidence.get('approval_id'),
+    }
 
 
 def _handle_capture_delegate(
@@ -7183,6 +7323,7 @@ def _handle_capture_delegate(
     action: Optional[str],
     actor: str,
     captures_path: Path,
+    force: bool = False,
 ) -> dict[str, Any]:
     """POST /api/missions/captures/{id}/delegate (§ 2) — hand a parked card to
     the team. Emits a `human-approval-gate` APPROVAL_REQUEST proposal for Beacon
@@ -7194,9 +7335,13 @@ def _handle_capture_delegate(
     shared single-committer path (`_stamp_spawned_on_capture`).
 
     404 if the capture doesn't exist; 409 if it isn't parked; 400 on an
-    unrecognized action. Idempotent: a re-POST that finds an already-open
-    proposal in Beacon's inbox collapses onto it (no second proposal), and the
-    spawned-ref stamp is idempotent too (no rewrite on an unchanged identity)."""
+    unrecognized action. Idempotent at TWO depths: a re-POST that finds an
+    already-open proposal in Beacon's inbox collapses onto it (no second
+    proposal), and once that proposal has been consumed, the standing `spawned`
+    ref short-circuits to `already_delegated` (the 2026-07-11 revert-report
+    class: the live-inbox dedup window is only minutes, after which every
+    re-click dispatched a fresh paid Beacon run whose answer went nowhere).
+    `force=True` deliberately re-delegates past the standing ref."""
     import safe_write_inbox  # noqa: PLC0415 — lazy; sibling module (jail-guarded)
 
     registry = _read_captures_registry(captures_path)
@@ -7235,6 +7380,11 @@ def _handle_capture_delegate(
         # predates Phase S still gets linked.
         _stamp_spawned_on_capture(captures_path, capture_id, spawned_ref)
         return {'dispatched': True, 'deduped': True}
+
+    short_circuit = _already_delegated_short_circuit(
+        cap.get('spawned'), task_id, force=force)
+    if short_circuit is not None:
+        return short_circuit
 
     title = cap.get('title') or capture_id
     meaning = _meaning_layer_fields(cap)
@@ -7279,8 +7429,11 @@ def _handle_capture_delegate(
     )
     # Phase S (S1): stamp the spawned ref AFTER the proposal exists, so a crash
     # before the proposal write leaves no dangling link — and the capture stays
-    # parked (the stamp is additive, not a state transition).
-    _stamp_spawned_on_capture(captures_path, capture_id, spawned_ref)
+    # parked (the stamp is additive, not a state transition). overwrite=True:
+    # every REAL dispatch refreshes stamped_at (a force re-delegation must not
+    # keep reporting the first click's timestamp as delegated_at).
+    _stamp_spawned_on_capture(captures_path, capture_id, spawned_ref,
+                              overwrite=True)
     return {'dispatched': True}
 
 
@@ -7773,18 +7926,26 @@ def _handle_mission_delegate(
     action: Optional[str],
     actor: str,
     missions_path: Path,
+    force: bool = False,
 ) -> dict[str, Any]:
     """POST /api/system/missions/{id}/delegate (Contract B) — hand a proposed
     mission-backed funnel card to the team, mirroring the parked-capture Delegate.
     Emits a `human-approval-gate` APPROVAL_REQUEST proposal for Beacon via
-    safe_write_inbox; it does NOT mutate missions.json (the registry is PR-backed
-    and the delegation lives as a Beacon proposal, not a mission-state edit — so
-    the no-dirty-tree invariant holds, same as the capture Delegate leaves the
-    capture parked).
+    safe_write_inbox, and stamps a `spawned` ref onto the mission entry
+    (`_stamp_spawned_on_mission`) — the join key the delegate-tracking read side
+    needs. The mission's `phase` stays proposed; the stamp is additive, written
+    locally and version-controlled by the GC healer's next tick (the same
+    local-write + healer-commit model captures use — the phase-field edits in
+    this registry already flow that way via the GC's own reconcile, so this is
+    not a new durability class). Before 2026-07-11 this handler stamped nothing,
+    which is why a fully-successful delegation rendered as if it never happened.
 
     404 if no such mission; 409 if not proposed; 400 on an unrecognized action.
-    Idempotent: a re-POST that finds an already-open proposal in Beacon's inbox
-    collapses onto it (deterministic filename `delegate-{mission_id}.json`)."""
+    Idempotent at TWO depths (mirrors the capture handler): an already-open
+    proposal in Beacon's inbox collapses (deterministic filename
+    `delegate-{mission_id}.json`), and a standing `spawned` ref short-circuits
+    to `already_delegated` — no fresh paid Beacon run. `force=True` deliberately
+    re-delegates past the standing ref."""
     import safe_write_inbox  # noqa: PLC0415 — lazy; sibling module (jail-guarded)
 
     registry = _read_missions_registry(missions_path)
@@ -7811,13 +7972,26 @@ def _handle_mission_delegate(
         )
 
     task_id = f'delegate-{mission_id}'
+    spawned_ref = {
+        'kind': 'delegate',
+        'task_id': task_id,
+        'stamped_at': _now_utc_iso(),
+    }
     filename = f'{task_id}.json'
     safe_name = safe_write_inbox.canonical_inbox_name(filename)
     proposal_path = (safe_write_inbox.INBOXES_ROOT / 'beacon' / safe_name)
     if proposal_path.exists():
         # An open delegate proposal already sits in Beacon's inbox — collapse
-        # onto it rather than double-proposing.
+        # onto it rather than double-proposing. Re-assert the spawned ref
+        # (idempotent no-op when already stamped) so a mission whose proposal
+        # predates the stamp still gets linked.
+        _stamp_spawned_on_mission(missions_path, mission_id, spawned_ref)
         return {'dispatched': True, 'deduped': True}
+
+    short_circuit = _already_delegated_short_circuit(
+        mission.get('spawned'), task_id, force=force)
+    if short_circuit is not None:
+        return short_circuit
 
     name = mission.get('name') or mission_id
     brief = mission.get('brief') or ''
@@ -7852,6 +8026,11 @@ def _handle_mission_delegate(
         source_agent='dashboard',
         filename=filename,
     )
+    # Stamp AFTER the proposal exists, so a crash before the proposal write
+    # leaves no dangling link (same ordering as the capture handler).
+    # overwrite=True: every REAL dispatch refreshes stamped_at.
+    _stamp_spawned_on_mission(missions_path, mission_id, spawned_ref,
+                              overwrite=True)
     return {'dispatched': True}
 
 
@@ -10627,6 +10806,7 @@ def post_capture_delegate(
         action=body.action if body else None,
         actor=actor,
         captures_path=_captures_json_path(),
+        force=bool(body.force) if body else False,
     )
 
 
@@ -10858,7 +11038,8 @@ def post_project_archive(
 # POST /api/system/missions/{id}/delegate — "Delegate to team" for a proposed
 # mission-backed funnel card (Projects v3 P2 Contract B). Mirrors the parked-card
 # Delegate: emits a human-approval-gate APPROVAL_REQUEST proposal into Beacon's
-# inbox without mutating missions.json. Same auth: X-Dashboard-Token + X-Actor.
+# inbox and stamps the additive `spawned` ref onto the mission (phase stays
+# proposed). Same auth: X-Dashboard-Token + X-Actor.
 @app.post(
     '/api/system/missions/{mission_id}/delegate',
     response_model=MissionDelegateResponse,
@@ -10875,6 +11056,7 @@ def post_mission_delegate(
         action=body.action if body else None,
         actor=actor,
         missions_path=_missions_json_path(),
+        force=bool(body.force) if body else False,
     )
 
 

@@ -48,6 +48,7 @@ from __future__ import annotations
 
 import fnmatch
 import glob
+import hashlib
 import json
 import os
 import random
@@ -11566,6 +11567,73 @@ def _primary_chat_id() -> Optional[int]:
     return min(ids) if ids else None
 
 
+def _alert_dashboard_delegate_no_outcome(data: dict[str, Any]) -> None:
+    """Delegate-tracking backstop (2026-07-11 revert report): a dashboard
+    Delegate envelope (`delegate-<card_id>`) whose Beacon run concluded WITHOUT
+    a durable outcome — no APPROVAL_REQUEST marker (a prose verdict like
+    "already fixed, dismiss the card"), a malformed marker, or a timed-out /
+    forfeited run (a watcher-restart forfeit carries no `source`, so the
+    caller keys on the task_id prefix, not the source). The
+    beacon+source='dashboard' branch is the only APPROVAL_REQUEST producer
+    with no marker-error cascade, so before this alert the paid answer to
+    Larry's explicit click fell through to the dashboard dead-end
+    (`archived-no-notify`) and the card silently looked un-delegated.
+
+    Skips when the result DOES carry a valid APPROVAL_REQUEST marker: then the
+    decline was notifier-side (trust_policy raised, no reply chat) — a
+    transient routing failure, not Beacon's verdict; alerting "nothing was
+    handed to the team" over a well-formed proposal would misdiagnose it.
+
+    Surface Beacon's verdict where Larry decides: needs-you feed
+    (needs_larry=True) + DM (route='escalate') — this is the direct answer to
+    an operator action, not healer toil. Cooldown keys on the envelope task_id
+    PLUS a digest of the verdict text, so a re-processed identical outbox
+    can't double-DM but a NEW verdict for the same card (e.g. after a force
+    re-delegation) still alerts inside the cooldown window.
+    Fire-and-forget — never raises."""
+    task_id = str(data.get('task_id') or '')
+    card_id = task_id[len('delegate-'):] or task_id
+    result_text = str(data.get('result') or '')
+    try:
+        payload, _narrative = approval.extract_approval_request(result_text)
+        if payload is not None:
+            log(
+                f'delegate no-outcome backstop: valid APPROVAL_REQUEST present '
+                f'for {task_id} — notifier-side decline, not a Beacon verdict; '
+                'skipping alert',
+                'WARN',
+            )
+            return
+    except approval.MalformedApprovalMarker:
+        pass  # malformed marker IS a no-outcome verdict — alert below
+    except Exception:  # noqa: BLE001 — extraction failure must not block the alert
+        pass
+    snippet = ' '.join((result_text or '(no result text)').split())
+    if len(snippet) > 400:
+        snippet = snippet[:400] + '…'
+    try:
+        digest = hashlib.sha1(snippet.encode('utf-8', 'replace')).hexdigest()[:8]
+        larry_alerts.append_alert(
+            source='outbox-notifier',
+            severity='info',
+            route='escalate',
+            needs_larry=True,
+            subject=f'{task_id}:{digest}',
+            task_id=task_id,
+            message=(
+                f'Your "Delegate to team" on card `{card_id}` ended without a '
+                'dispatch or approval — nothing was handed to the team. '
+                f"Beacon's verdict: {snippet}"
+            ),
+        )
+    except Exception as e:  # noqa: BLE001 — surfacing must never break routing
+        log(
+            f'delegate no-outcome alert failed for {task_id}: '
+            f'{type(e).__name__}: {e}',
+            'WARN',
+        )
+
+
 def _route_beacon_pulse_auto_dispatch_approval(
     data: dict[str, Any],
     *,
@@ -12781,6 +12849,13 @@ def process_outbox(outbox_file: Path) -> str:
     agent = data.get('agent', '')
     source = data.get('source', '')
     if not agent or not source:
+        # Died-verdictless delegate backstop, forfeit leg: a watcher-restart
+        # forfeit outbox (inbox_watcher.reap_orphans) carries no `source`, so
+        # it exits here — but a delegate-* run dying across a restart is
+        # exactly the silent-drop class the backstop exists for. Alert before
+        # archiving; the helper skips results carrying a valid marker.
+        if agent == 'beacon' and str(data.get('task_id') or '').startswith('delegate-'):
+            _alert_dashboard_delegate_no_outcome(data)
         _archive_outbox(outbox_file)
         return 'archived-no-notify'
 
@@ -13037,7 +13112,11 @@ def process_outbox(outbox_file: Path) -> str:
     #     whose task_id legitimately differs from the `delegate-{capture_id}`
     #     envelope task_id (mirrors the direction-ask + headless paths).
     # A markerless / non-Forge dashboard result returns False and falls through
-    # to default routing unchanged.
+    # to default routing unchanged — except that a declined `delegate-*`
+    # envelope first surfaces Beacon's verdict to Larry (see
+    # _alert_dashboard_delegate_no_outcome): for dashboard-source the default
+    # route dead-ends at archived-no-notify, which silently ate "already
+    # done, dismiss the card" answers (2026-07-11 revert report).
     if agent == 'beacon' and source == 'dashboard':
         if _route_beacon_pulse_auto_dispatch_approval(
             data,
@@ -13047,6 +13126,14 @@ def process_outbox(outbox_file: Path) -> str:
         ):
             _archive_outbox(outbox_file)
             return 'notified-board-delegate'
+    # Declined-route leg of the delegate backstop (the forfeit leg lives in
+    # the no-source early exit above). The helper itself skips results that
+    # DO carry a valid marker (a notifier-side decline — trust_policy raised,
+    # no reply chat — is a transient routing failure, not Beacon's verdict),
+    # so this never misdiagnoses a well-formed proposal.
+    if (agent == 'beacon' and source == 'dashboard'
+            and str(data.get('task_id') or '').startswith('delegate-')):
+        _alert_dashboard_delegate_no_outcome(data)
 
     # Task #17 (2026-05-19) — headless Beacon APPROVAL_REQUEST handler.
     # When Claude in a Larry-session drops a dispatch envelope into Beacon's
