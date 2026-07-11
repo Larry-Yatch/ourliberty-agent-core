@@ -124,5 +124,115 @@ class LockedUpdateBasicsTest(unittest.TestCase):
             holder.join(timeout=10)
 
 
+def _counts(**overrides) -> dict:
+    """Expected degrade_counts() dict: all three causes at 0, then overrides.
+    Encodes the stable-shape contract (every cause key always present)."""
+    base = {'no_flock': 0, 'timeout': 0, 'sidecar_oserror': 0}
+    base.update(overrides)
+    return base
+
+
+class LockedUpdateDegradeTelemetryTest(unittest.TestCase):
+    """Every fail-open degrade must be OBSERVABLE (per-cause counter + throttled
+    WARN) and the telemetry must itself be fail-safe — it runs on the ledger RMW
+    path whose "never raises" contract the degrade is upholding."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.data = Path(self._tmp.name) / 'state.json'
+        atomic_io._reset_degrade_telemetry()
+        self.addCleanup(atomic_io._reset_degrade_telemetry)
+
+    def test_no_flock_degrade_is_counted_as_no_flock(self):
+        orig = file_lock._HAVE_FLOCK
+        file_lock._HAVE_FLOCK = False
+        try:
+            with atomic_io.locked_update(self.data) as held:
+                self.assertFalse(held)
+        finally:
+            file_lock._HAVE_FLOCK = orig
+        self.assertEqual(atomic_io.degrade_counts(), _counts(no_flock=1))
+
+    def test_sidecar_oserror_degrade_is_counted_distinctly(self):
+        orig = file_lock.exclusive_lock
+
+        def _boom(*a, **k):
+            raise OSError('sidecar unwritable')
+
+        file_lock.exclusive_lock = _boom
+        try:
+            with atomic_io.locked_update(self.data) as held:
+                self.assertFalse(held)
+        finally:
+            file_lock.exclusive_lock = orig
+        # A transient sidecar write failure is NOT a timeout — it must land in
+        # its own bucket even though LockTimeout also subclasses OSError.
+        self.assertEqual(atomic_io.degrade_counts(), _counts(sidecar_oserror=1))
+
+    @unittest.skipUnless(file_lock.have_flock(), 'requires fcntl.flock')
+    def test_timeout_degrade_is_counted_as_timeout(self):
+        ctx = multiprocessing.get_context()
+        ready_q = ctx.Queue()
+        release_evt = ctx.Event()
+        holder = ctx.Process(
+            target=_hold_sidecar_worker,
+            args=(str(self.data), ready_q, release_evt))
+        holder.start()
+        try:
+            self.assertEqual(ready_q.get(timeout=10), 'held')
+            with atomic_io.locked_update(self.data, timeout=0.3) as held:
+                self.assertFalse(held)
+        finally:
+            release_evt.set()
+            holder.join(timeout=10)
+        self.assertEqual(atomic_io.degrade_counts(), _counts(timeout=1))
+
+    @unittest.skipUnless(file_lock.have_flock(), 'requires fcntl.flock')
+    def test_successful_lock_records_no_degrade(self):
+        with atomic_io.locked_update(self.data) as held:
+            self.assertTrue(held)
+        self.assertEqual(atomic_io.degrade_counts(), _counts())  # stable shape, all 0
+
+    def test_warn_is_rate_limited_but_every_degrade_is_counted(self):
+        """A looping daemon degrading on every call must emit ONE WARN per cause
+        per interval, yet the counter must tally EVERY degrade (the storm signal
+        lives in the count + the per-process fan-out, not in log volume)."""
+        orig = file_lock._HAVE_FLOCK
+        file_lock._HAVE_FLOCK = False
+        try:
+            with self.assertLogs(atomic_io._DEGRADE_LOG.name, level='WARNING') as cm:
+                for _ in range(5):
+                    with atomic_io.locked_update(self.data):
+                        pass
+        finally:
+            file_lock._HAVE_FLOCK = orig
+        self.assertEqual(len(cm.records), 1)                       # throttled
+        self.assertIn('cause=no_flock', cm.records[0].getMessage())
+        self.assertEqual(atomic_io.degrade_counts(), _counts(no_flock=5))  # all tallied
+
+    def test_telemetry_failure_never_escapes_into_the_rmw(self):
+        """If the WARN emit itself raises (handler at ENOSPC, logging misconfig),
+        _note_degrade must swallow it — the RMW still runs and never raises."""
+        def _explode(*a, **k):
+            raise RuntimeError('logging is down')
+
+        orig_warn = atomic_io._DEGRADE_LOG.warning
+        orig_flock = file_lock._HAVE_FLOCK
+        atomic_io._DEGRADE_LOG.warning = _explode
+        file_lock._HAVE_FLOCK = False
+        try:
+            ran = []
+            with atomic_io.locked_update(self.data) as held:
+                ran.append(True)
+            self.assertEqual(ran, [True])   # body ran despite telemetry blowup
+            self.assertFalse(held)
+        finally:
+            atomic_io._DEGRADE_LOG.warning = orig_warn
+            file_lock._HAVE_FLOCK = orig_flock
+        # The count is still recorded — the tally happens before the WARN emit.
+        self.assertEqual(atomic_io.degrade_counts(), _counts(no_flock=1))
+
+
 if __name__ == '__main__':
     unittest.main()
