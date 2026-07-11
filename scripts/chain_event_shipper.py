@@ -726,14 +726,15 @@ _LOG_EVENT_KEYWORDS = {
     # failed to dashboard_api._derive_done_today (cost_budget is in its
     # _DONE_FAILURE_EVENT_TYPES). Only the cap-fire sentinel is a chain event.
     'COST_BUDGET_EXHAUSTED': 'cost_budget',
-    # SUPERSEDED (forge-queue-in-review-lane): review_request is now
-    # push-emitted by outbox_notifier._emit_review_request_chain_event with
-    # agent='forge' at the dispatch sites. Do NOT add a REVIEW_REQUEST log
-    # line on the producer side — it would double-write the event (push ts
-    # != log ts, so the event_id PK can't dedup the pair) and the parsed
-    # copy would carry agent='notifier', which the dashboard's
-    # .eq('agent','forge') fetch ignores anyway.
-    'REVIEW_REQUEST': 'review_request',
+    # NO 'REVIEW_REQUEST' keyword — deliberately absent (forge-queue-in-review-
+    # lane): review_request is push-emitted by
+    # outbox_notifier._emit_review_request_chain_event with agent='forge' at the
+    # dispatch sites, and that push payload carries `origin_task_id`, the
+    # load-bearing join key delegate-tracking Slice 2a joins review_request rows
+    # by. A log-parsed copy would double-write the event — push ts != log ts, so
+    # the deterministic event_id can't dedup the pair — with agent='notifier'
+    # and NO origin_task_id, leaving a dashboard reader that joins on
+    # origin_task_id in an inconsistent state. Never re-add this mapping.
     'BUILD_DISPATCHED': 'build_dispatched',
     'HEALER_FIRE': 'healer_fire',
     'PREFLIGHT_PROCEED': 'preflight_proceed',
