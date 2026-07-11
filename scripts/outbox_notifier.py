@@ -91,6 +91,7 @@ import revision_in_flight_ledger    # noqa: E402  # dup-review guard: Forge revi
 import routing_validator            # noqa: E402  # allowed_repos source of truth
 import safe_write_inbox             # noqa: E402
 import sequence_shortcut_helpers as ssh  # noqa: E402  # V6: step-merged signal
+import spec_review_gate             # noqa: E402  # spec-gauntlet intercept + deferred stamp
 import trust_policy                 # noqa: E402
 import worktree_manager             # noqa: E402  # auto-merge worktree teardown
 from test_isolation_guard import gh_write  # noqa: E402
@@ -11011,9 +11012,18 @@ def _trip_emergency_halt(
         )
 
 
-def _route_beacon_replan_approval(data: dict[str, Any]) -> bool:
+def _route_beacon_replan_approval(
+    data: dict[str, Any], *, _final_payload: Optional[dict[str, Any]] = None,
+) -> bool:
     """Handle Beacon's auto-replan APPROVAL_REQUEST emitted in response to a
     review-escalate inbox dispatch.
+
+    ``_final_payload`` (spec-gauntlet §3.1 deferred-stamp pickup): when set, this
+    is the post-gauntlet FINAL payload (challenge digest already appended) and
+    the caller is the ``_spec_review_pickup_sweep``, not a fresh outbox. Skip the
+    marker extraction, discipline gate, and the intercept (they already ran when
+    the payload was first spooled); run the byte-identical legacy stamp path on
+    the final payload so trust evaluates the post-revision spec.
 
     D3.5 commit 5c. Bridges the gap between Beacon-via-inbox-watcher (her
     APPROVAL_REQUEST in result text) and the bot's existing chat-mode
@@ -11056,38 +11066,41 @@ def _route_beacon_replan_approval(data: dict[str, Any]) -> bool:
     paths plus a Beacon CLAUDE.md retry contract. Deferred.
     """
     task_id = data.get('task_id') or 'unknown'
-    result_text = data.get('result') or ''
-    if not isinstance(result_text, str) or not result_text:
-        return False
-
-    try:
-        payload, _narrative = approval.extract_approval_request(result_text)
-    except approval.MalformedApprovalMarker as e:
-        log(
-            f'beacon replan APPROVAL_REQUEST malformed for task {task_id}: '
-            f'{e}; falling through to default routing',
-            'WARN',
-        )
-        return False
-
-    if payload is None:
-        # Beacon chose to push back with prose only — no marker emitted.
-        # Default routing will notify-back informationally.
-        return False
-
-    # Level-3 discipline gate. Failures log WARN and fall through; no
-    # cascade per 5c sign-off.
     mirror_reason = data.get('mirror_escalate_reason', '') or ''
-    ok, err = approval.validate_replan_discipline(
-        payload, data, mirror_reason,
-    )
-    if not ok:
-        log(
-            f'beacon replan APPROVAL_REQUEST failed discipline gate for '
-            f'task {task_id}: {err}; falling through to default routing',
-            'WARN',
+    if _final_payload is not None:
+        payload = _final_payload
+    else:
+        result_text = data.get('result') or ''
+        if not isinstance(result_text, str) or not result_text:
+            return False
+
+        try:
+            payload, _narrative = approval.extract_approval_request(result_text)
+        except approval.MalformedApprovalMarker as e:
+            log(
+                f'beacon replan APPROVAL_REQUEST malformed for task {task_id}: '
+                f'{e}; falling through to default routing',
+                'WARN',
+            )
+            return False
+
+        if payload is None:
+            # Beacon chose to push back with prose only — no marker emitted.
+            # Default routing will notify-back informationally.
+            return False
+
+        # Level-3 discipline gate. Failures log WARN and fall through; no
+        # cascade per 5c sign-off.
+        ok, err = approval.validate_replan_discipline(
+            payload, data, mirror_reason,
         )
-        return False
+        if not ok:
+            log(
+                f'beacon replan APPROVAL_REQUEST failed discipline gate for '
+                f'task {task_id}: {err}; falling through to default routing',
+                'WARN',
+            )
+            return False
 
     # Budget gate (system-side backstop — Beacon's CLAUDE.md is first line).
     decision, next_count, max_count = approval.evaluate_replan_budget(data)
@@ -11139,6 +11152,33 @@ def _route_beacon_replan_approval(data: dict[str, Any]) -> bool:
                 'WARN',
             )
         return True
+
+    # spec-gauntlet intercept (§3.1) — hand the spec to antagonistic review
+    # before stamping. Skipped on the deferred-stamp pickup (_final_payload set):
+    # it already ran when the payload was first spooled.
+    if _final_payload is None and is_valid_chat:
+        outcome = spec_review_gate.intercept(
+            payload, 'replan', reply_chat_id=reply_chat_id,
+            meta={
+                'replan_count': data.get('replan_count'),
+                'max_replans': data.get('max_replans'),
+                'mirror_escalate_reason': mirror_reason,
+            },
+        )
+        if outcome == 'spooled':
+            larry_alerts.append_notification(
+                source='outbox-notifier', intent='spec-review-ack',
+                message=spec_review_gate.ACK_MESSAGE,
+                chat_id=reply_chat_id, task_id=task_id)
+            log(f'spec-gauntlet intercepted beacon replan for task {task_id}; '
+                f'spooled + acked, deferring stamp until conclusion')
+            return True
+        if outcome == 'duplicate':
+            log(f'spec-gauntlet duplicate spool for beacon replan task '
+                f'{task_id}; already pending/concluded, skipping re-spool')
+            return True
+        if outcome == 'disabled':
+            payload = spec_review_gate.with_disabled_label(payload)
 
     # Trust policy decision.
     try:
@@ -11334,6 +11374,7 @@ def _route_beacon_pulse_auto_dispatch_approval(
     policy_source: str = 'pulse-auto-dispatch',
     chat_id_fallback: Optional[int] = None,
     enforce_task_id_match: bool = True,
+    _final_payload: Optional[dict[str, Any]] = None,
 ) -> bool:
     """Handle Beacon's APPROVAL_REQUEST emitted in response to a
     Pulse-auto-dispatch inbox envelope (closed-loop step 4).
@@ -11384,40 +11425,44 @@ def _route_beacon_pulse_auto_dispatch_approval(
     WARN and fall through; Beacon's CLAUDE.md is the first-line gate).
     """
     task_id = data.get('task_id') or 'unknown'
-    result_text = data.get('result') or ''
-    if not isinstance(result_text, str) or not result_text:
-        return False
+    if _final_payload is not None:
+        payload = _final_payload
+        marker_task_id = payload.get('task_id')
+    else:
+        result_text = data.get('result') or ''
+        if not isinstance(result_text, str) or not result_text:
+            return False
 
-    try:
-        payload, _narrative = approval.extract_approval_request(result_text)
-    except approval.MalformedApprovalMarker as e:
-        log(
-            f'beacon pulse-auto-dispatch APPROVAL_REQUEST malformed for task '
-            f'{task_id}: {e}; falling through to default routing',
-            'WARN',
-        )
-        return False
+        try:
+            payload, _narrative = approval.extract_approval_request(result_text)
+        except approval.MalformedApprovalMarker as e:
+            log(
+                f'beacon pulse-auto-dispatch APPROVAL_REQUEST malformed for task '
+                f'{task_id}: {e}; falling through to default routing',
+                'WARN',
+            )
+            return False
 
-    if payload is None:
-        # No marker emitted — Beacon's push-back narrative reaches Mirror
-        # via default routing.
-        return False
+        if payload is None:
+            # No marker emitted — Beacon's push-back narrative reaches Mirror
+            # via default routing.
+            return False
 
-    # Discipline gate: marker task_id must match envelope task_id. Strip
-    # any `notify-` prefix on the envelope side (the notifier prefixes
-    # filenames for disambiguation; Beacon's marker uses the original id).
-    envelope_task_id = task_id
-    if envelope_task_id.startswith('notify-'):
-        envelope_task_id = envelope_task_id[len('notify-'):]
-    marker_task_id = payload.get('task_id')
-    if enforce_task_id_match and marker_task_id != envelope_task_id:
-        log(
-            f'beacon pulse-auto-dispatch APPROVAL_REQUEST task_id mismatch '
-            f'(envelope={envelope_task_id}, marker={marker_task_id!r}); '
-            f'falling through to default routing',
-            'WARN',
-        )
-        return False
+        # Discipline gate: marker task_id must match envelope task_id. Strip
+        # any `notify-` prefix on the envelope side (the notifier prefixes
+        # filenames for disambiguation; Beacon's marker uses the original id).
+        envelope_task_id = task_id
+        if envelope_task_id.startswith('notify-'):
+            envelope_task_id = envelope_task_id[len('notify-'):]
+        marker_task_id = payload.get('task_id')
+        if enforce_task_id_match and marker_task_id != envelope_task_id:
+            log(
+                f'beacon pulse-auto-dispatch APPROVAL_REQUEST task_id mismatch '
+                f'(envelope={envelope_task_id}, marker={marker_task_id!r}); '
+                f'falling through to default routing',
+                'WARN',
+            )
+            return False
 
     reply_chat_id = data.get('reply_chat_id')
     if not isinstance(reply_chat_id, int):
@@ -11438,6 +11483,42 @@ def _route_beacon_pulse_auto_dispatch_approval(
                 'WARN',
             )
             return False
+
+    # Spec gauntlet (§3.1): on the FIRST pass (not the deferred re-invocation),
+    # intercept before trust runs. `reply_chat_id` is already resolved above, so
+    # the ack always has a destination.
+    if _final_payload is None:
+        outcome = spec_review_gate.intercept(
+            payload,
+            'pulse_auto_dispatch',
+            reply_chat_id=reply_chat_id,
+            meta={
+                'policy_source': policy_source,
+                'chat_id_fallback': chat_id_fallback,
+                'enforce_task_id_match': enforce_task_id_match,
+            },
+        )
+        if outcome == 'spooled':
+            larry_alerts.append_notification(
+                source='outbox-notifier',
+                intent='spec-review-ack',
+                message=spec_review_gate.ACK_MESSAGE,
+                chat_id=reply_chat_id,
+                task_id=task_id,
+            )
+            log(
+                f'beacon pulse-auto-dispatch spec gauntlet spooled: task={task_id}, '
+                f'chat_id={reply_chat_id}; ack queued, stamp deferred',
+            )
+            return True
+        if outcome == 'duplicate':
+            log(
+                f'beacon pulse-auto-dispatch spec gauntlet duplicate (already '
+                f'spooled/concluded): task={task_id}; no re-spool, no re-ack',
+            )
+            return True
+        if outcome == 'disabled':
+            payload = spec_review_gate.with_disabled_label(payload)
 
     # Trust policy — source='pulse-auto-dispatch' so the policy file can
     # carve out per-source rules independently of beacon-sourced dispatches.
@@ -11592,6 +11673,70 @@ def _route_beacon_pulse_auto_dispatch_approval(
         f'task={task_id}, chat_id={reply_chat_id}',
     )
     return True
+
+
+def _spec_review_pickup_sweep() -> None:
+    """Deferred-stamp pickup for gauntlets concluded at the two notifier sites
+    (§3.1): ``replan`` and ``pulse_auto_dispatch``.
+
+    For each concluded, not-yet-stamped gauntlet the notifier owns, rebuild the
+    minimal ``data`` envelope from the routing sidecar and re-invoke the SAME
+    route fn with ``_final_payload`` = the runner's final (post-revision) payload
+    with the challenge digest appended. Passing the final payload back through
+    the site's own function reuses its exact trust semantics (replan uses
+    ``approval.trust_decision`` source=beacon; pulse uses ``trust_policy.evaluate``
+    with the stored ``policy_source``) — the byte-identical legacy stamp path.
+
+    ``mark_stamped`` runs only when the route fn returns True (stamp landed); a
+    False (declined / trust raised) leaves the entry for the next sweep — the
+    spec's "delay an approval, never lose one" priority (§3.4). Each pickup is
+    isolated: one raising gauntlet never blocks the rest.
+    """
+    for task_id, conc, routing in spec_review_gate.collect_concluded(
+        ['replan', 'pulse_auto_dispatch'],
+    ):
+        site = routing.get('site')
+        meta = routing.get('meta') or {}
+        reply_chat_id = routing.get('reply_chat_id')
+        final_payload = spec_review_gate.with_digest(
+            conc.get('final_payload') or {}, spec_review_gate.build_digest(conc))
+        try:
+            if site == 'replan':
+                data = {
+                    'task_id': task_id,
+                    'reply_chat_id': reply_chat_id,
+                    'replan_count': meta.get('replan_count'),
+                    'max_replans': meta.get('max_replans'),
+                    'mirror_escalate_reason': meta.get('mirror_escalate_reason', ''),
+                }
+                stamped = _route_beacon_replan_approval(
+                    data, _final_payload=final_payload)
+            elif site == 'pulse_auto_dispatch':
+                data = {'task_id': task_id, 'reply_chat_id': reply_chat_id}
+                stamped = _route_beacon_pulse_auto_dispatch_approval(
+                    data,
+                    policy_source=meta.get('policy_source', 'pulse-auto-dispatch'),
+                    chat_id_fallback=meta.get('chat_id_fallback'),
+                    enforce_task_id_match=meta.get('enforce_task_id_match', True),
+                    _final_payload=final_payload,
+                )
+            else:
+                continue
+            if stamped:
+                spec_review_gate.mark_stamped(task_id)
+                log(f'spec-gauntlet stamped concluded {site} approval {task_id}')
+            else:
+                log(
+                    f'spec-gauntlet pickup for {task_id} ({site}) declined to '
+                    f'stamp (route fn returned False); leaving for next sweep',
+                    'WARN',
+                )
+        except Exception as e:  # noqa: BLE001 — one bad pickup never wedges the rest
+            log(
+                f'spec-gauntlet pickup stamp failed for {task_id} ({site}): '
+                f'{type(e).__name__}: {e}',
+                'WARN',
+            )
 
 
 def _handle_beacon_headless_approval_request(
@@ -13709,6 +13854,19 @@ def main_loop() -> int:
         except Exception as e:  # noqa: BLE001
             log(
                 f'auto-merge queue sweep error: {type(e).__name__}: {e}',
+                'ERROR',
+            )
+
+        # Spec gauntlet (§3.1) — deferred-stamp pickup. Cheap when nothing
+        # concluded (one dir glob). For each gauntlet that finished for a site
+        # this daemon owns, re-invoke the site's own route fn with the final
+        # (post-revision) payload + digest so trust evaluates the FINAL spec and
+        # the byte-identical legacy stamp path runs. Daemon-never-wedge.
+        try:
+            _spec_review_pickup_sweep()
+        except Exception as e:  # noqa: BLE001
+            log(
+                f'spec-review pickup sweep error: {type(e).__name__}: {e}',
                 'ERROR',
             )
 
