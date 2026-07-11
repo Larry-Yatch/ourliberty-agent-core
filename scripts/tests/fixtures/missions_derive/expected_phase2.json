@@ -82,7 +82,9 @@
       "spawned_phase": null,
       "spawned_pr_url": null,
       "spawned_expected_cost_usd": null,
-      "delegation_needs_you": null
+      "delegation_needs_you": null,
+      "delegation_build_phase": null,
+      "delegation_pr_url": null
     },
     {
       "capture_id": "cap-fresh-two",
@@ -101,7 +103,9 @@
       "spawned_phase": null,
       "spawned_pr_url": null,
       "spawned_expected_cost_usd": null,
-      "delegation_needs_you": null
+      "delegation_needs_you": null,
+      "delegation_build_phase": null,
+      "delegation_pr_url": null
     }
   ]
 }
