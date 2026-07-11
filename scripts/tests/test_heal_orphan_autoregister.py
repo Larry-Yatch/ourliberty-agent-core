@@ -1362,5 +1362,139 @@ class RunOnceQueueDrainTest(unittest.TestCase):
         self.assertEqual(closed, [(9, 'bar')])   # PR backstop closed
 
 
+# ------------------------------------------------- § 2 lost-update write guard
+
+
+class RunOnceLostUpdateGuardTest(unittest.TestCase):
+    """run_once holds its read-time snapshot across chain_events + gh
+    round-trips; a concurrent writer's delta landing in that window (dashboard
+    delegate `spawned` stamp, GC phase flip, another ingest) must survive the
+    healer's write. Mirrors heal_missions_card_gc's lost-update tests, plus the
+    append-aware cases the GC merge doesn't need (this healer authors NEW
+    entries via propose/ingest/drain)."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix='run-once-lost-update-')
+        self.core = Path(self.tmp) / 'agent-core'
+        (self.core / 'agents' / 'beacon').mkdir(parents=True)
+        self.mfile = self.core / h.MISSIONS_REL
+        self.qd = Path(self.tmp) / 'new-mission-queue'
+        self.now = datetime(2026, 6, 15, 12, 0, tzinfo=timezone.utc)
+        _gate = mock.patch.object(h, '_load_terminal_gate',
+                                  return_value=lambda tids: (False, None))
+        _gate.start()
+        self.addCleanup(_gate.stop)
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _write_missions(self, missions):
+        self.mfile.write_text(json.dumps(
+            {'schema_version': 1, 'missions': missions}) + '\n')
+
+    def _disk(self):
+        return json.loads(self.mfile.read_text())
+
+    def _ctx(self, on_main):
+        import larry_alerts
+        return [
+            mock.patch.object(h, 'load_repo_paths',
+                              return_value={'ourliberty-agent-core': self.core}),
+            mock.patch.object(h, '_new_mission_queue_dir', return_value=self.qd),
+            mock.patch.object(h, 'list_open_new_mission_prs', return_value=[]),
+            mock.patch.object(h, 'commit_and_push_missions', return_value='committed'),
+            mock.patch.object(h, '_missions_ids_on_main', return_value=on_main),
+            # the stuck-flag tick emits an info digest — keep the tests hermetic
+            mock.patch.object(larry_alerts, 'append_alert'),
+        ]
+
+    def _run(self, events_fetcher, on_main=frozenset()):
+        """One LIVE tick (queue-drain enabled) with the given events seam — the
+        seam runs AFTER the registry read and BEFORE the write, so its side
+        effect lands inside the lost-update window."""
+        with mock.patch.dict(os.environ, {h.ENV_NEWMISSION_INGEST: 'true'}):
+            with contextlib.ExitStack() as es:
+                for cm in self._ctx(set(on_main)):
+                    es.enter_context(cm)
+                return h.run_once(dry_run=False, events_fetcher=events_fetcher,
+                                  derive=derive, pr_state_resolver=lambda urls: {},
+                                  now=self.now)
+
+    def _concurrent(self, mutate):
+        """events_fetcher that simulates a SEPARATE process writing
+        missions.json mid-tick, then reports no chain_events."""
+        def fetch():
+            disk = self._disk()
+            mutate(disk)
+            self.mfile.write_text(json.dumps(disk) + '\n')
+            return []
+        return fetch
+
+    def test_concurrent_append_survives_our_append(self):
+        # Another writer registers m-concurrent mid-tick while this tick drains
+        # queued `foo` — the whole-file write used to clobber m-concurrent.
+        self._write_missions([])
+        _write_queue(self.qd, _mentry('foo'))
+        rc = self._run(self._concurrent(
+            lambda d: d['missions'].append(_mentry('m-concurrent'))))
+        self.assertEqual(rc, 0)
+        ids = sorted(m['id'] for m in self._disk()['missions'])
+        self.assertEqual(ids, ['foo', 'm-concurrent'])
+
+    def test_concurrent_field_stamp_on_untouched_entry_survives(self):
+        # The dashboard stamps a delegate `spawned` on del-1 mid-tick; this tick
+        # never touches del-1 (its work is the queue append) — the stamp survives.
+        self._write_missions([_mentry('del-1')])
+        _write_queue(self.qd, _mentry('foo'))
+
+        def stamp(disk):
+            disk['missions'][0]['spawned'] = {'session': 's-42', 'at': self.now.isoformat()}
+        rc = self._run(self._concurrent(stamp))
+        self.assertEqual(rc, 0)
+        by_id = {m['id']: m for m in self._disk()['missions']}
+        self.assertEqual(set(by_id), {'del-1', 'foo'})
+        self.assertEqual(by_id['del-1']['spawned'],
+                         {'session': 's-42', 'at': self.now.isoformat()})
+
+    def test_field_delta_merges_with_concurrent_change_on_same_entry(self):
+        # This tick flags note-1 stuck (needs_decision) WHILE a concurrent writer
+        # sets an unrelated field on the same entry — both must land.
+        stuck = {'id': 'note-1', 'phase': 'proposed', 'task_ids': ['t-x'],
+                 'proposed_by': 'closeout-author', 'created': '2026-05-01'}
+        self._write_missions([stuck])
+        rc = self._run(self._concurrent(
+            lambda d: d['missions'][0].__setitem__('note', 'concurrent')))
+        self.assertEqual(rc, 0)
+        e = self._disk()['missions'][0]
+        self.assertIs(e['needs_decision'], True)      # our flag landed
+        self.assertEqual(e['note'], 'concurrent')     # their field survived
+
+    def test_our_append_dedups_against_concurrent_same_id(self):
+        # A concurrent writer lands the SAME id we drained this tick — keep the
+        # fresh (their) copy untouched, never a duplicate.
+        self._write_missions([])
+        _write_queue(self.qd, _mentry('foo'))
+        theirs = dict(_mentry('foo'), origin='dashboard')
+        rc = self._run(self._concurrent(
+            lambda d: d['missions'].append(theirs)))
+        self.assertEqual(rc, 0)
+        missions = self._disk()['missions']
+        self.assertEqual([m['id'] for m in missions], ['foo'])
+        self.assertEqual(missions[0]['origin'], 'dashboard')
+
+    def test_entry_deleted_mid_tick_is_not_readded(self):
+        # A concurrent writer deletes the entry this tick flagged — drop our
+        # stale delta rather than resurrecting the entry.
+        stuck = {'id': 'note-1', 'phase': 'proposed', 'task_ids': ['t-x'],
+                 'proposed_by': 'closeout-author', 'created': '2026-05-01'}
+        self._write_missions([stuck])
+        _write_queue(self.qd, _mentry('foo'))   # keeps the tick's write firing
+        rc = self._run(self._concurrent(
+            lambda d: d['missions'].clear()))
+        self.assertEqual(rc, 0)
+        self.assertEqual([m['id'] for m in self._disk()['missions']], ['foo'])
+
+
 if __name__ == '__main__':
     unittest.main()
