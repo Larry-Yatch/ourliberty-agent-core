@@ -31231,3 +31231,71 @@ Notable: heal-systemd-install-drift auto-installed `ourliberty-spec-review-silen
 
 ---
 
+## Iteration ~5095 — 2026-07-11T13:18Z UTC (Larry /cycle, Tier 1)
+
+**Health:** ✅ Nominal. All 6 mandatory checks clean. 0 new alerts (watermark 883=file_length). Carries only.
+
+**VERIFY-BEFORE-REASSERT (from iter ~5094):**
+- **"zombie PID 1834248 (43d+17h+49m)"**: CONFIRMED ⚠️ — now 43d+17h+59m (Ss, bash poll loop awaiting absent archive file). [carry]
+- **"beacon PID 3965718"**: CONFIRMED ✅ — Ss, 04:17:59 elapsed. [carry]
+- **"outbox-notifier PID 3965731"**: CONFIRMED ✅ — Ss, 04:17:58 elapsed. [carry]
+- **"inbox_watcher PID 3940207"**: CONFIRMED ✅ — Ssl, 05:16:41 elapsed. [carry]
+- **"HEAD=052bb236=origin/main"**: SUPERSEDED — HEAD=fd9704cb (wrapper commit "Pulse cycle 20260711T131650Z" from iter ~5094). ✅
+- **"pending=1 (gh-burn-phase2-durable-fix-authorize, chat_id=0)"**: CONFIRMED ⚠️ — still pending=1, same approval, chat_id=0; doorbell L882 already delivered 13:10:28Z. [carry]
+- **"sync status=no-change, last_sync=13:00:20Z"**: CONFIRMED ✅ — ~17 min at check, within 2h threshold. [carry]
+- **"PR #860 [OPEN, UNKNOWN]"**: CONFIRMED ✅ — still OPEN, UNKNOWN, no labels. [carry]
+- **"Check XI attention_rate=18.8% (12/64)"**: CONFIRMED ✅ — no new artifact until tomorrow. [carry]
+- **"watermark=883=file_length"**: CONFIRMED ✅ — repair-watermark: repaired=false, 883=883. [carry]
+
+**Check 0 — Alert triage:** `repair-watermark {"repaired": false, "old_watermark": 883, "file_length": 883}` — 0 new alerts. NOMINAL ✅
+
+**Check 1 — Log noise:** outbox-notifier PID 3965731 ✅ (Ss, 04:17:58). Last action 03:51:27 MDT (09:51:27Z UTC) — AUTO_MERGE for PR #929. ~3.4h silence = normal (no new tasks). No WARNs/ERRORs since 02:59 MDT restart. NOMINAL ✅
+
+**Check 2 — Telegram sweep:** beacon PID 3965718 ✅ (Ss, 04:17:59). Last bot entry 07:11:58 MDT (13:11:58Z UTC) — idx=882 delivered (pulse, pending-approval-no-dm:gh-burn-phase2). No new Larry messages post-13:11Z. Pending=1 doorbell already delivered. NOMINAL for bot ✅; pending carry.
+
+**Check 3 — Pipeline stall:** DRY-RUN (13:17:56Z UTC) → "no stalls detected." 9 FORGE_NO_PR_SKIP entries all valid. NOMINAL ✅
+
+**Check 4 — Pending directives:** pending=1, `gh-burn-phase2-durable-fix-authorize`, chat_id=0. Doorbell L882 delivered 13:10:28Z. No Larry response yet. [carry]
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-11T13:12:19Z (~6 min at check; cadence=10 min). Within cadence. NOMINAL ✅
+
+**Check A — Source repo:** HEAD=fd9704cb=origin/main ✅; clean tree ✅; on main ✅. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-11T13:00:20Z (~17 min), status=no-change. Within 2h threshold. NOMINAL ✅
+**Check C — Agent liveness:** beacon PID 3965718 ✅ (Ss, 04:17:59); outbox-notifier PID 3965731 ✅ (Ss, 04:17:58); inbox_watcher PID 3940207 ✅ (Ssl, 05:16:41). Watchdog: last entry 07:16:40 MDT (13:16:40Z UTC) overall=healthy ✅. ⚠️ Zombie PID 1834248 (43d+17h+59m, bash poll loop awaiting absent archive file). [carry]
+**Check E — PR/merge state:**
+- PR #860 [OPEN, UNKNOWN] — spec XIV-b, no labels. [blue carry]
+
+**§5.0:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅.
+
+**Conditional checks — UTC Saturday 2026-07-11 (~13:18Z):**
+- Check XI: artifact check-xi-20260711T102013.json — attention_rate=18.8%, over_gate=True. Already fired today (10:20Z UTC); no new artifact expected until tomorrow. [yellow carry]
+- Check I: Not a firing day (Sat). Latest artifact: check-i-2026-07-10.json. ✅
+- Check III/IV/VIII/IX/X/XII/XIV: Sunday/Monday gates. Skip. ✅
+
+**G-rule assessment:**
+- No new occurrences this iter. All counts carry from iter ~5094.
+
+**Actions taken:**
+1. Alert watermark: steady at 883 (0 new alerts). ✅
+2. PRIME ledger: `iter_clean` appended (tier=1, template=nominal, 13:18:41Z UTC). ✅
+3. Tier state: `record --checks-clean false` → tier=1, consecutive_clean=0. ✅
+
+**Escalations:** 0 new DMs. All outstanding carries already DM'd in prior iters.
+
+**Standing findings (carry):**
+- [yellow] **zombie-bash-pid-1834248** — 43d+17h+59m, bash poll loop awaiting absent archive file `build-check-viii-pr-2b-analyzer-001.json`. ask-then-do: `kill 1834248`. [carry]
+- [yellow] **gh-burn-phase2-durable-fix-authorize** — pending=1, chat_id=0 (doorbell recovered at 13:10:28Z). Awaiting Larry `approve gh-burn-phase2-durable-fix-authorize`. [carry]
+- [yellow] **check-xi-drift-over-gate** — 18.8% (gate=10%). Next artifact tomorrow. [carry]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07`. [carry]
+- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
+- [blue] **PR #860** — spec XIV-b, UNKNOWN. No pipeline dependency. [carry]
+- [blue] **Check I proposal #1** — `notify-p3a-retro-prep` ($1.91 vs $0.28 baseline, 98σ). Use `/dispatch 1`. [carry]
+- [blue] **G-rules (dispatched, vp):** ourliberty-health-subject-key-mismatch-001 [3/3, vp]; forge-revision-preamble-missing-pr711-001 [vp]; forge-wip-redispatch-digest-tier4-001 [vp]; forge-wip-redispatch-exhausted-pr-exists-fp-001 [APPROVAL_REQUEST QUEUED iter ~3279, vp]; decision-needed-approval-forge-dispatch-no-target-repo-001 [vp]; no-session-revision-active-mirror-session-fp-001 [vp].
+- [blue] **G-rule 2/3:** outbox-notifier-merge-conflict-manual-rebase-tier4-001; forge-wip-redispatch-exhausted-genuine-no-pr-001; outbox-notifier-notification-intent-review-escalate-tier4-001; outbox-notifier-auto-merge-stale-revalidation-tier4-001; heal-unregistered-approval-null-chat-id-001 (2/3).
+- [blue] **G-rule 1/3:** mirror-malformed-verdict-heal-reap-path-001; mirror-queue-wait-gauge-tier4-001; inbox-watcher-tier-pool-all-unavailable-tier4-001; heal-pipeline-stall-unrouted-deep-review-required-fp-001; heal-pulse-check-staleness-single-flight-skip-fp-001; gate-parallelism-monitor-regression-data-001; pulse-rotation-check-source-tier4-001; watermark-rotation-gap [1/3 iter ~5063].
+
+**PRIME DIRECTIVE:** 0 new interventions; 0 new systemic_fixes; iter_clean appended. ratio=~18.97 (86 systemic_fixes / ~1634 interventions; 33 vp; trend=worsening).
+**Tier end-of-iter:** **Tier 1** (signal: zombie PID carry; consecutive_clean=0).
+
+---
+
