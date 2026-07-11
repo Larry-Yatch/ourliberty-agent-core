@@ -8825,6 +8825,40 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-auto-route-externally-authored-pr-reviews-001-retr-retry1",
+      "name": "Auto Route Externally Authored PR Reviews 001 Retr Retry1",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `auto-route-externally-authored-pr-reviews-001-retr-retry1`. Last activity 2026-07-11T20:09:18.255245+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "auto-route-externally-authored-pr-reviews-001-retr-retry1"
+      ],
+      "repo": null,
+      "created": "2026-07-11",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-11T20:12:16.143004+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-11T20:09:18.255245+00:00"
+    },
+    {
+      "id": "proposed-auto-route-externally-authored-pr-reviews-001-retr",
+      "name": "Auto Route Externally Authored PR Reviews 001 Retr",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `auto-route-externally-authored-pr-reviews-001-retr`. Last activity 2026-07-11T20:07:25.920527+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "auto-route-externally-authored-pr-reviews-001-retr"
+      ],
+      "repo": null,
+      "created": "2026-07-11",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-11T20:12:16.143004+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-11T20:07:25.920527+00:00"
     }
   ]
 }
