@@ -25204,3 +25204,79 @@ Watermark → 985. NOMINAL ✅
 
 ---
 
+## Iteration ~5012 — 2026-07-11T01:28Z UTC (Larry /cycle, Tier 1)
+
+**Health:** ✅ Nominal — 0 new alerts; Forge completed gg-s2-runner-engine revision-1 (~76s after dispatch); Mirror re-review (round=1) dispatched 01:20:10Z UTC; all mandatory checks clean; de-escalating Tier 1→2.
+
+**VERIFY-BEFORE-REASSERT (from iter ~5011):**
+- **"PR #921 Mirror REVIEW_REVISION; revision-1 in Forge inbox"**: UPDATED ✅ — Forge completed revision-1 at ~01:19-20Z UTC (~76s after dispatch at 01:18:54Z); outbox-notifier dispatched re-review round=1 (file=review-gg-s2-runner-engine-rev1.json) at 01:20:10Z UTC; Forge-result notified to Beacon at 01:20:11Z UTC; dup round-0 review also dispatched at 01:20:16Z UTC (G-rule 11th occurrence). PR #921 OPEN/UNKNOWN (awaiting Mirror round-1 verdict). [updated 🔄]
+- **"PR #874 Mirror REVIEW_PASS, AUTO_MERGE_HELD behind #918"**: CONFIRMED ✅ — OPEN/UNKNOWN per gh pr list; AUTO_MERGE_HELD at 18:51:39 MDT in notifier log. [carry]
+- **"PR #913 OPEN/UNKNOWN, blocked by #874"**: CONFIRMED ✅ — OPEN/UNKNOWN, no autoMerge. [carry]
+- **"beacon ✅"**: CONFIRMED alive — PID 3419183 (Ss, 01:00:05h uptime). ⚠️ Last log entry 01:16:31Z UTC (12 min stale at check); same Telegram 429/502/timeout hiccup from iter ~5011 (transient API burst; retry backoff likely). Outbox-notifier DM path confirmed working (01:20:16Z UTC). [alive, Telegram hiccup still monitoring]
+- **"outbox-notifier PID 3421106 ✅"**: CONFIRMED ✅ — active 01:20:16Z UTC. [carry]
+- **"inbox_watcher PID 3421105 ✅"**: CONFIRMED ✅. [carry]
+- **"zombie PID 1834248 (43d+06:13h)"**: CONFIRMED ⚠️ — etime=43-06:07:07 per ps (Ss; bash poll loop). [carry, growing]
+- **"daemon heartbeat 2026-07-11T01:14:14Z"**: UPDATED ✅ — heartbeat=2026-07-11T01:24:20Z UTC (~4 min at check). [fresh ✅]
+- **"6 items on Approvals tab"**: CONFIRMED ✅ — pending=6. [carry]
+
+**NEW FINDINGS:**
+1. **Forge completed gg-s2-runner-engine revision-1 in ~76s** (01:19-20Z UTC): Outbox-notifier log at 01:20:10Z UTC shows `re-review dispatched mirror <- beacon (round=1, file=review-gg-s2-runner-engine-rev1.json)` and `notified beacon <- forge (forge-result)` at 01:20:11Z UTC. Very fast revision — likely minor changes. Mirror round-1 review now in-flight. Normal pipeline. [nominal: system working as designed 🔄]
+2. **G-rule `notifier-concurrent-scan-duplicate-review-dispatch-001`, 11th occurrence** (01:20:16Z UTC): 6 seconds after the correct round-1 re-review, outbox-notifier dispatched a dup round-0 `review-request` (file=review-gg-s2-runner-engine.json). Same concurrent-scan race pattern. Fix PR #847 MERGED, verification_pending. Mirror inbox now has both the rev-1 review AND the dup round-0 review for gg-s2-runner-engine. [G-rule 11th, vp]
+
+**Check 0 — Alert triage:** `repair-watermark {"repaired": false, "old_watermark": 985, "file_length": 985}`. 0 new alerts. Watermark stays at 985. NOMINAL ✅
+
+**Check 1 — Log noise:** Last outbox-notifier entry 01:20:16Z UTC — dup review-request dispatched (G-rule 11th, noted above). No WARNs above threshold. NOMINAL ✅
+
+**Check 2 — Telegram sweep:** Beacon PID 3419183 ✅ alive. Last Larry message: 17:49 MDT 2026-07-10 "Yes monitor the drain and rebase any that need it" — tracked by Beacon response at 17:51 MDT. No new messages. NOMINAL ✅
+
+**Check 3 — Pipeline stall:** DRY-RUN → 0 alerts would fire; `unrouted_open_pr:918` cooldown-suppressed (G-rule 1/3); `stalled_active_step:gg-s2-runner-engine` cooldown-suppressed (revision cycle active). NOMINAL ✅
+
+**Check 4 — Pending directives:** pending=6 (PRs #823, #830, #833, #904, #917 + outbox-notifier-merge-held-deep-review-tier3-001). No change. Larry action needed on tab. NOMINAL (actionable) ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-11T01:24:20Z UTC (~4 min at check). NOMINAL ✅
+
+**Check A — Source repo:** HEAD=f2250e77=origin/main; main; clean. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-11T00:29:29Z UTC (~59 min at journal write). Within 2h. NOMINAL ✅
+**Check C — Agent liveness:** Beacon PID 3419183 ✅ (Ss, ~01:00h uptime); inbox_watcher PID 3421105 ✅ (Ssl); outbox-notifier PID 3421106 ✅ (Ss). ⚠️ beacon_telegram_bot.log last entry 01:16:31Z UTC (12 min stale, Telegram API hiccup monitoring). Zombie PID 1834248 ⚠️ (43-06:07:07, bash Ss). NOMINAL ✅
+**Check E — PR/merge state:** PR #921 OPEN/UNKNOWN (Forge rev-1 done; Mirror round-1 review in-flight); PR #918 OPEN/UNKNOWN (deep-review-required, blocking #874→#913); PR #917 OPEN/UNKNOWN (deep-review-hold); PR #913 OPEN/UNKNOWN (deep-review-passed, blocked by #874); PR #874 OPEN/UNKNOWN (Mirror PASS, HELD behind #918); PR #860 OPEN. NOMINAL (active pipeline) ✅
+
+**§5.0:** audit_due_nudge: no committed audit baseline; no-op ✅. distill_detector: no un-distilled audits; no-op ✅. audit_cadence_signal: no post-seed artifacts; no-op ✅.
+
+**Conditional checks — UTC Saturday 2026-07-11:**
+- Check I: Latest artifact check-i-2026-07-10.json (14:13Z, Friday fire). Saturday not a firing day. ✅
+- Check XI: Timer fires ~10:21Z today; no new artifact since iter ~5011. ✅
+- Check III/IV/VIII/IX/X/XII/XIV: Sunday/Monday gates. Skip. ✅
+
+**G-rule assessment:** `notifier-concurrent-scan-duplicate-review-dispatch-001` now 11th occurrence. Fix PR #847 MERGED ✅, vp — 11th occurrence is expected churn while the fix propagates. No new G-rules opened.
+
+**Actions taken:**
+1. Check 0: 0 new alerts; watermark confirmed at 985. ✅
+2. PRIME ledger: `iter_clean` appended (01:28:18Z UTC, tier=1, template=nominal). ✅
+3. Tier state: `record --checks-clean true` → **tier promoted 1→2** (consecutive_clean=3 → de-escalated; reset to 0). ✅
+
+**Escalations:** 0 Pulse DMs this iter.
+
+**Standing findings (carry):**
+- [yellow] **zombie-bash-pid-1834248** — 43d+06:07h, bash poll loop awaiting absent archive file. ask-then-do: `kill 1834248`. [carry, growing]
+- [yellow] **PR #917 deep-review-hold** — locked_update RMW; needs `/code-review high` + `scripts/merge_reviewed_pr.sh 917`. [carry]
+- [yellow] **PR #918 deep-review-required** — fix/notifier-block-dup-review; blocking #874→#913 chain. Deep review needed. [carry, blocking]
+- [yellow] **6 items on Approvals tab** — PRs #823, #830, #833, #904, #917 + outbox-notifier-merge-held-deep-review-tier3-001. Larry review needed. [carry]
+- [yellow] **check-xi-drift-over-gate** — 8/64 drifted (12.5%, gate=10%) on 2026-07-10. [carry, next XI fire ~10:21Z today]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07`. [carry]
+- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
+- [blue] **PR #921 (gg-s2-runner-engine)** — Forge rev-1 done; Mirror round-1 review in-flight (dispatched 01:20:10Z UTC). Dup round-0 review also dispatched (G-rule 11th). Awaiting Mirror verdict. [active 🔄]
+- [blue] **PR #874** — Mirror REVIEW_PASS, AUTO_MERGE_HELD behind #918. Will auto-merge when #918 clears. [monitoring]
+- [blue] **PR #913** — deep-review-passed label; UNKNOWN/no-autoMerge, blocked by #874. Cascade merge after #874. [monitoring]
+- [blue] **PR #860** — spec XIV-b. [carry]
+- [blue] **Orphaned .claimed/0/review-pr-911.json** — PR #911 MERGED. [carry]
+- [blue] **Check I proposal #1** — `notify-p3a-retro-prep` ($1.91 vs $0.28 baseline, 98σ). Use `/dispatch 1`. [carry]
+- [blue] **Beacon bot Telegram hiccup** — 429/502/timeout at 01:15-01:16Z UTC; bot alive; log silent ~12 min at check; monitoring recovery. [monitoring]
+- [blue] **G-rules (dispatched, vp):** outbox-notifier-merge-held-deep-review-tier4-001 [3/3 DISPATCHED ✅, vp]; notifier-concurrent-scan-dup [PR #847 MERGED ✅, vp, 11th]; heal-undispatched-pr-review-claimed-race-fp-001 [PR #912 MERGED ✅, vp]; ourliberty-health-subject-key-mismatch-001 [3/3, vp]; forge-revision-preamble-missing-pr711-001 [vp]; forge-wip-redispatch-digest-tier4-001 [vp]; forge-wip-redispatch-exhausted-pr-exists-fp-001 [APPROVAL_REQUEST QUEUED iter ~3279, vp]; decision-needed-approval-forge-dispatch-no-target-repo-001 [vp]; no-session-revision-active-mirror-session-fp-001 [vp]. [carry]
+- [blue] **G-rule 2/3:** forge-marker-task-id-mismatch-xii-v1; build-sequence-advancer-sequence-complete-tier4-001; outbox-notifier-merge-conflict-manual-rebase-tier4-001; forge-wip-redispatch-exhausted-genuine-no-pr-001; outbox-notifier-notification-intent-review-escalate-tier4-001. [carry]
+- [blue] **G-rule 1/3:** mirror-malformed-verdict-heal-reap-path-001; heal-unregistered-approval-null-chat-id-001; mirror-queue-wait-gauge-tier4-001; inbox-watcher-tier-pool-all-unavailable-tier4-001; heal-pipeline-stall-unrouted-deep-review-required-fp-001; RECONCILE_MISSING_REVIEW-.claimed-blindspot; heal-pulse-check-staleness-single-flight-skip-fp-001. [carry]
+
+**PRIME DIRECTIVE:** 0 interventions; 0 systemic_fixes; iter_clean appended. ratio=19.76 (carry).
+**Tier end-of-iter:** **Tier 2** (de-escalated from Tier 1 after 3 consecutive clean iters; consecutive_clean reset to 0).
+
+---
+
