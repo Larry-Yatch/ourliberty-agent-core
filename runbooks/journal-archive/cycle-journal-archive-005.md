@@ -23226,3 +23226,57 @@ NOMINAL ✅
 
 ---
 
+## Iteration ~4988 — 2026-07-10T19:55Z UTC (Larry /cycle, Tier 1)
+
+**Health:** ⚠️ One Tier-4 alert (forge-wip-redispatch, route=digest, known G-rule, no new DM)
+
+**VERIFY-BEFORE-REASSERT (from iter ~4987):**
+- **"beacon PID 2862981 ✅"**: CONFIRMED ✅ — Ss, 01:42:12 elapsed. [alive ✅]
+- **"outbox-notifier PID 2863277 ✅"**: CONFIRMED ✅ — Ss, 01:42:07 elapsed. Last log 13:40:16 MDT. [alive ✅]
+- **"inbox_watcher PID 2932566 ✅"**: CONFIRMED ✅ — Ssl, 50:25 elapsed. [alive ✅]
+- **"zombie PID 1834248 (~43d+)"**: CONFIRMED ⚠️ — 43d+00:33:58 elapsed. [carry, growing]
+- **"pending=0"**: CONFIRMED ✅ — beacon-pending-approvals.json pending=0. [stable ✅]
+- **"PR #913 Mirror review active in .claimed/1/"**: CONFIRMED ✅ — review-pr-ourliberty-agent-core-913.json in .claimed/1/. [active ✅]
+- **"Orphaned .claimed/0/"**: CONFIRMED ⚠️ — review-pr-ourliberty-agent-core-911.json still present (PR #911 MERGED). [carry]
+- **"daemon heartbeat"**: UPDATED ✅ — 2026-07-10T19:50:54Z UTC (~5 min at check). [fresh ✅]
+- **"Check I artifact check-i-2026-07-10.json"**: CONFIRMED — no new artifact. [carry ✅]
+
+**NEW FINDINGS:**
+1. **forge-wip-redispatch line 940** (19:50:59Z UTC): `source=forge-wip-redispatch, severity=info, route=digest, subject=rebase-pr909-sentinel-stale-lease-001`. Auto-re-dispatched retry1 for a task whose PR (#909) is already MERGED. Triage helper: Tier-4 (novel, no translation match). Bot already silenced via route=digest. G-rule forge-wip-redispatch-digest-tier4-001 (DISPATCHED ✅ iter ~2797, Beacon fix designed, Forge build pending). Per G-rule doctrine: NO DM to Larry. Journal note only. Watermark advanced 939→940. [blue, G-rule known]
+
+2. **RECONCILE_MISSING_REVIEW (Check 1)**: outbox-notifier fired RECONCILE_MISSING_REVIEW for PR #912 (13:19 MDT) and PR #909 (13:21 MDT). Both self-resolved — retry-dispatched reviews completed and both PRs merged. Occurrences 8+9 of G-rule notifier-concurrent-scan-duplicate-review-dispatch-001 (Forge preflight in-flight). [blue, self-resolved, G-rule carry]
+
+**Check 0 — Alert triage:** repair-watermark `{"repaired": false, "old_watermark": 939, "file_length": 939}`. 1 new alert (line 940, forge-wip-redispatch, Tier-4, route=digest; no DM per G-rule doctrine). Watermark → 940. TIER-RESET (Tier-4 unresolved).
+
+**Check 1 — Log noise:** RECONCILE_MISSING_REVIEW WARNs at 13:19/13:21 MDT (PRs #912/#909) self-resolved via retry; both merged. No new WARNs post-13:21 MDT. NOMINAL ✅
+
+**Check 2 — Telegram sweep:** Last Larry directive "go" at 10:59:49 MDT (approved sentinel-stale-lease-tier3-silence-001). No new directives. Last bot delivery 13:51:07 MDT (forge-wip-redispatch route=digest). NOMINAL ✅
+
+**Check 3 — Pipeline stall:** DRY-RUN 19:51Z UTC → 8× FORGE_NO_PR_SKIP (#898–#909 incl.); "no stalls detected." NOMINAL ✅
+
+**Check 4 — Pending directives:** pending=0. NOMINAL ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-10T19:50:54Z UTC (~5 min at check). NOMINAL ✅
+
+**Check A — Source repo:** HEAD=04ea9ff6=origin/main; main branch; clean tree. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-10T19:16:16Z (~38 min). Within 2h. NOMINAL ✅
+**Check C — Agent liveness:** beacon PID 2862981 ✅; outbox-notifier PID 2863277 ✅; inbox_watcher PID 2932566 ✅. Zombie PID 1834248 ⚠️ (43d+, carry). NOMINAL ✅
+**Check E — PR/merge state:** 4 open: #913 (Mirror review active .claimed/1/), #874 (fix heal-undispatched-pr-review, UNKNOWN), #860 (spec XIV-b), #847 (HELD_DEEP_REVIEW). No stale clean+green. NOMINAL ✅
+**Check H — Forge activity:** Shipped last 4h: PRs #912, #911, #910, #909, #908, #907, #906, #905, #904, #854 (10 merges). Active: #913 Mirror review in-flight. No Forge PRs >72h open. NOMINAL ✅
+
+**§5.0:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Rotations:** 0 overdue, 1 upcoming-within-60d (SUPABASE_SERVICE_ROLE_KEY due 2026-08-22, +43d) — DM skip (last DM 2026-07-02, 8d ago, within 14-day dedup window).
+
+**Conditional checks — UTC Friday 2026-07-10:**
+- Check I: Friday. Latest artifact check-i-2026-07-10.json (08:13 MDT = 14:13Z UTC) — triaged iter ~4983. No new artifact. ✅
+- Check XI: Daily. No new artifact (next fire 2026-07-11). ✅
+- Check III: Sunday gate. Skip. ✅
+- Check IV/VIII/IX/X/XII/XIV: Monday gate. Skip. ✅
+
+**PRIME DIRECTIVE:** intervention appended (forge-wip-redispatch Tier-4 observation). Ledger: 1638 interventions / 85 systemic_fixes, ratio=19.27, trend=worsening.
+
+**Tier state:** Tier-4 alert → tier-reset. consecutive_clean → 0. Tier 1 (unchanged).
+
+---
+
