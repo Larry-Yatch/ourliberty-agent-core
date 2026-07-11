@@ -8558,6 +8558,23 @@
       "retired_by": "heal_orphan_autoregister",
       "retired_at": "2026-07-11T05:22:39.783121+00:00",
       "retired_reason": "orphan-terminal"
+    },
+    {
+      "id": "proposed-heal-undispatched-pr-review-canonical-task-id-001",
+      "name": "Heal Undispatched PR Review Canonical Task ID 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `heal-undispatched-pr-review-canonical-task-id-001`. Last activity 2026-07-11T07:50:56.150247+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "heal-undispatched-pr-review-canonical-task-id-001"
+      ],
+      "repo": null,
+      "created": "2026-07-11",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-11T08:09:15.903270+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-11T07:50:56.150247+00:00"
     }
   ]
 }
