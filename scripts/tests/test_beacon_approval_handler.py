@@ -578,6 +578,33 @@ class DispatchApprovedTest(unittest.TestCase):
             data = json.load(f)
         self.assertEqual(data['source'], 'beacon')
 
+    def test_dispatch_carries_origin_task_id_onto_forge_envelope(self):
+        # Delegate-tracking Slice 2a: an entry stamped with origin_task_id
+        # (Slice 1) threads it onto the dispatched Forge envelope; the marker
+        # id (envelope task_id / routing key) is untouched.
+        entry = {
+            'id': 'fix-thing-001',
+            'target_agent': 'forge',
+            'origin_task_id': 'delegate-cap-fix-thing-ab12',
+            'dispatch_payload': _good_payload(task_id='fix-thing-001'),
+        }
+        dest = ah.dispatch_approved(entry)
+        with open(dest) as f:
+            data = json.load(f)
+        self.assertEqual(data['origin_task_id'], 'delegate-cap-fix-thing-ab12')
+        self.assertEqual(data['task_id'], 'fix-thing-001')
+
+    def test_dispatch_omits_origin_task_id_when_absent(self):
+        entry = {
+            'id': 'plain-001',
+            'target_agent': 'forge',
+            'dispatch_payload': _good_payload(task_id='plain-001'),
+        }
+        dest = ah.dispatch_approved(entry)
+        with open(dest) as f:
+            data = json.load(f)
+        self.assertNotIn('origin_task_id', data)
+
     def test_dispatch_to_invalid_route_raises(self):
         # forge is target — fine. But what if payload says mirror?
         # Pulse->forge would be wrong source — let's test pulse->forge denial.

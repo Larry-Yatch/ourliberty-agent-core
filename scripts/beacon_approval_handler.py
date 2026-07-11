@@ -1160,6 +1160,16 @@ def dispatch_approved(entry: dict[str, Any]) -> Path:
     task_dict = {**payload, 'source': envelope_source}
     if entry.get('chat_id') is not None:
         task_dict['reply_chat_id'] = entry['chat_id']
+    # Delegate-tracking Slice 2a — carry the origin envelope task_id
+    # (`delegate-<cid>`, stamped on the pending entry in Slice 1) forward onto
+    # the dispatched Forge envelope, so the resulting build's chain_events can be
+    # joined back to the delegated card (building → PR → merged). Additive +
+    # read-only downstream; every validator on the dispatch path reads named
+    # fields via `.get()` and ignores this one, and `payload['task_id']` (the
+    # Forge envelope id + routing key) is untouched. Absent on non-delegated
+    # dispatches (Slice 1 stamps it only when it differs from the marker id).
+    if entry.get('origin_task_id'):
+        task_dict['origin_task_id'] = entry['origin_task_id']
     # D3.5 5c — replan_count + max_replans propagation. When this entry was
     # added by `_route_beacon_replan_approval` (notifier extracted Beacon's
     # auto-replan APPROVAL_REQUEST from her outbox after a review-escalate

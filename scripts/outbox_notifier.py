@@ -2203,6 +2203,11 @@ def _emit_mirror_verdict_chain_event(
         'budget_exhausted': bool(marker_decision.get('budget_exhausted')),
         'pr_url': payload.get('pr_url', '') or data.get('pr_url', '') or '',
     }
+    # Delegate-tracking Slice 2a — carry the origin task_id (rode Mirror's outbox
+    # via the review-request's CARRY) so the verdict joins back to the card.
+    _origin = data.get('origin_task_id')
+    if _origin:
+        chain_payload['origin_task_id'] = _origin
     try:
         chain_event_emit.emit_event(
             event_type=event_type,
@@ -2225,6 +2230,7 @@ def _emit_review_request_chain_event(
     *,
     revision_count: int,
     replan_count: int,
+    origin_task_id: Optional[str] = None,
 ) -> None:
     """Push a `review_request` chain_event after a Mirror review dispatch.
 
@@ -2259,6 +2265,9 @@ def _emit_review_request_chain_event(
         'revision_count': revision_count,
         'replan_count': replan_count,
     }
+    # Delegate-tracking Slice 2a — join key back to the delegated card.
+    if origin_task_id:
+        chain_payload['origin_task_id'] = origin_task_id
     try:
         chain_event_emit.emit_event(
             event_type='review_request',
@@ -4837,6 +4846,12 @@ def _dispatch_mirror_review(
             'max_replans': CARRY,
         },
     )
+    # Delegate-tracking Slice 2a — carry the origin envelope task_id onto the
+    # Mirror review-request (as a base extra, not a whitelisted context field —
+    # only delegated chains have it) so it rides Mirror's outbox and the
+    # review/verdict chain_events can join back to the delegated card.
+    if data.get('origin_task_id'):
+        review_task['origin_task_id'] = data['origin_task_id']
 
     # D3.5 5c-followup-2 (audit C-2): key the review-task filename by
     # replan_count when this is a replan iteration's first review. Same
@@ -4908,6 +4923,7 @@ def _dispatch_mirror_review(
         _emit_review_request_chain_event(
             task_id, pr_url,
             revision_count=0, replan_count=replan_count,
+            origin_task_id=data.get('origin_task_id'),
         )
     except (
         safe_write_inbox.DispatchRejected,
@@ -6290,6 +6306,11 @@ def _dispatch_mirror_review_rerun(
             'max_replans': CARRY,
         },
     )
+    # Delegate-tracking Slice 2a — keep the origin task_id riding the re-review
+    # dispatch (base extra, see _dispatch_mirror_review) so revision rounds stay
+    # joined to the card.
+    if data.get('origin_task_id'):
+        review_task['origin_task_id'] = data['origin_task_id']
 
     # Idempotency: keyed on round number so re-process on notifier crash
     # doesn't double-dispatch a re-review.
@@ -6351,6 +6372,7 @@ def _dispatch_mirror_review_rerun(
         _emit_review_request_chain_event(
             task_id, pr_url,
             revision_count=round_num, replan_count=replan_count,
+            origin_task_id=data.get('origin_task_id'),
         )
     except (
         safe_write_inbox.DispatchRejected,

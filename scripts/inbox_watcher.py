@@ -767,6 +767,13 @@ def _build_outbox(agent: str, task_id: str, task: dict, task_file: Path,
                            'previous_findings',
                            'replan_count', 'max_replans',
                            'mirror_escalate_reason',
+                           # Delegate-tracking Slice 2a — propagate the origin
+                           # envelope task_id (`delegate-<cid>`) through the
+                           # Forge outbox so outbox_notifier can stamp it onto
+                           # the build-lifecycle chain_events, joining the build
+                           # back to the delegated card. Absent on non-delegated
+                           # work (only set when it differs from the marker id).
+                           'origin_task_id',
                            # PR-S4 rectification (H1+M4): propagate the
                            # inbound task `prompt` so outbox_notifier can
                            # discriminate Mirror DAG-preflight sessions
