@@ -29224,3 +29224,71 @@ NOMINAL ✅
 
 ---
 
+## Iteration ~5066 — 2026-07-11T09:34Z UTC (Larry /cycle, Tier 1)
+
+**Health:** ✅ Nominal. All 6 mandatory checks clean. Major positive: PR #929 OPENED — Forge built heal-undispatched-pr-review-canonical-task-id-001 fix; Mirror review dispatched at 09:30Z UTC. Zombie PID 1834248 carry only.
+
+**VERIFY-BEFORE-REASSERT (from iter ~5065):**
+- **"zombie PID 1834248 (43d+14h+02m)"**: CONFIRMED ✅ — stat=Ss, 43d+14h+12m. [carry]
+- **"beacon PID 3965718"**: CONFIRMED ✅ — Ss, 31:20 elapsed. ✅
+- **"outbox-notifier PID 3965731"**: CONFIRMED ✅ — Ss, 31:19 elapsed; last log 03:30:09 MDT (review dispatch for PR #929). ✅
+- **"inbox_watcher PID 3940207"**: CONFIRMED ✅ — Ssl, 01:30:02 elapsed. ✅
+- **"HEAD=5bd2597f=origin/main"**: SUPERSEDED — HEAD=1c8b6621 (2 more wrapper commits). ✅
+- **"pending=0 approvals"**: CONFIRMED ✅
+- **"sync status=success"**: CONFIRMED ✅ — last_sync=08:59:43Z (~32 min at check, within 2h threshold). ✅
+- **"forge-marker-task-id-mismatch-xii-v1 Forge build confirmed in inbox at 09:21Z"**: SUPERSEDED — PR #929 OPENED (Forge built fix, Mirror review dispatched 09:30Z UTC). ✅
+- **"PR #923 (gg-s4-silent-failure-gauge) carry"**: CONFIRMED MERGED at 07:21:37Z UTC. ✅
+
+**Check 0 — Alert triage:** `repair-watermark {"repaired": false, "old_watermark": 1026, "file_length": 1026}` — 0 new alerts past watermark. NOMINAL ✅
+
+**Check 1 — Log noise:** outbox-notifier PID 3965731 ✅. Last log 03:30:09 MDT (09:30Z UTC) — Mirror review dispatched for PR #929. No WARNs/ERRORs since 02:59 MDT restart. Pre-restart WARN at 01:55 MDT (malformed marker for PR #927, which had already auto-merged at 01:52 MDT) self-resolved on restart. NOMINAL ✅
+
+**Check 2 — Telegram sweep:** beacon PID 3965718 ✅. Larry's question at 01:04:15 MDT about "gg-s4-review-reconcile-stuck PR #923" — VERIFIED PR #923 MERGED at 07:21Z UTC; self-resolved. Larry's "Yes draft the fix" at 01:09:13 MDT — actioned (heal-undispatched-pr-review-canonical-task-id-001 build dispatched 09:03Z UTC; PR #929 now open in Mirror review). No unhandled directives. NOMINAL ✅
+
+**Check 3 — Pipeline stall:** DRY-RUN (09:31:08Z UTC) → "no stalls detected." All FORGE_NO_PR_SKIP valid. NOMINAL ✅
+
+**Check 4 — Pending directives:** All Larry directives in last 24h have chain artifacts. NOMINAL ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-11T09:30:16Z (~1 min at check; cadence=10 min). NOMINAL ✅
+
+**Check A — Source repo:** HEAD=1c8b6621=origin/main ✅; clean tree ✅; on main ✅; 0 commits behind. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-11T08:59:43Z (~32 min), status=success. NOMINAL ✅
+**Check C — Agent liveness:** beacon PID 3965718 ✅; outbox-notifier PID 3965731 ✅; inbox_watcher PID 3940207 ✅. ⚠️ Zombie PID 1834248 (43d+14h+12m, bash poll loop). [carry]
+**Check E — PR/merge state:**
+- PR #929 [OPEN, MERGEABLE] — fix(heal-undispatched-pr-review): forge-marker-task-id-mismatch-xii-v1 fix; Mirror review dispatched 09:30Z UTC. [vp]
+- PR #860 [OPEN, UNKNOWN] — spec XIV-b. [carry blue]
+
+**§5.0:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅.
+
+**Conditional checks — UTC Saturday 2026-07-11 (~09:34Z):**
+- Check I: Not a firing day (Sat). Latest artifact: check-i-2026-07-10.json. ✅
+- Check XI: Timer fires ~10:21Z today (~47 min). Latest artifact: check-xi-20260710T102121Z (attention_rate=0.125, gate=0.1, over_gate=true). No new artifact yet. [yellow carry]
+- Check III/IV/VIII/IX/X/XII/XIV: Sunday/Monday gates. Skip. ✅
+
+**G-rule assessment:**
+- **forge-marker-task-id-mismatch-xii-v1**: PR #929 OPEN and MERGEABLE. Mirror review dispatched at 09:30Z UTC (09:30:09 MDT log entry confirmed). [vp, carry — awaiting Mirror REVIEW_PASS + AUTO_MERGE]
+- All other G-rule counts carry from iter ~5065. No new occurrences.
+
+**Actions taken:**
+1. PRIME ledger: `iter_clean` appended (09:34:04Z UTC, tier=1, template=nominal). ✅
+2. Tier state: `record --checks-clean false` → tier=1, consecutive_clean=0. ✅
+
+**Escalations:** 0 new DMs. All outstanding carries already DM'd in prior iters.
+
+**Standing findings (carry):**
+- [yellow] **zombie-bash-pid-1834248** — 43d+14h+12m, bash poll loop awaiting absent archive file. ask-then-do: `kill 1834248`. [carry]
+- [yellow] **check-xi-drift-over-gate** — 8/64 (12.5%, gate=10%) on 2026-07-10. Check XI fires ~10:21Z today. [carry]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07`. [carry]
+- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
+- [blue] **PR #860** — spec XIV-b. [carry]
+- [blue] **Check I proposal #1** — `notify-p3a-retro-prep` ($1.91 vs $0.28 baseline, 98σ). Use `/dispatch 1`. [carry]
+- [blue] **forge-marker-task-id-mismatch-xii-v1** — PR #929 in Mirror review; awaiting REVIEW_PASS + AUTO_MERGE. [vp]
+- [blue] **G-rules (dispatched, vp):** ourliberty-health-subject-key-mismatch-001 [3/3, vp]; forge-revision-preamble-missing-pr711-001 [vp]; forge-wip-redispatch-digest-tier4-001 [vp]; forge-wip-redispatch-exhausted-pr-exists-fp-001 [APPROVAL_REQUEST QUEUED iter ~3279, vp]; decision-needed-approval-forge-dispatch-no-target-repo-001 [vp]; no-session-revision-active-mirror-session-fp-001 [vp].
+- [blue] **G-rule 2/3:** outbox-notifier-merge-conflict-manual-rebase-tier4-001; forge-wip-redispatch-exhausted-genuine-no-pr-001; outbox-notifier-notification-intent-review-escalate-tier4-001; outbox-notifier-auto-merge-stale-revalidation-tier4-001.
+- [blue] **G-rule 1/3:** mirror-malformed-verdict-heal-reap-path-001; heal-unregistered-approval-null-chat-id-001; mirror-queue-wait-gauge-tier4-001; inbox-watcher-tier-pool-all-unavailable-tier4-001; heal-pipeline-stall-unrouted-deep-review-required-fp-001; heal-pulse-check-staleness-single-flight-skip-fp-001; gate-parallelism-monitor-regression-data-001; pulse-rotation-check-source-tier4-001; watermark-rotation-gap [1/3 iter ~5063].
+
+**PRIME DIRECTIVE:** 0 new interventions; 0 new systemic_fixes; iter_clean appended. ratio=19.224 (85 systemic_fixes / 34 vp; carry).
+**Tier end-of-iter:** **Tier 1** (zombie carry; consecutive_clean=0).
+
+---
+
