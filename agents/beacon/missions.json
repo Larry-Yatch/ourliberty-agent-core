@@ -8574,7 +8574,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-11T08:09:15.903270+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-11T07:50:56.150247+00:00"
+      "orphan_last_activity_ts": "2026-07-11T07:50:56.150247+00:00",
+      "briefing": {
+        "what": "A cleanup fix so the team's automated review system stops filing duplicate copies of the same work under mismatched labels.",
+        "why": "Duplicate, mislabeled records make it harder to trust that each piece of work was actually reviewed once and signed off, which slows the team down and invites mistakes.",
+        "suggest": "Approve it, but confirm it's been checked against existing records first so the cleanup doesn't accidentally drop anything real."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-11T08:09:22.028464+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
