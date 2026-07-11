@@ -20,6 +20,7 @@ try:  # engage the test sandbox before any production import reads env/paths
 except ImportError:  # discover loads this module top-level (no package parent)
     import _bootstrap  # noqa: F401
 
+import json
 import sys
 import unittest
 from datetime import datetime, timedelta, timezone
@@ -1074,6 +1075,217 @@ class TestPipelineBackoffReason(unittest.TestCase):
         r, live_p, rec_p, pass_p = self._run(pr, passing=True)
         pass_p.assert_not_called()
         self.assertIsNone(r)
+
+
+class TestCanonicalTaskIdForPr(unittest.TestCase):
+    """canonical_task_id_for_pr: recover the build-outbox task_id by PR-URL match,
+    regardless of how the head branch mangled the id (G-rule
+    forge-marker-task-id-mismatch-xii). Fail-open to the fallback."""
+
+    PR_URL = 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/928'
+    CANON = 'heal-orphaned-mirror-claim-reinject-not-concluded-001'
+
+    def setUp(self):
+        import os
+        import tempfile
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.archive = self.root / 'outboxes' / 'forge' / '.archive'
+        self.archive.mkdir(parents=True)
+        self.now = datetime.now(timezone.utc)
+        # Point the healer's AGENTS_ROOT at the temp tree for the scan.
+        self._orig_root = h.AGENTS_ROOT
+        h.AGENTS_ROOT = self.root
+        self._os = os
+
+    def tearDown(self):
+        h.AGENTS_ROOT = self._orig_root
+        self._tmp.cleanup()
+
+    def _write_outbox(self, name, *, task_id, pr_url=None, agent='forge',
+                      phase='build', age_hours=0.0, raw=None):
+        p = self.archive / name
+        if raw is not None:
+            p.write_text(raw)
+        else:
+            result = f'PR opened: {pr_url}\n\nBuild complete.' if pr_url else ''
+            p.write_text(json.dumps({
+                'agent': agent, 'phase': phase, 'task_id': task_id,
+                'result': result,
+            }))
+        ts = (self.now - timedelta(hours=age_hours)).timestamp()
+        self._os.utime(p, (ts, ts))
+        return p
+
+    def test_truncated_branch_resolves_to_canonical_via_url_match(self):
+        # Shape 3 (PR #928): branch truncated the `-001` suffix, so the naive
+        # strip yields a WRONG id — but the build outbox naming this PR URL
+        # carries the canonical one.
+        self._write_outbox(f'{self.CANON}.1.json',
+                           task_id=self.CANON, pr_url=self.PR_URL)
+        truncated = 'heal-orphaned-mirror-claim-reinject-not-concluded-'
+        self.assertEqual(
+            h.canonical_task_id_for_pr(self.PR_URL, truncated), self.CANON)
+
+    def test_no_archive_match_returns_fallback(self):
+        # #412 shape: the build outbox was reaped / never written → no archive
+        # names this PR → keep the naive branch-derived fallback (this backstop
+        # is then the SOLE dispatcher, so no duplicate is possible).
+        self._write_outbox('other-task.json', task_id='other-task',
+                           pr_url='https://github.com/Larry-Yatch/'
+                                  'ourliberty-agent-core/pull/999')
+        self.assertEqual(
+            h.canonical_task_id_for_pr(self.PR_URL, 'fallback-id'), 'fallback-id')
+
+    def test_url_match_is_normalized(self):
+        # Trailing slash / case differences must not defeat the match.
+        self._write_outbox(f'{self.CANON}.json',
+                           task_id=self.CANON, pr_url=self.PR_URL + '/')
+        self.assertEqual(
+            h.canonical_task_id_for_pr(self.PR_URL.upper(), 'fb'), self.CANON)
+
+    def test_outbox_outside_window_is_ignored(self):
+        # Older than RECONCILE_WINDOW_HOURS → not scanned → fallback.
+        import outbox_notifier as on
+        self._write_outbox(f'{self.CANON}.json', task_id=self.CANON,
+                           pr_url=self.PR_URL,
+                           age_hours=on.RECONCILE_WINDOW_HOURS + 1)
+        self.assertEqual(
+            h.canonical_task_id_for_pr(self.PR_URL, 'fb'), 'fb')
+
+    def test_non_forge_build_outbox_ignored(self):
+        # A non-build / non-forge outbox that happens to name the PR must not
+        # supply a task_id (only Forge build outboxes carry the canonical id).
+        self._write_outbox('review.json', task_id='mirror-task',
+                           pr_url=self.PR_URL, agent='mirror', phase='review')
+        self.assertEqual(
+            h.canonical_task_id_for_pr(self.PR_URL, 'fb'), 'fb')
+
+    def test_malformed_entry_skipped_not_raised(self):
+        self._write_outbox('broken.json', task_id='x', raw='{not json')
+        self._write_outbox(f'{self.CANON}.json',
+                           task_id=self.CANON, pr_url=self.PR_URL)
+        self.assertEqual(
+            h.canonical_task_id_for_pr(self.PR_URL, 'fb'), self.CANON)
+
+    def test_fail_open_on_unreadable_archive_dir(self):
+        # No archive dir at all → glob raises/empties → fallback, never raises.
+        h.AGENTS_ROOT = self.root / 'nonexistent'
+        self.assertEqual(
+            h.canonical_task_id_for_pr(self.PR_URL, 'fb'), 'fb')
+
+    def test_empty_pr_url_returns_fallback(self):
+        self.assertEqual(h.canonical_task_id_for_pr('', 'fb'), 'fb')
+
+
+class TestResolveCanonicalTaskId(unittest.TestCase):
+    """resolve_canonical_task_id: forge/* → archive URL scan; everything else →
+    the pure branch key, untouched."""
+
+    PR_URL = 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/928'
+    CANON = 'heal-orphaned-mirror-claim-reinject-not-concluded-001'
+
+    def setUp(self):
+        import os
+        import tempfile
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.archive = self.root / 'outboxes' / 'forge' / '.archive'
+        self.archive.mkdir(parents=True)
+        self._orig_root = h.AGENTS_ROOT
+        h.AGENTS_ROOT = self.root
+        (self.archive / f'{self.CANON}.json').write_text(json.dumps({
+            'agent': 'forge', 'phase': 'build', 'task_id': self.CANON,
+            'result': f'PR opened: {self.PR_URL}',
+        }))
+
+    def tearDown(self):
+        h.AGENTS_ROOT = self._orig_root
+        self._tmp.cleanup()
+
+    def test_forge_branch_gets_canonical(self):
+        truncated_branch = 'forge/heal-orphaned-mirror-claim-reinject-not-concluded-'
+        self.assertEqual(
+            h.resolve_canonical_task_id(
+                truncated_branch, 928, 'Larry-Yatch/ourliberty-agent-core',
+                self.PR_URL),
+            self.CANON)
+
+    def test_claude_branch_keeps_branch_key_untouched(self):
+        # Opt-in keying is already unambiguous — never remapped, archive not
+        # consulted (even though it names this PR URL).
+        self.assertEqual(
+            h.resolve_canonical_task_id(
+                'claude/missions-bug-k404pz', 928,
+                'Larry-Yatch/ourliberty-agent-core', self.PR_URL),
+            'pr-ourliberty-agent-core-928')
+
+    def test_labeled_branch_keeps_repo_qualified_pr_key(self):
+        self.assertEqual(
+            h.resolve_canonical_task_id(
+                'fix/install-drift-dedup', 80,
+                'Larry-Yatch/ourliberty-dashboard', self.PR_URL),
+            'pr-ourliberty-dashboard-80')
+
+    def test_forge_branch_without_url_falls_back(self):
+        self.assertEqual(
+            h.resolve_canonical_task_id(
+                'forge/some-task-001', 5,
+                'Larry-Yatch/ourliberty-agent-core', None),
+            'some-task-001')
+
+
+class TestSelectOrphanedResolverInjection(unittest.TestCase):
+    """End-to-end: select_orphaned_prs applies the injected resolver BEFORE the
+    dedup check, so a mangled forge branch dedups on the CANONICAL id."""
+
+    PR_URL = 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/928'
+    CANON = 'heal-orphaned-mirror-claim-reinject-not-concluded-001'
+
+    def test_default_resolver_is_pure_branch_key(self):
+        # No resolver injected → the pure branch strip (unchanged behavior).
+        prs = [_pr(928, 'forge/heal-orphaned-mirror-claim-reinject-not-concluded-',
+                   age_minutes=60)]
+        sel = h.select_orphaned_prs(prs, NOW, lambda t, head=None: False)
+        self.assertEqual(
+            sel[0]['task_id'],
+            'heal-orphaned-mirror-claim-reinject-not-concluded-')
+
+    def test_injected_resolver_remaps_task_id_before_dedup(self):
+        # The canonical id is treated as already-dispatched; the truncated one is
+        # not. With the resolver the PR must dedup OUT (canonical review exists),
+        # proving resolution happens BEFORE the dedup check.
+        def already(task_id, head_sha=None):
+            return task_id == self.CANON
+
+        def resolver(head, num, repo, url):
+            return self.CANON if head.startswith('forge/') else \
+                h.task_id_for_branch(head, num, repo)
+
+        prs = [_pr(928, 'forge/heal-orphaned-mirror-claim-reinject-not-concluded-',
+                   age_minutes=60)]
+        sel = h.select_orphaned_prs(prs, NOW, already, resolver)
+        self.assertEqual(sel, [])  # canonical review found → no duplicate
+
+    def test_resolver_exception_falls_back_to_branch_key(self):
+        def boom(head, num, repo, url):
+            raise RuntimeError('archive scan down')
+
+        prs = [_pr(41, 'forge/task-001', age_minutes=60)]
+        sel = h.select_orphaned_prs(prs, NOW, lambda t, head=None: False, boom)
+        self.assertEqual([p['task_id'] for p in sel], ['task-001'])
+
+    def test_branch_field_stays_real_head(self):
+        # Only task_id is remapped; the row's headRefName (→ envelope branch)
+        # stays the real branch Mirror must check out.
+        def resolver(head, num, repo, url):
+            return self.CANON
+
+        branch = 'forge/heal-orphaned-mirror-claim-reinject-not-concluded-'
+        prs = [_pr(928, branch, age_minutes=60)]
+        sel = h.select_orphaned_prs(prs, NOW, lambda t, head=None: False, resolver)
+        self.assertEqual(sel[0]['task_id'], self.CANON)
+        self.assertEqual(sel[0]['headRefName'], branch)
 
 
 if __name__ == '__main__':
