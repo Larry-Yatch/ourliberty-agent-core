@@ -2203,6 +2203,11 @@ def _emit_mirror_verdict_chain_event(
         'budget_exhausted': bool(marker_decision.get('budget_exhausted')),
         'pr_url': payload.get('pr_url', '') or data.get('pr_url', '') or '',
     }
+    # Delegate-tracking Slice 2a — carry the origin task_id (rode Mirror's outbox
+    # via the review-request's CARRY) so the verdict joins back to the card.
+    _origin = data.get('origin_task_id')
+    if _origin:
+        chain_payload['origin_task_id'] = _origin
     try:
         chain_event_emit.emit_event(
             event_type=event_type,
@@ -2225,6 +2230,7 @@ def _emit_review_request_chain_event(
     *,
     revision_count: int,
     replan_count: int,
+    origin_task_id: Optional[str] = None,
 ) -> None:
     """Push a `review_request` chain_event after a Mirror review dispatch.
 
@@ -2259,6 +2265,9 @@ def _emit_review_request_chain_event(
         'revision_count': revision_count,
         'replan_count': replan_count,
     }
+    # Delegate-tracking Slice 2a — join key back to the delegated card.
+    if origin_task_id:
+        chain_payload['origin_task_id'] = origin_task_id
     try:
         chain_event_emit.emit_event(
             event_type='review_request',
@@ -4757,7 +4766,13 @@ def _dispatch_mirror_review(
     # round-trip (5b) loses the PR metadata when answering back to Beacon,
     # and the worktree gate rejects with "no canonical path" — same shape as
     # the 4a marker-error black hole.
-    for f_name in ('pr_title', 'pr_body', 'max_clarifications'):
+    # `origin_task_id` (delegate-tracking Slice 2a) rides the SAME pre-build
+    # base-extra path as the PR metadata: propagating it at every dispatch hop
+    # here keeps a delegated build's chain_events joinable to its card across
+    # review → revision → rebase → re-review. Only delegated chains have it (the
+    # `is not None` guard omits it otherwise), so it never touches normal work.
+    for f_name in ('pr_title', 'pr_body', 'max_clarifications',
+                   'origin_task_id'):
         if data.get(f_name) is not None:
             review_base[f_name] = data[f_name]
     # Record the PR head commit this review covers, so the round-0 dedup (and
@@ -4908,6 +4923,7 @@ def _dispatch_mirror_review(
         _emit_review_request_chain_event(
             task_id, pr_url,
             revision_count=0, replan_count=replan_count,
+            origin_task_id=data.get('origin_task_id'),
         )
     except (
         safe_write_inbox.DispatchRejected,
@@ -5441,7 +5457,13 @@ def _dispatch_revision_to_forge(
     # Propagate the same envelope fields _dispatch_build_phase does so a
     # future REVIEW_QUESTION (deferred) round-trip would preserve PR
     # metadata. Same shape as 5a M-2 review fix.
-    for f_name in ('pr_title', 'pr_body', 'max_clarifications'):
+    # `origin_task_id` (delegate-tracking Slice 2a) rides the SAME pre-build
+    # base-extra path as the PR metadata: propagating it at every dispatch hop
+    # here keeps a delegated build's chain_events joinable to its card across
+    # review → revision → rebase → re-review. Only delegated chains have it (the
+    # `is not None` guard omits it otherwise), so it never touches normal work.
+    for f_name in ('pr_title', 'pr_body', 'max_clarifications',
+                   'origin_task_id'):
         if data.get(f_name) is not None:
             revision_base[f_name] = data[f_name]
     # Chain context (M1). forge_build_session_id (C-1 5b) is set explicitly on
@@ -5687,7 +5709,13 @@ def _dispatch_rebase_to_forge(
         rebase_base['branch'] = branch
     if head_sha:
         rebase_base['head_sha'] = head_sha
-    for f_name in ('pr_title', 'pr_body', 'max_clarifications'):
+    # `origin_task_id` (delegate-tracking Slice 2a) rides the SAME pre-build
+    # base-extra path as the PR metadata: propagating it at every dispatch hop
+    # here keeps a delegated build's chain_events joinable to its card across
+    # review → revision → rebase → re-review. Only delegated chains have it (the
+    # `is not None` guard omits it otherwise), so it never touches normal work.
+    for f_name in ('pr_title', 'pr_body', 'max_clarifications',
+                   'origin_task_id'):
         if data.get(f_name) is not None:
             rebase_base[f_name] = data[f_name]
 
@@ -6270,7 +6298,13 @@ def _dispatch_mirror_review_rerun(
     # NEXT round's REVIEW_REVISION (if any) carries findings through.
     if isinstance(data.get('previous_findings'), list):
         review_base['previous_findings'] = data['previous_findings']
-    for f_name in ('pr_title', 'pr_body', 'max_clarifications'):
+    # `origin_task_id` (delegate-tracking Slice 2a) rides the SAME pre-build
+    # base-extra path as the PR metadata: propagating it at every dispatch hop
+    # here keeps a delegated build's chain_events joinable to its card across
+    # review → revision → rebase → re-review. Only delegated chains have it (the
+    # `is not None` guard omits it otherwise), so it never touches normal work.
+    for f_name in ('pr_title', 'pr_body', 'max_clarifications',
+                   'origin_task_id'):
         if data.get(f_name) is not None:
             review_base[f_name] = data[f_name]
     # forge_build_session_id propagates forward unchanged (CARRY) so the NEXT
@@ -6351,6 +6385,7 @@ def _dispatch_mirror_review_rerun(
         _emit_review_request_chain_event(
             task_id, pr_url,
             revision_count=round_num, replan_count=replan_count,
+            origin_task_id=data.get('origin_task_id'),
         )
     except (
         safe_write_inbox.DispatchRejected,
@@ -11417,6 +11452,13 @@ def _route_beacon_replan_approval(
         replan_count=next_count,
         max_replans=max_count,
         queued_during_pause=is_paused,
+        # Delegate-tracking Slice 2a — re-carry the origin task_id onto the
+        # replanned pending entry (Beacon authors a FRESH marker id on replan, so
+        # without this the escalate→replan path drops the join). `data` is
+        # Mirror's REVIEW_ESCALATE outbox, which carries origin via the
+        # review-request base-extra. add_pending stamps it only when distinct
+        # from the marker id, so non-delegated replans are unaffected.
+        origin_task_id=data.get('origin_task_id'),
     )
     chain_event_emit.emit_event(
         **approval.build_approval_request_chain_event(payload),
