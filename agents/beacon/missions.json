@@ -8841,7 +8841,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-11T20:12:16.143004+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-11T20:09:18.255245+00:00"
+      "orphan_last_activity_ts": "2026-07-11T20:09:18.255245+00:00",
+      "briefing": {
+        "what": "The team started building a way to automatically hand off outside-submitted work for review instead of routing it by hand.",
+        "why": "It saves your people from manually shepherding every outside contribution, so reviews happen faster and nothing slips through the cracks.",
+        "suggest": "Let them keep going, but ask for a quick check that it's actually working end-to-end before you count on it."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-11T20:17:47.706827+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-auto-route-externally-authored-pr-reviews-001-retr",
@@ -8858,7 +8872,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-11T20:12:16.143004+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-11T20:07:25.920527+00:00"
+      "orphan_last_activity_ts": "2026-07-11T20:07:25.920527+00:00",
+      "briefing": {
+        "what": "The team began setting up a way to automatically hand off reviews of work submitted by outside contributors.",
+        "why": "Faster, more consistent review of outside submissions keeps quality high and stops good contributions from stalling in a queue.",
+        "suggest": "Worth continuing, but confirm the scope and goal first before putting more time into it, since it isn't tied to a bigger effort yet."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-11T20:17:47.706827+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
