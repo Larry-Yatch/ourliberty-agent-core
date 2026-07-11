@@ -74,7 +74,7 @@ def _mission(mid='m-1', *, phase='proposed', name='Mission One',
 
 
 # ============================================================================
-# Delegate — inbox proposal (no missions.json mutation)
+# Delegate — inbox proposal (+ the additive spawned-ref stamp)
 # ============================================================================
 
 
@@ -203,14 +203,22 @@ class MissionDelegateProposalTest(_DelegateTestBase):
         self.assertEqual(r.status_code, 200, r.text)
         self.assertEqual(len(self.inbox.calls), 1)
 
-    def test_missions_json_not_mutated(self):
-        # Single-committer / no-dirty-tree: delegating a mission writes ONLY the
-        # Beacon proposal, never the curated registry.
+    def test_delegate_mutates_only_the_spawned_ref(self):
+        # Delegate-tracking (2026-07-11): the handler now stamps the additive
+        # `spawned` join-key ref onto the mission — the ONLY permitted mutation.
+        # Phase and every other field stay untouched (the old "never mutated"
+        # invariant, narrowed to everything-but-spawned).
         self._seed(_mission('m-1'))
-        before = self.missions_path.read_text()
+        before = json.loads(self.missions_path.read_text())
         r = self.client.post(self._endpoint('m-1'), headers=AUTH, json={})
         self.assertEqual(r.status_code, 200, r.text)
-        self.assertEqual(self.missions_path.read_text(), before)
+        after = json.loads(self.missions_path.read_text())
+        m_after = next(m for m in after['missions'] if m['id'] == 'm-1')
+        spawned = m_after.pop('spawned')
+        self.assertEqual(spawned['kind'], 'delegate')
+        self.assertEqual(spawned['task_id'], 'delegate-m-1')
+        m_before = next(m for m in before['missions'] if m['id'] == 'm-1')
+        self.assertEqual(m_after, m_before)  # nothing else changed
 
 
 class MissionDelegateGuardTest(_DelegateTestBase):

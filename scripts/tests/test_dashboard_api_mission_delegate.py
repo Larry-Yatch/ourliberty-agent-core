@@ -218,65 +218,90 @@ class MissionDelegateIdempotencyTest(_MissionDelegateTestBase):
         # Idempotent re-stamp: same identity, no stamped_at churn.
         self.assertEqual(self._mission_row('m-1')['spawned'], first_ref)
 
-    def test_consumed_proposal_short_circuits_to_already_delegated(self):
-        # The 2026-07-11 revert class: the proposal was consumed (no live inbox
-        # file) but the mission carries the standing spawned ref → re-POST
-        # returns the prior outcome instead of a fresh paid Beacon run.
-        self._seed(_mission('m-1', spawned={
-            'kind': 'delegate',
-            'task_id': 'delegate-m-1',
-            'stamped_at': '2026-07-09T20:05:00+00:00',
-        }))
+    _STANDING_REF = {
+        'kind': 'delegate',
+        'task_id': 'delegate-m-1',
+        'stamped_at': '2026-07-09T20:05:00+00:00',
+    }
+
+    def _with_evidence(self, evidence):
+        """Patch the outcome-evidence lookup for one request (the sandbox has
+        no pending-approvals store, so the real lookup always returns None)."""
+        orig = da._delegation_outcome_evidence
+        da._delegation_outcome_evidence = lambda tid, agents_root=None: evidence
+        self.addCleanup(
+            lambda: setattr(da, '_delegation_outcome_evidence', orig))
+
+    def test_consumed_proposal_with_evidence_short_circuits(self):
+        # The 2026-07-11 revert class: proposal consumed (no live inbox file),
+        # the mission carries the standing spawned ref, AND the prior run left
+        # durable evidence (an open approval) → re-POST returns the prior
+        # outcome instead of a fresh paid Beacon run. dispatched is honestly
+        # False — nothing new was handed to the team.
+        self._seed(_mission('m-1', spawned=dict(self._STANDING_REF)))
+        self._with_evidence({'status': 'open', 'approval_id': 'scoped-task-001',
+                             'created_at': '2026-07-09T20:10:00+00:00'})
         r = self.client.post(_endpoint('m-1'), headers=AUTH, json={})
         self.assertEqual(r.status_code, 200, r.text)
         body = r.json()
-        self.assertTrue(body['dispatched'])
+        self.assertFalse(body['dispatched'])
         self.assertTrue(body['already_delegated'])
         self.assertEqual(body['delegated_at'], '2026-07-09T20:05:00+00:00')
+        self.assertEqual(body['approval_id'], 'scoped-task-001')
         self.assertEqual(self.inbox.calls, [])  # NO new proposal, no LLM spend
 
-    def test_already_delegated_joins_open_approval(self):
-        # When the delegation's pending approval is still open, the short-
-        # circuit response carries its id (same origin_task_id join as the
-        # delegation_needs_you chip).
-        self._seed(_mission('m-1', spawned={
-            'kind': 'delegate',
-            'task_id': 'delegate-m-1',
-            'stamped_at': '2026-07-09T20:05:00+00:00',
-        }))
-        orig = da._open_delegate_approvals
-        da._open_delegate_approvals = lambda ids, agents_root=None: {
-            'delegate-m-1': {'approval_id': 'scoped-task-001',
-                             'created_at': '2026-07-09T20:10:00+00:00'},
-        }
-        try:
-            r = self.client.post(_endpoint('m-1'), headers=AUTH, json={})
-        finally:
-            da._open_delegate_approvals = orig
+    def test_no_outcome_evidence_redelegates(self):
+        # The prior run concluded with NO durable trace (the prose-verdict /
+        # died-verdictless class): the stamp alone must NOT wedge the card —
+        # a re-click re-delegates, matching the no-outcome alert's advice.
+        self._seed(_mission('m-1', spawned=dict(self._STANDING_REF)))
+        self._with_evidence(None)
+        r = self.client.post(_endpoint('m-1'), headers=AUTH, json={})
         self.assertEqual(r.status_code, 200, r.text)
-        self.assertEqual(r.json()['approval_id'], 'scoped-task-001')
+        self.assertTrue(r.json()['dispatched'])
+        self.assertNotIn('already_delegated', r.json())
+        self.assertEqual(len(self.inbox.calls), 1)  # fresh proposal written
+        # The re-dispatch refreshed stamped_at (overwrite semantics).
+        self.assertNotEqual(self._mission_row('m-1')['spawned']['stamped_at'],
+                            self._STANDING_REF['stamped_at'])
 
-    def test_force_redelegates_past_standing_ref(self):
-        self._seed(_mission('m-1', spawned={
-            'kind': 'delegate',
-            'task_id': 'delegate-m-1',
-            'stamped_at': '2026-07-09T20:05:00+00:00',
-        }))
+    def test_failed_outcome_redelegates(self):
+        # A GC-stamped failure outcome (spawned.outcome='closed') means a
+        # re-click is a RETRY — it must dispatch, not short-circuit.
+        ref = dict(self._STANDING_REF, outcome='closed')
+        self._seed(_mission('m-1', spawned=ref))
+        self._with_evidence({'status': 'resolved', 'approval_id': 'old-001',
+                             'created_at': '2026-07-09T20:10:00+00:00'})
+        r = self.client.post(_endpoint('m-1'), headers=AUTH, json={})
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertTrue(r.json()['dispatched'])
+        self.assertEqual(len(self.inbox.calls), 1)
+
+    def test_force_redelegates_and_refreshes_stamp(self):
+        self._seed(_mission('m-1', spawned=dict(self._STANDING_REF)))
+        self._with_evidence({'status': 'open', 'approval_id': 'scoped-task-001',
+                             'created_at': '2026-07-09T20:10:00+00:00'})
         r = self.client.post(_endpoint('m-1'), headers=AUTH,
                              json={'force': True})
         self.assertEqual(r.status_code, 200, r.text)
         self.assertTrue(r.json()['dispatched'])
         self.assertNotIn('already_delegated', r.json())
         self.assertEqual(len(self.inbox.calls), 1)  # fresh proposal written
+        # delegated_at now reports the FORCED dispatch, not the first click.
+        self.assertNotEqual(self._mission_row('m-1')['spawned']['stamped_at'],
+                            self._STANDING_REF['stamped_at'])
 
-    def test_foreign_spawned_kind_does_not_short_circuit(self):
+    def test_foreign_spawned_kind_is_preserved(self):
         # A mission whose spawned ref is some other kind (e.g. a future
-        # 'project' ref) still delegates normally.
+        # 'project' ref) still delegates — but its ref is NEVER clobbered
+        # (that would destroy the other work's join key).
         self._seed(_mission('m-1', spawned={
             'kind': 'project', 'task_id': 'proj-1'}))
         r = self.client.post(_endpoint('m-1'), headers=AUTH, json={})
         self.assertEqual(r.status_code, 200, r.text)
         self.assertEqual(len(self.inbox.calls), 1)
+        self.assertEqual(self._mission_row('m-1')['spawned'],
+                         {'kind': 'project', 'task_id': 'proj-1'})
 
 
 if __name__ == '__main__':

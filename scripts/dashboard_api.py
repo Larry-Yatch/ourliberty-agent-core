@@ -7048,16 +7048,46 @@ def _handle_approval_message(
 _DELEGATE_DEFAULT_ACTION = 'delegate'
 
 
+def _spawned_delegate_ref_matches(existing: Any, task_id: str) -> bool:
+    """The ONE definition of delegate-spawned identity (kind + task_id),
+    shared by the stamp helpers' idempotency checks and both handlers'
+    short-circuit guards so the four sites can never drift."""
+    return (isinstance(existing, dict)
+            and existing.get('kind') == 'delegate'
+            and existing.get('task_id') == task_id)
+
+
+def _apply_spawned_stamp(
+    item: dict[str, Any], spawned: dict[str, Any], *, overwrite: bool,
+) -> bool:
+    """Shared stamp discipline for both registries. Returns True iff the item
+    was mutated (caller writes the file). Rules:
+      - same delegate identity + not overwrite → idempotent no-op (a deduped
+        re-POST never churns `stamped_at`);
+      - same identity + overwrite → replace the ref (a REAL re-dispatch
+        refreshes `stamped_at` and clears any GC-stamped outcome/failure
+        fields from the prior run — `delegated_at` stays honest);
+      - a DIFFERENT-kind existing ref (e.g. a future 'project' ref) is NEVER
+        clobbered — that would destroy the other work's join key, the exact
+        vanishing-card class this project exists to stop."""
+    existing = item.get('spawned')
+    if isinstance(existing, dict) and existing.get('kind') not in (None, spawned.get('kind')):
+        return False
+    if _spawned_delegate_ref_matches(existing, spawned.get('task_id')) and not overwrite:
+        return False
+    item['spawned'] = spawned
+    return True
+
+
 def _stamp_spawned_on_capture(
     captures_path: Path, capture_id: str, spawned: dict[str, Any],
+    *, overwrite: bool = False,
 ) -> None:
     """Phase S (S1): stamp the `spawned` ref onto a capture under the shared
     capture-ingest lock — the SAME single committer / writer path (_read +
     _atomic_write_captures) the ingest, snooze, drop, and promote flows use, so
     captures.json keeps exactly one writer. The capture's `state` is untouched
-    (a delegated card stays parked). Idempotent: a re-stamp with the same
-    spawned identity (task_id + kind) is a no-op — no rewrite — so a deduped
-    re-POST never thrashes the file or churns `stamped_at`."""
+    (a delegated card stays parked). Stamp semantics: `_apply_spawned_stamp`."""
     with _CAPTURE_INGEST_LOCK:
         registry = _read_captures_registry(captures_path)
         cap = next(
@@ -7067,36 +7097,32 @@ def _stamp_spawned_on_capture(
         )
         if cap is None:
             return
-        existing = cap.get('spawned')
-        if (isinstance(existing, dict)
-                and existing.get('task_id') == spawned.get('task_id')
-                and existing.get('kind') == spawned.get('kind')):
+        if not _apply_spawned_stamp(cap, spawned, overwrite=overwrite):
             return
-        cap['spawned'] = spawned
         registry['schema_version'] = CAPTURES_SCHEMA_VERSION
         _atomic_write_captures(captures_path, registry)
 
 
-# Serializes the dashboard's read-modify-write of missions.json within the
-# single uvicorn process (mirror of _CAPTURE_INGEST_LOCK for the mission
-# registry). Cross-process safety is the GC healer's fresh-reread + per-item
-# field-delta merge, which explicitly anticipates a concurrent dashboard write.
-_MISSION_STAMP_LOCK = __import__('threading').Lock()
-
-
 def _stamp_spawned_on_mission(
     missions_path: Path, mission_id: str, spawned: dict[str, Any],
+    *, overwrite: bool = False,
 ) -> None:
     """Mission twin of `_stamp_spawned_on_capture`: stamp the `spawned` ref (the
     join key back to the work a Delegate click created — `delegate-<mission_id>`)
     onto the mission entry. The mission's `phase` is untouched (a delegated
     mission stays proposed — the stamp is additive, not a state transition).
+    Serialized under `_NEW_MISSION_LOCK` — the SAME in-process lock every other
+    local missions.json writer takes (confirm_shipped, the queue drain), so two
+    dashboard threads can never lose each other's write.
     Local-write + healer-commit, the same durability model as captures:
     heal_missions_card_gc version-controls the delta on its next tick, and its
     pre-write lost-update guard merges only its OWN field deltas onto a fresh
-    re-read, so this stamp survives a concurrent GC sweep. Idempotent: a
-    re-stamp with the same spawned identity (task_id + kind) is a no-op."""
-    with _MISSION_STAMP_LOCK:
+    re-read, so this stamp survives a concurrent GC sweep. KNOWN residual
+    hazard (pre-existing, tracked as a follow-up): heal_orphan_autoregister
+    whole-file-writes missions.json from a snapshot it can hold across gh
+    round-trips, which can drop any concurrent delta — this stamp included.
+    Stamp semantics: `_apply_spawned_stamp`."""
+    with _NEW_MISSION_LOCK:
         registry = _read_missions_registry(missions_path)
         mission = next(
             (m for m in registry.get('missions') or []
@@ -7105,30 +7131,72 @@ def _stamp_spawned_on_mission(
         )
         if mission is None:
             return
-        existing = mission.get('spawned')
-        if (isinstance(existing, dict)
-                and existing.get('task_id') == spawned.get('task_id')
-                and existing.get('kind') == spawned.get('kind')):
+        if not _apply_spawned_stamp(mission, spawned, overwrite=overwrite):
             return
-        mission['spawned'] = spawned
         _atomic_write_json(missions_path, registry)
 
 
-def _already_delegated_response(spawned: dict[str, Any], task_id: str) -> dict[str, Any]:
-    """Durable-idempotency short-circuit shared by both Delegate handlers: the
-    card already carries a delegate `spawned` ref, so its proposal was written
-    (and, since it is no longer in the live inbox, consumed — Beacon ran).
-    Re-dispatching would burn a fresh LLM run re-answering a question the team
-    already took; instead return what is known of the standing delegation.
-    `approval_id` joins the still-OPEN pending approval when one exists (the
-    same `origin_task_id` join the delegation_needs_you chip uses)."""
-    hit = _open_delegate_approvals([task_id]).get(task_id) or {}
+def _delegation_outcome_evidence(
+    task_id: str, agents_root: Optional[Path] = None,
+) -> Optional[dict[str, Any]]:
+    """Did a prior delegation of this card leave a DURABLE trace? Scans the
+    pending-approvals store (the same origin_task_id join #913 established) for:
+      - a still-OPEN pending entry → {'status': 'open', ...} (parked on Larry);
+      - an APPROVED history entry → {'status': 'resolved', ...} (work was
+        dispatched — the build trail is the 2b read side's job).
+    A REJECTED history entry is NOT evidence (policy said no; a re-click means
+    retry). None → the prior run concluded with no durable outcome (the
+    2026-07-11 prose-verdict class) OR the store is unreadable — both fall open
+    to re-delegate, matching pre-fix behavior and the no-outcome alert's advice."""
+    root = agents_root or _agents_root()
+    try:
+        data = json.loads(_beacon_pending_approvals_path(root).read_text())
+    except (OSError, json.JSONDecodeError, ValueError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    for entry in (data.get('pending') or []):
+        if (isinstance(entry, dict)
+                and entry.get('origin_task_id') == task_id
+                and entry.get('status') == 'pending'):
+            return {'status': 'open', 'approval_id': entry.get('id'),
+                    'created_at': entry.get('created_at')}
+    for entry in reversed(data.get('history') or []):
+        if (isinstance(entry, dict)
+                and entry.get('origin_task_id') == task_id
+                and entry.get('status') == 'approved'):
+            return {'status': 'resolved', 'approval_id': entry.get('id'),
+                    'created_at': entry.get('created_at')}
+    return None
+
+
+def _already_delegated_short_circuit(
+    existing_spawned: Any, task_id: str, *, force: bool,
+) -> Optional[dict[str, Any]]:
+    """Durable-idempotency guard shared by both Delegate handlers. Short-circuit
+    ONLY when re-dispatching would waste a paid Beacon run on a question the
+    team demonstrably took: the card carries the standing delegate ref, the
+    prior run left durable outcome evidence (open or approved approval), and
+    the spawned work hasn't been flagged failed/closed by the GC (a re-click on
+    a failed delegation is a RETRY and must go through). `force=True` always
+    goes through. Returns the short-circuit response dict, or None to proceed
+    with a fresh dispatch. `dispatched` is honestly False here — nothing new
+    was handed to the team; `already_delegated`/`delegated_at`/`approval_id`
+    carry what is known of the standing delegation."""
+    if force:
+        return None
+    if not _spawned_delegate_ref_matches(existing_spawned, task_id):
+        return None
+    if existing_spawned.get('outcome') or existing_spawned.get('failure_signaled'):
+        return None
+    evidence = _delegation_outcome_evidence(task_id)
+    if evidence is None:
+        return None
     return {
-        'dispatched': True,
-        'deduped': True,
+        'dispatched': False,
         'already_delegated': True,
-        'delegated_at': spawned.get('stamped_at'),
-        'approval_id': hit.get('approval_id'),
+        'delegated_at': existing_spawned.get('stamped_at'),
+        'approval_id': evidence.get('approval_id'),
     }
 
 
@@ -7196,12 +7264,10 @@ def _handle_capture_delegate(
         _stamp_spawned_on_capture(captures_path, capture_id, spawned_ref)
         return {'dispatched': True, 'deduped': True}
 
-    existing_spawned = cap.get('spawned')
-    if (not force
-            and isinstance(existing_spawned, dict)
-            and existing_spawned.get('kind') == 'delegate'
-            and existing_spawned.get('task_id') == task_id):
-        return _already_delegated_response(existing_spawned, task_id)
+    short_circuit = _already_delegated_short_circuit(
+        cap.get('spawned'), task_id, force=force)
+    if short_circuit is not None:
+        return short_circuit
 
     title = cap.get('title') or capture_id
     meaning = _meaning_layer_fields(cap)
@@ -7246,8 +7312,11 @@ def _handle_capture_delegate(
     )
     # Phase S (S1): stamp the spawned ref AFTER the proposal exists, so a crash
     # before the proposal write leaves no dangling link — and the capture stays
-    # parked (the stamp is additive, not a state transition).
-    _stamp_spawned_on_capture(captures_path, capture_id, spawned_ref)
+    # parked (the stamp is additive, not a state transition). overwrite=True:
+    # every REAL dispatch refreshes stamped_at (a force re-delegation must not
+    # keep reporting the first click's timestamp as delegated_at).
+    _stamp_spawned_on_capture(captures_path, capture_id, spawned_ref,
+                              overwrite=True)
     return {'dispatched': True}
 
 
@@ -7802,12 +7871,10 @@ def _handle_mission_delegate(
         _stamp_spawned_on_mission(missions_path, mission_id, spawned_ref)
         return {'dispatched': True, 'deduped': True}
 
-    existing_spawned = mission.get('spawned')
-    if (not force
-            and isinstance(existing_spawned, dict)
-            and existing_spawned.get('kind') == 'delegate'
-            and existing_spawned.get('task_id') == task_id):
-        return _already_delegated_response(existing_spawned, task_id)
+    short_circuit = _already_delegated_short_circuit(
+        mission.get('spawned'), task_id, force=force)
+    if short_circuit is not None:
+        return short_circuit
 
     name = mission.get('name') or mission_id
     brief = mission.get('brief') or ''
@@ -7844,7 +7911,9 @@ def _handle_mission_delegate(
     )
     # Stamp AFTER the proposal exists, so a crash before the proposal write
     # leaves no dangling link (same ordering as the capture handler).
-    _stamp_spawned_on_mission(missions_path, mission_id, spawned_ref)
+    # overwrite=True: every REAL dispatch refreshes stamped_at.
+    _stamp_spawned_on_mission(missions_path, mission_id, spawned_ref,
+                              overwrite=True)
     return {'dispatched': True}
 
 
