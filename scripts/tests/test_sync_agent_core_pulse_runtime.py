@@ -540,6 +540,119 @@ class CapturesJsonToleratedTest(_SyncResilienceBase):
         self.assertIn('sync-blocked:auto-commit-push-failed', subjects)
 
 
+class PushFailPersistenceGateTest(_SyncResilienceBase):
+    """The auto-commit-push failure is a benign self-healing race: the rollback
+    restores a pushable tree and the next ~5min tick retries. Alerting Larry on
+    every such tick was double-noise. Sync now counts CONSECUTIVE rolled-back
+    push failures in agent-core-sync.json and DMs (via notify_larry.py) exactly
+    once — on the tick the count crosses PUSH_FAIL_ALERT_THRESHOLD. Below
+    threshold: digest only, zero DMs; a successful tick resets the counter."""
+
+    def _reject_pushes(self) -> None:
+        hooks_dir = self.origin / 'hooks'
+        hooks_dir.mkdir(exist_ok=True)
+        hook = hooks_dir / 'pre-receive'
+        hook.write_text('#!/bin/sh\necho rejected by test hook >&2\nexit 1\n')
+        os.chmod(hook, 0o755)
+
+    def _accept_pushes(self) -> None:
+        hook = self.origin / 'hooks' / 'pre-receive'
+        if hook.exists():
+            hook.unlink()
+
+    def _install_notify_stub(self) -> Path:
+        """Drop a notify_larry.py stub that records each invocation. The real
+        alert_larry() no-ops when notify_larry.py is absent, so without this the
+        threshold DM is unobservable."""
+        record = self.tmp_path / 'notify_calls.log'
+        stub = self.scripts_dir / 'notify_larry.py'
+        stub.write_text(
+            '#!/usr/bin/env python3\n'
+            'import sys\n'
+            f'open({str(record)!r}, "a").write(" ".join(sys.argv[1:]) + "\\n")\n'
+        )
+        os.chmod(stub, 0o755)
+        return record
+
+    def _notify_call_count(self, record: Path) -> int:
+        if not record.exists():
+            return 0
+        return len([l for l in record.read_text().splitlines() if l.strip()])
+
+    def _sync_status(self) -> dict:
+        status_file = (
+            self.live_root / 'blackboard' / 'agent-core-sync.json'
+        )
+        return json.loads(status_file.read_text())
+
+    def _dirty_pulse(self, text: str) -> None:
+        (self.repo_dir / 'runbooks' / 'cycle-journal.md').write_text(text)
+
+    def test_single_failure_is_silent_digest_only_counter_one(self):
+        record = self._install_notify_stub()
+        self._reject_pushes()
+        self._dirty_pulse('seed journal\ntick 1 dirt\n')
+
+        result = self._run_sync()
+        self.assertNotEqual(result.returncode, 0)
+        # Counter incremented to 1, status errored.
+        status = self._sync_status()
+        self.assertEqual(status['status'], 'error')
+        self.assertEqual(status['consecutive_push_failures'], 1)
+        # The low-noise digest audit trail fired...
+        alerts = self._read_alerts()
+        subjects = [a['subject'] for a in alerts]
+        self.assertIn('sync-blocked:auto-commit-push-failed', subjects)
+        digest = [a for a in alerts
+                  if a['subject'] == 'sync-blocked:auto-commit-push-failed']
+        self.assertTrue(all(a.get('route') == 'digest' for a in digest))
+        # ...but Larry got ZERO DMs (below threshold).
+        self.assertEqual(self._notify_call_count(record), 0)
+
+    def test_successful_tick_resets_counter(self):
+        self._install_notify_stub()
+        self._reject_pushes()
+        self._dirty_pulse('seed journal\ntick 1 dirt\n')
+        first = self._run_sync()
+        self.assertNotEqual(first.returncode, 0)
+        self.assertEqual(self._sync_status()['consecutive_push_failures'], 1)
+
+        # Next tick: pushes accepted, tree clean → no-change/success sync resets.
+        self._accept_pushes()
+        self._dirty_pulse('seed journal\n')  # revert to committed content
+        second = self._run_sync()
+        self.assertEqual(second.returncode, 0, second.stderr)
+        self.assertEqual(self._sync_status()['consecutive_push_failures'], 0)
+
+    def test_threshold_reached_fires_exactly_one_dm(self):
+        record = self._install_notify_stub()
+        self._reject_pushes()
+        # Dirty once; the --mixed rollback keeps the worktree dirt, so each
+        # subsequent tick re-attempts the auto-commit + push and fails again.
+        self._dirty_pulse('seed journal\npersistent dirt\n')
+
+        # Ticks 1 and 2: below threshold (3) → silent.
+        for expected in (1, 2):
+            r = self._run_sync()
+            self.assertNotEqual(r.returncode, 0)
+            self.assertEqual(
+                self._sync_status()['consecutive_push_failures'], expected,
+            )
+            self.assertEqual(self._notify_call_count(record), 0)
+
+        # Tick 3: crosses the threshold → exactly ONE DM.
+        r3 = self._run_sync()
+        self.assertNotEqual(r3.returncode, 0)
+        self.assertEqual(self._sync_status()['consecutive_push_failures'], 3)
+        self.assertEqual(self._notify_call_count(record), 1)
+
+        # Tick 4: still failing but past the edge → no further DM (exactly one).
+        r4 = self._run_sync()
+        self.assertNotEqual(r4.returncode, 0)
+        self.assertEqual(self._sync_status()['consecutive_push_failures'], 4)
+        self.assertEqual(self._notify_call_count(record), 1)
+
+
 class MissionsJsonToleratedTest(_SyncResilienceBase):
     """agents/beacon/missions.json is healer-owned: heal_missions_card_gc.py is
     its SOLE committer (Contract D — it commits ANY pending missions.json delta
