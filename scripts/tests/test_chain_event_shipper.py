@@ -901,6 +901,11 @@ class TestKnownEventTypesContract(unittest.TestCase):
             # in the foundations slice before the runner ships so emit_event admits
             # it and the visibility surface can't silently drop.
             'spec_review_round',
+            # added by spec-gauntlet §3.5 silent-failure gauge — push-emitted by
+            # scripts/spec_review_silent_failure_gauge.py when the trailing run of
+            # errored/incomplete gauntlets crosses MIN_STREAK; info-only surface
+            # (no DM) that makes a persistently fail-open gate visible.
+            'spec_review_silent_failure',
         }
         self.assertEqual(ces.KNOWN_EVENT_TYPES, frozenset(spec_listed))
 

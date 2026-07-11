@@ -1,0 +1,12 @@
+[Unit]
+Description=Run spec_review_silent_failure_gauge hourly (surface a silently-stuck spec gauntlet gate)
+
+[Timer]
+OnBootSec=20min
+OnUnitActiveSec=1h
+RandomizedDelaySec=180
+Unit=ourliberty-spec-review-silent-failure-gauge.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target
