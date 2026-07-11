@@ -1381,14 +1381,111 @@ def tier_pool_status(now=None):
     }
 
 
+# ---- thin CLI (the bash wrappers' bridge into the pool) --------------------
+# run_cycle.sh / run_medic.sh are the two direct-`claude` spawns that live in
+# bash rather than python, so they consume the pool through these verbs
+# instead of calling select_durable_claude_env in-process. Logic lives in the
+# cli_* functions (unit-testable); __main__ only routes argv.
+
+# The only env keys select_durable_claude_env may set for a spawn: the OAuth
+# token on the setup-token path, plus HOME and the I10/I11 agents-root/gh/git
+# pins on the token-less credentials.json fallback. The CLI emits ONLY these
+# (as a delta vs the caller's env) so a wrapper can whitelist-export them
+# inside the claude subshell without ever touching its own shell's HOME.
+_CLI_ENV_KEYS = ('CLAUDE_CODE_OAUTH_TOKEN', 'HOME', 'OURLIBERTY_AGENTS_ROOT',
+                 'GH_CONFIG_DIR', 'GIT_CONFIG_GLOBAL')
+
+
+def cli_select_dispatch_env(base_env=None, now=None):
+    """``select-dispatch-env`` verb: pick a per-run tier for one wrapper
+    dispatch. Returns ``(exit_code, stdout_text)``.
+
+    stdout protocol (line-oriented, parsed by run_cycle.sh / run_medic.sh):
+      TIER=<tier>
+      KEY=VALUE     # only _CLI_ENV_KEYS entries that DIFFER from the base env
+                    # (normally just the tier's setup-token; HOME + pins only
+                    # on the token-less credentials.json fallback)
+
+    Exit 3 + empty stdout when no tier is dispatchable OR selection degraded
+    (select_durable_claude_env never raises) — the wrappers then fall back to
+    the legacy active-setup-token path so the heartbeat never dies with the
+    pool machinery. The token is printed for shell capture ONLY; callers must
+    never log the output verbatim."""
+    base = dict(base_env) if base_env is not None else os.environ.copy()
+    env_out, tier = select_durable_claude_env(env=base, now=now)
+    if tier is None:
+        return 3, ''
+    lines = ['TIER=%s' % tier]
+    for key in _CLI_ENV_KEYS:
+        val = env_out.get(key)
+        if val and val != base.get(key):
+            lines.append('%s=%s' % (key, val))
+    return 0, '\n'.join(lines) + '\n'
+
+
+def cli_report_dispatch_failure(tier, agent, output_path, now=None):
+    """``report-dispatch-failure`` verb: classify a failed wrapper ``claude``
+    run's captured output and, on a rate-limit / auth-401 wall, bench the
+    tier (set_cooldown) and append the quota-events ledger row — the same
+    reactive benching every python wiring point does (spec §6/V16), so a
+    pool-dispatched cycle/medic run can't keep round-robining onto a walled
+    tier and the calibration job keeps learning from wrapper walls.
+
+    Returns ``(exit_code, stdout_text)``; stdout is the failure class ('' when
+    the output matches no known wall shape — the wrapper just logs it).
+    Best-effort by contract: an unreadable output file or any internal error
+    returns (0, '') — reporting must never turn a failed cycle into a crashed
+    wrapper. Exit 2 = caller bug (unknown tier)."""
+    if tier not in _VALID_TIERS:
+        return 2, ''
+    try:
+        text = Path(output_path).read_text(errors='replace')
+    except OSError:
+        return 0, ''
+    try:
+        # Deferred import: agent_runner imports this module; by CLI-time both
+        # load cleanly and the classifier/ledger stay single-sourced there.
+        import agent_runner
+        cls = agent_runner.classify_tier1_failure(text, '')
+        if cls in ('rate_limit', 'auth_401'):
+            match = agent_runner.RATE_LIMIT_RE.search(text)
+            excerpt = (text[max(0, match.start() - 100):match.start() + 300]
+                       if match else text[:300])
+            set_cooldown(tier, raw_excerpt=excerpt, now=now, kind=cls)
+            ref = now or datetime.now(timezone.utc)
+            if ref.tzinfo is None:
+                ref = ref.replace(tzinfo=timezone.utc)
+            parsed = parse_reset_time(excerpt, now=ref)
+            retry_after = (max(0, int((parsed - ref).total_seconds()))
+                           if parsed else None)
+            agent_runner.append_rate_limit_event(
+                agent=agent, task_id='%s-wrapper' % agent, model='',
+                account=tier, stderr=excerpt, retry_after_sec=retry_after,
+                failure_class=cls)
+        return 0, (cls or '')
+    except Exception:  # noqa: BLE001 — never crash the calling wrapper
+        return 0, ''
+
+
 if __name__ == '__main__':  # pragma: no cover
-    # Thin single-purpose CLI so run_cycle.sh can resolve the active tier's
-    # setup-token without re-implementing the precedence rules. The token goes
-    # to stdout for capture only — empty when unconfigured (caller falls back to
-    # the credentials.json path). NEVER log the printed value.
+    # Thin CLI for the bash wrappers. Tokens go to stdout for capture only —
+    # NEVER log the printed values.
     import sys
     if len(sys.argv) == 2 and sys.argv[1] == 'active-setup-token':
         sys.stdout.write(active_setup_token() or '')
+    elif len(sys.argv) == 2 and sys.argv[1] == 'select-dispatch-env':
+        _code, _out = cli_select_dispatch_env()
+        sys.stdout.write(_out)
+        sys.exit(_code)
+    elif len(sys.argv) == 5 and sys.argv[1] == 'report-dispatch-failure':
+        _code, _out = cli_report_dispatch_failure(
+            sys.argv[2], sys.argv[3], sys.argv[4])
+        sys.stdout.write(_out)
+        sys.exit(_code)
     else:
-        sys.stderr.write('usage: active_tier.py active-setup-token\n')
+        sys.stderr.write(
+            'usage: active_tier.py active-setup-token\n'
+            '       active_tier.py select-dispatch-env\n'
+            '       active_tier.py report-dispatch-failure'
+            ' <tier> <agent> <output-file>\n')
         sys.exit(2)

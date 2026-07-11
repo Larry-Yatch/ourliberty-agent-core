@@ -140,33 +140,63 @@ cd "$PULSE_DIR"
 CYCLE_OUT="${LOG_DIR}/cycle.last-output.json"
 CYCLE_OK=0
 
-# --- auth: follow the team's active account tier ---------------------------
-# Authenticate /cycle against the active tier's durable setup-token — the SAME
-# source agent_runner uses for a dispatch — rather than HOME's auto-refreshing
-# ~/.claude/.credentials.json, which rots silently on an OAuth refresh failure
-# and then 401s every iteration (the recurring false "Tier N down"). active_tier
-# reads blackboard/active-tier.json, so a dashboard tier switch or an automatic
-# rotation moves the heartbeat with the team. HOME deliberately stays put: the
-# cycle operates against /home/larry/.claude (project trust, settings, MCP) — so
-# only the auth token follows the tier. Empty token => keep prior behavior.
-# Exported (never passed as an arg) so the token cannot leak into `ps`; NEVER
-# logged. Best-effort: a lookup failure leaves the token empty and the cycle
-# simply falls back to the pre-existing credentials.json path. The active tier
-# itself is already recorded per-iteration in the cost ledger below
-# (ACCOUNT_TIER), so we don't re-resolve it here just to name it in a log line.
-CYCLE_OAUTH_TOKEN="$(timeout 10 python3 "${HOME}/agent-core/scripts/active_tier.py" active-setup-token 2>>"$LOG_FILE" || true)"
-if [ -n "$CYCLE_OAUTH_TOKEN" ]; then
-    export CLAUDE_CODE_OAUTH_TOKEN="$CYCLE_OAUTH_TOKEN"
-    log "auth: /cycle authenticating via active-tier setup_token"
+# --- auth: per-run tier from the dispatch pool ------------------------------
+# Each /cycle run is a fresh short task, so it dispatches through the same
+# {tier1,tier3} round-robin pool as every other wiring point (spec §4) instead
+# of riding the single active tier — pre-pool the cycle burned the large
+# majority of tier1's budget while tier3 idled. select-dispatch-env honors the
+# operator pin (rotation.disabled), cooldowns, and the proactive budget caps,
+# and prints TIER=<tier> plus the env delta for the spawn (normally just the
+# tier's setup-token; HOME + agents-root/gh/git pins only on the token-less
+# credentials.json fallback). The delta is exported INSIDE the claude subshell
+# below — never in this shell — so a HOME swap can't repoint this script's own
+# ${HOME} paths (the #755 class), and the token never appears in argv/`ps` and
+# is NEVER logged.
+# Fail-safe: on ANY selection failure (missing/erroring CLI, no usable tier)
+# fall back to the legacy active-setup-token path — the self-healing heartbeat
+# must never die with the pool machinery it heals. Empty token there => keep
+# the original credentials.json behavior.
+DISPATCH_ENV_LINES="$(timeout 15 python3 "${HOME}/agent-core/scripts/active_tier.py" select-dispatch-env 2>>"$LOG_FILE" || true)"
+DISPATCH_TIER="$(printf '%s' "$DISPATCH_ENV_LINES" | sed -n '1s/^TIER=//p')"
+if [ -n "$DISPATCH_TIER" ]; then
+    log "auth: /cycle dispatching on pool-selected ${DISPATCH_TIER}"
 else
-    log "auth: /cycle falling back to credentials.json (no active-tier setup-token)"
+    DISPATCH_ENV_LINES=""
+    CYCLE_OAUTH_TOKEN="$(timeout 10 python3 "${HOME}/agent-core/scripts/active_tier.py" active-setup-token 2>>"$LOG_FILE" || true)"
+    if [ -n "$CYCLE_OAUTH_TOKEN" ]; then
+        DISPATCH_ENV_LINES="CLAUDE_CODE_OAUTH_TOKEN=${CYCLE_OAUTH_TOKEN}"
+        log "auth: /cycle authenticating via active-tier setup_token (pool selection unavailable)"
+    else
+        log "auth: /cycle falling back to credentials.json (no active-tier setup-token)"
+    fi
 fi
 
-if claude --print --model claude-sonnet-4-6 --output-format json "Run /cycle now per the spec in ../../runbooks/cycle-prompt.md. Report findings, take auto-fix actions, write the journal entry, send any escalations." > "$CYCLE_OUT" 2>&1; then
+if (
+    # Whitelist-export the selected tier's env delta for the claude child
+    # only (see the auth block above); the subshell keeps it out of this
+    # script's environment and out of `ps`.
+    while IFS= read -r kv; do
+        case "$kv" in
+            CLAUDE_CODE_OAUTH_TOKEN=*|HOME=*|OURLIBERTY_AGENTS_ROOT=*|GH_CONFIG_DIR=*|GIT_CONFIG_GLOBAL=*)
+                export "$kv" ;;
+        esac
+    done <<< "$DISPATCH_ENV_LINES"
+    exec claude --print --model claude-sonnet-4-6 --output-format json "Run /cycle now per the spec in ../../runbooks/cycle-prompt.md. Report findings, take auto-fix actions, write the journal entry, send any escalations." > "$CYCLE_OUT" 2>&1
+); then
     log "/cycle iteration completed successfully"
     CYCLE_OK=1
 else
     log "/cycle iteration failed (non-zero exit); see $CYCLE_OUT"
+    # Reactive benching (spec §6): when the pool dispatched this run and the
+    # failure is a rate-limit / auth-401 wall, bench the tier so the next
+    # fire round-robins onto a healthy one (and the calibration job learns
+    # from wrapper walls too). Best-effort; '' = not a wall shape.
+    if [ -n "$DISPATCH_TIER" ]; then
+        FAIL_CLASS="$(timeout 10 python3 "${HOME}/agent-core/scripts/active_tier.py" report-dispatch-failure "$DISPATCH_TIER" pulse "$CYCLE_OUT" 2>>"$LOG_FILE" || true)"
+        if [ -n "$FAIL_CLASS" ]; then
+            log "tier-pool: classified failure as ${FAIL_CLASS}; benched ${DISPATCH_TIER}"
+        fi
+    fi
 fi
 
 # --- cost capture (D2) ---
@@ -175,13 +205,17 @@ fi
 COSTS_FILE="${HOME}/agents/blackboard/costs.jsonl"
 mkdir -p "$(dirname "$COSTS_FILE")"
 if command -v jq >/dev/null 2>&1 && [ -s "$CYCLE_OUT" ]; then
-    # Step C: per-account field. Read active tier from blackboard/active-tier.json
-    # so a future rotation flip is reflected here too. Fall back to tier1 (the
-    # historical default) when the file is missing or malformed.
-    ACTIVE_TIER_FILE="${HOME}/agents/blackboard/active-tier.json"
-    ACCOUNT_TIER="$(jq -r '.tier // "tier1"' "$ACTIVE_TIER_FILE" 2>/dev/null || echo tier1)"
-    if [ -z "$ACCOUNT_TIER" ] || [ "$ACCOUNT_TIER" = "null" ]; then
-        ACCOUNT_TIER="tier1"
+    # Step C: per-account field — the pool-selected tier when the pool
+    # dispatched this run (so burn is attributed to the account that actually
+    # ran, feeding rolling_5h_token_volume/near_cap). On the legacy fallback
+    # path, read active-tier.json as before; tier1 when missing/malformed.
+    ACCOUNT_TIER="$DISPATCH_TIER"
+    if [ -z "$ACCOUNT_TIER" ]; then
+        ACTIVE_TIER_FILE="${HOME}/agents/blackboard/active-tier.json"
+        ACCOUNT_TIER="$(jq -r '.tier // "tier1"' "$ACTIVE_TIER_FILE" 2>/dev/null || echo tier1)"
+        if [ -z "$ACCOUNT_TIER" ] || [ "$ACCOUNT_TIER" = "null" ]; then
+            ACCOUNT_TIER="tier1"
+        fi
     fi
     if COST_LINE=$(jq -c --arg ts "$(date -u +%Y-%m-%dT%H:%M:%S%z)" --argjson ok "$CYCLE_OK" --arg acct "$ACCOUNT_TIER" '
         {
