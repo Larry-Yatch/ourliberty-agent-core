@@ -101,17 +101,36 @@ flagged unrouted but never auto-routed, because this backstop was agent-core-onl
 Per-PR task_id for the opt-in path is repo-qualified (`pr-<repo>-<number>`) so a
 PR #N present in both repos can't collide onto one review-request dedup key.
 
-Known scope limits (deliberate):
-  - task_id is recovered from the head branch by stripping `forge/`, which is
-    exact only when the branch round-trips the task_id. Forge build task_ids are
-    kebab-case in practice (e.g. `harden-test-prod-write-isolation-001`), for
-    which `forge/<task_id>` is loss-free. The dispatch validator DOES allow
-    task_ids with `: @ #`/spaces (e.g. Medic-domain ids), and the worktree
-    branch sanitizer collapses those to `-` while the inbox name preserves them
-    — so a Forge build PR carrying such an id would derive a slightly-off
-    task_id here. The dispatched review still targets the correct PR URL (Mirror
-    reviews the right PR); only task_id-keyed dedup/correlation degrades, and
-    the dispatch's own filename idempotency still prevents a same-key duplicate.
+CANONICAL task_id RECOVERY (G-rule forge-marker-task-id-mismatch-xii, 2026-07-11):
+
+  A Forge PR's head branch does NOT always round-trip the envelope task_id.
+  Three observed shapes defeated the naive `forge/`-strip:
+    1. stripped prefix — branch `xii-v1` vs canonical `pulse-check-xii-v1`;
+    2. hash-suffixed rename — branch
+       `cap-build-flip-readiness-gauge-5-completeness-gate-m-a453` vs canonical
+       `flip-readiness-gauge-spec-001` (no string relationship at all);
+    3. truncated suffix — branch
+       `forge/heal-orphaned-mirror-claim-reinject-not-concluded-` vs canonical
+       `heal-orphaned-mirror-claim-reinject-not-concluded-001` (PR #928).
+  For shape 3 the naive strip yields a truncated id, so the dedup check misses
+  the canonical `review-…-001.json` the inline path already dispatched, and this
+  backstop dispatches a SECOND, wrongly-keyed review — a duplicate file in
+  Mirror's inbox, a $0.00 cost row under the wrong id, and a wasted review
+  concurrency slot. `task_resolution.pr_matches_task` matches only by string, so
+  it covers shape 3 but NOT the prefix/rename shapes.
+
+  The authoritative, shape-independent signal is the Forge build outbox itself:
+  it records BOTH the canonical task_id AND a `PR opened: <url>` line. So for a
+  `forge/*` PR, `canonical_task_id_for_pr` scans the recent Forge build-outbox
+  archive and, on a PR-URL match, returns the canonical task_id — recovering the
+  correct dedup key no matter how the branch was mangled. Resolution runs BEFORE
+  the dedup check so the existing canonical review is found and no duplicate is
+  dispatched. When NO archive names the PR (the reaped-outbox #412 shape) the
+  resolver falls back to the naive strip — there this backstop is the SOLE
+  dispatcher, so a duplicate is impossible. The review envelope's `branch` field
+  stays the real head branch (Mirror checks out the actual branch); only the
+  task_id is remapped. Opt-in `pr-<repo>-<number>` keying (claude/*,
+  auto-review) is already unambiguous and is left untouched.
 
 The dispatch-FAILED escalation is Python-emitted, so it has a registered entry in
 config/alert-translations.json under source `heal-undispatched-pr-review` (subject
@@ -613,6 +632,114 @@ def task_id_for_branch(head_ref: str, pr_number: Optional[int] = None,
     return head_ref
 
 
+def _normalize_pr_url(url: Optional[str]) -> str:
+    """Canonical form for PR-URL equality: trim whitespace + trailing slash and
+    lowercase. gh and the outbox `PR opened:` line both emit the same
+    `https://github.com/<owner>/<repo>/pull/<N>` shape; lowercasing tolerates any
+    incidental host/owner-case difference. Empty/None → ''."""
+    return (url or '').strip().rstrip('/').lower()
+
+
+def canonical_task_id_for_pr(
+    pr_url: str,
+    fallback_task_id: str,
+    now: Optional[datetime] = None,
+) -> str:
+    """Recover the CANONICAL task_id Forge's build outbox recorded for `pr_url`,
+    or `fallback_task_id` when no recent Forge build outbox names this PR.
+
+    A Forge PR's head branch does not always round-trip the task_id (stripped
+    prefix / hash-suffixed rename / truncated suffix — see the module docstring),
+    so the naive `forge/`-strip fallback can key the review under a WRONG id and
+    dispatch a duplicate. The build outbox, by contrast, carries BOTH the
+    canonical task_id AND a `PR opened: <url>` line, so a PR-URL match recovers
+    the right id regardless of branch shape.
+
+    Scans `<AGENTS_ROOT>/outboxes/forge/.archive/*.json`, bounded to
+    `outbox_notifier.RECONCILE_WINDOW_HOURS` (the SAME window the notifier's
+    reconcile sweep uses — single source of truth, no drift), and for each Forge
+    build outbox (agent==forge, phase==build) compares its extracted PR URL
+    (`outbox_notifier._extract_pr_url_from_build_result`, normalized) to `pr_url`.
+    First match wins.
+
+    Fail-open, per the healer's never-crash-the-tick contract: an unimportable
+    notifier, an unreadable archive dir, or a malformed entry yields
+    `fallback_task_id`, never raises — so the worst case is the pre-fix naive
+    behavior, never a crashed tick."""
+    target = _normalize_pr_url(pr_url)
+    if not target:
+        return fallback_task_id
+    try:
+        import outbox_notifier
+        window_hours = outbox_notifier.RECONCILE_WINDOW_HOURS
+    except Exception as e:  # noqa: BLE001 — resolution must never crash the tick
+        log(f'canonical_task_id_for_pr: notifier unusable '
+            f'({type(e).__name__}); using fallback', 'WARN')
+        return fallback_task_id
+    archive_dir = AGENTS_ROOT / 'outboxes' / 'forge' / '.archive'
+    now = now or datetime.now(timezone.utc)
+    cutoff = now.timestamp() - window_hours * 3600
+    try:
+        entries = sorted(archive_dir.glob('*.json'))
+    except OSError:
+        return fallback_task_id
+    for outbox_file in entries:
+        if outbox_file.name.startswith('.'):
+            continue
+        try:
+            if outbox_file.stat().st_mtime < cutoff:
+                continue
+        except OSError:
+            continue
+        try:
+            data = json.loads(outbox_file.read_text())
+        except (OSError, json.JSONDecodeError, ValueError):
+            continue
+        if not isinstance(data, dict):
+            continue
+        if data.get('agent') != 'forge' or data.get('phase') != 'build':
+            continue
+        task_id = data.get('task_id')
+        if not task_id or not isinstance(task_id, str):
+            continue
+        try:
+            outbox_pr = outbox_notifier._extract_pr_url_from_build_result(
+                data.get('result', ''))
+        except Exception:  # noqa: BLE001 — one bad entry must not abort the scan
+            continue
+        if outbox_pr and _normalize_pr_url(outbox_pr) == target:
+            return task_id
+    return fallback_task_id
+
+
+def _default_resolve_task_id(
+    head_ref: str, pr_number: Optional[int], repo: Optional[str],
+    pr_url: Optional[str] = None,
+) -> str:
+    """Pure default resolver for `select_orphaned_prs`: the branch-derived
+    task_id, ignoring `pr_url`. `main()` injects the archive-backed
+    `resolve_canonical_task_id` in production; tests keep this pure default so the
+    selection core stays filesystem-free."""
+    return task_id_for_branch(head_ref, pr_number, repo)
+
+
+def resolve_canonical_task_id(
+    head_ref: str, pr_number: Optional[int], repo: Optional[str],
+    pr_url: Optional[str],
+) -> str:
+    """Production resolver injected by `main()`: canonical-resolve `forge/*` PRs
+    via the build-outbox URL scan; everything else keeps the pure branch key.
+
+    Only `forge/*` branches can BOTH mis-derive their task_id AND collide with
+    the inline path's canonical review, so only they need the archive scan. The
+    opt-in `pr-<repo>-<number>` keying (claude/*, auto-review) is already
+    unambiguous and has no inline path to collide with — return it unchanged."""
+    fallback = task_id_for_branch(head_ref, pr_number, repo)
+    if not head_ref.startswith(FORGE_BRANCH_PREFIX) or not pr_url:
+        return fallback
+    return canonical_task_id_for_pr(pr_url, fallback)
+
+
 def _is_reviewable_pr(head_ref: str, is_draft: bool, labels: Any) -> bool:
     """Whether an open PR should be auto-routed to a Mirror review.
 
@@ -644,6 +771,7 @@ def select_orphaned_prs(
     open_prs: list[dict[str, Any]],
     now: datetime,
     already_dispatched: Any,
+    resolve_task_id: Any = None,
     grace_minutes: int = DISPATCH_GRACE_MINUTES,
     hand_grace_minutes: int = HAND_PR_GRACE_MINUTES,
 ) -> list[dict[str, Any]]:
@@ -667,8 +795,18 @@ def select_orphaned_prs(
     testable without the notifier or the filesystem. `head_sha` is the PR's
     current head commit; the wrapper treats a review of a DIFFERENT (older) head
     as not-yet-dispatched, so a PR updated after its first review is re-reviewed.
-    Each returned row is the input row augmented with its derived `task_id`.
+
+    `resolve_task_id(head_ref, pr_number, repo, pr_url) -> str` is likewise
+    injected (default `_default_resolve_task_id`, the pure branch-derived key).
+    `main()` passes `resolve_canonical_task_id`, which — for a `forge/*` PR whose
+    branch does not round-trip its task_id — recovers the CANONICAL id from the
+    build-outbox archive by PR-URL match BEFORE the dedup check runs, so an
+    existing canonical review is found and no wrongly-keyed duplicate is
+    dispatched. Each returned row is the input row augmented with its derived
+    `task_id`.
     """
+    if resolve_task_id is None:
+        resolve_task_id = _default_resolve_task_id
     forge_cutoff = now - timedelta(minutes=grace_minutes)
     hand_cutoff = now - timedelta(minutes=hand_grace_minutes)
     out: list[dict[str, Any]] = []
@@ -684,7 +822,18 @@ def select_orphaned_prs(
             cutoff = hand_cutoff
         if ts is None or ts > cutoff:
             continue  # too fresh — forge: let inline fire; hand: still pushing
-        task_id = task_id_for_branch(head, pr.get('number'), pr.get('_repo'))
+        # Resolve BEFORE the dedup check so a mangled forge branch maps to the
+        # CANONICAL build-outbox task_id and the existing canonical review is
+        # found (no wrongly-keyed duplicate). Non-forge/opt-in PRs pass through
+        # the pure branch key. Fail-open: a raising resolver falls back to the
+        # branch key rather than dropping the PR from the sweep.
+        try:
+            task_id = resolve_task_id(head, pr.get('number'), pr.get('_repo'),
+                                      pr.get('url'))
+        except Exception as e:  # noqa: BLE001 — never let resolution crash selection
+            log(f'resolve_task_id raised for branch={head}: '
+                f'{type(e).__name__}: {e}; using branch-derived key', 'WARN')
+            task_id = task_id_for_branch(head, pr.get('number'), pr.get('_repo'))
         if not task_id:
             continue  # degenerate branch → no dispatchable task_id
         # Died-verdictless coverage note (post-#850 read-only review checkout):
@@ -850,7 +999,8 @@ def main() -> int:
     state = load_state()
     failed = state['failed_prs']
 
-    orphaned = select_orphaned_prs(open_prs, now, _already_dispatched)
+    orphaned = select_orphaned_prs(
+        open_prs, now, _already_dispatched, resolve_canonical_task_id)
     log(f'scanned {len(open_prs)} open PR(s); {len(orphaned)} reviewable PR(s) '
         f'(Forge + non-draft auto-review) past grace with no Mirror review')
 
