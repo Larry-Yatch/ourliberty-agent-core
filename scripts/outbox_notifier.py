@@ -145,6 +145,15 @@ DEAD_LETTER_STATE_CAP = 1000
 #     every POLL_INTERVAL_SECONDS poll, tracked via _last_reconcile_ts.
 RECONCILE_WINDOW_HOURS = 6
 RECONCILE_INTERVAL_SECONDS = 60
+# Cadence for the deep-review-held self-heal's LIVE PR-state recheck. Decoupled
+# from (and much slower than) RECONCILE_INTERVAL_SECONDS: an out-of-band
+# merge/close leaving a stale approval on the tab is a cosmetic lag that clearing
+# within minutes fully resolves, while one `gh pr view --json state` per held PR
+# every 60s is sustained load on the shared GraphQL pool (which the account has
+# exhausted before). Tests set this to 0 to recheck every call. Env-overridable.
+_DEEP_REVIEW_HELD_STATE_RECHECK_INTERVAL_S = int(
+    os.environ.get('DEEP_REVIEW_HELD_STATE_RECHECK_INTERVAL_S', '600')
+)
 MAX_RESULT_TEXT_CHARS = 8000  # truncate huge claude outputs in notify prompts
 
 # Maximum notify-cascade depth. Hop 0 = original dispatch; hop 1 = first notify
@@ -1739,6 +1748,9 @@ _running = True
 # Monotonic-ish last-run marker for the reconciliation sweep throttle (Part B).
 # 0.0 means "never run", so the first poll after startup runs the sweep once.
 _last_reconcile_ts = 0.0
+# Last time the deep-review-held self-heal ran its live PR-state recheck. 0.0 →
+# first reconcile after startup rechecks once (clears any stale-on-restart hold).
+_last_deep_review_held_state_recheck_ts = 0.0
 
 
 def log(msg: str, level: str = 'INFO', ts: Optional[str] = None) -> None:
@@ -9057,11 +9069,43 @@ def _reconcile_deep_review_held_approvals() -> None:
 
     Idempotent + actionable-only: at most one live approval per PR+head; re-runs
     are no-ops; no routine 'surfaced N held PRs' nag."""
+    # Throttle the live PR-state self-heal (below) to a slow cadence, decoupled
+    # from the 60s reconcile: catching an out-of-band merge/close within minutes
+    # fully resolves the cosmetic stale-approval lag, and one gh state call per
+    # held PR every reconcile tick is needless load on the shared GraphQL pool.
+    global _last_deep_review_held_state_recheck_ts
+    _now_mono = time.time()
+    _do_state_recheck = (
+        _now_mono - _last_deep_review_held_state_recheck_ts
+        >= _DEEP_REVIEW_HELD_STATE_RECHECK_INTERVAL_S
+    )
+    if _do_state_recheck:
+        _last_deep_review_held_state_recheck_ts = _now_mono
     live_ids: dict[str, dict[str, Any]] = {}
     for entry in _load_deep_review_held():
         repo = entry.get('repo')
         pr_number = entry.get('pr_number')
         if not isinstance(repo, str) or not isinstance(pr_number, int):
+            continue
+        # Self-heal against live PR state. A held entry whose PR has since MERGED
+        # or CLOSED out-of-band (desktop merge_reviewed_pr.sh, auto-merge, manual
+        # close) never runs the suppress-dispatch self-heal — no Mirror review is
+        # attempted for a closed PR — so its record lingers and its approval sits
+        # STALE on the tab (the #823/#830/#833/#904 backlog Larry saw after they
+        # had already resolved). Drop it here: clear the record and leave its
+        # approval_id OUT of live_ids so _resolve_cleared_deep_review_approvals
+        # resolves the approval off the tab (as 'approved' if it carries the
+        # deep-review-passed stamp, else 'expired'). Fail-OPEN — an undeterminable
+        # state (None, e.g. a gh hiccup or backoff) is treated as still-held so a
+        # transient error can never drop a legit hold. Mirrors step 2 of
+        # _deep_review_hold_suppresses_dispatch.
+        if _do_state_recheck and _gh_pr_is_open(repo, pr_number) is False:
+            _clear_deep_review_held(repo, pr_number)
+            log(
+                f'deep-review-held entry cleared for {repo}#{pr_number} '
+                f'(PR no longer OPEN); its approval will resolve off the tab',
+                'INFO',
+            )
             continue
         pr_url = entry.get('pr_url') or ''
         head_sha = entry.get('head_sha')

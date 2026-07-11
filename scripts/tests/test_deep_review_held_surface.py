@@ -108,6 +108,9 @@ class _GhRouter:
     def __init__(self):
         self.pr_files: dict[tuple[str, int], list[str]] = {}
         self.pr_labels: dict[tuple[str, int], list[str]] = {}
+        # PR liveness for the reconcile self-heal; default OPEN so entries that
+        # aren't explicitly resolved behave as still-held (the prior behavior).
+        self.pr_state: dict[tuple[str, int], str] = {}
         self.edit_calls: list[tuple[str, int, str]] = []
         self.edit_fail = False
 
@@ -128,6 +131,8 @@ class _GhRouter:
                 payload['labels'] = [
                     {'name': n} for n in self.pr_labels.get((repo, pr_n), [])
                 ]
+            if 'state' in fields:
+                payload['state'] = self.pr_state.get((repo, pr_n), 'OPEN')
             return _CompletedProc(stdout=json.dumps(payload), returncode=0)
         if cmd[1] == 'pr' and cmd[2] == 'edit':
             pr_n = int(cmd[3])
@@ -157,7 +162,13 @@ class _SurfaceTestBase(unittest.TestCase):
             'DEEP_REVIEW_HELD_FILE': on.DEEP_REVIEW_HELD_FILE,
             'LOG_FILE': on.LOG_FILE,
             'BLACKBOARD': on.BLACKBOARD,
+            # Recheck live PR state on EVERY reconcile call in tests (production
+            # throttles to a slow cadence); reset the throttle clock too.
+            '_DEEP_REVIEW_HELD_STATE_RECHECK_INTERVAL_S':
+                on._DEEP_REVIEW_HELD_STATE_RECHECK_INTERVAL_S,
         }
+        on._DEEP_REVIEW_HELD_STATE_RECHECK_INTERVAL_S = 0
+        on._last_deep_review_held_state_recheck_ts = 0.0
         on.AGENTS_ROOT = self._root
         on.DEEP_REVIEW_HELD_FILE = self._root / 'state' / 'deep-review-held-prs.json'
         on.LOG_FILE = self._root / 'logs' / 'outbox-notifier.log'
@@ -364,6 +375,61 @@ class ResolveOnClearTest(_SurfaceTestBase):
                if e['id'] == 'deep-review-hold-pr823-aaaaaaaa']
         self.assertEqual(len(old), 1)
         self.assertEqual(old[0]['status'], 'expired')
+
+
+class MergedOutOfBandTest(_SurfaceTestBase):
+    """The reconcile must reconcile against LIVE PR state, not just the held
+    file. A PR merged/closed out-of-band (desktop merge_reviewed_pr.sh,
+    auto-merge, manual close) leaves its held entry lingering — nothing removes
+    it, because the suppress-dispatch self-heal only runs when a Mirror review is
+    attempted, which never happens for a closed PR. Its approval then sits stale
+    on the tab (the #823/#830/#833/#904 backlog). The reconcile prunes it.
+    """
+
+    def test_merged_out_of_band_prunes_lingering_entry_and_approves(self):
+        self.gh.pr_labels[(REPO, 823)] = ['deep-review-passed']
+        self._seed_held(self._held_entry(823, 'aaaaaaaa11112222'))
+        self.on._reconcile_deep_review_held_approvals()
+        self.assertEqual(len(self._pending()), 1)          # surfaced
+        # PR merges out-of-band; its held entry STILL lingers in the file.
+        self.gh.pr_state[(REPO, 823)] = 'MERGED'
+        self.on._reconcile_deep_review_held_approvals()
+        self.assertEqual(self.on._load_deep_review_held(), [])   # entry pruned
+        self.assertEqual(self._pending(), [])                    # left the tab
+        hist = [e for e in self._history()
+                if e['id'] == 'deep-review-hold-pr823-aaaaaaaa']
+        self.assertEqual(hist[0]['status'], 'approved')          # stamped+merged
+
+    def test_closed_out_of_band_prunes_and_expires(self):
+        self._seed_held(self._held_entry(823, 'aaaaaaaa11112222'))
+        self.on._reconcile_deep_review_held_approvals()
+        self.assertEqual(len(self._pending()), 1)
+        self.gh.pr_state[(REPO, 823)] = 'CLOSED'           # closed, not merged
+        self.on._reconcile_deep_review_held_approvals()
+        self.assertEqual(self.on._load_deep_review_held(), [])
+        self.assertEqual(self._pending(), [])
+        hist = [e for e in self._history()
+                if e['id'] == 'deep-review-hold-pr823-aaaaaaaa']
+        self.assertEqual(hist[0]['status'], 'expired')
+
+    def test_unknown_state_keeps_entry_held_failopen(self):
+        # A gh hiccup / backoff (state undeterminable → None) must NOT drop a
+        # legit hold: the entry stays and the approval stays surfaced.
+        self._seed_held(self._held_entry(823, 'aaaaaaaa11112222'))
+        self.on._reconcile_deep_review_held_approvals()
+        self.gh.pr_state[(REPO, 823)] = 'SOMETHING_WEIRD'  # -> None -> fail-open
+        self.on._reconcile_deep_review_held_approvals()
+        self.assertEqual(len(self.on._load_deep_review_held()), 1)   # kept
+        self.assertEqual(len(self._pending()), 1)                    # still on tab
+
+    def test_open_pr_is_not_pruned(self):
+        # The common path: an OPEN held PR is untouched by the self-heal.
+        self._seed_held(self._held_entry(823, 'aaaaaaaa11112222'))
+        self.on._reconcile_deep_review_held_approvals()
+        self.gh.pr_state[(REPO, 823)] = 'OPEN'
+        self.on._reconcile_deep_review_held_approvals()
+        self.assertEqual(len(self.on._load_deep_review_held()), 1)
+        self.assertEqual(len(self._pending()), 1)
 
 
 if __name__ == '__main__':
