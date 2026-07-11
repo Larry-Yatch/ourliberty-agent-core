@@ -62,6 +62,7 @@ import chain_event_emit  # noqa: E402  # E4.4e PR-A: approval_request push write
 import decision_resolve  # noqa: E402  # Phase 2: four-store resolve fan-out
 import larry_alerts  # noqa: E402
 import safe_write_inbox  # noqa: E402
+import spec_review_gate  # noqa: E402  # spec-gauntlet intercept + deferred-stamp pickup
 import state_log_query  # noqa: E402  # work-in-flight State Log reader (Slice 1 D4)
 from telegram_text_utils import strip_leading_slash  # noqa: E402
 from test_isolation_guard import refuse_under_test  # noqa: E402
@@ -1100,10 +1101,58 @@ def _send_beacon_response(
         telegram_send(chat_id, reply)
         return
 
-    # Marker present — handle approval flow. Degrade to force_ask if the trust
-    # decision raises for any reason (audit #21): a malformed policy or any
-    # unexpected error must surface the decision to Larry, never crash the
-    # marker-handling path for this update.
+    # spec-gauntlet intercept (§3.1). At the bot chat stamp site, hand the spec
+    # to the antagonistic review runner before stamping. 'spooled' → send the
+    # instant ack and defer the stamp until the gauntlet concludes (picked up in
+    # the reminder-tick sweep). 'duplicate' → a host-restart replay already
+    # spooled/concluded this exact body; ack nothing. 'disabled' → gate off (or
+    # site not gated) → run the legacy stamp path, labelling the card.
+    outcome = spec_review_gate.intercept(
+        payload, 'bot_chat', chat_id=chat_id,
+        meta={
+            'inherited_replan_count': inherited_replan_count,
+            'inherited_max_replans': inherited_max_replans,
+        },
+    )
+    if outcome == 'spooled':
+        if narrative:
+            telegram_send(chat_id, narrative)
+        telegram_send(chat_id, spec_review_gate.ACK_MESSAGE)
+        log(f"spec-gauntlet intercepted chat approval {payload.get('task_id')}; "
+            f"spooled + acked, deferring stamp until conclusion")
+        return
+    if outcome == 'duplicate':
+        if narrative:
+            telegram_send(chat_id, narrative)
+        log(f"spec-gauntlet duplicate spool for {payload.get('task_id')}; "
+            f"already pending/concluded, skipping re-spool")
+        return
+    if outcome == 'disabled':
+        payload = spec_review_gate.with_disabled_label(payload)
+
+    _stamp_approval(
+        payload, chat_id, narrative=narrative,
+        inherited_replan_count=inherited_replan_count,
+        inherited_max_replans=inherited_max_replans,
+    )
+
+
+def _stamp_approval(
+    payload: dict, chat_id: int,
+    *,
+    narrative=None,
+    inherited_replan_count: int = 0,
+    inherited_max_replans=None,
+) -> None:
+    """The legacy stamp path — trust_decision → autonomy event → reject /
+    auto_approve / force_ask. Extracted from `_send_beacon_response` so the
+    spec-gauntlet's deferred pickup (§3.1) can run the byte-identical stamp on
+    the FINAL (post-revision) payload with the challenge digest appended.
+
+    Degrade to force_ask if the trust decision raises for any reason (audit #21):
+    a malformed policy or any unexpected error must surface the decision to Larry,
+    never crash the marker-handling path for this update.
+    """
     try:
         action_str, rule = approval.trust_decision(payload)
     except Exception as e:
@@ -1171,6 +1220,37 @@ def _send_beacon_response(
     else:
         telegram_send(chat_id, approval.format_approval_dm(entry))
         log(f"approval DMed for {entry['id']}")
+
+
+def _spec_review_pickup() -> None:
+    """Deferred-stamp pickup for gauntlets concluded at the bot chat site (§3.1).
+
+    Runs in the reminder-tick sweep: scans ``concluded/`` for bot_chat gauntlets
+    that have finished and not yet been stamped, then runs the legacy stamp path
+    on the FINAL payload with the challenge digest appended. ``mark_stamped``
+    keeps the next sweep from re-stamping. Stamp-then-mark: a crash re-stamps
+    (rare) rather than losing the approval.
+    """
+    for task_id, conc, routing in spec_review_gate.collect_concluded(['bot_chat']):
+        chat_id = routing.get('chat_id')
+        if not chat_id:
+            # No originating chat thread — nothing to DM. Leave it for the
+            # dashboard Approvals tab / manual handling; don't mark stamped.
+            continue
+        meta = routing.get('meta') or {}
+        payload = spec_review_gate.with_digest(
+            conc.get('final_payload') or {}, spec_review_gate.build_digest(conc))
+        try:
+            _stamp_approval(
+                payload, chat_id,
+                inherited_replan_count=meta.get('inherited_replan_count', 0) or 0,
+                inherited_max_replans=meta.get('inherited_max_replans'),
+            )
+            spec_review_gate.mark_stamped(task_id)
+            log(f"spec-gauntlet stamped concluded chat approval {task_id}")
+        except Exception as e:
+            log(f"spec-gauntlet pickup stamp failed for {task_id}: "
+                f"{type(e).__name__}: {e}")
 
 
 def _check_due_reminders() -> None:
@@ -1461,6 +1541,10 @@ def main() -> None:
                 _check_pending_alerts()
             except Exception as e:
                 log(f"alert sweep error: {type(e).__name__}: {e}")
+            try:
+                _spec_review_pickup()
+            except Exception as e:
+                log(f"spec-review pickup sweep error: {type(e).__name__}: {e}")
             last_reminder_check = now
 
         url = f"{API}/getUpdates?offset={offset}&timeout=30"
