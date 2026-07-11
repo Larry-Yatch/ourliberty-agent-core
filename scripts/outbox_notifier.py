@@ -11676,10 +11676,18 @@ def _route_beacon_pulse_auto_dispatch_approval(
     # Honor /pause — mirror the 5c-followup-3 pattern: queue durably with
     # queued_during_pause=True, skip the DM, surface on /resume.
     is_paused = approval.is_paused()
+    # Delegate-tracking: thread the ORIGIN envelope task_id (e.g. `delegate-<cid>`
+    # for a board-delegate; the pulse/pipeline id otherwise) onto the pending
+    # entry, so the dashboard can join a parked delegated card to its still-open
+    # approval (read via `_open_delegate_approvals` over the pending store).
+    # Deterministic here — `envelope_task_id` is a live local; no dependence on
+    # Beacon's marker. Stamped only when it differs from the marker id, so
+    # dispatch routing (which uses the marker id) is provably unchanged.
     entry = approval.add_pending(
         payload,
         chat_id=reply_chat_id,
         queued_during_pause=is_paused,
+        origin_task_id=envelope_task_id,
     )
     chain_event_emit.emit_event(
         **approval.build_approval_request_chain_event(payload),
