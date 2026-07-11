@@ -1023,7 +1023,7 @@
       "id": "cap-rebase-merge-stuck-pr-685-operator-needs-you-fee-bd07",
       "title": "Rebase + merge stuck PR #685 (operator-needs-you-feed build)",
       "note": "Mirror passed it but auto-merge can't fire \u2014 CONFLICTING/DIRTY against main; live alert pipeline-stall:mirror-pass-unmerged:PR#685 firing (23:08 2026-06-24). Final mile of the operator-action-queue -> operator-needs-you-feed thread (spec #676 merged 2026-06-24). Needs a rebase onto main to clear the conflict, then merge.",
-      "state": "parked",
+      "state": "dropped",
       "label": null,
       "origin": {
         "source": "desktop-chat",
@@ -1035,17 +1035,17 @@
       "last_touched": "2026-06-24T23:23:18.982081+00:00",
       "promoted_to": null,
       "briefing": {
-        "what": "The finished version of your single \"needs your attention\" list \u2014 the feed that surfaces exactly what's waiting on your decision \u2014 is built and reviewed, but the last step to switch it on is jammed.",
-        "why": "This is the final piece of the thread that turns scattered action items into one prioritized queue for you, so until it ships you're still hunting for what actually needs you.",
-        "suggest": "Have someone clear the snag and turn it on today, with a quick check afterward to confirm the feed shows the right items before you rely on it."
+        "what": "A finished feature that gives you one prioritized list of everything waiting on your attention, so nothing slips through the cracks.",
+        "why": "It's the last piece of a project meant to save you time by replacing scattered notifications with a single clear to-do view \u2014 and right now it's built but not switched on.",
+        "suggest": "Let's get it over the finish line soon, but have someone double-check it slots in cleanly before we flip it on."
       },
       "risk": "medium",
-      "recommended_action": "delegate",
+      "recommended_action": "drop",
       "briefing_provenance": {
         "by": "beacon",
         "model": "claude-opus-4-8",
-        "at": "2026-06-24T23:27:54.414271+00:00",
-        "from_state": "parked"
+        "at": "2026-07-11T17:05:20.526912+00:00",
+        "from_state": "dropped"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
       "aging": true
