@@ -451,8 +451,25 @@ class TestCheckForgeBuiltNoPr(_TempAgentsRootMixin, unittest.TestCase):
 
     def test_preflight_family_does_not_match_unrelated_build_pr(self) -> None:
         """Family reconciliation must not silence a genuine preflight stall:
-        a build PR for a *different* family must leave the alert intact."""
+        a build PR for a *different* family must leave the alert intact.
+
+        Under the shared no-PR-legitimacy classifier a preflight/clarify pointer
+        is legit-no-PR by SHAPE when nothing proves otherwise; the GENUINE stall
+        signal is now an outbox that resolved `=== PROCEED ===` (Forge committed
+        to building) yet no PR shipped — the classifier returns EXPECTS_PR
+        (proceed-then-no-pr), so the alert must survive an unrelated-family build
+        PR at step 1b."""
         task = 'forge-queue-api-preflight-20260603T231401Z-clarify1'
+        archive_dir = self.agents_root / 'outboxes' / 'forge' / '.archive'
+        archive_dir.mkdir(parents=True, exist_ok=True)
+        (archive_dir / f'{task}.json').write_text(json.dumps({
+            'task_id': task,
+            'phase': 'preflight',
+            'exit_code': 0,
+            'attempts': 1,
+            'result': ('=== PROCEED ===\nScope is clear; dispatching the build.\n'
+                       '=== END_PROCEED ==='),
+        }))
         lines = [_watcher_forge_done_line(task, minutes_ago=180)]
         merged_prs = [{
             'headRefName': 'forge/build-done-today-fix-20260604T045743Z',
@@ -739,15 +756,18 @@ class TestCheckForgeBuiltNoPr(_TempAgentsRootMixin, unittest.TestCase):
         self.assertEqual(alerts, [])
         skip_lines = [m for m in captured if 'FORGE_NO_PR_SKIP' in m]
         self.assertEqual(len(skip_lines), 1)
-        self.assertIn('reason=preflight_exit', skip_lines[0])
+        # Step 2 now routes through the shared classifier: legit_no_pr with the
+        # outbox-truth verdict carried for forensics.
+        self.assertIn('reason=legit_no_pr', skip_lines[0])
+        self.assertIn("verdict='outbox:preflight_exit'", skip_lines[0])
         self.assertIn(task, skip_lines[0])
 
     def test_skips_when_preflight_marker_delimiter_present_preserves_label(self) -> None:
         """Same outbox shape with phase=preflight + exit_code=0 + attempts=1,
         but `result` ALSO carries the literal `=== CLARIFY_REQUEST ===`
-        delimiter. Marker scan wins; the specific marker label is
-        preserved in the skip log (`reason=preflight_non_proceed
-        marker='CLARIFY_REQUEST'`) for precise reporting."""
+        delimiter. The marker scan wins in the classifier, and the specific
+        marker label is preserved in the skip log as the outbox-truth verdict
+        (`reason=legit_no_pr verdict='outbox:clarify_request'`)."""
         task = 'precise-clarify-marker-archived-001'
         archive_dir = self.agents_root / 'outboxes' / 'forge' / '.archive'
         archive_dir.mkdir(parents=True, exist_ok=True)
@@ -774,8 +794,8 @@ class TestCheckForgeBuiltNoPr(_TempAgentsRootMixin, unittest.TestCase):
         self.assertEqual(alerts, [])
         skip_lines = [m for m in captured if 'FORGE_NO_PR_SKIP' in m]
         self.assertEqual(len(skip_lines), 1)
-        self.assertIn('reason=preflight_non_proceed', skip_lines[0])
-        self.assertIn("marker='CLARIFY_REQUEST'", skip_lines[0])
+        self.assertIn('reason=legit_no_pr', skip_lines[0])
+        self.assertIn("verdict='outbox:clarify_request'", skip_lines[0])
 
     def test_alerts_on_build_phase_crash_no_preflight_skip(self) -> None:
         """Regression guard for legitimate stalls: a real build-phase
@@ -1763,6 +1783,49 @@ class TestCheckRetryExhausted(_TempAgentsRootMixin, unittest.TestCase):
         self.assertEqual(seen.get('task_id'), 'stuck-task-007')
         self.assertEqual(len(alerts), 1)
         self.assertIn('stuck-task-007', alerts[0]['subject'])
+
+    def test_legit_no_pr_task_suppressed_before_resolution_signal(self) -> None:
+        # A review/decision task that exhausts retries opens no PR by design,
+        # so the classifier suppresses it as the first gate — never reaching
+        # the (costlier) resolution-signal probe.
+        fake_journal = (
+            'Jun 03 09:00:00 host inbox_watcher: [forge] start '
+            'task=mirror-review-pr-ourliberty-agent-core-77\n'
+            'Jun 03 09:00:01 host inbox_watcher: [forge] [ERROR] All retries exhausted\n'
+            'Jun 03 09:00:02 host inbox_watcher: [forge] done '
+            'task=mirror-review-pr-ourliberty-agent-core-77 success=False\n'
+        )
+        with patch('subprocess.run') as mock_sub, \
+             patch.object(self.hps, '_resolution_signal_present') as mock_res:
+            mock_sub.return_value.returncode = 0
+            mock_sub.return_value.stdout = fake_journal
+            mock_sub.return_value.stderr = ''
+            alerts = self.hps.check_retry_exhausted({})
+        self.assertEqual(alerts, [])
+        mock_res.assert_not_called()
+
+    def test_genuine_build_exhaustion_still_pages(self) -> None:
+        # A genuine build task is UNKNOWN to the classifier → it falls through
+        # to the resolution-signal path and (unresolved) pages as a real loss.
+        self.assertEqual(
+            self.hps.tnpl.expects_no_pr('reconcile-hardening-mission-001')[0],
+            self.hps.tnpl.UNKNOWN)
+        fake_journal = (
+            'Jun 03 09:00:00 host inbox_watcher: [forge] start '
+            'task=reconcile-hardening-mission-001\n'
+            'Jun 03 09:00:01 host inbox_watcher: [forge] [ERROR] All retries exhausted\n'
+            'Jun 03 09:00:02 host inbox_watcher: [forge] done '
+            'task=reconcile-hardening-mission-001 success=False\n'
+        )
+        with patch('subprocess.run') as mock_sub, \
+             patch.object(self.hps, '_resolution_signal_present',
+                          return_value=(False, None)):
+            mock_sub.return_value.returncode = 0
+            mock_sub.return_value.stdout = fake_journal
+            mock_sub.return_value.stderr = ''
+            alerts = self.hps.check_retry_exhausted({})
+        self.assertEqual(len(alerts), 1)
+        self.assertIn('reconcile-hardening-mission-001', alerts[0]['subject'])
 
     def test_unidentifiable_batch_emits_no_unknown_alert(self) -> None:
         # A truly unidentifiable exhaustion is un-actionable and
@@ -3633,6 +3696,29 @@ class TestStalledActiveStep(_TempAgentsRootMixin, unittest.TestCase):
         self.assertIn('delegate-endpoint', a['message'])
         # No-PR step is unrecoverable → escalates directly, no recovery primitive.
         self.assertNotIn('recovery', a)
+
+    def test_silent_for_legit_no_pr_step_shape(self) -> None:
+        # A dag-preflight / review step legitimately produces no PR — the shared
+        # classifier suppresses the age-alert even though it's past threshold.
+        for step_id in ('dag-preflight-endpoint-adoption',
+                        'review-sequence-dag-endpoint-adoption',
+                        'mirror-review-pr-ourliberty-agent-core-42'):
+            with self.subTest(step_id=step_id):
+                (self.seqdir / 's.json').unlink(missing_ok=True)
+                self._write_seq('s', steps=[
+                    self._step(step_id, dispatched_min_ago=45)])
+                self.assertEqual(self.hps.check_stalled_active_step({}), [])
+
+    def test_fires_for_genuine_build_step_unknown_verdict(self) -> None:
+        # A genuine build step is UNKNOWN to the classifier → falls through to
+        # the age-alert (no false suppression of real stalls).
+        self.assertEqual(
+            self.hps.tnpl.expects_no_pr('delegate-endpoint')[0],
+            self.hps.tnpl.UNKNOWN)
+        self._write_seq('seq', steps=[
+            self._step('delegate-endpoint', dispatched_min_ago=45)])
+        alerts = self.hps.check_stalled_active_step({})
+        self.assertEqual(len(alerts), 1)
 
     def test_silent_when_dispatched_recent(self) -> None:
         # Under the 30m threshold — give a healthy build time to open its PR.

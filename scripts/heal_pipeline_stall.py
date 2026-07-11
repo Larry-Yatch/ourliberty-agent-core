@@ -139,6 +139,7 @@ import for_larry_escalations  # noqa: E402  # mirror-review-visibility Contract 
 import rebase_obligation_ledger  # noqa: E402  # post-open auto-rebase backstop
 import safe_write_inbox  # noqa: E402  # sanitize_component: match on-disk outbox names
 import pipeline_live_state  # noqa: E402  # canonical "is pipeline work live?" probes
+import task_no_pr_legitimacy as tnpl  # noqa: E402  # the shared no-PR-legitimacy classifier
 from heal_undispatched_pr_review import task_id_for_branch  # noqa: E402  # canonical PR->task_id key
 from id_match import id_matches  # noqa: E402
 from log_ts import parse_log_ts  # noqa: E402  (shared log-ts parser)
@@ -1167,20 +1168,11 @@ def _forge_preflight_non_proceed(task_id: str) -> Optional[str]:
     data = _load_forge_outbox(task_id)
     if data is None:
         return None
-    result = data.get('result')
-    if isinstance(result, str):
-        if '=== CLARIFY_REQUEST ===' in result:
-            return 'CLARIFY_REQUEST'
-        if '=== REJECT_REQUEST ===' in result:
-            return 'REJECT_REQUEST'
-    if (
-        data.get('phase') == 'preflight'
-        and data.get('exit_code') == 0
-        and isinstance(data.get('attempts'), int)
-        and data.get('attempts') >= 1
-    ):
-        return 'PREFLIGHT_EXIT'
-    return None
+    # The clean-preflight-non-PROCEED rule lives in ONE place now — the shared
+    # classifier's outbox_preflight_verdict — so heal_forge_wip_only_redispatch
+    # and this healer never drift on what a preflight REJECT/CLARIFY/exit looks
+    # like. We read the disk here (I/O stays in the healer) and classify there.
+    return tnpl.outbox_preflight_verdict(data)
 
 
 # Reconciliation step 4 / dispatch-spec "Step 5" (pr-create-inferred-failure).
@@ -1202,8 +1194,9 @@ def _forge_preflight_non_proceed(task_id: str) -> Optional[str]:
 # task_id without `-preflight`/`-clarify`) firing the original alert.
 def _is_preflight_or_clarify_task(task_id: str) -> bool:
     """True if `task_id` is a preflight/clarify pointer (contains
-    `-preflight` or `-clarify`). These never open their own PR."""
-    return '-preflight' in task_id or '-clarify' in task_id
+    `-preflight` or `-clarify`). These never open their own PR. Delegates to the
+    shared classifier so the shape rule has a single encoding."""
+    return tnpl.is_preflight_or_clarify(task_id)
 
 
 def _classify_outbox_error(data: dict) -> Optional[str]:
@@ -1823,18 +1816,24 @@ def check_forge_built_no_pr(watcher_lines: list[str], open_prs: list[dict],
             )
             seen_tasks.add(task)
             continue
-        # Reconciliation step 2: archived outbox carries a clean
-        # preflight non-PROCEED signal (marker delimiter in result, or
-        # phase=preflight + exit_code=0 + attempts>=1 fallback)?
-        preflight_marker = _forge_preflight_non_proceed(task)
-        if preflight_marker is not None:
-            if preflight_marker == 'PREFLIGHT_EXIT':
-                reason = 'preflight_exit'
-            else:
-                reason = 'preflight_non_proceed'
+        # Reconciliation step 2 (no-PR-legitimacy classifier): consult the ONE
+        # shared classifier — by task shape AND the archived outbox truth — for
+        # whether this task's CORRECT terminal outcome is no PR. It SUBSUMES the
+        # former ad-hoc preflight REJECT/CLARIFY/PREFLIGHT_EXIT/'no buildable
+        # delta' suppress step and ADDS the review/decision families
+        # (mirror-review-*, review-sequence-dag-*, dag-preflight-*, kickoff-*,
+        # ...) that were never guarded here. Placed AFTER the gh-existence /
+        # already-merged / sibling / retry / rebase steps (1-1f) so a task that
+        # actually shipped a PR is credited first, and BEFORE step 3/4 so an
+        # errored or PROCEED-then-died preflight task (classifier -> EXPECTS_PR)
+        # still falls through to the step-4 pr-create-inferred-failure reclassify
+        # path. EXPECTS_PR / UNKNOWN fall through to the normal alert decision
+        # (UNKNOWN = today's behavior, never a new silent suppression).
+        verdict, vreason = tnpl.expects_no_pr(task, outbox=_load_forge_outbox(task))
+        if verdict == tnpl.LEGIT_NO_PR:
             log(
-                f'FORGE_NO_PR_SKIP task={task} reason={reason} '
-                f'marker={preflight_marker!r} '
+                f'FORGE_NO_PR_SKIP task={task} reason=legit_no_pr '
+                f'verdict={vreason!r} '
                 f'archive={FORGE_OUTBOX_ARCHIVE / (task + ".json")}',
                 'INFO',
             )
@@ -2242,6 +2241,17 @@ def check_retry_exhausted(state: dict) -> list[dict]:
         if task in seen_tasks:
             continue
         seen_tasks.add(task)
+        # No-PR-legitimacy gate: a review/decision/state-transition task
+        # (mirror-review-*, review-sequence-dag-*, dag-preflight-*, kickoff-*,
+        # ...) opens no PR by DESIGN, so treating its exhaustion as a
+        # build-loss page is the same false-alarm class this task unifies.
+        # Only a positive LEGIT_NO_PR suppresses; EXPECTS_PR / UNKNOWN still
+        # page (a genuine build that dead-lettered is a real loss).
+        verdict, vreason = tnpl.expects_no_pr(task)
+        if verdict == tnpl.LEGIT_NO_PR:
+            log(f'RETRY_EXHAUSTED_SKIP task={task} reason=legit_no_pr '
+                f'verdict={vreason!r}', 'INFO')
+            continue
         hit, reason = _resolution_signal_present(
             task_id=task, since_ts=cutoff_dt,
         )
@@ -2656,6 +2666,21 @@ def check_stalled_active_step(state: dict) -> list[dict]:
             elapsed_min = int((now - disp_ts).total_seconds() / 60)
             if elapsed_min < STALLED_ACTIVE_STEP_MIN:
                 continue  # give a healthy build time to open its PR
+            # No-PR-legitimacy gate (the previously-UNGUARDED gap that motivated
+            # this task): a step whose CORRECT terminal outcome is no PR of its
+            # own — a `dag-preflight-*` / `review-sequence-dag-*` review step, a
+            # `review-*` step — legitimately sits `dispatched` with no pr_url and
+            # must NOT escalate as a stall. Consult the ONE shared classifier by
+            # step shape; only a positive LEGIT_NO_PR suppresses (EXPECTS_PR /
+            # UNKNOWN fall through to the alert below, so a genuine build step
+            # that lost its session still surfaces — status-quo behavior).
+            verdict, vreason = tnpl.expects_no_pr(step_id)
+            if verdict == tnpl.LEGIT_NO_PR:
+                log(
+                    f'STALLED_ACTIVE_STEP_SKIP seq={seq_id} step={step_id} '
+                    f'reason=legit_no_pr verdict={vreason!r}', 'INFO',
+                )
+                continue
             key = f'stalled_active_step:{seq_id}:{step_id}:{disp_ts.isoformat()}'
             alerts.append({
                 'key': key,
