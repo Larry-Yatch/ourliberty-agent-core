@@ -29292,3 +29292,71 @@ NOMINAL ✅
 
 ---
 
+## Iteration ~5067 — 2026-07-11T09:39Z UTC (Larry /cycle, Tier 1)
+
+**Health:** ✅ Nominal. All 6 mandatory checks clean. 1 Tier-3 alert silenced (heal-dashboard-api-sha-drift). Zombie PID 1834248 carry only.
+
+**VERIFY-BEFORE-REASSERT (from iter ~5066):**
+- **"zombie PID 1834248 (43d+14h+12m)"**: CONFIRMED ✅ — stat=Ss, 43d+14h+19m. [carry]
+- **"beacon PID 3965718"**: CONFIRMED ✅ — Ss, 38:18 elapsed. ✅
+- **"outbox-notifier PID 3965731"**: CONFIRMED ✅ — Ss, 38:17 elapsed; last log 03:30:09 MDT (09:30Z UTC). ✅
+- **"inbox_watcher PID 3940207"**: CONFIRMED ✅ — Ssl, 01:37:00 elapsed. ✅
+- **"HEAD=2ed76e11=origin/main"**: CONFIRMED ✅ (latest Pulse wrapper commit, clean tree). ✅
+- **"pending=0 approvals"**: CONFIRMED ✅
+- **"sync status=success"**: CONFIRMED ✅ — last_sync=08:59:43Z (~39 min at check, within 2h threshold). ✅
+- **"PR #929 OPEN, Mirror review dispatched at 09:30Z UTC"**: CONFIRMED ✅ — OPEN, UNKNOWN, no verdict yet. [vp, carry]
+
+**Check 0 — Alert triage:** `repair-watermark {"repaired": false, "old_watermark": 1026, "file_length": 1027}` — 1 new alert at line 1027. `{"ts": "2026-07-11T09:32:00.820367+00:00", "source": "heal-dashboard-api-sha-drift", "subject": "dashboard-api-sha-drift-healed", "route": "digest"}` → triage-alert returned Tier-3 (known-pattern match in alert-translations.json). Bot already handled as route=digest at 03:35:01 MDT (09:35Z UTC). Watermark advanced to 1027. NOMINAL ✅
+
+**Check 1 — Log noise:** outbox-notifier PID 3965731 ✅. Last log 03:30:09 MDT (09:30Z UTC, ~8 min at check) — Mirror review dispatch for heal-undispatched-pr-review-canonical-task-id-001 / PR #929. No WARNs/ERRORs since 02:59 MDT restart. RECONCILE_MISSING_REVIEW WARNs at 01:30–01:40 MDT were pre-PR#924-merge artifact (old code); no new RECONCILE_MISSING_REVIEW fires post-restart. NOMINAL ✅
+
+**Check 2 — Telegram sweep:** beacon PID 3965718 ✅ (38:18 elapsed). Last bot activity 03:35:01 MDT (09:35Z UTC) processing digest alert. Last Larry human message: 01:08:20 MDT "Yes draft the fix." — actioned (PR #929 in Mirror review). No unhandled directives. NOMINAL ✅
+
+**Check 3 — Pipeline stall:** DRY-RUN (09:37:03Z UTC) → "no stalls detected." All FORGE_NO_PR_SKIP valid. NOMINAL ✅
+
+**Check 4 — Pending directives:** pending=0. NOMINAL ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-11T09:30:16Z (~8 min at check; cadence=10 min). Within cadence. NOMINAL ✅
+
+**Check A — Source repo:** HEAD=2ed76e11=origin/main ✅; clean tree ✅; on main ✅; 0 commits behind. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-11T08:59:43Z (~39 min), status=success, commit=98f0a140. NOMINAL ✅
+**Check C — Agent liveness:** beacon PID 3965718 ✅; outbox-notifier PID 3965731 ✅; inbox_watcher PID 3940207 ✅. ⚠️ Zombie PID 1834248 (43d+14h+19m, bash poll loop). [carry]
+**Check E — PR/merge state:**
+- PR #929 [OPEN, UNKNOWN] — fix(heal-undispatched-pr-review): forge-marker-task-id-mismatch-xii-v1 fix; Mirror review dispatched 09:30Z UTC (~8 min at check, not yet at 30-min threshold). [vp, carry]
+- PR #860 [OPEN, UNKNOWN] — spec XIV-b. [carry blue]
+
+**§5.0:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅.
+
+**Conditional checks — UTC Saturday 2026-07-11 (~09:39Z):**
+- Check I: Not a firing day (Sat). Latest artifact: check-i-2026-07-10.json. ✅
+- Check XI: Timer fires ~10:21Z today (~42 min). Latest artifact: check-xi-20260710T102121Z (attention_rate=0.125, gate=0.1, over_gate=true). No new artifact yet. [yellow carry]
+- Check III/IV/VIII/IX/X/XII/XIV: Sunday/Monday gates. Skip. ✅
+
+**G-rule assessment:**
+- **forge-marker-task-id-mismatch-xii-v1**: PR #929 OPEN and UNKNOWN. Mirror review dispatched 09:30Z UTC; no verdict yet. [vp, carry]
+- All other G-rule counts carry from iter ~5066. No new occurrences.
+
+**Actions taken:**
+1. Check 0: Tier-3 silence for heal-dashboard-api-sha-drift-20260711T093200Z. Watermark advanced 1026→1027. ✅
+2. PRIME ledger: `iter_clean` appended (09:39:32Z UTC, tier=1, template=nominal). ✅
+3. Tier state: `record --checks-clean false` → tier=1, consecutive_clean=0. ✅
+
+**Escalations:** 0 new DMs. All outstanding carries already DM'd in prior iters.
+
+**Standing findings (carry):**
+- [yellow] **zombie-bash-pid-1834248** — 43d+14h+19m, bash poll loop awaiting absent archive file. ask-then-do: `kill 1834248`. [carry]
+- [yellow] **check-xi-drift-over-gate** — 8/64 (12.5%, gate=10%) on 2026-07-10. Check XI fires ~10:21Z today. [carry]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07`. [carry]
+- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
+- [blue] **PR #860** — spec XIV-b. [carry]
+- [blue] **Check I proposal #1** — `notify-p3a-retro-prep` ($1.91 vs $0.28 baseline, 98σ). Use `/dispatch 1`. [carry]
+- [blue] **forge-marker-task-id-mismatch-xii-v1** — PR #929 in Mirror review; awaiting REVIEW_PASS + AUTO_MERGE. [vp]
+- [blue] **G-rules (dispatched, vp):** ourliberty-health-subject-key-mismatch-001 [3/3, vp]; forge-revision-preamble-missing-pr711-001 [vp]; forge-wip-redispatch-digest-tier4-001 [vp]; forge-wip-redispatch-exhausted-pr-exists-fp-001 [APPROVAL_REQUEST QUEUED iter ~3279, vp]; decision-needed-approval-forge-dispatch-no-target-repo-001 [vp]; no-session-revision-active-mirror-session-fp-001 [vp].
+- [blue] **G-rule 2/3:** outbox-notifier-merge-conflict-manual-rebase-tier4-001; forge-wip-redispatch-exhausted-genuine-no-pr-001; outbox-notifier-notification-intent-review-escalate-tier4-001; outbox-notifier-auto-merge-stale-revalidation-tier4-001.
+- [blue] **G-rule 1/3:** mirror-malformed-verdict-heal-reap-path-001; heal-unregistered-approval-null-chat-id-001; mirror-queue-wait-gauge-tier4-001; inbox-watcher-tier-pool-all-unavailable-tier4-001; heal-pipeline-stall-unrouted-deep-review-required-fp-001; heal-pulse-check-staleness-single-flight-skip-fp-001; gate-parallelism-monitor-regression-data-001; pulse-rotation-check-source-tier4-001; watermark-rotation-gap [1/3 iter ~5063].
+
+**PRIME DIRECTIVE:** 0 new interventions; 0 new systemic_fixes; iter_clean appended. ratio=19.224 (85 systemic_fixes / 34 vp; carry).
+**Tier end-of-iter:** **Tier 1** (zombie carry; consecutive_clean=0).
+
+---
+
