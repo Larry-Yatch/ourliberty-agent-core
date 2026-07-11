@@ -4,6 +4,74 @@
 
 ---
 
+## Iteration ~5096 — 2026-07-11T13:28Z UTC (Larry /cycle, Tier 1)
+
+**Health:** ⚠️ Drift. All 6 mandatory checks clean. 0 new alerts. 1 new state change: PR #860 UNKNOWN→CONFLICTING (blue, no pipeline dep). Zombie PID 1834248 and pending gh-burn-phase2 carry.
+
+**VERIFY-BEFORE-REASSERT (from iter ~5095):**
+- **"zombie PID 1834248 (43d+17h+59m)"**: CONFIRMED ⚠️ — now 43d+18h+08m (Ss, bash poll loop awaiting absent archive file). [carry]
+- **"beacon PID 3965718"**: CONFIRMED ✅ — Ss, 04:26:35 elapsed. [carry]
+- **"outbox-notifier PID 3965731"**: CONFIRMED ✅ — Ss, 04:26:34 elapsed. [carry]
+- **"inbox_watcher PID 3940207"**: CONFIRMED ✅ — Ssl, 05:25:17 elapsed. [carry]
+- **"HEAD=fd9704cb=origin/main"**: SUPERSEDED — HEAD=d10f4672 (wrapper commit "Pulse cycle 20260711T132028Z" from iter ~5095). ✅
+- **"pending=1 (gh-burn-phase2-durable-fix-authorize, chat_id=0)"**: CONFIRMED ⚠️ — still pending=1, same approval, chat_id=0; doorbell L882 already delivered 13:10:28Z. [carry]
+- **"sync status=no-change, last_sync=13:00:20Z"**: CONFIRMED ✅ — ~26 min at check, within 2h threshold. [carry]
+- **"PR #860 [OPEN, UNKNOWN]"**: SUPERSEDED — PR #860 now OPEN + CONFLICTING. ⚠️ New state change: conflict likely developed after PR #929 merged (same file areas). Blue finding — Larry's own spec PR, no labels, no pipeline dep.
+- **"Check XI attention_rate=18.8% (12/64)"**: CONFIRMED ✅ — no new artifact until tomorrow. [carry]
+- **"watermark=883=file_length"**: CONFIRMED ✅ — repair-watermark: repaired=false, 883=883. [carry]
+
+**Check 0 — Alert triage:** `repair-watermark {"repaired": false, "old_watermark": 883, "file_length": 883}` — 0 new alerts. NOMINAL ✅
+
+**Check 1 — Log noise:** outbox-notifier PID 3965731 ✅ (Ss, 04:26:34). Last action 03:51:27 MDT (09:51:27Z UTC) — AUTO_MERGE_WORKTREE_TEARDOWN + PR #929 completion DM. ~3.6h silence = normal (no new tasks). No WARNs/ERRORs since 02:59 MDT restart. NOMINAL ✅
+
+**Check 2 — Telegram sweep:** beacon PID 3965718 ✅ (Ss, 04:26:35). Last bot entry 07:11:58 MDT (13:11:58Z UTC) — idx=882 delivered (pulse, pending-approval-no-dm:gh-burn-phase2). No new Larry messages post-13:11Z. Pending=1 doorbell already delivered. NOMINAL for bot ✅; pending carry.
+
+**Check 3 — Pipeline stall:** DRY-RUN (13:26:23Z UTC) → "no stalls detected." 4 FORGE_NO_PR_SKIP entries all valid. NOMINAL ✅
+
+**Check 4 — Pending directives:** pending=1, `gh-burn-phase2-durable-fix-authorize`, chat_id=0. Doorbell L882 delivered 13:10:28Z. No Larry response yet. [carry]
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-11T13:22:43Z (~4 min at check; cadence=10 min). Within cadence. NOMINAL ✅
+
+**Check A — Source repo:** HEAD=d10f4672=origin/main ✅; clean tree ✅; on main ✅. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-11T13:00:20Z (~26 min), status=no-change. Within 2h threshold. NOMINAL ✅
+**Check C — Agent liveness:** beacon PID 3965718 ✅ (Ss, 04:26:35); outbox-notifier PID 3965731 ✅ (Ss, 04:26:34); inbox_watcher PID 3940207 ✅ (Ssl, 05:25:17). Watchdog: last entry 07:21:41 MDT (13:21:41Z UTC) overall=healthy ✅. ⚠️ Zombie PID 1834248 (43d+18h+08m, bash poll loop awaiting absent archive file `build-check-viii-pr-2b-analyzer-001.json`). [carry]
+**Check E — PR/merge state:**
+- PR #860 [OPEN, CONFLICTING] — spec XIV-b, no labels. ⚠️ State change: UNKNOWN→CONFLICTING (likely from PR #929 merge). Blue finding — no auto-merge label, no pipeline dependency; Larry will need to rebase if he wants to land it.
+
+**§5.0:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅.
+
+**Conditional checks — UTC Saturday 2026-07-11 (~13:28Z):**
+- Check XI: artifact check-xi-20260711T102013.json — attention_rate=18.8%, over_gate=True. Already fired today (10:20Z UTC); no new artifact expected until tomorrow. [yellow carry]
+- Check I: Not a firing day (Sat). Latest artifact: check-i-2026-07-10.json. ✅
+- Check III/IV/VIII/IX/X/XII/XIV: Sunday/Monday gates. Skip. ✅
+
+**G-rule assessment:**
+- No new occurrences this iter. All counts carry from iter ~5095.
+
+**Actions taken:**
+1. Alert watermark: steady at 883 (0 new alerts). ✅
+2. PRIME ledger: `iter_clean` appended (tier=1, template=nominal, 13:28:02Z UTC). ✅
+3. Tier state: `record --checks-clean false` → tier=1, consecutive_clean=0. ✅
+
+**Escalations:** 0 new DMs. All outstanding carries already DM'd in prior iters.
+
+**Standing findings (carry):**
+- [yellow] **zombie-bash-pid-1834248** — 43d+18h+08m, bash poll loop awaiting absent archive file `build-check-viii-pr-2b-analyzer-001.json`. ask-then-do: `kill 1834248`. [carry]
+- [yellow] **gh-burn-phase2-durable-fix-authorize** — pending=1, chat_id=0 (doorbell recovered at 13:10:28Z). Awaiting Larry `approve gh-burn-phase2-durable-fix-authorize`. [carry]
+- [yellow] **check-xi-drift-over-gate** — 18.8% (gate=10%). Next artifact tomorrow. [carry]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07`. [carry]
+- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
+- [blue] **PR #860** — spec XIV-b, CONFLICTING (was UNKNOWN). No pipeline dependency; Larry rebase needed to land. [carry; state updated]
+- [blue] **Check I proposal #1** — `notify-p3a-retro-prep` ($1.91 vs $0.28 baseline, 98σ). Use `/dispatch 1`. [carry]
+- [blue] **G-rules (dispatched, vp):** ourliberty-health-subject-key-mismatch-001 [3/3, vp]; forge-revision-preamble-missing-pr711-001 [vp]; forge-wip-redispatch-digest-tier4-001 [vp]; forge-wip-redispatch-exhausted-pr-exists-fp-001 [APPROVAL_REQUEST QUEUED iter ~3279, vp]; decision-needed-approval-forge-dispatch-no-target-repo-001 [vp]; no-session-revision-active-mirror-session-fp-001 [vp].
+- [blue] **G-rule 2/3:** outbox-notifier-merge-conflict-manual-rebase-tier4-001; forge-wip-redispatch-exhausted-genuine-no-pr-001; outbox-notifier-notification-intent-review-escalate-tier4-001; outbox-notifier-auto-merge-stale-revalidation-tier4-001; heal-unregistered-approval-null-chat-id-001 (2/3).
+- [blue] **G-rule 1/3:** mirror-malformed-verdict-heal-reap-path-001; mirror-queue-wait-gauge-tier4-001; inbox-watcher-tier-pool-all-unavailable-tier4-001; heal-pipeline-stall-unrouted-deep-review-required-fp-001; heal-pulse-check-staleness-single-flight-skip-fp-001; gate-parallelism-monitor-regression-data-001; pulse-rotation-check-source-tier4-001; watermark-rotation-gap [1/3 iter ~5063].
+
+**PRIME DIRECTIVE:** 0 new interventions; 0 new systemic_fixes; iter_clean appended. ratio=~18.97 (86 systemic_fixes / ~1635 interventions; 33 vp; trend=worsening).
+**Tier end-of-iter:** **Tier 1** (signal: PR #860 CONFLICTING + zombie PID + pending approval; consecutive_clean=0).
+
+---
+
 ## Iteration ~5095 — 2026-07-11T13:18Z UTC (Larry /cycle, Tier 1)
 
 **Health:** ✅ Nominal. All 6 mandatory checks clean. 0 new alerts (watermark 883=file_length). Carries only.
@@ -2583,73 +2651,6 @@ Watermark advanced 1025→1026. NOMINAL ✅
 - [yellow] **PR #924** — reconcile-claimed-check-001; label=deep-review-passed; pending approval deep-review-hold-pr924-eeadc669. Approve to release hold and merge. [carry]
 - [yellow] **pending approval [1]** — heal-undispatched-pr-review-canonical-task-id-001: Forge build plan for forge-marker-task-id-mismatch-xii-v1. Approve to authorize Forge build. [carry]
 - [yellow] **zombie-bash-pid-1834248** — 43d+12h+59m, bash poll loop. ask-then-do: `kill 1834248`. [carry]
-- [yellow] **check-xi-drift-over-gate** — 8/64 (12.5%, gate=10%) on 2026-07-10. Check XI fires ~10:21Z today. [carry]
-- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07`. [carry]
-- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
-- [blue] **PR #860** — spec XIV-b. [carry]
-- [blue] **Check I proposal #1** — `notify-p3a-retro-prep` ($1.91 vs $0.28 baseline, 98σ). Use `/dispatch 1`. [carry]
-- [blue] **G-rules (dispatched, vp):** forge-marker-task-id-mismatch-xii-v1 [3/3 DISPATCHED ✅, build-plan pending Larry approval]; RECONCILE_MISSING_REVIEW-.claimed-blindspot [3/3 DISPATCHED ✅, vp — PR #924 HELD, PR #928 healer live]; ourliberty-health-subject-key-mismatch-001 [3/3, vp]; forge-revision-preamble-missing-pr711-001 [vp]; forge-wip-redispatch-digest-tier4-001 [vp]; forge-wip-redispatch-exhausted-pr-exists-fp-001 [APPROVAL_REQUEST QUEUED iter ~3279, vp]; decision-needed-approval-forge-dispatch-no-target-repo-001 [vp]; no-session-revision-active-mirror-session-fp-001 [vp].
-- [blue] **G-rule 2/3:** outbox-notifier-merge-conflict-manual-rebase-tier4-001; forge-wip-redispatch-exhausted-genuine-no-pr-001; outbox-notifier-notification-intent-review-escalate-tier4-001; outbox-notifier-auto-merge-stale-revalidation-tier4-001.
-- [blue] **G-rule 1/3:** mirror-malformed-verdict-heal-reap-path-001; heal-unregistered-approval-null-chat-id-001; mirror-queue-wait-gauge-tier4-001; inbox-watcher-tier-pool-all-unavailable-tier4-001; heal-pipeline-stall-unrouted-deep-review-required-fp-001; heal-pulse-check-staleness-single-flight-skip-fp-001; gate-parallelism-monitor-regression-data-001; pulse-rotation-check-source-tier4-001.
-
-**PRIME DIRECTIVE:** 0 new interventions; 0 new systemic_fixes; iter_clean appended. ratio=19.476 (84 systemic_fixes / 34 vp; carry).
-**Tier end-of-iter:** **Tier 1** (pending approvals + zombie carry; consecutive_clean=0).
-
----
-
-## Iteration ~5056 — 2026-07-11T08:14Z UTC (Larry /loop /cycle, Tier 1)
-
-**Health:** ✅ Nominal carry — 1 new alert (doorbell Tier-3 silence). All checks nominal. Carries: PR #924 HELD, zombie PID 1834248, 2 pending approvals. Check XI fires ~10:21Z today (over gate carry: 8/64 = 12.5% vs 10% gate).
-
-**VERIFY-BEFORE-REASSERT (from iter ~5055):**
-- **"PR #924 HELD pending approval deep-review-hold-pr924-eeadc669"**: CONFIRMED ✅ — OPEN, label=deep-review-passed, mergeable=UNKNOWN (CI running). [carry]
-- **"zombie PID 1834248 (43d+12h+46m)"**: CONFIRMED ✅ — stat=Ss, 43d+12h+53m (bash poll loop awaiting absent archive file). [carry]
-- **"beacon PID 3888347"**: CONFIRMED ✅ — Ss, 42:58 elapsed. [carry]
-- **"outbox-notifier PID 3891045"**: CONFIRMED ✅ — Ss, 41:20 elapsed; silent since 01:55:03 MDT (marker-error WARN for PR #927 dup, retry 1/3). [carry]
-- **"inbox_watcher PID 3940207"**: CONFIRMED ✅ — Ssl, 11:16 elapsed. [carry]
-- **"HEAD=97a2c800=origin/main"**: UPDATED — HEAD=85790ccb=origin/main ("Pulse cycle 20260711T081055Z" wrapper commit from iter ~5055). ✅
-
-**Check 0 — Alert triage:** `repair-watermark {"repaired": false, "old_watermark": 1024, "file_length": 1025}` — 1 new alert:
-- L1025 (idx=1024): `source=doorbell, kind=notification, intent=doorbell` — doorbell summary for 2 pending approvals (PR #924 deep-review hold + heal-undispatched-pr-review-canonical-task-id-001). Triage helper → Tier-3 silence (known-pattern match). ✅
-Watermark advanced 1024→1025. NOMINAL ✅
-
-**Check 1 — Log noise:** outbox-notifier PID 3891045 ✅. Last log entry 01:55:03 MDT (07:55Z UTC) — [WARN] mirror marker error for PR #927 duplicate outbox file (RECONCILE_MISSING_REVIEW; retry 1/3; self-resolves on ALREADY_MERGED detection next scan). No new WARNs since iter ~5055. Silent ~19 min (expected; no active tasks). NOMINAL ✅
-
-**Check 2 — Telegram sweep:** Beacon PID 3888347 ✅. Last log entry 02:04:38 MDT (08:04:38Z UTC). Last Larry human message: 01:08:20 MDT "Yes draft the fix." — actioned in prior iters. No unhandled directives. NOMINAL ✅
-
-**Check 3 — Pipeline stall:** DRY-RUN (08:12:35Z UTC) → "no stalls detected." FORGE_NO_PR_SKIP valid for #906/#908/#909/#912/#914/#916/#919/#920/#921/#922/#923. MIRROR_PASS_UNMERGED_SKIP reconcile-claimed-check-001 reason=held_deep_review. RETRY_EXHAUSTED_SKIP outbox-notifier-merge-held-deep-review-tier3-001 reason=superseded_session. NOMINAL ✅
-
-**Check 4 — Pending directives:** pending=2. [0]=deep-review-hold-pr924-eeadc669 (chat_id=7998341473) [carry]. [1]=heal-undispatched-pr-review-canonical-task-id-001 (chat_id=7998341473) [carry]. ⚠️ Signal (carry)
-
-**Check 5 — Stale daemon code:** heartbeat=2026-07-11T08:09:21Z (~5 min at check). Next expected tick ~08:19Z. NOMINAL ✅
-
-**Check A — Source repo:** HEAD=85790ccb=origin/main ✅; clean tree ✅; on main ✅; 0 commits behind. NOMINAL ✅
-**Check B — Sync health:** last_sync=2026-07-11T08:02:30Z (~12 min at check), status=error "Auto-commit push failed; rolled back to 1ac0edd2" — known PR #728 pattern (sync.service attempted auto-commit; wrapper had already pushed 85790ccb; non-FF race; repo now at 85790ccb=origin/main, clean; self-heals next tick). NOMINAL ✅ (Tier-3 known)
-**Check C — Agent liveness:** beacon PID 3888347 ✅; outbox-notifier PID 3891045 ✅; inbox_watcher PID 3940207 ✅. ⚠️ Zombie PID 1834248 (43d+12h+53m, bash poll loop). [carry]
-**Check E — PR/merge state:**
-- PR #924 [OPEN, UNKNOWN] reconcile-claimed-check-001 — label=deep-review-passed; HELD pending approval deep-review-hold-pr924-eeadc669. ⚠️ Signal [carry]
-- PR #860 [OPEN, UNKNOWN] spec XIV-b. [carry]
-
-**§5.0:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅.
-
-**Conditional checks — UTC Saturday 2026-07-11 (~08:14Z):**
-- Check I: Not a firing day (Sat). Latest artifact: check-i-2026-07-10.json. ✅
-- Check XI: Timer fires ~10:21Z today. Latest artifact: check-xi-20260710T102121Z (attention_rate=0.125, gate=0.1, over_gate=true; 8/64 cards need attention). No new artifact yet (~2h before firing time). [yellow carry]
-- Check III/IV/VIII/IX/X/XII/XIV: Sunday/Monday gates. Skip. ✅
-
-**G-rule assessment:** No new occurrences this iter. All G-rule counts carry from iter ~5055.
-
-**Actions taken:**
-1. Watermark advanced 1024→1025 via `set-watermark --line 1025`. ✅
-2. PRIME ledger: `iter_clean` appended (08:14:05Z UTC, tier=1, template=nominal). ✅
-3. Tier state: `record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=08:14:18Z UTC. ✅
-
-**Escalations:** 0 new DMs to Larry. No new findings warrant escalation. Outstanding carries already DM'd in prior iters.
-
-**Standing findings (carry):**
-- [yellow] **PR #924** — reconcile-claimed-check-001; label=deep-review-passed; pending approval deep-review-hold-pr924-eeadc669. Approve to release hold and merge. [carry]
-- [yellow] **pending approval [1]** — heal-undispatched-pr-review-canonical-task-id-001: Forge build plan for forge-marker-task-id-mismatch-xii-v1. Approve to authorize Forge build. [carry]
-- [yellow] **zombie-bash-pid-1834248** — 43d+12h+53m, bash poll loop. ask-then-do: `kill 1834248`. [carry]
 - [yellow] **check-xi-drift-over-gate** — 8/64 (12.5%, gate=10%) on 2026-07-10. Check XI fires ~10:21Z today. [carry]
 - [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07`. [carry]
 - [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
