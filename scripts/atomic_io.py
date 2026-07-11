@@ -28,12 +28,15 @@ the destination is never left pointing at a half-written temp.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import sys
 import tempfile
+import threading
+import time
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterator, Union
+from typing import Any, Dict, Iterator, Union
 
 _SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(_SCRIPTS_DIR) not in sys.path:
@@ -46,6 +49,7 @@ __all__ = [
     'atomic_write_text',
     'atomic_write_json',
     'locked_update',
+    'degrade_counts',
 ]
 
 
@@ -122,6 +126,105 @@ def atomic_write_json(
 _DEFAULT_LOCK_TIMEOUT = 5.0
 
 
+# --- fail-open degrade telemetry -------------------------------------------
+# locked_update is fail-open: when the cross-process lock can't be taken it runs
+# the read-modify-write UNSERIALIZED, silently reintroducing the lost-update
+# class the lock exists to prevent. That degrade is rare and self-healing (a
+# flock is kernel-released when its holder dies; an unwritable sidecar clears),
+# so a per-call page would be pure noise — but a *sustained storm* of degrades is
+# a real signal an operator must see. We give it two lightweight, fail-SAFE
+# surfaces, both emitted from locked_update itself (the single choke point):
+#
+#   * a per-cause WARN log, rate-limited PER PROCESS so one looping daemon can't
+#     spam the journal — a genuine cross-process storm still surfaces because
+#     each affected process emits its own throttled line, which the digest reads;
+#   * a per-cause, process-lifetime counter (:func:`degrade_counts`) an
+#     in-process health/metrics surface (e.g. the dashboard_api daemon) — or a
+#     test — can read without parsing logs.
+#
+# Deliberately NO on-disk counter: atomic_io is foundational, stdlib-only infra,
+# and a shared-state counter file would itself need ``locked_update`` to be
+# written safely — i.e. it would depend on the very thing that is degrading.
+# Process-local telemetry sidesteps that circularity, and the fail-open is
+# itself process-local, so a process-scoped view is the honest one.
+#
+# The three mutually-exclusive causes (see ``locked_update``):
+#   ``no_flock``        advisory locking unavailable on this platform (no fcntl);
+#   ``timeout``         a peer held the lock past ``timeout`` (wedged holder);
+#   ``sidecar_oserror`` the ``<path>.lock`` sidecar was transiently unwritable
+#                       (EROFS under ProtectHome, ENOSPC, EMFILE, ...).
+_DEGRADE_CAUSES = ('no_flock', 'timeout', 'sidecar_oserror')
+
+# Minimum seconds between WARN logs for a given cause, per process. Genuine
+# contention clears in sub-ms, so this only throttles a *sustained* degrade —
+# exactly the storm we want compressed to one line/interval. Every degrade is
+# still tallied in the counter regardless of throttling.
+_DEGRADE_WARN_INTERVAL = 60.0
+
+_DEGRADE_LOG = logging.getLogger('atomic_io.locked_update')
+_degrade_lock = threading.Lock()
+# Seed every known cause to 0 so degrade_counts() has a STABLE shape: an
+# in-process metrics/health reader can index any cause without a KeyError, and a
+# cause that has never fired reads 0 (distinct from the key being absent).
+_degrade_counts: Dict[str, int] = {cause: 0 for cause in _DEGRADE_CAUSES}
+_degrade_last_warn: Dict[str, float] = {}
+
+
+def _note_degrade(cause: str) -> None:
+    """Record + rate-limited-log one fail-open degrade of :func:`locked_update`.
+
+    Fail-SAFE: this runs on the ledger read-modify-write path, whose "never
+    raises" contract the degrade itself is upholding, so the entire body is
+    guarded — a logging misconfiguration, a handler that hits ENOSPC, or a clock
+    quirk can NEVER turn a survivable unserialized run into a raised exception.
+    Best-effort by design: dropping a telemetry line is always preferable to
+    perturbing the mutation it is observing.
+    """
+    try:
+        now = time.monotonic()
+        emit = False
+        with _degrade_lock:
+            count = _degrade_counts.get(cause, 0) + 1
+            _degrade_counts[cause] = count
+            last = _degrade_last_warn.get(cause)
+            if last is None or (now - last) >= _DEGRADE_WARN_INTERVAL:
+                _degrade_last_warn[cause] = now
+                emit = True
+        if emit:
+            _DEGRADE_LOG.warning(
+                'locked_update degraded to UNSERIALIZED (cause=%s, '
+                'process-total=%d): a read-modify-write ran without the '
+                'cross-process lock; a sustained storm reintroduces the '
+                'lost-update class this lock prevents.',
+                cause, count,
+            )
+    except Exception:  # noqa: BLE001 - telemetry must never escape into the RMW
+        pass
+
+
+def degrade_counts() -> Dict[str, int]:
+    """Snapshot of per-cause fail-open degrade counts for THIS process.
+
+    Always carries all three keys from :data:`_DEGRADE_CAUSES` (``no_flock`` /
+    ``timeout`` / ``sidecar_oserror``); a cause that has not fired reads ``0``.
+    Lets an in-process health/metrics surface expose how often
+    :func:`locked_update` fell back to an unserialized run without scraping the
+    journal. Process-local by design (see the module note above).
+    """
+    with _degrade_lock:
+        return dict(_degrade_counts)
+
+
+def _reset_degrade_telemetry() -> None:
+    """Re-seed the per-process degrade counters to 0 + clear the WARN throttle.
+    For tests only — production never resets (the counts are a process-lifetime
+    tally)."""
+    with _degrade_lock:
+        _degrade_counts.clear()
+        _degrade_counts.update({cause: 0 for cause in _DEGRADE_CAUSES})
+        _degrade_last_warn.clear()
+
+
 @contextmanager
 def locked_update(
     path: Union[str, Path], *, timeout: Union[float, None] = _DEFAULT_LOCK_TIMEOUT,
@@ -132,7 +235,10 @@ def locked_update(
     torn file), but it does NOT serialize the surrounding load→mutate→write: two
     processes can both read the old state, each mutate its own copy, and the
     second write clobbers the first — a lost update. Wrap the whole critical
-    section in this context manager so only one process holds the file at a time::
+    section in this context manager so only one process holds the file at a time.
+    Each degrade is recorded via :func:`_note_degrade` (rate-limited WARN +
+    :func:`degrade_counts`) so a sustained fail-open is observable — see the
+    "fail-open degrade telemetry" note above. ::
 
         with atomic_io.locked_update(LEDGER_FILE):
             state = _load()
@@ -192,8 +298,20 @@ def locked_update(
         try:
             cm = file_lock.exclusive_lock(lock_path, timeout=timeout)
             cm.__enter__()
-        except (file_lock.LockTimeout, OSError):
-            cm = None  # degrade: run the body unserialized (see docstring)
+        except file_lock.LockTimeout:
+            # A peer held the lock past ``timeout``. Degrade + tally the cause.
+            # (LockTimeout subclasses OSError, so this clause MUST precede the
+            # OSError one to be distinguished from a sidecar write failure.)
+            cm = None
+            _note_degrade('timeout')
+        except OSError:
+            # The .lock sidecar mkdir/open was transiently unwritable
+            # (EROFS/ENOSPC/EMFILE). Degrade + tally (see docstring).
+            cm = None
+            _note_degrade('sidecar_oserror')
+    else:
+        # No advisory locking on this platform: every RMW is unserialized.
+        _note_degrade('no_flock')
     try:
         yield cm is not None
     finally:
