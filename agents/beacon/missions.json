@@ -6525,7 +6525,8 @@
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
       "needs_decision": true,
       "needs_decision_since": "2026-07-11T00:05:20.081600+00:00",
-      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop",
+      "acknowledged": true
     },
     {
       "id": "proposed-beacon-pipeline-fixes-briefing-001",
