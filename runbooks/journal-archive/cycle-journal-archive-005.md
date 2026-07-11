@@ -34035,3 +34035,91 @@ Beacon handled all directives. No orphan for Pulse. NOMINAL ✅
 
 ---
 
+## Iteration ~5136 — 2026-07-11T18:53Z UTC (Larry /cycle, Tier 1)
+
+**Health:** ⚠️ Nominal with 1 new finding. G-rule `outbox-notifier-notification-intent-reject-tier4-001` → **3/3 DISPATCHED** ✅. **auto-route-externally-authored-pr-reviews-001 REJECTED** by Forge at 18:49:50Z (preemption: feature already implemented). **gh-burn-phase2-shared-open-pr-snapshot-001** dispatched to Forge inbox (Larry directive 12:45 MDT). PR #934 Mirror review in progress. Zombie carry holds Tier 1.
+
+**VERIFY-BEFORE-REASSERT (from iter ~5135):**
+- **"zombie PID 1834248 (43d+23h+22m)"**: CONFIRMED ⚠️ — now 43d+23h+30m (Ss, bash poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`). [carry]
+- **"beacon PID 3965718"**: CONFIRMED ✅ — Ss, ~9h49m. [carry]
+- **"outbox-notifier PID 3965731"**: CONFIRMED ✅ — Ss, ~9h49m. [carry]
+- **"inbox_watcher PID 3940207"**: CONFIRMED ✅ — Ssl, ~10h47m. [carry]
+- **"pending=0"**: CONFIRMED ✅. [carry]
+- **"sync status=no-change, last_sync=18:00:39Z"**: CONFIRMED ✅ — ~53 min at check. Within 2h. [carry]
+- **"PR #860 OPEN/CONFLICTING"**: CONFIRMED ✅. [carry]
+- **"Check XI attention_rate=18.8%"**: CONFIRMED ✅ — same artifact check-xi-20260711T102013. No new until Sun. [yellow carry]
+- **"PR #934 Mirror review in progress (.claimed/0)"**: CONFIRMED ✅ — still in progress (.claimed/0, 12:30 MDT). [in motion]
+- **"auto-route durable fix dispatched...Forge build in progress"**: SUPERSEDED ⚠️ — Forge **REJECTED** at 18:49:50Z (preemption: already-implemented — see Check 1 below). [updated]
+- **"watermark=899=file_length=899 → repair repaired=false"**: SUPERSEDED — watermark=899, file_length=900 at cycle start (L900 new alert queued by notifier at 18:49:50Z). Triaged Tier-4; advanced to 900. [new]
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 899, "file_length": 899}` at iter-start. Mid-iter: L900 appeared (18:49:50Z, kind=notification, source=outbox-notifier, intent=reject — Forge reject delivery for `auto-route-externally-authored-pr-reviews-001`). Helper: **Tier-4** (novel, no translation match). G-rule `outbox-notifier-notification-intent-reject-tier4-001` 3/3 → direction-ask dispatched to Beacon. Watermark advanced 899→900. NOMINAL (1 Tier-4 finding, systemic dispatch taken) ⚠️
+
+**Check 1 — Log noise:** outbox-notifier.log new entries since iter ~5135:
+- 12:46:28 MDT: WARN `forge marker error in auto-route-externally-authored-pr-reviews-001.json` — MalformedForgeMarker: preflight requires ONE marker block, none found. Retry 1/3 issued.
+- 12:47:10 MDT: Forge sent `clarify_request`; Beacon notified.
+- 12:48:03 MDT: Clarification-response continuation dispatched forge ← beacon (round=1).
+- 12:49:50 MDT: Forge classified as **reject** — delivery notification queued to Larry chat. Forge-result/reject notified to Beacon.
+Zero sustained errors. The 1 WARN is preflight-discipline enforcement, not a healer failure. NOMINAL ✅
+
+**Check 2 — Telegram sweep:** Active Beacon conversation since iter ~5135. Key events:
+- 12:45:27 MDT: Larry: "Ok so 931 is on its way and the auto route fix is running. Get on with the gh phase 2 build"
+- 12:48:17 MDT: Beacon presented gh-burn phase-2 build brief (GraphQL-only, 6/36 hours maxed)
+- 12:48:18 MDT: `gh-burn-phase2-shared-open-pr-snapshot-001` **auto_approved + dispatched** → Forge inbox
+- 12:49:50 MDT: Forge reject DM queued for Larry (via outbox-notifier)
+Beacon handled Larry's directive promptly. No orphan directives for Pulse. NOMINAL ✅
+
+**Check 3 — Pipeline stall:** DRY-RUN (18:49:34Z UTC) → "0 alert(s) would fire, 0 recovery(ies) would be attempted." 17 FORGE_NO_PR_SKIP entries (PR #912 claimed-check, #909 sibling-shipped, #909-retry1, #914 branch, #916 gg-s1, #919 branch, #874 sibling-shipped, #920 branch, #874-retry1, #921 gg-s2, #922 gg-s3, #923 gg-s4, #924 reconcile-claimed, #927 merge-held-deep-review, #928 branch_truncated, #929 canonical-task-id, #930 sync-push-fail). NOMINAL ✅
+
+**Check 4 — Pending directives:** pending=0. Larry's 12:45 MDT directive ("get on with gh phase 2 build") fully actioned by Beacon. NOMINAL ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-11T18:46:56Z (~6 min at check; cadence=10 min). NOMINAL ✅
+
+**Check A — Source repo:** HEAD=e3dc1246=origin/main ✅; clean tree ✅; on main ✅. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-11T18:00:39Z (~53 min). Within 2h. NOMINAL ✅
+**Check C — Agent liveness:** beacon PID 3965718 ✅ 9h49m; outbox-notifier PID 3965731 ✅ 9h49m; inbox_watcher PID 3940207 ✅ 10h47m; watchdog overall=healthy (12:46:56 MDT = 18:46:56Z UTC) ✅. ⚠️ Zombie PID 1834248 (43d+23h+30m, Ss, bash poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`). [carry]
+**Check E — PR/merge state:**
+- **PR #934** — OPEN, UNKNOWN. `chore(ledgers): extract shared ledger_base`. Mirror review in progress (.claimed/0, 12:30 MDT ~23 min). [in motion ✅]
+- **PR #860** — OPEN, CONFLICTING. docs(spec): XIV-b. Needs rebase. [yellow carry]
+
+**§5.0:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅.
+
+**Conditional checks — UTC Saturday 2026-07-11 (~18:53Z):**
+- Check XI: artifact check-xi-20260711T102013 — attention_rate=18.8%, over_gate=True. No new artifact until tomorrow (Sun). [yellow carry]
+- Check I: Not a firing day (Sat). ✅
+- Check III/IV/VIII/IX/X/XII/XIV: Sunday/Monday gates. Skip. ✅
+
+**G-rule assessment:**
+- **`outbox-notifier-notification-intent-reject-tier4-001` → 3/3 DISPATCHED** ✅: direction-ask `direction-ask-outbox-notifier-intent-reject-tier3-001` written to Beacon inbox at 18:53Z UTC. Requested: add `source=outbox-notifier, intent=reject` → Tier-3 FYI entry to config/alert-translations.json. verification_pending. [NEW]
+- **`unreviewed-merge-larry-authored-pr-001`**: auto-route durable fix **REJECTED** by Forge (preemption: `heal_undispatched_pr_review._is_reviewable_pr` lines 743-767 already implements label-gated routing for ambiguous/external PRs, shipped 2026-06-22). Forge recommendation: "If Beacon believes a specific gap remains, cite the PR number/branch." Root gap is label-application for PRs opened outside `open_pr_for_team.sh` — not a routing gap. Beacon receives forge-result/reject and handles next steps (Beacon's Step 2 from iter ~3372 recommendation: default PR-open to `open_pr_for_team.sh` so unlabeled PRs get auto-review label). [updated status: durable fix path back to Beacon]
+- All other G-rule counts carry from iter ~5135.
+
+**Actions taken:**
+1. Check 0: L900 triaged Tier-4 (helper: novel/no translation). Watermark 899→900. ✅
+2. Beacon direction-ask: `direction-ask-outbox-notifier-intent-reject-tier3-001.json` written to Beacon inbox. ✅
+3. PRIME ledger: `intervention` + `verification_pending` appended (outbox-notifier-notification-intent-reject-tier4-001, 18:53Z UTC). ✅
+4. Tier state: `record --checks-clean false` → tier=1, consecutive_clean=0 (zombie + L900 Tier-4). ✅
+
+**Escalations:** 0 new Pulse DMs. (Larry already received Forge reject DM via outbox-notifier at 12:49:50 MDT — no duplicate DM needed from Pulse.)
+
+**Standing findings (updated):**
+- [yellow] **zombie-bash-pid-1834248** — 43d+23h+30m, bash poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`. ask-then-do: `kill 1834248`. [carry]
+- [yellow] **check-xi-drift-over-gate** — 18.8% (gate=10%). Next artifact tomorrow (Sun). [carry]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07`. [carry]
+- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
+- [blue] **PR #934** — Mirror review in progress (.claimed/0, 12:30 MDT). chore(ledgers): extract shared ledger_base. [in motion]
+- [blue] **PR #860** — OPEN/CONFLICTING. docs(spec): XIV-b. Needs rebase. [carry]
+- [blue] **auto-route-externally-authored-pr-reviews-001 REJECTED** — Forge preemption (already-implemented). Beacon handles next steps (label-application path, Step 2 from Beacon's iter ~3372 recommendation). Larry DM delivered by notifier. [NEW]
+- [blue] **gh-burn-phase2-shared-open-pr-snapshot-001** — in Forge inbox (Larry-directed GH rate-limit Phase 2 fix). [NEW]
+- [blue] **GH API rate limit** — advisory from Beacon at 12:30 MDT. [carry]
+- [blue] **Check I proposal #1** — `notify-p3a-retro-prep` ($1.91 vs $0.28 baseline, 98σ). Use `/dispatch 1`. [carry]
+- [blue] **G-rules (dispatched, vp):** outbox-notifier-notification-intent-reject-tier4-001 [3/3, vp NEW]; ourliberty-health-subject-key-mismatch-001 [3/3, vp]; forge-revision-preamble-missing-pr711-001 [vp]; forge-wip-redispatch-digest-tier4-001 [vp]; forge-wip-redispatch-exhausted-pr-exists-fp-001 [APPROVAL_REQUEST QUEUED iter ~3279, vp]; decision-needed-approval-forge-dispatch-no-target-repo-001 [vp]; no-session-revision-active-mirror-session-fp-001 [vp].
+- [blue] **G-rule 2/3:** outbox-notifier-merge-conflict-manual-rebase-tier4-001; forge-wip-redispatch-exhausted-genuine-no-pr-001; outbox-notifier-notification-intent-review-escalate-tier4-001; outbox-notifier-auto-merge-stale-revalidation-tier4-001.
+- [blue] **G-rule 1/3:** mirror-malformed-verdict-heal-reap-path-001; mirror-queue-wait-gauge-tier4-001; inbox-watcher-tier-pool-all-unavailable-tier4-001; heal-pipeline-stall-unrouted-deep-review-required-fp-001; heal-pulse-check-staleness-single-flight-skip-fp-001; gate-parallelism-monitor-regression-data-001; pulse-rotation-check-source-tier4-001.
+
+**PRIME DIRECTIVE:** 1 intervention (L900 Tier-4 dispatch), 1 verification_pending (outbox-notifier-intent-reject-tier3-001). ratio carries (ledger is ground truth).
+**Tier end-of-iter:** **Tier 1** (zombie + L900 Tier-4 finding; consecutive_clean=0).
+
+**[Post-iter result — Beacon direction-ask-outbox-notifier-intent-reject-tier3-001 → SUCCESS, ~2026-07-11T19:05Z UTC]:** Beacon verified ground-truth and dispatched Forge config-only preflight. Key findings: alert emits at outbox_notifier.py L11375 + L11715 (`append_notification(source='outbox-notifier', intent='reject', ...)`) with NO subject field; intent-only fallback fires at alert_triage_state.py L643-644 (table key = literal `reject` under `outbox-notifier`); correct fix is `severity: INFO, tier: FYI` entry (no `never_silence`). Forge preflight dispatched as `doc-only`; trust policy expected to auto-approve. MEMORY.md updated: G-rule now `FORGE DISPATCHED ✅ → verification_pending`.
+
+---
+
