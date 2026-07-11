@@ -1,0 +1,18 @@
+[Unit]
+Description=Refresh the shared PR snapshot every ~3 minutes so all readers serve fresh data for FREE (gh-api-burn phase 2)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/gh_pr_snapshot_refresher.py
+
+[Timer]
+# First fire 3 min after boot, then every 3 min. This is the ONE gh pr list
+# caller; the reader's freshness window (DEFAULT_MAX_AGE_S = 10 min) tolerates ~3
+# missed refreshes before a read is flagged stale. The refresher honors the
+# phase-1 gh_budget backoff, so a tight cadence can't deepen exhaustion.
+OnBootSec=3min
+OnUnitActiveSec=3min
+RandomizedDelaySec=20s
+AccuracySec=15s
+Unit=ourliberty-gh-pr-snapshot-refresher.service
+Persistent=true
+
+[Install]
+WantedBy=timers.target

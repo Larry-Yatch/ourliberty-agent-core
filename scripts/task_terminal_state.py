@@ -330,6 +330,31 @@ def pr_coordinate_state(
     return state, (sha if isinstance(sha, str) and sha else None)
 
 
+# -------------------- shared-snapshot read (gh-api-burn phase 2) --------------------
+
+def _snapshot_all_prs(
+    repo: str, *, limit: int, timeout: float,
+) -> list[dict[str, Any]]:
+    """All PRs (any state) for `repo` from the shared cached snapshot, sliced to
+    the `limit` most-recent (the snapshot is number-descending, as `gh pr list`
+    returns — so this reproduces the old `--state all --limit N` window exactly).
+
+    Replaces this kernel's former live `gh pr list` per repo: the reader serves a
+    FRESH snapshot for free, and `live_fallback=True` lets it fire ONE bounded,
+    cooldown-and-budget-guarded live fetch when the snapshot is down — preserving
+    correctness for this terminal-state probe without letting the ~10 callers
+    stampede gh. The reader never raises; a bad import degrades to `[]`, which
+    (like the old gh-failure path) leaves matched_states empty -> UNKNOWN (KEEP).
+    Lazy import keeps the reader<->kernel dependency acyclic at module load."""
+    try:
+        import gh_pr_snapshot
+        return gh_pr_snapshot.all_prs(
+            repo, limit=limit, live_fallback=True, fallback_timeout=timeout,
+        )
+    except Exception:  # noqa: BLE001 — a snapshot read must never wedge the probe
+        return []
+
+
 # -------------------- the canonical probe (spec § 2) --------------------
 
 def task_terminal_state(
@@ -361,35 +386,18 @@ def task_terminal_state(
     """
     if not task_id or not isinstance(task_id, str):
         return UNKNOWN
-    # gh-api-burn phase 1: this shared probe is called by ~10 healers each tick;
-    # when the GraphQL budget is low, back off and return UNKNOWN — the SAME
-    # indeterminate verdict this kernel already returns on any gh failure, which
-    # every consumer treats conservatively (KEEP, never falsely retire). No
-    # decision logic changes; we just decline to deepen the exhaustion. Fail-open:
-    # a budget-check error (or a missing gh_budget) proceeds to the live queries.
-    try:
-        import gh_budget
-        if gh_budget.should_skip('task_terminal_state'):
-            return UNKNOWN
-    except Exception:  # noqa: BLE001 — never let a broken guard wedge the probe
-        pass
+    # gh-api-burn phase 2: reads now come from the shared cached PR snapshot
+    # (refreshed once per ~3 min by gh_pr_snapshot_refresher), not a live
+    # per-caller `gh pr list`. That removes this probe from the burn path entirely
+    # — so the phase-1 budget backoff guard that used to gate these queries is
+    # gone (a snapshot read is free and never deepens exhaustion). Behavior is
+    # identical given the same PR state: the snapshot is `--state all` and sliced
+    # to the same `limit` window; only the DATA SOURCE changed.
     repo_list = list(repos) if repos is not None else default_repos()
     candidates = expand_variants(task_id, variants)
     matched_states: list[str] = []
     for repo in repo_list:
-        data = gh_json(
-            [
-                'gh', 'pr', 'list', '--repo', _qualify_repo(repo),
-                '--state', 'all', '--limit', str(limit),
-                '--json', 'number,state,title,headRefName,url',
-            ],
-            timeout=timeout,
-        )
-        if not isinstance(data, list):
-            # gh failed for this repo (None) or returned an unexpected shape;
-            # skip it. If EVERY repo fails, matched_states stays empty -> UNKNOWN.
-            continue
-        for pr in data:
+        for pr in _snapshot_all_prs(repo, limit=limit, timeout=timeout):
             if isinstance(pr, dict) and _pr_matches(pr, candidates, min_len):
                 matched_states.append(classify_state(pr.get('state')))
     return _combine(matched_states)

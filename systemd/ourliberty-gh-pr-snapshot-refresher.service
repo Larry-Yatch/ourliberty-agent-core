@@ -1,0 +1,42 @@
+[Unit]
+Description=Ourliberty shared PR-snapshot refresher — the SINGLE gh pr list caller; writes ~/agents/state/gh-open-pr-snapshot.json for all readers (gh-api-burn phase 2)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/gh_pr_snapshot_refresher.py
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+WorkingDirectory=/home/larry/agent-core
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/gh_pr_snapshot_refresher.py
+
+# One gh pr list per repo + a single atomic JSON write; generous headroom for a
+# slow-but-successful rich listing.
+TimeoutStartSec=120
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-gh-pr-snapshot-refresher
+
+# Memory cap: a few hundred PR records held in memory + one JSON write.
+MemoryMax=256M
+MemoryHigh=128M
+
+# Hardening — matches the gh-burn-sampler pattern.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/larry/agents /home/larry/agent-core /home/larry/.claude /home/larry/.claude.json /home/larry/.local /home/larry/.cache /tmp
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target

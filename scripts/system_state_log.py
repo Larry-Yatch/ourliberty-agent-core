@@ -691,26 +691,32 @@ def _bulk_terminal_states(
     min_len: int = tts.MATCH_MIN_LEN,
 ) -> dict[str, str]:
     """Probe the terminal state (MERGED/CLOSED/OPEN/UNKNOWN) of each task id,
-    listing each repo's PRs ONCE and reducing every task id against that single
-    snapshot. This is the bounded form of calling `task_terminal_state` per id
-    (which would re-list PRs for every task). Returns {task_id -> state}; any gh
-    failure leaves a task at UNKNOWN (KEEP — never a guessed terminal, spec § 2
-    conservative posture preserved)."""
+    reading each repo's PRs ONCE from the shared cached snapshot and reducing
+    every task id against that single in-memory list. This is the bounded form of
+    calling `task_terminal_state` per id (which would re-scan PRs for every task).
+    Returns {task_id -> state}; any read failure leaves a task at UNKNOWN (KEEP —
+    never a guessed terminal, spec § 2 conservative posture preserved).
+
+    gh-api-burn phase 2: the per-repo source is now the shared snapshot
+    (`gh_pr_snapshot.all_prs`, refreshed once per ~3 min) instead of a live
+    `gh pr list` per repo — the same all-state data sliced to the same `limit`
+    window, so the terminal verdicts are unchanged; only the DATA SOURCE moved off
+    the burn path. `live_fallback=True` keeps a bounded, budget-and-cooldown
+    guarded live fetch available when the snapshot is down."""
     states = {tid: tts.UNKNOWN for tid in task_ids}
     if not task_ids:
         return states
     repo_list = repos if repos is not None else tts.default_repos()
-    # One PR listing per repo (bounded by repo count, not task count).
+    # One snapshot read per repo (bounded by repo count, not task count).
     prs: list[dict[str, Any]] = []
     for repo in repo_list:
-        data = tts.gh_json(
-            [
-                'gh', 'pr', 'list', '--repo', tts._qualify_repo(repo),
-                '--state', 'all', '--limit', str(limit),
-                '--json', 'number,state,title,headRefName,url',
-            ],
-            timeout=timeout,
-        )
+        try:
+            import gh_pr_snapshot
+            data = gh_pr_snapshot.all_prs(
+                repo, limit=limit, live_fallback=True, fallback_timeout=timeout,
+            )
+        except Exception:  # noqa: BLE001 — a read failure must never wedge the tick
+            data = []
         if isinstance(data, list):
             prs.extend(p for p in data if isinstance(p, dict))
     for tid in task_ids:
