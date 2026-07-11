@@ -4873,11 +4873,86 @@ def _delegation_needs_you_field(
     }}
 
 
+# Delegate-tracking Slice 2b — the build/review trail. The build dispatched from
+# a delegation runs under a FRESH task_id, but its REVIEW chain_events carry
+# `payload.origin_task_id == delegate-<cid>` (Slice 2a). Those event types
+# (`review_request` / `review_pass|revision|escalate`) are NOT read by
+# `derive_phase_for_task` (which keys on session_start / marker_emit /
+# auto_merge), so the trail needs this dedicated verdict-aware deriver.
+_DELEGATION_IN_REVIEW_EVENT_TYPES = frozenset({
+    'review_request', 'review_revision', 'review_escalate',
+})
+
+
+def _delegation_build_phase(events: list[dict[str, Any]]) -> Optional[str]:
+    """Verdict-aware phase for a delegated build from its origin-joined REVIEW
+    events. Most-advanced first:
+      - a `review_pass` → 'review_passed' (passed review, awaiting merge)
+      - any review_request / review_revision / review_escalate → 'in_review'
+      - nothing → None (no build activity joined yet — neutral)
+    Deliberately does NOT claim 'merged'/'shipped': the auto_merge event is not
+    origin-tagged (it rides the async merge queue), so merged-state is derived
+    elsewhere (GitHub-truth completion probe off the mission's spawned ref)."""
+    if not events:
+        return None
+    saw_pass = False
+    saw_review = False
+    for ev in events:
+        et = ev.get('event_type')
+        if et == 'review_pass':
+            saw_pass = True
+        elif et in _DELEGATION_IN_REVIEW_EVENT_TYPES:
+            saw_review = True
+    if saw_pass:
+        return 'review_passed'
+    if saw_review:
+        return 'in_review'
+    return None
+
+
+def _delegation_build_pr_url(events: list[dict[str, Any]]) -> Optional[str]:
+    """The PR url off the delegated build's review events (newest-first, first
+    non-empty wins). None when no event carries one."""
+    for ev in events:
+        pr = ev.get('pr_url')
+        if isinstance(pr, str) and pr:
+            return pr
+    return None
+
+
+def _delegation_trail_field(
+    cap: dict[str, Any],
+    build_events_by_origin: Optional[dict[str, list[dict[str, Any]]]],
+) -> dict[str, Any]:
+    """Delegate-tracking Slice 2b: surface the delegated build's review trail on
+    the card — `delegation_build_phase` (in_review | review_passed | None) plus
+    `delegation_pr_url`. Joined by the card's `delegate-<cid>` against chain_events
+    tagged with `payload.origin_task_id`. Neutral None for a non-delegate card or
+    before any build event joins — never a misleading claim."""
+    neutral = {'delegation_build_phase': None, 'delegation_pr_url': None}
+    if not build_events_by_origin:
+        return neutral
+    spawned = cap.get('spawned')
+    if not isinstance(spawned, dict) or spawned.get('kind') != 'delegate':
+        return neutral
+    tid = spawned.get('task_id')
+    if not isinstance(tid, str):
+        return neutral
+    events = build_events_by_origin.get(tid)
+    if not events:
+        return neutral
+    return {
+        'delegation_build_phase': _delegation_build_phase(events),
+        'delegation_pr_url': _delegation_build_pr_url(events),
+    }
+
+
 def _parked_from_captures(
     captures: list[dict[str, Any]],
     now: datetime,
     events_by_task_id: Optional[dict[str, list[dict[str, Any]]]] = None,
     open_delegate_approvals: Optional[dict[str, dict[str, Any]]] = None,
+    build_events_by_origin: Optional[dict[str, list[dict[str, Any]]]] = None,
 ) -> list[dict[str, Any]]:
     """Build the `parked[]` array (§ 3.3) from captures.json. Only state=='parked'
     captures; `aging` is the GC healer's persisted flag (Phase 1 — never
@@ -4914,6 +4989,7 @@ def _parked_from_captures(
         entry.update(_meaning_layer_fields(cap))
         entry.update(_spawned_fields(cap, events_by_task_id))
         entry.update(_delegation_needs_you_field(cap, open_delegate_approvals))
+        entry.update(_delegation_trail_field(cap, build_events_by_origin))
         out.append(entry)
     return out
 
@@ -4947,6 +5023,40 @@ def _fetch_events_for_task_ids(
         if not tid:
             continue
         out.setdefault(tid, []).append(ev)
+    return out
+
+
+def _fetch_delegation_build_events(
+    supabase_client: Any,
+    origin_task_ids: list[str],
+) -> dict[str, list[dict[str, Any]]]:
+    """Delegate-tracking Slice 2b: fetch the REVIEW chain_events of the builds
+    spawned by delegated cards, keyed by the card's origin id. The build runs
+    under a fresh task_id, so we join on `payload->>origin_task_id` (Slice 2a
+    stamps it) rather than `task_id`. Returns a dict keyed by origin_task_id,
+    events newest-first. Degrades to {} on no client / no ids / any error — the
+    derive never raises and a card simply shows no trail."""
+    if supabase_client is None or not origin_task_ids:
+        return {}
+    try:
+        resp = (
+            supabase_client.table('chain_events')
+            .select('event_id,event_type,task_id,agent,pr_url,ts,payload')
+            .in_('payload->>origin_task_id', origin_task_ids)
+            .order('ts', desc=True)
+            .execute()
+        )
+    except Exception:  # noqa: BLE001 — never 500 a read-only derive
+        return {}
+    rows = list(getattr(resp, 'data', None) or [])
+    rows.sort(key=lambda r: _ts_key(r.get('ts')), reverse=True)
+    out: dict[str, list[dict[str, Any]]] = {}
+    for ev in rows:
+        payload = _ev_payload(ev)
+        origin = payload.get('origin_task_id') if isinstance(payload, dict) else None
+        if not isinstance(origin, str) or not origin:
+            continue
+        out.setdefault(origin, []).append(ev)
     return out
 
 
@@ -5217,6 +5327,7 @@ def _build_derived_response(
     promoted_orphan_task_ids: Optional[set[str]] = None,
     collapsed_task_ids: Optional[set[str]] = None,
     open_delegate_approvals: Optional[dict[str, dict[str, Any]]] = None,
+    build_events_by_origin: Optional[dict[str, list[dict[str, Any]]]] = None,
 ) -> dict[str, Any]:
     """Pure derive: build the full /api/missions/derived response (pre-filter).
 
@@ -5305,7 +5416,8 @@ def _build_derived_response(
         ))
 
     parked = _parked_from_captures(
-        captures, now, events_by_task_id, open_delegate_approvals)
+        captures, now, events_by_task_id, open_delegate_approvals,
+        build_events_by_origin)
     return {
         'schema_version': 1,
         'missions': missions,
@@ -5455,6 +5567,10 @@ def _handle_missions_derived(
     # Delegate-tracking: which parked-delegated cards have a still-open approval
     # waiting on Larry (join by the `origin_task_id` the approval handler stamps).
     open_delegate_approvals = _open_delegate_approvals(parked_spawned_ids)
+    # Slice 2b: the delegated builds' review trail — chain_events keyed by
+    # payload.origin_task_id back to each parked-delegated card.
+    build_events_by_origin = _fetch_delegation_build_events(
+        supabase_client, parked_spawned_ids)
 
     events_by_task_id = _fetch_events_for_task_ids(supabase_client, fetch_ids)
     recent_events = _fetch_recent_chain_events(
@@ -5497,6 +5613,7 @@ def _handle_missions_derived(
         promoted_orphan_task_ids=promoted_orphan_task_ids,
         collapsed_task_ids=collapsed_task_ids,
         open_delegate_approvals=open_delegate_approvals,
+        build_events_by_origin=build_events_by_origin,
     )
     response = _apply_derived_filters(
         response, repo=repo, task_id=task_id, now=now,
