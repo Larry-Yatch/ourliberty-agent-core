@@ -628,9 +628,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-12T14:37Z UTC (Iter ~5297, **Tier 1**, consecutive_clean=0)
+## Status snapshot — updated 2026-07-12T14:48Z UTC (Iter ~5298, **Tier 1**, consecutive_clean=0)
 
-**Iter ~5297 summary (2026-07-12T14:37Z):** 0 new alerts (wm=952==fl=952). No open PRs. Services: all PIDs alive. Zombie PID 1834248 ALIVE (44d19h17m+, bash poll). Sync status=no-change, last_sync=14:32Z; HEAD==origin/main=ee231124. systemic_fixes=85, vp=36, ratio=~19.12. Check I/XI/III artifacts unchanged (all fired today already). Awaiting Larry `approve threshold-update-2026-07-12`. outbox-notifier silent ~10h+ (no work in flight — normal). **ACTIVE G-rules:** unchanged from iter ~5296.
+**Iter ~5298 summary (2026-07-12T14:48Z):** 0 new alerts (wm=952==fl=952). No open PRs. Services: all PIDs alive. Zombie PID 1834248 ALIVE (44d19h37m+, bash poll). Sync status=no-change, last_sync=14:32Z; HEAD==origin/main=17d1b9ec. systemic_fixes=85, vp=36, ratio=~19.12. Check I/XI/III artifacts unchanged (all fired today already). Awaiting Larry `approve threshold-update-2026-07-12`. outbox-notifier silent ~10.2h+ (no work in flight — normal). **ACTIVE G-rules:** unchanged from iter ~5297.
 
 ---
 
