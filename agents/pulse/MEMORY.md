@@ -628,9 +628,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-12T11:27Z UTC (Iter ~5272, **Tier 1**, consecutive_clean=0)
+## Status snapshot — updated 2026-07-12T11:38Z UTC (Iter ~5273, **Tier 1**, consecutive_clean=0)
 
-**Iter ~5272 summary (2026-07-12T11:27Z):** 0 new alerts. wm=947. No open PRs. Services: all PIDs alive. Zombie PID 1834248 ALIVE (44d16h07m+, bash poll). Sync status=no-change, last_sync=10:31Z; HEAD==origin/main=e89d4607 [stable]. systemic_fixes=85, vp=36, ratio=~19.19 (trend=worsening — single-step from stable; attributable to spurious iter ~5270 intervention row; monitor not escalate). Check III artifact 2026-07-12T10:42Z (3 high-attention proposals). Awaiting Larry `approve threshold-update-2026-07-12`. Check I timer fires ~14:13Z UTC today (not yet fired). **ACTIVE G-rules:** unchanged from iter ~5271.
+**Iter ~5273 summary (2026-07-12T11:38Z):** 0 new alerts. wm=947. No open PRs. Services: all PIDs alive. Zombie PID 1834248 ALIVE (44d16h17m+, bash poll). Sync status=no-change, last_sync=11:31Z; HEAD==origin/main=55cd58b2 [stable]. systemic_fixes=85, vp=36, ratio=~19.19 (trend=worsening — attributable to spurious iter ~5270 intervention row; monitor not escalate). Check III artifact 2026-07-12T10:42Z (3 high-attention proposals). Awaiting Larry `approve threshold-update-2026-07-12`. Check I timer fires ~14:13Z UTC today (not yet fired). **ACTIVE G-rules:** unchanged from iter ~5272.
 
 ---
 
