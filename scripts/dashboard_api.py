@@ -7798,8 +7798,10 @@ def _handle_mission_dismiss(
     """`dismiss` — acknowledge an auto-proposed orphan thread so the board stops
     surfacing it (§ 6). Sets the ADDITIVE `acknowledged: true` flag; `phase`
     STAYS `proposed`. PR-backed (missions.json only). 404 if no such mission;
-    409 if not proposed (only a proposed thread is dismissable). Returns
-    {pr_url, branch}.
+    409 if not proposed (only a proposed thread is dismissable); 409 if already
+    acknowledged (idempotency guard — mirrors `defer`: a second dismiss would
+    write byte-identical missions.json content, so GitHub records no commit and
+    the PR opens with an empty diff, e.g. PR #940). Returns {pr_url, branch}.
 
     Re-proposal suppression is structural: the proposed entry persists, so its
     task_id stays registered and the autoregister healer's detect_orphans never
@@ -7828,6 +7830,21 @@ def _handle_mission_dismiss(
                     'mission_id': mission_id,
                     'phase': mission.get('phase'),
                     'hint': 'only a proposed mission can be dismissed',
+                },
+            )
+        # Already-dismissed idempotency guard. Without it a re-dismiss (a
+        # double-click, or a mission the healer already acknowledged) sets an
+        # already-true flag → the registry serializes byte-identical to main →
+        # GitHub's PUT records no commit → an empty-diff PR is opened (PR #940).
+        # Surface the no-op as a 409 instead of emitting a hollow PR, matching
+        # the `defer`/`resume` guards above.
+        if mission.get('acknowledged') is True:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    'error': 'mission already dismissed',
+                    'mission_id': mission_id,
+                    'hint': 'the proposed thread is already acknowledged',
                 },
             )
 
