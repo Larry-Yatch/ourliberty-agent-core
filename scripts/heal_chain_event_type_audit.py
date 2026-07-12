@@ -36,6 +36,11 @@ KILL_SWITCH = AGENTS_ROOT / 'healers.disabled'
 LOG_FILE = AGENTS_ROOT / 'logs' / 'heal-chain-event-type-audit.log'
 HEARTBEAT_FILE = AGENTS_ROOT / 'blackboard' / 'heal-chain-event-type-audit.heartbeat'
 
+# The alert this healer emits (source:subject). The positive-clear retraction
+# keys on this SAME source:subject so it retracts exactly its own stale red.
+ALERT_SOURCE = 'heal-chain-event-type-audit'
+ALERT_SUBJECT = 'chain-event-type-audit'
+
 # Repo scripts dir on sys.path so we can import chain_event_shipper.
 _SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(_SCRIPTS_DIR) not in sys.path:
@@ -70,7 +75,7 @@ def _dm_larry(message: str, subject: str, suggested_action: str) -> bool:
     try:
         import larry_alerts as la  # noqa: E402
         return la.append_alert(
-            source='heal-chain-event-type-audit',
+            source=ALERT_SOURCE,
             severity='warning',
             message=message,
             subject=subject,
@@ -79,6 +84,33 @@ def _dm_larry(message: str, subject: str, suggested_action: str) -> bool:
     except Exception as e:
         log(f'dm_larry failed: {type(e).__name__}: {e}', 'WARN')
         return False
+
+
+def _retract_standdown() -> int:
+    """Positive-clear retraction: the audit ran successfully AND observed zero
+    unknown event_types, so any earlier unknown-type red this healer emitted is
+    resolved. Retract it (keyed on this healer's own `source:subject`) and emit
+    one closure stand-down (auditable, never silent). Best-effort — swallow any
+    error so it can never wedge the tick. Note this is reached ONLY after a
+    successful connect + query + classify; every degraded read returns early
+    above, so a degraded probe can never reach here."""
+    try:
+        import larry_alerts as la  # noqa: E402
+        removed = la.retract_with_standdown(
+            f'{ALERT_SOURCE}:{ALERT_SUBJECT}',
+            standdown_message=(
+                'Weekly chain_events audit found zero unknown event_types this '
+                'run — the earlier unknown-type alert has resolved. Standing '
+                'it down.'
+            ),
+        )
+        if removed:
+            log(f'retracted {removed} stale chain-event-type-audit alert '
+                f'line(s) (no unknown types this run)')
+        return removed
+    except Exception as e:  # noqa: BLE001
+        log(f'_retract_standdown failed: {type(e).__name__}: {e}', 'WARN')
+        return 0
 
 
 def _connect_supabase():
@@ -155,6 +187,11 @@ def main() -> int:
     log(f'tick: 7d distinct types={len(counts)} unknown={len(unknown)}')
 
     if not unknown:
+        # POSITIVE-CLEAR ONLY: the audit positively ran (connect + query +
+        # classify all succeeded) and observed zero unknown types. Both degraded
+        # paths (connect fail, query fail) return early ABOVE this line, so a
+        # degraded read can never reach this retract.
+        _retract_standdown()
         return 0
 
     body_lines = [
@@ -172,7 +209,7 @@ def main() -> int:
     ])
     delivered = _dm_larry(
         message='\n'.join(body_lines),
-        subject='chain-event-type-audit',
+        subject=ALERT_SUBJECT,
         suggested_action=(
             'Investigate the writer (recent migrations, hot-patched '
             'daemons, manual INSERTs). If legitimate: add the type to '

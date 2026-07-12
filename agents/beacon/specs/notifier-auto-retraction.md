@@ -1,6 +1,6 @@
 # Spec: Notifier auto-retraction — recurring detectors clear their own reds
 
-**Status:** Slice 1 shipping (mechanism + 2 pilots); slices 2–3 planned
+**Status:** Slice 1 shipped (mechanism + 2 pilots); Slice 2 shipping (classification audit §7 + 5 single-subject adopters); Slice 3 planned
 **Author:** Claude-as-Forge (dispatched by Beacon, `notifier-auto-retraction-slice1-001`)
 **Related:** `heal_systemd_install_drift.py` (the retraction exemplar); `alert-pipeline-rework.md` (severity→route model this reuses)
 
@@ -110,3 +110,93 @@ positive-clear detector can adopt one call.
 - Any change to `resolve_alert`'s semantics, the cooldown/route model, or the
   digest pipeline.
 - Set-diff-shaped detectors (the `live_set` diff pattern) — deferred to slice 2.
+
+---
+
+## 7. Slice 2 — classification audit (the durable deliverable)
+
+Every recurring detector in `scripts/` (42 `heal_*.py` + the `dispatch_sentinel.py`
+sentinel = **43 total**) is classified below into one of the three shapes from §2,
+plus the two exclusion buckets. This audit is the reference slice 3 uses to know
+which detectors carry a per-detection *confidence* signal worth threading into
+`severity` — that set is exactly the **single-subject retractable** rows (adopted
++ deferred), because a positive-clear observation is also the natural place a
+confidence score lives.
+
+Classification was grounded factually: a detector that never calls
+`larry_alerts.append_alert` cannot emit a red and is therefore non-retractable by
+construction (verified by grep, 2026-07-11).
+
+### 7.1 Already retracting (baseline — untouched by slice 2)
+
+| Detector | Shape | Note |
+|---|---|---|
+| `heal_chain_event_shipper_heartbeat` | single-subject | Slice-1 pilot |
+| `heal_build_sequence_advancer_heartbeat` | single-subject | Slice-1 pilot |
+| `heal_systemd_install_drift` | set-diff | The `live_set` exemplar §4 generalizes |
+
+### 7.2 Retractable, single-subject — ADOPTED in slice 2 (this PR)
+
+Each retracts on a positive-clear branch gated by a sentinel unreachable by a
+degraded read, keyed on its own `source:subject`, with a REQUIRED
+degraded-does-not-retract test.
+
+| Detector | Positive-clear observation | Alert subject(s) retracted |
+|---|---|---|
+| `heal_pr_terminal_fanout_heartbeat` | `reason == 'fresh'` (recent heartbeat mtime) | `pr-terminal-fanout-stale` |
+| `heal_tier2_weekly_health_probe` | `ok is True` (PROBE_OK, exit 0) | `tier2_weekly_probe_failed` |
+| `heal_dashboard_api_sha_drift` | PROBE_OK **and** running SHA == on-disk HEAD (`'fresh'`) | `dashboard-api-sha-drift-stuck`, `dashboard-api-sha-drift-restart-failed` |
+| `heal_daemon_restart_manifest_drift` | `not drift.has_drift` (committed manifest == live closure) | `wrong-branch`, `commit-failed`, `push-failed`, `write-failed` |
+| `heal_chain_event_type_audit` | successful connect+query+classify **and** zero unknown types | `chain-event-type-audit` |
+
+Note two of these clear more than one subject from a single positive observation
+(dashboard-api, daemon-restart) — a single-detector-multi-red shape, still
+single-*observation* and so structurally safe, distinct from the set-diff shape
+(which diffs a live inventory).
+
+### 7.3 Retractable, single-subject — DEFERRED (structural hazard)
+
+| Detector | Why deferred |
+|---|---|
+| `heal_claude_max_burn_rate` | **Degrade-to-zero hazard.** `rolling_5h_token_volume` returns `0` on a missing/unreadable `costs.jsonl`, so the "under threshold" clear branch (pct low) is *reachable by a degraded read* — it violates POSITIVE-CLEAR ONLY without an extra existence/success guard. Adopt only after adding that guard (a follow-up, not slice 2). |
+
+### 7.4 Retractable, set-diff — DEFERRED to a later slice (per §2/§6)
+
+The clear-state is a *set difference* over a live inventory; adoption needs the
+per-member diff loop (the `heal_systemd_install_drift` pattern), out of scope here.
+
+`heal_pipeline_stall`, `heal_pulse_check_staleness`, `heal_stale_daemon_code`,
+`heal_undispatched_pr_review`, `heal_wedged_review_sessions`,
+`heal_claude_json_bind_drift`, `heal_credential_registry_drift`,
+`heal_droplet_git_drift`, `dispatch_sentinel`.
+
+### 7.5 One-shot / non-retractable — EXCLUDED
+
+Emit a red on an irreversible or point-in-time event; there is no recurring
+"now-clear" observation to key a retraction on.
+
+`heal_forge_wip_only_redispatch`, `heal_missions_card_gc`,
+`heal_orphan_autoregister`, `heal_phantom_dispatch_claim`, `heal_pr_auto_merge`,
+`heal_resume_paused_on_tier1`, `heal_unreviewed_merge_detector`.
+
+### 7.6 Non-alerting / silent — EXCLUDED (cannot emit a red)
+
+No `larry_alerts.append_alert` red to retract: reconcilers, GC, board-drains, and
+digest/tab-registration-only detectors.
+
+- **Zero `append_alert` (16):** `heal_abandoned_inbox_tasks`,
+  `heal_blocked_inbox_age`, `heal_completed_sequence_mission_reconcile`,
+  `heal_empty_inbox_files`, `heal_merged_pr_board_reconcile`,
+  `heal_missions_board_drain`, `heal_orphaned_mirror_claims`,
+  `heal_projects_store`, `heal_recovery_already_merged`,
+  `heal_restart_dedup_obsolete`, `heal_silent_loop_death`,
+  `heal_stale_alert_triage`, `heal_stale_approvals`,
+  `heal_stale_in_review_reconcile`, `heal_stale_pr_escalations`,
+  `heal_zombie_main_workers`.
+- **Non-red alert lanes (2):** `heal_review_ceiling_fit` (digest-only),
+  `heal_unregistered_approval` (registers approval-tab cards, not an escalate red).
+
+### 7.7 Tally
+
+3 already-retracting + 5 adopted + 1 single-subject-deferred + 9 set-diff-deferred
++ 7 one-shot-excluded + 18 non-alerting-excluded = **43**.

@@ -72,6 +72,13 @@ import daemon_restart_manifest as drm  # noqa: E402
 SOURCE = 'heal-daemon-restart-manifest-drift'
 MANIFEST_REL = 'config/daemon-restart-manifest.json'
 
+# The escalate subjects this healer can emit (each == the failing status token).
+# The positive-clear retraction (on the 'fresh' / no-drift branch) keys on the
+# SAME source:subject so it retracts exactly its own stale reds. The
+# 'regenerated' (committed) subject routes to the digest lane, not a red.
+_ESCALATE_SUBJECTS = ('wrong-branch', 'commit-failed', 'push-failed',
+                      'write-failed')
+
 GIT_TIMEOUT_SEC = 60
 PUSH_TIMEOUT_SEC = 180
 
@@ -376,6 +383,39 @@ def emit_alert(drift: DriftResult, status: str) -> bool:
         return False
 
 
+def _retract_standdown() -> int:
+    """Positive-clear retraction: the committed manifest matches the live import
+    closure again (no drift), so any earlier drift-escalation red this healer
+    emitted is resolved. Retract each escalate subject, keyed on this healer's
+    own `source:subject`, and emit one closure stand-down per subject actually
+    removed (auditable, never silent). Best-effort — swallow any error so it can
+    never wedge the tick."""
+    try:
+        la = _import_larry_alerts()
+    except Exception as e:  # noqa: BLE001 — import is best-effort
+        log(f'_retract_standdown import failed: {type(e).__name__}: {e}', 'WARN')
+        return 0
+    total = 0
+    for subject in _ESCALATE_SUBJECTS:
+        try:
+            removed = la.retract_with_standdown(
+                f'{SOURCE}:{subject}',
+                standdown_message=(
+                    'Daemon-restart manifest matches the live import closure '
+                    f'again — the earlier drift alert ({subject}) has resolved. '
+                    'Standing it down.'
+                ),
+            )
+            if removed:
+                log(f'retracted {removed} stale {subject} alert line(s) '
+                    f'(manifest fresh again)')
+            total += removed
+        except Exception as e:  # noqa: BLE001
+            log(f'_retract_standdown[{subject}] failed: '
+                f'{type(e).__name__}: {e}', 'WARN')
+    return total
+
+
 # -------------------- orchestration --------------------
 
 def run_once(*, dry_run: bool = False) -> str:
@@ -394,6 +434,11 @@ def run_once(*, dry_run: bool = False) -> str:
     drift = compute_drift(committed, fresh)
     if not drift.has_drift:
         log('no drift: committed manifest matches the live import closure')
+        # POSITIVE-CLEAR ONLY: retract our own drift reds solely on a positively
+        # observed no-drift state (committed manifest == freshly-built closure).
+        # A build/load failure returns 'error' above BEFORE this branch, so a
+        # degraded read can never reach the retract.
+        _retract_standdown()
         return 'fresh'
 
     log('DRIFT: ' + drift.one_line(), 'WARN')

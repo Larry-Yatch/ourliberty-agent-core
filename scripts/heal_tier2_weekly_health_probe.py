@@ -81,6 +81,13 @@ EXPECTED_TOKEN = 'PROBE_OK'
 PROBE_TIMEOUT_SEC = 60
 DM_COOLDOWN_HOURS = 6
 
+# The OAuth-liveness alert this healer emits (source:subject). The retraction
+# keys on this SAME source:subject so a recovered probe clears exactly its own
+# stale red, nothing else. The sibling `tier2_provisioning_drift` subject is a
+# set-diff/parity clear and is deliberately NOT retracted here (deferred).
+PROBE_ALERT_SOURCE = 'heal-tier2-weekly-probe'
+PROBE_ALERT_SUBJECT = 'tier2_weekly_probe_failed'
+
 _CONFIG_FILE = Path(__file__).resolve().parent.parent / 'config' / 'agent-models.json'
 
 # Haiku is the cheapest viable Claude model — probe is intentionally
@@ -408,6 +415,29 @@ def alert_parity_drift(drift: list) -> None:
     )
 
 
+def _retract_probe_standdown() -> int:
+    """Positive-clear retraction: the probe just returned PROBE_OK, so Tier-2
+    OAuth liveness recovered. Retract any stale 🔴 this healer emitted for the
+    probe-failed subject and emit one closure stand-down (auditable, never
+    silent), keyed on this healer's own `source:subject`. Best-effort — swallow
+    any error so it can never break the probe tick."""
+    try:
+        removed = larry_alerts.retract_with_standdown(
+            f'{PROBE_ALERT_SOURCE}:{PROBE_ALERT_SUBJECT}',
+            standdown_message=(
+                'Tier-2 weekly probe returned PROBE_OK again — OAuth liveness '
+                'has recovered. Standing down the earlier probe-failed alert.'
+            ),
+        )
+        if removed:
+            log(f'retracted {removed} stale tier2-probe alert line(s) '
+                f'(probe healthy again)', 'INFO')
+        return removed
+    except Exception as e:  # noqa: BLE001
+        log(f'_retract_probe_standdown failed: {type(e).__name__}: {e}', 'WARN')
+        return 0
+
+
 def run() -> int:
     if KILL_SWITCH.exists():
         log('kill switch present — exiting', 'INFO')
@@ -432,6 +462,12 @@ def run() -> int:
     ok, stdout, stderr, exit_code = run_probe(model_id)
     if ok:
         log(f'TIER2_WEEKLY_PROBE_OK model={model_id}', 'INFO')
+        # POSITIVE-CLEAR ONLY: retract our own probe-failed red solely on a
+        # positively-successful probe (`ok is True` — PROBE_OK observed with
+        # exit 0). Every degraded read (timeout / OOM / 401 / missing binary)
+        # returns ok=False and falls through to the alert branch below, so a
+        # degraded probe can never reach this retract.
+        _retract_probe_standdown()
         return 0
     reason, detail, suggested = classify_failure(stdout, stderr, exit_code)
     log(f'TIER2_WEEKLY_PROBE_FAILED model={model_id} reason={reason} '
@@ -453,10 +489,10 @@ def run() -> int:
         f'(exit={exit_code}). Detail: {snippet!r}. {suggested}'
     )
     ok = larry_alerts.append_alert(
-        source='heal-tier2-weekly-probe',
+        source=PROBE_ALERT_SOURCE,
         severity='warning',
         message=body,
-        subject='tier2_weekly_probe_failed',
+        subject=PROBE_ALERT_SUBJECT,
         suggested_action=suggested,
     )
     if ok:

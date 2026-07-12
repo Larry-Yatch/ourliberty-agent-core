@@ -32,6 +32,9 @@ LOG_FILE = AGENTS_ROOT / 'logs' / 'heal-pr-terminal-fanout-heartbeat.log'
 # The emitting source string — MUST match the sentinel's ALERT_SOURCE and the
 # never_silence entry in config/alert-translations.json exactly (§ 6).
 ALERT_SOURCE = 'pr-terminal-fanout'
+# The stale-alert subject (also the DM subject below) — the retraction keys on
+# this SAME source:subject so it clears exactly its own stale red, nothing else.
+ALERT_SUBJECT = 'pr-terminal-fanout-stale'
 
 STALE_THRESHOLD_SEC = 45 * 60       # 45 min == ~3 missed 15-min passes (§ 6).
 
@@ -83,6 +86,32 @@ def _dm_larry(message: str, subject: str, suggested_action: str) -> bool:
         return False
 
 
+def _retract_standdown() -> int:
+    """Positive-clear retraction: the heartbeat was just observed FRESH, so the
+    sentinel recovered. Retract any stale 🔴 this healer emitted for it and emit
+    one closure stand-down (auditable, never silent). Keyed on this healer's own
+    `source:subject`. Best-effort — swallow any error so it can never break the
+    tick, mirroring the alert path's fire-and-forget posture."""
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import larry_alerts as la  # noqa: E402
+        removed = la.retract_with_standdown(
+            f'{ALERT_SOURCE}:{ALERT_SUBJECT}',
+            standdown_message=(
+                'pr_terminal_fanout sentinel heartbeat is fresh again — the '
+                'sentinel has recovered. Standing down the earlier '
+                'stale-heartbeat alert.'
+            ),
+        )
+        if removed:
+            log(f'retracted {removed} stale fanout-heartbeat alert line(s) '
+                f'(heartbeat fresh again)')
+        return removed
+    except Exception as e:  # noqa: BLE001
+        log(f'_retract_standdown failed: {type(e).__name__}: {e}', 'WARN')
+        return 0
+
+
 def check_staleness(now: float | None = None) -> tuple[bool, float, str]:
     """Return (is_stale, age_seconds, reason)."""
     if not HEARTBEAT_FILE.exists():
@@ -106,6 +135,13 @@ def main() -> int:
     stale, age, reason = check_staleness()
     if not stale:
         log(f'tick: sentinel heartbeat fresh ({int(age)}s)')
+        # POSITIVE-CLEAR ONLY: retract our own stale red solely on a positively
+        # observed fresh heartbeat (reason == 'fresh'), NEVER on a degraded /
+        # unreadable probe. check_staleness returns is_stale=True on every error
+        # path, so a degraded read never reaches this branch — but gate on the
+        # positive sentinel explicitly so the invariant is local and testable.
+        if reason == 'fresh':
+            _retract_standdown()
         return 0
 
     log(f'STALE sentinel heartbeat — {reason}', 'WARN')
@@ -116,7 +152,7 @@ def main() -> int:
             f'Reason: {reason}\n'
             f'Heartbeat path: {HEARTBEAT_FILE}'
         ),
-        subject='pr-terminal-fanout-stale',
+        subject=ALERT_SUBJECT,
         suggested_action=(
             'ssh larry@134.209.44.80 and run: '
             'systemctl status ourliberty-pr-terminal-fanout.service '
