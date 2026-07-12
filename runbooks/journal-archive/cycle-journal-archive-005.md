@@ -38327,3 +38327,84 @@ No new WARNs/ERRORs. NOMINAL ✅
 
 ---
 
+## Iteration ~5192 — 2026-07-12T01:31Z UTC (Larry /cycle, Tier 1)
+
+**Health:** ✅ Mostly nominal. 0 new alerts. Positive: **PR #950 NEW** (fix-pulse-envelope-builder-reply-chat-id-001, Mirror review dispatched 19:24:50 MDT). Carries: zombie PID 1834248, PR #945 CONFLICTING (Larry owns), PR #946 round-1 malformed retry 1/3 self-healing.
+
+**VERIFY-BEFORE-REASSERT (from iter ~5191):**
+- **"zombie PID 1834248 (44d+6h+)"**: CONFIRMED ⚠️ — 44d+06:11:03 elapsed (Ss, bash poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`). [carry]
+- **"beacon PID 575391"**: CONFIRMED ✅ — pgrep: running.
+- **"outbox-notifier PID 575404"**: CONFIRMED ✅ — pgrep: running.
+- **"inbox_watcher PID 278746"**: CONFIRMED ✅ — pgrep: running.
+- **"pending=0"**: CONFIRMED ✅ — beacon-pending-approvals.json: pending=0. NOMINAL ✅
+- **"sync push_failures=0"**: CONFIRMED ✅ — last_sync=2026-07-12T00:51:17Z (39 min ago), status=success. ✅
+- **"PR #945 CONFLICTING"**: CONFIRMED ⚠️ — OPEN/UNKNOWN. Stall healer DM'd Larry 18:50:47 MDT. Larry owns rebase. [yellow carry]
+- **"PR #946 round-1 malformed marker retry 1/3"**: CONFIRMED ⚠️ — retry 1/3 written at 19:20:11 MDT. Mirror inbox clear of this item (likely claimed or pending dispatch). Self-healing. [yellow monitoring]
+- **"PR #949 Mirror review in progress"**: CONFIRMED — review file present in Mirror inbox. [positive carry]
+- **"watermark=945"**: CONFIRMED ✅ — file_length=945 (0 new alerts). NOMINAL ✅
+- **"HEAD=3a38a48d=origin/main"**: UPDATED ✅ — HEAD=00c5d430 (Pulse cycle 20260712T012834Z, wrapper commit post-5191) == origin/main. ✅
+
+**Check 0 — Alert triage:** repair-watermark: repaired=false (wm=945, fl=945). 0 new alerts. Watermark holds at 945. NOMINAL ✅
+
+**Check 1 — Log noise:** outbox-notifier PID 575404 ✅. New since iter ~5191 (~01:27Z):
+- 19:24:50 MDT (01:24:50Z): review-request dispatched mirror for fix-pulse-envelope-builder-reply-chat-id-001 (PR #950). ✅ [positive — PR #950 opened, Mirror review in motion]
+- No new WARNs/ERRORs. Last entry 19:24:50 MDT. NOMINAL ✅
+
+**Check 2 — Telegram sweep:** beacon PID 575391 ✅. Last bot log: idx=944 at 19:21:35 MDT (heal-wedged-review-sessions reaped wt-mirror-pr-ourliberty-agent-core-946 — already triaged iter ~5191). No new Larry directives. NOMINAL ✅
+
+**Check 3 — Pipeline stall:** DRY-RUN (01:29Z UTC) → "0 alert(s) would fire, 0 recovery(ies) would be attempted." All stalls in cooldown (mirror_pass_unmerged, rebase_obligation, unrouted_open_pr:940). RETRY_EXHAUSTED_SKIP for PR #946 (reason=superseded_session). NOMINAL ✅
+
+**Check 4 — Pending directives:** pending=0. NOMINAL ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-12T01:31:04Z (fresh at check). NOMINAL ✅
+
+**Check A — Source repo:** HEAD=00c5d430==origin/main ✅; clean tree ✅; on main ✅. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-12T00:51:17Z (39 min), status=success, push_failures=0. G-rule `sync-push-fail-/dev/stdout-systemd-001` [2/3 carry — fix not yet landed]. ✅
+**Check C — Agent liveness:** beacon PID 575391 ✅; outbox-notifier PID 575404 ✅; inbox_watcher PID 278746 ✅. ⚠️ Zombie PID 1834248 (44d+06:11:03, bash poll loop, target file MISSING). [carry]
+**Check E — PR/merge state:**
+- **PR #950** — OPEN/UNKNOWN, no labels. `fix(pulse): resolve reply_chat_id at direction-ask envelope`. Mirror review dispatched 19:24:50 MDT. **NEW ✅** (fix-pulse-envelope-builder-reply-chat-id-001 built + review in flight)
+- **PR #949** — OPEN/UNKNOWN, no labels. `chore(alert-translations): classify outbox-notifier merge_conflict_manual_rebase as Tier-3`. Mirror review in inbox. [carry]
+- **PR #946** — OPEN/UNKNOWN, auto-review. Round-1 malformed marker; retry 1/3 written 19:20:11 MDT. Mirror inbox clear of it (picked up or pending dispatch). [yellow monitoring]
+- **PR #945** — OPEN/UNKNOWN. CONFLICTING. Larry owns rebase. [yellow carry]
+- **PR #940** — OPEN/UNKNOWN, no labels. chore(*). By-design. [blue carry]
+- **PR #860** — OPEN/UNKNOWN, no labels. Mirror review in inbox. [blue positive motion]
+
+**§5.0:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅.
+
+**Conditional checks — UTC Sunday 2026-07-12 (~01:31Z):**
+- Check I: Timer fires ~14:13Z UTC today. Not yet fired. [carry]
+- Check III: Timer fires ~10:44Z UTC today. Not yet fired. [carry]
+- Check XI: Timer fires ~10:20Z UTC today (attention_rate=18.8%, over gate). Not yet fired. [yellow carry]
+- Check IV/VIII/IX/X/XII/XIV: Monday gates. Skip. ✅
+
+**G-rule assessment:** No new G-rule occurrences this iter. PR #950 represents positive motion on G-rule pulse-auto-dispatch-null-reply-chat-id [3/3 DISPATCHED, vp → Forge built PR #950, Mirror review in flight]. All counts carry from iter ~5191.
+
+**Actions taken:**
+1. §5.0: audit_due_nudge no-op; distill_detector no-op. ✅
+2. PRIME ledger: `iter_clean` appended (01:30Z UTC). ✅
+3. Tier state: `record --checks-clean false` → tier=1, consecutive_clean=0. ✅
+
+**Escalations:** 0 new Pulse DMs. All carries already DM'd via stall healer (PR #945 18:50:47 MDT) or prior iters.
+
+**Standing findings (updated):**
+- [yellow] **zombie-bash-pid-1834248** — 44d+06:11:03, bash poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`. ask-then-do: `kill 1834248`. [carry]
+- [yellow] **PR #945 rebase_obligation** — CONFLICTING, stall healer DM'd Larry 18:50:47 MDT. Manual rebase: `gh pr checkout 945 && git fetch origin && git rebase origin/main && git push --force-with-lease`. [carry — Larry owns]
+- [yellow] **PR #946 round-1 malformed marker** — retry 1/3 self-written 19:20:11 MDT. Monitoring for retry 2/3 result. [monitoring]
+- [yellow] **sync-push-fail-/dev/stdout-systemd-001** — [2/3]. push_failures=0 this iter. Fix not yet landed. [carry]
+- [yellow] **check-xi-drift-over-gate** — 18.8% (gate=10%). Timer fires Sun ~10:20Z UTC today. [carry]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07`. [carry]
+- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
+- [blue] **PR #950** — NEW ✅. fix-pulse-envelope-builder-reply-chat-id-001. Mirror review dispatched 19:24:50 MDT. [positive]
+- [blue] **PR #949** — OPEN. alert-translation-merge-conflict-rebase-tier3-001. Mirror review in inbox. [positive motion]
+- [blue] **PR #860** — OPEN. rebase-pr-860-001. Mirror review in inbox. [positive motion]
+- [blue] **PR #940** — OPEN, no labels. chore(*). By-design. [carry]
+- [blue] **Check I proposal #1** — `notify-p3a-retro-prep` ($1.91 vs $0.28 baseline, 98σ). Use `/dispatch 1`. [carry]
+- [blue] **G-rules (dispatched, vp):** pulse-auto-dispatch-null-reply-chat-id [3/3 DISPATCHED, vp — PR #950 Mirror review in flight]; outbox-notifier-merge-conflict-manual-rebase-tier4-001 [3/3 vp, Forge built PR #949, Mirror review in inbox]; outbox-notifier-notification-intent-reject-tier4-001 [3/3, vp]; ourliberty-health-subject-key-mismatch-001 [3/3, vp]; forge-wip-redispatch-digest-tier4-001 [vp]; forge-revision-preamble-missing-pr711-001 [vp]; forge-wip-redispatch-exhausted-pr-exists-fp-001 [APPROVAL_REQUEST QUEUED, vp]; decision-needed-approval-forge-dispatch-no-target-repo-001 [vp]; no-session-revision-active-mirror-session-fp-001 [vp].
+- [blue] **G-rule 2/3:** forge-wip-redispatch-exhausted-genuine-no-pr-001; outbox-notifier-notification-intent-review-escalate-tier4-001; outbox-notifier-auto-merge-stale-revalidation-tier4-001.
+- [blue] **G-rule 1/3:** mirror-malformed-verdict-heal-reap-path-001; mirror-queue-wait-gauge-tier4-001; inbox-watcher-tier-pool-all-unavailable-tier4-001; heal-pipeline-stall-unrouted-deep-review-required-fp-001; heal-pulse-check-staleness-single-flight-skip-fp-001; gate-parallelism-monitor-regression-data-001; pulse-rotation-check-source-tier4-001.
+
+**PRIME DIRECTIVE:** 0 new interventions; 0 new systemic_fixes; iter_clean appended. ratio=18.95 (86 systemic_fixes / ~1631 interventions; 36 vp; ledger is ground truth). trend=worsening (carry — no new systemic_fixes).
+**Tier end-of-iter:** **Tier 1** (zombie carry; PR #945 carry; PR #946 monitoring; consecutive_clean=0).
+
+---
+
