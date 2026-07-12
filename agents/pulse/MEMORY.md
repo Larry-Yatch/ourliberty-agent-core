@@ -628,9 +628,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-12T17:57Z UTC (Iter ~5314, **Tier 3**, consecutive_clean=2)
+## Status snapshot — updated 2026-07-12T18:28Z UTC (Iter ~5315, **Tier 3**, consecutive_clean=3)
 
-**Iter ~5314 summary (2026-07-12T17:57Z):** 0 new alerts. No open PRs. Services: all PIDs alive. Zombie PID 1834248 ALIVE (44d22h37m+, bash poll). Sync push_failures=0; HEAD=3f82734d==origin/main. ratio=~19.80 (trailing-30d). **Tier 3**, consecutive_clean=2. Check I/XI/III artifacts unchanged (all fired today already). Awaiting Larry `approve threshold-update-2026-07-12`. outbox-notifier silent ~13h13m (no work in flight — normal). **ACTIVE G-rules:** unchanged from iter ~5313.
+**Iter ~5315 summary (2026-07-12T18:28Z):** 1 new alert (Tier-3 silence, heal-dashboard-api-sha-drift-healed). No open PRs. Services: all PIDs alive. Zombie PID 1834248 ALIVE (44d23h8m+, bash poll). Sync push_failures=0; HEAD=ffc5b9c7==origin/main. ratio=~19.80 (trailing-30d). **Tier 3**, consecutive_clean=3. threshold-update-2026-07-12-001 APPROVAL_REQUEST now in pipeline (Larry approved 18:13Z, Beacon created request 18:16Z, pending=1). outbox-notifier silent ~13h32m (no work in flight — normal). **ACTIVE G-rules:** unchanged from iter ~5314.
 
 ---
 
