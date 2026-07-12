@@ -36096,3 +36096,80 @@ NOMINAL ✅
 
 ---
 
+## Iteration ~5165 — 2026-07-11T22:25Z UTC (Larry /loop /cycle, Tier 1)
+
+**Health:** ✅ Nominal. 2 new alerts both Tier-3 (dashboard-api-sha-drift-healed, pipeline-stall retr-retry1 now on cooldown). Zombie carry + PR #860 conflict hold Tier 1. Notable: `heal-wip-and-stall-suppress-rejected-tasks-001` Forge build active — durable fix for the reject-stall loop auto-approved by Beacon.
+
+**VERIFY-BEFORE-REASSERT (from iter ~5164):**
+- **"zombie PID 1834248 (~44d+2h+58m)"**: CONFIRMED ⚠️ — ps shows 44-03:06:04 (Ss, bash poll loop). [carry]
+- **"beacon PID 278509"**: CONFIRMED ✅ — Ss, 02:05:10 elapsed.
+- **"outbox-notifier PID 279048"**: CONFIRMED ✅ — Ss, 02:04:52 elapsed.
+- **"inbox_watcher PID 278746"**: CONFIRMED ✅ — Ssl, 02:05:01 elapsed.
+- **"pending=1 (heal-stall-forge-reject-no-pr-skip-001)"**: CONFIRMED ⚠️ — still pending=1 (approval_id field null in json; created 22:16:52Z). Not stale (~8 min). NOMINAL.
+- **"sync last_sync=2026-07-11T22:00:49Z"**: CONFIRMED ✅ — ~25 min at check; within 2h window. NOMINAL.
+- **"PR #860 OPEN/UNKNOWN"**: UPDATED — now OPEN/**CONFLICTING** (merge conflict). No labels. [blue carry, state updated]
+- **"Check XI attention_rate=18.8%"**: Carry — no new artifact until Sun. [yellow carry]
+- **"watermark=921"**: UPDATED — repair-watermark returned file_length=923 > watermark=921. 2 new alerts at lines 922–923. Both triaged Tier-3; watermark advanced to 923. ✅
+- **"HEAD=9e774d12=origin/main"**: CONFIRMED ✅ — clean tree, on main, up to date. NOMINAL ✅
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 921, "file_length": 923}`. 2 new alerts:
+- Line 922: `ts=2026-07-11T22:17:44Z, source=heal-dashboard-api-sha-drift, subject=dashboard-api-sha-drift-healed, route=digest`. Triage helper → **Tier-3 silence (known-pattern)**. Dashboard API auto-restarted on sha drift (running 35efdd05, on-disk HEAD c1a3edbb); routine auto-heal, bot skipped DM (route=digest). ✅
+- Line 923: `ts=2026-07-11T22:22:24Z, source=heal-pipeline-stall, subject=pipeline-stall:forge-no-pr:auto-route-externally-authored-pr-reviews-001-retr-retry1, route=escalate`. Triage helper → **Tier-3 silence (known-pattern)**. Same G-rule FP as iter ~5163 (3/3 REJECT-archive blind spot); fix dispatched last iter to Beacon (APPROVAL_REQUEST queued). Cooldown now active per Check 3. ✅
+- Watermark advanced 921→923. NOMINAL ✅
+
+**Check 1 — Log noise:** outbox-notifier PID 279048 ✅ (Ss, 02:04:52). Latest entry: `[16:23:29 MDT] build-phase dispatched forge <- beacon (task=heal-wip-and-stall-suppress-rejected-tasks-001)`. Active Forge build in progress. Prior entries: PR #938 (heal-wip-redispatch-already-merged-suppress-001) MIRROR REVIEW_PASS + AUTO_MERGE 15:00:31 MDT ✅. APPROVAL_REQUEST `heal-stall-forge-reject-no-pr-skip-001` delivered force_ask to Larry chat at 16:16:52 MDT ✅. No WARNs/ERRORs. NOMINAL ✅
+
+**Check 2 — Telegram sweep:** beacon PID 278509 ✅ (Ss, 02:05:10). Key log entries (MDT):
+- 16:15:13 MDT: Larry sent "we got the same errors again" (about auto-route stall) → Beacon responded 16:19:51 MDT: durable fix, auto-approved `heal-wip-and-stall-suppress-rejected-tasks-001`. ✅
+- 16:19:53 MDT: approval_request idx=920 delivered (`heal-stall-forge-reject-no-pr-skip-001`) to Larry chat 7998341473. [carry APPROVAL_PENDING]
+- 16:20:59 MDT: Larry sent "Since this is the third loop of the same bug, should we do a broader analysis to try and find all the loops of this bug" → call_beacon dispatch_tier=tier1 at 16:21:00 MDT. Beacon session active handling this.
+- Watchdog last: 16:20:16 MDT (22:20:16Z UTC) — overall=healthy ✅. NOMINAL ✅
+
+**Check 3 — Pipeline stall:** DRY-RUN (22:23:52Z UTC) → "0 alert(s) would fire, 0 recovery(ies) would be attempted." Both `retry1` AND `retr-retry1` now suppressed (cooldown). 18+ FORGE_NO_PR_SKIP entries. NOMINAL ✅
+
+**Check 4 — Pending directives:** pending=1 (history=474). APPROVAL_REQUEST `heal-stall-forge-reject-no-pr-skip-001` (created 22:16:52Z, ~8 min). Delivery confirmed (bot log idx=920). Awaiting Larry "approve". Not stale. Note: broader fix `heal-wip-and-stall-suppress-rejected-tasks-001` already auto-approved + Forge building — may supersede this narrower fix. NOMINAL ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-11T22:19:10Z (~6 min at check). Watchdog last: 22:20:16Z UTC — overall=healthy. NOMINAL ✅
+
+**Check A — Source repo:** HEAD=9e774d12 ("Pulse cycle 20260711T222213Z") = origin/main ✅; clean tree ✅; on main ✅. Not ahead, not behind. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-11T22:00:49Z, status=no-change. NOMINAL ✅
+**Check C — Agent liveness:** beacon PID 278509 ✅; outbox-notifier PID 279048 ✅ (active build dispatch); inbox_watcher PID 278746 ✅; watchdog overall=healthy (22:20:16Z UTC). ⚠️ Zombie PID 1834248 (44-03:06:04, Ss, bash poll loop). [carry]
+**Check E — PR/merge state:**
+- **PR #860** — OPEN/**CONFLICTING** (was UNKNOWN iter ~5164, DIRTY iter ~5163, UNKNOWN again ~5162). docs(spec): XIV-b. No labels. Merge conflict persists. [blue carry, state updated]
+
+**§5.0:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅.
+
+**Conditional checks — UTC Saturday 2026-07-11 (~22:25Z):**
+- Check I: Not a firing day (Sat). ✅
+- Check III/IV/VIII/IX/X/XII/XIV: Sunday/Monday gates. Skip. ✅
+- Check XI: artifact check-xi-20260711T102013 — attention_rate=18.8%, over_gate=True. No new artifact until Sun. [yellow carry]
+
+**G-rule assessment:** 0 new G-rule hits this iter. `heal-pipeline-stall-forge-reject-no-pr-fp-001` remains APPROVAL_REQUEST PENDING (`heal-stall-forge-reject-no-pr-skip-001`). Broader fix `heal-wip-and-stall-suppress-rejected-tasks-001` Forge build active — if it lands, the narrower approval may be moot. All other G-rule counts carry from iter ~5164.
+
+**Actions taken:**
+1. Check 0: triaged line 922 (Tier-3 silence, dashboard-api-sha-drift-healed). ✅
+2. Check 0: triaged line 923 (Tier-3 silence, pipeline-stall retr-retry1 known-pattern). Watermark advanced 921→923. ✅
+3. PRIME ledger: `iter_clean` appended (tier=1, template=nominal, 22:25:05Z UTC). ✅
+4. Tier state: `record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=22:25:06Z. ✅
+
+**Escalations:** 0 new Pulse DMs. Beacon session active on Larry's "broader analysis" question; `heal-wip-and-stall-suppress-rejected-tasks-001` in Forge build queue.
+
+**Standing findings (updated):**
+- [yellow] **zombie-bash-pid-1834248** — 44-03:06:04, bash poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`. ask-then-do: `kill 1834248`. [carry]
+- [yellow] **check-xi-drift-over-gate** — 18.8% (gate=10%). Next artifact Sun. [carry]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07`. [carry]
+- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
+- [yellow] **forge-reject-stall-fp-APPROVAL_PENDING** — `heal-stall-forge-reject-no-pr-skip-001` queued for Larry. Reply "approve" to begin fix (may be superseded by broader `heal-wip-and-stall-suppress-rejected-tasks-001` build). [carry]
+- [blue] **PR #860** — OPEN/CONFLICTING. docs(spec): XIV-b. No labels; merge conflict. [carry, state updated]
+- [blue] **heal-wip-and-stall-suppress-rejected-tasks-001** — Forge build ACTIVE (build-phase dispatched 22:23:29Z UTC). Beacon auto-approved. Broader fix for reject-stall loop. [NEW this iter]
+- [blue] **Larry "broader analysis" ask** — Larry asked at 16:20:59 MDT about broader loop-bug analysis. Beacon session active. [NEW this iter]
+- [blue] **Check I proposal #1** — `notify-p3a-retro-prep` ($1.91 vs $0.28 baseline, 98σ). Use `/dispatch 1`. [carry]
+- [blue] **G-rules (dispatched, vp):** heal-pipeline-stall-forge-reject-no-pr-fp-001 [APPROVAL_REQUEST pending]; outbox-notifier-notification-intent-reject-tier4-001 [3/3, vp]; ourliberty-health-subject-key-mismatch-001 [3/3, vp]; forge-wip-redispatch-digest-tier4-001 [vp]; forge-revision-preamble-missing-pr711-001 [vp]; forge-wip-redispatch-exhausted-pr-exists-fp-001 [APPROVAL_REQUEST QUEUED iter ~3279, vp]; decision-needed-approval-forge-dispatch-no-target-repo-001 [vp]; no-session-revision-active-mirror-session-fp-001 [vp].
+- [blue] **G-rule 2/3 (CARRY):** outbox-notifier-merge-conflict-manual-rebase-tier4-001; forge-wip-redispatch-exhausted-genuine-no-pr-001; outbox-notifier-notification-intent-review-escalate-tier4-001; outbox-notifier-auto-merge-stale-revalidation-tier4-001.
+- [blue] **G-rule 1/3:** mirror-malformed-verdict-heal-reap-path-001; mirror-queue-wait-gauge-tier4-001; inbox-watcher-tier-pool-all-unavailable-tier4-001; heal-pipeline-stall-unrouted-deep-review-required-fp-001; heal-pulse-check-staleness-single-flight-skip-fp-001; gate-parallelism-monitor-regression-data-001; pulse-rotation-check-source-tier4-001.
+
+**PRIME DIRECTIVE:** 0 new interventions; 0 new systemic_fixes; iter_clean appended. ratio=18.91 (86 systemic_fixes / ~1630 interventions; 36 vp; ledger is ground truth). trend=worsening.
+**Tier end-of-iter:** **Tier 1** (zombie carry + PR #860 conflict; consecutive_clean=0).
+
+---
+
