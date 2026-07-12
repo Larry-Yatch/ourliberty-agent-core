@@ -35955,3 +35955,75 @@ NOMINAL ✅
 
 ---
 
+## Iteration ~5163 — 2026-07-11T22:14Z UTC (Larry /cycle, Tier 1)
+
+**Health:** ⚠️ Drift. Check 3 new DRY-RUN finding: `retr-retry1` task also REJECT-archive — G-rule `heal-pipeline-stall-forge-reject-no-pr-fp-001` advances to [3/3] → Beacon dispatched. PR #860 state changed UNKNOWN→DIRTY. Zombie carry holds Tier 1.
+
+**VERIFY-BEFORE-REASSERT (from iter ~5162):**
+- **"zombie PID 1834248 (~44d+2h+45m)"**: CONFIRMED ⚠️ — ps shows 44-02:52:17 (Ss, bash poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`). [carry]
+- **"beacon PID 278509"**: CONFIRMED ✅ — Ss, 01:52:42 elapsed.
+- **"outbox-notifier PID 279048"**: CONFIRMED ✅ — Ss, 01:52:24 elapsed. Last entry 15:00:32 MDT (21:00:32Z UTC) — unchanged.
+- **"inbox_watcher PID 278746"**: CONFIRMED ✅ — Ssl, 01:52:33 elapsed.
+- **"pending=0"**: CONFIRMED ✅ — history=473.
+- **"sync last_sync=2026-07-11T22:00:49Z"**: CONFIRMED ✅ — ~13 min at check; within 2h window. NOMINAL.
+- **"PR #860 OPEN/UNKNOWN"**: UPDATED ⚠️ — now OPEN/DIRTY (merge conflict). No labels. [blue carry, state updated]
+- **"Check XI attention_rate=18.8%"**: Carry — no new artifact until Sun. [yellow carry]
+- **"watermark=920=file_length=920"**: CONFIRMED ✅ — repair-watermark: repaired=false. 0 new alerts.
+- **"HEAD=35efdd05=origin/main"**: CONFIRMED ✅ — git on main, clean tree, up to date with origin. NOMINAL ✅
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 920, "file_length": 920}`. 0 new alerts. NOMINAL ✅
+
+**Check 1 — Log noise:** outbox-notifier PID 279048 ✅ (Ss, 01:52:24). Last entry 15:00:32 MDT (21:00:32Z UTC) — unchanged (queued completion DM for PR #938 review-pass). No new entries, no WARNs/ERRORs. NOMINAL ✅
+
+**Check 2 — Telegram sweep:** beacon PID 278509 ✅ (Ss, 01:52:42). Last bot log entry: `[16:00:26-0600] notification idx=919 delivered (intent=medic-diagnosis)` (22:00:26Z UTC). No new Larry messages. No orphan directives. Watchdog last: 16:09:58 MDT (22:09:58Z UTC) — overall=healthy ✅. NOMINAL ✅
+
+**Check 3 — Pipeline stall:** DRY-RUN (22:10:54Z UTC) → ⚠️ "1 alert(s) would fire, 0 recovery(ies) would be attempted."
+- `retry1` → `suppressed (cooldown)`. ✅
+- **NEW:** `DRY-RUN would alert: forge_built_no_pr:auto-route-externally-authored-pr-reviews-001-retr-retry1`. Investigation: archive at `forge/.archive/auto-route-externally-authored-pr-reviews-001-retr-retry1.json` → `result="Preflight decision: **REJECT**..."`, `branch=null`, `status=null`. Same FP pattern as `retry1` — Forge REJECT'd at preflight; stall checker sees no branch and no PREFLIGHT_EXIT marker, fires `forge_built_no_pr`. **G-rule `heal-pipeline-stall-forge-reject-no-pr-fp-001` [3/3]** → dispatch to Beacon. Note: this is the medic-diagnosed "stale-ledger" task from iter ~5161 — medic framing was partially correct (healer ledger not cleaned up) but root cause is also the REJECT-archive blind spot.
+
+**Check 4 — Pending directives:** pending=0 (history=473). NOMINAL ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-11T22:08:59Z (~5 min at check). Watchdog last: 22:09:58Z UTC — overall=healthy. NOMINAL ✅
+
+**Check A — Source repo:** HEAD=35efdd05 ("Pulse cycle 20260711T220542Z") = origin/main ✅; clean tree ✅; on main ✅. Not ahead, not behind. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-11T22:00:49Z, status=no-change. NOMINAL ✅
+**Check C — Agent liveness:** beacon PID 278509 ✅; outbox-notifier PID 279048 ✅; inbox_watcher PID 278746 ✅; watchdog overall=healthy (22:09:58Z UTC). ⚠️ Zombie PID 1834248 (44-02:52:17, Ss, bash poll loop). [carry]
+**Check E — PR/merge state:**
+- **PR #860** — OPEN/**DIRTY** (was UNKNOWN). docs(spec): XIV-b. No labels. Merge conflict developed. [blue carry, state updated]
+
+**§5.0:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅.
+
+**Conditional checks — UTC Saturday 2026-07-11 (~22:14Z):**
+- Check I: Not a firing day (Sat). ✅
+- Check III/IV/VIII/IX/X/XII/XIV: Sunday/Monday gates. Skip. ✅
+- Check XI: artifact check-xi-20260711T102013 — attention_rate=18.8%, over_gate=True. No new artifact until Sun. [yellow carry]
+
+**G-rule assessment:** 1 G-rule advances this iter: `heal-pipeline-stall-forge-reject-no-pr-fp-001` → [3/3] (DRY-RUN `retr-retry1` confirmed REJECT-result archive, same FP as `retry1`). Dispatch to Beacon written: `direction-ask-forge-reject-stall-fp-forge-no-pr-001.json`. Fix requested: add `preflight_reject` skip guard in `scripts/heal_pipeline_stall.py` (symmetric with existing `preflight_exit` skip). All other G-rule counts carry from iter ~5162.
+
+**Actions taken:**
+1. Check 3: investigated `retr-retry1` archive — REJECT-result confirmed. G-rule [3/3]. ✅
+2. Dispatched `direction-ask-forge-reject-stall-fp-forge-no-pr-001.json` to Beacon inbox (`/home/larry/agents/inboxes/beacon/`). ✅
+3. PRIME ledger: `intervention` appended (tier=1, template=heal-pipeline-stall-forge-reject-no-pr-fp-001-3of3, 22:14:23Z UTC). ✅
+4. PRIME ledger: `systemic_fix` appended (tier=1, template=heal-pipeline-stall-forge-reject-no-pr-fp-001-beacon-dispatch, 22:14:25Z UTC). ✅
+5. Tier state: `record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=22:14:26Z. ✅
+
+**Escalations:** 0 new Pulse DMs. Bot already DM'd Larry for medic-diagnosis (idx=919, retr-retry1 stale-ledger); Beacon dispatch is the systemic fix path.
+
+**Standing findings (updated):**
+- [yellow] **zombie-bash-pid-1834248** — 44-02:52:17, bash poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`. ask-then-do: `kill 1834248`. [carry]
+- [yellow] **check-xi-drift-over-gate** — 18.8% (gate=10%). Next artifact Sun. [carry]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07`. [carry]
+- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
+- [blue] **PR #860** — OPEN/DIRTY. docs(spec): XIV-b. Merge conflict; no labels. [carry, state updated]
+- [blue] **Check I proposal #1** — `notify-p3a-retro-prep` ($1.91 vs $0.28 baseline, 98σ). Use `/dispatch 1`. [carry]
+- [blue] **medic-stale-ledger-auto-route-retr-retry1** — medic DM'd Larry with diagnosis. Root cause also includes REJECT-archive blind spot (now dispatched to Beacon via G-rule 3/3 fix). Watching for Larry response on remediation options. [carry]
+- [blue] **G-rule DISPATCHED ✅:** `heal-pipeline-stall-forge-reject-no-pr-fp-001` [3/3 → Beacon dispatch] — `direction-ask-forge-reject-stall-fp-forge-no-pr-001.json` written. verification_pending.
+- [blue] **G-rules (dispatched, vp):** outbox-notifier-notification-intent-reject-tier4-001 [3/3, vp]; ourliberty-health-subject-key-mismatch-001 [3/3, vp]; forge-wip-redispatch-digest-tier4-001 [vp]; forge-revision-preamble-missing-pr711-001 [vp]; forge-wip-redispatch-exhausted-pr-exists-fp-001 [APPROVAL_REQUEST QUEUED iter ~3279, vp]; decision-needed-approval-forge-dispatch-no-target-repo-001 [vp]; no-session-revision-active-mirror-session-fp-001 [vp].
+- [blue] **G-rule 2/3 (CARRY):** outbox-notifier-merge-conflict-manual-rebase-tier4-001; forge-wip-redispatch-exhausted-genuine-no-pr-001; outbox-notifier-notification-intent-review-escalate-tier4-001; outbox-notifier-auto-merge-stale-revalidation-tier4-001.
+- [blue] **G-rule 1/3:** mirror-malformed-verdict-heal-reap-path-001; mirror-queue-wait-gauge-tier4-001; inbox-watcher-tier-pool-all-unavailable-tier4-001; heal-pipeline-stall-unrouted-deep-review-required-fp-001; heal-pulse-check-staleness-single-flight-skip-fp-001; gate-parallelism-monitor-regression-data-001; pulse-rotation-check-source-tier4-001.
+
+**PRIME DIRECTIVE:** 1 new intervention (G-rule 3/3); 1 new systemic_fix (Beacon dispatch); ratio carries ~19.09 (86 systemic_fixes / ~1631 interventions; 37 vp; ledger is ground truth). trend=worsening (ratio unchanged — new intervention + systemic_fix added simultaneously).
+**Tier end-of-iter:** **Tier 1** (zombie carry + Check 3 DRY-RUN; consecutive_clean=0).
+
+---
+
