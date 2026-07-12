@@ -628,9 +628,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-12T15:17Z UTC (Iter ~5302, **Tier 1**, consecutive_clean=0)
+## Status snapshot — updated 2026-07-12T15:32Z UTC (Iter ~5304, **Tier 1**, consecutive_clean=0)
 
-**Iter ~5302 summary (2026-07-12T15:17Z):** 0 new alerts (wm=952==fl=952). No open PRs. Services: all PIDs alive. Zombie PID 1834248 ALIVE (44d19h57m+, bash poll). Sync status=no-change, last_sync=14:32Z; HEAD==origin/main=2b0a18b7. systemic_fixes=85, vp=36, ratio=~19.12. Check I/XI/III artifacts unchanged (all fired today already). Awaiting Larry `approve threshold-update-2026-07-12`. outbox-notifier silent ~10.5h+ (no work in flight — normal). **ACTIVE G-rules:** unchanged from iter ~5301.
+**Iter ~5304 summary (2026-07-12T15:32Z):** 1 new alert (wm=952→953), Tier-3 silenced (heal-dashboard-api-sha-drift-healed, auto-restart of ourliberty-dashboard-api.service after Pulse wrapper commit 163af3b7). No open PRs. Services: all PIDs alive. Zombie PID 1834248 ALIVE (44d20h12m+, bash poll). Sync status=no-change, last_sync=14:32Z; HEAD==origin/main=163af3b7. systemic_fixes=85, vp=36, ratio=~19.12. Check I/XI/III artifacts unchanged (all fired today already). Awaiting Larry `approve threshold-update-2026-07-12`. outbox-notifier silent ~10.5h+ (no work in flight — normal). **ACTIVE G-rules:** unchanged from iter ~5303.
 
 ---
 
