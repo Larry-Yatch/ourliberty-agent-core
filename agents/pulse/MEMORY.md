@@ -628,9 +628,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-12T19:47Z UTC (Iter ~5319, **Tier 1**, consecutive_clean=2)
+## Status snapshot — updated 2026-07-12T19:52Z UTC (Iter ~5320, **Tier 2**, consecutive_clean=0)
 
-**Iter ~5319 summary (2026-07-12T19:47Z):** 0 new alerts. All mandatory checks clean. **threshold-update-2026-07-12-001 CLOSED** — PR #956 MERGED 19:31:51Z UTC (Check III proposals applied: forge 3436→1232, mirror 488→1531, beacon 2147→320). Zombie PID 1834248 ALIVE (45d00h27m+, bash poll). Sync push_failures=0; HEAD=80ea8675==origin/main. No open PRs. ratio=19.79 (trailing-30d). **Tier 1**, consecutive_clean=2 (1 more clean iter → Tier 2). **ACTIVE G-rules:** unchanged from iter ~5318.
+**Iter ~5320 summary (2026-07-12T19:52Z):** 0 new alerts. All mandatory checks clean. **Tier 1→2 de-escalation** (3 consecutive clean at Tier 1). Zombie PID 1834248 ALIVE (45d00h32m+, bash poll). Sync push_failures=0; HEAD=3df815a4==origin/main. No open PRs. ratio=19.79 (trailing-30d). **Tier 2**, consecutive_clean=0 (3 more clean iters → Tier 3). **ACTIVE G-rules:** unchanged from iter ~5319.
 
 ---
 
