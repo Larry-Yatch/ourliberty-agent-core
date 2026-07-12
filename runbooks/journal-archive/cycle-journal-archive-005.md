@@ -37084,3 +37084,83 @@ Watermark advanced 928→929. NOMINAL ✅
 
 ---
 
+## Iteration ~5178 — 2026-07-11T23:49Z UTC (Larry /cycle, Tier 1)
+
+**Health:** ✅ Nominal. Doorbell re-fire Tier-3 silenced. Zombie and PR #860 APPROVAL_REQUEST carry.
+
+**VERIFY-BEFORE-REASSERT (from iter ~5177):**
+- **"zombie PID 1834248 (~44d+4h+22m)"**: CONFIRMED ⚠️ — ps shows 44-04:29:07 (Ss, bash poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`). [carry]
+- **"beacon PID 443348"**: CONFIRMED ✅ — Ss, 06:41 elapsed.
+- **"outbox-notifier PID 442925"**: CONFIRMED ✅ — Ss, 07:00 elapsed.
+- **"inbox_watcher PID 278746"**: CONFIRMED ✅ — Ssl, 03:29:23 elapsed.
+- **"pending=1 (rebase-pr-860-001)"**: CONFIRMED — pending=1, history=477. Created 23:34:48Z UTC (~15 min old at check). NOMINAL.
+- **"sync last_sync=2026-07-11T23:01:02Z (push failed, 1 consecutive)"**: UNCHANGED — status=error, consecutive_push_failures=1 (~48 min old). Transient carry. INFO.
+- **"PR #943 OPEN/MERGEABLE"**: CONFIRMED — OPEN/UNKNOWN (GH lazy-compute). fix(autoregister). No labels. fix/* label-gated. [blue carry]
+- **"PR #942 MERGED 23:39:16Z UTC"**: CONFIRMED ✅ — HEAD=f3365797 (Pulse cycle 20260711T234637Z = iter ~5177 journal commit). RESOLVED ✅
+- **"PR #940 OPEN/UNKNOWN"**: CONFIRMED — chore/*, by-design. [blue carry]
+- **"PR #860 OPEN/UNKNOWN"**: CONFIRMED — APPROVAL_REQUEST `rebase-pr-860-001` pending Larry. [yellow in-flight]
+- **"watermark=929"**: UPDATED — repair-watermark: old_watermark=929, file_length=930 → 1 new alert at L930. NOMINAL.
+- **"HEAD=f3365797=origin/main"**: CONFIRMED ✅ — HEAD=f3365797=origin/main. Clean tree. On main. ✅
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 929, "file_length": 930}`. 1 new alert:
+- L930: `source=doorbell, kind=notification, intent=doorbell, ts=23:42:18Z` — doorbell re-fire for `rebase-pr-860-001` APPROVAL_REQUEST (outbox-notifier already delivered idx=928 to Larry; doorbell = dashboard reminder). triage-alert: Tier-3 (known-pattern match in alert-translations.json). Silenced. ✅
+Watermark advanced 929→930. NOMINAL ✅
+
+**Check 1 — Log noise:** outbox-notifier PID 442925 ✅ (07:00 elapsed). Only startup entries in log (17:19:52 MDT, 17:40:30 MDT). No WARNs/ERRORs. Watchdog 17:46:16 MDT (23:46:16Z UTC) — overall=healthy ✅. NOMINAL ✅
+
+**Check 2 — Telegram sweep:** beacon PID 443348 ✅. Last Larry message: 16:43:51 MDT (22:43:51Z UTC) — "it does but you know the system I do not so I cannot say if it is complete or not" (in-context Beacon exchange, no new directive). Last bot action: doorbell idx=929 delivered 17:45:52 MDT. No orphaned directives. NOMINAL ✅
+
+**Check 3 — Pipeline stall:** DRY-RUN (23:48:07Z UTC) → "1 alert(s) would fire" — `unrouted_open_pr:Larry-Yatch/ourliberty-agent-core:940`. PR #940 is chore/* with no labels. Per MEMORY: unrouted-pr on chore/*/fix/* is by-design (label-gated, Larry adopting habit). 6 FORGE_NO_PR_SKIP entries (pr_exists, preflight_exit). Both cooldowns active. BY-DESIGN. NOMINAL ✅
+
+**Check 4 — Pending directives:** pending=1 (`rebase-pr-860-001`, created 23:34:48Z, ~15 min old at check). New/expected in-flight APPROVAL_REQUEST. Not stale. NOMINAL ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-11T23:40:17Z (~9 min at check). Watchdog 23:46:16Z UTC — overall=healthy ✅. NOMINAL ✅
+
+**Check A — Source repo:** HEAD=f3365797=origin/main ✅; clean tree ✅; on main ✅. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-11T23:01:02Z (~48 min old), status=error (1 consecutive push failure, transient carry). INFO. NOMINAL ✅
+**Check C — Agent liveness:** beacon PID 443348 ✅; outbox-notifier PID 442925 ✅; inbox_watcher PID 278746 ✅; watchdog overall=healthy (23:46:16Z UTC). ⚠️ Zombie PID 1834248 (44-04:29:07, bash poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`). [carry]
+**Check E — PR/merge state:**
+- **PR #943** — OPEN/UNKNOWN. `fix(autoregister): close the missions.json lost-update window`. Branch: worktree-autoregister-lost-update-guard. No labels. fix/* label-gated by-design. [blue carry]
+- **PR #940** — OPEN/UNKNOWN. No labels. chore(missions). By-design. [blue carry]
+- **PR #860** — OPEN/UNKNOWN. No labels. docs(spec): XIV-b. APPROVAL_REQUEST `rebase-pr-860-001` pending Larry. [yellow in-flight]
+
+**§5.0:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅.
+
+**Conditional checks — UTC Saturday 2026-07-11 (~23:49Z):**
+- Check I: Not a firing day (Sat). ✅
+- Check III/IV/VIII/IX/X/XII/XIV: Sunday/Monday gates. Skip. ✅
+- Check XI: artifact check-xi-20260711T102013 — attention_rate=18.8%, over_gate=True. No new artifact until Sun. [yellow carry]
+
+**G-rule assessment:**
+- `pr-860-conflicting`: dispatch executed iter ~5175; APPROVAL_REQUEST in-flight. Verify Forge rebase once Larry approves. [dispatched, in-flight]
+- `pulse-auto-dispatch null reply_chat_id`: no new obs this iter. [blue 2/3 carry]
+- All other G-rule counts carry from iter ~5177.
+
+**Actions taken:**
+1. Check 0: triage-alert Tier-3 (doorbell L930). Watermark 929→930. ✅
+2. PRIME ledger: `iter_clean` appended (tier=1, template=nominal, 23:49:21Z UTC). ✅
+3. Tier state: `record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=23:49:22Z. ✅
+
+**Escalations:** 0 new Pulse DMs.
+
+**Standing findings (updated):**
+- [yellow] **zombie-bash-pid-1834248** — 44-04:29:07, bash poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`. ask-then-do: `kill 1834248`. [carry]
+- [yellow] **pr-860-rebase-approval-pending** — APPROVAL_REQUEST `rebase-pr-860-001`, ~15 min old. Waiting Larry's "approve". [in-flight]
+- [yellow] **check-xi-drift-over-gate** — 18.8% (gate=10%). Next artifact Sun. [carry]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07`. [carry]
+- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
+- [blue] **PR #943** — OPEN/UNKNOWN. fix(autoregister): missions.json lost-update guard. No labels, label-gated by-design. [carry]
+- [blue] **PR #940** — OPEN, no labels. chore(missions). By-design. [carry]
+- [blue] **task-no-pr-legitimacy-classifier-001** — Forge building. Fix #2 for G-rule heal-pipeline-stall-forge-reject-no-pr-fp-001. [carry]
+- [blue] **notifier-auto-retraction-slice2-001** — Forge building. [carry]
+- [blue] **pulse-auto-dispatch null reply_chat_id** — 2nd obs post-PR #933. Fallback delivered. Watch for 3rd then dispatch to Beacon. [2/3]
+- [blue] **Check I proposal #1** — `notify-p3a-retro-prep` ($1.91 vs $0.28 baseline, 98σ). Use `/dispatch 1`. [carry]
+- [blue] **G-rules (dispatched, vp):** heal-pipeline-stall-forge-reject-no-pr-fp-001 [fix#1 VERIFIED, fix#2 Forge building]; outbox-notifier-notification-intent-reject-tier4-001 [3/3, vp]; ourliberty-health-subject-key-mismatch-001 [3/3, vp]; forge-wip-redispatch-digest-tier4-001 [vp]; forge-revision-preamble-missing-pr711-001 [vp]; forge-wip-redispatch-exhausted-pr-exists-fp-001 [APPROVAL_REQUEST QUEUED iter ~3279, vp]; decision-needed-approval-forge-dispatch-no-target-repo-001 [vp]; no-session-revision-active-mirror-session-fp-001 [vp].
+- [blue] **G-rule 2/3 (CARRY):** outbox-notifier-merge-conflict-manual-rebase-tier4-001; forge-wip-redispatch-exhausted-genuine-no-pr-001; outbox-notifier-notification-intent-review-escalate-tier4-001; outbox-notifier-auto-merge-stale-revalidation-tier4-001; pulse-auto-dispatch-null-reply-chat-id [2/3 post-PR#933].
+- [blue] **G-rule 1/3:** mirror-malformed-verdict-heal-reap-path-001; mirror-queue-wait-gauge-tier4-001; inbox-watcher-tier-pool-all-unavailable-tier4-001; heal-pipeline-stall-unrouted-deep-review-required-fp-001; heal-pulse-check-staleness-single-flight-skip-fp-001; gate-parallelism-monitor-regression-data-001; pulse-rotation-check-source-tier4-001.
+
+**PRIME DIRECTIVE:** 0 new interventions; 0 new systemic_fixes; iter_clean appended (23:49:21Z UTC). ratio=19.15 (85 systemic_fixes / ~1630 interventions; 36 vp; ledger is ground truth). trend=worsening.
+**Tier end-of-iter:** **Tier 1** (zombie carry + PR #860 rebase pending Larry; consecutive_clean=0).
+
+---
+
