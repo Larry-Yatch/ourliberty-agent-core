@@ -17,10 +17,12 @@ try:  # engage the test sandbox before any production import reads env/paths
 except ImportError:  # discover loads this module top-level (no package parent)
     import _bootstrap  # noqa: F401
 
+import os
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 _REPO_SCRIPTS = Path(__file__).resolve().parent.parent
 if str(_REPO_SCRIPTS) not in sys.path:
@@ -77,6 +79,36 @@ class BuildEnvelopeConstructionTest(unittest.TestCase):
     def test_bad_source_rejected_at_construction(self):
         with self.assertRaises(peb.EnvelopeValidationError):
             peb.build_envelope('t-005', _GOOD_PROMPT, source='not-a-real-source')
+
+
+class ReplyChatIdStampTest(unittest.TestCase):
+    """Direction-ask envelopes must resolve reply_chat_id at creation so the
+    outbox-notifier null-reply-chat-id fallback (the G-rule log line) never
+    fires. Mirrors PR #933's coverage for the sibling pulse_check_i builder."""
+
+    def test_reply_chat_id_stamped_when_allow_list_set(self):
+        with mock.patch.dict(os.environ, {'TELEGRAM_ALLOWED_CHAT_IDS': '7998341473'}):
+            env = peb.build_envelope('t-chat-001', _GOOD_PROMPT)
+        self.assertEqual(env['reply_chat_id'], 7998341473)
+
+    def test_reply_chat_id_key_absent_when_allow_list_empty(self):
+        with mock.patch.dict(os.environ, {'TELEGRAM_ALLOWED_CHAT_IDS': ''}):
+            env = peb.build_envelope('t-chat-002', _GOOD_PROMPT)
+        # Never present-but-null — the key is omitted so the notifier fallback
+        # stays intact for the degenerate (unset allow-list) case.
+        self.assertNotIn('reply_chat_id', env)
+
+    def test_reply_chat_id_key_absent_when_allow_list_unset(self):
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop('TELEGRAM_ALLOWED_CHAT_IDS', None)
+            env = peb.build_envelope('t-chat-003', _GOOD_PROMPT)
+        self.assertNotIn('reply_chat_id', env)
+
+    def test_lowest_id_wins_with_multiple_allow_listed(self):
+        # Parity with _primary_chat_id: comma-or-space separated, min() wins.
+        with mock.patch.dict(os.environ, {'TELEGRAM_ALLOWED_CHAT_IDS': '8000000000, 7998341473 9000000000'}):
+            env = peb.build_envelope('t-chat-004', _GOOD_PROMPT)
+        self.assertEqual(env['reply_chat_id'], 7998341473)
 
 
 class WriteEnvelopeSmokeTest(unittest.TestCase):
