@@ -68,15 +68,38 @@ class SelectDispatchEnvTest(_PoolBase):
         self.assertEqual(code, 0)
         pairs = _parse_lines(out)
         self.assertIn(pairs['TIER'], {'tier1', 'tier3'})
-        # Setup-token path: the token is the delta; HOME already matches the
-        # tier1 home, so no HOME line (the wrappers must never see a HOME
-        # swap unless the token-less fallback genuinely requires one).
+        # Token-only protocol: the setup-token is the ONLY line besides TIER=.
+        # A wrapper never receives a HOME swap (the units' ProtectHome mount
+        # can't satisfy one — see cli_select_dispatch_env).
         expected_token = ('sk-ant-oat01-t1' if pairs['TIER'] == 'tier1'
                           else 'sk-ant-oat01-t3')
         self.assertEqual(pairs['CLAUDE_CODE_OAUTH_TOKEN'], expected_token)
         self.assertNotIn('HOME', pairs)
+        self.assertEqual(set(pairs), {'TIER', 'CLAUDE_CODE_OAUTH_TOKEN'})
         # First line is the TIER marker (the shell parses line 1 only).
         self.assertTrue(out.startswith('TIER='))
+
+    def test_tokenless_selected_tier_exits_3_for_legacy_fallback(self):
+        # Force the pool to select a tier that has NO setup-token (tier2 via
+        # the emergency fallback): it would require a HOME swap the wrapper
+        # can't do, so the CLI reports "no tier" (exit 3) and the wrapper
+        # falls back to the legacy active-setup-token path (HOME stays put).
+        os.environ['CLAUDE_CODE_OAUTH_TOKEN_TIER2'] = 'sk-ant-oat01-t2'
+        # Give tier2 a real usable home + creds so select_dispatch_tier would
+        # otherwise pick it, but strip its setup-token so the durable-env path
+        # is token-less (HOME-swap shape).
+        os.environ.pop('CLAUDE_CODE_OAUTH_TOKEN_TIER2', None)
+        active_tier.set_cooldown('tier1', raw_excerpt='resets 3pm', now=_NOW)
+        active_tier.set_cooldown('tier3', raw_excerpt='resets 3pm', now=_NOW)
+        # Make tier2 auth-ok via a valid credentials.json (token-less path).
+        creds = Path(active_tier.TIER2_HOME) / '.claude' / '.credentials.json'
+        creds.parent.mkdir(parents=True, exist_ok=True)
+        future_ms = int((_NOW.timestamp() + 3600) * 1000)
+        creds.write_text(json.dumps({'claudeAiOauth': {'expiresAt': future_ms}}))
+        code, out = active_tier.cli_select_dispatch_env(
+            base_env=self._base_env(), now=_NOW)
+        self.assertEqual(code, 3)
+        self.assertEqual(out, '')
 
     def test_round_robins_across_primaries(self):
         tiers = set()
@@ -115,6 +138,8 @@ class ReportDispatchFailureTest(_PoolBase):
         return [json.loads(ln) for ln in path.read_text().splitlines() if ln]
 
     def test_rate_limit_benches_tier_and_ledgers(self):
+        # A real CLI wall: the usage-limit message is a bare (non-JSON) dump,
+        # so the whole thing is scanned.
         self.out_file.write_text(
             'Claude usage limit reached — you have hit your limit, '
             'resets 3:30pm.')
@@ -129,6 +154,46 @@ class ReportDispatchFailureTest(_PoolBase):
         self.assertEqual(rows[0]['account'], 'tier3')
         self.assertEqual(rows[0]['failure_class'], 'rate_limit')
         self.assertEqual(rows[0]['agent'], 'pulse')
+
+    def test_quoted_limit_text_inside_result_does_not_bench(self):
+        # The FALSE-positive case: the agent transcript (a valid --output-format
+        # json envelope) QUOTES rate-limit language inside .result — e.g. Medic
+        # triaging a quota alert — and the run failed for an unrelated reason.
+        # The .result exclusion must keep the healthy tier unbenched and the
+        # ledger clean.
+        self.out_file.write_text(json.dumps({
+            'type': 'result', 'subtype': 'error_during_execution',
+            'is_error': True,
+            'result': 'Investigated the alert quoting "you have hit your '
+                      'limit, resets 3:30pm" — it was a false positive.',
+        }))
+        code, cls = active_tier.cli_report_dispatch_failure(
+            'tier3', 'medic', str(self.out_file), now=_NOW)
+        self.assertEqual((code, cls), (0, ''))
+        self.assertIsNone(active_tier.cooldown_until('tier3', now=_NOW))
+        self.assertEqual(self._ledger_rows(), [])
+
+    def test_real_wall_outside_result_still_benches(self):
+        # A real wall's CLI message is emitted OUTSIDE .result; even inside a
+        # JSON-ish envelope it must still bench (the exclusion only drops the
+        # quoted-prose FP, never a genuine wall).
+        self.out_file.write_text(
+            '{"type":"result","subtype":"success","result":"ok"}\n'
+            'Claude usage limit reached — you have hit your limit, resets 3pm.')
+        code, cls = active_tier.cli_report_dispatch_failure(
+            'tier1', 'pulse', str(self.out_file), now=_NOW)
+        self.assertEqual((code, cls), (0, 'rate_limit'))
+        self.assertIsNotNone(active_tier.cooldown_until('tier1', now=_NOW))
+
+    def test_session_lost_is_not_benched_and_returns_empty(self):
+        # session_lost is a known class the classifier recognizes but which we
+        # never bench — the wrapper must not log a bench that didn't happen.
+        self.out_file.write_text('No conversation found with session ID abc')
+        code, cls = active_tier.cli_report_dispatch_failure(
+            'tier1', 'medic', str(self.out_file), now=_NOW)
+        self.assertEqual((code, cls), (0, ''))
+        self.assertIsNone(active_tier.cooldown_until('tier1', now=_NOW))
+        self.assertEqual(self._ledger_rows(), [])
 
     def test_non_wall_output_is_noop(self):
         self.out_file.write_text('{"result": "some ordinary failure text"}')

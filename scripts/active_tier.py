@@ -1387,40 +1387,77 @@ def tier_pool_status(now=None):
 # instead of calling select_durable_claude_env in-process. Logic lives in the
 # cli_* functions (unit-testable); __main__ only routes argv.
 
-# The only env keys select_durable_claude_env may set for a spawn: the OAuth
-# token on the setup-token path, plus HOME and the I10/I11 agents-root/gh/git
-# pins on the token-less credentials.json fallback. The CLI emits ONLY these
-# (as a delta vs the caller's env) so a wrapper can whitelist-export them
-# inside the claude subshell without ever touching its own shell's HOME.
-_CLI_ENV_KEYS = ('CLAUDE_CODE_OAUTH_TOKEN', 'HOME', 'OURLIBERTY_AGENTS_ROOT',
-                 'GH_CONFIG_DIR', 'GIT_CONFIG_GLOBAL')
-
-
 def cli_select_dispatch_env(base_env=None, now=None):
     """``select-dispatch-env`` verb: pick a per-run tier for one wrapper
     dispatch. Returns ``(exit_code, stdout_text)``.
 
     stdout protocol (line-oriented, parsed by run_cycle.sh / run_medic.sh):
       TIER=<tier>
-      KEY=VALUE     # only _CLI_ENV_KEYS entries that DIFFER from the base env
-                    # (normally just the tier's setup-token; HOME + pins only
-                    # on the token-less credentials.json fallback)
+      CLAUDE_CODE_OAUTH_TOKEN=<setup-token>
 
-    Exit 3 + empty stdout when no tier is dispatchable OR selection degraded
-    (select_durable_claude_env never raises) — the wrappers then fall back to
-    the legacy active-setup-token path so the heartbeat never dies with the
-    pool machinery. The token is printed for shell capture ONLY; callers must
-    never log the output verbatim."""
+    The ONLY env the wrapper applies is the selected tier's setup-token — the
+    original wrapper invariant ("only the auth token follows the tier; HOME
+    deliberately stays put on /home/larry/.claude for project trust, settings,
+    MCP") is preserved exactly. A wrapper must NEVER take the token-less
+    credentials.json branch's HOME swap: both units run ``ProtectHome=read-only``
+    with only /home/larry/.claude writable, so pointing HOME at another tier's
+    home (e.g. tier2's /home/larry/.claude-larry-personal) makes the claude
+    child EROFS on ~/.claude.json (the #470 class) — and because selection
+    otherwise "succeeds", the legacy fail-safe would never engage, killing the
+    self-healing heartbeat during the very dual-wall emergency the tier2
+    fallback exists for.
+
+    So: only the setup-token path is wrapper-usable. When the pool selects a
+    tier that has no setup-token (it would require a HOME swap), we return
+    exit 3 exactly as for "no tier" — the wrapper then falls back to the legacy
+    active-setup-token path (which also keeps HOME put). Emitting the token
+    ALSO overrides any bare CLAUDE_CODE_OAUTH_TOKEN the wrapper inherited, so
+    burn can't land on an inherited account while the cost row stamps another.
+
+    Exit 3 + empty stdout when no wrapper-usable tier is dispatchable OR
+    selection degraded (select_durable_claude_env never raises). The token is
+    printed for shell capture ONLY; callers must never log the output."""
     base = dict(base_env) if base_env is not None else os.environ.copy()
-    env_out, tier = select_durable_claude_env(env=base, now=now)
+    # select_durable_claude_env owns the never-raises selection contract (pin,
+    # cooldowns, budget cap, round-robin); we only need the chosen tier.
+    _env_out, tier = select_durable_claude_env(env=base, now=now)
     if tier is None:
         return 3, ''
-    lines = ['TIER=%s' % tier]
-    for key in _CLI_ENV_KEYS:
-        val = env_out.get(key)
-        if val and val != base.get(key):
-            lines.append('%s=%s' % (key, val))
-    return 0, '\n'.join(lines) + '\n'
+    # Only the tier's own durable setup-token is wrapper-usable. Resolve it
+    # directly (not from the built env, which may carry an inherited bare
+    # token): a tier with no setup-token would force the HOME-swapping
+    # credentials.json fallback, which a wrapper cannot do (see docstring), so
+    # defer to legacy exactly as for "no tier".
+    token = _setup_token_for_tier(tier)
+    if not token:
+        return 3, ''
+    return 0, 'TIER=%s\nCLAUDE_CODE_OAUTH_TOKEN=%s\n' % (tier, token)
+
+
+def _wrapper_scan_text(raw):
+    """The text ``cli_report_dispatch_failure`` classifies for a wall.
+
+    The captured output is the OPERATOR AGENT's own transcript, not a bare CLI
+    error: for Pulse/Medic that transcript routinely quotes rate-limit language
+    (Medic triages "hit your limit … resets 3:30pm" quota alerts; the /cycle
+    journal reports tier cooldown/reset state), and RATE_LIMIT_RE is content-
+    loose. A REAL claude usage-limit wall is emitted by the CLI itself OUTSIDE
+    the JSON result envelope; quoted alert prose lives INSIDE the ``.result``
+    field. So when the output parses as the ``--output-format json`` envelope,
+    classify the envelope WITHOUT ``.result`` — this cannot mask a real wall
+    (the CLI's own limit message is never inside ``.result``; it lands in a
+    sibling field or, on a hard wall, as a bare non-JSON dump) but drops the
+    dominant false-positive that would bench a healthy tier and poison the
+    calibration ledger. Unparseable output (a bare CLI error dump, or a JSON
+    object followed by a trailing CLI error line) fails json.loads and is
+    scanned whole, so a real wall printed after the envelope is still caught."""
+    try:
+        obj = json.loads(raw)
+    except (ValueError, TypeError):
+        return raw
+    if isinstance(obj, dict) and 'result' in obj:
+        return json.dumps({k: v for k, v in obj.items() if k != 'result'})
+    return raw
 
 
 def cli_report_dispatch_failure(tier, agent, output_path, now=None):
@@ -1431,11 +1468,14 @@ def cli_report_dispatch_failure(tier, agent, output_path, now=None):
     pool-dispatched cycle/medic run can't keep round-robining onto a walled
     tier and the calibration job keeps learning from wrapper walls.
 
-    Returns ``(exit_code, stdout_text)``; stdout is the failure class ('' when
-    the output matches no known wall shape — the wrapper just logs it).
-    Best-effort by contract: an unreadable output file or any internal error
-    returns (0, '') — reporting must never turn a failed cycle into a crashed
-    wrapper. Exit 2 = caller bug (unknown tier)."""
+    Returns ``(exit_code, stdout_text)``; stdout is the failure class the
+    wrapper LOGS — non-empty ONLY when the tier was actually benched
+    (rate_limit / auth_401). A non-wall failure (including session_lost, which
+    is never benched) returns (0, '') so the wrapper never logs a bench that
+    didn't happen. Best-effort by contract: an unreadable output file returns
+    (0, ''); any internal error is written to stderr (which the wrappers
+    redirect into their log, so a silently-broken bench path leaves a trail)
+    and returns (0, ''). Exit 2 = caller bug (unknown tier)."""
     if tier not in _VALID_TIERS:
         return 2, ''
     try:
@@ -1446,24 +1486,23 @@ def cli_report_dispatch_failure(tier, agent, output_path, now=None):
         # Deferred import: agent_runner imports this module; by CLI-time both
         # load cleanly and the classifier/ledger stay single-sourced there.
         import agent_runner
-        cls = agent_runner.classify_tier1_failure(text, '')
-        if cls in ('rate_limit', 'auth_401'):
-            match = agent_runner.RATE_LIMIT_RE.search(text)
-            excerpt = (text[max(0, match.start() - 100):match.start() + 300]
-                       if match else text[:300])
-            set_cooldown(tier, raw_excerpt=excerpt, now=now, kind=cls)
-            ref = now or datetime.now(timezone.utc)
-            if ref.tzinfo is None:
-                ref = ref.replace(tzinfo=timezone.utc)
-            parsed = parse_reset_time(excerpt, now=ref)
-            retry_after = (max(0, int((parsed - ref).total_seconds()))
-                           if parsed else None)
-            agent_runner.append_rate_limit_event(
-                agent=agent, task_id='%s-wrapper' % agent, model='',
-                account=tier, stderr=excerpt, retry_after_sec=retry_after,
-                failure_class=cls)
-        return 0, (cls or '')
-    except Exception:  # noqa: BLE001 — never crash the calling wrapper
+        scan = _wrapper_scan_text(text)
+        cls = agent_runner.classify_tier1_failure(scan, '')
+        if cls not in ('rate_limit', 'auth_401'):
+            return 0, ''
+        # Full scan text as the excerpt (matches agent_runner's set_cooldown
+        # callers; append_rate_limit_event truncates to 300 internally). The
+        # windowed excerpt could drop a "resets <time>" beyond the window,
+        # degrading a parseable reset to a blind backoff.
+        set_cooldown(tier, raw_excerpt=scan, now=now, kind=cls)
+        retry_after = agent_runner._derive_retry_after_sec(scan, now=now)
+        agent_runner.append_rate_limit_event(
+            agent=agent, task_id='%s-wrapper' % agent, model='',
+            account=tier, stderr=scan, retry_after_sec=retry_after,
+            failure_class=cls)
+        return 0, cls
+    except Exception as exc:  # noqa: BLE001 — never crash the calling wrapper
+        sys.stderr.write('report-dispatch-failure: %s\n' % exc)
         return 0, ''
 
 

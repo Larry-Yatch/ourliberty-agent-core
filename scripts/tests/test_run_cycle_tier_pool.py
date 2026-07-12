@@ -140,27 +140,32 @@ class PoolDispatchTest(_TierPoolBase):
             self.assertEqual(rows[0]['account'], 'tier3')
             self.assertTrue(rows[0]['success'])
 
-    def test_home_delta_scoped_to_claude_child_only(self):
-        # Token-less credentials.json fallback shape: the delta carries a HOME
-        # swap. The child must see it; the wrapper's own files (cost ledger,
-        # logs) must stay under the ORIGINAL home (the #755 class).
+    def test_home_line_is_never_exported_token_only_whitelist(self):
+        # Defense in depth: even if a stray HOME= line reached the wrapper, the
+        # token-only export whitelist must ignore it — a wrapper must never
+        # swap HOME (the units' ProtectHome mount can't satisfy it; the child
+        # would EROFS on ~/.claude.json). The child keeps the wrapper's HOME.
         alt_home = self.tmp_path / 'alt-home'
         alt_home.mkdir()
         self._install_active_tier_stub(
-            select_out=f'TIER=tier2\nHOME={alt_home}\n', select_code=0)
+            select_out=(f'TIER=tier1\nCLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-t1\n'
+                        f'HOME={alt_home}\n'),
+            select_code=0)
         self._install_claude_stub(exit_code=0)
 
         result = self._run_cycle()
 
         self.assertEqual(result.returncode, 0,
                          f'stderr={result.stderr.decode()[:500]}')
-        self.assertEqual(self._read_probe()['HOME'], str(alt_home))
-        # Wrapper-owned paths stayed on the original home.
+        probe = self._read_probe()
+        self.assertEqual(probe['TOKEN'], 'sk-ant-oat01-t1')
+        # HOME line ignored — child ran under the wrapper's own home.
+        self.assertEqual(probe['HOME'], str(self.home))
         self.assertTrue((self.home / 'agents' / 'logs' / 'cycle.log').exists())
         if _HAS_JQ:
             rows = self._read_cost_rows()
             self.assertEqual(len(rows), 1)
-            self.assertEqual(rows[0]['account'], 'tier2')
+            self.assertEqual(rows[0]['account'], 'tier1')
 
 
 class WallBenchingTest(_TierPoolBase):

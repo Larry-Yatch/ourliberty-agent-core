@@ -146,16 +146,19 @@ CYCLE_OK=0
 # of riding the single active tier — pre-pool the cycle burned the large
 # majority of tier1's budget while tier3 idled. select-dispatch-env honors the
 # operator pin (rotation.disabled), cooldowns, and the proactive budget caps,
-# and prints TIER=<tier> plus the env delta for the spawn (normally just the
-# tier's setup-token; HOME + agents-root/gh/git pins only on the token-less
-# credentials.json fallback). The delta is exported INSIDE the claude subshell
-# below — never in this shell — so a HOME swap can't repoint this script's own
-# ${HOME} paths (the #755 class), and the token never appears in argv/`ps` and
-# is NEVER logged.
-# Fail-safe: on ANY selection failure (missing/erroring CLI, no usable tier)
-# fall back to the legacy active-setup-token path — the self-healing heartbeat
-# must never die with the pool machinery it heals. Empty token there => keep
-# the original credentials.json behavior.
+# and prints TIER=<tier> plus the
+# selected tier's setup-token. Only the token follows the tier — HOME
+# deliberately stays on /home/larry/.claude (project trust, settings, MCP),
+# preserving the original wrapper invariant; select-dispatch-env returns "no
+# tier" for any tier that would require a HOME swap (the units run
+# ProtectHome=read-only with only /home/larry/.claude writable, so a swap would
+# EROFS the child on ~/.claude.json — the #470 class — and never fall back).
+# The token is exported INSIDE the claude subshell below — never in this shell
+# — so it never appears in this script's argv/`ps` and is NEVER logged.
+# Fail-safe: on ANY selection failure (missing/erroring CLI, no usable tier,
+# a would-need-HOME-swap tier) fall back to the legacy active-setup-token path
+# — the self-healing heartbeat must never die with the pool machinery it heals.
+# Empty token there => keep the original credentials.json behavior.
 DISPATCH_ENV_LINES="$(timeout 15 python3 "${HOME}/agent-core/scripts/active_tier.py" select-dispatch-env 2>>"$LOG_FILE" || true)"
 DISPATCH_TIER="$(printf '%s' "$DISPATCH_ENV_LINES" | sed -n '1s/^TIER=//p')"
 if [ -n "$DISPATCH_TIER" ]; then
@@ -172,13 +175,13 @@ else
 fi
 
 if (
-    # Whitelist-export the selected tier's env delta for the claude child
-    # only (see the auth block above); the subshell keeps it out of this
-    # script's environment and out of `ps`.
+    # Export the selected tier's token for the claude child only (see the auth
+    # block above); the subshell keeps it out of this script's environment and
+    # out of `ps`. Token-only by contract — the TIER= marker line and anything
+    # else are ignored.
     while IFS= read -r kv; do
         case "$kv" in
-            CLAUDE_CODE_OAUTH_TOKEN=*|HOME=*|OURLIBERTY_AGENTS_ROOT=*|GH_CONFIG_DIR=*|GIT_CONFIG_GLOBAL=*)
-                export "$kv" ;;
+            CLAUDE_CODE_OAUTH_TOKEN=*) export "$kv" ;;
         esac
     done <<< "$DISPATCH_ENV_LINES"
     exec claude --print --model claude-sonnet-4-6 --output-format json "Run /cycle now per the spec in ../../runbooks/cycle-prompt.md. Report findings, take auto-fix actions, write the journal entry, send any escalations." > "$CYCLE_OUT" 2>&1

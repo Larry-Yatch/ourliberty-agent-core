@@ -82,15 +82,17 @@ PROMPT_BODY="${PROMPT_BODY} IMPORTANT: when you emit via scripts/larry_alerts.py
 # {tier1,tier3} round-robin pool as every other wiring point (spec §4) instead
 # of riding the single active tier. select-dispatch-env honors the operator
 # pin, cooldowns, and the proactive budget caps, and prints TIER=<tier> plus
-# the env delta for the spawn (normally just the tier's setup-token; HOME +
-# agents-root/gh/git pins only on the token-less credentials.json fallback).
-# The delta is exported INSIDE the claude subshell below -- never in this
-# shell -- so a HOME swap can't repoint this script's own ${HOME} paths (the
-# #755 class), and the token never appears in argv/`ps` and is NEVER logged.
-# Fail-safe: on ANY selection failure (missing/erroring CLI, no usable tier)
-# fall back to the legacy active-setup-token path so Medic never silently
-# stops with the pool machinery. Empty token there => keep the original
-# credentials.json behavior.
+# the selected tier's setup-token. Only the token follows the tier -- HOME
+# deliberately stays on /home/larry/.claude; select-dispatch-env returns "no
+# tier" for any tier that would need a HOME swap (the units run
+# ProtectHome=read-only with only /home/larry/.claude writable, so a swap would
+# EROFS the child on ~/.claude.json and never fall back). The token is exported
+# INSIDE the claude subshell below -- never in this shell -- so it never
+# appears in this script's argv/`ps` and is NEVER logged.
+# Fail-safe: on ANY selection failure (missing/erroring CLI, no usable tier,
+# a would-need-HOME-swap tier) fall back to the legacy active-setup-token path
+# so Medic never silently stops with the pool machinery. Empty token there =>
+# keep the original credentials.json behavior.
 DISPATCH_ENV_LINES="$(timeout 15 python3 "${HOME}/agent-core/scripts/active_tier.py" select-dispatch-env 2>>"$LOG_FILE" || true)"
 DISPATCH_TIER="$(printf '%s' "$DISPATCH_ENV_LINES" | sed -n '1s/^TIER=//p')"
 if [ -n "$DISPATCH_TIER" ]; then
@@ -107,13 +109,13 @@ else
 fi
 
 if (
-    # Whitelist-export the selected tier's env delta for the claude child
-    # only (see the auth block above); the subshell keeps it out of this
-    # script's environment and out of `ps`.
+    # Export the selected tier's token for the claude child only (see the auth
+    # block above); the subshell keeps it out of this script's environment and
+    # out of `ps`. Token-only by contract -- the TIER= marker and anything else
+    # are ignored.
     while IFS= read -r kv; do
         case "$kv" in
-            CLAUDE_CODE_OAUTH_TOKEN=*|HOME=*|OURLIBERTY_AGENTS_ROOT=*|GH_CONFIG_DIR=*|GIT_CONFIG_GLOBAL=*)
-                export "$kv" ;;
+            CLAUDE_CODE_OAUTH_TOKEN=*) export "$kv" ;;
         esac
     done <<< "$DISPATCH_ENV_LINES"
     exec timeout "$CLAUDE_TIMEOUT" claude --print --model claude-sonnet-4-6 --output-format json "$PROMPT_BODY" > "$MEDIC_OUT" 2>&1
