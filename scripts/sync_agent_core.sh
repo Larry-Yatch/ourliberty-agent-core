@@ -271,9 +271,25 @@ if ! git diff --quiet || ! git diff --cached --quiet; then
             # when an interactive PR merge advances origin/main mid-cycle. Rebase
             # onto origin and retry instead of rolling back + alerting on every
             # routine non-FF (SYNC-PUSH-REBASE-FALLBACK-001).
-            if push_with_rebase origin main /dev/stdout; then
+            #
+            # push_with_rebase appends its log lines with `>> "$log_file"`, so the
+            # 3rd arg must be an OPENABLE path. Under systemd this script's stdout
+            # is a journal socket, and opening /dev/stdout for append fails with
+            # ENXIO ("No such device or address") on every push — the sync-time
+            # regression that silently rolled back the hourly push
+            # (sync-push-fail-/dev/stdout-systemd-001). Capture the helper's log
+            # to a temp file, then replay it to our own stdout (which systemd
+            # journals) so the lines stay visible. The helper's lines already
+            # carry their own timestamps + `push_with_rebase:` prefix, so a plain
+            # cat preserves journal visibility without double-prefixing via log().
+            PUSH_LOG="$(mktemp 2>/dev/null || echo /tmp/sync_push_log.$$)"
+            if push_with_rebase origin main "$PUSH_LOG"; then
+                cat "$PUSH_LOG" 2>/dev/null || true
+                rm -f "$PUSH_LOG" 2>/dev/null || true
                 log "Pushed Pulse runtime auto-commit to origin/main (rebase fallback available)"
             else
+                cat "$PUSH_LOG" 2>/dev/null || true
+                rm -f "$PUSH_LOG" 2>/dev/null || true
                 log "ERROR: push of Pulse runtime auto-commit failed even after rebase fallback; rolling back to ${AUTO_PRE_HEAD} (captures.json preserved)"
                 git rebase --abort 2>/dev/null || true
                 # Undo the auto-commit WITHOUT touching the working tree: a

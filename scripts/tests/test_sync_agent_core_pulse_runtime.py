@@ -47,6 +47,7 @@ except ImportError:  # discover loads this module top-level (no package parent)
 
 import json
 import os
+import socket
 import subprocess
 import tempfile
 import unittest
@@ -839,6 +840,80 @@ class UncommittedChangesOneTickGraceTest(_SyncResilienceBase):
             self._grace_marker().exists(),
             'tolerated (captures.json) tick must clear the grace marker',
         )
+
+
+class PushLogPathSurvivesNonOpenableStdoutTest(_SyncResilienceBase):
+    """Regression for sync-push-fail-/dev/stdout-systemd-001.
+
+    sync_agent_core.sh used to hand push_with_rebase the literal /dev/stdout as
+    its log-file argument. push_with_rebase appends its log lines with
+    `>> "$log_file"`, which requires an OPENABLE path. Under systemd the sync
+    service's stdout is the journal *socket*; opening /dev/stdout
+    (=/proc/self/fd/1) for append then fails with ENXIO ("No such device or
+    address") on every push, so the push errored and the Pulse auto-commit was
+    rolled back — the hourly push never landed whenever Pulse dirt accumulated.
+
+    The fix captures the helper's log to a temp file and replays it to the
+    script's own stdout. These tests pin that: the push path must not depend on
+    /dev/stdout being openable.
+    """
+
+    def _run_sync_with_socket_stdout(self):
+        """Same as _run_sync but with the child's stdout bound to a socket —
+        exactly the systemd condition that makes /dev/stdout un-openable for
+        append. With the old /dev/stdout code the push errors and rolls back
+        (exit 1); with the temp-file capture the push lands (exit 0)."""
+        env = os.environ.copy()
+        env['HOME'] = str(self.home)
+        env['REPO_DIR'] = str(self.repo_dir)
+        env['LIVE_ROOT'] = str(self.live_root)
+        env['STAGING_ROOT'] = str(self.staging_root)
+        env['BACKUP_ROOT'] = str(self.backup_root)
+        env['PATH'] = f"{self.shim_bin}{os.pathsep}{env.get('PATH', '')}"
+        scrub_run_sentinel(env)
+        redirect_agents_root(env)
+        parent, child = socket.socketpair()
+        try:
+            return subprocess.run(
+                ['bash', str(self.scripts_dir / 'sync_agent_core.sh')],
+                env=env, cwd=self.repo_dir,
+                stdout=child.fileno(), stderr=subprocess.PIPE,
+                timeout=30,
+            )
+        finally:
+            child.close()
+            parent.close()
+
+    def test_auto_commit_push_succeeds_when_stdout_is_a_socket(self):
+        pre_head = self._head()
+        # Pulse-runtime-only dirt → the auto-commit + push path runs.
+        (self.repo_dir / 'runbooks' / 'cycle-journal.md').write_text(
+            'seed journal\nsystemd-socket-stdout tick\n',
+        )
+
+        result = self._run_sync_with_socket_stdout()
+        self.assertEqual(
+            result.returncode, 0,
+            f'auto-commit push must not depend on an openable /dev/stdout; '
+            f'stderr={result.stderr!r}',
+        )
+        # The commit landed AND reached origin — no rollback.
+        new_head = self._head()
+        self.assertNotEqual(new_head, pre_head)
+        self.assertEqual(new_head, self._origin_head())
+        # No push-failure page.
+        alerts = self._read_alerts()
+        sync_blocked = [
+            a for a in alerts if a.get('subject', '').startswith('sync-blocked')
+        ]
+        self.assertEqual(sync_blocked, [], f'unexpected alerts: {alerts}')
+
+    def test_script_does_not_pass_dev_stdout_as_push_log(self):
+        # Belt-and-suspenders: the caller must never hand a /dev/stdout or
+        # /dev/fd/* pseudo-path to push_with_rebase (its log arg must be an
+        # openable file). Guards against a future regression reintroducing it.
+        src = (self.scripts_dir / 'sync_agent_core.sh').read_text()
+        self.assertNotRegex(src, r'push_with_rebase[^\n]*/dev/(stdout|fd/)')
 
 
 if __name__ == '__main__':
