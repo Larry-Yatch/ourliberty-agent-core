@@ -11508,15 +11508,22 @@ def _sanitize_operator_entry(e: Any) -> Optional[dict[str, Any]]:
 def _project_delegation_fields(
     ranked: list[dict[str, Any]],
     supabase_client: Any,
+    pr_state_resolver: Optional[
+        Callable[[list[str]], dict[str, str]]
+    ] = None,
 ) -> None:
     """Attach the delegation trail to each ranked operator-queue entry that was
     delegated — the surface Larry actually delegates from. `delegation_needs_you`
     (a still-OPEN approval parked on him, via the pending-store origin join #942
     added) + `delegation_build_phase` / `delegation_pr_url` (the build's review
     trail, Slice 2b). Keyed by the deterministic origin id `delegate-<entry id>`
-    (what the capture/mission delegate stamps). Fail-safe: every entry starts
-    neutral None and any read error leaves it there — never a 500 (this endpoint
-    is always-200)."""
+    (what the capture/mission delegate stamps).
+
+    `pr_state_resolver` (optional) flips `review_passed` → `merged` off GitHub
+    truth (the auto_merge event isn't origin-tagged), mirroring the parked derive
+    — resolved ONLY for the review_passed entries so the always-200 endpoint stays
+    cheap. Fail-safe: every entry starts neutral None and any read error (build
+    events, evidence, or PR-state) leaves it as-is — never a 500."""
     origin_ids = [
         f'delegate-{e["id"]}' for e in ranked
         if isinstance(e.get('id'), str) and e.get('id')
@@ -11546,6 +11553,28 @@ def _project_delegation_fields(
         if evs:
             e['delegation_build_phase'] = _delegation_build_phase(evs)
             e['delegation_pr_url'] = _delegation_build_pr_url(evs)
+
+    # Merged-state (GitHub truth): flip review_passed → merged for entries whose
+    # PR has merged, so the operator queue completes the arc through ✅ Merged
+    # like the parked derive. Only the review_passed entries need a lookup (a
+    # merged card usually leaves the queue soon after), keeping this cheap.
+    if pr_state_resolver is None:
+        return
+    to_check = sorted({
+        e['delegation_pr_url'] for e in ranked
+        if e.get('delegation_build_phase') == 'review_passed'
+        and isinstance(e.get('delegation_pr_url'), str) and e['delegation_pr_url']
+    })
+    if not to_check:
+        return
+    try:
+        states = pr_state_resolver(to_check) or {}
+    except Exception:  # noqa: BLE001 — never 500 the always-200 operator queue
+        states = {}
+    for e in ranked:
+        if (e.get('delegation_build_phase') == 'review_passed'
+                and states.get(e.get('delegation_pr_url')) == 'MERGED'):
+            e['delegation_build_phase'] = 'merged'
 
 
 @app.get(
@@ -11581,7 +11610,7 @@ def get_approvals_operator_queue() -> dict[str, Any]:
     except Exception:  # noqa: BLE001 — never 500 the always-200 operator queue
         _reply_client = None
     _project_team_reply_fields(ranked, lambda e: e.get('id'), _reply_client)
-    _project_delegation_fields(ranked, _reply_client)
+    _project_delegation_fields(ranked, _reply_client, _resolve_orphan_pr_states)
     gen = data.get('generated_at')
     summary = data.get('summary')
     return {
