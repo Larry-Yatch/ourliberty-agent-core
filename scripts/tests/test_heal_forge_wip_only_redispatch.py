@@ -381,6 +381,94 @@ class MirrorReviewSuppressionTest(_Base):
         self.assertTrue(self._ledger()[self._REVIEW_STEM]['suppressed'])
 
 
+class RebaseResolveSuppressionTest(_Base):
+    """Gate 0 generalizes beyond mirror-review: a `rebase-`/`resolve-` task operates
+    on an EXISTING PR and opens none of its own, so it always trips the WIP-only /
+    no-PR signature. When the TARGET PR is terminal the op is moot -> suppress (no
+    retry, no escalation); OPEN/UNKNOWN -> surface (never suppressed). Regression for
+    `rebase-pr-860-001` WIP-retried + falsely escalated after PR #860 merged
+    (2026-07-11) — the same gap `heal_pipeline_stall._forge_rebase_target_shipped`
+    already closes on the forge-no-PR stall path."""
+
+    def _run_branch_with_state(self, branch: str, state: str):
+        old = time.time() - 3600
+        with self._git_world([(branch, old)]), \
+             mock.patch.object(h.tts, 'pr_coordinate_state',
+                               return_value=(state, None)) as probe:
+            self._run()
+        return probe
+
+    def test_rebase_target_merged_suppresses(self):
+        probe = self._run_branch_with_state('forge/rebase-pr-860-001', 'MERGED')
+        # No retry envelope, no alert at all (neither digest nor escalate).
+        self.assertEqual(self._inbox_files(), [])
+        self.assertEqual(self._alerts.call_count, 0)
+        ledger = self._ledger()
+        self.assertTrue(ledger['rebase-pr-860-001']['suppressed'])
+        self.assertEqual(ledger['rebase-pr-860-001']['suppress_reason'],
+                         'suppressed-reviewed-pr-terminal')
+        self.assertNotIn('attempts', ledger['rebase-pr-860-001'])
+        probe.assert_called_once()
+        # The target PR number parsed out of the task id is what we probed.
+        self.assertEqual(probe.call_args.args[1], 860)
+
+    def test_rebase_target_merged_retry_suffixed_suppresses(self):
+        # The healer `-retry<k>` suffix is tolerated: the target number still parses
+        # and the ledger keys on the retry-stripped base.
+        probe = self._run_branch_with_state('forge/rebase-pr-860-retry1', 'MERGED')
+        self.assertEqual(self._inbox_files(), [])
+        self.assertEqual(self._alerts.call_count, 0)
+        self.assertTrue(self._ledger()['rebase-pr-860']['suppressed'])
+        self.assertEqual(probe.call_args.args[1], 860)
+
+    def test_rebase_target_open_surfaces(self):
+        # A rebase op on a still-OPEN PR must NOT be suppressed (a genuine failure
+        # has to surface); this build-WIP healer also never redispatches it.
+        probe = self._run_branch_with_state('forge/rebase-pr-860-001', 'OPEN')
+        self.assertEqual(self._inbox_files(), [])
+        self.assertEqual(self._alerts.call_count, 0)
+        self.assertEqual(self._ledger(), {})
+        probe.assert_called_once()
+
+    def test_rebase_target_unknown_is_conservative(self):
+        # A gh failure (UNKNOWN) never suppresses (and never redispatches).
+        self._run_branch_with_state('forge/rebase-pr-860-001', 'UNKNOWN')
+        self.assertEqual(self._inbox_files(), [])
+        self.assertEqual(self._alerts.call_count, 0)
+        self.assertEqual(self._ledger(), {})
+
+    def test_resolve_target_terminal_suppresses(self):
+        probe = self._run_branch_with_state('forge/resolve-pr860', 'CLOSED')
+        self.assertEqual(self._inbox_files(), [])
+        self.assertEqual(self._alerts.call_count, 0)
+        self.assertTrue(self._ledger()['resolve-pr860']['suppressed'])
+        self.assertEqual(probe.call_args.args[1], 860)
+
+    def test_rebase_embedded_target_number_suppresses(self):
+        # An id embedding the target number before a manual `-001` counter, with no
+        # `pr` token: `rebase-forge-post-open-mergeable-860-001` -> #860.
+        probe = self._run_branch_with_state(
+            'forge/rebase-forge-post-open-mergeable-860-001', 'MERGED')
+        self.assertEqual(self._inbox_files(), [])
+        self.assertTrue(
+            self._ledger()['rebase-forge-post-open-mergeable-860-001']['suppressed'])
+        self.assertEqual(probe.call_args.args[1], 860)
+
+    def test_genuine_build_unaffected_by_generalized_gate(self):
+        # A genuine forge/<task> WIP-only build (no PR coordinate) is recovered
+        # exactly as today — Gate 0 never fires, so its gh probe is not even called.
+        self._archive_original()
+        old = time.time() - 3600
+        with self._git_world([('forge/synthetic-wip-001', old)]), \
+             mock.patch.object(h.tts, 'pr_coordinate_state',
+                               return_value=('MERGED', None)) as probe:
+            self._run()
+        probe.assert_not_called()
+        self.assertIn('synthetic-wip-001-retry1.json', self._inbox_files())
+        routes = [c.args[0] for c in self._alerts.call_args_list]
+        self.assertEqual(routes, ['digest'])
+
+
 class RejectSuppressionTest(_Base):
     """A Forge task REJECTED at preflight ('no buildable delta — already fully
     implemented') legitimately produces NO PR — its `[WIP][session-start]`-only
@@ -556,6 +644,64 @@ class HelperUnitTest(unittest.TestCase):
                 h._reviewed_pr_coordinate('reconcile-hardening-mission-001'))
             self.assertIsNone(
                 h._reviewed_pr_coordinate('reconcile-hardening-mission-001-retry1'))
+
+    def test_extract_target_pr_number_variants(self):
+        # `pr` anchor wins (repo-less), tolerant of a counter/descriptor tail...
+        self.assertEqual(h._extract_target_pr_number('pr-860'), 860)
+        self.assertEqual(h._extract_target_pr_number('pr860'), 860)
+        self.assertEqual(h._extract_target_pr_number('pr-860-001'), 860)
+        self.assertEqual(
+            h._extract_target_pr_number('pr252-digest-generator-001'), 252)
+        # ...else the trailing number after a manual `-<counter>` strip.
+        self.assertEqual(
+            h._extract_target_pr_number('forge-post-open-mergeable-860-001'), 860)
+        # No number -> None (never guesses).
+        self.assertIsNone(h._extract_target_pr_number('cleanup-branches'))
+
+    def test_target_pr_coordinate_rebase_resolve_shapes(self):
+        repo = Path('/home/larry/ourliberty-agent-core')
+        with mock.patch.dict(
+                os.environ,
+                {'OURLIBERTY_TERMINAL_STATE_REPOS': 'ourliberty-agent-core'}):
+            # Repo-less pr-anchored shapes -> number from the id, repo from the
+            # checkout the branch lives in.
+            for stem in ('rebase-pr-860', 'rebase-pr-860-001',
+                         'rebase-pr-860-retry1', 'resolve-pr860',
+                         'rebase-pr252-digest-generator-001'):
+                got = h._target_pr_coordinate(stem, repo)
+                self.assertIsNotNone(got, stem)
+                self.assertTrue(got[0].endswith('/ourliberty-agent-core'), stem)
+            self.assertEqual(h._target_pr_coordinate('rebase-pr-860', repo)[1], 860)
+            self.assertEqual(
+                h._target_pr_coordinate(
+                    'rebase-pr252-digest-generator-001', repo)[1], 252)
+            # Embedded target number before a manual counter, no `pr` token.
+            self.assertEqual(
+                h._target_pr_coordinate(
+                    'rebase-forge-post-open-mergeable-860-001', repo)[1], 860)
+            # A repo-QUALIFIED shape resolves its OWN embedded repo/number.
+            got = h._target_pr_coordinate(
+                'resolve-pr-ourliberty-agent-core-860', repo)
+            self.assertEqual(got[1], 860)
+            self.assertTrue(got[0].endswith('/ourliberty-agent-core'))
+            # Mirror-review still parses through the generalized entry point.
+            self.assertEqual(
+                h._target_pr_coordinate(
+                    'mirror-review-pr-ourliberty-agent-core-931', repo)[1], 931)
+
+    def test_target_pr_coordinate_none_for_genuine_build(self):
+        repo = Path('/home/larry/ourliberty-agent-core')
+        with mock.patch.dict(
+                os.environ,
+                {'OURLIBERTY_TERMINAL_STATE_REPOS': 'ourliberty-agent-core'}):
+            # No PR-op prefix and no coordinate -> genuine build -> None.
+            self.assertIsNone(
+                h._target_pr_coordinate('reconcile-hardening-mission-001', repo))
+            # A rebase-shaped id that names no number -> None (never guesses).
+            self.assertIsNone(
+                h._target_pr_coordinate('rebase-cleanup-branches', repo))
+            # A repo-less number shape with no checkout context -> None.
+            self.assertIsNone(h._target_pr_coordinate('rebase-pr-860', None))
 
 
 if __name__ == '__main__':
