@@ -628,9 +628,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-12T16:52Z UTC (Iter ~5312, **Tier 3**, consecutive_clean=0)
+## Status snapshot — updated 2026-07-12T17:27Z UTC (Iter ~5313, **Tier 3**, consecutive_clean=1)
 
-**Iter ~5312 summary (2026-07-12T16:52Z):** 1 new alert (heal-dashboard-api-sha-drift-healed at 16:37Z, Tier-3 silence). No open PRs. Services: all PIDs alive. Zombie PID 1834248 ALIVE (44d21h32m+, bash poll). Sync push_failures=0; HEAD=b347933e==origin/main (mission healer committed after cycle). ratio=~19.33 (trailing-30d). **Tier 2→3 promoted** (3 consecutive clean iters). Check I/XI/III artifacts unchanged (all fired today already). Awaiting Larry `approve threshold-update-2026-07-12`. outbox-notifier silent ~12h (no work in flight — normal). **ACTIVE G-rules:** unchanged from iter ~5311.
+**Iter ~5313 summary (2026-07-12T17:27Z):** 0 new alerts. No open PRs. Services: all PIDs alive. Zombie PID 1834248 ALIVE (44d22h7m+, bash poll). Sync push_failures=0; HEAD=c01c6cd7==origin/main. ratio=~19.33 (trailing-30d). **Tier 3**, consecutive_clean=1. Check I/XI/III artifacts unchanged (all fired today already). Awaiting Larry `approve threshold-update-2026-07-12`. outbox-notifier silent ~12h33m (no work in flight — normal). **ACTIVE G-rules:** unchanged from iter ~5312.
 
 ---
 
