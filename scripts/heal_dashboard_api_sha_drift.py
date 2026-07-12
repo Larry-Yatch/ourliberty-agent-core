@@ -73,6 +73,14 @@ REPO_DIR = Path(os.environ.get('OURLIBERTY_AGENT_CORE_DIR', '/home/larry/agent-c
 
 UNIT = 'ourliberty-dashboard-api.service'
 
+# The alert source + the TWO escalate subjects this healer can emit. The
+# positive-clear retraction (on the 'fresh' branch) keys on this SAME
+# source:subject pair so it retracts exactly its own stale reds, nothing else.
+# The `-healed` subject routes to the digest lane (not a retractable red).
+ALERT_SOURCE = 'heal-dashboard-api-sha-drift'
+STUCK_SUBJECT = 'dashboard-api-sha-drift-stuck'
+RESTART_FAILED_SUBJECT = 'dashboard-api-sha-drift-restart-failed'
+
 # Local, token-gated API base. The healer runs on the droplet, so it talks to
 # the loopback listener directly rather than through the public edge.
 DEFAULT_API_BASE = 'http://127.0.0.1:8000'
@@ -310,7 +318,7 @@ def _dm(message: str, subject: str, suggested_action: str,
     try:
         import larry_alerts as la  # noqa: E402
         return la.append_alert(
-            source='heal-dashboard-api-sha-drift',
+            source=ALERT_SOURCE,
             severity=severity,
             message=message,
             subject=subject,
@@ -320,6 +328,39 @@ def _dm(message: str, subject: str, suggested_action: str,
     except Exception as e:  # noqa: BLE001 — never wedge the healer on a DM
         log(f'dm failed: {type(e).__name__}: {e}', 'WARN')
         return False
+
+
+def _retract_standdown() -> int:
+    """Positive-clear retraction: the running process is FRESH again (its loaded
+    SHA == on-disk HEAD), so any earlier code-drift red this healer emitted is
+    resolved. Retract both escalate subjects (`-stuck`, `-restart-failed`),
+    keyed on this healer's own `source:subject`, and emit one closure stand-down
+    per subject actually removed (auditable, never silent). Best-effort — swallow
+    any error so it can never wedge the tick."""
+    total = 0
+    for subject, note in (
+        (STUCK_SUBJECT,
+         'stuck running stale code'),
+        (RESTART_FAILED_SUBJECT,
+         'a failed auto-restart'),
+    ):
+        try:
+            import larry_alerts as la  # noqa: E402
+            removed = la.retract_with_standdown(
+                f'{ALERT_SOURCE}:{subject}',
+                standdown_message=(
+                    f'{UNIT} is running on-disk HEAD again — the earlier '
+                    f'code-drift alert ({note}) has resolved. Standing it down.'
+                ),
+            )
+            if removed:
+                log(f'retracted {removed} stale {subject} alert line(s) '
+                    f'(process fresh again)')
+            total += removed
+        except Exception as e:  # noqa: BLE001
+            log(f'_retract_standdown[{subject}] failed: '
+                f'{type(e).__name__}: {e}', 'WARN')
+    return total
 
 
 # -------------------- orchestration --------------------
@@ -342,6 +383,12 @@ def run_once(now: Optional[float] = None) -> str:
     if probe_status == PROBE_OK:
         if running_sha == disk_head:
             log(f'fresh: running {running_sha[:8]} == HEAD {disk_head[:8]}')
+            # POSITIVE-CLEAR ONLY: the process positively reported a SHA that
+            # equals on-disk HEAD (PROBE_OK + equality). Every degraded probe
+            # (unreachable / auth / no-token / field-or-route-missing) returns
+            # an early non-'fresh' outcome above or falls into the stale branch,
+            # so a degraded read can never reach this retract.
+            _retract_standdown()
             return 'fresh'
         reason = (f'running git_sha {running_sha[:8]} != on-disk HEAD '
                   f'{disk_head[:8]}')
@@ -387,7 +434,7 @@ def run_once(now: Optional[float] = None) -> str:
                     f'This is a loop or a stuck deploy — the restart is not '
                     f'making the process pick up on-disk HEAD.'
                 ),
-                subject='dashboard-api-sha-drift-stuck',
+                subject=STUCK_SUBJECT,
                 suggested_action=(
                     'ssh larry@134.209.44.80 and run: '
                     'systemctl status ourliberty-dashboard-api.service && '
@@ -437,7 +484,7 @@ def run_once(now: Optional[float] = None) -> str:
             f'Tried to auto-restart {UNIT} (running stale code) but the '
             f'restart FAILED.\n\n{reason}\nRestart error: {stderr}'
         ),
-        subject='dashboard-api-sha-drift-restart-failed',
+        subject=RESTART_FAILED_SUBJECT,
         suggested_action=(
             'ssh larry@134.209.44.80 and run: '
             'sudo systemctl restart ourliberty-dashboard-api.service && '
