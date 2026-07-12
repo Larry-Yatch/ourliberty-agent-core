@@ -628,9 +628,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-12T13:07Z UTC (Iter ~5286, **Tier 1**, consecutive_clean=0)
+## Status snapshot — updated 2026-07-12T13:28Z UTC (Iter ~5288, **Tier 1**, consecutive_clean=0)
 
-**Iter ~5286 summary (2026-07-12T13:07Z):** 0 new alerts (wm=948==fl=948). No open PRs. Services: all PIDs alive. Zombie PID 1834248 ALIVE (44d17h48m+, bash poll). Sync status=no-change, last_sync=12:31Z; HEAD==origin/main=1d2c28d3 [stable]. systemic_fixes=85, vp=36, ratio=~19.16. Check III artifact 2026-07-12T10:42Z (3 high-attention proposals). Awaiting Larry `approve threshold-update-2026-07-12`. Check I timer fires ~14:13Z UTC today (not yet fired at 13:07Z). outbox-notifier silent ~8.3h+ (no work in flight — normal). **ACTIVE G-rules:** unchanged from iter ~5285.
+**Iter ~5288 summary (2026-07-12T13:28Z):** 1 new alert (wm=948→949): dashboard-api-sha-drift-healed, Tier-3 silenced. No open PRs. Services: all PIDs alive. Zombie PID 1834248 ALIVE (44d18h08m+, bash poll). Sync status=no-change, last_sync=12:31Z; HEAD==origin/main=d19c3cb6 [stable]. systemic_fixes=85, vp=36, ratio=~19.16. Check III artifact 2026-07-12T10:42Z (3 high-attention proposals). Awaiting Larry `approve threshold-update-2026-07-12`. Check I timer fires ~14:13Z UTC today (not yet fired at 13:28Z). outbox-notifier silent ~8.8h+ (no work in flight — normal). **ACTIVE G-rules:** unchanged from iter ~5287.
 
 ---
 
