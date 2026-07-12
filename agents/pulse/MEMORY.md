@@ -628,9 +628,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-12T14:07Z UTC (Iter ~5293, **Tier 1**, consecutive_clean=0)
+## Status snapshot — updated 2026-07-12T14:17Z UTC (Iter ~5294, **Tier 1**, consecutive_clean=0)
 
-**Iter ~5293 summary (2026-07-12T14:07Z):** 0 new alerts (wm=949==fl=949). No open PRs. Services: all PIDs alive. Zombie PID 1834248 ALIVE (44d18h47m+, bash poll). Sync status=no-change, last_sync=13:32Z; HEAD==origin/main=185fa06f [stable]. systemic_fixes=85, vp=36, ratio=~19.14. Check III artifact 2026-07-12T10:42Z (3 high-attention proposals). Awaiting Larry `approve threshold-update-2026-07-12`. Check I timer fires ~14:13Z UTC today (not yet fired at 14:07Z). outbox-notifier silent ~9.2h+ (no work in flight — normal). **ACTIVE G-rules:** unchanged from iter ~5292.
+**Iter ~5294 summary (2026-07-12T14:17Z):** 2 new alerts (L950-951: ledger weekly-2026-07-06 + Check I Sunday fire), both Tier-3 silenced; wm advanced to 951. Check I timer FIRED — artifact check-i-2026-07-12.json (same proposal: notify-p3a-retro-prep 98σ). No open PRs. Services: all PIDs alive. Zombie PID 1834248 ALIVE (44d18h57m+, bash poll). Sync status=no-change, last_sync=13:32Z; HEAD==origin/main=ef607ada (ledger commit). systemic_fixes=85, vp=36, ratio=~19.14. Check III artifact 2026-07-12T10:42Z (3 high-attention proposals). Awaiting Larry `approve threshold-update-2026-07-12`. outbox-notifier silent ~9.5h+ (no work in flight — normal). **ACTIVE G-rules:** unchanged from iter ~5293.
 
 ---
 
