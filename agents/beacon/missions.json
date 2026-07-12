@@ -8923,6 +8923,23 @@
       "repo": "ourliberty-agent-core",
       "created": "2026-07-07",
       "deferred_reason": "Build deferred ~1 month per Larry's briefing (target kickoff ~2026-08-07): let the NOW/SOON/FYI alert taxonomy stabilize and accumulate ~1 month of real traffic before instrumenting outcomes, so the lapse window and outcome buckets are set against a real distribution, not a moving target."
+    },
+    {
+      "id": "proposed-larry-reject-aac182cbcbbb180e5be533d58054e463a7330bd8",
+      "name": "Larry Reject Aac182cbcbbb180e5be533d58054e463a7330bd8",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `larry-reject-aac182cbcbbb180e5be533d58054e463a7330bd8`. Last activity 2026-07-06T18:15:40.584697+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "larry-reject-aac182cbcbbb180e5be533d58054e463a7330bd8"
+      ],
+      "repo": null,
+      "created": "2026-07-12",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-12T16:50:05.382048+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-06T18:15:40.584697+00:00"
     }
   ]
 }
