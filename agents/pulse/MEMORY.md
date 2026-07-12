@@ -628,9 +628,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-12T12:11Z UTC (Iter ~5278, **Tier 1**, consecutive_clean=0)
+## Status snapshot — updated 2026-07-12T12:18Z UTC (Iter ~5279, **Tier 1**, consecutive_clean=0)
 
-**Iter ~5278 summary (2026-07-12T12:11Z):** 0 new alerts. wm=947. No open PRs. Services: all PIDs alive. Zombie PID 1834248 ALIVE (44d16h52m+, bash poll). Sync status=no-change, last_sync=11:31Z; HEAD==origin/main=597dfe3f [stable]. systemic_fixes=85, vp=36, ratio=~19.19 (trend=worsening — attributable to spurious iter ~5270 intervention row; monitor not escalate). Check III artifact 2026-07-12T10:42Z (3 high-attention proposals). Awaiting Larry `approve threshold-update-2026-07-12`. Check I timer fires ~14:13Z UTC today (not yet fired). **ACTIVE G-rules:** unchanged from iter ~5277.
+**Iter ~5279 summary (2026-07-12T12:18Z):** 1 new alert (heal-dashboard-api-sha-drift/12:14Z, Tier-3 silence, wm→948). No open PRs. Services: all PIDs alive. Zombie PID 1834248 ALIVE (44d16h57m+, bash poll). Sync status=no-change, last_sync=11:31Z; HEAD==origin/main=f8823cd0 [stable]. systemic_fixes=85, vp=36, ratio=~19.19. Check III artifact 2026-07-12T10:42Z (3 high-attention proposals). Awaiting Larry `approve threshold-update-2026-07-12`. Check I timer fires ~14:13Z UTC today (not yet fired). heal-dashboard-api-sha-drift firing ~hourly (tied to Pulse cycle commits) — Tier-3/self-healing, monitoring pattern. **ACTIVE G-rules:** unchanged from iter ~5278.
 
 ---
 
