@@ -628,9 +628,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-12T19:36Z UTC (Iter ~5317, **Tier 1**, consecutive_clean=0)
+## Status snapshot — updated 2026-07-12T19:47Z UTC (Iter ~5319, **Tier 1**, consecutive_clean=2)
 
-**Iter ~5317 summary (2026-07-12T19:35Z):** 2 new alerts (both Tier-3 silences: dashboard-api-sha-drift-healed + outbox-notifier review-pass PR #956). **threshold-update-2026-07-12-001 RESOLVED** — PR #956 MERGED 19:31:51Z UTC (Check III proposals applied: forge 3436→1232, mirror 488→1531, beacon 2147→320). Fast-forward applied (repo behind by PR #956 merge). Zombie PID 1834248 ALIVE (45d00h14m+, bash poll). Sync push_failures=0; HEAD=a2644d5e==origin/main (post-ff). ratio=~19.79 (trailing-30d). **Tier 1**, consecutive_clean=0 (reset by fast-forward finding; next clean iters restore Tier 3). **ACTIVE G-rules:** unchanged from iter ~5316.
+**Iter ~5319 summary (2026-07-12T19:47Z):** 0 new alerts. All mandatory checks clean. **threshold-update-2026-07-12-001 CLOSED** — PR #956 MERGED 19:31:51Z UTC (Check III proposals applied: forge 3436→1232, mirror 488→1531, beacon 2147→320). Zombie PID 1834248 ALIVE (45d00h27m+, bash poll). Sync push_failures=0; HEAD=80ea8675==origin/main. No open PRs. ratio=19.79 (trailing-30d). **Tier 1**, consecutive_clean=2 (1 more clean iter → Tier 2). **ACTIVE G-rules:** unchanged from iter ~5318.
 
 ---
 
