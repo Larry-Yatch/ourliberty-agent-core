@@ -4940,12 +4940,20 @@ def _delegation_build_pr_url(events: list[dict[str, Any]]) -> Optional[str]:
 def _delegation_trail_field(
     cap: dict[str, Any],
     build_events_by_origin: Optional[dict[str, list[dict[str, Any]]]],
+    pr_state_by_url: Optional[dict[str, str]] = None,
 ) -> dict[str, Any]:
     """Delegate-tracking Slice 2b: surface the delegated build's review trail on
-    the card — `delegation_build_phase` (in_review | review_passed | None) plus
-    `delegation_pr_url`. Joined by the card's `delegate-<cid>` against chain_events
-    tagged with `payload.origin_task_id`. Neutral None for a non-delegate card or
-    before any build event joins — never a misleading claim."""
+    the card — `delegation_build_phase` (in_review | review_passed | merged |
+    None) plus `delegation_pr_url`. Joined by the card's `delegate-<cid>` against
+    chain_events tagged with `payload.origin_task_id`.
+
+    `merged` (the deferred Slice-2b terminal) comes from GitHub truth, not an
+    event: the auto_merge event is not origin-tagged, so when the build's PR
+    resolves to MERGED (via the same bounded/fail-safe `pr_state_resolver` the
+    orphan lane uses) the trail flips `review_passed` → `merged`.
+
+    Neutral None for a non-delegate card or before any build event joins — never
+    a misleading claim."""
     neutral = {'delegation_build_phase': None, 'delegation_pr_url': None}
     if not build_events_by_origin:
         return neutral
@@ -4958,10 +4966,11 @@ def _delegation_trail_field(
     events = build_events_by_origin.get(tid)
     if not events:
         return neutral
-    return {
-        'delegation_build_phase': _delegation_build_phase(events),
-        'delegation_pr_url': _delegation_build_pr_url(events),
-    }
+    pr_url = _delegation_build_pr_url(events)
+    phase = _delegation_build_phase(events)
+    if pr_url and (pr_state_by_url or {}).get(pr_url) == 'MERGED':
+        phase = 'merged'
+    return {'delegation_build_phase': phase, 'delegation_pr_url': pr_url}
 
 
 def _parked_from_captures(
@@ -4970,6 +4979,7 @@ def _parked_from_captures(
     events_by_task_id: Optional[dict[str, list[dict[str, Any]]]] = None,
     open_delegate_approvals: Optional[dict[str, dict[str, Any]]] = None,
     build_events_by_origin: Optional[dict[str, list[dict[str, Any]]]] = None,
+    pr_state_by_url: Optional[dict[str, str]] = None,
 ) -> list[dict[str, Any]]:
     """Build the `parked[]` array (§ 3.3) from captures.json. Only state=='parked'
     captures; `aging` is the GC healer's persisted flag (Phase 1 — never
@@ -5006,7 +5016,8 @@ def _parked_from_captures(
         entry.update(_meaning_layer_fields(cap))
         entry.update(_spawned_fields(cap, events_by_task_id))
         entry.update(_delegation_needs_you_field(cap, open_delegate_approvals))
-        entry.update(_delegation_trail_field(cap, build_events_by_origin))
+        entry.update(_delegation_trail_field(
+            cap, build_events_by_origin, pr_state_by_url))
         out.append(entry)
     return out
 
@@ -5419,11 +5430,19 @@ def _build_derived_response(
     pr_state_by_url: dict[str, str] = {}
     if pr_state_resolver is not None:
         orphan_pr_urls = [o['pr_url'] for o in orphans if o.get('pr_url')]
-        if orphan_pr_urls:
+        # Delegate-tracking Slice 2b: resolve the delegated builds' PR urls in the
+        # SAME bounded/batched call so a delegated card flips "review passed" →
+        # "✅ merged" off GitHub truth (the auto_merge event is not origin-tagged).
+        delegated_pr_urls = [
+            u for evs in (build_events_by_origin or {}).values()
+            if (u := _delegation_build_pr_url(evs))
+        ]
+        lookup_urls = list(dict.fromkeys(orphan_pr_urls + delegated_pr_urls))
+        if lookup_urls:
             # Backstop: the resolver is contracted to never raise, but a derive
             # must never 500 — if it does raise, degrade to the event-only path.
             try:
-                pr_state_by_url = pr_state_resolver(orphan_pr_urls) or {}
+                pr_state_by_url = pr_state_resolver(lookup_urls) or {}
             except Exception:  # noqa: BLE001 — fail-safe: never break the derive
                 pr_state_by_url = {}
     for o in orphans:
@@ -5434,7 +5453,7 @@ def _build_derived_response(
 
     parked = _parked_from_captures(
         captures, now, events_by_task_id, open_delegate_approvals,
-        build_events_by_origin)
+        build_events_by_origin, pr_state_by_url)
     return {
         'schema_version': 1,
         'missions': missions,

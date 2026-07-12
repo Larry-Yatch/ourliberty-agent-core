@@ -107,6 +107,18 @@ class DelegationTrailFieldTest(unittest.TestCase):
         self.assertIsNone(got['delegation_build_phase'])
         self.assertIsNone(got['delegation_pr_url'])
 
+    def test_merged_pr_flips_review_passed_to_merged(self):
+        pr = 'https://github.com/o/r/pull/7'
+        m = {DELEGATE_ID: [_ev('review_pass', pr_url=pr)]}
+        got = da._delegation_trail_field(_delegate_cap(), m, {pr: 'MERGED'})
+        self.assertEqual(got['delegation_build_phase'], 'merged')
+
+    def test_open_pr_stays_review_passed(self):
+        pr = 'https://github.com/o/r/pull/7'
+        m = {DELEGATE_ID: [_ev('review_pass', pr_url=pr)]}
+        got = da._delegation_trail_field(_delegate_cap(), m, {pr: 'OPEN'})
+        self.assertEqual(got['delegation_build_phase'], 'review_passed')
+
     def test_parked_integration_surfaces_trail(self):
         m = {DELEGATE_ID: [_ev('review_request')]}
         parked = da._parked_from_captures(
