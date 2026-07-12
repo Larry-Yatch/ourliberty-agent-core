@@ -32,6 +32,17 @@ before re-probing gh. An OPEN or gh-UNKNOWN reviewed PR is left alone here — a
 genuinely-dead open review is recovered by the orphaned-mirror-claims re-inject
 path, not by this build-WIP healer (Mirror review #931 false 'exhausted', 2026-07-11).
 
+PR-OPERATING SUPPRESSION (generalized) — mirror-review is one case of a broader
+class: any task that operates on an EXISTING PR #N and opens none of its own also
+always trips the WIP-only / no-PR signature. A ``rebase-pr-<N>`` / ``resolve-pr<N>``
+task (Gate 0, ``_target_pr_coordinate``) rebases/resolves PR #N and emits no PR, so
+after PR #N merges it too was WIP-retried + falsely escalated (``rebase-pr-860-001``
+after #860 merged, 2026-07-11). Gate 0 now suppresses these the SAME way it
+suppresses a mirror-review of a terminal PR — merged/closed target => suppress;
+open/unknown => surface. The forge-no-PR stall path already guards rebase via
+``heal_pipeline_stall._forge_rebase_target_shipped``; this closes the same gap in
+the WIP-redispatch healer.
+
 REJECT / NO-DELTA SUPPRESSION — a task Forge REJECTED at preflight ('no buildable
 delta — already fully implemented') legitimately produces NO PR: its
 ``forge/<task>`` branch carries only the ``[WIP][session-start]`` checkpoint, so it
@@ -207,6 +218,88 @@ def _reviewed_pr_coordinate(branch_stem: str) -> Optional[tuple[str, int]]:
     ``parse_pr_coordinate``'s numeric-tail anchor rejects a non-hex ``-retry<k>``
     tail; the retry-stripped ``mirror-review-pr-<repo>-<N>`` parses cleanly."""
     return tts.parse_pr_coordinate(_ledger_base(branch_stem))
+
+
+# Action-verb prefixes a PR-OPERATING task id can carry: a ``rebase-``/``resolve-``
+# task operates on an EXISTING PR and — exactly like a mirror-review — opens no PR
+# of its own, so it always trips the WIP-only / no-PR signature and must be treated
+# as terminal-by-design (not an abandoned build) when its target PR is merged/closed.
+_PR_OP_PREFIXES = ('rebase-', 'resolve-')
+
+# A ``pr<sep><digits>`` coordinate token: ``pr-860``, ``pr860``, ``pr-860-001``,
+# ``pr252-digest-generator``. Anchored on a token boundary (start or ``-``) so a
+# stray ``pr`` inside a word never yields a bogus number; the trailing boundary
+# (``-`` or end) lets the target number precede a counter/descriptor tail.
+_PR_NUM_TOKEN_RE = re.compile(r'(?:^|-)pr-?(\d+)(?:-|$)')
+
+
+def _extract_target_pr_number(core: str) -> Optional[int]:
+    """The target PR number from a repo-less rebase/resolve core (action verb and
+    ``-retry<k>`` already stripped by the caller). A ``pr<sep><digits>`` token wins
+    (``pr-860``, ``pr860``, ``pr252-digest-generator-001``); otherwise the trailing
+    number after a manual ``-<counter>`` suffix is dropped
+    (``...-mergeable-860-001`` -> 860). None when the core names no number.
+
+    Mirrors the digit-extraction convention ``heal_pipeline_stall._forge_rebase_
+    target_shipped`` uses (``re.findall(r'\\d+', task_id)``), but resolves the
+    counter-vs-target ambiguity structurally from the id alone — the ``pr`` anchor,
+    then a single trailing-counter strip — because this Gate does a direct
+    single-PR probe rather than intersecting against the fetched PR set."""
+    m = _PR_NUM_TOKEN_RE.search(core)
+    if m:
+        return int(m.group(1))
+    trimmed = _NUMERIC_SUFFIX_RE.sub('', core)  # drop a trailing -<counter>
+    m2 = re.search(r'(\d+)$', trimmed)
+    return int(m2.group(1)) if m2 else None
+
+
+def _target_pr_coordinate(branch_stem: str,
+                          repo: Optional[Path] = None) -> Optional[tuple[str, int]]:
+    """(qualified_repo, pr_number) of the EXISTING PR a PR-operating task targets,
+    or None when the stem names no such PR (a genuine build).
+
+    Generalizes the former mirror-review-only Gate 0 parser to every task shape
+    that operates on an existing PR and opens none of its own, so all of them are
+    recognized as terminal-by-design when that PR is already merged/closed:
+      * ``mirror-review-pr-<repo>-<N>`` — unchanged; one case of the generalization
+        (delegated verbatim to ``_reviewed_pr_coordinate``),
+      * ``rebase-pr-<N>`` / ``rebase-pr-<repo>-<N>`` / ``rebase-pr-<N>-<counter>`` and
+        rebase ids that embed the target number
+        (``rebase-forge-post-open-mergeable-<N>-001``, ``rebase-pr252-...-001``),
+      * ``resolve-pr<N>`` / ``resolve-pr-<repo>-<N>``,
+    all tolerant of a trailing ``-retry<k>`` suffix (stripped via ``_ledger_base``).
+
+    Repo resolution: the ``pr-<repo>-<N>`` shapes embed the repo (resolved by the
+    shared ``parse_pr_coordinate``); the repo-less shapes fall back to ``repo`` — the
+    canonical checkout the dispatch branch lives in, which IS the repo a
+    rebase/resolve task targets. A wrong guess is safe: the downstream
+    ``pr_coordinate_state`` probe then returns UNKNOWN (gh miss), which never
+    suppresses — so at worst this preserves today's behavior, never a false
+    suppress of a still-open target."""
+    # Mirror-review keeps its exact prior parse.
+    coord = _reviewed_pr_coordinate(branch_stem)
+    if coord is not None:
+        return coord
+
+    stem = _ledger_base(branch_stem)
+    prefix = next((p for p in _PR_OP_PREFIXES if stem.startswith(p)), None)
+    if prefix is None:
+        return None
+    core = stem[len(prefix):]
+
+    # ``rebase-pr-<repo>-<N>`` / ``resolve-pr-<repo>-<N>``: once the action verb is
+    # stripped, the remainder is the shared repo-anchored coordinate shape.
+    embedded = tts.parse_pr_coordinate(core)
+    if embedded is not None:
+        return embedded
+
+    number = _extract_target_pr_number(core)
+    if number is None or repo is None:
+        return None
+    qualified = tts._qualify_repo(repo.name)
+    if not qualified:
+        return None
+    return qualified, number
 
 
 # ---------- reject / no-delta terminal-signal lookup ----------
@@ -470,25 +563,27 @@ def evaluate(cand: Candidate, now: float, open_heads: set[str],
     if (now - cand.committer_ts) < GRACE_SECONDS:
         return 'skip', f'too-young (<{GRACE_SECONDS}s)'
 
-    # Gate 0 (mirror-review): a `mirror-review-pr-<repo>-<N>` task REVIEWS PR #N and
-    # emits a verdict, never a PR of its own — so it always trips the WIP-only /
-    # no-PR signature below. When the reviewed PR is already terminal (merged or
-    # closed) the review is moot: suppress it (never redispatch, never escalate)
-    # and record the suppression in the ledger so later ticks short-circuit without
-    # re-probing gh. An OPEN or UNKNOWN (gh error) reviewed PR is left alone here —
-    # a genuinely-dead open review is recovered by the orphaned-mirror-claims
-    # re-inject path, not by this build-WIP healer.
-    coord = _reviewed_pr_coordinate(cand.branch_stem)
+    # Gate 0 (PR-operating task): a task that operates on an EXISTING PR #N and
+    # emits no PR of its own — a `mirror-review-pr-<repo>-<N>` verdict, or a
+    # `rebase-`/`resolve-` op on PR #N — always trips the WIP-only / no-PR signature
+    # below. When that target PR is already terminal (merged or closed) the op is
+    # moot: suppress it (never redispatch, never escalate) and record the
+    # suppression in the ledger so later ticks short-circuit without re-probing gh.
+    # An OPEN or UNKNOWN (gh error) target PR is left alone here — a genuinely-dead
+    # open review is recovered by the orphaned-mirror-claims re-inject path, and a
+    # genuine rebase/resolve failure on a still-open PR must still surface — so the
+    # conservative posture (only MERGED/CLOSED suppresses) is unchanged.
+    coord = _target_pr_coordinate(cand.branch_stem, cand.repo)
     if coord is not None:
         if (ledger.get(base) or {}).get('suppressed'):
-            return 'skip', 'reviewed-pr-terminal (already suppressed)'
+            return 'skip', 'target-pr-terminal (already suppressed)'
         pr_repo, pr_number = coord
         state, _ = tts.pr_coordinate_state(pr_repo, pr_number)
         if state in (tts.MERGED, tts.CLOSED):
-            return 'suppress', (f'reviewed-pr-terminal ({pr_repo}#{pr_number} '
+            return 'suppress', (f'target-pr-terminal ({pr_repo}#{pr_number} '
                                 f'{state})')
-        return 'skip', (f'mirror-review of {pr_repo}#{pr_number} (state={state}) '
-                        f'— not a build-WIP candidate')
+        return 'skip', (f'PR-operating task on {pr_repo}#{pr_number} '
+                        f'(state={state}) — not a build-WIP candidate')
 
     # Gate 0b (already-suppressed): a family already recorded as a terminal
     # reject/no-delta (or, defensively, any other suppressed reason) short-
