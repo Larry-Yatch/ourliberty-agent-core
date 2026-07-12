@@ -628,9 +628,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-12T11:13Z UTC (Iter ~5270, **Tier 1**, consecutive_clean=0)
+## Status snapshot — updated 2026-07-12T11:18Z UTC (Iter ~5271, **Tier 1**, consecutive_clean=0)
 
-**Iter ~5270 summary (2026-07-12T11:13Z):** 1 new alert L947 (heal-dashboard-api-sha-drift-healed, Tier-3 silence — dashboard-api auto-restarted to f5a6ba45). wm=947. No open PRs. Services: all PIDs alive. Zombie PID 1834248 ALIVE (44d15h52m+, bash poll). Sync status=no-change, last_sync=10:31Z; HEAD==origin/main=f5a6ba45 [stable]. systemic_fixes=85 (ratio inflated +1 by discipline error: Tier-3 logged as intervention), vp=36. Check III artifact 2026-07-12T10:42Z (3 high-attention proposals). Awaiting Larry `approve threshold-update-2026-07-12`. Check I timer fires ~14:13Z UTC today (not yet fired). **ACTIVE G-rules:** unchanged from iter ~5269.
+**Iter ~5271 summary (2026-07-12T11:18Z):** 0 new alerts. wm=947. No open PRs. Services: all PIDs alive. Zombie PID 1834248 ALIVE (44d15h58m+, bash poll). Sync status=no-change, last_sync=10:31Z; HEAD==origin/main=4ce90544 [stable]. systemic_fixes=85, vp=36, ratio=~19.19 (trend=stable). Check III artifact 2026-07-12T10:42Z (3 high-attention proposals). Awaiting Larry `approve threshold-update-2026-07-12`. Check I timer fires ~14:13Z UTC today (not yet fired). **ACTIVE G-rules:** unchanged from iter ~5270.
 
 ---
 
