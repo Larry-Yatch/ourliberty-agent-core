@@ -7683,7 +7683,12 @@
         "at": "2026-07-08T08:18:12.118971+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-12T01:43:33.410303+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#860"
     },
     {
       "id": "proposed-card-message-1644bef4a48186be1d71f7787439a9de97d26317",
