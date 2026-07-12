@@ -34716,3 +34716,73 @@ Watermark advanced 912→913. ✅
 
 ---
 
+## Iteration ~5145 — 2026-07-11T19:57Z UTC (Larry /cycle, Tier 1)
+
+**Health:** ✅ Nominal. 0 new alerts. All 6 mandatory checks clean. Zombie carry holds Tier 1. New: PR #937 Mirror review dispatched since iter ~5144.
+
+**VERIFY-BEFORE-REASSERT (from iter ~5144):**
+- **"zombie PID 1834248 (~44d)"**: CONFIRMED ⚠️ — ps shows 44-00:38:10 (Ss, bash poll loop awaiting absent build-check-viii-pr-2b-analyzer-001.json). [carry]
+- **"beacon PID 178114"**: CONFIRMED ✅ — running. [carry]
+- **"outbox-notifier PID 178789"**: CONFIRMED ✅ — running. [carry]
+- **"inbox_watcher PID 198743"**: CONFIRMED ✅ — Ssl, running. [carry]
+- **"pending=0"**: CONFIRMED ✅. [carry]
+- **"sync last_sync=19:00:44Z, status=error, consecutive_push_failures=1"**: CONFIRMED — now ~57 min old; still within 2h window. Self-heals on next sync tick. [carry NOMINAL]
+- **"PR #860 OPEN/UNKNOWN"**: CONFIRMED ✅ — still OPEN/UNKNOWN, no labels. [yellow carry]
+- **"PR #936 OPEN/UNKNOWN in Mirror review"**: CONFIRMED — still OPEN/UNKNOWN; Mirror review dispatched 13:35:49 MDT (19:35:49Z); ~22 min into review at iter start. Active pipeline. [carry]
+- **"Check XI attention_rate=18.8%"**: CONFIRMED ✅ — same artifact check-xi-20260711T102013. No new until Sun. [yellow carry]
+- **"watermark=913=file_length=913"**: CONFIRMED ✅ — repair-watermark: repaired=false. 0 new alerts. [carry]
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 913, "file_length": 913}`. 0 new alerts. NOMINAL ✅
+
+**Check 1 — Log noise:** outbox-notifier.log last entry: 13:55:18 MDT (19:55:18Z UTC) — `review-request dispatched mirror <- beacon (task=pr-ourliberty-agent-core-937, PR #937)`. No WARNs/ERRORs. NOMINAL ✅
+
+**Check 2 — Telegram sweep:** Last bot entries 13:37:27 MDT (alert idx=912 delivered; forge-wip-redispatch for PR #931 FP, already DM'd). No new Larry messages. No orphan directives. NOMINAL ✅
+
+**Check 3 — Pipeline stall:** DRY-RUN (19:56:13Z UTC) → "no stalls detected." 16 FORGE_NO_PR_SKIP entries (all valid carries). NOMINAL ✅
+
+**Check 4 — Pending directives:** pending=0. NOMINAL ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-11T19:47:15Z (~10 min at check). Watchdog last: 13:52:20 MDT (19:52:20Z UTC) = overall=healthy. NOMINAL ✅
+
+**Check A — Source repo:** HEAD=3ed334a0=origin/main ✅. Clean working tree. On main. Not ahead, not behind. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-11T19:00:44Z (~57 min), status=error, consecutive_push_failures=1. Within 2h window. Self-heals on next sync tick (~20:00Z expected). NOMINAL ✅
+**Check C — Agent liveness:** beacon PID 178114 ✅; outbox-notifier PID 178789 ✅; inbox_watcher PID 198743 ✅; watchdog overall=healthy 13:52:20 MDT ✅. ⚠️ Zombie PID 1834248 (44d+38m, Ss, bash poll loop). [carry]
+**Check E — PR/merge state:**
+- **PR #937** — NEW ✅: "chore(shipper): drop dead REVIEW_REQUEST log keyword (dual-emit hazard)". OPEN/UNKNOWN. `auto-review` label. Mirror review dispatched 13:55:18 MDT (19:55:18Z). Active pipeline — nominal.
+- **PR #936** — OPEN/UNKNOWN. feat(gh-budget): gh-burn-phase2. No labels. Mirror review in flight (13:35:49 MDT dispatch; ~22 min in at iter ~5145). Active pipeline — nominal. [carry]
+- **PR #860** — OPEN/UNKNOWN. docs(spec): XIV-b. No labels. [yellow carry]
+
+**§5.0:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅.
+
+**Conditional checks — UTC Saturday 2026-07-11 (~19:57Z):**
+- Check I: Not a firing day (Sat). ✅
+- Check III/IV/VIII/IX/X/XII/XIV: Sunday/Monday gates. Skip. ✅
+- Check XI: artifact check-xi-20260711T102013 — attention_rate=18.8%, over_gate=True. No new until Sun. [yellow carry]
+
+**G-rule assessment:** 0 new hits this iter. All G-rule counts carry from iter ~5144.
+
+**Actions taken:**
+1. Check 0: repair-watermark no-op. 0 new alerts. Watermark stays 913. ✅
+2. PRIME ledger: `iter_clean` appended (tier=1, template=nominal, 19:57:30Z UTC). ✅
+3. Tier state: `record --checks-clean false` → tier=1, consecutive_clean=0 (zombie carry). ✅
+
+**Escalations:** 0 new Pulse DMs.
+
+**Standing findings (updated):**
+- [yellow] **zombie-bash-pid-1834248** — 44d+38m, bash poll loop awaiting absent build-check-viii-pr-2b-analyzer-001.json. ask-then-do: `kill 1834248`. [carry]
+- [yellow] **check-xi-drift-over-gate** — 18.8% (gate=10%). Next artifact tomorrow (Sun). [carry]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07`. [carry]
+- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
+- [yellow] **PR #860** — OPEN/UNKNOWN. docs(spec): XIV-b. [carry]
+- [blue] **PR #936** — OPEN/UNKNOWN. gh-burn-phase2. Mirror review in flight (~22 min). [carry]
+- [blue] **PR #937** — OPEN/UNKNOWN. `auto-review` label. Mirror review dispatched 13:55:18 MDT. Active. ✅
+- [blue] **Check I proposal #1** — notify-p3a-retro-prep ($1.91 vs $0.28 baseline, 98σ). Use `/dispatch 1`. [carry]
+- [blue] **G-rules (dispatched, vp):** outbox-notifier-notification-intent-reject-tier4-001 [3/3, vp]; ourliberty-health-subject-key-mismatch-001 [3/3, vp]; forge-wip-redispatch-digest-tier4-001 [vp]; forge-revision-preamble-missing-pr711-001 [vp]; forge-wip-redispatch-exhausted-pr-exists-fp-001 [APPROVAL_REQUEST QUEUED iter ~3279, vp]; decision-needed-approval-forge-dispatch-no-target-repo-001 [vp]; no-session-revision-active-mirror-session-fp-001 [vp].
+- [blue] **G-rule 2/3:** outbox-notifier-merge-conflict-manual-rebase-tier4-001; forge-wip-redispatch-exhausted-genuine-no-pr-001; outbox-notifier-notification-intent-review-escalate-tier4-001; outbox-notifier-auto-merge-stale-revalidation-tier4-001.
+- [blue] **G-rule 1/3:** mirror-malformed-verdict-heal-reap-path-001; mirror-queue-wait-gauge-tier4-001; inbox-watcher-tier-pool-all-unavailable-tier4-001; heal-pipeline-stall-unrouted-deep-review-required-fp-001; heal-pulse-check-staleness-single-flight-skip-fp-001; gate-parallelism-monitor-regression-data-001; pulse-rotation-check-source-tier4-001.
+
+**PRIME DIRECTIVE:** 0 new interventions; 0 new systemic_fixes; iter_clean appended. ratio=19.1 (worsening trend — ledger is ground truth).
+**Tier end-of-iter:** **Tier 1** (zombie carry; consecutive_clean=0).
+
+---
+
