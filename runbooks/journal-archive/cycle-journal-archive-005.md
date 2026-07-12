@@ -36695,3 +36695,78 @@ Notable [blue, 1st obs]: `card-message-notifier-auto-retraction-stale-red-alerts
 
 ---
 
+## Iteration ~5173 — 2026-07-11T23:16Z UTC (Larry /cycle, Tier 1)
+
+**Health:** ⚠️ Nominal with carry. PR #860 CONFLICTING (new, 1st obs). Zombie PID 1834248 (~44d) holds Tier 1. 2 Forge builds in flight.
+
+**VERIFY-BEFORE-REASSERT (from iter ~5172):**
+- **"zombie PID 1834248 (~44d+3h+50m)"**: CONFIRMED ⚠️ — ps shows 44-03:57:53 (Ss, bash poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`). [carry]
+- **"beacon PID 278509"**: CONFIRMED ✅ — Ss, 02:58:17 elapsed.
+- **"outbox-notifier PID 279048"**: CONFIRMED ✅ — Ss, 02:57:59 elapsed.
+- **"inbox_watcher PID 278746"**: CONFIRMED ✅ — Ssl, 02:58:08 elapsed.
+- **"pending=0"**: CONFIRMED ✅ — pending=0, history=477. NOMINAL.
+- **"sync last_sync=2026-07-11T23:01:02Z (push failed, 1 consecutive)"**: UNCHANGED — still status=error, 1 consecutive. Self-heals next tick. INFO.
+- **"PR #860 OPEN/UNKNOWN"**: UPDATED ⚠️ — now OPEN/CONFLICTING after recent merges (PR #939, #941 cascade). [yellow new]
+- **"PR #940 OPEN/UNKNOWN"**: UPDATED ✅ — now OPEN/MERGEABLE. No labels. chore/*. By-design. [blue carry]
+- **"PR #941 OPEN/UNKNOWN — merged iter ~5172"**: CONFIRMED RESOLVED ✅.
+- **"watermark=927"**: CONFIRMED ✅ — repair-watermark: file_length=927. 0 new alerts. NOMINAL.
+- **"HEAD=6217963a=origin/main"**: UPDATED ✅ — HEAD=1a9870cd (run_cycle.sh auto-committed iter ~5172 journal as "Pulse cycle 20260711T231525Z"). HEAD=1a9870cd=origin/main ✅. Clean tree. On main. NOMINAL.
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 927, "file_length": 927}`. 0 new alerts. Watermark stays at 927. NOMINAL ✅
+
+**Check 1 — Log noise:** outbox-notifier PID 279048 ✅. Last entry: 17:02:21 MDT (23:02:21Z UTC) — idx=926 route=digest (sync push fail, suppressed). No WARNs/ERRORs. Watchdog last: 17:15:28 MDT (23:15:28Z UTC) — overall=healthy ✅. 2 Forge builds dispatched 16:49–16:53 MDT: `task-no-pr-legitimacy-classifier-001` and `notifier-auto-retraction-slice2-001`; both still in Forge inbox (~26 min at check, normal). NOMINAL ✅
+
+**Check 2 — Telegram sweep:** beacon PID 278509 ✅. Last Larry message: 16:43:51 MDT (22:43:51Z UTC) — already handled by Beacon at 16:47:11 MDT (APPROVAL_REQUEST auto-dispatched `task-no-pr-legitimacy-classifier-001`). No new messages. Watchdog 23:15:28Z UTC overall=healthy ✅. NOMINAL ✅
+
+**Check 3 — Pipeline stall:** DRY-RUN (23:16:38Z UTC) → "0 alert(s) would fire, 0 recovery(ies) would be attempted." 18 FORGE_NO_PR_SKIP entries. Both cooldowns active (auto-route-externally-authored-pr-reviews-001-retry1 + retr-retry1). NOMINAL ✅
+
+**Check 4 — Pending directives:** pending=0, history=477. NOMINAL ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-11T23:09:36Z (~7 min at check). Watchdog 23:15:28Z UTC — overall=healthy ✅. NOMINAL ✅
+
+**Check A — Source repo:** HEAD=1a9870cd=origin/main ✅; clean tree ✅; on main ✅. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-11T23:01:02Z (~15 min old), status=error (1 consecutive push failure, transient, self-heals). INFO. NOMINAL ✅
+**Check C — Agent liveness:** beacon PID 278509 ✅; outbox-notifier PID 279048 ✅; inbox_watcher PID 278746 ✅; watchdog overall=healthy (23:15:28Z UTC). ⚠️ Zombie PID 1834248 (44-03:57:53, Ss, bash poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`). [carry]
+**Check E — PR/merge state:**
+- **PR #940** — OPEN/MERGEABLE. No labels. chore(missions). By-design. [blue carry]
+- **PR #860** — OPEN/CONFLICTING ⚠️. No labels. docs(spec): XIV-b tier-4 alert write-back loop. New: CONFLICTING after PR #939/941 merge cascade. 1st obs. Needs Forge rebase. [yellow new]
+
+**§5.0:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅.
+
+**Conditional checks — UTC Saturday 2026-07-11 (~23:20Z):**
+- Check I: Not a firing day (Sat). ✅
+- Check III/IV/VIII/IX/X/XII/XIV: Sunday/Monday gates. Skip. ✅
+- Check XI: artifact check-xi-20260711T102013 — attention_rate=18.8%, over_gate=True. No new artifact until Sun. [yellow carry]
+
+**G-rule assessment:**
+- `heal-pipeline-stall-forge-reject-no-pr-fp-001`: fix #1 (PR #939) VERIFIED ✅; fix #2 (`task-no-pr-legitimacy-classifier-001`) in Forge build. verification_pending.
+- `card-message-notifier-auto-retraction-stale-red-alerts-never-clear` in Forge build (`notifier-auto-retraction-slice2-001`). verification_pending.
+- `pr-860-conflicting`: 1st obs this iter. Watch for 2 more before dispatching to Beacon for Forge rebase.
+- All other G-rule counts carry from iter ~5172.
+
+**Actions taken:**
+1. PRIME ledger: `iter_clean` appended (tier=1, template=nominal, 23:19:43Z UTC). ✅
+2. Tier state: `record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=23:19:44Z. ✅
+
+**Escalations:** 0 new Pulse DMs.
+
+**Standing findings (updated):**
+- [yellow] **zombie-bash-pid-1834248** — 44-03:57:53, bash poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`. ask-then-do: `kill 1834248`. [carry]
+- [yellow] **pr-860-conflicting** — PR #860 OPEN/CONFLICTING. docs(spec): XIV-b. CONFLICTING after PR #939/941 merge cascade. 1st obs. Needs Forge rebase via Beacon dispatch at 3/3.
+- [yellow] **check-xi-drift-over-gate** — 18.8% (gate=10%). Next artifact Sun. [carry]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07`. [carry]
+- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
+- [blue] **task-no-pr-legitimacy-classifier-001** — Forge building (~26 min at check). Fix #2 for G-rule heal-pipeline-stall-forge-reject-no-pr-fp-001. [carry]
+- [blue] **notifier-auto-retraction-slice2-001** — Forge building (`card-message-notifier-auto-retraction-stale-red-alerts-never-clear`). [carry]
+- [blue] **pulse-auto-dispatch null reply_chat_id** — 1st obs post-PR #933 (card-message-notifier-auto-retraction). Fallback delivered. Watch for 2 more. [carry]
+- [blue] **PR #940** — OPEN/MERGEABLE. chore(missions). No labels, by-design. [carry]
+- [blue] **Check I proposal #1** — `notify-p3a-retro-prep` ($1.91 vs $0.28 baseline, 98σ). Use `/dispatch 1`. [carry]
+- [blue] **G-rules (dispatched, vp):** heal-pipeline-stall-forge-reject-no-pr-fp-001 [fix#1 VERIFIED, fix#2 Forge building]; outbox-notifier-notification-intent-reject-tier4-001 [3/3, vp]; ourliberty-health-subject-key-mismatch-001 [3/3, vp]; forge-wip-redispatch-digest-tier4-001 [vp]; forge-revision-preamble-missing-pr711-001 [vp]; forge-wip-redispatch-exhausted-pr-exists-fp-001 [APPROVAL_REQUEST QUEUED iter ~3279, vp]; decision-needed-approval-forge-dispatch-no-target-repo-001 [vp]; no-session-revision-active-mirror-session-fp-001 [vp].
+- [blue] **G-rule 2/3 (CARRY):** outbox-notifier-merge-conflict-manual-rebase-tier4-001; forge-wip-redispatch-exhausted-genuine-no-pr-001; outbox-notifier-notification-intent-review-escalate-tier4-001; outbox-notifier-auto-merge-stale-revalidation-tier4-001.
+- [blue] **G-rule 1/3:** mirror-malformed-verdict-heal-reap-path-001; mirror-queue-wait-gauge-tier4-001; inbox-watcher-tier-pool-all-unavailable-tier4-001; heal-pipeline-stall-unrouted-deep-review-required-fp-001; heal-pulse-check-staleness-single-flight-skip-fp-001; gate-parallelism-monitor-regression-data-001; pulse-rotation-check-source-tier4-001; pr-860-conflicting [1/3 new].
+
+**PRIME DIRECTIVE:** 0 new interventions; 0 new systemic_fixes; iter_clean appended (23:19:43Z UTC). ratio=19.14 (85 systemic_fixes / ~1627 interventions; 36 vp; ledger is ground truth). trend=worsening.
+**Tier end-of-iter:** **Tier 1** (zombie carry + PR #860 CONFLICTING; consecutive_clean=0).
+
+---
+
