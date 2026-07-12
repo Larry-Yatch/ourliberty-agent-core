@@ -8939,7 +8939,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-12T16:50:05.382048+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-06T18:15:40.584697+00:00"
+      "orphan_last_activity_ts": "2026-07-06T18:15:40.584697+00:00",
+      "briefing": {
+        "what": "Some work the team kicked off on its own, without a clear project or goal attached to it yet.",
+        "why": "Unassigned work can quietly eat time and attention without moving anything the business actually cares about.",
+        "suggest": "Hold off on approving it until someone can tie it to a real goal \u2014 worth a quick check before it goes further."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-12T16:51:00.399437+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
