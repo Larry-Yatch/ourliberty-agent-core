@@ -4,6 +4,75 @@
 
 ---
 
+## Iteration ~5254 — 2026-07-12T09:11Z UTC (Larry /cycle, Tier 1)
+
+**Health:** ✅ Nominal. 0 new alerts (wm=984==fl=984). All mandatory checks nominal. No open PRs. Zombie PID 1834248 carries.
+
+**VERIFY-BEFORE-REASSERT (from iter ~5253):**
+- **"zombie PID 1834248 (44d+13:47)"**: CONFIRMED ⚠️ — PID 1834248 alive (44d+13:52:20 elapsed, Ss, bash poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`). [carry]
+- **"beacon PID 775484"**: CONFIRMED ✅ — running (05:27:28 elapsed). ✅
+- **"outbox-notifier PID 776464"**: CONFIRMED ✅ — running (05:26:16 elapsed). Last entry 22:54:38 MDT = 04:54:38Z UTC (PR #954 AUTO_MERGE). Silent ~4h17m. ✅
+- **"inbox_watcher PID 776463"**: CONFIRMED ✅ — running (05:26:16 elapsed). ✅
+- **"agent_telegram_bot.py PIDs 774641/774899/775066"**: CONFIRMED ✅ — all running (05:27+ elapsed). ✅
+- **"sync status=no-change"**: CONFIRMED ✅ — last_sync=2026-07-12T08:31:40Z (~40 min). push_failures=0. NOMINAL ✅
+- **"HEAD==origin/main"**: CONFIRMED ✅ — HEAD=3b5b15e1 (Pulse cycle 20260712T090927Z — iter ~5253 commit) == origin/main. Clean tree, on main. ✅
+- **"No open PRs"**: CONFIRMED ✅ — gh pr list returns []. ✅
+
+**Check 0 — Alert triage:**
+- `repair-watermark`: repaired=false (wm=984, fl=984 → 0 new alerts). NOMINAL ✅
+- Watermark stays 984.
+
+**Check 1 — Log noise:** outbox-notifier PID 776464 ✅. Last entry 22:54:38 MDT = 04:54:38Z UTC (PR #954 AUTO_MERGE). Silent ~4h17m (no work in flight). All entries in last 20 lines are INFO. No WARNs/ERRORs. NOMINAL ✅
+
+**Check 2 — Telegram sweep:** beacon PIDs 774641/774899/775066/775484 ✅. Bot log last delivery idx=983 at 03:01:03 MDT = 09:01:03Z UTC (route=digest, heal-dashboard-api-sha-drift). No new Larry messages. pending=0. NOMINAL ✅
+
+**Check 3 — Pipeline stall:** DRY-RUN (09:11Z UTC) → "0 alert(s) would fire, 0 recovery(ies) would be attempted." FORGE_NO_PR_SKIP: 11 tasks (pr_exists, pr_closed, rebase_target_shipped, pr_task_id_closed_or_merged, already_merged_bridge). Cooldowns: auto-route-externally-authored-pr-reviews-001 retry1/retr-retry1 + rebase-enhance-pr945-target-pr-terminal-001-retry1 (superseded). NOMINAL ✅
+
+**Check 4 — Pending directives:** pending=0. NOMINAL ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-12T09:05:40Z UTC (~6 min at check). NOMINAL ✅
+
+**Check A — Source repo:** HEAD=3b5b15e1==origin/main ✅; clean tree ✅; on main ✅. NOMINAL ✅
+**Check B — Sync health:** status=no-change, last_sync=2026-07-12T08:31:40Z (~40 min), consecutive_push_failures=0. NOMINAL ✅
+**Check C — Agent liveness:** beacon PID 775484 ✅; outbox-notifier PID 776464 ✅; inbox_watcher PID 776463 ✅; agent_telegram_bot.py PIDs 774641/774899/775066 ✅. ⚠️ Zombie PID 1834248 (44d+13:52, bash poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`). [carry]
+**Check E — PR/merge state:** No open PRs (gh pr list returns []). NOMINAL ✅
+
+**§5.0:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅.
+
+**Conditional checks — UTC Sunday 2026-07-12 (~09:11Z):**
+- Check XI: Most recent artifact 2026-07-11T10:20:13Z UTC (attention_rate=18.8%, over gate). Timer fires ~10:20Z UTC today — not yet fired. [carry]
+- Check III: Most recent artifact 2026-06-27. Timer fires ~10:44Z UTC today — not yet fired. [carry]
+- Check I: Most recent artifact 2026-07-10. Timer fires ~14:13Z UTC today (Sun firing day) — not yet fired. [carry]
+- Check IV/VIII/IX/X/XII/XIV: Monday gates. Skip. ✅
+
+**G-rule assessment:** No new G-rule occurrences this iter. All active G-rule counts carry unchanged from iter ~5253.
+
+**Actions taken:**
+1. Check 0: repair-watermark no-op; 0 new alerts; watermark stays 984. ✅
+2. §5.0: audit_due_nudge no-op; distill_detector no-op. ✅
+3. PRIME ledger: `iter_clean` appended (09:11:42Z UTC). ✅
+4. Tier state: `record --checks-clean false` (zombie carry) → tier=1, consecutive_clean=0, last_signal_at=2026-07-12T09:11:43Z. ✅
+
+**Escalations:** 0 new Pulse DMs. All prior escalations carry.
+
+**Standing findings (updated):**
+- [yellow] **zombie-bash-pid-1834248** — 44d+13:52, bash poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`. ask-then-do: `kill 1834248`. [carry]
+- [yellow] **check-xi-drift-over-gate** — 18.8% (gate=10%). Timer fires Sun ~10:20Z UTC today. [carry]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07`. [carry]
+- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
+- [green] **sync VERIFIED** — status=no-change, push_failures=0, last_sync=08:31Z. [stable]
+- [green] **No open PRs** — gh pr list returns []. ✅
+- [green] **gh-pr-snapshot-refresher** — Service+timer live (install-healed confirmed idx=979/980). ✅
+- [blue] **Check I proposal #1** — `notify-p3a-retro-prep` ($1.91 vs $0.28 baseline, 98σ). Use `/dispatch 1`. [carry]
+- [blue] **G-rules (dispatched, vp):** forge-wip-redispatch-exhausted-genuine-no-pr-001 [3/3, vp; 4th occurrence iter ~5216]; ourliberty-health-subject-key-mismatch-001 [3/3, vp]; outbox-notifier-notification-intent-reject-tier4-001 [3/3, vp]; forge-wip-redispatch-digest-tier4-001 [vp]; forge-revision-preamble-missing-pr711-001 [vp]; forge-wip-redispatch-exhausted-pr-exists-fp-001 [APPROVAL_REQUEST QUEUED, vp]; decision-needed-approval-forge-dispatch-no-target-repo-001 [vp]; no-session-revision-active-mirror-session-fp-001 [vp].
+- [blue] **G-rule 2/3:** outbox-notifier-notification-intent-review-escalate-tier4-001; outbox-notifier-auto-merge-stale-revalidation-tier4-001.
+- [blue] **G-rule 1/3:** medic-approval-request-tier4-001; mirror-malformed-verdict-heal-reap-path-001; mirror-queue-wait-gauge-tier4-001; inbox-watcher-tier-pool-all-unavailable-tier4-001; heal-pipeline-stall-unrouted-deep-review-required-fp-001; heal-pulse-check-staleness-single-flight-skip-fp-001; gate-parallelism-monitor-regression-data-001; pulse-rotation-check-source-tier4-001.
+
+**PRIME DIRECTIVE:** 0 new interventions; 0 new systemic_fixes; iter_clean appended. ratio=~19.16 (85 SF / ~1630 interventions; 36 vp; ledger ground truth). trend=worsening (carry).
+**Tier end-of-iter:** **Tier 1** (zombie carry; consecutive_clean=0).
+
+---
+
 ## Iteration ~5253 — 2026-07-12T09:08Z UTC (Larry /cycle, Tier 1)
 
 **Health:** ✅ Nominal. 1 new alert (L984, Tier-3 silence). All mandatory checks nominal. No open PRs. Zombie PID 1834248 carries.
@@ -2701,76 +2770,6 @@ Watermark advanced 969→971. ✅ NOMINAL ✅
 
 **PRIME DIRECTIVE:** 0 new interventions; 0 new systemic_fixes; iter_clean appended. ratio=19.42 (84 SF / ~1635 interventions; 36 vp; ledger ground truth). trend=worsening (carry).
 **Tier end-of-iter:** **Tier 1** (zombie + sync carry; consecutive_clean=0).
-
----
-
-## Iteration ~5214 — 2026-07-12T04:00Z UTC (Larry /cycle, Tier 1)
-
-**Health:** ✅ Nominal. 0 new alerts (wm=969==fl=969). All mandatory checks clean. **Positive update:** PR #955 opened by Forge (`fix(sync): replace /dev/stdout push-log path with temp-file capture for systemd context`) — sync push fix is now in review pipeline. Carries: zombie PID 1834248, sync error (PR #955 healing).
-
-**VERIFY-BEFORE-REASSERT (from iter ~5213):**
-- **"zombie PID 1834248 (44d+08:34)"**: CONFIRMED ⚠️ — 44d+08:39:49 elapsed (Ss, bash poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`). [carry]
-- **"beacon PID 775484"**: CONFIRMED ✅ — 14:57 elapsed. ✅
-- **"outbox-notifier PID 776464"**: CONFIRMED ✅ — 13:45 elapsed. Quiet since startup at 21:44:26 MDT (no new events; Forge build in flight). ✅
-- **"inbox_watcher PID 776463"**: CONFIRMED ✅ — 13:45 elapsed. ✅
-- **"agent_telegram_bot.py PIDs 774641/774899/775066"**: CONFIRMED ✅ — 15:20/15:11/15:07 elapsed. ✅
-- **"sync status=error, push_failures=2"**: CONFIRMED ⚠️ — status=error. Fix advanced: PR #955 opened by Forge. Mirror dispatch pending outbox-notifier scan. [carry; healing]
-- **"PR #954 OPEN, Mirror review in progress (~17 min)"**: CONFIRMED ✅ — OPEN, UNKNOWN. Mirror review ~20 min at check. Not stale (30 min threshold). ✅ [watching]
-- **"HEAD=799e2ac2"**: UPDATED ✅ — HEAD=c109776f==ORIGIN/main (wrapper auto-committed `Pulse cycle 20260712T035717Z`). Clean tree, on main. ✅
-
-**Check 0 — Alert triage:** repair-watermark: repaired=false (wm=969==fl=969). 0 new alerts. NOMINAL ✅
-
-**Check 1 — Log noise:** outbox-notifier PID 776464 ✅. Last 30 log lines end at `[2026-07-11 21:44:26] outbox-notifier starting`. Quiet since startup (14 min — Forge build in flight, no new events). No WARNs/ERRORs. NOMINAL ✅
-
-**Check 2 — Telegram sweep:** beacon PID 775484 ✅. Last bot entries end at `idx=968 route=digest skip` (21:43:14 MDT = 03:43:14Z UTC). No new Larry messages. NOMINAL ✅
-
-**Check 3 — Pipeline stall:** DRY-RUN (03:58Z UTC) → "0 alert(s) would fire, 0 recovery(ies) would be attempted." 15+ FORGE_NO_PR_SKIP tasks (pr_exists, pr_closed, pr_task_id_closed_or_merged, rebase_target_shipped, preflight_exit). Cooldowns: forge_built_no_pr retries. NOMINAL ✅
-
-**Check 4 — Pending directives:** pending=0. NOMINAL ✅
-
-**Check 5 — Stale daemon code:** heartbeat=2026-07-12T03:52:49Z (~7 min at check). NOMINAL ✅
-
-**Check A — Source repo:** HEAD=c109776f==origin/main ✅; clean tree ✅; on main ✅. NOMINAL ✅
-**Check B — Sync health:** last_sync=2026-07-12T03:30:24Z (~30 min), status=error, consecutive_push_failures=2. G-rule `sync-push-fail-/dev/stdout-systemd-001` [3/3, vp]. PR #955 opened by Forge. ⚠️ Known carry; healing.
-**Check C — Agent liveness:** beacon PID 775484 ✅; outbox-notifier PID 776464 ✅; inbox_watcher PID 776463 ✅; agent_telegram_bot.py PIDs 774641/774899/775066 ✅. ⚠️ Zombie PID 1834248 (44d+08:39, bash poll loop, target file MISSING). [carry]
-**Check E — PR/merge state:**
-- **PR #954** — OPEN, UNKNOWN. `fix(heal-wip-redispatch): Gate 0 covers rebase-/resolve-`. Mirror review ~20 min at check. Not stale. ✅ [watching]
-- **PR #955** — OPEN, UNKNOWN. `fix(sync): replace /dev/stdout push-log path with temp-file capture for systemd context`. Branch `forge/fix-sync-push-devstdout-systemd-001`. NEW — Forge session still in flight (~18 min in); outbox-notifier will dispatch Mirror review on next scan. No labels. ✅ [watching]
-- **Forge inbox:** `build-fix-sync-push-devstdout-systemd-001.json` still present (Forge session in flight, PR #955 opened, finalizing). Normal. ✅
-
-**§5.0:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅.
-
-**Conditional checks — UTC Sunday 2026-07-12 (~04:00Z):**
-- Check I: Timer fires ~14:13Z UTC today (Sun firing day). Not yet fired. [carry]
-- Check III: Timer fires ~10:44Z UTC today. Not yet fired. [carry]
-- Check XI: Timer fires ~10:20Z UTC today (attention_rate=18.8%, over gate). Not yet fired. [yellow carry]
-- Check IV/VIII/IX/X/XII/XIV: Monday gates. Skip. ✅
-
-**G-rule assessment:** No new G-rule occurrences this iter. All counts carry unchanged from iter ~5213. **Note:** G-rule `sync-push-fail-/dev/stdout-systemd-001` [3/3, vp] is actively healing — PR #955 opened.
-
-**Actions taken:**
-1. Check 0: repair-watermark repaired=false; 0 new alerts. NOMINAL ✅
-2. §5.0: audit_due_nudge no-op; distill_detector no-op. ✅
-3. PRIME ledger: `iter_clean` appended (04:00:23Z UTC). ✅
-4. Tier state: `record --checks-clean false` (zombie + sync error carry) → tier=1, consecutive_clean=0 (04:00:24Z UTC). ✅
-
-**Escalations:** 0 new Pulse DMs. All prior escalations carry.
-
-**Standing findings (updated):**
-- [yellow] **zombie-bash-pid-1834248** — 44d+08:39, bash poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`. ask-then-do: `kill 1834248`. [carry]
-- [yellow] **sync-push-fail-/dev/stdout-systemd-001** — 3/3 DISPATCHED; PR #955 opened by Forge. Mirror dispatch pending. vp. [carry; healing → PR #955]
-- [yellow] **check-xi-drift-over-gate** — 18.8% (gate=10%). Timer fires Sun ~10:20Z UTC today. [carry]
-- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07`. [carry]
-- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
-- [blue] **PR #954** — OPEN, UNKNOWN, Mirror review ~20 min. fix(heal-wip-redispatch). ✅ Watching.
-- [blue] **PR #955** — OPEN, UNKNOWN, NEW. fix(sync): /dev/stdout systemd fix. Forge finalizing. ✅ Watching.
-- [blue] **Check I proposal #1** — `notify-p3a-retro-prep` ($1.91 vs $0.28 baseline, 98σ). Use `/dispatch 1`. [carry]
-- [blue] **G-rules (dispatched, vp):** sync-push-fail-/dev/stdout-systemd-001 [3/3, vp → PR #955]; forge-wip-redispatch-exhausted-genuine-no-pr-001 [3/3, vp]; ourliberty-health-subject-key-mismatch-001 [3/3, vp]; outbox-notifier-notification-intent-reject-tier4-001 [3/3, vp]; forge-wip-redispatch-digest-tier4-001 [vp]; forge-revision-preamble-missing-pr711-001 [vp]; forge-wip-redispatch-exhausted-pr-exists-fp-001 [APPROVAL_REQUEST QUEUED, vp]; decision-needed-approval-forge-dispatch-no-target-repo-001 [vp]; no-session-revision-active-mirror-session-fp-001 [vp].
-- [blue] **G-rule 2/3:** outbox-notifier-notification-intent-review-escalate-tier4-001; outbox-notifier-auto-merge-stale-revalidation-tier4-001.
-- [blue] **G-rule 1/3:** medic-approval-request-tier4-001; mirror-malformed-verdict-heal-reap-path-001; mirror-queue-wait-gauge-tier4-001; inbox-watcher-tier-pool-all-unavailable-tier4-001; heal-pipeline-stall-unrouted-deep-review-required-fp-001; heal-pulse-check-staleness-single-flight-skip-fp-001; gate-parallelism-monitor-regression-data-001; pulse-rotation-check-source-tier4-001.
-
-**PRIME DIRECTIVE:** 0 new interventions; 0 new systemic_fixes; iter_clean appended. ratio=19.43 (84 SF / ~1635 interventions; 36 vp; ledger ground truth). trend=worsening (carry).
-**Tier end-of-iter:** **Tier 1** (zombie + sync error carry; consecutive_clean=0).
 
 ---
 
