@@ -39381,3 +39381,89 @@ No new WARNs/ERRORs. NOMINAL ✅
 
 ---
 
+## Iteration ~5205 — 2026-07-12T03:05Z UTC (Larry /cycle, Tier 1)
+
+**Health:** ⚠️ Signal. 3 new alerts (L961–L963): L961 Tier-4 (pipeline-stall rebase-obligation, bot already delivered, condition self-resolved via PR #945 CLOSED); L962 Tier-3 (medic-diagnosis, silence); L963 Tier-3 (approval_request delivery confirmation). New finding: Forge inbox has stale task `rebase-enhance-pr945-target-pr-terminal-001` (targets CLOSED PR #945; superseded by `wip-redispatch-gate0-cover-rebase-resolve-001`). Pending approval: `fix-sync-push-devstdout-systemd-001`. Zombie PID 1834248 carries.
+
+**VERIFY-BEFORE-REASSERT (from iter ~5204):**
+- **"zombie PID 1834248 (44d+07:34:26)"**: CONFIRMED ⚠️ — 44d+07:41:43 elapsed (Ss, bash poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`). [carry]
+- **"beacon PID 646121"**: CONFIRMED ✅ — running (01:18:54 elapsed).
+- **"outbox-notifier PID 650077"**: CONFIRMED ✅ — running (01:17:16 elapsed).
+- **"inbox_watcher PID 650075"**: CONFIRMED ✅ — running (01:17:16 elapsed).
+- **"mirror PID 647443"**: CONFIRMED ✅ — running (01:18:42 elapsed).
+- **"pending=0"**: UPDATED ⚠️ — pending=1 (fix-sync-push-devstdout-systemd-001 awaiting Larry approval). Approval_request delivered ~20:58 MDT.
+- **"sync status=error, push_failures=1"**: CONFIRMED ⚠️ — last_sync=2026-07-12T02:50:50Z, status=error. Self-heals pending approval of sync fix. G-rule 3/3 DISPATCHED (carry).
+- **"PR #945 OPEN/CONFLICTING"**: UPDATED ✅ — PR #945 CLOSED (02:57:12Z UTC, not merged). Obligation resolved as "pr-closed-superseded-by-938-939" at 02:57:43Z. RESOLVED ✅
+- **"PR #940 OPEN/MERGEABLE"**: CONFIRMED ✅ — OPEN/MERGEABLE. chore(missions). By-design. [blue carry]
+- **"watermark=960"**: UPDATED — wm=960, fl=963. 3 new alerts L961–L963. Triaged; watermark advanced to 963.
+- **"HEAD=df24920b=origin/main"**: CONFIRMED ✅ — HEAD=df24920b==origin/main. Clean tree, on main. ✅
+
+**Check 0 — Alert triage:** repair-watermark: repaired=false (old_wm=960, fl=963 — 3 new alerts). 3 new alerts:
+- **L961** `source=heal-pipeline-stall, severity=warning, subject=pipeline-stall:rebase-obligation:task-no-pr-legitimacy-classifier-001, route=escalate` — PR #945 rebase dispatched 184 min ago, PR remained CONFLICTING. Helper: **Tier-4** (novel, no translation match). Bot already delivered idx=960 at 20:58:37 MDT. **Condition self-resolved:** PR #945 CLOSED at 02:57:12Z; obligation resolved as superseded-by-938-939; pipeline-stall dry-run confirms 0 alerts now. No Pulse DM (bot already handled). ⚠️ Tier-4 recorded (tier-reset). journal-only.
+- **L962** `source=medic, kind=notification, intent=medic-diagnosis` — PR #945 CLOSED (02:57:12Z), obligation still open in ledger per medic (ledger since confirmed resolved). Helper: **Tier-3** (known-pattern). Silence. NOMINAL ✅
+- **L963** `source=outbox-notifier, kind=approval_request, approval_id=fix-sync-push-devstdout-systemd-001` — delivery confirmation: Forge plan for sync push fix queued for Larry approval. Helper: **Tier-3** (known-pattern). Silence. Pending=1 in beacon-pending-approvals.json. NOMINAL ✅
+- Watermark advanced 960→963. ✅
+
+**Check 1 — Log noise:** outbox-notifier PID 650077 ✅. Last entry 20:58:42 MDT — APPROVAL_REQUEST queued for fix-sync-push-devstdout-systemd-001. No WARNs/ERRORs. NOMINAL ✅
+
+**Check 2 — Telegram sweep:** beacon PID 646121 ✅. Timeline since iter ~5204:
+- 20:52–20:58 MDT: Larry ↔ Beacon conversation about forge-wip-redispatch EXHAUSTED alert and PR #945. Beacon: "same false-alarm class again." Larry at 20:56: "check the status... wrap it in if you can." Beacon at 20:58:33: "Yes — can wrap it in" → auto_approved + dispatched `rebase-enhance-pr945-target-pr-terminal-001` at 20:58:36 MDT.
+- 20:58:37 MDT: Larry sent "Decisive finding: PR #945 is superseded. Its stated goal was already achieved..." → call_beacon (supersede directive).
+- 21:02:23 MDT: Beacon responded with new minimal fix: "Here's the minimal fix — one file, one gate, reusing the existing terminal-check. Approve to send it to Forge: === APPR..." → `wip-redispatch-gate0-cover-rebase-resolve-001` dispatched to Forge inbox.
+- No new Larry directives since 20:58:37 MDT.
+⚠️ **Stale task finding:** `rebase-enhance-pr945-target-pr-terminal-001` was auto-dispatched BEFORE Larry said "superseded". It is now stale in Forge's inbox alongside the correct replacement `wip-redispatch-gate0-cover-rebase-resolve-001`. Forge hasn't claimed either task. Escalated to pulse-escalations.json (ask-then-do: archive stale task). ⚠️ Non-nominal.
+
+**Check 3 — Pipeline stall:** DRY-RUN (03:03Z UTC) → "0 alert(s) would fire, 0 recovery(ies) would be attempted." FORGE_NO_PR_SKIP for 15 tasks: `task-no-pr-legitimacy-classifier-001 reason=pr_closed pr=#945` ✅ (CLOSED, correctly skipped). All other tasks: pr_exists, pr_task_id_closed_or_merged, or preflight_exit. Cooldowns: forge_built_no_pr retries, unrouted_open_pr:940. NOMINAL ✅
+
+**Check 4 — Pending directives:** pending=1 (`fix-sync-push-devstdout-systemd-001` — Forge plan for sync push fix, awaiting Larry approval). APPROVAL_REQUEST was queued at 20:58:42 MDT (~21:02 MDT bot response suggests it was delivered around then). Action: Larry can approve with "approve fix-sync-push-devstdout-systemd-001" to unblock Forge build. ⚠️ Non-nominal (pending approval).
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-12T02:52:20Z (~13 min at check). NOMINAL ✅
+
+**Check A — Source repo:** HEAD=df24920b==origin/main ✅; clean tree ✅; on main ✅. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-12T02:50:50Z (~14 min), status=error, push_failures=1. G-rule `sync-push-fail-/dev/stdout-systemd-001` [3/3 DISPATCHED, vp]. Fix pending Larry approval. Self-heals on next sync tick post-merge. ⚠️ Known carry.
+**Check C — Agent liveness:** beacon PID 646121 ✅ (01:18:54); outbox-notifier PID 650077 ✅ (01:17:16); inbox_watcher PID 650075 ✅ (01:17:16); mirror PID 647443 ✅ (01:18:42). ⚠️ Zombie PID 1834248 (44d+07:41:43, bash poll loop, target file MISSING). [carry]
+**Check E — PR/merge state:**
+- **PR #945** — CLOSED ✅ (02:57:12Z UTC, not merged). Obligation resolved as superseded-by-938-939. RESOLVED.
+- **PR #940** — OPEN, MERGEABLE. chore(missions). By-design. [blue carry]
+- **Forge inbox:** 2 tasks — `rebase-enhance-pr945-target-pr-terminal-001` (STALE: targets CLOSED PR #945, superseded by replacement) and `wip-redispatch-gate0-cover-rebase-resolve-001` (CORRECT: one file, Gate 0 generalize rebase-*/resolve-* coverage). Neither claimed yet. ⚠️ Stale task escalated.
+
+**§5.0:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅.
+
+**Conditional checks — UTC Sunday 2026-07-12 (~03:05Z):**
+- Check I: Timer fires ~14:13Z UTC today (Sun firing day). Not yet fired. [carry]
+- Check III: Timer fires ~10:44Z UTC today. Not yet fired. [carry]
+- Check XI: Timer fires ~10:20Z UTC today (attention_rate=18.8%, over gate). Not yet fired. [yellow carry]
+- Check IV/VIII/IX/X/XII/XIV: Monday gates. Skip. ✅
+
+**G-rule assessment:** No new G-rule occurrences this iter. All counts carry from iter ~5204. L961 (Tier-4, pipeline-stall:rebase-obligation) condition now resolved; not a recurring G-rule candidate.
+
+**Actions taken:**
+1. Check 0: triaged L961 Tier-4 (bot already handled, condition self-resolved; journal-only, no Pulse DM); L962 Tier-3 (medic-diagnosis, silence); L963 Tier-3 (approval_request delivery confirm, silence). Watermark advanced 960→963. ✅
+2. §5.0: audit_due_nudge no-op; distill_detector no-op. ✅
+3. Escalation: wrote stale-task finding to pulse-escalations.json (ask-then-do: archive `rebase-enhance-pr945-target-pr-terminal-001` from Forge inbox). ⚠️
+4. PRIME ledger: intervention appended (stale Forge inbox task, 03:05Z UTC). ✅
+5. Tier state: `record --checks-clean false` (L961 Tier-4 + zombie carry + stale inbox task + pending approval) → tier=1, consecutive_clean=0 (03:05Z UTC). ✅
+
+**Escalations:**
+- [yellow] **Forge inbox stale task** — `rebase-enhance-pr945-target-pr-terminal-001` is stale (PR #945 CLOSED, superseded by `wip-redispatch-gate0-cover-rebase-resolve-001`). Forge will hit a CLOSED PR at preflight — wastes a roundtrip. Authorize archival: `python3 -c "import shutil; shutil.move('/home/larry/agents/inboxes/forge/rebase-enhance-pr945-target-pr-terminal-001.json', '/home/larry/agents/inboxes/forge/.archive/')"`. Say go/approve. Written to pulse-escalations.json #28.
+- [yellow] **Pending approval** — `fix-sync-push-devstdout-systemd-001` (sync push fix). Approve to unblock Forge. Should have been delivered via Telegram ~20:58-21:05 MDT. Check your Telegram if not seen.
+
+**Standing findings (updated):**
+- [yellow] **zombie-bash-pid-1834248** — 44d+07:41, bash poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`. ask-then-do: `kill 1834248`. [carry]
+- [yellow] **Forge stale inbox task** — `rebase-enhance-pr945-target-pr-terminal-001` stale (PR #945 CLOSED). ask-then-do: authorize archival. **[NEW]**
+- [yellow] **Pending approval: fix-sync-push-devstdout-systemd-001** — sync push fix. Approve to unblock Forge build. [carry, now actionable]
+- [yellow] **sync-push-fail-/dev/stdout-systemd-001** — 3/3 DISPATCHED, vp. Fix pending approval. [carry]
+- [yellow] **check-xi-drift-over-gate** — 18.8% (gate=10%). Timer fires Sun ~10:20Z UTC today. [carry]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07`. [carry]
+- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
+- [blue] **PR #940** — OPEN, MERGEABLE. chore(*). By-design. [carry]
+- [blue] **Check I proposal #1** — `notify-p3a-retro-prep` ($1.91 vs $0.28 baseline, 98σ). Use `/dispatch 1`. [carry]
+- [blue] **G-rules (dispatched, vp):** sync-push-fail-/dev/stdout-systemd-001 [3/3 DISPATCHED]; forge-wip-redispatch-exhausted-genuine-no-pr-001 [3/3 DISPATCHED, vp]; ourliberty-health-subject-key-mismatch-001 [3/3, vp]; outbox-notifier-notification-intent-reject-tier4-001 [3/3, vp]; forge-wip-redispatch-digest-tier4-001 [vp]; forge-revision-preamble-missing-pr711-001 [vp]; forge-wip-redispatch-exhausted-pr-exists-fp-001 [APPROVAL_REQUEST QUEUED, vp]; decision-needed-approval-forge-dispatch-no-target-repo-001 [vp]; no-session-revision-active-mirror-session-fp-001 [vp].
+- [blue] **G-rule 2/3:** outbox-notifier-notification-intent-review-escalate-tier4-001; outbox-notifier-auto-merge-stale-revalidation-tier4-001.
+- [blue] **G-rule 1/3:** medic-approval-request-tier4-001 [iter ~5196]; mirror-malformed-verdict-heal-reap-path-001; mirror-queue-wait-gauge-tier4-001; inbox-watcher-tier-pool-all-unavailable-tier4-001; heal-pipeline-stall-unrouted-deep-review-required-fp-001; heal-pulse-check-staleness-single-flight-skip-fp-001; gate-parallelism-monitor-regression-data-001; pulse-rotation-check-source-tier4-001.
+
+**PRIME DIRECTIVE:** 1 intervention (stale Forge inbox task; escalated to Larry); 0 new systemic_fixes. ratio=19.2 (85 SF / 1633 interventions; 36 vp; ledger ground truth). trend=worsening (carry).
+**Tier end-of-iter:** **Tier 1** (L961 Tier-4 + zombie carry + stale inbox task + pending approval; consecutive_clean=0).
+
+---
+
