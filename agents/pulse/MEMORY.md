@@ -628,9 +628,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-12T18:28Z UTC (Iter ~5315, **Tier 3**, consecutive_clean=3)
+## Status snapshot — updated 2026-07-12T19:03Z UTC (Iter ~5316, **Tier 3**, consecutive_clean=4)
 
-**Iter ~5315 summary (2026-07-12T18:28Z):** 1 new alert (Tier-3 silence, heal-dashboard-api-sha-drift-healed). No open PRs. Services: all PIDs alive. Zombie PID 1834248 ALIVE (44d23h8m+, bash poll). Sync push_failures=0; HEAD=ffc5b9c7==origin/main. ratio=~19.80 (trailing-30d). **Tier 3**, consecutive_clean=3. threshold-update-2026-07-12-001 APPROVAL_REQUEST now in pipeline (Larry approved 18:13Z, Beacon created request 18:16Z, pending=1). outbox-notifier silent ~13h32m (no work in flight — normal). **ACTIVE G-rules:** unchanged from iter ~5314.
+**Iter ~5316 summary (2026-07-12T19:03Z):** 1 new alert (doorbell Tier-3 silence, threshold-update-2026-07-12-001 reminder). No open PRs. Services: all PIDs alive. Zombie PID 1834248 ALIVE (44d23h42m+, bash poll). Sync push_failures=0; HEAD=e4fdd7da==origin/main. ratio=~19.80 (trailing-30d). **Tier 3**, consecutive_clean=4. threshold-update-2026-07-12-001 APPROVAL_REQUEST pending=1 (bot DM 18:16Z + doorbell reminder 18:46Z). outbox-notifier silent ~14h (no work in flight — normal). **ACTIVE G-rules:** unchanged from iter ~5315.
 
 ---
 
