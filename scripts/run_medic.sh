@@ -77,21 +77,49 @@ export LARRY_CHAT_ID="${TELEGRAM_CHAT_ID_LARRY:-}"
 MEDIC_CHAT_ID="${TELEGRAM_CHAT_ID_LARRY:-}"
 PROMPT_BODY="${PROMPT_BODY} IMPORTANT: when you emit via scripts/larry_alerts.py append_notification / append_approval_request, write --chat-id ${MEDIC_CHAT_ID} as a LITERAL integer. Never use a shell variable (e.g. \$LARRY_CHAT_ID) in any command -- Claude Code blocks commands containing variable expansions, so the escalation would be denied and silently fail."
 
-# Authenticate Medic against the active tier's durable setup-token (the SAME
-# source agent_runner / run_cycle.sh use) rather than HOME's auto-refreshing
-# ~/.claude/.credentials.json, which rots headlessly (~14h, no refresh) and then
-# 401s every tick -- which would silently stop Medic. Exported (never an arg) so
-# it can't leak into `ps`; NEVER logged. Best-effort: an empty lookup leaves the
-# token unset and Medic falls back to the prior credentials.json path.
-MEDIC_OAUTH_TOKEN="$(timeout 10 python3 "${HOME}/agent-core/scripts/active_tier.py" active-setup-token 2>>"$LOG_FILE" || true)"
-if [ -n "$MEDIC_OAUTH_TOKEN" ]; then
-    export CLAUDE_CODE_OAUTH_TOKEN="$MEDIC_OAUTH_TOKEN"
-    log "auth: Medic authenticating via active-tier setup_token"
+# --- auth: per-run tier from the dispatch pool (mirror run_cycle.sh) --------
+# Each Medic tick is a fresh short task, so it dispatches through the same
+# {tier1,tier3} round-robin pool as every other wiring point (spec §4) instead
+# of riding the single active tier. select-dispatch-env honors the operator
+# pin, cooldowns, and the proactive budget caps, and prints TIER=<tier> plus
+# the selected tier's setup-token. Only the token follows the tier -- HOME
+# deliberately stays on /home/larry/.claude; select-dispatch-env returns "no
+# tier" for any tier that would need a HOME swap (the units run
+# ProtectHome=read-only with only /home/larry/.claude writable, so a swap would
+# EROFS the child on ~/.claude.json and never fall back). The token is exported
+# INSIDE the claude subshell below -- never in this shell -- so it never
+# appears in this script's argv/`ps` and is NEVER logged.
+# Fail-safe: on ANY selection failure (missing/erroring CLI, no usable tier,
+# a would-need-HOME-swap tier) fall back to the legacy active-setup-token path
+# so Medic never silently stops with the pool machinery. Empty token there =>
+# keep the original credentials.json behavior.
+DISPATCH_ENV_LINES="$(timeout 15 python3 "${HOME}/agent-core/scripts/active_tier.py" select-dispatch-env 2>>"$LOG_FILE" || true)"
+DISPATCH_TIER="$(printf '%s' "$DISPATCH_ENV_LINES" | sed -n '1s/^TIER=//p')"
+if [ -n "$DISPATCH_TIER" ]; then
+    log "auth: Medic dispatching on pool-selected ${DISPATCH_TIER}"
 else
-    log "auth: Medic falling back to credentials.json (no active-tier setup-token)"
+    DISPATCH_ENV_LINES=""
+    MEDIC_OAUTH_TOKEN="$(timeout 10 python3 "${HOME}/agent-core/scripts/active_tier.py" active-setup-token 2>>"$LOG_FILE" || true)"
+    if [ -n "$MEDIC_OAUTH_TOKEN" ]; then
+        DISPATCH_ENV_LINES="CLAUDE_CODE_OAUTH_TOKEN=${MEDIC_OAUTH_TOKEN}"
+        log "auth: Medic authenticating via active-tier setup_token (pool selection unavailable)"
+    else
+        log "auth: Medic falling back to credentials.json (no active-tier setup-token)"
+    fi
 fi
 
-if timeout "$CLAUDE_TIMEOUT" claude --print --model claude-sonnet-4-6 --output-format json "$PROMPT_BODY" > "$MEDIC_OUT" 2>&1; then
+if (
+    # Export the selected tier's token for the claude child only (see the auth
+    # block above); the subshell keeps it out of this script's environment and
+    # out of `ps`. Token-only by contract -- the TIER= marker and anything else
+    # are ignored.
+    while IFS= read -r kv; do
+        case "$kv" in
+            CLAUDE_CODE_OAUTH_TOKEN=*) export "$kv" ;;
+        esac
+    done <<< "$DISPATCH_ENV_LINES"
+    exec timeout "$CLAUDE_TIMEOUT" claude --print --model claude-sonnet-4-6 --output-format json "$PROMPT_BODY" > "$MEDIC_OUT" 2>&1
+); then
     log "Medic operator completed successfully"
     MEDIC_OK=1
 else
@@ -101,16 +129,30 @@ else
         exit 124
     fi
     log "Medic operator failed (exit=$CLAUDE_EXIT); see $MEDIC_OUT"
+    # Reactive benching (spec §6): when the pool dispatched this tick and the
+    # failure is a rate-limit / auth-401 wall, bench the tier so the next
+    # tick round-robins onto a healthy one. Best-effort; '' = not a wall.
+    if [ -n "$DISPATCH_TIER" ]; then
+        FAIL_CLASS="$(timeout 10 python3 "${HOME}/agent-core/scripts/active_tier.py" report-dispatch-failure "$DISPATCH_TIER" medic "$MEDIC_OUT" 2>>"$LOG_FILE" || true)"
+        if [ -n "$FAIL_CLASS" ]; then
+            log "tier-pool: classified failure as ${FAIL_CLASS}; benched ${DISPATCH_TIER}"
+        fi
+    fi
 fi
 
 # --- cost capture (mirror run_cycle.sh) ---
 COSTS_FILE="${HOME}/agents/blackboard/costs.jsonl"
 mkdir -p "$(dirname "$COSTS_FILE")"
 if command -v jq >/dev/null 2>&1 && [ -s "$MEDIC_OUT" ]; then
-    ACTIVE_TIER_FILE="${HOME}/agents/blackboard/active-tier.json"
-    ACCOUNT_TIER="$(jq -r '.tier // "tier1"' "$ACTIVE_TIER_FILE" 2>/dev/null || echo tier1)"
-    if [ -z "$ACCOUNT_TIER" ] || [ "$ACCOUNT_TIER" = "null" ]; then
-        ACCOUNT_TIER="tier1"
+    # Account attribution: the pool-selected tier when the pool dispatched
+    # this tick; otherwise the legacy active-tier.json read (fallback path).
+    ACCOUNT_TIER="$DISPATCH_TIER"
+    if [ -z "$ACCOUNT_TIER" ]; then
+        ACTIVE_TIER_FILE="${HOME}/agents/blackboard/active-tier.json"
+        ACCOUNT_TIER="$(jq -r '.tier // "tier1"' "$ACTIVE_TIER_FILE" 2>/dev/null || echo tier1)"
+        if [ -z "$ACCOUNT_TIER" ] || [ "$ACCOUNT_TIER" = "null" ]; then
+            ACCOUNT_TIER="tier1"
+        fi
     fi
     if COST_LINE=$(jq -c --arg ts "$(date -u +%Y-%m-%dT%H:%M:%S%z)" --argjson ok "$MEDIC_OK" --arg acct "$ACCOUNT_TIER" '
         {

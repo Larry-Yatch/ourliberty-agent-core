@@ -122,6 +122,7 @@
       "entrypoint": "scripts/dashboard_api.py",
       "watch_paths": [
         "scripts/active_tier.py",
+        "scripts/agent_runner.py",
         "scripts/alert_triage_state.py",
         "scripts/atomic_io.py",
         "scripts/beacon_approval_handler.py",
@@ -132,6 +133,7 @@
         "scripts/chain_event_emit.py",
         "scripts/chain_event_shipper.py",
         "scripts/cleanup_stale_worktrees.py",
+        "scripts/concurrency_guard.py",
         "scripts/cycle_prime_ledger.py",
         "scripts/dashboard_api.py",
         "scripts/decision_identity.py",
@@ -312,6 +314,7 @@
       "entrypoint": "scripts/outbox_notifier.py",
       "watch_paths": [
         "scripts/active_tier.py",
+        "scripts/agent_runner.py",
         "scripts/alert_triage_state.py",
         "scripts/atomic_io.py",
         "scripts/beacon_approval_handler.py",
@@ -322,6 +325,7 @@
         "scripts/chain_event_emit.py",
         "scripts/chain_event_shipper.py",
         "scripts/cleanup_stale_worktrees.py",
+        "scripts/concurrency_guard.py",
         "scripts/cycle_prime_ledger.py",
         "scripts/dashboard_api.py",
         "scripts/decision_identity.py",
