@@ -35348,3 +35348,69 @@ NOMINAL ✅
 
 ---
 
+## Iteration ~5154 — 2026-07-11T21:07Z UTC (Larry /cycle, Tier 1)
+
+**Health:** ✅ Nominal. 0 new alerts. All 6 mandatory checks clean. Zombie carry holds Tier 1. New observation: PR #860 state-change UNKNOWN→CONFLICTING.
+
+**VERIFY-BEFORE-REASSERT (from iter ~5153):**
+- **"zombie PID 1834248 (~44d+1h43m)"**: CONFIRMED ⚠️ — ps shows 44-01:47:50 (Ss, bash poll loop awaiting absent build-check-viii-pr-2b-analyzer-001.json). [carry]
+- **"beacon PID 278509"**: CONFIRMED ✅ — Ss, 48:15 uptime.
+- **"outbox-notifier PID 279048"**: CONFIRMED ✅ — Ss, 47:57 uptime. Last entry 15:00:32 MDT — worktree teardown/completion DM for PR #938 (same as iter ~5153 snapshot).
+- **"inbox_watcher PID 278746"**: CONFIRMED ✅ — Ssl, 48:05 uptime.
+- **"pending=0"**: CONFIRMED ✅ — history=473.
+- **"sync last_sync=2026-07-11T21:01:21Z"**: CONFIRMED ✅ — ~6 min at check; within 2h window. NOMINAL.
+- **"PR #860 OPEN/UNKNOWN"**: UPDATED ⚠️ — now **OPEN/CONFLICTING** (branch=forge/xiv-b-alert-write-back-spec-001, no labels). State-change from UNKNOWN → CONFLICTING. Forge needs rebase. [yellow — new state]
+- **"Check XI attention_rate=18.8%"**: CONFIRMED ✅ — same artifact check-xi-20260711T102013. No new until Sun. [yellow carry]
+- **"watermark=917=file_length=917"**: CONFIRMED ✅ — repair-watermark: repaired=false. 0 new alerts. [carry]
+- **"HEAD=068265b4=origin/main"**: CONFIRMED ✅ — HEAD 1f164b88 (Pulse cycle 20260711T210439Z) = origin/main. Clean tree. NOMINAL ✅
+
+**Check 0 — Alert triage:** repair-watermark → `{"repaired": false, "old_watermark": 917, "file_length": 917}`. 0 new alerts. Watermark stays 917. NOMINAL ✅
+
+**Check 1 — Log noise:** outbox-notifier.log last entry: 15:00:32 MDT (21:00:32Z UTC) — `queued completion DM for intent=review-pass` (PR #938, same as last iter end state). No new entries since iter ~5153. NOMINAL ✅
+
+**Check 2 — Telegram sweep:** Last bot activity: 15:04:55 MDT (21:04:55Z UTC) — notification idx=916 delivered (intent=review-pass). No new Larry messages after iter ~5153. No orphan directives. NOMINAL ✅
+
+**Check 3 — Pipeline stall:** DRY-RUN (21:06:23Z UTC) → "no stalls detected." 19 FORGE_NO_PR_SKIP entries (all valid carries — same 17 from iters ~5152/~5153 + auto-route-externally-authored-pr-reviews-001 + gh-burn-phase2-shared-open-pr-snapshot-001 + pr-ourliberty-agent-core-934). NOMINAL ✅
+
+**Check 4 — Pending directives:** pending=0 (history=473). NOMINAL ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-11T20:58:16Z (~9 min at check). Watchdog last: 15:03:17 MDT (21:03:17Z UTC) — overall=healthy. NOMINAL ✅
+
+**Check A — Source repo:** HEAD=1f164b88=origin/main ✅. Clean working tree. On main. Not ahead, not behind. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-11T21:01:21Z (~6 min), status=success, cpf=0. NOMINAL ✅
+**Check C — Agent liveness:** beacon PID 278509 ✅ (Ss, 48:15); outbox-notifier PID 279048 ✅ (Ss, 47:57); inbox_watcher PID 278746 ✅ (Ssl, 48:05); watchdog overall=healthy 15:03 MDT ✅. ⚠️ Zombie PID 1834248 (44d+1h47m, Ss, bash poll loop). [carry]
+**Check E — PR/merge state:**
+- **PR #860** — OPEN/**CONFLICTING** (was UNKNOWN). docs(spec): XIV-b. No labels. Forge/xiv-b-alert-write-back-spec-001 branch has merge conflict with main (likely from ~15+ PRs merged since it opened). Forge rebase needed. [yellow — state-change]
+
+**§5.0:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅.
+
+**Conditional checks — UTC Saturday 2026-07-11 (~21:07Z):**
+- Check I: Not a firing day (Sat). ✅
+- Check III/IV/VIII/IX/X/XII/XIV: Sunday/Monday gates. Skip. ✅
+- Check XI: artifact check-xi-20260711T102013 — attention_rate=18.8%, over_gate=True. No new until Sun. [yellow carry]
+
+**G-rule assessment:** 0 new hits this iter. PR #860 CONFLICTING is a state-change observation, not a new G-rule. All G-rule counts carry from iter ~5153.
+
+**Actions taken:**
+1. Check 0: repair-watermark no-op. 0 new alerts. Watermark stays 917. ✅
+2. PRIME ledger: `iter_clean` appended (tier=1, template=nominal, 21:07:12Z UTC). ✅
+3. Tier state: `record --checks-clean false` → tier=1, consecutive_clean=0 (zombie carry). ✅
+
+**Escalations:** 0 new Pulse DMs.
+
+**Standing findings (updated):**
+- [yellow] **zombie-bash-pid-1834248** — 44d+1h47m, bash poll loop awaiting absent build-check-viii-pr-2b-analyzer-001.json. ask-then-do: `kill 1834248`. [carry]
+- [yellow] **PR #860 CONFLICTING** — OPEN/CONFLICTING (was UNKNOWN). docs(spec): XIV-b. Branch forge/xiv-b-alert-write-back-spec-001 needs rebase against main. No labels. [state-change from iter ~5153]
+- [yellow] **check-xi-drift-over-gate** — 18.8% (gate=10%). Next artifact Sun. [carry]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07`. [carry]
+- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
+- [blue] **Check I proposal #1** — notify-p3a-retro-prep ($1.91 vs $0.28 baseline, 98σ). Use `/dispatch 1`. [carry]
+- [blue] **G-rules (dispatched, vp):** outbox-notifier-notification-intent-reject-tier4-001 [3/3, vp]; ourliberty-health-subject-key-mismatch-001 [3/3, vp]; forge-wip-redispatch-digest-tier4-001 [vp]; forge-revision-preamble-missing-pr711-001 [vp]; forge-wip-redispatch-exhausted-pr-exists-fp-001 [APPROVAL_REQUEST QUEUED iter ~3279, vp]; decision-needed-approval-forge-dispatch-no-target-repo-001 [vp]; no-session-revision-active-mirror-session-fp-001 [vp].
+- [blue] **G-rule 2/3:** outbox-notifier-merge-conflict-manual-rebase-tier4-001; forge-wip-redispatch-exhausted-genuine-no-pr-001; outbox-notifier-notification-intent-review-escalate-tier4-001; outbox-notifier-auto-merge-stale-revalidation-tier4-001.
+- [blue] **G-rule 1/3:** mirror-malformed-verdict-heal-reap-path-001; mirror-queue-wait-gauge-tier4-001; inbox-watcher-tier-pool-all-unavailable-tier4-001; heal-pipeline-stall-unrouted-deep-review-required-fp-001; heal-pulse-check-staleness-single-flight-skip-fp-001; gate-parallelism-monitor-regression-data-001; pulse-rotation-check-source-tier4-001.
+
+**PRIME DIRECTIVE:** 0 new interventions; 0 new systemic_fixes; iter_clean appended. ratio: systemic_fixes=85, vp=36, interventions=1624, ratio=19.11, trend=worsening.
+**Tier end-of-iter:** **Tier 1** (zombie carry; consecutive_clean=0).
+
+---
+
