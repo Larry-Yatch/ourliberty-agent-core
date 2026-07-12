@@ -50,6 +50,7 @@ watcher::
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 from typing import Any, Optional
@@ -65,6 +66,20 @@ DEFAULT_SOURCE = 'pulse'
 
 class EnvelopeValidationError(Exception):
     """The constructed envelope failed ``dispatch_validator.validate_task``."""
+
+
+def _primary_chat_id() -> Optional[int]:
+    """Larry's primary Telegram chat — the lowest id in TELEGRAM_ALLOWED_CHAT_IDS
+    (mirrors pulse_check_i / heal_unregistered_approval / outbox_notifier
+    _primary_chat_id). None only when the allow-list is unset/empty."""
+    raw = os.environ.get("TELEGRAM_ALLOWED_CHAT_IDS", "")
+    ids = []
+    for tok in raw.replace(",", " ").split():
+        try:
+            ids.append(int(tok))
+        except ValueError:
+            continue
+    return min(ids) if ids else None
 
 
 def build_envelope(
@@ -96,6 +111,12 @@ def build_envelope(
         envelope['dedup_identity'] = dedup_identity
     if timeout is not None:
         envelope['timeout'] = timeout
+    # Stamp the recipient at creation so the downstream APPROVAL_REQUEST marker
+    # carries a real reply_chat_id (#933 null-chat pattern) — omit the key when
+    # unresolvable so the notifier's fallback stays intact (never stamp null).
+    reply_chat_id = _primary_chat_id()
+    if reply_chat_id is not None:
+        envelope['reply_chat_id'] = reply_chat_id
 
     ok, reason = dispatch_validator.validate_task(envelope)
     if not ok:
