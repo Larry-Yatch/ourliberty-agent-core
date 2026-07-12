@@ -82,6 +82,35 @@ class ProjectDelegationFieldsTest(unittest.TestCase):
         self.assertEqual(ranked[0]['delegation_pr_url'],
                          'https://github.com/o/r/pull/7')
 
+    def test_merged_pr_flips_review_passed_to_merged(self):
+        self._write_pending([])
+        pr = 'https://github.com/o/r/pull/7'
+        rows = [{'event_type': 'review_pass', 'pr_url': pr, 'ts': 't',
+                 'payload': {'origin_task_id': DELEGATE}}]
+        ranked = [{'id': 'm1', 'name': 'X'}]
+        da._project_delegation_fields(
+            ranked, _StubClient(rows), lambda urls: {pr: 'MERGED'})
+        self.assertEqual(ranked[0]['delegation_build_phase'], 'merged')
+
+    def test_no_resolver_stays_review_passed(self):
+        self._write_pending([])
+        pr = 'https://github.com/o/r/pull/7'
+        rows = [{'event_type': 'review_pass', 'pr_url': pr, 'ts': 't',
+                 'payload': {'origin_task_id': DELEGATE}}]
+        ranked = [{'id': 'm1', 'name': 'X'}]
+        da._project_delegation_fields(ranked, _StubClient(rows))  # no resolver
+        self.assertEqual(ranked[0]['delegation_build_phase'], 'review_passed')
+
+    def test_open_pr_stays_review_passed(self):
+        self._write_pending([])
+        pr = 'https://github.com/o/r/pull/7'
+        rows = [{'event_type': 'review_pass', 'pr_url': pr, 'ts': 't',
+                 'payload': {'origin_task_id': DELEGATE}}]
+        ranked = [{'id': 'm1', 'name': 'X'}]
+        da._project_delegation_fields(
+            ranked, _StubClient(rows), lambda urls: {pr: 'OPEN'})
+        self.assertEqual(ranked[0]['delegation_build_phase'], 'review_passed')
+
     def test_in_review_without_open_approval(self):
         # approved (dispatched) → no needs-you, but the build trail shows
         self._write_pending([], history=[{
