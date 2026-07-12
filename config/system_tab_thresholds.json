@@ -3,7 +3,7 @@
     "owner": "stuck-detector",
     "tweak_via": "edit this file + commit; dashboard reads on next poll (no service reload needed)",
     "rationale": "Locked 2026-05-25 round D: D1=15min tighter start, D2=10min, D3=2min, D4 Mirror task_type override. Round E 2026-05-27: added forge_overrides_seconds[feature-development]=1800 after 2026-05-26 false positives on PRs #129/#132/dash#12; tuned via Check III self-optimization. Round F 2026-05-31: added beacon_overrides_seconds + pulse_overrides_seconds to unblock Check III default-bucket conflicts (incident: check-iii-2026-05-31 artifact had non-resolvable beacon-vs-pulse conflict on shared default). See agents/beacon/specs/e4-4d-system-tab.md § 5.4 and runbooks/system-tab-thresholds.md.",
-    "last_threshold_update": "2026-05-31T00:04:40.057660+00:00"
+    "last_threshold_update": "2026-07-12T10:42:59.633472+00:00"
   },
   "session_duration_seconds_default": 900,
   "no_journal_output_seconds": 600,
@@ -12,14 +12,14 @@
     "doc-only": 900,
     "bug-investigation": 1500,
     "feature-development": 2100,
-    "_default": 488
+    "_default": 1531
   },
   "forge_overrides_seconds": {
-    "_default": 3436,
+    "_default": 1232,
     "feature-development": 1800
   },
   "beacon_overrides_seconds": {
-    "_default": 2147
+    "_default": 320
   },
   "pulse_overrides_seconds": {
     "_default": 262
