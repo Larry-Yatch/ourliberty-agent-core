@@ -514,6 +514,18 @@ class DismissTest(_MissionActionsTestBase):
         self.assertEqual(r.json()['detail']['error'], 'mission not proposed')
         self.assertEqual(self.gh.calls, [])
 
+    def test_already_acknowledged_returns_409_no_github(self):
+        # A re-dismiss (double-click, or a mission the healer already
+        # acknowledged) must NOT open an empty-diff PR (PR #940 regression) —
+        # the no-op is surfaced as a 409 with zero GitHub calls.
+        self._seed(_mission('proposed-orphan-x', phase='proposed',
+                            acknowledged=True))
+        r = self.client.post(_endpoint('proposed-orphan-x'), headers=AUTH,
+                             json={'action': 'dismiss'})
+        self.assertEqual(r.status_code, 409, r.text)
+        self.assertEqual(r.json()['detail']['error'], 'mission already dismissed')
+        self.assertEqual(self.gh.calls, [])
+
     def test_missing_mission_returns_404_no_github(self):
         self._seed(_mission('proposed-orphan-x', phase='proposed'))
         r = self.client.post(_endpoint('nope'), headers=AUTH, json={'action': 'dismiss'})
