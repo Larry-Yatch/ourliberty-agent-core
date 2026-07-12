@@ -11462,7 +11462,8 @@ def _route_beacon_replan_approval(
         origin_task_id=data.get('origin_task_id'),
     )
     chain_event_emit.emit_event(
-        **approval.build_approval_request_chain_event(payload),
+        **approval.build_approval_request_chain_event(
+            payload, origin_task_id=data.get('origin_task_id')),
     )
     if is_paused:
         log(
@@ -11868,7 +11869,8 @@ def _route_beacon_pulse_auto_dispatch_approval(
         origin_task_id=envelope_task_id,
     )
     chain_event_emit.emit_event(
-        **approval.build_approval_request_chain_event(payload),
+        **approval.build_approval_request_chain_event(
+            payload, origin_task_id=envelope_task_id),
     )
     if is_paused:
         log(

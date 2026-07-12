@@ -77,6 +77,32 @@ class AddPendingOriginTest(unittest.TestCase):
         self.assertNotIn('origin_task_id', entry)
 
 
+# ---------- write side: build_approval_request_chain_event ----------
+# The approval_request chain_event carries origin_task_id so the needs-you card
+# (PendingCard) can say "from your delegation of <card>". Re-added once PendingCard
+# became a real reader (it was dropped in #935 as dead surface).
+
+
+class ChainEventOriginTest(unittest.TestCase):
+    def test_distinct_origin_rides_the_payload(self):
+        ev = ah.build_approval_request_chain_event(
+            _payload(), ts='2026-07-12T00:00:00Z', origin_task_id=DELEGATE_ID)
+        self.assertEqual(ev['payload']['origin_task_id'], DELEGATE_ID)
+        # event key + dispatch identity remain the marker id — dispatch unchanged
+        self.assertEqual(ev['task_id'], MARKER_ID)
+        self.assertEqual(ev['payload']['dedup_identity'], MARKER_ID)
+
+    def test_no_origin_leaves_payload_clean(self):
+        ev = ah.build_approval_request_chain_event(
+            _payload(), ts='2026-07-12T00:00:00Z')
+        self.assertNotIn('origin_task_id', ev['payload'])
+
+    def test_origin_equal_to_marker_not_stamped(self):
+        ev = ah.build_approval_request_chain_event(
+            _payload(), ts='2026-07-12T00:00:00Z', origin_task_id=MARKER_ID)
+        self.assertNotIn('origin_task_id', ev['payload'])
+
+
 # ---------- read side: _open_delegate_approvals ----------
 
 

@@ -982,6 +982,7 @@ def build_approval_request_chain_event(
     payload: dict[str, Any],
     *,
     ts: Optional[str] = None,
+    origin_task_id: Optional[str] = None,
 ) -> dict[str, Any]:
     """Build kwargs for `chain_event_emit.emit_event` for an approval_request.
 
@@ -1030,6 +1031,14 @@ def build_approval_request_chain_event(
         'suggested_envelope_for_approve': suggested_envelope_for_approve,
         'suggested_envelope_for_reject': suggested_envelope_for_reject,
     }
+    # Delegate-tracking: stamp the origin envelope task_id (`delegate-<cid>`) so
+    # the dashboard's needs-you card (PendingCard) can tell Larry this approval
+    # came FROM a card he delegated — not a spontaneous ask. Only when distinct
+    # from the marker task_id (a plain pulse/replan where they coincide gets no
+    # redundant self-reference); the event's own task_id + dispatch routing are
+    # untouched.
+    if origin_task_id and origin_task_id != task_id:
+        chain_payload['origin_task_id'] = origin_task_id
     return {
         'event_type': 'approval_request',
         'agent': 'beacon',
