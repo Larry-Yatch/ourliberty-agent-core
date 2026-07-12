@@ -11398,6 +11398,14 @@ class OperatorQueueEntry(BaseModel):
     # None / False (never unread).
     latest_team_message_id: Optional[str] = None
     blocked_on_you: bool = False
+    # Delegate-tracking (Slice 2b operator-queue surface): the delegation trail on
+    # the surface Larry actually delegates from. `delegation_needs_you` = a
+    # still-OPEN approval parked on him; `delegation_build_phase`/`_pr_url` = the
+    # build's review trail. Null before any delegation state joins. Keyed by the
+    # deterministic origin id `delegate-<id>`.
+    delegation_needs_you: Optional[dict[str, Any]] = None
+    delegation_build_phase: Optional[str] = None
+    delegation_pr_url: Optional[str] = None
 
 
 class OperatorQueueResponse(BaseModel):
@@ -11461,6 +11469,49 @@ def _sanitize_operator_entry(e: Any) -> Optional[dict[str, Any]]:
     }
 
 
+def _project_delegation_fields(
+    ranked: list[dict[str, Any]],
+    supabase_client: Any,
+) -> None:
+    """Attach the delegation trail to each ranked operator-queue entry that was
+    delegated — the surface Larry actually delegates from. `delegation_needs_you`
+    (a still-OPEN approval parked on him, via the pending-store origin join #942
+    added) + `delegation_build_phase` / `delegation_pr_url` (the build's review
+    trail, Slice 2b). Keyed by the deterministic origin id `delegate-<entry id>`
+    (what the capture/mission delegate stamps). Fail-safe: every entry starts
+    neutral None and any read error leaves it there — never a 500 (this endpoint
+    is always-200)."""
+    origin_ids = [
+        f'delegate-{e["id"]}' for e in ranked
+        if isinstance(e.get('id'), str) and e.get('id')
+    ]
+    try:
+        build_events = _fetch_delegation_build_events(supabase_client, origin_ids)
+    except Exception:  # noqa: BLE001 — never 500 the always-200 operator queue
+        build_events = {}
+    for e in ranked:
+        e['delegation_needs_you'] = None
+        e['delegation_build_phase'] = None
+        e['delegation_pr_url'] = None
+        eid = e.get('id')
+        if not (isinstance(eid, str) and eid):
+            continue
+        origin = f'delegate-{eid}'
+        try:
+            evidence = _delegation_outcome_evidence(origin)
+        except Exception:  # noqa: BLE001 — never 500 the always-200 operator queue
+            evidence = None
+        if evidence and evidence.get('status') == 'open':
+            e['delegation_needs_you'] = {
+                'approval_id': evidence.get('approval_id'),
+                'created_at': evidence.get('created_at'),
+            }
+        evs = build_events.get(origin)
+        if evs:
+            e['delegation_build_phase'] = _delegation_build_phase(evs)
+            e['delegation_pr_url'] = _delegation_build_pr_url(evs)
+
+
 @app.get(
     '/api/approvals/operator-queue',
     response_model=OperatorQueueResponse,
@@ -11494,6 +11545,7 @@ def get_approvals_operator_queue() -> dict[str, Any]:
     except Exception:  # noqa: BLE001 — never 500 the always-200 operator queue
         _reply_client = None
     _project_team_reply_fields(ranked, lambda e: e.get('id'), _reply_client)
+    _project_delegation_fields(ranked, _reply_client)
     gen = data.get('generated_at')
     summary = data.get('summary')
     return {
