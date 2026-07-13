@@ -634,9 +634,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-13T20:12Z UTC (Iter ~5373, **Tier 1**, consecutive_clean=0)
+## Status snapshot — updated 2026-07-13T20:17Z UTC (Iter ~5374, **Tier 1**, consecutive_clean=1)
 
-**Iter ~5373 summary (2026-07-13T20:12Z):** 0 new alerts (wm=949, fl=949). Check A: repo behind 1 commit → fast-forwarded to 24431ed0 (PR #959 MERGED). PR #959 = G-rule heal-pipeline-stall-forge-reject-no-pr-fp-001 fix#2 now live. No open PRs. Zombie PID 1834248 static carry (46-00:53:13+). Sync push_failures=0; HEAD=24431ed0==origin/main. ratio≈20.14 (trailing-30d). **Tier 2→1** (Check A finding), consecutive_clean=0. Check VIII awaiting Larry response (idx=931). Check XIV [1/3] carry.
+**Iter ~5374 summary (2026-07-13T20:17Z):** 0 new alerts (wm=949, fl=949). All checks nominal. No open PRs. Zombie PID 1834248 static carry (46-00:58:26+). Sync push_failures=0; HEAD=a4905787==origin/main. ratio≈20.14 (trailing-30d). **Tier 1**, consecutive_clean=1. Check VIII awaiting Larry response (idx=931). Check XIV [1/3] carry. G-rule heal-pipeline-stall-forge-reject-no-pr-fp-001 fix#2 (PR #959) MERGED; verification_pending next stall dry-run.
 
 ---
 
