@@ -46516,3 +46516,71 @@ Bot will DM Larry via route=escalate. Approve with `approve threshold-update-202
 
 ---
 
+## Iteration ~5307 — 2026-07-12T15:53Z UTC (Larry /cycle direct, Tier 1)
+
+**Health:** ✅ Nominal. 1 new alert (L954: Tier 3 silence). All mandatory checks clean. No open PRs. Zombie PID 1834248 carries (no new activity).
+
+**VERIFY-BEFORE-REASSERT (from iter ~5306):**
+- **"zombie PID 1834248 (~44d20h23m+)"**: CONFIRMED ⚠️ — PID 1834248 alive (44d20h32m+, Ss, bash poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`). [carry, no new activity]
+- **"beacon PID 775484"**: CONFIRMED ✅ — running (12h08m elapsed).
+- **"outbox-notifier PID 776464"**: CONFIRMED ✅ — running (12h06m elapsed). Last entry [2026-07-11 22:54:38] MDT = 04:54:38Z UTC (~11h silent, no work in flight). ✅
+- **"inbox_watcher PID 776463"**: CONFIRMED ✅ — running (12h06m).
+- **"agent_telegram_bot.py PIDs 774641/774899/775066"**: CONFIRMED ✅ — all running (~12h08m elapsed).
+- **"sync status=no-change"**: CONFIRMED ✅ — last_sync=2026-07-12T15:32:19Z (~21 min at check), push_failures=0. NOMINAL ✅
+- **"HEAD==origin/main"**: UPDATED ✅ — HEAD advanced to 44723668 (Pulse cycle 20260712T154411Z). HEAD==origin/main ✅.
+- **"No open PRs"**: CONFIRMED ✅ — open_prs=0.
+- **"check-iii awaiting approve threshold-update-2026-07-12"**: CONFIRMED [carry] — no new artifact, no Larry response yet.
+
+**Check 0 — Alert triage:**
+- `repair-watermark`: repaired=false (wm=953, fl=954 → 1 new alert).
+- L954: `{"source":"dispatch-branch-cleanup","severity":"info","subject":"summary","route":"digest","message":"dispatch-branch cleanup: pruned 2 local + 1 remote stale branch(es)"}` → Tier 3 silence (known-pattern match). wm→954. NOMINAL ✅
+
+**Check 1 — Log noise:** outbox-notifier tail-50 all INFO. No WARNs in recent window. NOMINAL ✅
+
+**Check 2 — Telegram sweep:** Larry messages 20:54-20:58 MDT 2026-07-11 (~19h ago): rebase-pr-860-001 EXHAUSTED (bot alert, not Larry directive) + Larry "check the status of that build" + "PR #945 is superseded" — both tracked by prior iters and resolved (rebase-pr-860-001 superseded by #938/#939; PR #945 closed). pending=0. NOMINAL ✅
+
+**Check 3 — Pipeline stall:** DRY-RUN (15:50Z UTC) → "0 alert(s) would fire, 0 recovery(ies) would be attempted." 18-entry FORGE_NO_PR_SKIP + 3 cooldown-suppressed. NOMINAL ✅
+
+**Check 4 — Pending directives:** pending=0, history=483. NOMINAL ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-12T15:50:16Z (~0 min at check). NOMINAL ✅
+
+**Check A — Source repo:** HEAD=44723668==origin/main ✅; clean tree ✅; on main ✅. NOMINAL ✅
+**Check B — Sync health:** status=no-change, last_sync=2026-07-12T15:32:19Z (~21 min at check), consecutive_push_failures=0. NOMINAL ✅
+**Check C — Agent liveness:** beacon PID 775484 ✅; outbox-notifier PID 776464 ✅; inbox_watcher PID 776463 ✅; agent_telegram_bot.py PIDs 774641/774899/775066 ✅. ⚠️ Zombie PID 1834248 (44d20h32m+, bash poll awaiting absent `build-check-viii-pr-2b-analyzer-001.json`). [carry]
+**Check E — PR/merge state:** open_prs=0. NOMINAL ✅
+
+**§5.0:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks — UTC Sunday 2026-07-12 (~15:53Z):**
+- **Check I:** check-i-2026-07-12.json (10:42Z UTC). 1 small proposal. No new artifact since iter ~5306. [carry] ✅
+- **Check III:** check-iii-2026-07-12.json (10:42Z). Threshold proposals awaiting `approve threshold-update-2026-07-12`. [carry]
+- Check IV/VIII/IX/X/XII/XIV: Monday gates. Skip. ✅
+
+**G-rule assessment:** No new G-rule occurrences this iter. All active G-rule counts carry unchanged from iter ~5306.
+
+**Actions taken:**
+1. Check 0: L954 triaged Tier 3 (dispatch-branch-cleanup summary, known-pattern). wm→954. ✅
+2. §5.0: all three one-shots no-op. ✅
+3. PRIME ledger: `iter_clean` appended (15:53:00Z UTC). ✅
+4. Tier state: `record --checks-clean true` → tier=1, consecutive_clean=1. (Zombie is a static background condition with no new activity this iter; all new checks nominal.) ✅
+
+**Escalations:** 0 new Pulse DMs. All prior escalations carry.
+
+**Standing findings (unchanged):**
+- [yellow] **zombie-bash-pid-1834248** — 44d20h32m+, bash poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`. ask-then-do. [carry]
+- [yellow] **check-iii-threshold-proposals-2026-07-12** — beacon 2147→320s, forge 3436→1232s, mirror 488→1531s. Awaiting `approve threshold-update-2026-07-12`. [carry]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07`. [carry]
+- [yellow] **check-viii-deprecate-token-gate-2026-07-07** — idx=991. Awaiting approval. [carry]
+- [green] **sync VERIFIED** — status=no-change, push_failures=0, last_sync=15:32Z; HEAD=44723668==origin/main. [stable]
+- [green] **No open PRs** — open_prs=0. ✅
+- [blue] **Check I proposal #1** — 1 small proposal in check-i-2026-07-12.json. Use `/dispatch 1` to action. [carry]
+- [blue] **G-rules (dispatched, vp):** forge-wip-redispatch-exhausted-genuine-no-pr-001 [3/3, vp]; ourliberty-health-subject-key-mismatch-001 [3/3, vp]; outbox-notifier-notification-intent-reject-tier4-001 [3/3, vp]; forge-wip-redispatch-digest-tier4-001 [vp]; forge-revision-preamble-missing-pr711-001 [vp]; forge-wip-redispatch-exhausted-pr-exists-fp-001 [vp]; decision-needed-approval-forge-dispatch-no-target-repo-001 [vp]; no-session-revision-active-mirror-session-fp-001 [vp].
+- [blue] **G-rule 2/3:** outbox-notifier-notification-intent-review-escalate-tier4-001; outbox-notifier-auto-merge-stale-revalidation-tier4-001.
+- [blue] **G-rule 1/3:** medic-approval-request-tier4-001; heal-pipeline-stall-forge-reject-no-pr-fp-001 fix#2 [vp]; mirror-malformed-verdict-heal-reap-path-001; mirror-queue-wait-gauge-tier4-001; inbox-watcher-tier-pool-all-unavailable-tier4-001; heal-pipeline-stall-unrouted-deep-review-required-fp-001; heal-pulse-check-staleness-single-flight-skip-fp-001; gate-parallelism-monitor-regression-data-001; pulse-rotation-check-source-tier4-001.
+
+**PRIME DIRECTIVE:** 0 new interventions; 0 new systemic_fixes; iter_clean appended. ratio=~19.12 (85 SF / 36 vp / 1625 interventions). trend=worsening.
+**Tier end-of-iter:** **Tier 1**, consecutive_clean=1.
+
+---
+
