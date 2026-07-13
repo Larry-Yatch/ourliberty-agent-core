@@ -574,6 +574,12 @@ PR #909 (`chore(alerts): Tier-3 silence sentinel stale-lease duplicate re-escala
 
 ---
 
+## G-rule pulse-check-xiv-tier4-001 — 1/3 (new, iter ~5351)
+
+**Rule:** `source=pulse-check-xiv` alerts classify Tier-4 (novel, no translation match). These are timer-managed periodic Check XIV outputs (over-silence surface + precision digest). outbox-notifier already DMs Larry via route=escalate; Pulse re-triage returning Tier-4 prompts a duplicate DM. Fix at 3/3: add `source=pulse-check-xiv` → Tier-3 (severity: INFO, tier: FYI) to `config/alert-translations.json`. Dispatch to Beacon at 3/3. First occurrence: iter ~5351 (L933 oversilence:doorbell, L934 oversilence:heal-dashboard-api-sha-drift, L935 digest — all from 2026-07-13T11:50:43Z UTC Check XIV timer firing). Note: both oversilence findings reviewed and confirmed correct (doorbell=PR #648, dashboard-api-sha-drift-healed=routine healing); no config change needed.
+
+---
+
 ## G-rule medic-approval-request-tier4-001 — 1/3 (new, iter ~5196)
 
 **Rule:** `source=medic, kind=approval_request` alerts classify Tier-4 (novel, no translation match). These are medic delivery confirmations — medic already DMs Larry via `chat_id` when it creates an approval_request gate; Pulse triage returning Tier-4 prompts a duplicate DM. Fix: add `source=medic, kind=approval_request` → Tier-3 (severity: INFO, tier: FYI) to `config/alert-translations.json`. Dispatch to Beacon at 3/3. First occurrence: iter ~5196 (L955, medic attempt 3 for PR #945 rebase-obligation).
@@ -628,9 +634,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-13T11:23Z UTC (Iter ~5350, **Tier 3**, consecutive_clean=27)
+## Status snapshot — updated 2026-07-13T11:54Z UTC (Iter ~5351, **Tier 1**, consecutive_clean=0)
 
-**Iter ~5350 summary (2026-07-13T11:22Z):** 1 new alert (L932 pulse-check-viii check-viii-update:2026-07-13, Tier-3 silence; bot DM delivered idx=931 at 11:15Z UTC). All mandatory checks clean. Zombie PID 1834248 ALIVE (45-16:02:50+, bash poll). Sync push_failures=0; HEAD=b3626173==origin/main. No open PRs. Stall checker: 0 alerts, FORGE_NO_PR_SKIP ×1 (PR #956). **Check VIII new proposal** (deprecate token gate, 2026-07-13 — supersedes 2026-07-07). Check XI CLOSED ✅ (3.1% gate). Check I timer fires ~14:10Z UTC today (Mon). ratio=19.77 (trailing-30d). **Tier 3**, consecutive_clean=27. **ACTIVE G-rules:** unchanged from iter ~5349.
+**Iter ~5351 summary (2026-07-13T11:54Z):** 3 new alerts (L933-L935, source=pulse-check-xiv, Check XIV timer fired 11:50Z UTC). All Tier-4 novel (no translation). Bot delivered all 3 (idx=932/933/934). No Pulse DM. Both oversilence findings (doorbell, heal-dashboard-api-sha-drift) confirmed correct — no config change needed. All mandatory checks otherwise nominal. Zombie PID 1834248 ALIVE (45-16:32:39+, bash poll). Sync push_failures=0; HEAD=14752d87==origin/main. No open PRs. ratio≈20.0 (trailing-30d). **Tier 3→1** (tier-reset: Tier-4 novel alerts; system itself healthy). **NEW G-rule: pulse-check-xiv-tier4-001 [1/3]**.
 
 ---
 
