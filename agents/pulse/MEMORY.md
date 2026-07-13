@@ -634,9 +634,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-13T14:54Z UTC (Iter ~5360, **Tier 3**, consecutive_clean=3/floor)
+## Status snapshot — updated 2026-07-13T15:22Z UTC (Iter ~5361, **Tier 3**, consecutive_clean=4/floor)
 
-**Iter ~5360 summary (2026-07-13T14:53Z):** 1 new alert (heal-dashboard-api-sha-drift Tier-3 silence, wm→939). All mandatory checks nominal. Zombie PID 1834248 static carry (45-19:34:32+). Sync push_failures=0; HEAD=7e22f6c9==origin/main. No open PRs. ratio≈20.39 (trailing-30d). **Tier 3**, consecutive_clean=3 (floor). Check I artifact check-i-2026-07-13.json: 1 proposal [small] `pr3-staged-autonomy` ($8.81 vs $0.93 baseline, 128.6σ). Check VIII awaiting Larry response (idx=931). Check XIV [1/3] carry.
+**Iter ~5361 summary (2026-07-13T15:21Z):** 1 new alert (review-ceiling-fit Tier-3 silence, wm→940; recommends RAISE ceiling 35→45 min due to 9 false-kills in 30d — informational, bot route=digest). All mandatory checks nominal. Zombie PID 1834248 static carry (45-20:02:17+). Sync push_failures=0; HEAD=bb6eb561==origin/main. No open PRs. ratio≈20.39 (trailing-30d). **Tier 3**, consecutive_clean=4 (floor). Check I artifact check-i-2026-07-13.json: 1 proposal [small] `pr3-staged-autonomy` ($8.81 vs $0.93 baseline, 128.6σ). Check VIII awaiting Larry response (idx=931). Check XIV [1/3] carry.
 
 ---
 
