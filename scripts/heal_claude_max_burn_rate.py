@@ -104,6 +104,18 @@ RATE_LIMIT_RECENT_HOURS = 2
 DEFAULT_MAX_5H_TOKEN_THRESHOLD = 10_000_000
 WINDOW_HOURS = 5
 ALERT_THRESHOLD_FRACTION = 0.80
+# Slice 3 (confidence -> severity routing). The alert fires on any pct >= 0.80,
+# but a reading in the leading-edge band [0.80, HIGH_CONFIDENCE_FRACTION) with
+# NO corroborating rate-limit event is a borderline pace indicator, not a
+# confirmed breach — it routes to the digest lane (severity='info') instead of
+# paging. HIGH_CONFIDENCE_FRACTION is the midpoint of the 0.80 trigger and the
+# 1.0 token wall: at/above it the pace is closing on the actual gate and
+# escalates (severity='warning'). Any observed 429 in the trailing-2h
+# ground-truth ledger escalates regardless of pct. This never buries a degraded
+# read: a missing/unreadable costs.jsonl sums to 0 tokens -> pct 0.0 -> below
+# the 0.80 trigger -> early return in run(), so the digest branch is reachable
+# ONLY by a positively-observed borderline reading, never an absent/degraded one.
+HIGH_CONFIDENCE_FRACTION = 0.90
 # Cooldown between DMs. Aligned with the 5h window — once we fire on a
 # burn period, we don't re-fire until that period has fully cycled. This
 # is independent of (and longer than) larry_alerts.WARNING_COOLDOWN_SEC
@@ -345,6 +357,12 @@ def run() -> int:
             f'(last_dm_ts={state.get("last_dm_ts")}) — suppressing', 'INFO')
         return 0
     recent_events = recent_rate_limit_event_count(now=now)
+    # Confidence -> severity (slice 3). A leading-edge pace reading with no
+    # ground-truth 429 corroboration is borderline: digest it (severity='info')
+    # rather than page. A pace at/over HIGH_CONFIDENCE_FRACTION, or any observed
+    # 429, is a high-confidence breach that escalates (severity='warning').
+    high_confidence = pct >= HIGH_CONFIDENCE_FRACTION or recent_events > 0
+    severity = 'warning' if high_confidence else 'info'
     body = (
         f'Trailing {WINDOW_HOURS}h quota pace at {pct * 100:.0f}% of token gate '
         f'({usage:,} of {threshold:,} tokens; input+output+cache_creation). '
@@ -355,7 +373,7 @@ def run() -> int:
     )
     ok = larry_alerts.append_alert(
         source='heal-claude-max-burn-rate',
-        severity='warning',
+        severity=severity,
         message=body,
         subject='claude_max_5h_burn_threshold_breached',
         suggested_action=(
@@ -369,7 +387,7 @@ def run() -> int:
     if ok:
         state['last_dm_ts'] = now.isoformat()
         save_state(state)
-        log(f'alerted: usage at {pct * 100:.1f}% of threshold', 'INFO')
+        log(f'alerted ({severity}): usage at {pct * 100:.1f}% of threshold', 'INFO')
     else:
         log('larry_alerts append failed (cooldown or write error)', 'WARN')
     return 0

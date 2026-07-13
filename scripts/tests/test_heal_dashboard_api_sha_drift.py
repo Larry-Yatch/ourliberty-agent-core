@@ -296,5 +296,59 @@ class ProbeParsingTest(_Base):
         self.assertEqual((st, sha), (h.PROBE_NO_TOKEN, None))
 
 
+class ConfidenceSeverityLockTest(_Base):
+    """Slice 3 lock: this healer ALREADY threads confidence into severity
+    (slice 2), so slice 3 makes NO code change here — but the invariant it
+    relies on must be locked. Its two red branches are high-confidence,
+    CONFIRMED conditions and carry severity='critical' (the value append_alert
+    can never hold/downgrade); its self-healed branch is the low-signal case
+    and already digests. There is no borderline red to downgrade, so a future
+    refactor must NEVER quiet these criticals into the digest lane."""
+
+    def test_confirmed_stuck_is_critical_escalate(self):
+        # Restart taken, still stale next tick within cooldown -> confirmed
+        # loop -> critical/escalate. Never downgradeable.
+        self._patch(
+            read_disk_head=lambda *a, **k: 'b' * 40,
+            probe_running_sha=lambda *a, **k: (h.PROBE_OK, 'a' * 40),
+            restart_unit=lambda *a, **k: (0, ''),
+        )
+        h.run_once(now=1000.0)          # first tick: restart (digest)
+        h.run_once(now=1060.0)          # second tick: still stale -> stuck
+        stuck = [d for d in self.dms if d.get('subject')
+                 == 'dashboard-api-sha-drift-stuck']
+        self.assertEqual(len(stuck), 1)
+        self.assertEqual(stuck[0]['severity'], 'critical')
+        self.assertEqual(stuck[0]['route'], 'escalate')
+
+    def test_restart_failed_is_critical_escalate(self):
+        # The restart itself failed -> confirmed failure -> critical/escalate.
+        self._patch(
+            read_disk_head=lambda *a, **k: 'b' * 40,
+            probe_running_sha=lambda *a, **k: (h.PROBE_OK, 'a' * 40),
+            restart_unit=lambda *a, **k: (1, 'boom'),
+        )
+        h.run_once(now=1000.0)
+        failed = [d for d in self.dms if d.get('subject')
+                  == 'dashboard-api-sha-drift-restart-failed']
+        self.assertEqual(len(failed), 1)
+        self.assertEqual(failed[0]['severity'], 'critical')
+        self.assertEqual(failed[0]['route'], 'escalate')
+
+    def test_self_healed_is_warning_digest(self):
+        # The low-signal branch (auto-restart succeeded) already digests.
+        self._patch(
+            read_disk_head=lambda *a, **k: 'b' * 40,
+            probe_running_sha=lambda *a, **k: (h.PROBE_OK, 'a' * 40),
+            restart_unit=lambda *a, **k: (0, ''),
+        )
+        self.assertEqual(h.run_once(now=1000.0), 'restarted')
+        healed = [d for d in self.dms if d.get('subject')
+                  == 'dashboard-api-sha-drift-healed']
+        self.assertEqual(len(healed), 1)
+        self.assertEqual(healed[0]['severity'], 'warning')
+        self.assertEqual(healed[0]['route'], 'digest')
+
+
 if __name__ == '__main__':
     unittest.main()

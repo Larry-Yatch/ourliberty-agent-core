@@ -200,3 +200,58 @@ digest/tab-registration-only detectors.
 
 3 already-retracting + 5 adopted + 1 single-subject-deferred + 9 set-diff-deferred
 + 7 one-shot-excluded + 18 non-alerting-excluded = **43**.
+
+### 7.8 Slice-3 confidence classification (per-detector)
+
+Slice 3 threads detection *confidence* into the `severity=` argument so a
+positively-observed BORDERLINE detection routes to the digest lane
+(`severity='info'`) instead of firing an escalate DM. Per the load-bearing
+guardrail, a downgrade fires ONLY on a real borderline reading — NEVER on a
+degraded/unreadable/absent-signal probe, and NEVER on a critical/death-alarm
+detection. A detector carries a threadable signal IFF its detection has a
+genuinely graded/borderline mode; binary-certain detectors have no
+low-confidence mode and stay at their current severity, declared unchanged.
+
+**Confidence-bearing — THREADED (1):**
+
+- **`heal_claude_max_burn_rate`** — graded pct-over-threshold signal.
+  `pct = usage / threshold`; alert fires at `pct >= 0.80`. Confidence is
+  `high` iff `pct >= HIGH_CONFIDENCE_FRACTION` (0.90) OR a real 429
+  rate-limit event corroborates in the trailing window; else the reading is
+  borderline (in the `[0.80, 0.90)` band with no 429 ground truth) and
+  downgrades to `severity='info'`/digest. A degraded/unreadable
+  `costs.jsonl` yields `rolling_5h_token_volume == 0` → `pct == 0` → early
+  return BEFORE the alert, so a degraded read can never masquerade as a
+  borderline downgrade. The `0.90` boundary was chosen so the existing
+  95%-fixture escalation tests stay green.
+
+**Already-graded / already-threaded — UNCHANGED (1):**
+
+- **`heal_dashboard_api_sha_drift`** — severity is already a graded variable.
+  Its two red branches (confirmed-stuck loop, confirmed restart-failed) are
+  `severity='critical'`/escalate, which the guardrail forbids downgrading;
+  its self-healed branch already emits `severity='warning'`/digest. No code
+  change; a lock test pins the invariant.
+
+**Binary-certain / guardrail-protected — UNCHANGED (6):**
+
+- **`heal_chain_event_shipper_heartbeat`** — heartbeat fresh-or-stale, no
+  middle band. Binary-certain; `severity='warning'` unchanged.
+- **`heal_build_sequence_advancer_heartbeat`** — heartbeat fresh-or-stale.
+  Binary-certain; `severity='warning'` unchanged.
+- **`heal_pr_terminal_fanout_heartbeat`** — `severity='critical'` death
+  alarm. Never downgraded per guardrail; unchanged.
+- **`heal_tier2_weekly_health_probe`** — its probe-failed red is fed
+  exclusively by degraded reads (timeout / OOM / 401 / missing-binary). No
+  safe borderline mode; the guardrail overrides the op-def's "single weekly
+  probe failure" blip example. Unchanged.
+- **`heal_daemon_restart_manifest_drift`** — escalates on confirmed git-op
+  failures (binary); the already-healed path already digests. Unchanged.
+- **`heal_chain_event_type_audit`** — any unknown `event_type` is actionable;
+  no numeric threshold, no graded band. Binary-certain; unchanged.
+
+**Net:** of the 8 slice-3 candidates, exactly one
+(`heal_claude_max_burn_rate`) carries a genuine graded confidence signal with
+a SAFE downgrade branch. Threading a constant severity would be a no-op;
+over-threading a degraded-fed or critical detector is the dangerous failure
+mode the guardrail exists to prevent, so the conservative outcome is correct.

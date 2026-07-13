@@ -459,12 +459,116 @@ class LeadingWarningTest(_IsolatedAgentsRoot):
         self.assertEqual(captured, {})
 
 
+class ConfidenceSeverityRoutingTest(_IsolatedAgentsRoot):
+    """Slice 3 (confidence -> severity). The alert still fires on any
+    pct >= 0.80, but the severity it carries now depends on how confident the
+    reading is:
+      - high-confidence (pct >= HIGH_CONFIDENCE_FRACTION, OR any trailing-2h
+        429 in the ground-truth ledger) -> severity='warning' -> escalate (DM);
+      - borderline (0.80 <= pct < HIGH_CONFIDENCE_FRACTION, no 429s) ->
+        severity='info' -> digest lane (no DM);
+      - degraded read (missing/unreadable costs.jsonl) -> pct 0.0 -> early
+        return, NO alert at all (can never reach the digest branch).
+    """
+
+    def _run_with_tokens(self, tokens_now, ledger_events=None,
+                         threshold=10_000_000):
+        now = datetime.now(timezone.utc)
+        self._write_costs([
+            {'ts': (now - timedelta(minutes=10)).isoformat(),
+             'agent': 'forge', 'cost_usd': 0.0,
+             'input_tokens': tokens_now // 2,
+             'output_tokens': tokens_now - (tokens_now // 2),
+             'cache_creation': 0,
+             'cache_read': 999_999_999},
+        ])
+        if ledger_events is not None:
+            self._write_ledger(ledger_events)
+        captured = {}
+
+        def fake_append_alert(**kwargs):
+            captured.update(kwargs)
+            return True
+
+        with mock.patch.object(self.h, 'gate_enabled', return_value=True), \
+             mock.patch.object(self.h, 'load_threshold',
+                               return_value=threshold), \
+             mock.patch('larry_alerts.append_alert',
+                        side_effect=fake_append_alert):
+            rc = self.h.run()
+        return rc, captured
+
+    def test_high_confidence_pace_escalates(self):
+        # 95% of 10M -> pct 0.95 >= HIGH_CONFIDENCE_FRACTION (0.90), no 429s.
+        # A high-confidence/sustained breach still pages: severity='warning',
+        # and no explicit route (so append_alert's default 'escalate' applies).
+        rc, captured = self._run_with_tokens(9_500_000, ledger_events=[])
+        self.assertEqual(rc, 0)
+        self.assertEqual(captured.get('severity'), 'warning')
+        self.assertIsNone(captured.get('route'),
+                          'severity drives the route default; slice 3 threads '
+                          'severity only, never an explicit route')
+
+    def test_observed_429_escalates_even_in_borderline_band(self):
+        # 84% pace (borderline band) BUT a trailing-2h 429 is ground-truth
+        # corroboration -> high confidence -> escalate. A real problem in the
+        # borderline band is NEVER buried in the digest.
+        now = datetime.now(timezone.utc)
+        rc, captured = self._run_with_tokens(
+            8_400_000,
+            ledger_events=[
+                {'ts': (now - timedelta(minutes=20)).isoformat(),
+                 'agent': 'forge', 'task_id': 't1'},
+            ],
+        )
+        self.assertEqual(rc, 0)
+        self.assertEqual(captured.get('severity'), 'warning')
+
+    def test_borderline_pace_digests(self):
+        # 84% of 10M -> pct 0.84 in [0.80, 0.90) with NO 429s -> borderline ->
+        # severity='info' (routes to the digest lane, no DM).
+        rc, captured = self._run_with_tokens(8_400_000, ledger_events=[])
+        self.assertEqual(rc, 0)
+        self.assertEqual(captured.get('severity'), 'info',
+                         'a borderline leading-edge reading must digest, '
+                         'not page')
+
+    def test_degraded_read_does_not_downgrade_to_digest(self):
+        # No costs.jsonl written -> rolling volume 0 -> pct 0.0 -> below the
+        # 0.80 trigger -> early return. The degraded read produces NO alert of
+        # any severity; it can never reach the digest branch. This is the
+        # guardrail's inverse: absence-of-signal keeps the fail-loud posture.
+        captured = {}
+
+        def fake_append_alert(**kwargs):
+            captured.update(kwargs)
+            return True
+
+        with mock.patch.object(self.h, 'gate_enabled', return_value=True), \
+             mock.patch.object(self.h, 'load_threshold',
+                               return_value=10_000_000), \
+             mock.patch('larry_alerts.append_alert',
+                        side_effect=fake_append_alert):
+            rc = self.h.run()
+        self.assertEqual(rc, 0)
+        self.assertEqual(captured, {},
+                         'a degraded/absent read must emit NO alert — never a '
+                         'digested red')
+
+    def test_at_confidence_boundary_escalates(self):
+        # Exactly HIGH_CONFIDENCE_FRACTION (90% of 10M) -> escalate (>=).
+        rc, captured = self._run_with_tokens(9_000_000, ledger_events=[])
+        self.assertEqual(rc, 0)
+        self.assertEqual(captured.get('severity'), 'warning')
+
+
 class ConstantsTest(_IsolatedAgentsRoot):
     """Pin the cooldown + window constants so a refactor can't silently
     weaken the dedup story."""
 
     def test_constants_intact(self):
         self.assertEqual(self.h.ALERT_THRESHOLD_FRACTION, 0.80)
+        self.assertEqual(self.h.HIGH_CONFIDENCE_FRACTION, 0.90)
         self.assertEqual(self.h.WINDOW_HOURS, 5)
         self.assertEqual(self.h.DM_COOLDOWN_HOURS, 5)
         self.assertEqual(self.h.RATE_LIMIT_RECENT_HOURS, 2)
