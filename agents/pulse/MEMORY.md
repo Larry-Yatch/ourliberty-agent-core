@@ -634,9 +634,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-13T11:54Z UTC (Iter ~5351, **Tier 1**, consecutive_clean=0)
+## Status snapshot — updated 2026-07-13T11:59Z UTC (Iter ~5352, **Tier 1**, consecutive_clean=1)
 
-**Iter ~5351 summary (2026-07-13T11:54Z):** 3 new alerts (L933-L935, source=pulse-check-xiv, Check XIV timer fired 11:50Z UTC). All Tier-4 novel (no translation). Bot delivered all 3 (idx=932/933/934). No Pulse DM. Both oversilence findings (doorbell, heal-dashboard-api-sha-drift) confirmed correct — no config change needed. All mandatory checks otherwise nominal. Zombie PID 1834248 ALIVE (45-16:32:39+, bash poll). Sync push_failures=0; HEAD=14752d87==origin/main. No open PRs. ratio≈20.0 (trailing-30d). **Tier 3→1** (tier-reset: Tier-4 novel alerts; system itself healthy). **NEW G-rule: pulse-check-xiv-tier4-001 [1/3]**.
+**Iter ~5352 summary (2026-07-13T11:59Z):** 0 new alerts (wm=fl=935). All mandatory checks nominal. Zombie PID 1834248 static carry (45-16:39:55+). Sync push_failures=0; HEAD=3c506a54==origin/main. No open PRs. ratio≈20.0 (trailing-30d). **Tier 1**, consecutive_clean=1. System healthy; Check I timer fires ~14:10Z UTC today.
 
 ---
 
