@@ -634,15 +634,15 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-13T19:52Z UTC (Iter ~5372, **Tier 2**, consecutive_clean=0)
+## Status snapshot — updated 2026-07-13T20:12Z UTC (Iter ~5373, **Tier 1**, consecutive_clean=0)
 
-**Iter ~5372 summary (2026-07-13T19:52Z):** 0 new alerts (wm=949, fl=949). All checks nominal. PR #959 OPEN (fix(heal-pipeline-stall): treat closed-not-merged rebase target PR as valid resolution, ~11 min old, Mirror review active since 19:41:30Z UTC). PR #958 MERGED (0f1c0fb4). Zombie PID 1834248 static carry (46-00:32:56+). Sync push_failures=0; HEAD=37dd1816==origin/main. ratio≈20.38 (trailing-30d). **Tier 1→2** (3 consecutive clean, promoted), consecutive_clean=0. Check VIII awaiting Larry response (idx=931). Check XIV [1/3] carry.
+**Iter ~5373 summary (2026-07-13T20:12Z):** 0 new alerts (wm=949, fl=949). Check A: repo behind 1 commit → fast-forwarded to 24431ed0 (PR #959 MERGED). PR #959 = G-rule heal-pipeline-stall-forge-reject-no-pr-fp-001 fix#2 now live. No open PRs. Zombie PID 1834248 static carry (46-00:53:13+). Sync push_failures=0; HEAD=24431ed0==origin/main. ratio≈20.14 (trailing-30d). **Tier 2→1** (Check A finding), consecutive_clean=0. Check VIII awaiting Larry response (idx=931). Check XIV [1/3] carry.
 
 ---
 
-## G-rule heal-pipeline-stall-forge-reject-no-pr-fp-001 — fix #1 VERIFIED ✅ (PR #939, iter ~5170), fix #2 verification_pending
+## G-rule heal-pipeline-stall-forge-reject-no-pr-fp-001 — BOTH FIXES LIVE ✅ (PR #939 + PR #959, iter ~5173)
 
-**Rule:** `heal_pipeline_stall.py` fires `forge_built_no_pr:<task>` for tasks whose archive entry has `result=~"=== REJECT ==="` and `branch=null` (Forge REJECTED at preflight). Two-part fix: (1) add `preflight_reject` skip guard in `check_forge_built_no_pr` (PR #939, MERGED 2026-07-11T22:54:47Z UTC — +353 lines across heal_forge_wip_only_redispatch.py + heal_pipeline_stall.py + 13 tests; fix #1 VERIFIED iter ~5170); (2) broader "no-PR legitimacy classifier" (task-no-pr-legitimacy-classifier-001, in Forge build phase as of 22:49Z, $0.76 cost, fix #2 verification_pending). Occurrences: iter ~5159 (dry-run, `retry1`, REJECT); iter ~5160 (real alert idx=918, Tier-3 silenced); iter ~5163 (dry-run, `retr-retry1`, also REJECT — 3/3).
+**Rule:** `heal_pipeline_stall.py` fires `forge_built_no_pr:<task>` for tasks whose archive entry has `result=~"=== REJECT ==="` and `branch=null` (Forge REJECTED at preflight). Two-part fix: (1) add `preflight_reject` skip guard in `check_forge_built_no_pr` (PR #939, MERGED 2026-07-11T22:54:47Z UTC; fix #1 VERIFIED iter ~5170); (2) treat closed-not-merged rebase target PR as valid resolution (PR #959, MERGED 2026-07-13T~20:10Z UTC — 24431ed0; fix#2 live as of iter ~5373). systemic_fix appended PRIME ledger 20:13Z UTC iter ~5373. verification_pending (next stall dry-run confirmation for fix#2). Occurrences: iter ~5159 (dry-run, `retry1`, REJECT); iter ~5160 (real alert idx=918, Tier-3 silenced); iter ~5163 (dry-run, `retr-retry1`, also REJECT — 3/3).
 
 
 ## G-rule outbox-notifier-auto-merge-stale-revalidation-tier4-001 — 2/3 (updated iter ~5021)
