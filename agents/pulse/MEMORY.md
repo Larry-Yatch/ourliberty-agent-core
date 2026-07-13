@@ -628,9 +628,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-12T23:27Z UTC (Iter ~5328, **Tier 3**, consecutive_clean=5)
+## Status snapshot — updated 2026-07-13T00:02Z UTC (Iter ~5329, **Tier 3**, consecutive_clean=6)
 
-**Iter ~5328 summary (2026-07-12T23:27Z):** 0 new alerts (wm=963==fl). All mandatory checks clean. Zombie PID 1834248 ALIVE (45-04:07:33+, bash poll). Sync push_failures=0; HEAD=a2381ad9==origin/main. No open PRs. ratio=19.78 (trailing-30d). **Tier 3**, consecutive_clean=5. Next cycle ~30 min. **ACTIVE G-rules:** unchanged from iter ~5327.
+**Iter ~5329 summary (2026-07-13T00:02Z):** 1 new alert (L964 Tier-3 silence, heal-dashboard-api-sha-drift). All mandatory checks clean. Zombie PID 1834248 ALIVE (45-04:43:08+, bash poll). Sync push_failures=0; HEAD=a9a23be7==origin/main. No open PRs. ratio=19.78 (trailing-30d). **Tier 3**, consecutive_clean=6. Next cycle ~30 min. **ACTIVE G-rules:** unchanged from iter ~5328.
 
 ---
 
