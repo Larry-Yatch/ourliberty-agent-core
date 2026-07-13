@@ -628,9 +628,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-13T10:52Z UTC (Iter ~5349, **Tier 3**, consecutive_clean=26)
+## Status snapshot — updated 2026-07-13T11:23Z UTC (Iter ~5350, **Tier 3**, consecutive_clean=27)
 
-**Iter ~5349 summary (2026-07-13T10:52Z):** 1 new alert (L931 heal-dashboard-api-sha-drift Tier-3 silence, dashboard-api restarted to HEAD f9f56498). All mandatory checks clean. Zombie PID 1834248 ALIVE (45-15:32:41+, bash poll). Sync push_failures=0; HEAD=f9f56498==origin/main. No open PRs. Stall checker: 0 alerts, FORGE_NO_PR_SKIP ×1 (PR #956). **Check XI CLOSED ✅** (3.1% < 10% gate, artifact 10:20Z UTC today). Check I timer fires ~14:10Z UTC today (Mon). ratio=19.77 (trailing-30d). **Tier 3**, consecutive_clean=26. **ACTIVE G-rules:** unchanged from iter ~5348.
+**Iter ~5350 summary (2026-07-13T11:22Z):** 1 new alert (L932 pulse-check-viii check-viii-update:2026-07-13, Tier-3 silence; bot DM delivered idx=931 at 11:15Z UTC). All mandatory checks clean. Zombie PID 1834248 ALIVE (45-16:02:50+, bash poll). Sync push_failures=0; HEAD=b3626173==origin/main. No open PRs. Stall checker: 0 alerts, FORGE_NO_PR_SKIP ×1 (PR #956). **Check VIII new proposal** (deprecate token gate, 2026-07-13 — supersedes 2026-07-07). Check XI CLOSED ✅ (3.1% gate). Check I timer fires ~14:10Z UTC today (Mon). ratio=19.77 (trailing-30d). **Tier 3**, consecutive_clean=27. **ACTIVE G-rules:** unchanged from iter ~5349.
 
 ---
 
