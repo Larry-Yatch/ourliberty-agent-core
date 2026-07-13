@@ -628,9 +628,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-13T07:08Z UTC (Iter ~5342, **Tier 3**, consecutive_clean=19)
+## Status snapshot — updated 2026-07-13T08:17Z UTC (Iter ~5344, **Tier 3**, consecutive_clean=21)
 
-**Iter ~5342 summary (2026-07-13T07:08Z):** 2 new alerts (L971 heal-dashboard-api-sha-drift Tier-3 silence, L972 ledger/weekly-2026-07-13 Tier-3 silence; bot DM'd Larry $1946.88 +86% weekly). All mandatory checks clean. Zombie PID 1834248 ALIVE (45-11:48:31+, bash poll). Sync push_failures=0; HEAD=4622d249==origin/main (ledger weekly wrapper commit). No open PRs. Stall checker: 0 alerts, FORGE_NO_PR_SKIP ×1 (PR #956). ratio=19.77 (trailing-30d). **Tier 3**, consecutive_clean=19. Next cycle ~30 min. **ACTIVE G-rules:** unchanged from iter ~5341.
+**Iter ~5344 summary (2026-07-13T08:17Z):** 1 new alert (L973 heal-dashboard-api-sha-drift Tier-3 silence; dashboard-api restarted to HEAD 5905d340). All mandatory checks clean. Zombie PID 1834248 ALIVE (45-12:58:27+, bash poll). Sync push_failures=0; HEAD=5905d340==origin/main. No open PRs. Stall checker: 0 alerts, FORGE_NO_PR_SKIP ×1 (PR #956). ratio=19.77 (trailing-30d). **Tier 3**, consecutive_clean=21. Next cycle ~30 min. **ACTIVE G-rules:** unchanged from iter ~5343.
 
 ---
 
