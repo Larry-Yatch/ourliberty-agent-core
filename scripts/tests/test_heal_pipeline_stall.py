@@ -1310,6 +1310,61 @@ class TestCheckForgeBuiltNoPr(_TempAgentsRootMixin, unittest.TestCase):
         self.assertEqual(len(skip), 1)
         self.assertIn('pr=#687', skip[0])
 
+    def test_rebase_target_in_closed_prs_suppresses_stall(self) -> None:
+        """Closed-not-merged target (2026-07-13): task
+        `rebase-enhance-pr945-001` is a rebase-class task that operates on the
+        EXISTING PR #945 and opens none of its own. PR #945 was CLOSED (not
+        merged) as superseded by #938/#939, so it is ABSENT from the open+merged
+        union and step 1a's branch/title `_pr_matches_task` never correlates the
+        rebase-style task_id — the case falls in the seam. The archived result
+        names PR #945, present in `closed_prs`; a terminal PR is a valid
+        resolution, so the stall is suppressed — reason=rebase_target_shipped,
+        pr=#945."""
+        task = 'rebase-enhance-pr945-001'
+        self._write_archive(task, {
+            'task_id': task, 'phase': 'build', 'exit_code': 0,
+            'result': ('Rebased PR #945; on inspection #945 was already '
+                       'superseded and closed. Nothing to open. Done.'),
+        })
+        closed_prs = [{
+            'headRefName': 'forge/some-superseded-945',
+            'number': 945, 'title': 'feat: the superseded work',
+            '_repo': self._AGENT_CORE,
+        }]
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        captured: list[str] = []
+        with patch.object(self.hps, 'log',
+                          side_effect=lambda msg, level='INFO': captured.append(msg)):
+            alerts = self.hps.check_forge_built_no_pr(
+                lines, [], [], {}, closed_prs=closed_prs)
+        self.assertEqual(alerts, [])
+        skip = [m for m in captured
+                if 'FORGE_NO_PR_SKIP' in m and 'rebase_target_shipped' in m]
+        self.assertEqual(len(skip), 1)
+        self.assertIn('pr=#945', skip[0])
+
+    def test_rebase_target_absent_from_all_states_still_alerts(self) -> None:
+        """NEGATIVE fail-safe (closed path): a `rebase-` task whose referenced
+        PR is in NONE of open/merged/closed (a genuinely missing target) must
+        still fire, even with a non-empty `closed_prs` that names other PRs.
+        The closed-PR union can only REMOVE false stalls, never mask a real
+        one."""
+        task = 'rebase-enhance-pr945-001'
+        self._write_archive(task, {
+            'task_id': task, 'phase': 'build', 'exit_code': 0,
+            'result': 'PR #945 rebased. Done.',
+        })
+        closed_prs = [{
+            'headRefName': 'forge/unrelated-900', 'number': 900,
+            'title': 'something else', '_repo': self._AGENT_CORE,
+        }]
+        lines = [_watcher_forge_done_line(task, minutes_ago=180)]
+        alerts = self.hps.check_forge_built_no_pr(
+            lines, [], [], {}, closed_prs=closed_prs)
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(alerts[0]['subject'],
+                         f'pipeline-stall:forge-no-pr:{task}')
+
     def test_rebase_target_absent_from_union_still_alerts(self) -> None:
         """NEGATIVE (Pattern B): a `rebase-` task whose referenced PR is NOT in
         the open+merged union (a genuinely missing target) must still fire."""

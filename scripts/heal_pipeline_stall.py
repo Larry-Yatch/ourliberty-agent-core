@@ -1531,8 +1531,14 @@ def _forge_rebase_target_shipped(task_id: str,
                                  all_prs: list[dict]) -> Optional[dict]:
     """Suppress a `forge built / no PR` stall for a REBASE-class task, which by
     design operates on an EXISTING PR and opens none of its own. Returns the
-    targeted PR dict when the task named a PR that exists in the open+merged
-    union (gh-truth), else None.
+    targeted PR dict when the task named a PR that exists in the candidate
+    `all_prs` list (gh-truth), else None.
+
+    The caller passes the open+merged union PLUS `closed_prs`, so a rebase
+    target that was CLOSED-not-merged (superseded/abandoned) is a valid
+    resolution here too — a terminal PR is still the PR the rebase targeted,
+    just as step 1a already trusts closed PRs. `all_prs` is thus the full
+    candidate union, not only the open+merged subset.
 
     Applies ONLY when `task_id.startswith('rebase-')` — a deliberately tight
     scope, because rebase tasks are the only class expected to open no PR while
@@ -1812,9 +1818,19 @@ def check_forge_built_no_pr(watcher_lines: list[str], open_prs: list[dict],
         # which it rebased to MERGEABLE/CLEAN before #687 MERGED with its branch
         # deleted — so both branch-match and title-match fail and the stall
         # fired. See `_forge_rebase_target_shipped`: the rebase task's `result`
-        # names `#<N>` and PR #<N> is present in the open+merged union.
+        # names `#<N>` and PR #<N> is present in the candidate union.
         # gh-truth-gated, tightly scoped to `rebase-` ids, fail-safe to None.
-        rebase_pr = _forge_rebase_target_shipped(task, all_prs)
+        #
+        # The candidate union includes `closed_prs` in addition to open+merged:
+        # a rebase target that was CLOSED-not-merged (e.g. superseded — PR #945
+        # closed in favour of #938/#939 on 2026-07-12) is absent from the
+        # open+merged `all_prs`, and step 1a's branch/title `_pr_matches_task`
+        # never correlates a `rebase-`-style task_id, so the case falls in the
+        # seam and false-fires. A terminal (closed) PR is a valid resolution,
+        # exactly as step 1a already trusts — so it belongs in the union the
+        # rebase resolver sees. Still fail-safe to None on no `#<N>` ref / no
+        # resolving PR / unresolvable ambiguity, so a genuine stall still fires.
+        rebase_pr = _forge_rebase_target_shipped(task, all_prs + closed_prs)
         if rebase_pr is not None:
             log(
                 f'FORGE_NO_PR_SKIP task={task} reason=rebase_target_shipped '
