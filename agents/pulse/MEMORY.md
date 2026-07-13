@@ -628,9 +628,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-13T06:07Z UTC (Iter ~5340, **Tier 3**, consecutive_clean=17)
+## Status snapshot — updated 2026-07-13T06:38Z UTC (Iter ~5341, **Tier 3**, consecutive_clean=18)
 
-**Iter ~5340 summary (2026-07-13T06:07Z):** 2 new alerts (L969 heal-dashboard-api-sha-drift Tier-3, L970 dispatch-branch-cleanup Tier-3). All mandatory checks clean. Zombie PID 1834248 ALIVE (45-10:47:55+, bash poll). Sync push_failures=0; HEAD=bd5af883==origin/main. No open PRs. Stall checker: 0 alerts, FORGE_NO_PR_SKIP ×1 (PR #956). ratio=19.77 (trailing-30d). **Tier 3**, consecutive_clean=17. Next cycle ~30 min. **ACTIVE G-rules:** unchanged from iter ~5339.
+**Iter ~5341 summary (2026-07-13T06:38Z):** 0 new alerts (wm=fl=970). All mandatory checks clean. heal-dashboard-api-sha-drift WARN at 06:09:34Z UTC (bd5af883→53eca90b drift post-wrapper) — alert pending write, L971 expected next iter Tier-3. Zombie PID 1834248 ALIVE (45-11:17:54+, bash poll). Sync push_failures=0; HEAD=53eca90b==origin/main. No open PRs. Stall checker: 0 alerts, FORGE_NO_PR_SKIP ×1 (PR #956). ratio=19.77 (trailing-30d). **Tier 3**, consecutive_clean=18. Next cycle ~30 min. **ACTIVE G-rules:** unchanged from iter ~5340.
 
 ---
 
