@@ -1353,7 +1353,8 @@
         "at": "2026-07-03T03:22:16.128113+00:00",
         "from_state": "parked"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "aging": true
     },
     {
       "id": "cap-fast-follow-guard-cycle-tier-state-log-on-corrup-00a7",
@@ -1383,7 +1384,8 @@
         "at": "2026-07-03T16:33:29.194907+00:00",
         "from_state": "parked"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "aging": true
     },
     {
       "id": "cap-capstone-build-the-bwrap-kernel-wall-closes-test-cbb6",
@@ -1413,7 +1415,8 @@
         "at": "2026-07-04T02:10:18.511314+00:00",
         "from_state": "parked"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "aging": true
     },
     {
       "id": "cap-slice-2-reconciler-hardening-closed-unmerged-ter-8d9e",
