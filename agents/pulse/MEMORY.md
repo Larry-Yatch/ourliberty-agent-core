@@ -634,9 +634,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-13T18:33Z UTC (Iter ~5367, **Tier 3**, consecutive_clean=10)
+## Status snapshot — updated 2026-07-13T19:04Z UTC (Iter ~5368, **Tier 3**, consecutive_clean=11)
 
-**Iter ~5367 summary (2026-07-13T18:33Z):** 1 new alert (L945 outbox-notifier review-pass Tier-3 silence, wm→945). All mandatory checks nominal. Zombie PID 1834248 static carry (45-23:12:43+). Sync push_failures=0; HEAD=6faa8b1b==origin/main (2 healer auto-commits: GC + autoregister). No open PRs. ratio≈20.37 (trailing-30d). **Tier 3**, consecutive_clean=10. Forge dispatch `notifier-auto-retraction-slice3-001` in flight (trust-policy auto-approved 18:22Z UTC). Check I artifact check-i-2026-07-13.json: 1 proposal [small] `pr3-staged-autonomy`. Check VIII awaiting Larry response (idx=931). Check XIV [1/3] carry.
+**Iter ~5368 summary (2026-07-13T19:04Z):** 2 new alerts (L946–L947, both Tier-3 silence, wm→947). All mandatory checks nominal. Zombie PID 1834248 static carry (45-23:42+). Sync push_failures=0; HEAD=94dc2539==origin/main. 2 new open PRs (#957 dismiss-mission, #958 notifier-slice3 from Forge), both <30min old at check. ratio≈20.37 (trailing-30d). **Tier 3**, consecutive_clean=11. Check I artifact check-i-2026-07-13.json: 1 proposal [small] `pr3-staged-autonomy`. Check VIII awaiting Larry response (idx=931). Check XIV [1/3] carry.
 
 ---
 
