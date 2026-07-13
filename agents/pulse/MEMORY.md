@@ -628,9 +628,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-13T10:25Z UTC (Iter ~5348, **Tier 3**, consecutive_clean=25)
+## Status snapshot — updated 2026-07-13T10:52Z UTC (Iter ~5349, **Tier 3**, consecutive_clean=26)
 
-**Iter ~5348 summary (2026-07-13T10:25Z):** 0 new alerts (wm=fl=930, alert file compacted 974→930 lines). All mandatory checks clean. Zombie PID 1834248 ALIVE (45-15:02:46+, bash poll). Sync push_failures=0; HEAD=6ddf51bd==origin/main. No open PRs. Stall checker: 0 alerts, FORGE_NO_PR_SKIP ×1 (PR #956). **Check XI RESOLVED: new artifact 10:20Z UTC shows over_gate=false (3.1% < 10% gate); 2 residual drifted under gate (atomic_io, universal-card).** Check I timer fires ~14:10Z UTC today (Mon). ratio=19.77 (trailing-30d). **Tier 3**, consecutive_clean=25. **ACTIVE G-rules:** unchanged from iter ~5347.
+**Iter ~5349 summary (2026-07-13T10:52Z):** 1 new alert (L931 heal-dashboard-api-sha-drift Tier-3 silence, dashboard-api restarted to HEAD f9f56498). All mandatory checks clean. Zombie PID 1834248 ALIVE (45-15:32:41+, bash poll). Sync push_failures=0; HEAD=f9f56498==origin/main. No open PRs. Stall checker: 0 alerts, FORGE_NO_PR_SKIP ×1 (PR #956). **Check XI CLOSED ✅** (3.1% < 10% gate, artifact 10:20Z UTC today). Check I timer fires ~14:10Z UTC today (Mon). ratio=19.77 (trailing-30d). **Tier 3**, consecutive_clean=26. **ACTIVE G-rules:** unchanged from iter ~5348.
 
 ---
 
