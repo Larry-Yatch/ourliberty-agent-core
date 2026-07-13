@@ -634,9 +634,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-13T19:35Z UTC (Iter ~5369, **Tier 1**, consecutive_clean=0)
+## Status snapshot — updated 2026-07-13T19:42Z UTC (Iter ~5370, **Tier 1**, consecutive_clean=1)
 
-**Iter ~5369 summary (2026-07-13T19:35Z):** 1 new alert (L948 Tier-3 silence, wm→948 — heal-wedged-review-sessions for Forge build worktree). Check E finding: PR #957 (chore/dismiss-mission) 34 min old → enabled auto-merge → MERGED immediately. PR #958 (notifier-slice3) Mirror review in progress (dispatched 19:15Z UTC). Zombie PID 1834248 static carry (46-00:13+). Sync push_failures=0; HEAD=5ab6e554==origin/main. ratio≈20.37 (trailing-30d). **Tier 1** (reset from Tier 3 by Check E finding), consecutive_clean=0. Check VIII awaiting Larry response (idx=931). Check XIV [1/3] carry.
+**Iter ~5370 summary (2026-07-13T19:42Z):** 2 new alerts (L948–L949, both Tier-3 silence, wm→949 — watermark persistence gap carry for L948; L949=heal-dashboard-api-sha-drift post-cycle-commit). All checks nominal. No open PRs: PR #958 MERGED (0f1c0fb4 feat(alerts): thread detector confidence into severity routing (slice 3)). Zombie PID 1834248 static carry (46-00:22:24+). Sync push_failures=0; HEAD=f86ed103==origin/main. ratio≈20.37 (trailing-30d). **Tier 1**, consecutive_clean=1. Check VIII awaiting Larry response (idx=931). Check XIV [1/3] carry.
 
 ---
 
