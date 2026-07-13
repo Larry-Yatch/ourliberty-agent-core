@@ -8975,7 +8975,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-13T18:31:29.862183+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-13T18:30:31.050484+00:00"
+      "orphan_last_activity_ts": "2026-07-13T18:30:31.050484+00:00",
+      "briefing": {
+        "what": "A one-click Retry button for the operator's task feed, so a step that failed can be re-run on the spot instead of being stuck.",
+        "why": "Right now failed items quietly dead-end, forcing manual workarounds and slowing down how fast your team clears its to-do list.",
+        "suggest": "Worth finishing, but have someone confirm it works cleanly on a failed item before it goes live."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-13T18:40:15.806238+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
