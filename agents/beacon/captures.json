@@ -386,7 +386,7 @@
       "id": "cap-investigate-retry-clarification-cost-sources-7995",
       "title": "Investigate retry / clarification cost sources",
       "note": "~$3.00/wk reclaimable (22.0% of total spend is retries/clarifications)\n\nRetry overhead is above the 15% threshold. Audit the outbox-notifier log for the dominant retry shapes (revision, clarification, cycle-fix) and tighten the upstream preflight / spec template that caused them.",
-      "state": "parked",
+      "state": "dropped",
       "label": "pulse-check-i",
       "origin": {
         "source": "agent",
@@ -398,17 +398,17 @@
       "last_touched": "2026-06-11T06:19:53.430591+00:00",
       "promoted_to": null,
       "briefing": {
-        "what": "About a fifth of our automation spending is going to redo-work \u2014 tasks that have to be repeated because the first attempt wasn't clear enough.",
-        "why": "It's quietly wasting roughly $3 a week, and that share is higher than what we'd consider healthy, so it's a sign our instructions to the system aren't tight enough.",
-        "suggest": "Worth a careful look \u2014 let's first confirm where the redo-work is really coming from before changing anything, so we fix the actual cause rather than guess."
+        "what": "About a fifth of our weekly software-automation spend is being burned on do-overs and back-and-forth clarifications instead of finished work.",
+        "why": "It's roughly $3 a week we could reclaim, and it signals our work is getting kicked back too often \u2014 a sign of avoidable friction in how tasks are set up.",
+        "suggest": "Worth a careful look at what's triggering the redos before changing anything, so we fix the root cause rather than just trimming the symptom."
       },
       "risk": "careful",
-      "recommended_action": "delegate",
+      "recommended_action": "drop",
       "briefing_provenance": {
         "by": "beacon",
         "model": "claude-opus-4-8",
-        "at": "2026-06-14T17:52:43.946307+00:00",
-        "from_state": "parked"
+        "at": "2026-07-13T21:31:33.609592+00:00",
+        "from_state": "dropped"
       },
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
       "aging": true
@@ -1178,7 +1178,7 @@
       "id": "cap-forensic-29-mirror-malformed-marker-pr-stranding-7378",
       "title": "Forensic: ~29 Mirror malformed-marker PR strandings/window leak through existing enforcement",
       "note": "Emit-time marker enforcement already exists (agent_runner build_review_marker_reminder_system_prompt + marker-error retry + PASS-prose synthesizer), yet ~29 tasks/window still strand on MalformedMirrorMarker. Mine outbox-notifier.log for the residual pattern of the leak-throughs (non-PASS prose verdicts? retry also malformed?) then a targeted fix \u2014 likely extend the prose synthesizer or tighten the reminder. Evidence-first, NOT a blind rebuild.",
-      "state": "parked",
+      "state": "dropped",
       "label": null,
       "origin": {
         "source": "desktop-chat",
@@ -1190,17 +1190,17 @@
       "last_touched": "2026-06-26T14:53:13.040670+00:00",
       "promoted_to": null,
       "briefing": {
-        "what": "Our automated review system has a quality checkpoint that's supposed to catch bad reviews before they get stuck, but about 29 jobs per cycle are still slipping through and stalling.",
-        "why": "Each stalled job is work that quietly stops moving until someone notices, slowing down delivery and eroding trust that the system runs itself.",
-        "suggest": "Worth a short, evidence-based look to pin down exactly why these are leaking through before committing to any fix \u2014 don't greenlight a big rebuild yet."
+        "what": "Roughly 29 automated reviews per cycle silently fail to hand back their verdict because of a formatting glitch, even though we already have safeguards meant to catch this.",
+        "why": "Every one of those is a piece of work that stalls instead of moving forward, quietly slowing throughput and eroding trust in the automation we've already paid for.",
+        "suggest": "Have the team first pull the logs to pinpoint exactly why these are still slipping through, then make a small targeted fix \u2014 worth doing soon, but only after we've confirmed the real cause rather than guessing."
       },
       "risk": "medium",
-      "recommended_action": "delegate",
+      "recommended_action": "drop",
       "briefing_provenance": {
         "by": "beacon",
         "model": "claude-opus-4-8",
-        "at": "2026-06-26T14:55:50.087187+00:00",
-        "from_state": "parked"
+        "at": "2026-07-13T21:31:33.609592+00:00",
+        "from_state": "dropped"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
       "aging": true
