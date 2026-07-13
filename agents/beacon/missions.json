@@ -5729,7 +5729,12 @@
       },
       "needs_decision": true,
       "needs_decision_since": "2026-07-09T00:01:19.901008+00:00",
-      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop",
+      "spawned": {
+        "kind": "delegate",
+        "task_id": "delegate-the-steering-endpoint-and-proxy-accept-a-retry-action-but-the-dashboard-only-surfaces-resume-skip-cancel-buttons-so-the-retry-path-is-wired-up-without-a-way-to-trigger-it-from-the-ui",
+        "stamped_at": "2026-07-13T18:11:18.837002+00:00"
+      }
     },
     {
       "id": "the-stuck-dispatched-threshold-is-fixed-at-15-minutes-as-a-hardcoded-module-constant-so-adjusting-how-long-a-step-waits-before-flagging-larry-requires-a-code-change",
