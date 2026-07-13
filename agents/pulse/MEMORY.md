@@ -634,9 +634,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-13T20:32Z UTC (Iter ~5376, **Tier 2**, consecutive_clean=0)
+## Status snapshot — updated 2026-07-13T20:52Z UTC (Iter ~5377, **Tier 2**, consecutive_clean=1)
 
-**Iter ~5376 summary (2026-07-13T20:32Z):** 0 new alerts (wm=949, fl=949). All checks nominal. 0 open PRs. Zombie PID 1834248 static carry (46-01:12:43+). Sync push_failures=0; HEAD=7d5be2f1==origin/main. ratio≈20.38 (trailing-30d). **Tier 1→2 promoted** (3 consecutive clean iters). Check VIII awaiting Larry response (idx=931). Check XIV [1/3] carry. G-rule heal-pipeline-stall-forge-reject-no-pr-fp-001 fix#2 (PR #959) MERGED; verification_pending next stall dry-run with matching closed-not-merged-rebase-target task.
+**Iter ~5377 summary (2026-07-13T20:52Z):** 0 new alerts (wm=949, fl=949). All checks nominal. 0 open PRs. Zombie PID 1834248 static carry (46-01:33:10+). Sync push_failures=0; HEAD=424c0af3==origin/main. ratio≈20.38 (trailing-30d). **Tier 2**, consecutive_clean=1 (1 more clean iter needed for Tier 3 promotion). Check VIII awaiting Larry response (idx=931). Check XIV [1/3] carry. G-rule heal-pipeline-stall-forge-reject-no-pr-fp-001 fix#2 (PR #959) MERGED; verification_pending next stall dry-run with matching closed-not-merged-rebase-target task.
 
 ---
 
