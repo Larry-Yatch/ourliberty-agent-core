@@ -634,9 +634,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-13T19:42Z UTC (Iter ~5370, **Tier 1**, consecutive_clean=1)
+## Status snapshot — updated 2026-07-13T19:48Z UTC (Iter ~5371, **Tier 1**, consecutive_clean=2)
 
-**Iter ~5370 summary (2026-07-13T19:42Z):** 2 new alerts (L948–L949, both Tier-3 silence, wm→949 — watermark persistence gap carry for L948; L949=heal-dashboard-api-sha-drift post-cycle-commit). All checks nominal. No open PRs: PR #958 MERGED (0f1c0fb4 feat(alerts): thread detector confidence into severity routing (slice 3)). Zombie PID 1834248 static carry (46-00:22:24+). Sync push_failures=0; HEAD=f86ed103==origin/main. ratio≈20.37 (trailing-30d). **Tier 1**, consecutive_clean=1. Check VIII awaiting Larry response (idx=931). Check XIV [1/3] carry.
+**Iter ~5371 summary (2026-07-13T19:48Z):** 0 new alerts (wm=949, fl=949). All checks nominal. PR #959 OPEN (forge/fix-rebase-closed-pr-reconciliation-001, 6 min old, Mirror review active since 19:41:30Z UTC). PR #958 MERGED (0f1c0fb4). Dashboard PR #133 (needs-you-retry-button-001) merged 19:42:12Z UTC. Zombie PID 1834248 static carry (46-00:28:11+). Sync push_failures=0; HEAD=3deeebf7==origin/main. ratio≈20.38 (trailing-30d). **Tier 1**, consecutive_clean=2. Check VIII awaiting Larry response (idx=931). Check XIV [1/3] carry.
 
 ---
 
