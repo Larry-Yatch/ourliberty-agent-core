@@ -634,9 +634,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-14T13:36Z UTC (Iter ~5409, **Tier 3**, consecutive_clean=30)
+## Status snapshot — updated 2026-07-14T14:12Z UTC (Iter ~5410, **Tier 3**, consecutive_clean=31)
 
-**Iter ~5409 summary (2026-07-14T13:36Z):** 0 new alerts (wm=872, fl=872). All checks nominal. 0 open PRs. Zombie PID 1834248 static carry (46-18:17:18+). beacon PID 1706301 + outbox-notifier PID 1706314 running cleanly. Bot last idx=871 at 12:32Z UTC; PIDs alive. HEAD=63c0e227==origin/main; clean tree. ratio≈20.4 (trailing-30d, worsening). **Tier 3**, consecutive_clean=30. Check VIII awaiting Larry response (idx=931). Check I Monday timer fires ~14:13Z UTC today (~37 min away at iter start). Check XIV [1/3] carry.
+**Iter ~5410 summary (2026-07-14T14:12Z):** 1 new alert (L873 Tier-3 heal-dashboard-api-sha-drift). All checks nominal. 0 open PRs. Zombie PID 1834248 static carry (46-18:52:48+). beacon PID 1706301 + outbox-notifier PID 1706314 running cleanly. Bot last idx=872 at 13:42Z UTC; PIDs alive. HEAD=1de654ac==origin/main; clean tree. ratio≈20.4 (trailing-30d, worsening). **Tier 3**, consecutive_clean=31. Check VIII awaiting Larry response (idx=931). Check I Monday timer fires ~14:13Z UTC today (timer had not fired yet at iter check; expect new artifact imminently). Check XIV [1/3] carry.
 
 ---
 
