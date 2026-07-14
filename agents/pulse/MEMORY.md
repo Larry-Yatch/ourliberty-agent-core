@@ -634,9 +634,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-14T00:39Z UTC (Iter ~5385, **Tier 3**, consecutive_clean=6)
+## Status snapshot — updated 2026-07-14T01:12Z UTC (Iter ~5386, **Tier 3**, consecutive_clean=7)
 
-**Iter ~5385 summary (2026-07-14T00:37Z):** 1 new alert (L954 missions-autoregister Tier-3 silenced; wm=953→954). All checks nominal. 0 open PRs. Zombie PID 1834248 static carry (46-05:17:34+). Daemon restart: heal-stale-daemon-code restarted beacon (1706301) + outbox-notifier (1706314) after PR#960 deploy; both running cleanly. Sync push_failures=0; HEAD=217e8109==origin/main (2 new commits: b8d2edaf missions-autoregister healer + PR#960 approvals tie). ratio≈20.35 (trailing-30d). **Tier 3**, consecutive_clean=6. Check VIII awaiting Larry response (idx=931). Check XIV [1/3] carry. G-rule heal-pipeline-stall-forge-reject-no-pr-fp-001 fix#2 (PR #959 MERGED) verification_pending.
+**Iter ~5386 summary (2026-07-14T01:11Z):** 1 new alert (L955 heal-dashboard-api-sha-drift Tier-3 silenced; wm=954→955). All checks nominal. 0 open PRs. Zombie PID 1834248 static carry (46-05:52:51+). beacon PID 1706301 + outbox-notifier PID 1706314 running cleanly post-PR#960 restart. Sync push_failures=0; HEAD=bef31634==origin/main (iter ~5385 auto-commit). ratio≈20.35 (trailing-30d). **Tier 3**, consecutive_clean=7. Check VIII awaiting Larry response (idx=931). Check XIV [1/3] carry. G-rule heal-pipeline-stall-forge-reject-no-pr-fp-001 fix#2 (PR #959 MERGED) verification_pending.
 
 ---
 
