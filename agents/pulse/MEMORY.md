@@ -634,9 +634,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-14T08:07Z UTC (Iter ~5399, **Tier 3**, consecutive_clean=20)
+## Status snapshot — updated 2026-07-14T08:41Z UTC (Iter ~5400, **Tier 3**, consecutive_clean=21)
 
-**Iter ~5399 summary (2026-07-14T08:07Z):** 0 new alerts (wm=961, fl=961). All checks nominal. 0 open PRs. Zombie PID 1834248 static carry (46-12:47:52+). beacon PID 1706301 + outbox-notifier PID 1706314 running cleanly. Bot last idx=960 at 07:09Z UTC; PIDs alive. Sync last_sync=07:35:53Z no-change; HEAD=7edfbd0b==origin/main. ratio≈20.99 (trailing-30d). **Tier 3**, consecutive_clean=20. Check VIII awaiting Larry response (idx=931). Check XIV [1/3] carry. G-rule heal-pipeline-stall-forge-reject-no-pr-fp-001 fix#2 VERIFIED ✅ (PR #959, stall dry-run confirms).
+**Iter ~5400 summary (2026-07-14T08:41Z):** 1 new alert L962 Tier-3 silenced (heal-dashboard-api-sha-drift-healed, 08:11:39Z UTC). All checks nominal. 0 open PRs. Zombie PID 1834248 static carry (46-13:22:27+). beacon PID 1706301 + outbox-notifier PID 1706314 running cleanly. Bot last idx=961 at 08:15Z UTC; PIDs alive. HEAD=4e7595c1==origin/main; git fetch up-to-date. ratio≈20.99 (trailing-30d). **Tier 3**, consecutive_clean=21. Check VIII awaiting Larry response (idx=931). Check I Monday timer fires ~14:13Z UTC today. Check XIV [1/3] carry.
 
 ---
 
