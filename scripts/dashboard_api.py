@@ -4973,6 +4973,99 @@ def _delegation_trail_field(
     return {'delegation_build_phase': phase, 'delegation_pr_url': pr_url}
 
 
+# Talk-with-the-team origin trail (approval cards). When Larry discusses an
+# Approvals-tab decision card ("Talk with the team") and that conversation makes
+# Beacon dispatch a build, the dashboard card-message door
+# (`_post_card_message` → Beacon inbox → outbox_notifier
+# `_route_beacon_pulse_auto_dispatch_approval`) DETERMINISTICALLY stamps the
+# dispatched build's approval + REVIEW chain_events with
+# `payload.origin_task_id == card-message-<approval_event_id>` — the same
+# join-key discipline the Delegate action uses (`delegate-<cid>`). So the build
+# is ALREADY tied to the card in the chain log; what was missing is a read that
+# surfaces it back on the card. This is that read — it reuses the delegate
+# trail's join + verdict-aware phase derive verbatim (ONE trail-phase source,
+# no second deriver) but keys on the `card-message-` origin.
+_CARD_MESSAGE_ORIGIN_PREFIX = 'card-message-'
+
+# Bound the origin `IN (...)` filter so a pathological pending bucket can't build
+# an unbounded PostgREST query — and so the GET endpoint's comma-joined
+# `?event_ids=` never grows a URL past proxy/browser limits (100 × ~50-char
+# event_ids ≈ 5 KB, comfortably under the ~8 KB practical ceiling). Decision
+# volume is a few dozen/week (see the _MAX_* note near the reconcile sweep), so
+# this never bites in practice; if it ever does we truncate + report it (no
+# silent cap) via the endpoint's `truncated` flag rather than dropping silently.
+_MAX_APPROVAL_TRAIL_EVENT_IDS = 100
+
+
+def _approval_build_trails(
+    event_ids: list[str],
+    supabase_client: Any,
+    pr_state_resolver: Optional[
+        Callable[[list[str]], dict[str, str]]
+    ] = None,
+) -> dict[str, dict[str, Any]]:
+    """Map each Approvals-tab decision card (`approval_request` chain_event,
+    keyed by its `event_id`) → the trail of the build a "Talk with the team"
+    conversation ON that card spawned: `{build_phase, pr_url}`.
+
+    Joins on `origin_task_id == card-message-<event_id>` (stamped by the
+    card-message door) via the SAME `_fetch_delegation_build_events` the delegate
+    trail uses, then the SAME `_delegation_build_phase`/`_delegation_build_pr_url`
+    derive. `pr_state_resolver` (optional) flips `review_passed` → `merged` off
+    GitHub truth (the auto_merge event isn't origin-tagged), resolved only for
+    the review_passed PRs so a caller stays cheap — mirroring
+    `_project_delegation_fields`.
+
+    Only cards whose discussion actually produced build activity appear in the
+    result; a card with no spawned build is OMITTED (the client renders no chip)
+    rather than carried as a neutral null. Fail-safe: empty input / no client /
+    any error → {} — never raises."""
+    if not event_ids or supabase_client is None:
+        return {}
+    # De-dupe + preserve order, bounded. `origin_by_event` maps the join key
+    # back to the card it belongs to so we can re-key the result by event_id.
+    origin_by_event: dict[str, str] = {}
+    for eid in event_ids[:_MAX_APPROVAL_TRAIL_EVENT_IDS]:
+        if isinstance(eid, str) and eid:
+            origin_by_event[f'{_CARD_MESSAGE_ORIGIN_PREFIX}{eid}'] = eid
+    if not origin_by_event:
+        return {}
+    events_by_origin = _fetch_delegation_build_events(
+        supabase_client, list(origin_by_event))
+    out: dict[str, dict[str, Any]] = {}
+    for origin, eid in origin_by_event.items():
+        evs = events_by_origin.get(origin)
+        if not evs:
+            continue
+        phase = _delegation_build_phase(evs)
+        pr_url = _delegation_build_pr_url(evs)
+        if phase is None and not pr_url:
+            continue
+        out[eid] = {'build_phase': phase, 'pr_url': pr_url}
+    # Merged-state (GitHub truth): flip review_passed → merged. Only the
+    # review_passed PRs get a lookup — the SAME cost tradeoff the batch sibling
+    # `_project_delegation_fields` makes (resolving every in_review PR's state on
+    # each poll would multiply gh hits). Edge, accepted like the sibling: a build
+    # that reaches MERGED without a `review_pass` event (e.g. a gate-override
+    # merge) shows `in_review` until it leaves the queue, rather than `merged`.
+    if pr_state_resolver is not None:
+        to_check = sorted({
+            v['pr_url'] for v in out.values()
+            if v.get('build_phase') == 'review_passed'
+            and isinstance(v.get('pr_url'), str) and v['pr_url']
+        })
+        if to_check:
+            try:
+                states = pr_state_resolver(to_check) or {}
+            except Exception:  # noqa: BLE001 — never break a read-only derive
+                states = {}
+            for v in out.values():
+                if (v.get('build_phase') == 'review_passed'
+                        and states.get(v.get('pr_url')) == 'MERGED'):
+                    v['build_phase'] = 'merged'
+    return out
+
+
 def _parked_from_captures(
     captures: list[dict[str, Any]],
     now: datetime,
@@ -11452,6 +11545,21 @@ class OperatorQueueResponse(BaseModel):
     ranked: list[OperatorQueueEntry] = []
 
 
+class ApprovalBuildTrail(BaseModel):
+    # `build_phase`: in_review | review_passed | merged (same value space as the
+    # delegate trail's `delegation_build_phase`, so the client reuses one type).
+    build_phase: Optional[str] = None
+    pr_url: Optional[str] = None
+
+
+class ApprovalBuildTrailsResponse(BaseModel):
+    # Keyed by decision-card event_id; only cards whose "Talk with the team"
+    # discussion spawned a build appear. `truncated` is True iff the request
+    # exceeded the id cap and some cards were not looked up (no silent cap).
+    trails: dict[str, ApprovalBuildTrail] = {}
+    truncated: bool = False
+
+
 def _operator_rank_path() -> Path:
     """state/mission-rank.json under `_agents_root()` (OURLIBERTY_AGENTS_ROOT)
     so tests redirect it to a tmpdir."""
@@ -11620,6 +11728,51 @@ def get_approvals_operator_queue() -> dict[str, Any]:
         'summary': summary if isinstance(summary, dict) else {},
         'ranked': ranked,
     }
+
+
+@app.get(
+    '/api/approvals/build-trails',
+    response_model=ApprovalBuildTrailsResponse,
+    response_model_exclude_none=True,
+    dependencies=[Depends(_require_token)],
+)
+def get_approval_build_trails(
+    event_ids: str = Query(
+        default='',
+        description='Comma-separated Approvals-tab decision-card event_ids.',
+    ),
+) -> dict[str, Any]:
+    """Batch: given the Approvals tab's decision-card event_ids (comma-separated
+    query param), return the trail of any build a "Talk with the team"
+    conversation on each card spawned (build_phase + pr_url), so the card can
+    track that work through completion.
+
+    GET + query param (not POST) so the dashboard's existing GET read-proxy
+    consumes it with a single allowlist entry, exactly like `missions/derived?
+    repo=` — no bespoke Next.js route needed.
+
+    Read-only, always-200 contract: a missing supabase client or any read error
+    degrades to empty trails (the tab simply shows no chips) rather than a 5xx —
+    the Approvals tab must never fail to load because this enrichment couldn't
+    resolve. `truncated` is computed on the de-duped, non-blank id set so it
+    reports honestly (True iff real cards were dropped by the cap), not on the
+    raw string."""
+    seen: set[str] = set()
+    ids: list[str] = []
+    for raw in event_ids.split(','):
+        eid = raw.strip()
+        if eid and eid not in seen:
+            seen.add(eid)
+            ids.append(eid)
+    truncated = len(ids) > _MAX_APPROVAL_TRAIL_EVENT_IDS
+    try:
+        client = _get_larry_action_supabase_client()
+    except Exception:  # noqa: BLE001 — never 500 this read-only enrichment
+        client = None
+    if client is None:
+        return {'trails': {}, 'truncated': truncated}
+    trails = _approval_build_trails(ids, client, _resolve_orphan_pr_states)
+    return {'trails': trails, 'truncated': truncated}
 
 
 if __name__ == '__main__':
