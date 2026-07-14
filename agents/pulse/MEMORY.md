@@ -102,9 +102,9 @@
 
 ---
 
-## auto-dispatch-APPROVAL_REQUEST-task-id-mismatch — 2/3 (updated iter ~4086)
+## auto-dispatch-APPROVAL_REQUEST-task-id-mismatch → DISPATCHED ✅ (iter ~5414)
 
-**Rule:** When Pulse sends a Check I auto-dispatch envelope, outbox-notifier WARNs `APPROVAL_REQUEST task_id mismatch`. Dispatch STILL SUCCEEDS via fallback. Fires on every Check I auto-dispatch (envelope task_id ≠ APPROVAL_REQUEST marker name). Occurrences: iter ~1910 (1/3); iter ~4086 (2/3, envelope=pulse-auto-2960a494ad-20260706 marker='notify-tasktype-split-001'). Dispatch to Beacon at 3/3 to fix outbox-notifier's task_id matching logic for pulse-auto-dispatch envelopes.
+**Rule:** When Pulse sends a Check I auto-dispatch envelope, outbox-notifier WARNs `APPROVAL_REQUEST task_id mismatch`. Dispatch STILL SUCCEEDS via fallback. Fires on every Check I auto-dispatch (envelope task_id ≠ APPROVAL_REQUEST marker name). Occurrences: iter ~1910 (1/3); iter ~4086 (2/3, envelope=pulse-auto-2960a494ad-20260706 marker='notify-tasktype-split-001'); iter ~5414 (3/3, envelope=pulse-auto-f27d85fc6f-20260713 marker='build-step-scope-cap-001'). direction-ask-pulse-auto-dispatch-task-id-mismatch-3of3-001 dispatched to Beacon inbox 2026-07-14T16:24Z UTC. verification_pending.
 
 ---
 
@@ -634,9 +634,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-14T15:47Z UTC (Iter ~5413, **Tier 3**, consecutive_clean=34)
+## Status snapshot — updated 2026-07-14T16:24Z UTC (Iter ~5414, **Tier 1**, consecutive_clean=0)
 
-**Iter ~5413 summary (2026-07-14T15:47Z):** 0 new alerts (wm=874, fl=874). All checks nominal. 0 open PRs. Zombie PID 1834248 static carry (46-20:27:37+). beacon PID 1706301 + outbox-notifier PID 1706314 running cleanly. Bot last idx=873 at 14:48Z UTC; PIDs alive. HEAD=3876a6ba==origin/main; clean tree. ratio≈20.4 (trailing-30d, worsening). **Tier 3**, consecutive_clean=34. Check VIII awaiting Larry response (idx=931). Today is Tuesday July 14 — Check I fires Wed Jul 15 08:12 MDT. Check XIV [1/3] carry.
+**Iter ~5414 summary (2026-07-14T16:21Z):** 1 new alert (L875 Tier-3 silenced). G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch reached 3/3; direction-ask dispatched to Beacon. 0 open PRs. Zombie PID 1834248 static carry (46-21:02:41+). beacon PID 1706301 + outbox-notifier PID 1706314 running cleanly. Bot last idx=874 at 15:54Z UTC; PIDs alive. HEAD=e04c17ea==origin/main; clean tree. ratio≈20.68 (trailing-30d, worsening). **Tier 1** (tier-reset), consecutive_clean=0. Check VIII awaiting Larry response (idx=931). Check I next fire Wed Jul 15 08:12 MDT. Check XIV [1/3] carry.
 
 ---
 
