@@ -9030,7 +9030,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-14T16:26:29.812037+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-14T16:24:36.161236+00:00"
+      "orphan_last_activity_ts": "2026-07-14T16:24:36.161236+00:00",
+      "briefing": {
+        "what": "Some behind-the-scenes work got started to fix a hiccup where the system's automatic hand-offs weren't matching up correctly, but it isn't tied to any bigger goal yet.",
+        "why": "If those hand-offs keep mismatching, routine work can quietly stall or get dropped, which slows the team down without an obvious cause.",
+        "suggest": "Have someone confirm what this work is meant to accomplish and fold it into a real priority before it moves further \u2014 worth a quick check rather than letting it run on its own."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-14T16:32:16.282339+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
