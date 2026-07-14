@@ -9014,6 +9014,23 @@
       "retired_at": "2026-07-13T19:47:12.572554+00:00",
       "retired_reason": "orphan-terminal",
       "retired_signal": "pr_merged:#133"
+    },
+    {
+      "id": "proposed-direction-ask-pulse-auto-dispatch-task-id-mismatch-3of3-001",
+      "name": "Direction Ask Pulse Auto Dispatch Task ID Mismatch 3of3 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `direction-ask-pulse-auto-dispatch-task-id-mismatch-3of3-001`. Last activity 2026-07-14T16:24:36.161236+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "direction-ask-pulse-auto-dispatch-task-id-mismatch-3of3-001"
+      ],
+      "repo": null,
+      "created": "2026-07-14",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-14T16:26:29.812037+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-14T16:24:36.161236+00:00"
     }
   ]
 }
