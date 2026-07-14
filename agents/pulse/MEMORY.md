@@ -634,15 +634,15 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-14T07:32Z UTC (Iter ~5398, **Tier 3**, consecutive_clean=19)
+## Status snapshot — updated 2026-07-14T08:07Z UTC (Iter ~5399, **Tier 3**, consecutive_clean=20)
 
-**Iter ~5398 summary (2026-07-14T07:32Z):** 1 new alert L961 Tier-3 silenced (heal-dashboard-api-sha-drift post-cycle SHA drift). All checks nominal. 0 open PRs. Zombie PID 1834248 static carry (46-12:13:15+). beacon PID 1706301 + outbox-notifier PID 1706314 running cleanly. Bot last idx=960 at 07:09Z UTC; PIDs alive. Sync last_sync=06:35:48Z no-change; HEAD=004c599a==origin/main. ratio≈21.04 (trailing-30d). **Tier 3**, consecutive_clean=19. Check VIII awaiting Larry response (idx=931). Check XIV [1/3] carry. G-rule heal-pipeline-stall-forge-reject-no-pr-fp-001 fix#2 (PR #959 MERGED) verification_pending.
+**Iter ~5399 summary (2026-07-14T08:07Z):** 0 new alerts (wm=961, fl=961). All checks nominal. 0 open PRs. Zombie PID 1834248 static carry (46-12:47:52+). beacon PID 1706301 + outbox-notifier PID 1706314 running cleanly. Bot last idx=960 at 07:09Z UTC; PIDs alive. Sync last_sync=07:35:53Z no-change; HEAD=7edfbd0b==origin/main. ratio≈20.99 (trailing-30d). **Tier 3**, consecutive_clean=20. Check VIII awaiting Larry response (idx=931). Check XIV [1/3] carry. G-rule heal-pipeline-stall-forge-reject-no-pr-fp-001 fix#2 VERIFIED ✅ (PR #959, stall dry-run confirms).
 
 ---
 
-## G-rule heal-pipeline-stall-forge-reject-no-pr-fp-001 — BOTH FIXES LIVE ✅ (PR #939 + PR #959, iter ~5173)
+## G-rule heal-pipeline-stall-forge-reject-no-pr-fp-001 → COMPLETE ✅ (PR #939 + PR #959, iter ~5399)
 
-**Rule:** `heal_pipeline_stall.py` fires `forge_built_no_pr:<task>` for tasks whose archive entry has `result=~"=== REJECT ==="` and `branch=null` (Forge REJECTED at preflight). Two-part fix: (1) add `preflight_reject` skip guard in `check_forge_built_no_pr` (PR #939, MERGED 2026-07-11T22:54:47Z UTC; fix #1 VERIFIED iter ~5170); (2) treat closed-not-merged rebase target PR as valid resolution (PR #959, MERGED 2026-07-13T~20:10Z UTC — 24431ed0; fix#2 live as of iter ~5373). systemic_fix appended PRIME ledger 20:13Z UTC iter ~5373. verification_pending (next stall dry-run confirmation for fix#2). Occurrences: iter ~5159 (dry-run, `retry1`, REJECT); iter ~5160 (real alert idx=918, Tier-3 silenced); iter ~5163 (dry-run, `retr-retry1`, also REJECT — 3/3).
+**Rule:** `heal_pipeline_stall.py` fires `forge_built_no_pr:<task>` for tasks whose archive entry has `result=~"=== REJECT ==="` and `branch=null` (Forge REJECTED at preflight). Two-part fix: (1) add `preflight_reject` skip guard in `check_forge_built_no_pr` (PR #939, MERGED 2026-07-11T22:54:47Z UTC; fix #1 VERIFIED iter ~5170); (2) treat closed-not-merged rebase target PR as valid resolution (PR #959, MERGED 2026-07-13T~20:10Z UTC — 24431ed0; fix#2 live as of iter ~5373). **VERIFIED iter ~5399: stall dry-run shows FORGE_NO_PR_SKIP reason=pr_exists for fix-rebase-closed-pr-reconciliation-001/PR #959 (MERGED); "no stalls detected."** systemic_fix appended PRIME ledger 20:13Z UTC iter ~5373. Moving to Completed G-rules. Occurrences: iter ~5159 (dry-run, `retry1`, REJECT); iter ~5160 (real alert idx=918, Tier-3 silenced); iter ~5163 (dry-run, `retr-retry1`, also REJECT — 3/3).
 
 
 ## G-rule outbox-notifier-auto-merge-stale-revalidation-tier4-001 — 2/3 (updated iter ~5021)
