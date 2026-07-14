@@ -634,9 +634,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-14T18:48Z UTC (Iter ~5422, **Tier 3**, consecutive_clean=2)
+## Status snapshot — updated 2026-07-14T19:17Z UTC (Iter ~5423, **Tier 3**, consecutive_clean=3)
 
-**Iter ~5422 summary (2026-07-14T18:46Z):** 1 new alert (L877 heal-dashboard-api-sha-drift Tier-3 silenced, wm→877). All mandatory+additive checks nominal. 0 open PRs. Zombie PID 1834248 static carry (46-23:28:03+). beacon PID 1706301 + outbox-notifier PID 1706314 running cleanly. Bot last idx=876 at 18:15:28Z UTC (12:15 MDT); PIDs alive. HEAD=c332f8ab==origin/main; clean tree. ratio≈21.48 (trailing-30d, worsening). **Tier 3**, consecutive_clean=2. Check VIII awaiting Larry response (idx=931). Check I next fire Wed Jul 15 08:12 MDT. Check XIV [1/3] carry. G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch: Beacon diagnosed + APPROVAL_REQUEST for `pulse-auto-taskid-gate-fix-001` emitted; awaiting Larry approval.
+**Iter ~5423 summary (2026-07-14T19:17Z):** 0 new alerts (wm=877, fl=877). All mandatory+additive checks nominal. 0 open PRs. Zombie PID 1834248 static carry (~47d 1h). beacon PID 1706301 + outbox-notifier PID 1706314 running cleanly. Bot last idx=876 at 18:15:28Z UTC (12:15 MDT); PIDs alive. HEAD=8e0606df==origin/main; clean tree. ratio≈21.48 (trailing-30d, worsening). **Tier 3**, consecutive_clean=3. Check VIII awaiting Larry response (idx=931). Check I next fire Wed Jul 15 08:12 MDT. Check XIV [1/3] carry. G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch: Beacon diagnosed + APPROVAL_REQUEST for `pulse-auto-taskid-gate-fix-001` emitted; awaiting Larry approval.
 
 ---
 
