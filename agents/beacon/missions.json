@@ -8460,7 +8460,11 @@
         "at": "2026-07-10T18:20:16.950433+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-15T16:51:31.282937+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-direction-ask-pr909-rebase-sentinel-stale-lease-001",
