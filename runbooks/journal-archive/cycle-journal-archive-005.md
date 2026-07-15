@@ -54420,3 +54420,93 @@ NOMINAL ✅
 
 ---
 
+## Iteration ~5414 — 2026-07-14T16:21Z UTC (Larry /cycle direct, Tier 3→1)
+
+**Health:** ⚠️ Signal. 1 new alert (L875 Tier-3 silenced). G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch reached 3/3; dispatched to Beacon. **Tier 3→1** (tier-reset, consecutive_clean→0).
+
+**VERIFY-BEFORE-REASSERT (from iter ~5413):**
+- **"zombie PID 1834248 (~46-20:27:37+)"**: CONFIRMED ⚠️ — PID 1834248 alive (46-21:02:41, Ss, bash poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`). [carry, static]
+- **"beacon PID 1706301"**: CONFIRMED ✅ — running (15:45:21 elapsed).
+- **"outbox-notifier PID 1706314"**: CONFIRMED ✅ — running (15:45:20 elapsed).
+- **"inbox_watcher PID 776463"**: CONFIRMED ✅ — running (2d+).
+- **"agent_telegram_bot.py PIDs 774641/774899/775066"**: CONFIRMED ✅ — all running (2d+).
+- **"sync status=no-change"**: CONFIRMED ✅ — last_sync=2026-07-14T15:37:18Z UTC (~44 min at check). NOMINAL ✅
+- **"HEAD==origin/main"**: CONFIRMED ✅ — HEAD=e04c17ea==origin/main. Clean tree. ✅
+- **"check-viii-deprecate-token-gate-2026-07-13 (idx=931)"**: CONFIRMED PENDING — pending=0, history=487 (unchanged). [carry yellow]
+- **"check-vi-posture-proposals-2026-07-07 (idx=990)"**: CONFIRMED PENDING — no new activity. [carry yellow]
+- **"Check I — Tuesday July 14 not a firing day"**: CONFIRMED — Next fire Wed Jul 15 08:12 MDT. No new artifact. [carry blue]
+- **"pulse-check-xiv-tier4-001 [1/3]"**: CONFIRMED CARRY — newest artifact still check-xiv-2026-07-13.json. [carry]
+
+**Check 0 — Alert triage:**
+- `repair-watermark`: repaired=false (wm=874, fl=875). 1 new alert at L875.
+- L875: `source=heal-dashboard-api-sha-drift, subject=dashboard-api-sha-drift-healed, route=digest, ts=2026-07-14T15:49:20Z UTC` — Auto-restarted ourliberty-dashboard-api.service (running 3876a6ba != on-disk HEAD e04c17ea). Post-cycle-autocommit SHA drift from iter ~5413: normal. Triage helper: tier=3, resolution="known-pattern match in alert-translations.json". Silenced. ✅
+- Watermark advanced: 874→875. ✅
+
+**Check 1 — Log noise:** journalctl (last 30 min) requires sudo (blocked). inbox-watcher.log: clean. outbox-notifier.log tail-100 scan: 1 WARN at [2026-07-13 08:17:19 MDT]: `beacon pulse-auto-dispatch APPROVAL_REQUEST task_id mismatch (envelope=pulse-auto-f27d85fc6f-20260713, marker='build-step-scope-cap-001'); falling through to default routing`. Outside 24h window but confirms G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch at **3/3** (occurrences: iter ~1910, iter ~4086 Jul-06, iter ~5414 Jul-13). Dispatching to Beacon. Dispatch still succeeded via fallback — no active failure. ⚠️ G-rule 3/3 DISPATCHED.
+
+**Check 2 — Telegram sweep:** Bot log newest: `[2026-07-14T09:54:06-0600 MDT = 2026-07-14T15:54:06Z UTC]` — idx=874 route=digest (heal-dashboard-api-sha-drift). PIDs 774641/774899/775066 confirmed alive (2d+). No new Larry directives. NOMINAL ✅
+
+**Check 3 — Pipeline stall:** DRY-RUN (16:21Z UTC) → "no stalls detected." (FORGE_NO_PR_SKIP: notifier-auto-retraction-slice3-001 pr=#958 MERGED; needs-you-retry-button-001 pr=#133 dashboard MERGED; fix-rebase-closed-pr-reconciliation-001 pr=#959 MERGED — all expected.) NOMINAL ✅
+
+**Check 4 — Pending directives:** pending=0, history=487 (unchanged). NOMINAL ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-14T16:12:04Z UTC (~9 min at check). NOMINAL ✅
+
+**Check A — Source repo:** HEAD=e04c17ea==origin/main ✅; clean tree ✅; on main ✅. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-14T15:37:18Z UTC (~44 min at check, within 2h threshold), status=no-change. NOMINAL ✅
+**Check C — Agent liveness:** beacon PID 1706301 ✅; outbox-notifier PID 1706314 ✅; inbox_watcher PID 776463 ✅; agent_telegram_bot.py PIDs 774641/774899/775066 ✅. ⚠️ Zombie PID 1834248 (46-21:02:41, bash poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`). [carry, static]
+**Check E — PR/merge state:** open_prs=0 (agent-core + dashboard). NOMINAL ✅
+
+**§5.0:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks — Tuesday 2026-07-14 (~16:21Z):**
+- **Check I:** Tuesday is not a firing day. Next fire Wed Jul 15 08:12 MDT. Newest artifact: check-i-2026-07-13.json. 1 proposal [small] `pr3-staged-autonomy`. Use `/dispatch 1`. [carry blue]
+- **Check VIII:** Timer fired 11:12Z UTC 2026-07-13; proposal idx=931. Awaiting Larry response. [carry yellow]
+- **Check XIV:** Last artifact check-xiv-2026-07-13.json (11:50:43Z UTC). [1/3 carry]
+- **Check XI:** CLOSED ✅ — over_gate=false (3.1%). [carry]
+- **Check III:** COMPLETE ✅ — PR #956 MERGED 2026-07-12. [carry]
+- Check IV/VI/IX/X/XII: timer-managed. No new artifacts. ✅
+
+**G-rule assessment:**
+- **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch → 3/3 DISPATCHED ✅** — direction-ask-pulse-auto-dispatch-task-id-mismatch-3of3-001 written to Beacon inbox (16:24Z UTC). WARN in outbox-notifier.log from Jul 13 Check I auto-dispatch confirmed 3rd occurrence. verification_pending.
+- All other G-rule counts carry unchanged from iter ~5413.
+
+**Actions taken:**
+1. Check 0: L875 triaged Tier-3 (known-pattern heal-dashboard-api-sha-drift); watermark advanced 874→875. ✅
+2. G-rule 3/3: dispatched direction-ask-pulse-auto-dispatch-task-id-mismatch-3of3-001 to Beacon inbox (16:24Z UTC). ✅
+3. PRIME ledger: intervention + verification_pending appended (16:24:52Z UTC). ✅
+4. Tier state: reset 3→1 (signal at 16:24:54Z UTC), consecutive_clean=0. ✅
+
+**Escalations:** 0 new Pulse DMs. G-rule dispatch routed to Beacon (standard path). All prior escalations carry.
+
+**Standing findings:**
+- [yellow] **check-viii-deprecate-token-gate-2026-07-13** — idx=931. Reply `approve check-viii-update-2026-07-13` or `reject check-viii-update-2026-07-13 <reason>`. [carry]
+- [yellow] **zombie-bash-pid-1834248** — 46-21:02:41+, bash poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`. ask-then-do: `kill 1834248`. [carry, static]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07`. [carry]
+- [green] **G-rule heal-pipeline-stall-forge-reject-no-pr-fp-001 fix#2 VERIFIED ✅** — stall dry-run confirms PR #959 fix live. [carry]
+- [green] **sync VERIFIED** — status=no-change, last_sync=15:37:18Z UTC; HEAD=e04c17ea==origin/main. [stable]
+- [blue] **review-ceiling-fit ATTENTION** — 9 false-kills in 30d; recommends RAISE ceiling 35→45 min. Tier-3. No Pulse action. [carry]
+- [blue] **Check I proposal #1** — `pr3-staged-autonomy`. Next fire: Wed Jul 15 08:12 MDT. Use `/dispatch 1`. [carry]
+- [blue] **pulse-check-xiv-tier4-001 [1/3]** — Dispatch at 3/3. [carry]
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch — DISPATCHED ✅ (3/3)** — direction-ask-pulse-auto-dispatch-task-id-mismatch-3of3-001 in Beacon inbox. verification_pending.
+- [blue] **G-rules (dispatched, vp):** forge-wip-redispatch-exhausted-genuine-no-pr-001; ourliberty-health-subject-key-mismatch-001; outbox-notifier-notification-intent-reject-tier4-001; forge-wip-redispatch-digest-tier4-001; forge-revision-preamble-missing-pr711-001; forge-wip-redispatch-exhausted-pr-exists-fp-001; decision-needed-approval-forge-dispatch-no-target-repo-001; no-session-revision-active-mirror-session-fp-001.
+- [blue] **G-rule 2/3:** outbox-notifier-notification-intent-review-escalate-tier4-001; outbox-notifier-auto-merge-stale-revalidation-tier4-001.
+- [blue] **G-rule 1/3:** pulse-check-xiv-tier4-001; medic-approval-request-tier4-001; mirror-malformed-verdict-heal-reap-path-001; mirror-queue-wait-gauge-tier4-001; inbox-watcher-tier-pool-all-unavailable-tier4-001; heal-pipeline-stall-unrouted-deep-review-required-fp-001; heal-pulse-check-staleness-single-flight-skip-fp-001; gate-parallelism-monitor-regression-data-001; pulse-rotation-check-source-tier4-001.
+
+**PRIME DIRECTIVE:** 1 intervention + 1 verification_pending; 0 iter_clean (tier-reset). ratio≈20.68 (trailing-30d, trend=worsening).
+**Tier end-of-iter:** **Tier 1**, consecutive_clean=0 (tier-reset from G-rule dispatch).
+
+---
+
+## Notification — 2026-07-14T16:27Z UTC (inter-agent notify, Beacon → Pulse)
+
+**Task:** `direction-ask-pulse-auto-dispatch-task-id-mismatch-3of3-001` — status=SUCCESS.
+
+**Beacon diagnosis:** `_route_beacon_pulse_auto_dispatch_approval` runs with `enforce_task_id_match=True`. Envelope id is `pulse-auto-<slug>-<date>`; Beacon's APPROVAL_REQUEST marker carries a work-slug id (e.g. `build-step-scope-cap-001`) — the two never match → WARN → falls through to default routing, bypassing the intended spec-gauntlet + pulse-auto-dispatch trust path. Three sibling callers (`source='pulse'`, `source='dashboard'`, headless `source='larry'`) already pass `enforce_task_id_match=False`; fix is to flip this caller to match and invert the test that locks in the broken behavior.
+
+**Fix dispatched to Forge:** APPROVAL_REQUEST marker for task `pulse-auto-taskid-gate-fix-001` authored and emitted by Beacon. Awaiting Larry approval (`approve` / `yes`). No Pulse action needed — routing through Beacon's standard approval chain.
+
+**Standing finding update:** G-rule `auto-dispatch-APPROVAL_REQUEST-task-id-mismatch` → **Beacon-diagnosed ✅, fix in Forge queue, APPROVAL_REQUEST pending Larry**.
+
+---
+

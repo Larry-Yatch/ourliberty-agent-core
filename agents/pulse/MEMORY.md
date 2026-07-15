@@ -634,9 +634,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-15T11:07Z UTC (Iter ~5453, **Tier 3**, consecutive_clean=33)
+## Status snapshot — updated 2026-07-15T11:41Z UTC (Iter ~5454, **Tier 3**, consecutive_clean=34)
 
-**Iter ~5453 summary (2026-07-15T11:07Z):** 0 new alerts. All mandatory+additive checks nominal. 0 open PRs. Zombie PID 1834248 static carry (~47d 15h 48m). beacon PID 1706301 + outbox-notifier PID 1706314 running (1d+10h). HEAD=73ce2d33==origin/main — 2 new commits since iter ~5452: `Pulse cycle 20260715T104238Z` + `chore(missions): GC healer — commit missions.json delta`. Clean tree. last_sync=10:39:14Z UTC (~27 min, within 2h). ratio≈21.2 (trailing-30d, trend=worsening). **Tier 3**, consecutive_clean=33. Check VIII awaiting Larry response (idx=931). Check I fires today ~14:12Z UTC (~3h 6m from 11:06Z). Check XIV [1/3] carry. G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch: verification_pending.
+**Iter ~5454 summary (2026-07-15T11:41Z):** 1 new alert (L826 heal-dashboard-api-sha-drift Tier-3 silenced). All mandatory+additive checks nominal. 0 open PRs. Zombie PID 1834248 static carry (~47d 16h 22m). beacon PID 1706301 + outbox-notifier PID 1706314 running (1d+11h). HEAD=642e8510==origin/main — 2 new commits since iter ~5453: `Pulse cycle 20260715T110902Z` + `chore(missions): autoregister healer — reconcile proposed lane`. Clean tree. last_sync=11:39:15Z UTC (~2 min, within 2h). ratio≈21.2 (trailing-30d, trend=worsening). **Tier 3**, consecutive_clean=34. Check VIII awaiting Larry response (idx=931). Check I fires today ~14:12Z UTC (~2h 31m from 11:41Z). Check XIV [1/3] carry. G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch: verification_pending.
 
 ---
 
