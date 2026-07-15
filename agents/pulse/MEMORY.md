@@ -634,9 +634,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-15T14:28Z UTC (Iter ~5459, **Tier 3**, consecutive_clean=39)
+## Status snapshot — updated 2026-07-15T15:01Z UTC (Iter ~5460, **Tier 3**, consecutive_clean=40)
 
-**Iter ~5459 summary (2026-07-15T14:28Z):** 2 new alerts (L829 ledger weekly-2026-07-13 Tier-3, L830 check-i-2026-07-13 Tier-3 — both already bot-delivered). Check I timer fired 14:14Z UTC → new artifact check-i-2026-07-15.json, 1 proposal [small] pr3-staged-autonomy ($8.81, 128.6σ), use `/dispatch 1`. Weekly ledger: $1946.88 (+86% vs prior). All mandatory+additive checks nominal. 0 open PRs. Zombie PID 1834248 static carry (~47d 19h 7m). beacon PID 1706301 + outbox-notifier PID 1706314 running (1d+13h 50m). HEAD=1903db1d==origin/main (ledger weekly commit). last_sync=13:39:20Z UTC (~49 min). ratio≈21.4 (trailing-30d, trend=worsening). **Tier 3**, consecutive_clean=39. Check VIII awaiting Larry response (idx=931). Check VI awaiting Larry response (idx=990). Check XIV [1/3] carry. G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch: verification_pending.
+**Iter ~5460 summary (2026-07-15T15:01Z):** 1 new alert (L831 heal-dashboard-api-sha-drift Tier-3, route=digest — bot already skipped DM). All mandatory+additive checks nominal. 0 open PRs. Zombie PID 1834248 static carry (~47d 19h 42m). beacon PID 1706301 + outbox-notifier PID 1706314 running (1d+14h 25m). HEAD=a9c939a5==origin/main (iter ~5459 wrapper commit). last_sync=14:39:20Z UTC (~22 min). ratio≈21.4 (trailing-30d, trend=worsening). **Tier 3**, consecutive_clean=40. Check VIII awaiting Larry response (idx=931). Check VI awaiting Larry response (idx=990). Check XIV [1/3] carry. G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch: verification_pending. Check I fired today 14:14Z UTC → check-i-2026-07-15.json, 1 proposal [small] pr3-staged-autonomy ($8.81, 128.6σ), use `/dispatch 1`.
 
 ---
 
