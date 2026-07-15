@@ -9045,6 +9045,23 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-merge-509-510-direct-001",
+      "name": "Merge 509 510 Direct 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `merge-509-510-direct-001`. Last activity 2026-06-15T16:56:32.429585+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "merge-509-510-direct-001"
+      ],
+      "repo": null,
+      "created": "2026-07-15",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-15T10:35:15.993886+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-15T16:56:32.429585+00:00"
     }
   ]
 }
