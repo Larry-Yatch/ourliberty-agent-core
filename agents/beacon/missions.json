@@ -9133,6 +9133,28 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-one-time-stale-dispatch-branch-cleanup-001",
+      "name": "One Time Stale Dispatch Branch Cleanup 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `one-time-stale-dispatch-branch-cleanup-001`. Last activity 2026-06-25T00:49:09.458052+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "one-time-stale-dispatch-branch-cleanup-001"
+      ],
+      "repo": null,
+      "created": "2026-07-15",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-15T17:06:35.836548+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-25T00:49:09.458052+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-15T17:06:35.836548+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#690"
     }
   ]
 }
