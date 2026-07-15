@@ -9061,7 +9061,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-15T10:35:15.993886+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-15T16:56:32.429585+00:00"
+      "orphan_last_activity_ts": "2026-06-15T16:56:32.429585+00:00",
+      "briefing": {
+        "what": "A piece of work your team kicked off on their own that isn't yet attached to any active project.",
+        "why": "Work happening outside your planned priorities can quietly eat time and drift from what the business actually needs right now.",
+        "suggest": "Take a quick look to confirm it's worth continuing and give it a home in a real project \u2014 or pause it until you're sure it fits."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-15T10:43:45.682948+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
