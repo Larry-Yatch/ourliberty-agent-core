@@ -9098,6 +9098,23 @@
       "retired_at": "2026-07-15T11:20:16.799015+00:00",
       "retired_reason": "orphan-terminal",
       "retired_signal": "pr_merged:#700"
+    },
+    {
+      "id": "proposed-direction-ask-pr-fanout-probe-health-tier3-translation-001",
+      "name": "Direction Ask PR Fanout Probe Health Tier3 Translation 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `direction-ask-pr-fanout-probe-health-tier3-translation-001`. Last activity 2026-07-09T10:44:39.152677+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "direction-ask-pr-fanout-probe-health-tier3-translation-001"
+      ],
+      "repo": null,
+      "created": "2026-07-15",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-15T13:35:38.289382+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-09T10:44:39.152677+00:00"
     }
   ]
 }
