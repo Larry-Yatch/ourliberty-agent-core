@@ -634,9 +634,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-16T22:07Z UTC (Iter ~5517, **Tier 3**, consecutive_clean=97)
+## Status snapshot — updated 2026-07-16T22:42Z UTC (Iter ~5518, **Tier 3**, consecutive_clean=98)
 
-**Iter ~5517 summary (2026-07-16T22:07Z):** 1 new alert (Tier-3 silenced, heal-dashboard-api-sha-drift). All mandatory+additive checks nominal. 0 open PRs. Zombie PID 1834248 static carry (~49d 02h 47m). beacon PID 1706301 + outbox-notifier PID 1706314 running (~2d 21h 30m). HEAD=ee01aa24==origin/main. last_sync=21:42:15Z UTC (~25 min). ratio≈21.64 (trailing-30d, trend=worsening). **Tier 3**, consecutive_clean=97. Telegram API 502 burst (21:32-21:35Z UTC from iter ~5516) VERIFIED RESOLVED — bot delivered idx=791 at 21:43Z. Check VIII awaiting Larry response (idx=931). Check VI awaiting Larry response (idx=990). Check XIV [1/3] carry. G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch: verification_pending. Check I: check-i-2026-07-15.json, 1 proposal [small] pr3-staged-autonomy ($8.81, 128.6σ), use `/dispatch 1`. Not a Check I firing day today (Thu Jul 16).
+**Iter ~5518 summary (2026-07-16T22:42Z):** 0 new alerts. All mandatory+additive checks nominal. 0 open PRs. Zombie PID 1834248 static carry (~49d 03h 22m). beacon PID 1706301 + outbox-notifier PID 1706314 running (~2d 22h 05m). HEAD=ef5efbdb==origin/main. last_sync=21:42:15Z UTC (~60 min). ratio≈21.61 (trailing-30d, trend=worsening). **Tier 3**, consecutive_clean=98. Telegram 502 burst (iter ~5516) fully resolved. Check VIII awaiting Larry response (idx=931). Check VI awaiting Larry response (idx=990). Check XIV [1/3] carry. G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch: verification_pending. Check I: check-i-2026-07-15.json, 1 proposal [small] pr3-staged-autonomy ($8.81, 128.6σ), use `/dispatch 1`. Not a Check I firing day today (Thu Jul 16).
 
 ---
 
