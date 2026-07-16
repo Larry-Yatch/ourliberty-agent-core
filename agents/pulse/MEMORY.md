@@ -634,9 +634,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-16T23:12Z UTC (Iter ~5519, **Tier 3**, consecutive_clean=99)
+## Status snapshot — updated 2026-07-16T23:47Z UTC (Iter ~5520, **Tier 3**, consecutive_clean=100)
 
-**Iter ~5519 summary (2026-07-16T23:12Z):** 1 new alert (Tier-3 silenced, heal-dashboard-api-sha-drift L793). All mandatory+additive checks nominal. 0 open PRs. Zombie PID 1834248 static carry (~49d 03h 52m). beacon PID 1706301 + outbox-notifier PID 1706314 running (~2d 22h 35m). HEAD=2dafb613==origin/main. last_sync=22:42:17Z UTC (~30 min). ratio≈21.61 (trailing-30d, trend=worsening). **Tier 3**, consecutive_clean=99. Check VIII awaiting Larry response (idx=931). Check VI awaiting Larry response (idx=990). Check XIV [1/3] carry. G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch: verification_pending. Check I: check-i-2026-07-15.json, 1 proposal [small] pr3-staged-autonomy ($8.81, 128.6σ), use `/dispatch 1`. Not a Check I firing day today (Thu Jul 16).
+**Iter ~5520 summary (2026-07-16T23:47Z):** 0 new alerts. All mandatory+additive checks nominal. Dashboard PR #134 merged at 23:44Z UTC (Mirror REVIEW_PASS + AUTO_MERGE). 0 open PRs. Zombie PID 1834248 static carry (~49d 04h 27m). beacon PID 1706301 + outbox-notifier PID 1706314 running (~3d+). HEAD=b4696318==origin/main. last_sync=23:42:19Z UTC (~5 min). ratio≈21.60 (trailing-30d, trend=worsening). **Tier 3**, consecutive_clean=100. Check VIII awaiting Larry response (idx=931). Check VI awaiting Larry response (idx=990). Check XIV [1/3] carry. G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch: verification_pending. Check I: check-i-2026-07-15.json, 1 proposal [small] pr3-staged-autonomy ($8.81, 128.6σ), use `/dispatch 1`. Not a Check I firing day today (Thu Jul 16).
 
 ---
 
