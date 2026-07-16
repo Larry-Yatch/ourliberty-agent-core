@@ -1516,7 +1516,8 @@
         "at": "2026-07-08T00:14:30.501617+00:00",
         "from_state": "parked"
       },
-      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
+      "aging": true
     },
     {
       "id": "cap-run-sort-once-cleanup-of-352-stale-tier-4-asks-a-bbf0",
@@ -1550,7 +1551,8 @@
         "kind": "delegate",
         "task_id": "delegate-cap-run-sort-once-cleanup-of-352-stale-tier-4-asks-a-bbf0",
         "stamped_at": "2026-07-08T03:38:08.400566+00:00"
-      }
+      },
+      "aging": true
     },
     {
       "id": "cap-add-monthly-digest-line-for-proposed-mission-pil-7457",
@@ -1584,7 +1586,8 @@
         "kind": "delegate",
         "task_id": "delegate-cap-add-monthly-digest-line-for-proposed-mission-pil-7457",
         "stamped_at": "2026-07-08T03:38:08.416770+00:00"
-      }
+      },
+      "aging": true
     },
     {
       "id": "cap-build-flip-readiness-gauge-5-completeness-gate-m-a453",
@@ -1618,7 +1621,8 @@
         "kind": "delegate",
         "task_id": "delegate-cap-build-flip-readiness-gauge-5-completeness-gate-m-a453",
         "stamped_at": "2026-07-08T03:59:16.019090+00:00"
-      }
+      },
+      "aging": true
     },
     {
       "id": "cap-spec-build-xiv-b-tier-4-alert-write-back-loop-f78b",
@@ -1652,7 +1656,8 @@
         "kind": "delegate",
         "task_id": "delegate-cap-spec-build-xiv-b-tier-4-alert-write-back-loop-f78b",
         "stamped_at": "2026-07-08T03:59:16.028451+00:00"
-      }
+      },
+      "aging": true
     },
     {
       "id": "cap-verify-pr-3-sentinel-has-self-firing-arming-appr-b272",
@@ -1686,7 +1691,8 @@
         "kind": "delegate",
         "task_id": "delegate-cap-verify-pr-3-sentinel-has-self-firing-arming-appr-b272",
         "stamped_at": "2026-07-08T04:22:09.491480+00:00"
-      }
+      },
+      "aging": true
     }
   ]
 }
