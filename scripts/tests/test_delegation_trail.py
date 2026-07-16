@@ -132,6 +132,115 @@ class DelegationTrailFieldTest(unittest.TestCase):
         self.assertIsNone(parked[0]['delegation_pr_url'])
 
 
+# ---------- discuss trail (approval-card-build-trail Phase 2) ----------
+
+
+def _discuss_ev(event_type, cid, *, pr_url=None, ts='2026-07-11T12:00:00Z'):
+    """A build event spawned by 'Talk with the team' on card <cid>: origin-tagged
+    card-message-<cid>, with NO delegate ref on the card."""
+    return {'event_type': event_type, 'pr_url': pr_url, 'ts': ts,
+            'payload': {'origin_task_id': f'card-message-{cid}'}}
+
+
+class DiscussTrailFieldTest(unittest.TestCase):
+    def test_discussed_card_with_no_spawned_ref_shows_trail(self):
+        cid = 'cap-talked-about-ab12'
+        cap = {'id': cid, 'state': 'parked', 'title': 'Talked about'}  # no spawned
+        m = {f'card-message-{cid}': [
+            _discuss_ev('review_pass', cid, pr_url='https://github.com/o/r/pull/9')]}
+        got = da._delegation_trail_field(cap, m)
+        self.assertEqual(got['delegation_build_phase'], 'review_passed')
+        self.assertEqual(got['delegation_pr_url'], 'https://github.com/o/r/pull/9')
+
+    def test_discussed_card_in_review(self):
+        cid = 'cap-x'
+        cap = {'id': cid, 'state': 'parked'}
+        got = da._delegation_trail_field(
+            cap, {f'card-message-{cid}': [_discuss_ev('review_request', cid)]})
+        self.assertEqual(got['delegation_build_phase'], 'in_review')
+
+    def test_discussed_merged_flip(self):
+        cid = 'cap-x'
+        pr = 'https://github.com/o/r/pull/9'
+        cap = {'id': cid, 'state': 'parked'}
+        got = da._delegation_trail_field(
+            cap, {f'card-message-{cid}': [_discuss_ev('review_pass', cid, pr_url=pr)]},
+            {pr: 'MERGED'})
+        self.assertEqual(got['delegation_build_phase'], 'merged')
+
+    def test_delegated_and_discussed_pick_most_advanced_COHERENTLY(self):
+        # Same card delegated (in_review, its OWN PR-A) AND discussed
+        # (review_pass, PR-B). The most-advanced wins — AND phase+pr_url must
+        # come from the SAME build: review_passed → PR-B (not the newer PR-A).
+        cid = 'cap-fix-the-thing-ab12'
+        pr_a = 'https://github.com/o/r/pull/1'   # delegate build, in review
+        pr_b = 'https://github.com/o/r/pull/9'   # discuss build, passed
+        cap = _delegate_cap()  # id == cid, spawned delegate ref
+        m = {
+            # delegate build's review_request is NEWER than discuss's review_pass
+            DELEGATE_ID: [_ev('review_request', pr_url=pr_a,
+                              ts='2026-07-11T13:00:00Z')],
+            f'card-message-{cid}': [
+                _discuss_ev('review_pass', cid, pr_url=pr_b,
+                            ts='2026-07-11T12:00:00Z')],
+        }
+        got = da._delegation_trail_field(cap, m)
+        self.assertEqual(got['delegation_build_phase'], 'review_passed')
+        self.assertEqual(got['delegation_pr_url'], pr_b)  # coherent, not pr_a
+
+    def test_both_doors_merged_flip_checks_the_passing_build_pr(self):
+        cid = 'cap-fix-the-thing-ab12'
+        pr_a = 'https://github.com/o/r/pull/1'
+        pr_b = 'https://github.com/o/r/pull/9'
+        cap = _delegate_cap()
+        m = {
+            DELEGATE_ID: [_ev('review_request', pr_url=pr_a,
+                              ts='2026-07-11T13:00:00Z')],
+            f'card-message-{cid}': [
+                _discuss_ev('review_pass', cid, pr_url=pr_b,
+                            ts='2026-07-11T12:00:00Z')],
+        }
+        # PR-B (the passing build) merged → merged; PR-A merging must NOT flip.
+        self.assertEqual(
+            da._delegation_trail_field(cap, m, {pr_b: 'MERGED'})['delegation_build_phase'],
+            'merged')
+        self.assertEqual(
+            da._delegation_trail_field(cap, m, {pr_a: 'MERGED'})['delegation_build_phase'],
+            'review_passed')
+
+    def test_both_doors_same_phase_newest_wins(self):
+        # Both in_review → tie broken by newest event's origin. Uses explicit
+        # +00:00 offsets (not `Z`) so the recency compare is version-independent
+        # (datetime.fromisoformat only parses a `Z` suffix on Python ≥3.11; the
+        # droplet runs 3.12 but the local/CI runner may be older).
+        cid = 'cap-fix-the-thing-ab12'
+        cap = _delegate_cap()
+        m = {
+            DELEGATE_ID: [_ev('review_request', pr_url='https://github.com/o/r/pull/1',
+                              ts='2026-07-11T11:00:00+00:00')],
+            f'card-message-{cid}': [
+                _discuss_ev('review_request', cid,
+                            pr_url='https://github.com/o/r/pull/9',
+                            ts='2026-07-11T13:00:00+00:00')],
+        }
+        got = da._delegation_trail_field(cap, m)
+        self.assertEqual(got['delegation_build_phase'], 'in_review')
+        self.assertEqual(got['delegation_pr_url'], 'https://github.com/o/r/pull/9')
+
+    def test_no_id_is_neutral(self):
+        got = da._delegation_trail_field(
+            {'state': 'parked'}, {'card-message-x': [_discuss_ev('review_pass', 'x')]})
+        self.assertIsNone(got['delegation_build_phase'])
+
+    def test_discussed_integration_via_parked(self):
+        cid = 'cap-talked-ab12'
+        cap = {'id': cid, 'state': 'parked', 'title': 'T'}
+        m = {f'card-message-{cid}': [_discuss_ev('review_request', cid)]}
+        parked = da._parked_from_captures(
+            [cap], NOW, {}, None, build_events_by_origin=m)
+        self.assertEqual(parked[0]['delegation_build_phase'], 'in_review')
+
+
 # ---------- fetch join ----------
 
 
@@ -192,6 +301,56 @@ class FetchDelegationBuildEventsTest(unittest.TestCase):
     def test_no_client_or_ids_degrades_empty(self):
         self.assertEqual(da._fetch_delegation_build_events(None, [DELEGATE_ID]), {})
         self.assertEqual(da._fetch_delegation_build_events(_StubClient([]), []), {})
+
+    def test_large_origin_list_is_chunked_not_one_oversized_query(self):
+        # Finding 1: a big parked backlog must NOT build one over-length URL.
+        # 250 origins → 3 bounded `.in_` queries (100, 100, 50), all resolving.
+        n = 250
+        ids = [f'card-message-cap-{i}' for i in range(n)]
+        client = _StubClient([])
+        da._fetch_delegation_build_events(client, ids)
+        chunk = da._DELEGATION_ORIGIN_CHUNK
+        self.assertEqual(len(client.calls), 3)
+        self.assertEqual([len(c[1]) for c in client.calls], [chunk, chunk, n - 2 * chunk])
+        # union of the chunks covers every id exactly once
+        seen = [v for c in client.calls for v in c[1]]
+        self.assertEqual(sorted(seen), sorted(ids))
+
+    def test_one_failing_chunk_does_not_drop_the_others(self):
+        # A chunk that raises drops only its own ids; the rest still resolve.
+        class _FlakyTable:
+            def __init__(self, rows, calls):
+                self._rows, self._calls = rows, calls
+
+            def select(self, *_a, **_k):
+                return self
+
+            def in_(self, _col, vals):
+                self._calls.append(list(vals))
+                return self
+
+            def order(self, *_a, **_k):
+                return self
+
+            def execute(self):
+                # fail the FIRST chunk only
+                if len(self._calls) == 1:
+                    raise RuntimeError('supabase hiccup')
+                return type('R', (), {'data': self._rows})()
+
+        class _FlakyClient:
+            def __init__(self, rows):
+                self._rows, self.calls = rows, []
+
+            def table(self, _n):
+                return _FlakyTable(self._rows, self.calls)
+
+        ids = [f'card-message-cap-{i}' for i in range(da._DELEGATION_ORIGIN_CHUNK + 5)]
+        good = {'event_type': 'review_pass', 'task_id': 't', 'ts': 'x',
+                'pr_url': None, 'payload': {'origin_task_id': ids[-1]}}
+        out = da._fetch_delegation_build_events(_FlakyClient([good]), ids)
+        # first chunk raised (its ids dropped); second chunk's event survives
+        self.assertIn(ids[-1], out)
 
 
 if __name__ == '__main__':

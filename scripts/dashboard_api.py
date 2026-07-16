@@ -4937,37 +4937,84 @@ def _delegation_build_pr_url(events: list[dict[str, Any]]) -> Optional[str]:
     return None
 
 
+def _best_spawned_trail(
+    event_lists: list[list[dict[str, Any]]],
+) -> tuple[Optional[str], Optional[str]]:
+    """Pick ONE coherent (phase, pr_url) from several per-origin event lists.
+
+    A card can have more than one spawned-build origin — the Delegate ref
+    (`delegate-<cid>`) AND the discuss key (`card-message-<cid>`) — and those are
+    DIFFERENT builds with DIFFERENT PRs. So we derive each origin's (phase,
+    pr_url) as a UNIT and pick the most-advanced (review_passed > in_review; tie
+    → newest event wins), keeping phase and pr_url from the SAME build rather
+    than conflating a phase from one build with a PR url from another. Returns
+    (None, None) when no origin has build activity. The `merged` flip (GitHub
+    truth) is applied by the caller on the chosen pr_url."""
+    best: Optional[tuple[tuple[int, Any], Optional[str], Optional[str]]] = None
+    _rank = {'review_passed': 2, 'in_review': 1}
+    for evs in event_lists:
+        if not evs:
+            continue
+        phase = _delegation_build_phase(evs)
+        if phase is None:
+            continue
+        pr_url = _delegation_build_pr_url(evs)
+        newest = max((_ts_key(e.get('ts')) for e in evs), default=_ts_key(None))
+        key = (_rank.get(phase, 0), newest)
+        if best is None or key > best[0]:
+            best = (key, phase, pr_url)
+    if best is None:
+        return None, None
+    return best[1], best[2]
+
+
 def _delegation_trail_field(
     cap: dict[str, Any],
     build_events_by_origin: Optional[dict[str, list[dict[str, Any]]]],
     pr_state_by_url: Optional[dict[str, str]] = None,
 ) -> dict[str, Any]:
-    """Delegate-tracking Slice 2b: surface the delegated build's review trail on
-    the card — `delegation_build_phase` (in_review | review_passed | merged |
-    None) plus `delegation_pr_url`. Joined by the card's `delegate-<cid>` against
-    chain_events tagged with `payload.origin_task_id`.
+    """Surface a card's spawned-build review trail — `delegation_build_phase`
+    (in_review | review_passed | merged | None) + `delegation_pr_url` — joined
+    against chain_events tagged with `payload.origin_task_id`.
 
-    `merged` (the deferred Slice-2b terminal) comes from GitHub truth, not an
-    event: the auto_merge event is not origin-tagged, so when the build's PR
-    resolves to MERGED (via the same bounded/fail-safe `pr_state_resolver` the
-    orphan lane uses) the trail flips `review_passed` → `merged`.
+    Two origins feed the trail, both read-side (no ref stamped for the second):
+      - Delegate (Slice 2b): a card Larry delegated carries a `spawned` ref of
+        kind 'delegate' whose task_id (`delegate-<cid>`) is the join key.
+      - Discuss (approval-card-build-trail Phase 2): a card Larry discussed via
+        "Talk with the team" has NO spawned ref, but its spawned build's events
+        are tagged `origin_task_id == card-message-<card_id>` (the card-message
+        door) — so we ALSO look up that constructed key from the card's own id.
 
-    Neutral None for a non-delegate card or before any build event joins — never
-    a misleading claim."""
+    Both event lists are merged before derivation: `_delegation_build_phase` is
+    most-advanced-wins and we sort the union newest-first for
+    `_delegation_build_pr_url`, so a card that was BOTH delegated and discussed
+    yields one coherent trail rather than two competing ones.
+
+    `merged` comes from GitHub truth, not an event: the auto_merge event is not
+    origin-tagged, so when the build's PR resolves to MERGED (via the same
+    bounded/fail-safe `pr_state_resolver` the orphan lane uses) the trail flips
+    `review_passed` → `merged`.
+
+    Neutral None before any build event joins — never a misleading claim."""
     neutral = {'delegation_build_phase': None, 'delegation_pr_url': None}
     if not build_events_by_origin:
         return neutral
+    origins: list[str] = []
     spawned = cap.get('spawned')
-    if not isinstance(spawned, dict) or spawned.get('kind') != 'delegate':
+    if isinstance(spawned, dict) and spawned.get('kind') == 'delegate':
+        tid = spawned.get('task_id')
+        if isinstance(tid, str) and tid:
+            origins.append(tid)
+    cid = cap.get('id')
+    if isinstance(cid, str) and cid:
+        origins.append(f'{_CARD_MESSAGE_ORIGIN_PREFIX}{cid}')
+    # Coherent per-origin pick (NOT a merged event stream) so phase + pr_url
+    # always describe the same build even when a card was both delegated AND
+    # discussed (two different builds/PRs).
+    phase, pr_url = _best_spawned_trail(
+        [build_events_by_origin.get(o) or [] for o in origins])
+    if phase is None:
         return neutral
-    tid = spawned.get('task_id')
-    if not isinstance(tid, str):
-        return neutral
-    events = build_events_by_origin.get(tid)
-    if not events:
-        return neutral
-    pr_url = _delegation_build_pr_url(events)
-    phase = _delegation_build_phase(events)
     if pr_url and (pr_state_by_url or {}).get(pr_url) == 'MERGED':
         phase = 'merged'
     return {'delegation_build_phase': phase, 'delegation_pr_url': pr_url}
@@ -5147,29 +5194,43 @@ def _fetch_events_for_task_ids(
     return out
 
 
+# Chunk size for the origin `IN (...)` join. The ids ride in the PostgREST GET
+# URL query string, so an unbounded list can blow past the proxy/URL ceiling
+# (~8 KB). Since Phase 2 builds a `card-message-<id>` origin for EVERY parked
+# capture (not just delegated ones), a large parked backlog would otherwise
+# overflow one query and — because the fetch fail-degrades to {} — silently drop
+# EVERY card's trail. We batch instead of cap: all ids are queried, just across
+# several bounded requests (100 × ~50-char ids ≈ 5 KB/request).
+_DELEGATION_ORIGIN_CHUNK = 100
+
+
 def _fetch_delegation_build_events(
     supabase_client: Any,
     origin_task_ids: list[str],
 ) -> dict[str, list[dict[str, Any]]]:
-    """Delegate-tracking Slice 2b: fetch the REVIEW chain_events of the builds
-    spawned by delegated cards, keyed by the card's origin id. The build runs
-    under a fresh task_id, so we join on `payload->>origin_task_id` (Slice 2a
-    stamps it) rather than `task_id`. Returns a dict keyed by origin_task_id,
-    events newest-first. Degrades to {} on no client / no ids / any error — the
-    derive never raises and a card simply shows no trail."""
+    """Delegate-tracking Slice 2b + approval-card-build-trail Phase 2: fetch the
+    REVIEW chain_events of the builds spawned by a card (delegated OR discussed),
+    keyed by the card's origin id. The build runs under a fresh task_id, so we
+    join on `payload->>origin_task_id` rather than `task_id`. Returns a dict keyed
+    by origin_task_id, events newest-first. Degrades to {} on no client / no ids;
+    a failing chunk drops only its own ids (the rest still resolve) — the derive
+    never raises and a card simply shows no trail."""
     if supabase_client is None or not origin_task_ids:
         return {}
-    try:
-        resp = (
-            supabase_client.table('chain_events')
-            .select('event_id,event_type,task_id,agent,pr_url,ts,payload')
-            .in_('payload->>origin_task_id', origin_task_ids)
-            .order('ts', desc=True)
-            .execute()
-        )
-    except Exception:  # noqa: BLE001 — never 500 a read-only derive
-        return {}
-    rows = list(getattr(resp, 'data', None) or [])
+    rows: list[dict[str, Any]] = []
+    for i in range(0, len(origin_task_ids), _DELEGATION_ORIGIN_CHUNK):
+        chunk = origin_task_ids[i:i + _DELEGATION_ORIGIN_CHUNK]
+        try:
+            resp = (
+                supabase_client.table('chain_events')
+                .select('event_id,event_type,task_id,agent,pr_url,ts,payload')
+                .in_('payload->>origin_task_id', chunk)
+                .order('ts', desc=True)
+                .execute()
+            )
+        except Exception:  # noqa: BLE001 — never 500 a read-only derive
+            continue
+        rows.extend(getattr(resp, 'data', None) or [])
     rows.sort(key=lambda r: _ts_key(r.get('ts')), reverse=True)
     out: dict[str, list[dict[str, Any]]] = {}
     for ev in rows:
@@ -5695,11 +5756,31 @@ def _handle_missions_derived(
 
     # Delegate-tracking: which parked-delegated cards have a still-open approval
     # waiting on Larry (join by the `origin_task_id` the approval handler stamps).
+    # Delegate-only: the needs-you-approval join belongs to the Delegate action.
     open_delegate_approvals = _open_delegate_approvals(parked_spawned_ids)
-    # Slice 2b: the delegated builds' review trail — chain_events keyed by
-    # payload.origin_task_id back to each parked-delegated card.
+    # Slice 2b + approval-card-build-trail Phase 2: the spawned builds' review
+    # trail — chain_events keyed by payload.origin_task_id back to each parked
+    # card. Two origin families, both read-side: the delegate ref
+    # (`delegate-<cid>`, from the spawned stamp) AND the discuss key
+    # (`card-message-<cid>`, constructed from the capture id — a card Larry
+    # discussed via "Talk with the team" carries no spawned ref, but its build's
+    # events are origin-tagged `card-message-<cid>`). `_delegation_trail_field`
+    # merges whichever join(s) hit. The `card-message-` keys are built for EVERY
+    # parked capture (not just delegated ones); unmatched keys cost nothing (the
+    # `IN` returns no rows for them).
+    trail_origin_ids = list(parked_spawned_ids)
+    _seen_origins = set(trail_origin_ids)
+    for cap in captures:
+        if not isinstance(cap, dict) or cap.get('state') != 'parked':
+            continue
+        cid = cap.get('id')
+        if isinstance(cid, str) and cid:
+            origin = f'{_CARD_MESSAGE_ORIGIN_PREFIX}{cid}'
+            if origin not in _seen_origins:
+                _seen_origins.add(origin)
+                trail_origin_ids.append(origin)
     build_events_by_origin = _fetch_delegation_build_events(
-        supabase_client, parked_spawned_ids)
+        supabase_client, trail_origin_ids)
 
     events_by_task_id = _fetch_events_for_task_ids(supabase_client, fetch_ids)
     recent_events = _fetch_recent_chain_events(
@@ -11620,22 +11701,30 @@ def _project_delegation_fields(
         Callable[[list[str]], dict[str, str]]
     ] = None,
 ) -> None:
-    """Attach the delegation trail to each ranked operator-queue entry that was
-    delegated — the surface Larry actually delegates from. `delegation_needs_you`
-    (a still-OPEN approval parked on him, via the pending-store origin join #942
-    added) + `delegation_build_phase` / `delegation_pr_url` (the build's review
-    trail, Slice 2b). Keyed by the deterministic origin id `delegate-<entry id>`
-    (what the capture/mission delegate stamps).
+    """Attach the spawned-build trail to each ranked operator-queue entry.
+    `delegation_needs_you` (a still-OPEN approval parked on him, via the
+    pending-store origin join #942 added) + `delegation_build_phase` /
+    `delegation_pr_url` (the build's review trail).
+
+    Two origin families feed the trail (approval-card-build-trail Phase 2), both
+    read-side: `delegate-<entry id>` (the Delegate action's stamped ref) AND
+    `card-message-<entry id>` (a card Larry discussed via "Talk with the team" —
+    no ref, but its build's events are origin-tagged from the card id). Events
+    from both are merged before derivation (most-advanced phase wins). The
+    `delegation_needs_you` join stays delegate-only — it's the Delegate action's
+    approval.
 
     `pr_state_resolver` (optional) flips `review_passed` → `merged` off GitHub
     truth (the auto_merge event isn't origin-tagged), mirroring the parked derive
     — resolved ONLY for the review_passed entries so the always-200 endpoint stays
     cheap. Fail-safe: every entry starts neutral None and any read error (build
     events, evidence, or PR-state) leaves it as-is — never a 500."""
-    origin_ids = [
-        f'delegate-{e["id"]}' for e in ranked
-        if isinstance(e.get('id'), str) and e.get('id')
-    ]
+    origin_ids: list[str] = []
+    for e in ranked:
+        eid = e.get('id')
+        if isinstance(eid, str) and eid:
+            origin_ids.append(f'delegate-{eid}')
+            origin_ids.append(f'{_CARD_MESSAGE_ORIGIN_PREFIX}{eid}')
     try:
         build_events = _fetch_delegation_build_events(supabase_client, origin_ids)
     except Exception:  # noqa: BLE001 — never 500 the always-200 operator queue
@@ -11647,9 +11736,10 @@ def _project_delegation_fields(
         eid = e.get('id')
         if not (isinstance(eid, str) and eid):
             continue
-        origin = f'delegate-{eid}'
+        # needs-you approval join is Delegate-only (the Delegate action's gate).
+        delegate_origin = f'delegate-{eid}'
         try:
-            evidence = _delegation_outcome_evidence(origin)
+            evidence = _delegation_outcome_evidence(delegate_origin)
         except Exception:  # noqa: BLE001 — never 500 the always-200 operator queue
             evidence = None
         if evidence and evidence.get('status') == 'open':
@@ -11657,10 +11747,16 @@ def _project_delegation_fields(
                 'approval_id': evidence.get('approval_id'),
                 'created_at': evidence.get('created_at'),
             }
-        evs = build_events.get(origin)
-        if evs:
-            e['delegation_build_phase'] = _delegation_build_phase(evs)
-            e['delegation_pr_url'] = _delegation_build_pr_url(evs)
+        # Build trail: coherent per-origin pick across the delegate + discuss
+        # origins (phase + pr_url from the SAME build) so a card delegated AND
+        # discussed shows one honest trail, not a phase/PR from two builds.
+        phase, pr_url = _best_spawned_trail([
+            build_events.get(delegate_origin) or [],
+            build_events.get(f'{_CARD_MESSAGE_ORIGIN_PREFIX}{eid}') or [],
+        ])
+        if phase is not None:
+            e['delegation_build_phase'] = phase
+            e['delegation_pr_url'] = pr_url
 
     # Merged-state (GitHub truth): flip review_passed → merged for entries whose
     # PR has merged, so the operator queue completes the arc through ✅ Merged
