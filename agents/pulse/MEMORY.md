@@ -634,9 +634,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-17T09:07Z UTC (Iter ~5544, **Tier 3**, consecutive_clean=13)
+## Status snapshot — updated 2026-07-17T09:37Z UTC (Iter ~5545, **Tier 3**, consecutive_clean=14)
 
-**Iter ~5544 summary (2026-07-17T09:06Z):** ✅ Nominal. 0 new alerts (wm=805=fl). All checks clean. HEAD=aa6f7b16==origin/main (Pulse cycle 20260717T083428Z). Beacon PID 2749067, outbox-notifier PID 2749157 (~8h04m, stable post-01:01Z restart). 0 open PRs. Zombie PID 1834248 static carry (~49d13h47m). last_sync=08:43:19Z UTC (~23 min at check). ratio≈21.51 (trailing-30d, trend=worsening). **Tier 3**, consecutive_clean=13. Check VIII awaiting Larry response (idx=931). Check VI awaiting Larry response (idx=990). Check XIV [1/3] carry. G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch: verification_pending. Check I: Friday firing day; timer not yet fired at 09:06Z UTC; last artifact check-i-2026-07-15.json, 1 proposal [small] pr3-staged-autonomy ($8.81, 128.6σ), use `/dispatch 1`. New artifact expected today.
+**Iter ~5545 summary (2026-07-17T09:37Z):** ✅ Nominal. 1 Tier-3 alert (heal-dashboard-api-sha-drift/dashboard-api-sha-drift-healed, wm 805→806). All checks clean. HEAD=a45c9c8b==origin/main (Pulse cycle 20260717T090848Z). Beacon PID 2749067, outbox-notifier PID 2749157 (~8h35m, stable post-01:01Z restart). 0 open PRs. Zombie PID 1834248 static carry (~49d14h17m). last_sync=08:43:19Z UTC (~54 min at check). ratio≈21.51 (trailing-30d, trend=worsening). **Tier 3**, consecutive_clean=14. Check VIII awaiting Larry response (idx=931). Check VI awaiting Larry response (idx=990). Check XIV [1/3] carry. G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch: verification_pending. Check I: Friday firing day; timer NextElapse=08:14 MDT=14:14Z UTC (CORRECTED from prior "~08:xx UTC" — those were UTC not MDT); last artifact check-i-2026-07-15.json, 1 proposal [small] pr3-staged-autonomy ($8.81, 128.6σ), use `/dispatch 1`. New artifact expected ~14:14Z UTC today.
 
 ---
 
