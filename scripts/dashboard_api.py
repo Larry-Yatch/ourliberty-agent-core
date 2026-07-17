@@ -5534,6 +5534,24 @@ def _build_derived_response(
         if isinstance(tids, list):
             registered_task_ids.update(t for t in tids if isinstance(t, str))
 
+    # Card slice: the mission-board spawned-build trail map. A mission delegated
+    # OR discussed spawns a build under a FRESH task_id (not in the mission's
+    # task_ids), so aggregate_phase can't see it. Rather than fetch an origin per
+    # mission (~hundreds → many chunked queries on a POLLED endpoint), we scan
+    # `recent_events` (already in memory) for `delegate-`/`card-message-` origins
+    # and group by origin. Trade-off vs the parked path's dedicated fetch: bounded
+    # to the recent window (a build in active review is recent), zero extra
+    # queries. `_delegation_trail_field` reads this exactly like the parked map.
+    mission_trail_events: dict[str, list[dict[str, Any]]] = {}
+    for _ev in recent_events:
+        _payload = _ev_payload(_ev)
+        _origin = _payload.get('origin_task_id') if isinstance(_payload, dict) else None
+        if isinstance(_origin, str) and (
+            _origin.startswith('delegate-')
+            or _origin.startswith(_CARD_MESSAGE_ORIGIN_PREFIX)
+        ):
+            mission_trail_events.setdefault(_origin, []).append(_ev)
+
     missions: list[dict[str, Any]] = []
     for entry in entries:
         task_ids = entry.get('task_ids')
@@ -5553,6 +5571,18 @@ def _build_derived_response(
         mission = dict(entry)  # spread the raw registry entry verbatim
         mission['tasks'] = tasks
         mission['aggregate_phase'] = aggregate_mission_phase(entry, tasks)
+        # Card slice: the mission's spawned-build trail (delegated OR discussed).
+        # The build runs under a fresh task_id NOT in this mission's task_ids, so
+        # aggregate_phase can't track it; `_delegation_trail_field` joins
+        # `delegate-<mid>` + `card-message-<mid>` instead. ATTACH ONLY WHEN
+        # active: a mission with no spawned-build activity stays byte-for-byte
+        # identical, so the § 4 missions parity gate is preserved without a
+        # strip. No merged-flip here (pr_state isn't resolved this early in the
+        # derive, and a merged mission build has usually shipped the mission off
+        # the board) — the trail shows up to "Review passed ✓".
+        _trail = _delegation_trail_field(entry, mission_trail_events, None)
+        if _trail.get('delegation_build_phase') is not None:
+            mission.update(_trail)
         missions.append(mission)
 
     # Group recent events by task_id (newest-first preserved) for orphan
@@ -5770,15 +5800,18 @@ def _handle_missions_derived(
     # `IN` returns no rows for them).
     trail_origin_ids = list(parked_spawned_ids)
     _seen_origins = set(trail_origin_ids)
+
+    def _add_origin(origin: str) -> None:
+        if origin not in _seen_origins:
+            _seen_origins.add(origin)
+            trail_origin_ids.append(origin)
+
     for cap in captures:
         if not isinstance(cap, dict) or cap.get('state') != 'parked':
             continue
         cid = cap.get('id')
         if isinstance(cid, str) and cid:
-            origin = f'{_CARD_MESSAGE_ORIGIN_PREFIX}{cid}'
-            if origin not in _seen_origins:
-                _seen_origins.add(origin)
-                trail_origin_ids.append(origin)
+            _add_origin(f'{_CARD_MESSAGE_ORIGIN_PREFIX}{cid}')
     build_events_by_origin = _fetch_delegation_build_events(
         supabase_client, trail_origin_ids)
 

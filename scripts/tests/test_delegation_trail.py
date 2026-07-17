@@ -241,6 +241,53 @@ class DiscussTrailFieldTest(unittest.TestCase):
         self.assertEqual(parked[0]['delegation_build_phase'], 'in_review')
 
 
+# ---------- mission-board trail (card slice) ----------
+
+
+class MissionBoardTrailTest(unittest.TestCase):
+    """The card slice: a mission delegated OR discussed spawns a build under a
+    fresh task_id (not in the mission's task_ids), so `_build_derived_response`
+    surfaces it via `_delegation_trail_field` on the mission entry — attached
+    ONLY when active (parity-preserving)."""
+
+    def _derive(self, entries, recent_events):
+        # The mission trail map is built from recent_events (in-memory), not a
+        # dedicated fetch — so inject the build events there.
+        return da._build_derived_response(
+            entries=entries, last_synced_at=None, captures=[],
+            events_by_task_id={}, recent_events=recent_events, now=NOW)
+
+    def test_discussed_mission_gets_trail(self):
+        mid = 'mission-refactor-thing'
+        resp = self._derive(
+            [{'id': mid, 'name': 'Refactor', 'phase': 'proposed', 'task_ids': []}],
+            [_discuss_ev('review_pass', mid,
+                         pr_url='https://github.com/o/r/pull/9')])
+        m = resp['missions'][0]
+        self.assertEqual(m['delegation_build_phase'], 'review_passed')
+        self.assertEqual(m['delegation_pr_url'], 'https://github.com/o/r/pull/9')
+
+    def test_delegated_mission_gets_trail(self):
+        mid = 'mission-x'
+        # delegate build event carries origin card-message? no — delegate-<mid>.
+        ev = {'event_type': 'review_request', 'pr_url': None, 'ts': 'x',
+              'payload': {'origin_task_id': f'delegate-{mid}'}}
+        resp = self._derive(
+            [{'id': mid, 'name': 'X', 'phase': 'proposed', 'task_ids': [],
+              'spawned': {'kind': 'delegate', 'task_id': f'delegate-{mid}'}}],
+            [ev])
+        self.assertEqual(resp['missions'][0]['delegation_build_phase'], 'in_review')
+
+    def test_mission_without_spawned_build_has_no_trail_keys(self):
+        # Parity-preserving: no activity → keys absent entirely (not None).
+        resp = self._derive(
+            [{'id': 'mission-quiet', 'name': 'Q', 'phase': 'active', 'task_ids': []}],
+            [_discuss_ev('review_pass', 'someone-else')])
+        m = resp['missions'][0]
+        self.assertNotIn('delegation_build_phase', m)
+        self.assertNotIn('delegation_pr_url', m)
+
+
 # ---------- fetch join ----------
 
 
