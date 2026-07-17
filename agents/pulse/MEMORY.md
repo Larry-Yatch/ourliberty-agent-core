@@ -634,9 +634,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-17T10:41Z UTC (Iter ~5547, **Tier 3**, consecutive_clean=16)
+## Status snapshot — updated 2026-07-17T11:11Z UTC (Iter ~5548, **Tier 3**, consecutive_clean=17)
 
-**Iter ~5547 summary (2026-07-17T10:41Z):** ✅ Nominal. 1 Tier-3 alert (heal-dashboard-api-sha-drift/dashboard-api-sha-drift-healed, wm 765→766). All checks clean. HEAD=6da2a921==origin/main (Pulse cycle 20260717T101102Z). Beacon PID 2749067, outbox-notifier PID 2749157 (~9h39m, stable post-01:01Z restart). 0 open PRs. Zombie PID 1834248 static carry (~49d15h22m). last_sync=09:43:29Z UTC (~58 min at check). ratio≈21.82 (trailing-30d, trend=worsening). **Tier 3**, consecutive_clean=16. Check VIII awaiting Larry response (idx=931). Check VI awaiting Larry response (idx=990). Check XIV [1/3] carry. G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch: verification_pending. Check I: Friday firing day; timer NextElapse=08:14:29 MDT=14:14:29Z UTC; ~3h33min left at check (~10:41Z UTC); last artifact check-i-2026-07-15.json, 1 proposal [small] pr3-staged-autonomy ($8.81, 128.6σ), use `/dispatch 1`. New artifact expected ~14:14Z UTC today.
+**Iter ~5548 summary (2026-07-17T11:11Z):** ✅ Nominal. 0 new alerts (wm=766=fl). All checks clean. HEAD=84963057==origin/main (Pulse cycle 20260717T104351Z). Beacon PID 2749067, outbox-notifier PID 2749157 (~10h10m, stable post-01:01Z restart). 0 open PRs. Zombie PID 1834248 static carry (~49d15h54m). last_sync=10:43:42Z UTC (~27 min at check). ratio≈21.82 (trailing-30d, trend=worsening). **Tier 3**, consecutive_clean=17. Check VIII awaiting Larry response (idx=931). Check VI awaiting Larry response (idx=990). Check XIV [1/3] carry. G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch: verification_pending. Check I: Friday firing day; timer NextElapse=14:14:29Z UTC; ~3h3min left at check (~11:11Z UTC); last artifact check-i-2026-07-15.json, 1 proposal [small] pr3-staged-autonomy ($8.81, 128.6σ), use `/dispatch 1`. New artifact expected ~14:14Z UTC today.
 
 ---
 
