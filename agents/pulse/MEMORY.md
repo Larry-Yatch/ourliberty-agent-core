@@ -634,9 +634,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-17T05:16Z UTC (Iter ~5537, **Tier 3**, consecutive_clean=6)
+## Status snapshot — updated 2026-07-17T05:47Z UTC (Iter ~5538, **Tier 3**, consecutive_clean=7)
 
-**Iter ~5537 summary (2026-07-17T05:16Z):** ✅ Nominal. 0 new alerts. All checks clean. HEAD=01f5ab89==origin/main. Beacon PID 2749067, outbox-notifier PID 2749157 (~4h14m, stable post-01:01Z restart). 0 open PRs. Zombie PID 1834248 static carry (~49d 09h 57m). last_sync=04:43:11Z UTC (~33 min at check). ratio≈21.55 (trailing-30d, trend=worsening). **Tier 3**, consecutive_clean=6. Check VIII awaiting Larry response (idx=931). Check VI awaiting Larry response (idx=990). Check XIV [1/3] carry. G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch: verification_pending. Check I: Friday firing day; timer not yet fired (05:16Z UTC); last artifact check-i-2026-07-15.json, 1 proposal [small] pr3-staged-autonomy ($8.81, 128.6σ), use `/dispatch 1`. New artifact expected ~08:xx UTC.
+**Iter ~5538 summary (2026-07-17T05:47Z):** ✅ Nominal. 0 new alerts. All checks clean. HEAD=b6c6b3e1==origin/main. Beacon PID 2749067, outbox-notifier PID 2749157 (~4h44m, stable post-01:01Z restart). 0 open PRs. Zombie PID 1834248 static carry (~49d 10h 27m). last_sync=05:43:15Z UTC (~3 min at check). ratio≈21.55 (trailing-30d, trend=worsening). **Tier 3**, consecutive_clean=7. Check VIII awaiting Larry response (idx=931). Check VI awaiting Larry response (idx=990). Check XIV [1/3] carry. G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch: verification_pending. Check I: Friday firing day; timer not yet fired (05:47Z UTC); last artifact check-i-2026-07-15.json, 1 proposal [small] pr3-staged-autonomy ($8.81, 128.6σ), use `/dispatch 1`. New artifact expected ~08:xx UTC.
 
 ---
 
