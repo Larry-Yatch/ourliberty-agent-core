@@ -634,9 +634,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-17T14:30Z UTC (Iter ~5554, **Tier 3**, consecutive_clean=23)
+## Status snapshot — updated 2026-07-17T14:57Z UTC (Iter ~5555, **Tier 3**, consecutive_clean=24)
 
-**Iter ~5554 summary (2026-07-17T14:30Z):** ✅ Nominal. 2 new alerts (L770 ledger-weekly-2026-07-13, L771 check-i-2026-07-13, both Tier-3 silence). Check I FIRED at 14:13Z UTC — new artifact check-i-2026-07-17.json (week 2026-07-13), DM delivered (bot idx=769+770). All checks clean. HEAD=80e6bd18==origin/main (ledger: weekly run 20260717T141316Z). Beacon PID 2749067, outbox-notifier PID 2749157 (~13h25m, stable post-01:01Z restart). inbox_watcher PID 776463 (~5d10h42m). 0 open PRs. Zombie PID 1834248 static carry (~49d19h8m). last_sync=13:44:05Z UTC (~46 min at check). ratio≈22.42 (trailing-30d, trend=worsening). **Tier 3**, consecutive_clean=23. Check VIII awaiting Larry response (idx=931). Check VI awaiting Larry response (idx=990). Check XIV [1/3] carry. G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch: verification_pending. Check I: artifact check-i-2026-07-17.json, 1 proposal [small] pr3-staged-autonomy ($8.81, 128.6σ), use `/dispatch 1`. wm=771.
+**Iter ~5555 summary (2026-07-17T14:57Z):** ✅ Nominal. 1 new alert (L772 dashboard-api-sha-drift-healed, Tier-3 silence). All checks clean. HEAD=08800a09==origin/main (Pulse cycle 20260717T143253Z). Beacon PID 2749067, outbox-notifier PID 2749157 (~13h55m, stable post-01:01Z restart). inbox_watcher PID 776463 (~5d11h12m). 0 open PRs. Zombie PID 1834248 static carry (~49d19h38m). last_sync=14:44:15Z UTC (~13 min at check). ratio≈22.42 (trailing-30d, trend=worsening). **Tier 3**, consecutive_clean=24. Check VIII awaiting Larry response (idx=931). Check VI awaiting Larry response (idx=990). Check XIV [1/3] carry. G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch: verification_pending. Check I: artifact check-i-2026-07-17.json, 1 proposal [small] pr3-staged-autonomy ($8.81, 128.6σ), use `/dispatch 1`. wm=772.
 
 ---
 
