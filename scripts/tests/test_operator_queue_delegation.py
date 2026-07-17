@@ -130,6 +130,47 @@ class ProjectDelegationFieldsTest(unittest.TestCase):
         self.assertIsNone(ranked[0]['delegation_build_phase'])
         self.assertIsNone(ranked[0]['delegation_pr_url'])
 
+    def test_discussed_entry_shows_trail_without_delegation(self):
+        # approval-card-build-trail Phase 2: an entry Larry discussed via "Talk
+        # with the team" (build origin-tagged card-message-<id>, never delegated)
+        # gets the build trail but NO needs-you (that's Delegate-only).
+        self._write_pending([])
+        rows = [{'event_type': 'review_pass',
+                 'pr_url': 'https://github.com/o/r/pull/9', 'ts': 't',
+                 'payload': {'origin_task_id': 'card-message-m1'}}]
+        ranked = [{'id': 'm1', 'name': 'Talked about'}]
+        da._project_delegation_fields(ranked, _StubClient(rows))
+        self.assertIsNone(ranked[0]['delegation_needs_you'])
+        self.assertEqual(ranked[0]['delegation_build_phase'], 'review_passed')
+        self.assertEqual(ranked[0]['delegation_pr_url'],
+                         'https://github.com/o/r/pull/9')
+
+    def test_delegated_and_discussed_pick_coherently(self):
+        # Entry delegated (in_review, its OWN newer PR-A) AND discussed
+        # (review_pass, PR-B). Most-advanced wins AND phase+pr_url come from the
+        # SAME build: review_passed → PR-B, never the newer PR-A.
+        self._write_pending([{
+            'id': 'appr1', 'origin_task_id': DELEGATE,
+            'status': 'pending', 'created_at': '2026-07-11T12:00:00Z',
+        }])
+        rows = [
+            {'event_type': 'review_request',
+             'pr_url': 'https://github.com/o/r/pull/1',
+             'ts': '2026-07-11T13:00:00Z',
+             'payload': {'origin_task_id': DELEGATE}},
+            {'event_type': 'review_pass',
+             'pr_url': 'https://github.com/o/r/pull/9',
+             'ts': '2026-07-11T12:00:00Z',
+             'payload': {'origin_task_id': 'card-message-m1'}},
+        ]
+        ranked = [{'id': 'm1', 'name': 'Both'}]
+        da._project_delegation_fields(ranked, _StubClient(rows))
+        # delegate approval still surfaces needs-you; trail is coherent.
+        self.assertEqual(ranked[0]['delegation_needs_you']['approval_id'], 'appr1')
+        self.assertEqual(ranked[0]['delegation_build_phase'], 'review_passed')
+        self.assertEqual(ranked[0]['delegation_pr_url'],
+                         'https://github.com/o/r/pull/9')
+
     def test_missing_id_is_safe(self):
         ranked = [{'name': 'no-id-row'}]
         da._project_delegation_fields(ranked, None)
