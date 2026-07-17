@@ -634,9 +634,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-17T02:12Z UTC (Iter ~5531, **Tier 3**, consecutive_clean=0)
+## Status snapshot — updated 2026-07-17T02:43Z UTC (Iter ~5532, **Tier 3**, consecutive_clean=1)
 
-**Iter ~5531 summary (2026-07-17T02:12Z):** ✅ Nominal. 0 new alerts. All checks clean. HEAD=e88d8045==origin/main. Beacon PID 2749067, outbox-notifier PID 2749157 (~1h09m, stable post-01:01Z restart). 0 open PRs. Zombie PID 1834248 static carry (~49d 06h 52m). last_sync=01:42:35Z UTC (~29 min at check). ratio≈21.58 (trailing-30d, trend=worsening). **Tier 3** (de-escalated from Tier 2), consecutive_clean=0. Check VIII awaiting Larry response (idx=931). Check VI awaiting Larry response (idx=990). Check XIV [1/3] carry. G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch: verification_pending. Check I: Friday firing day; timer not yet fired (02:12Z UTC); last artifact check-i-2026-07-15.json, 1 proposal [small] pr3-staged-autonomy ($8.81, 128.6σ), use `/dispatch 1`. New artifact expected ~08:xx UTC.
+**Iter ~5532 summary (2026-07-17T02:43Z):** ✅ Nominal. 1 Tier-3 alert (dashboard-api-sha-drift-healed, route=digest, silenced; dashboard-api auto-restarted to pick up 5fa65396 post cycle ~5531 wrapper commit). All checks clean. HEAD=5fa65396==origin/main. Beacon PID 2749067, outbox-notifier PID 2749157 (~1h43m, stable post-01:01Z restart). 0 open PRs. Zombie PID 1834248 static carry (~49d 07h 23m). last_sync=01:42:35Z UTC (~61 min at check). ratio≈21.58 (trailing-30d, trend=worsening). **Tier 3**, consecutive_clean=1. Check VIII awaiting Larry response (idx=931). Check VI awaiting Larry response (idx=990). Check XIV [1/3] carry. G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch: verification_pending. Check I: Friday firing day; timer not yet fired (02:43Z UTC); last artifact check-i-2026-07-15.json, 1 proposal [small] pr3-staged-autonomy ($8.81, 128.6σ), use `/dispatch 1`. New artifact expected ~08:xx UTC.
 
 ---
 
