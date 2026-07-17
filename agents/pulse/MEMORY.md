@@ -634,9 +634,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-17T00:39Z UTC (Iter ~5523, **Tier 1**, consecutive_clean=2)
+## Status snapshot — updated 2026-07-17T00:44Z UTC (Iter ~5524, **Tier 2**, consecutive_clean=0)
 
-**Iter ~5523 summary (2026-07-17T00:39Z):** ✅ Nominal. 2 new alerts (both Tier-3 silenced: heal-stale-daemon-code restarted beacon-bot PID→2727647 + outbox-notifier PID→2727787 at 00:31Z UTC due to stale dashboard_api.py post-PR#961). PR #962 created 00:37Z UTC (auto-review label; Mirror dispatch pending). Zombie PID 1834248 static carry (~49d 05h). HEAD=442b3d12==origin/main. last_sync=23:42:19Z UTC (57 min, within 2h). ratio≈21.60 (trailing-30d, trend=worsening). **Tier 1**, consecutive_clean=2. Check VIII awaiting Larry response (idx=931). Check VI awaiting Larry response (idx=990). Check XIV [1/3] carry. G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch: verification_pending. Check I: Friday firing day; timer not yet fired (00:39 UTC); last artifact check-i-2026-07-15.json, 1 proposal [small] pr3-staged-autonomy ($8.81, 128.6σ), use `/dispatch 1`. New artifact expected ~08:xx UTC.
+**Iter ~5524 summary (2026-07-17T00:44Z):** ✅ Nominal. 0 new alerts. All checks clean. 2 open PRs: #962 agent-core + #135 dashboard (both brand-new missions spawned-build-trail PRs, MERGEABLE, auto-review labeled, notifier sweep pending). Zombie PID 1834248 static carry (~49d 05h 24m). HEAD=fce06a84==origin/main. last_sync=00:42:19Z UTC (2 min fresh). ratio≈21.60 (trailing-30d, trend=worsening). **Tier 1→2** (de-escalation after 3 consecutive clean iters). consecutive_clean=0. Check VIII awaiting Larry response (idx=931). Check VI awaiting Larry response (idx=990). Check XIV [1/3] carry. G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch: verification_pending. Check I: Friday firing day; timer not yet fired (00:44 UTC); last artifact check-i-2026-07-15.json, 1 proposal [small] pr3-staged-autonomy ($8.81, 128.6σ), use `/dispatch 1`. New artifact expected ~08:xx UTC.
 
 ---
 
