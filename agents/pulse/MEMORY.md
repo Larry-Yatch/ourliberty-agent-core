@@ -634,9 +634,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-17T01:05Z UTC (Iter ~5525, **Tier 1**, consecutive_clean=0)
+## Status snapshot — updated 2026-07-17T01:10Z UTC (Iter ~5526, **Tier 1**, consecutive_clean=1)
 
-**Iter ~5525 summary (2026-07-17T01:05Z):** ⚠️ Drift (routine). 1 new alert (Tier-3 silenced). Check A: repo 1 behind origin (PR #962 squash-merge 3891120a at 00:57Z); fast-forward executed. heal-stale-daemon-code restarted ourliberty-dashboard-api.service + ourliberty-beacon-bot.service + ourliberty-outbox-notifier.service after PR #962 updated dashboard_api.py. New beacon PID 2749067, outbox-notifier PID 2749157. PR #962 + #135 both MERGED (missions spawned-build trail, Mirror REVIEW_PASS + AUTO_MERGE). 0 open PRs. Zombie PID 1834248 static carry (~49d 05h 42m). HEAD=3891120a==origin/main. last_sync=00:42:19Z UTC (23 min fresh). ratio≈21.58 (trailing-30d, trend=worsening). **Tier 2→1** (always-fix = tier-reset). consecutive_clean=0. Check VIII awaiting Larry response (idx=931). Check VI awaiting Larry response (idx=990). Check XIV [1/3] carry. G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch: verification_pending. Check I: Friday firing day; timer not yet fired (01:05 UTC); last artifact check-i-2026-07-15.json, 1 proposal [small] pr3-staged-autonomy ($8.81, 128.6σ), use `/dispatch 1`. New artifact expected ~08:xx UTC.
+**Iter ~5526 summary (2026-07-17T01:10Z):** ✅ Nominal. 0 new alerts. All checks clean. HEAD=66fd4ede==origin/main. Beacon PID 2749067, outbox-notifier PID 2749157 (~7 min, post-01:01Z restart). 0 open PRs. Zombie PID 1834248 static carry (~49d 05h 52m). last_sync=00:42:19Z UTC (27 min fresh). ratio≈21.60 (trailing-30d, trend=worsening). **Tier 1**, consecutive_clean=1. Check VIII awaiting Larry response (idx=931). Check VI awaiting Larry response (idx=990). Check XIV [1/3] carry. G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch: verification_pending. Check I: Friday firing day; timer not yet fired (01:10 UTC); last artifact check-i-2026-07-15.json, 1 proposal [small] pr3-staged-autonomy ($8.81, 128.6σ), use `/dispatch 1`. New artifact expected ~08:xx UTC.
 
 ---
 
