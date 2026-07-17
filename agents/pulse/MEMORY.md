@@ -634,9 +634,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-17T11:47Z UTC (Iter ~5549, **Tier 3**, consecutive_clean=18)
+## Status snapshot — updated 2026-07-17T12:17Z UTC (Iter ~5550, **Tier 3**, consecutive_clean=19)
 
-**Iter ~5549 summary (2026-07-17T11:47Z):** ✅ Nominal. 1 Tier-3 alert (heal-dashboard-api-sha-drift/dashboard-api-sha-drift-healed, routine restart on HEAD fb1ab6cf). All checks clean. HEAD=fb1ab6cf==origin/main (Pulse cycle 20260717T111639Z). Beacon PID 2749067, outbox-notifier PID 2749157 (~10h45m, stable post-01:01Z restart). 0 open PRs. Zombie PID 1834248 static carry (~49d16h28m). last_sync=11:43:39Z UTC (~4 min at close). ratio≈21.82 (trailing-30d, trend=worsening). **Tier 3**, consecutive_clean=18. Check VIII awaiting Larry response (idx=931). Check VI awaiting Larry response (idx=990). Check XIV [1/3] carry. G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch: verification_pending. Check I: Friday firing day; timer NextElapse=14:14:29Z UTC; ~2h27min left at close (~11:47Z UTC); last artifact check-i-2026-07-15.json, 1 proposal [small] pr3-staged-autonomy ($8.81, 128.6σ), use `/dispatch 1`. New artifact expected ~14:14Z UTC today.
+**Iter ~5550 summary (2026-07-17T12:17Z):** ✅ Nominal. 0 new alerts. All checks clean. HEAD=f8b05124==origin/main (Pulse cycle 20260717T114925Z). Beacon PID 2749067, outbox-notifier PID 2749157 (~11h14m, stable post-01:01Z restart). inbox_watcher PID 776463 (~5d8h32m). 0 open PRs. Zombie PID 1834248 static carry (~49d16h58m). last_sync=11:43:39Z UTC (~32 min at check). ratio≈21.82 (trailing-30d, trend=worsening). **Tier 3**, consecutive_clean=19. Check VIII awaiting Larry response (idx=931). Check VI awaiting Larry response (idx=990). Check XIV [1/3] carry. G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch: verification_pending. Check I: Friday firing day; timer NextElapse=08:12:17 MDT=14:12:17Z UTC; ~1h55m left at check (~12:17Z UTC); last artifact check-i-2026-07-15.json, 1 proposal [small] pr3-staged-autonomy ($8.81, 128.6σ), use `/dispatch 1`. New artifact expected ~14:12Z UTC today.
 
 ---
 
