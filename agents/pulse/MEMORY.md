@@ -634,9 +634,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-17T00:23Z UTC (Iter ~5521, **Tier 1**, consecutive_clean=0)
+## Status snapshot — updated 2026-07-17T00:28Z UTC (Iter ~5522, **Tier 1**, consecutive_clean=1)
 
-**Iter ~5521 summary (2026-07-17T00:23Z):** 2 new alerts (both Tier-3 silenced). ⚠️ Local main was 1 commit behind origin/main → fast-forwarded (457d44fb→58bf84d0). PR #961 merged since iter ~5520 (dashboard_api.py + delegation trail tests, 00:08:13Z UTC). missions-autoregister: proposed card `proposed-direction-ask-no-session-revision-active-mirror-fix-001` flagged 14d+ stale (route=digest, no DM; needs Larry keep/drop decision). Zombie PID 1834248 static carry (~49d 05h). beacon PID 1706301 + outbox-notifier PID 1706314 running (~3d+). HEAD=58bf84d0==origin/main. last_sync=23:42:19Z UTC (pre-fast-forward). ratio≈21.60 (trailing-30d, trend=worsening). **Tier 1** (reset from Tier 3 due to fast-forward intervention), consecutive_clean=0. Check VIII awaiting Larry response (idx=931). Check VI awaiting Larry response (idx=990). Check XIV [1/3] carry. G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch: verification_pending. Check I: TODAY IS Friday UTC (firing day). Timer not yet fired (00:22 UTC); last artifact check-i-2026-07-15.json, 1 proposal [small] pr3-staged-autonomy ($8.81, 128.6σ), use `/dispatch 1`. New artifact expected ~08:xx UTC.
+**Iter ~5522 summary (2026-07-17T00:28Z):** ✅ Nominal. 0 new alerts. All checks clean. 0 open PRs. Zombie PID 1834248 static carry (~49d 05h). beacon PID 1706301 + outbox-notifier PID 1706314 running (~2d 23h+). HEAD=0bb4ffd6==origin/main. last_sync=23:42:19Z UTC (46 min, within 2h). ratio≈21.60 (trailing-30d, trend=worsening). **Tier 1**, consecutive_clean=1. Check VIII awaiting Larry response (idx=931). Check VI awaiting Larry response (idx=990). Check XIV [1/3] carry. G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch: verification_pending. Check I: TODAY IS Friday UTC (firing day). Timer not yet fired (00:28 UTC); last artifact check-i-2026-07-15.json, 1 proposal [small] pr3-staged-autonomy ($8.81, 128.6σ), use `/dispatch 1`. New artifact expected ~08:xx UTC.
 
 ---
 
