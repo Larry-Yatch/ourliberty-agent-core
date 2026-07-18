@@ -634,9 +634,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-18T01:19Z UTC (Iter ~5574, **Tier 3**, consecutive_clean=43)
+## Status snapshot — updated 2026-07-18T01:53Z UTC (Iter ~5575, **Tier 3**, consecutive_clean=44)
 
-**Iter ~5574 summary (2026-07-18T01:16Z):** ⚠️ 1 new Tier-3 alert: `probe-blind:ourliberty-cycle.service` (heal-claude-json-bind-drift healer BLIND for cycle service; sudo-n/nsenter failed; bot DM'd Larry idx=780 at 00:54Z UTC). HEAD=58ee4725==origin/main. Beacon PID 2749067, outbox-notifier PID 2749157 (~24h14m). inbox_watcher PID 776463 (~5d21h31m). 0 open PRs. Zombie PID 1834248 static carry (~50d05h57m). last_sync=00:45:16Z UTC (~31 min at check). ratio≈22.27 (trailing-30d, trend=worsening). **Tier 3**, consecutive_clean=43. NEW yellow: probe-blind:ourliberty-cycle.service (fix sudoers NOPASSWD + nsenter). Check VIII awaiting Larry response (idx=931). Check VI awaiting Larry response (idx=990). Check XIV [1/3] carry. G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch: verification_pending. Check I: artifact check-i-2026-07-17.json, 1 proposal [small] pr3-staged-autonomy ($8.81, 128.6σ), use `/dispatch 1`. wm=781.
+**Iter ~5575 summary (2026-07-18T01:53Z):** ✅ Nominal. 1 Tier-3 alert (dashboard-api-sha-drift-healed L782, known-pattern silence). HEAD=0d8d98f4==origin/main. Beacon PID 2749067, outbox-notifier PID 2749157 (~24h49m). inbox_watcher PID 776463 (~5d22h06m). 0 open PRs. Zombie PID 1834248 static carry (~50d06h32m). last_sync=01:45:16Z UTC (~8 min at check). ratio≈22.23 (trailing-30d, trend=worsening). **Tier 3**, consecutive_clean=44. [yellow] probe-blind:ourliberty-cycle.service (carry from ~5574; bot DM'd Larry idx=780). Check VIII awaiting Larry response (idx=931). Check VI awaiting Larry response (idx=990). Check XIV [1/3] carry. G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch: verification_pending. Check I: artifact check-i-2026-07-17.json, 1 proposal [small] pr3-staged-autonomy ($8.81, 128.6σ), use `/dispatch 1`. wm=782.
 
 ---
 
