@@ -634,9 +634,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-18T17:32Z UTC (Iter ~5604, **Tier 3**, consecutive_clean=73)
+## Status snapshot — updated 2026-07-18T18:07Z UTC (Iter ~5605, **Tier 3**, consecutive_clean=74)
 
-**Iter ~5604 summary (2026-07-18T17:32Z):** ✅ Nominal. 1 Tier-3 alert (L755 heal-dashboard-api-sha-drift, routine). HEAD=af965022==origin/main. inbox_watcher PID 776463 (~6d13h46m). beacon PID 3183708 (~12h20m). outbox-notifier PID 3183882 (~12h20m). Zombie PID 1834248 static carry (~50d22h12m). last_sync=16:47:09Z UTC (no-change, push_failures=0). ratio≈22.23 (trailing-30d, trend=worsening). **Tier 3**, consecutive_clean=73. [yellow] probe-blind:ourliberty-cycle.service (carry; idx=780). Check VIII awaiting Larry response (idx=931). Check VI awaiting Larry response (idx=990). Check XIV [1/3] carry. G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch: verification_pending. Check I: artifact check-i-2026-07-17.json, 1 proposal [small] pr3-staged-autonomy ($8.81, 128.6σ), use `/dispatch 1`. wm=755.
+**Iter ~5605 summary (2026-07-18T18:07Z):** ✅ Nominal. 0 new alerts. HEAD=76781e2d==origin/main. inbox_watcher PID 776463 (~6d14h21m). beacon PID 3183708 (~12h55m). outbox-notifier PID 3183882 (~12h55m). Zombie PID 1834248 static carry (~50d22h47m). last_sync=17:47:09Z UTC (no-change, push_failures=0). ratio≈22.23 (trailing-30d, trend=worsening). **Tier 3**, consecutive_clean=74. [yellow] probe-blind:ourliberty-cycle.service (carry; idx=780). Check VIII awaiting Larry response (idx=931). Check VI awaiting Larry response (idx=990). Check XIV [1/3] carry. G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch: verification_pending. Check I: artifact check-i-2026-07-17.json, 1 proposal [small] pr3-staged-autonomy ($8.81, 128.6σ), use `/dispatch 1`. wm=755.
 
 ---
 
