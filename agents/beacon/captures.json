@@ -473,7 +473,12 @@
         "from_state": "parked"
       },
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
-      "aging": true
+      "aging": true,
+      "spawned": {
+        "kind": "delegate",
+        "task_id": "delegate-cap-investigate-retry-clarification-cost-sources-d121",
+        "stamped_at": "2026-07-18T04:34:08.328284+00:00"
+      }
     },
     {
       "id": "cap-make-team-two-way-chat-a-dashboard-wide-layer-no-adaf",
