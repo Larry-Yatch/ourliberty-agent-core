@@ -634,9 +634,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-18T05:33Z UTC (Iter ~5582, **Tier 3**, consecutive_clean=51)
+## Status snapshot — updated 2026-07-18T06:09Z UTC (Iter ~5583, **Tier 3**, consecutive_clean=52)
 
-**Iter ~5582 summary (2026-07-18T05:33Z):** ✅ Nominal. 2 new Tier-3 alerts (heal-stale-daemon-code auto-restarts: beacon-bot PID→3183708, outbox-notifier PID→3183882, routine code-drift response to PR #963 merge at 05:10–05:11Z UTC). wm persistence gap corrected (784→788). HEAD=9619b066==origin/main. inbox_watcher PID 776463 (~6d01h47m). Zombie PID 1834248 static carry (~50d10h13m). last_sync=04:45:19Z UTC (~46 min, within 2h). ratio≈22.25 (trailing-30d, trend=worsening). **Tier 3**, consecutive_clean=51. [yellow] probe-blind:ourliberty-cycle.service (carry; idx=780). Check VIII awaiting Larry response (idx=931). Check VI awaiting Larry response (idx=990). Check XIV [1/3] carry. G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch: verification_pending. Check I: artifact check-i-2026-07-17.json, 1 proposal [small] pr3-staged-autonomy ($8.81, 128.6σ), use `/dispatch 1`. wm=788.
+**Iter ~5583 summary (2026-07-18T06:09Z):** ✅ Nominal. 1 new Tier-3 alert (heal-dashboard-api-sha-drift auto-restart of dashboard-api: running 9619b066 → on-disk 5af121c9, routine code-drift after Pulse wrapper). HEAD=5af121c9==origin/main. inbox_watcher PID 776463 (~6d02h22m). beacon PID 3183708 (~55 min). outbox-notifier PID 3183882 (~55 min). Zombie PID 1834248 static carry (~50d10h48m). last_sync=05:46:06Z UTC (~23 min, within 2h). ratio≈22.25 (trailing-30d, trend=worsening). **Tier 3**, consecutive_clean=52. [yellow] probe-blind:ourliberty-cycle.service (carry; idx=780). Check VIII awaiting Larry response (idx=931). Check VI awaiting Larry response (idx=990). Check XIV [1/3] carry. G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch: verification_pending. Check I: artifact check-i-2026-07-17.json, 1 proposal [small] pr3-staged-autonomy ($8.81, 128.6σ), use `/dispatch 1`. wm=789.
 
 ---
 
