@@ -634,9 +634,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-18T05:05Z UTC (Iter ~5581, **Tier 3**, consecutive_clean=50)
+## Status snapshot — updated 2026-07-18T05:33Z UTC (Iter ~5582, **Tier 3**, consecutive_clean=51)
 
-**Iter ~5581 summary (2026-07-18T05:05Z):** ⚠️ Auto-corrected. FF applied (63a954a8→ddaa5201, PR #963 squash-merge). 3 new Tier-3 alerts (heal-dashboard-api-sha-drift ×2, doorbell ×1). PR #963 (agent-core revert) MERGED ✅; PR #136 (dashboard revert) MERGED ✅. redo-work-investigation-finding-d121 approved (Option A: accept finding, no dispatch; true waste ≈$3/wk diffuse retries). HEAD=ddaa5201==origin/main. Beacon PID 2749067, outbox-notifier PID 2749157 (~1d04h). inbox_watcher PID 776463 (~6d01h). Zombie PID 1834248 static carry (~50d09h42m). last_sync=04:45:19Z UTC (~20 min at check, within 2h). ratio≈22.23 (trailing-30d, trend=worsening). **Tier 3**, consecutive_clean=50. [yellow] probe-blind:ourliberty-cycle.service (carry; idx=780). Check VIII awaiting Larry response (idx=931). Check VI awaiting Larry response (idx=990). Check XIV [1/3] carry. G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch: verification_pending. Check I: artifact check-i-2026-07-17.json, 1 proposal [small] pr3-staged-autonomy ($8.81, 128.6σ), use `/dispatch 1`. wm=787.
+**Iter ~5582 summary (2026-07-18T05:33Z):** ✅ Nominal. 2 new Tier-3 alerts (heal-stale-daemon-code auto-restarts: beacon-bot PID→3183708, outbox-notifier PID→3183882, routine code-drift response to PR #963 merge at 05:10–05:11Z UTC). wm persistence gap corrected (784→788). HEAD=9619b066==origin/main. inbox_watcher PID 776463 (~6d01h47m). Zombie PID 1834248 static carry (~50d10h13m). last_sync=04:45:19Z UTC (~46 min, within 2h). ratio≈22.25 (trailing-30d, trend=worsening). **Tier 3**, consecutive_clean=51. [yellow] probe-blind:ourliberty-cycle.service (carry; idx=780). Check VIII awaiting Larry response (idx=931). Check VI awaiting Larry response (idx=990). Check XIV [1/3] carry. G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch: verification_pending. Check I: artifact check-i-2026-07-17.json, 1 proposal [small] pr3-staged-autonomy ($8.81, 128.6σ), use `/dispatch 1`. wm=788.
 
 ---
 
