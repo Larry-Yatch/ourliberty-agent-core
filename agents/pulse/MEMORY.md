@@ -634,9 +634,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-19T11:32Z UTC (Iter ~5637, **Tier 3**, consecutive_clean=106)
+## Status snapshot — updated 2026-07-19T12:07Z UTC (Iter ~5638, **Tier 3**, consecutive_clean=107)
 
-**Iter ~5637 summary (2026-07-19T11:32Z):** ✅ Nominal. 0 new alerts. HEAD=495e15c2==origin/main. inbox_watcher PID 776463 (~7d7h48m). beacon PID 3183708 (~1d6h21m). outbox-notifier PID 3183882 (~1d6h21m). Zombie PID 1834248 static carry (~51d16h14m). last_sync=2026-07-19T10:48:19Z UTC (no-change, push_failures=0). ratio≈21.89 (trailing-30d, trend=flat). **Tier 3**, consecutive_clean=106. [yellow] probe-blind:ourliberty-cycle.service (carry; idx=780). Check VIII awaiting Larry response (idx=931). Check VI awaiting Larry response (idx=990). Check XIV [1/3] carry. G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch: verification_pending. Check I: FIRED Sunday 2026-07-19, artifact check-i-2026-07-19.json, 1 proposal [small] pr3-staged-autonomy ($8.81, 128.6σ) dedup-skip (already dispatched 2026-07-13), use `/dispatch 1`. Check III: no new artifact yet (check-iii-2026-07-12.json last; timer fires Sunday, artifact may appear later today). wm=755.
+**Iter ~5638 summary (2026-07-19T12:07Z):** ✅ Nominal. 0 new alerts. HEAD=92159f92==origin/main. inbox_watcher PID 776463 (~7d8h22m). beacon PID 3183708 (~1d6h55m). outbox-notifier PID 3183882 (~1d6h55m). Zombie PID 1834248 static carry (~51d16h48m). last_sync=2026-07-19T11:48:26Z UTC (no-change, push_failures=0). ratio≈21.89 (trailing-30d, trend=flat). **Tier 3**, consecutive_clean=107. [yellow] probe-blind:ourliberty-cycle.service (carry; idx=780). Check VIII awaiting Larry response (idx=931). Check VI awaiting Larry response (idx=990). Check XIV [1/3] carry. G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch: verification_pending. Check I: FIRED Sunday 2026-07-19, artifact check-i-2026-07-19.json, 1 proposal [small] pr3-staged-autonomy ($8.81, 128.6σ) dedup-skip (already dispatched 2026-07-13), use `/dispatch 1`. Check III: no new artifact yet (check-iii-2026-07-12.json last; timer fires Sunday, artifact may appear later today). wm=755.
 
 ---
 
