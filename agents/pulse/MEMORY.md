@@ -634,9 +634,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## Status snapshot — updated 2026-07-19T10:32Z UTC (Iter ~5635, **Tier 3**, consecutive_clean=104)
+## Status snapshot — updated 2026-07-19T11:02Z UTC (Iter ~5636, **Tier 3**, consecutive_clean=105)
 
-**Iter ~5635 summary (2026-07-19T10:32Z):** ✅ Nominal. 0 new alerts. HEAD=5052ca6d==origin/main. inbox_watcher PID 776463 (~7d6h47m). beacon PID 3183708 (~1d5h20m). outbox-notifier PID 3183882 (~1d5h20m). Zombie PID 1834248 static carry (~51d15h13m). last_sync=2026-07-19T09:48:19Z UTC (no-change, push_failures=0). ratio≈21.89 (trailing-30d, trend=flat). **Tier 3**, consecutive_clean=104. [yellow] probe-blind:ourliberty-cycle.service (carry; idx=780). Check VIII awaiting Larry response (idx=931). Check VI awaiting Larry response (idx=990). Check XIV [1/3] carry. G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch: verification_pending. Check I: FIRED Sunday 2026-07-19, artifact check-i-2026-07-19.json, 1 proposal [small] pr3-staged-autonomy ($8.81, 128.6σ) dedup-skip (already dispatched 2026-07-13), use `/dispatch 1`. Check III: no new artifact yet (check-iii-2026-07-12.json last; timer fires Sunday, artifact may appear later today). wm=754.
+**Iter ~5636 summary (2026-07-19T11:02Z):** ✅ Nominal. 1 alert (L755 Tier-3 heal-dashboard-api-sha-drift). HEAD=b3458cf2==origin/main. inbox_watcher PID 776463 (~7d7h17m). beacon PID 3183708 (~1d5h50m). outbox-notifier PID 3183882 (~1d5h50m). Zombie PID 1834248 static carry (~51d15h43m). last_sync=2026-07-19T10:48:19Z UTC (no-change, push_failures=0). ratio≈21.89 (trailing-30d, trend=flat). **Tier 3**, consecutive_clean=105. [yellow] probe-blind:ourliberty-cycle.service (carry; idx=780). Check VIII awaiting Larry response (idx=931). Check VI awaiting Larry response (idx=990). Check XIV [1/3] carry. G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch: verification_pending. Check I: FIRED Sunday 2026-07-19, artifact check-i-2026-07-19.json, 1 proposal [small] pr3-staged-autonomy ($8.81, 128.6σ) dedup-skip (already dispatched 2026-07-13), use `/dispatch 1`. Check III: no new artifact yet (check-iii-2026-07-12.json last; timer fires Sunday, artifact may appear later today). wm=755.
 
 ---
 
