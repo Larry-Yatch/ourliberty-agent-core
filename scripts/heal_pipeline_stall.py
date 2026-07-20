@@ -192,6 +192,7 @@ BUILD_SEQUENCES_DIR = AGENTS_ROOT / 'blackboard' / 'build-sequences'
 REPOS = [
     'Larry-Yatch/ourliberty-agent-core',
     'Larry-Yatch/ourliberty-dashboard',
+    'Larry-Yatch/RSDPM',
 ]
 
 GH_TIMEOUT_S = 30

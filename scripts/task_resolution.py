@@ -47,6 +47,7 @@ GH_TIMEOUT_S = 15
 DEFAULT_REPOS = (
     'Larry-Yatch/ourliberty-agent-core',
     'Larry-Yatch/ourliberty-dashboard',
+    'Larry-Yatch/RSDPM',
 )
 
 # Branch-truncation floor: Forge truncates long branch names, so a PR branch

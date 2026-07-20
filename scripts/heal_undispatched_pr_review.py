@@ -170,6 +170,7 @@ STATE_FILE = AGENTS_ROOT / 'state' / 'heal-undispatched-pr-review.json'
 REPOS = (
     'Larry-Yatch/ourliberty-agent-core',
     'Larry-Yatch/ourliberty-dashboard',
+    'Larry-Yatch/RSDPM',
 )
 # Three classes of open PR get auto-routed to a Mirror review:
 #   1. Forge build PRs — head branch `forge/<task-id>` (the original #412 gap).
