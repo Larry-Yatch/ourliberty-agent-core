@@ -9237,6 +9237,19 @@
         "root_signature": "heal-claude-json-bind-drift::probe-blind",
         "count_at_proposal": 1,
         "rationale": "A healer reporting probe-blind for five consecutive weeks on a rising trend is a real instrumentation or connectivity defect, not noise \u2014 the probe mechanism needs to be repaired."
+      },
+      "briefing": {
+        "what": "The team ran a review of a recent self-fix, checking whether a monitoring blind spot has been fully closed.",
+        "why": "Catching gaps in how the system watches itself keeps small glitches from turning into outages that reach customers.",
+        "suggest": "This is routine housekeeping that's already in hand \u2014 glance at the takeaways when convenient, but no decision is needed from you."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-20T13:20:31.181276+00:00",
+        "from_state": "proposed"
       }
     },
     {
@@ -9258,6 +9271,19 @@
         "root_signature": "ledger::weekly",
         "count_at_proposal": 4,
         "rationale": "Five weeks of steady, operator-ignored weekly ledger alerts with no approve/reject/ack responses indicates a recurring informational digest that should be held on the dashboard without DMing."
+      },
+      "briefing": {
+        "what": "A weekly look-back report summarizing how the team's work went this past week.",
+        "why": "Regular reviews like this catch small problems early and keep the team improving, so nothing festers into a bigger issue.",
+        "suggest": "Give it a quick read when you have a moment \u2014 it's routine and low-stakes, so no urgent action is needed from you."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-20T13:20:31.181276+00:00",
+        "from_state": "proposed"
       }
     },
     {
@@ -9279,6 +9305,19 @@
         "root_signature": "pulse::check-i",
         "count_at_proposal": 5,
         "rationale": "Five weeks of rising, unaddressed check-I failures with zero operator response suggests a real recurring defect that is worsening, not benign noise the operator has silently accepted."
+      },
+      "briefing": {
+        "what": "The team ran a routine self-review of how the operation performed today and wrote up what they found.",
+        "why": "These regular check-ins catch small problems early and keep the operation running smoothly, before issues grow into costly ones.",
+        "suggest": "Give it a quick look when you have a moment, but there's nothing here that needs a decision from you right now."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-20T13:20:31.181276+00:00",
+        "from_state": "proposed"
       }
     },
     {
@@ -9300,6 +9339,19 @@
         "root_signature": "pulse-check-viii::check-viii-update",
         "count_at_proposal": 1,
         "rationale": "Memory confirms this check requires a healer code change (not just config) that was explicitly deferred into A-vs-B work; the alert will keep recurring until that code change lands."
+      },
+      "briefing": {
+        "what": "The team ran a routine internal review of one of our automated systems to make sure it's still working as intended.",
+        "why": "These regular check-ups keep our operations reliable and catch small problems before they become expensive ones, but this one isn't yet linked to any active priority.",
+        "suggest": "No action needed from you \u2014 this is safe housekeeping, so let it wrap up on its own unless you want it tied to a specific goal."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-20T13:20:31.181276+00:00",
+        "from_state": "proposed"
       }
     },
     {
@@ -9321,6 +9373,19 @@
         "root_signature": "pulse-check-xiv::pulse-check-xiv-digest",
         "count_at_proposal": 1,
         "rationale": "Two weeks of steady, operator-ignored digest alerts from check-XIV with no action taken indicates an informational summary subject that should be silenced in Medic rather than DM-ing on each sweep."
+      },
+      "briefing": {
+        "what": "A routine end-of-cycle review the team ran to check in on how a recent batch of work went.",
+        "why": "These check-ins keep the operation healthy and surface small issues early, but this one isn't attached to any active priority yet.",
+        "suggest": "Low stakes \u2014 a quick glance to confirm nothing needs your attention is enough; no action required."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-20T13:20:31.181276+00:00",
+        "from_state": "proposed"
       }
     },
     {
@@ -9342,6 +9407,19 @@
         "root_signature": "pulse-check-xiv::pulse-check-xiv-oversilence",
         "count_at_proposal": 2,
         "rationale": "An oversilence warning from check-XIV that the operator consistently ignores points to a miscalibrated threshold or flawed detection logic in the check itself, not to a benign pattern worth suppressing."
+      },
+      "briefing": {
+        "what": "The team ran an internal review looking at whether the system has been too quiet lately and missing things it should have flagged.",
+        "why": "Catching blind spots early keeps the operation reliable and prevents small misses from turning into problems you hear about too late.",
+        "suggest": "Let it wrap up on its own and give it a quick look when it's done \u2014 nothing here needs your hands-on attention right now."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-20T13:20:31.181276+00:00",
+        "from_state": "proposed"
       }
     }
   ]
