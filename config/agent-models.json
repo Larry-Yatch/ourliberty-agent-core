@@ -22,7 +22,7 @@
       "inbox_model": "claude-opus-4-8",
       "fallback_model": "claude-sonnet-4-6",
       "worktree_enabled": true,
-      "allowed_repos": ["ourliberty-agent-core", "ourliberty-dashboard", "ourliberty-graph"],
+      "allowed_repos": ["ourliberty-agent-core", "ourliberty-dashboard", "ourliberty-graph", "RSDPM"],
       "note": "Sonnet for chat / routine implementation. Opus for hard tasks (architecture, debugging, security review). Forge can self-escalate to Opus mid-task by setting model in the inbox handshake. worktree_enabled: dispatches go into /tmp/wt-forge-<task_id>/ via worktree_manager; allowed_repos gates target_repo on inbox writes."
     },
     "mirror": {
@@ -33,7 +33,7 @@
       "fallback_model": "claude-sonnet-4-6",
       "worktree_enabled": true,
       "review_slots": 2,
-      "allowed_repos": ["ourliberty-agent-core", "ourliberty-dashboard", "ourliberty-graph"],
+      "allowed_repos": ["ourliberty-agent-core", "ourliberty-dashboard", "ourliberty-graph", "RSDPM"],
       "note": "Opus for actual reviews. Sonnet acceptable for chat / status queries. worktree_enabled: review dispatches go into a per-task worktree (~/agent-worktrees/wt-mirror-<task_id>/) so Mirror can gh pr checkout the branch and run tests against the PR. allowed_repos gates target_repo on inbox writes (same shape as Forge). review_slots=2 (mirror-two-slot-review-spec §4 PR3): spawns two concurrent review watcher threads consuming the one mirror inbox; the slot plumbing landed inert in PR1/PR2. Rollback = set to 1 (or delete the key) + restart the watcher (spec §6.4)."
     },
     "pulse": {
@@ -131,7 +131,8 @@
   "repo_paths": {
     "ourliberty-agent-core": "/home/larry/agent-core",
     "ourliberty-dashboard": "/home/larry/ourliberty-dashboard",
-    "ourliberty-graph": "/home/larry/ourliberty-graph"
+    "ourliberty-graph": "/home/larry/ourliberty-graph",
+    "RSDPM": "/home/larry/RSDPM"
   },
   "_history": [
     {
@@ -227,6 +228,11 @@
       "date": "2026-06-26",
       "change": "mirror-marker-self-validate-gate-001: add loop_bounds.mirror_marker_self_validate_retries=2. Caps a new SAME-PROCESS verdict-marker self-validation re-prompt loop in inbox_watcher.process_task that detects a malformed/missing Mirror verdict marker (phase=review, run_claude success) via mirror_review_handler.parse_mirror_marker and re-invokes run_claude under --resume with a terse correction BEFORE the outbox is written. Kills the slow cross-process round-trip that fired (via outbox_notifier._notify_mirror_marker_error) on Mirror's first review within ~10-25 min of a mirror-bot restart (G-rule mirror-malformed-verdict-post-restart-001, 3/3: PR #728/#729, #728 retry, #731). The gate is a fast inner loop in FRONT of the existing slow outer net, never a replacement — on exhaust the best-effort outbox is written and outbox_notifier's marker-error path still fires. Default 2; 0 disables. No daemon-behavior change for non-mirror / non-review tasks or run_claude failures.",
       "author": "Forge (via Beacon D3 dispatch)"
+    },
+    {
+      "date": "2026-07-19",
+      "change": "RSDPM onboarding (BUILD_PLAN prep-week P3): add 'RSDPM' (Larry-Yatch/RSDPM, the 4th factory dispatch repo — RS Digital Project Manager for Rocket Station) to forge.allowed_repos + mirror.allowed_repos AND repo_paths (-> /home/larry/RSDPM). Follows the proven ourliberty-graph onboarding path (the 4-layer checklist): layer 1 (this allowlist add) + layer 2 (this repo_paths add) gate the routing_validator inbox write + inbox_watcher worktree creation; layer 3 = restart ourliberty-beacon-bot.service so routing_validator._MODELS_CACHE re-reads this file (in-process cache, never re-read otherwise); layer 4 = append /home/larry/RSDPM to ReadWritePaths on ourliberty-inbox-watcher/outbox-notifier/cleanup-dispatch-branches .service units + cp to /etc/systemd/system + daemon-reload + restart (git worktree add EROFSes under ProtectHome=read-only otherwise). RSDPM main has no branch protection (auto-merge unblocked). Trust: RSDPM is NOT added to any auto_approve rule — it resolves to the global default_action=force_ask (beacon->forge auto_approve is scoped to ourliberty-agent-core only); the repo stays force_ask until trust is dialed up per confidence via the dashboard autonomy dial.",
+      "author": "Claude (RSDPM provisioning chat)"
     }
   ]
 }
