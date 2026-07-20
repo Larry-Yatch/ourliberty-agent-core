@@ -9421,6 +9421,23 @@
         "at": "2026-07-20T13:20:31.181276+00:00",
         "from_state": "proposed"
       }
+    },
+    {
+      "id": "proposed-check-viii-suppress-deprecate-when-already-disabled-001",
+      "name": "Check Viii Suppress Deprecate When Already Disabled 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `check-viii-suppress-deprecate-when-already-disabled-001`. Last activity 2026-07-20T16:35:28.331055+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "check-viii-suppress-deprecate-when-already-disabled-001"
+      ],
+      "repo": null,
+      "created": "2026-07-20",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-20T16:43:41.287715+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-20T16:35:28.331055+00:00"
     }
   ]
 }
