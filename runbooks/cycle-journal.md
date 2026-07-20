@@ -4,6 +4,85 @@
 
 ---
 
+## Iteration ~5687 — 2026-07-20T13:07Z UTC (Larry /cycle chat, Tier 2)
+
+**Health:** ✅ Nominal. 1 new alert (Tier-3 silence). All mandatory + additive checks clean. wm=769 (fl=769). **Tier 2**, consecutive_clean→2.
+
+**VERIFY-BEFORE-REASSERT (from iter ~5686 status snapshot at 12:52Z UTC):**
+- **"HEAD=4dd58d27==origin/main"**: UPDATED ✅ — wrapper committed eb987d56 (Pulse cycle 20260720T125423Z). HEAD=eb987d56==origin/main ✅
+- **"zombie PID 1834248 (~52d17h33m)"**: UPDATED ⚠️ — etime=52-17:47:44 (~52d17h47m). [carry, static]
+- **"beacon PID 3801553 (~11h7m)"**: UPDATED ✅ — etime=11:22:11 (~11h22m) ✅
+- **"outbox-notifier PID 3801576 (~11h7m)"**: UPDATED ✅ — etime=11:22:11 (~11h22m) ✅
+- **"inbox_watcher PID 3801575 (~11h7m)"**: UPDATED ✅ — etime=11:22:11 (~11h22m) ✅
+- **"last_sync=2026-07-20T12:51:16Z UTC"**: CONFIRMED ✅ — same timestamp (~16 min at ~13:07Z check), status=no-change, push_failures=0. NOMINAL ✅
+- **"wm=768"**: UPDATED ✅ — 1 new alert at line 769; triaged Tier 3; wm advanced to 769. ✅
+- **"0 open PRs"**: CONFIRMED ✅ — 0 open PRs both repos. NOMINAL ✅
+- All other carries unchanged. [carry]
+
+**Check 0 — Alert triage:**
+- `repair-watermark`: repaired=false (old_wm=768, fl=769). 1 new alert.
+- L769: `source=heal-dashboard-api-sha-drift, subject=dashboard-api-sha-drift-healed` (2026-07-20T12:56:21Z UTC) — healer auto-restarted ourliberty-dashboard-api.service (running 4dd58d27, on-disk HEAD eb987d56 per Pulse wrapper commit). route=digest. Bot confirmed skipped DM (idx=768 at 12:59:52Z UTC). **Triage: Tier 3** (known-pattern match in alert-translations.json). wm advanced 768→769. NOMINAL ✅
+
+**Check 1 — Log noise:** outbox-notifier.log: 0 WARN/ERROR. Last restart 2026-07-19T23:10:59 MDT (2026-07-20T05:10:59Z UTC). Idle since (expected — no open PRs, no pending tasks). NOMINAL ✅
+
+**Check 2 — Telegram sweep:** Bot last delivery: idx=767 (pulse-check-xiv-digest) at 05:54:18 MDT (11:54:18Z UTC). Last idx non-digest delivery: idx=765 (pulse-check-xiv-oversilence:heal-dashboard-api-sha-drift) at 05:54:17 MDT. No Larry messages in recent entries. PIDs 3801553/3801576 confirmed alive (~11h22m). pending=0, history=488. NOMINAL ✅
+
+**Check 3 — Pipeline stall:** DRY-RUN (13:06:36Z UTC) → "no stalls detected." NOMINAL ✅
+
+**Check 4 — Pending directives:** pending=0, history=488. All inboxes empty (beacon=0, forge=0, mirror=0). NOMINAL ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-20T13:00:21Z UTC (~7 min at ~13:07Z check). NOMINAL ✅
+
+**Check A — Source repo:** HEAD=eb987d56==origin/main ✅; on main ✅; clean tree ✅; 0 behind/0 ahead ✅. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-20T12:51:16Z UTC (~16 min), status=no-change, push_failures=0. NOMINAL ✅
+**Check C — Agent liveness:** beacon PID 3801553 ✅ (~11h22m); outbox-notifier PID 3801576 ✅ (~11h22m); inbox_watcher PID 3801575 ✅ (~11h22m). ⚠️ Zombie PID 1834248 (~52d17h47m, bash poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`). [carry, static]
+**Check E — PR/merge state:** 0 open PRs agent-core; 0 open PRs dashboard. NOMINAL ✅
+**Check H — Forge/Beacon/Mirror activity:** All inboxes empty (0/0/0). NOMINAL ✅
+**Rotations:** 0 overdue. NOMINAL ✅
+
+**§5.0:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks:**
+- **Check I:** Monday firing expected ~14:14Z UTC today; current time ~13:07Z (~1h7m out). No new artifact since check-i-2026-07-19.json (Sunday). Dedup-skip anticipated (same `pr3-staged-autonomy` proposal). dm_route second-emission-Sunday carry (1st occurrence 2026-07-19T14:14Z; monitor Wed 2026-07-23). [carry]
+- **Check III:** OFF-WEEK ✅ — biweekly cadence. Next fire: 2026-07-26 04:42:51 MDT.
+- **Check VIII:** TWO proposals pending (2026-07-13 + 2026-07-20). Awaiting Larry response. [carry yellow]
+- **Check XIV:** [2/3 carry]. Bot DM'd Larry. Dispatch at 3/3 (next firing).
+- **Check XI:** CLOSED ✅ — over_gate=false. [carry]
+- Check IV/VI/IX/X/XII: timer-managed. No new artifacts. ✅
+
+**G-rule assessment:** 0 new occurrences this iter. All active G-rule counts carry unchanged.
+
+**Actions taken:**
+1. Check 0: 1 new alert triaged Tier 3 (heal-dashboard-api-sha-drift known pattern). wm advanced 768→769. ✅
+2. §5.0: all three one-shots no-op. ✅
+3. PRIME ledger: `iter_clean` appended (13:07:45Z UTC). ✅
+4. Tier state: `record --checks-clean true` → Tier 2, consecutive_clean=2. ✅
+
+**Escalations:** 0 new Pulse DMs. All prior escalations carry.
+
+**Standing findings:**
+- [yellow] **probe-blind:ourliberty-cycle.service** *(carry from iter ~5574)* — heal-claude-json-bind-drift healer blind for cycle.service mount namespace. Bot DM'd Larry 00:54Z UTC (idx=780). [ask-then-do]
+- [yellow] **check-viii — TWO proposals pending (2026-07-13 + 2026-07-20)** — TP=0 across 8w/3648 quota-events, recommend DEPRECATE token gate. Bot DM'd both. Reply `approve check-viii-update-2026-07-13` or `approve check-viii-update-2026-07-20`. [carry]
+- [yellow] **zombie-bash-pid-1834248** — ~52d17h47m, bash poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`. ask-then-do: `kill 1834248`. [carry, static]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07`. [carry]
+- [green] **sync VERIFIED** — status=no-change, last_sync=12:51:16Z UTC; HEAD=eb987d56==origin/main. [stable]
+- [green] **daemons healthy** — beacon PID 3801553, outbox-notifier PID 3801576, inbox_watcher PID 3801575 (~11h22m). [stable]
+- [blue] **pulse-check-xiv-tier4-001 [2/3]** — Dispatch at 3/3 (next Check XIV firing). Bot DM'd Larry. Oversilence findings confirmed correct. [carry]
+- [blue] **Check I — Monday firing expected ~14:14Z UTC 2026-07-20** — ~1h7m out at check time; not yet fired; dedup-skip anticipated.
+- [blue] **Check I dm_route second-emission-Sunday** — 1st occurrence 2026-07-19T14:14Z. Monitor at Wed 2026-07-23 next firing. [carry]
+- [blue] **Ledger weekly 2026-07-20** — $392.22 total, −79.8% vs prior week. No Pulse action. [carry]
+- [blue] **review-ceiling-fit ATTENTION** — 9 false-kills in 30d; recommends RAISE ceiling 35→45 min. No Pulse action. [carry]
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch — DISPATCHED ✅ (3/3)** — verification_pending. [carry]
+- [blue] **G-rules (dispatched, vp):** forge-wip-redispatch-exhausted-genuine-no-pr-001; ourliberty-health-subject-key-mismatch-001; outbox-notifier-notification-intent-reject-tier4-001; forge-wip-redispatch-digest-tier4-001; forge-revision-preamble-missing-pr711-001; forge-wip-redispatch-exhausted-pr-exists-fp-001; decision-needed-approval-forge-dispatch-no-target-repo-001; no-session-revision-active-mirror-session-fp-001.
+- [blue] **G-rule 2/3:** outbox-notifier-notification-intent-review-escalate-tier4-001; outbox-notifier-auto-merge-stale-revalidation-tier4-001; pulse-check-xiv-tier4-001.
+- [blue] **G-rule 1/3:** medic-approval-request-tier4-001; mirror-malformed-verdict-heal-reap-path-001; mirror-queue-wait-gauge-tier4-001; inbox-watcher-tier-pool-all-unavailable-tier4-001; heal-pipeline-stall-unrouted-deep-review-required-fp-001; heal-pulse-check-staleness-single-flight-skip-fp-001; gate-parallelism-monitor-regression-data-001; pulse-rotation-check-source-tier4-001; pulse-auto-dispatch-null-reply-chat-id-post-pr950 [carry].
+- [blue] **missions-autoregister: proposed card `proposed-no-session-revision-mirror-active-fp-001` flagged 14d+ no shipped-PR** — digest route; Tier-3 silence; missions healer owns decision flow. [carry]
+
+**PRIME DIRECTIVE:** 0 new interventions; 0 new systemic_fixes; iter_clean appended (13:07:45Z UTC). ratio≈22.85 (trailing-30d, trend=improving).
+**Tier end-of-iter:** **Tier 2** (consecutive_clean=2; last_signal_at=2026-07-20T12:14:47Z UTC). One more clean iter de-escalates to Tier 3.
+
+---
+
 ## Iteration ~5686 — 2026-07-20T12:52Z UTC (Larry /loop /cycle, Tier 2)
 
 **Health:** ✅ Nominal. 0 new alerts. All mandatory + additive checks clean. wm=768 stable (fl=768). **Tier 2**, consecutive_clean→1.
@@ -3056,84 +3135,6 @@
 
 **PRIME DIRECTIVE:** 0 new interventions; 0 new systemic_fixes; iter_clean appended (17:32:59Z UTC). ratio≈22.22 (trailing-30d, trend=improving).
 **Tier end-of-iter:** **Tier 3** (consecutive_clean=117).
-
----
-
-## Iteration ~5647 — 2026-07-19T17:01Z UTC (Larry /cycle, Tier 3)
-
-**Health:** ✅ Nominal. 1 new alert (L761 Tier-3 silence). All mandatory + additive checks clean. wm=760→761. **Tier 3**, consecutive_clean→116.
-
-**VERIFY-BEFORE-REASSERT (from iter ~5646 status snapshot at 16:26Z UTC):**
-- **"HEAD=64d3d1e3==origin/main"**: UPDATED ✅ — wrapper committed 608dbc1f (Pulse cycle 20260719T163032Z). HEAD=608dbc1f==origin/main ✅
-- **"zombie PID 1834248 (~51d21h7m)"**: UPDATED ⚠️ — etime=51-21:42:27 (~51d21h42m). [carry, static]
-- **"beacon PID 3183708 (~1d11h15m)"**: UPDATED ✅ — etime=1-11:49:55 (~1d11h50m) ✅
-- **"outbox-notifier PID 3183882 (~1d11h15m)"**: UPDATED ✅ — etime=1-11:49:51 (~1d11h50m) ✅
-- **"inbox_watcher PID 776463 (~7d12h41m)"**: UPDATED ✅ — etime=7-13:16:23 (~7d13h16m) ✅
-- **"last_sync=2026-07-19T15:48:47Z UTC"**: UPDATED ✅ — last_sync=2026-07-19T16:48:51Z UTC (~12 min at ~17:01Z check), status=no-change, push_failures=0. NOMINAL ✅
-- **"wm=760"**: UPDATED ✅ — 1 new alert at L761 (heal-dashboard-api-sha-drift Tier-3). wm→761. ✅
-- **"0 open PRs"**: CONFIRMED ✅ — 0 open PRs both repos. NOMINAL ✅
-- **"Check III OFF-WEEK"**: CONFIRMED ✅ — next fire 2026-07-26. OFF-WEEK. ✅
-- All other carries (check-viii, check-vi, Check I artifact, pulse-check-xiv, G-rule vp items, probe-blind, dm_route second-emission-Sunday, pulse-auto-dispatch-null-reply-chat-id [1/3]) unchanged. [carry]
-
-**Check 0 — Alert triage:**
-- `repair-watermark`: repaired=false (old_wm=760, fl=761). 1 new alert.
-- **L761:** `source=heal-dashboard-api-sha-drift, subject=dashboard-api-sha-drift-healed, route=digest, ts=2026-07-19T16:32:43Z` — dashboard-api restarted on HEAD 608dbc1f after Pulse cycle 20260719T163032Z commit. Triage helper: **Tier-3 silence** (known-pattern match). No Pulse DM. wm→761. ✅
-
-**Check 1 — Log noise:** outbox-notifier.log: last meaningful activity notifier restart 23:10:59 MDT 2026-07-17 (05:11Z UTC 2026-07-18); idle since (no open PRs). No WARN/ERROR in recent lines. NOMINAL ✅
-
-**Check 2 — Telegram sweep:** Bot log last entry: idx=760 route=digest (heal-dashboard-api-sha-drift) at [2026-07-19T10:34:17-0600] (16:34:17Z UTC, ~27 min before check). No new Larry messages. No agent-distress keywords. PIDs 3183708/3183882 confirmed alive (~1d11h50m). pending=0, history=488. NOMINAL ✅
-
-**Check 3 — Pipeline stall:** DRY-RUN (17:01:12Z UTC) → "no stalls detected." NOMINAL ✅
-
-**Check 4 — Pending directives:** pending=0, history=488. NOMINAL ✅
-
-**Check 5 — Stale daemon code:** heartbeat=2026-07-19T16:55:44Z UTC (~5 min at ~17:01Z check). NOMINAL ✅
-
-**Check A — Source repo:** HEAD=608dbc1f==origin/main ✅; on main ✅; clean tree ✅; 0 behind/0 ahead ✅. NOMINAL ✅
-**Check B — Sync health:** last_sync=2026-07-19T16:48:51Z UTC (~12 min), status=no-change, consecutive_push_failures=0. NOMINAL ✅
-**Check C — Agent liveness:** beacon PID 3183708 ✅ (~1d11h50m); outbox-notifier PID 3183882 ✅ (~1d11h50m); inbox_watcher PID 776463 ✅ (~7d13h16m). ⚠️ Zombie PID 1834248 (~51d21h42m, bash poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`). [carry, static]
-**Check E — PR/merge state:** 0 open PRs agent-core; 0 open PRs dashboard. NOMINAL ✅
-**Check H — Forge/Beacon/Mirror activity:** All inboxes empty (0/0/0). NOMINAL ✅
-**Rotations:** 0 overdue. NOMINAL ✅
-
-**§5.0:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
-
-**Conditional checks:**
-- **Check I:** CARRY ✅ — artifact check-i-2026-07-19.json (Sunday firing). 1 proposal [small] `pr3-staged-autonomy` ($8.81, 128.6σ). Dedup skip (already dispatched 2026-07-13). Use `/dispatch 1` anytime. dm_route second-emission-Sunday carry (1st occurrence 2026-07-19T14:14Z; monitor Wed 2026-07-23).
-- **Check III:** OFF-WEEK ✅ — biweekly cadence. Next fire: 2026-07-26 04:42:51 MDT. [no-carry needed]
-- **Check VIII:** Timer fired 11:12Z UTC 2026-07-13; proposal idx=931. Awaiting Larry response. [carry yellow]
-- **Check XIV:** Last artifact check-xiv-2026-07-13.json. [1/3 carry]
-- **Check XI:** CLOSED ✅ — over_gate=false. [carry]
-- Check IV/VI/IX/X/XII: timer-managed. No new artifacts. ✅
-
-**G-rule assessment:** 0 new G-rule occurrences. All active G-rule counts carry unchanged.
-
-**Actions taken:**
-1. Check 0: 1 alert (L761), Tier-3 silenced (heal-dashboard-api-sha-drift). wm 760→761. ✅
-2. §5.0: all three one-shots no-op. ✅
-3. PRIME ledger: `iter_clean` appended (17:01:32Z UTC). ✅
-4. Tier state: `record --checks-clean true` → Tier 3, consecutive_clean=116. ✅
-
-**Escalations:** 0 new Pulse DMs. All prior escalations carry.
-
-**Standing findings:**
-- [yellow] **probe-blind:ourliberty-cycle.service** *(carry from iter ~5574)* — heal-claude-json-bind-drift healer blind for cycle.service mount namespace. Bot DM'd Larry 00:54Z UTC (idx=780). [ask-then-do]
-- [yellow] **check-viii-deprecate-token-gate-2026-07-13** — idx=931. Reply `approve check-viii-update-2026-07-13` or `reject check-viii-update-2026-07-13 <reason>`. [carry]
-- [yellow] **zombie-bash-pid-1834248** — ~51d21h42m, bash poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`. ask-then-do: `kill 1834248`. [carry, static]
-- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07`. [carry]
-- [green] **sync VERIFIED** — status=no-change, last_sync=16:48:51Z UTC; HEAD=608dbc1f==origin/main. [stable]
-- [green] **daemons healthy** — beacon PID 3183708, outbox-notifier PID 3183882 (~1d11h50m); inbox_watcher PID 776463 (~7d13h16m). [stable]
-- [blue] **review-ceiling-fit ATTENTION** — 9 false-kills in 30d; recommends RAISE ceiling 35→45 min. Tier-3. No Pulse action. [carry]
-- [blue] **Check I — FIRED ✅ Sunday 2026-07-19** — Artifact check-i-2026-07-19.json. 1 proposal [small] `pr3-staged-autonomy`. Dedup skip. Use `/dispatch 1` anytime. dm_route second-emission noted.
-- [blue] **pulse-check-xiv-tier4-001 [1/3]** — Dispatch at 3/3. [carry]
-- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch — DISPATCHED ✅ (3/3)** — verification_pending. [carry]
-- [blue] **G-rules (dispatched, vp):** forge-wip-redispatch-exhausted-genuine-no-pr-001; ourliberty-health-subject-key-mismatch-001; outbox-notifier-notification-intent-reject-tier4-001; forge-wip-redispatch-digest-tier4-001; forge-revision-preamble-missing-pr711-001; forge-wip-redispatch-exhausted-pr-exists-fp-001; decision-needed-approval-forge-dispatch-no-target-repo-001; no-session-revision-active-mirror-session-fp-001.
-- [blue] **G-rule 2/3:** outbox-notifier-notification-intent-review-escalate-tier4-001; outbox-notifier-auto-merge-stale-revalidation-tier4-001.
-- [blue] **G-rule 1/3:** pulse-check-xiv-tier4-001; medic-approval-request-tier4-001; mirror-malformed-verdict-heal-reap-path-001; mirror-queue-wait-gauge-tier4-001; inbox-watcher-tier-pool-all-unavailable-tier4-001; heal-pipeline-stall-unrouted-deep-review-required-fp-001; heal-pulse-check-staleness-single-flight-skip-fp-001; gate-parallelism-monitor-regression-data-001; pulse-rotation-check-source-tier4-001; pulse-auto-dispatch-null-reply-chat-id-post-pr950 [carry].
-- [blue] **Check I dm_route second-emission-Sunday** — 1st occurrence 2026-07-19T14:14Z. Monitor at Wed 2026-07-23 next firing. [carry]
-
-**PRIME DIRECTIVE:** 0 new interventions; 0 new systemic_fixes; iter_clean appended (17:01:32Z UTC). ratio≈22.22 (trailing-30d, trend=improving).
-**Tier end-of-iter:** **Tier 3** (consecutive_clean=116).
 
 ---
 
