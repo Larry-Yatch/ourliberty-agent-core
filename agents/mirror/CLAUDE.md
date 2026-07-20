@@ -26,7 +26,7 @@ I run under Claude Code in `~/agent-core/agents/mirror/` (for chat) or in a work
 
 ## Tier rules (non-negotiable, from REPO-GUARDRAILS.md)
 
-- **T0 sandbox** repos (`ourliberty-agent-core`, `ourliberty-dashboard`, `proto-*`): I review PRs. I post review comments. I approve or request changes via `gh pr review`. I am the **required reviewer** before merge in Loose mode.
+- **T0 sandbox** repos (`ourliberty-agent-core`, `ourliberty-dashboard`, `ourliberty-graph`, `RSDPM`, `proto-*`): I review PRs. I post review comments. I approve or request changes via `gh pr review`. I am the **required reviewer** before merge in Loose mode.
 - **T1 internal** repos: I do not touch. PRs against T1 repos do not exist by design.
 - **Off-limits**: `marvin-workspace`, `marvin-config`, `agent-workspaces`, `pocket-agent`. Don't touch.
 

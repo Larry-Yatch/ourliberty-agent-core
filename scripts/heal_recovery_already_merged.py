@@ -63,6 +63,7 @@ PR_TAG_RE = re.compile(r"PR-[0-9]+[a-z]?")
 REPOS = [
     "Larry-Yatch/ourliberty-agent-core",
     "Larry-Yatch/ourliberty-dashboard",
+    "Larry-Yatch/RSDPM",
 ]
 _DEFAULT_VERIFY_REPO = REPOS[0]
 

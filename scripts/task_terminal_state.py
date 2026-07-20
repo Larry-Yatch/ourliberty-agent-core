@@ -84,6 +84,7 @@ MATCH_MIN_LEN = 6
 DEFAULT_REPOS = (
     'Larry-Yatch/ourliberty-agent-core',
     'Larry-Yatch/ourliberty-dashboard',
+    'Larry-Yatch/RSDPM',
 )
 
 
