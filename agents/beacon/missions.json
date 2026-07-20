@@ -9217,6 +9217,132 @@
       "retired_at": "2026-07-18T23:12:26.175904+00:00",
       "retired_reason": "orphan-terminal",
       "retired_signal": "pr_merged:#705"
+    },
+    {
+      "id": "retrospective-heal-claude-json-bind-drift-probe-blind-2026-07-20",
+      "name": "retrospective heal-claude-json-bind-drift-probe-blind 2026-07-20",
+      "phase": "proposed",
+      "brief": "Weekly elevation retrospective (2026-07-20) \u2014 FIX-PERMANENTLY.\n\nSignature: heal-claude-json-bind-drift::probe-blind\nSource: heal-claude-json-bind-drift  \u00b7  subject: probe-blind\nThis period: 1 fire(s), 5 week(s) recurring, trend=rising.\nResolution histogram: {'approve': 0, 'reject': 0, 'silence': 0, 'ack': 0, 'none': 1}.\n\nRationale: A healer reporting probe-blind for five consecutive weeks on a rising trend is a real instrumentation or connectivity defect, not noise \u2014 the probe mechanism needs to be repaired.\n\nRecurring problem with no safe templated auto-fix \u2014 build an objective fix (spec, no code in this card). Accept to start drafting; dismiss to silence.",
+      "spec_docs": [
+        "agents/beacon/specs/alert-pipeline-rework.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-07-20",
+      "deferred_reason": null,
+      "proposed_by": "retrospective-author",
+      "proposed_at": "2026-07-20T13:02:05.418914+00:00",
+      "predraft": {
+        "classification": "fix-permanently",
+        "root_signature": "heal-claude-json-bind-drift::probe-blind",
+        "count_at_proposal": 1,
+        "rationale": "A healer reporting probe-blind for five consecutive weeks on a rising trend is a real instrumentation or connectivity defect, not noise \u2014 the probe mechanism needs to be repaired."
+      }
+    },
+    {
+      "id": "retrospective-ledger-weekly-2026-07-20",
+      "name": "retrospective ledger-weekly 2026-07-20",
+      "phase": "proposed",
+      "brief": "Weekly elevation retrospective (2026-07-20) \u2014 FIX-PERMANENTLY.\n\nSignature: ledger::weekly\nSource: ledger  \u00b7  subject: weekly\nThis period: 4 fire(s), 5 week(s) recurring, trend=steady.\nResolution histogram: {'approve': 0, 'reject': 0, 'silence': 0, 'ack': 0, 'none': 4}.\n\nRationale: Five weeks of steady, operator-ignored weekly ledger alerts with no approve/reject/ack responses indicates a recurring informational digest that should be held on the dashboard without DMing.\n\nRecurring problem with no safe templated auto-fix \u2014 build an objective fix (spec, no code in this card). Accept to start drafting; dismiss to silence.",
+      "spec_docs": [
+        "agents/beacon/specs/alert-pipeline-rework.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-07-20",
+      "deferred_reason": null,
+      "proposed_by": "retrospective-author",
+      "proposed_at": "2026-07-20T13:02:05.379956+00:00",
+      "predraft": {
+        "classification": "fix-permanently",
+        "root_signature": "ledger::weekly",
+        "count_at_proposal": 4,
+        "rationale": "Five weeks of steady, operator-ignored weekly ledger alerts with no approve/reject/ack responses indicates a recurring informational digest that should be held on the dashboard without DMing."
+      }
+    },
+    {
+      "id": "retrospective-pulse-check-i-2026-07-20",
+      "name": "retrospective pulse-check-i 2026-07-20",
+      "phase": "proposed",
+      "brief": "Weekly elevation retrospective (2026-07-20) \u2014 FIX-PERMANENTLY.\n\nSignature: pulse::check-i\nSource: pulse  \u00b7  subject: check-i\nThis period: 5 fire(s), 5 week(s) recurring, trend=rising.\nResolution histogram: {'approve': 0, 'reject': 0, 'silence': 0, 'ack': 0, 'none': 5}.\n\nRationale: Five weeks of rising, unaddressed check-I failures with zero operator response suggests a real recurring defect that is worsening, not benign noise the operator has silently accepted.\n\nRecurring problem with no safe templated auto-fix \u2014 build an objective fix (spec, no code in this card). Accept to start drafting; dismiss to silence.",
+      "spec_docs": [
+        "agents/beacon/specs/alert-pipeline-rework.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-07-20",
+      "deferred_reason": null,
+      "proposed_by": "retrospective-author",
+      "proposed_at": "2026-07-20T13:02:05.357620+00:00",
+      "predraft": {
+        "classification": "fix-permanently",
+        "root_signature": "pulse::check-i",
+        "count_at_proposal": 5,
+        "rationale": "Five weeks of rising, unaddressed check-I failures with zero operator response suggests a real recurring defect that is worsening, not benign noise the operator has silently accepted."
+      }
+    },
+    {
+      "id": "retrospective-pulse-check-viii-check-viii-update-2026-07-20",
+      "name": "retrospective pulse-check-viii-check-viii-update 2026-07-20",
+      "phase": "proposed",
+      "brief": "Weekly elevation retrospective (2026-07-20) \u2014 FIX-PERMANENTLY.\n\nSignature: pulse-check-viii::check-viii-update\nSource: pulse-check-viii  \u00b7  subject: check-viii-update\nThis period: 1 fire(s), 3 week(s) recurring, trend=falling.\nResolution histogram: {'approve': 0, 'reject': 0, 'silence': 0, 'ack': 0, 'none': 1}.\n\nRationale: Memory confirms this check requires a healer code change (not just config) that was explicitly deferred into A-vs-B work; the alert will keep recurring until that code change lands.\n\nRecurring problem with no safe templated auto-fix \u2014 build an objective fix (spec, no code in this card). Accept to start drafting; dismiss to silence.",
+      "spec_docs": [
+        "agents/beacon/specs/alert-pipeline-rework.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-07-20",
+      "deferred_reason": null,
+      "proposed_by": "retrospective-author",
+      "proposed_at": "2026-07-20T13:02:05.438020+00:00",
+      "predraft": {
+        "classification": "fix-permanently",
+        "root_signature": "pulse-check-viii::check-viii-update",
+        "count_at_proposal": 1,
+        "rationale": "Memory confirms this check requires a healer code change (not just config) that was explicitly deferred into A-vs-B work; the alert will keep recurring until that code change lands."
+      }
+    },
+    {
+      "id": "retrospective-pulse-check-xiv-pulse-check-xiv-digest-2026-07-20",
+      "name": "retrospective pulse-check-xiv-pulse-check-xiv-digest 2026-07-20",
+      "phase": "proposed",
+      "brief": "Weekly elevation retrospective (2026-07-20) \u2014 FIX-PERMANENTLY.\n\nSignature: pulse-check-xiv::pulse-check-xiv-digest\nSource: pulse-check-xiv  \u00b7  subject: pulse-check-xiv-digest\nThis period: 1 fire(s), 2 week(s) recurring, trend=steady.\nResolution histogram: {'approve': 0, 'reject': 0, 'silence': 0, 'ack': 0, 'none': 1}.\n\nRationale: Two weeks of steady, operator-ignored digest alerts from check-XIV with no action taken indicates an informational summary subject that should be silenced in Medic rather than DM-ing on each sweep.\n\nRecurring problem with no safe templated auto-fix \u2014 build an objective fix (spec, no code in this card). Accept to start drafting; dismiss to silence.",
+      "spec_docs": [
+        "agents/beacon/specs/alert-pipeline-rework.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-07-20",
+      "deferred_reason": null,
+      "proposed_by": "retrospective-author",
+      "proposed_at": "2026-07-20T13:02:05.458319+00:00",
+      "predraft": {
+        "classification": "fix-permanently",
+        "root_signature": "pulse-check-xiv::pulse-check-xiv-digest",
+        "count_at_proposal": 1,
+        "rationale": "Two weeks of steady, operator-ignored digest alerts from check-XIV with no action taken indicates an informational summary subject that should be silenced in Medic rather than DM-ing on each sweep."
+      }
+    },
+    {
+      "id": "retrospective-pulse-check-xiv-pulse-check-xiv-oversilence-2026-07-20",
+      "name": "retrospective pulse-check-xiv-pulse-check-xiv-oversilence 2026-07-20",
+      "phase": "proposed",
+      "brief": "Weekly elevation retrospective (2026-07-20) \u2014 FIX-PERMANENTLY.\n\nSignature: pulse-check-xiv::pulse-check-xiv-oversilence\nSource: pulse-check-xiv  \u00b7  subject: pulse-check-xiv-oversilence\nThis period: 2 fire(s), 2 week(s) recurring, trend=steady.\nResolution histogram: {'approve': 0, 'reject': 0, 'silence': 0, 'ack': 0, 'none': 2}.\n\nRationale: An oversilence warning from check-XIV that the operator consistently ignores points to a miscalibrated threshold or flawed detection logic in the check itself, not to a benign pattern worth suppressing.\n\nRecurring problem with no safe templated auto-fix \u2014 build an objective fix (spec, no code in this card). Accept to start drafting; dismiss to silence.",
+      "spec_docs": [
+        "agents/beacon/specs/alert-pipeline-rework.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-07-20",
+      "deferred_reason": null,
+      "proposed_by": "retrospective-author",
+      "proposed_at": "2026-07-20T13:02:05.400880+00:00",
+      "predraft": {
+        "classification": "fix-permanently",
+        "root_signature": "pulse-check-xiv::pulse-check-xiv-oversilence",
+        "count_at_proposal": 2,
+        "rationale": "An oversilence warning from check-XIV that the operator consistently ignores points to a miscalibrated threshold or flawed detection logic in the check itself, not to a benign pattern worth suppressing."
+      }
     }
   ]
 }
