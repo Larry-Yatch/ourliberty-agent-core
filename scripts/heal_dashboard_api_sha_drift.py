@@ -73,6 +73,15 @@ REPO_DIR = Path(os.environ.get('OURLIBERTY_AGENT_CORE_DIR', '/home/larry/agent-c
 
 UNIT = 'ourliberty-dashboard-api.service'
 
+# The authoritative "these files, when changed, require a dashboard-api restart"
+# set: the API's entrypoint + its transitive import closure, maintained in
+# config/daemon-restart-manifest.json (and kept fresh by
+# heal_daemon_restart_manifest_drift.py). Env-overridable for tests.
+MANIFEST_PATH = Path(os.environ.get(
+    'DAEMON_RESTART_MANIFEST',
+    str(REPO_DIR / 'config' / 'daemon-restart-manifest.json'),
+))
+
 # The alert source + the TWO escalate subjects this healer can emit. The
 # positive-clear retraction (on the 'fresh' branch) keys on this SAME
 # source:subject pair so it retracts exactly its own stale reds, nothing else.
@@ -176,6 +185,77 @@ def read_disk_head(repo_dir: Path = REPO_DIR) -> Optional[str]:
     if proc.returncode != 0:
         return None
     return proc.stdout.strip() or None
+
+
+def _dashboard_api_watch_paths(
+    manifest_path: Path = MANIFEST_PATH,
+) -> Optional[set[str]]:
+    """The repo-relative paths whose change requires a dashboard-api restart:
+    the unit's `watch_paths` (its transitive import closure) UNION its
+    `entrypoint`, read from config/daemon-restart-manifest.json.
+
+    Returns None on any read/parse error, a missing unit entry, or an empty
+    watch_paths list — None is the fail-safe signal 'cannot determine the
+    restart-relevant set', which the predicate treats as 'must restart'.
+    """
+    try:
+        data = json.loads(Path(manifest_path).read_text())
+    except (FileNotFoundError, json.JSONDecodeError, OSError, ValueError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    unit = (data.get('units') or {}).get(UNIT)
+    if not isinstance(unit, dict):
+        return None
+    watch = unit.get('watch_paths')
+    if not isinstance(watch, list) or not watch:
+        return None
+    paths = {p for p in watch if isinstance(p, str) and p}
+    entrypoint = unit.get('entrypoint')
+    if isinstance(entrypoint, str) and entrypoint:
+        paths.add(entrypoint)
+    if not paths:
+        return None
+    return paths
+
+
+def _changed_paths(
+    running_sha: str, disk_head: str, repo_dir: Path = REPO_DIR,
+) -> Optional[set[str]]:
+    """Repo-relative paths that differ between the running process's loaded SHA
+    and on-disk HEAD (`git diff --name-only <running_sha> <disk_head>`).
+
+    Returns None on non-zero rc (e.g. running_sha absent after a history
+    rewrite), subprocess error, or timeout — None is the fail-safe signal
+    'cannot determine what changed', which the predicate treats as 'must
+    restart'.
+    """
+    try:
+        proc = subprocess.run(
+            ['git', '-C', str(repo_dir), 'diff', '--name-only',
+             running_sha, disk_head],
+            capture_output=True, text=True, timeout=10,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if proc.returncode != 0:
+        return None
+    return {ln.strip() for ln in proc.stdout.splitlines() if ln.strip()}
+
+
+def _drift_is_relevant(
+    *, watch_paths: Optional[set[str]], changed_paths: Optional[set[str]],
+) -> bool:
+    """Should a running_sha != disk_head drift trigger a restart?
+
+    True (restart) whenever we cannot PROVE the drift is irrelevant: either
+    set unknown (None -> fail safe), or the two sets intersect (a
+    restart-relevant file changed). False (skip) ONLY when both sets are known
+    AND disjoint — HEAD moved but touched nothing the dashboard-api serves.
+    """
+    if watch_paths is None or changed_paths is None:
+        return True
+    return bool(watch_paths & changed_paths)
 
 
 def _api_base() -> str:
@@ -392,6 +472,23 @@ def run_once(now: Optional[float] = None) -> str:
             return 'fresh'
         reason = (f'running git_sha {running_sha[:8]} != on-disk HEAD '
                   f'{disk_head[:8]}')
+        # Path-gate (PROBE_OK only — we have a running_sha to diff from): HEAD
+        # advances many times a day from commits that touch NONE of the
+        # dashboard-api's served code (Pulse cycles, missions deltas, unrelated
+        # healers). Restart ONLY when the running_sha..disk_head diff actually
+        # intersects the API's restart-relevant path set; otherwise the process
+        # is serving identical code and a restart is a needless availability
+        # blip. Fail safe to restart if either set can't be determined.
+        watch_paths = _dashboard_api_watch_paths()
+        changed_paths = _changed_paths(running_sha, disk_head)
+        if not _drift_is_relevant(
+                watch_paths=watch_paths, changed_paths=changed_paths):
+            log(f'fresh-irrelevant-drift: HEAD moved to {disk_head[:8]} but the '
+                f'running process serves identical dashboard-api code '
+                f'(running {running_sha[:8]}); no restart')
+            # Behaviorally the code is fresh, so any prior drift red resolves.
+            _retract_standdown()
+            return 'fresh-irrelevant-drift'
     elif probe_status == PROBE_FIELD_MISSING:
         reason = ('running process returned no git_sha (code predates the '
                   f'SHA-reporting field; on-disk HEAD is {disk_head[:8]})')

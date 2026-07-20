@@ -296,6 +296,138 @@ class ProbeParsingTest(_Base):
         self.assertEqual((st, sha), (h.PROBE_NO_TOKEN, None))
 
 
+class PathAwareDriftTest(_Base):
+    """dashboard-api-sha-drift-path-aware-restart-001: a PROBE_OK drift only
+    restarts when the running_sha..disk_head diff intersects the API's
+    restart-relevant path set. Irrelevant HEAD advances (Pulse cycles, missions
+    deltas, unrelated healers) no longer restart."""
+
+    _WATCH = {'scripts/dashboard_api.py', 'scripts/larry_alerts.py'}
+
+    def test_irrelevant_drift_skips_restart(self):
+        # Diff touches ONLY a non-watch_path -> no restart, no page.
+        restarts = []
+        self._patch(
+            read_disk_head=lambda *a, **k: 'b' * 40,
+            probe_running_sha=lambda *a, **k: (h.PROBE_OK, 'a' * 40),
+            restart_unit=lambda *a, **k: restarts.append(1) or (0, ''),
+            _dashboard_api_watch_paths=lambda *a, **k: set(self._WATCH),
+            _changed_paths=lambda *a, **k: {'agents/beacon/missions.json',
+                                            'scripts/heal_unrelated.py'},
+        )
+        self.assertEqual(h.run_once(now=1000.0), 'fresh-irrelevant-drift')
+        self.assertEqual(restarts, [])
+        self.assertEqual(self.dms, [])
+
+    def test_relevant_drift_restarts(self):
+        # Diff touches a watch_path (the API entrypoint) -> restart proceeds.
+        restarts = []
+        self._patch(
+            read_disk_head=lambda *a, **k: 'b' * 40,
+            probe_running_sha=lambda *a, **k: (h.PROBE_OK, 'a' * 40),
+            restart_unit=lambda *a, **k: restarts.append(1) or (0, ''),
+            _dashboard_api_watch_paths=lambda *a, **k: set(self._WATCH),
+            _changed_paths=lambda *a, **k: {'scripts/dashboard_api.py'},
+        )
+        self.assertEqual(h.run_once(now=1000.0), 'restarted')
+        self.assertEqual(len(restarts), 1)
+        self.assertEqual(self.dms[0]['route'], 'digest')
+
+    def test_unknown_watch_paths_fails_safe_to_restart(self):
+        # Manifest unreadable / missing unit -> watch_paths None -> restart.
+        restarts = []
+        self._patch(
+            read_disk_head=lambda *a, **k: 'b' * 40,
+            probe_running_sha=lambda *a, **k: (h.PROBE_OK, 'a' * 40),
+            restart_unit=lambda *a, **k: restarts.append(1) or (0, ''),
+            _dashboard_api_watch_paths=lambda *a, **k: None,
+            _changed_paths=lambda *a, **k: {'agents/beacon/missions.json'},
+        )
+        self.assertEqual(h.run_once(now=1000.0), 'restarted')
+        self.assertEqual(len(restarts), 1)
+
+    def test_unknown_changed_paths_fails_safe_to_restart(self):
+        # git diff non-zero rc -> changed_paths None -> restart.
+        restarts = []
+        self._patch(
+            read_disk_head=lambda *a, **k: 'b' * 40,
+            probe_running_sha=lambda *a, **k: (h.PROBE_OK, 'a' * 40),
+            restart_unit=lambda *a, **k: restarts.append(1) or (0, ''),
+            _dashboard_api_watch_paths=lambda *a, **k: set(self._WATCH),
+            _changed_paths=lambda *a, **k: None,
+        )
+        self.assertEqual(h.run_once(now=1000.0), 'restarted')
+        self.assertEqual(len(restarts), 1)
+
+    def test_field_missing_ignores_path_gate(self):
+        # No running_sha to diff from -> path gate MUST NOT apply; restart
+        # unconditionally even if _changed_paths would say 'disjoint'.
+        restarts = []
+        self._patch(
+            read_disk_head=lambda *a, **k: 'b' * 40,
+            probe_running_sha=lambda *a, **k: (h.PROBE_FIELD_MISSING, None),
+            restart_unit=lambda *a, **k: restarts.append(1) or (0, ''),
+            _dashboard_api_watch_paths=lambda *a, **k: set(self._WATCH),
+            _changed_paths=lambda *a, **k: {'agents/beacon/missions.json'},
+        )
+        self.assertEqual(h.run_once(now=1000.0), 'restarted')
+        self.assertEqual(len(restarts), 1)
+
+    def test_route_missing_ignores_path_gate(self):
+        restarts = []
+        self._patch(
+            read_disk_head=lambda *a, **k: 'b' * 40,
+            probe_running_sha=lambda *a, **k: (h.PROBE_ROUTE_MISSING, None),
+            restart_unit=lambda *a, **k: restarts.append(1) or (0, ''),
+            _dashboard_api_watch_paths=lambda *a, **k: set(self._WATCH),
+            _changed_paths=lambda *a, **k: {'agents/beacon/missions.json'},
+        )
+        self.assertEqual(h.run_once(now=1000.0), 'restarted')
+        self.assertEqual(len(restarts), 1)
+
+
+class PathGateHelpersTest(_Base):
+    """Unit coverage for the three new helpers in isolation."""
+
+    def test_watch_paths_unions_entrypoint(self):
+        import json as _json
+        manifest = self.tmp / 'manifest.json'
+        manifest.write_text(_json.dumps({'units': {h.UNIT: {
+            'entrypoint': 'scripts/dashboard_api.py',
+            'watch_paths': ['scripts/larry_alerts.py', 'scripts/atomic_io.py'],
+        }}}))
+        got = h._dashboard_api_watch_paths(manifest)
+        self.assertEqual(got, {'scripts/dashboard_api.py',
+                               'scripts/larry_alerts.py', 'scripts/atomic_io.py'})
+
+    def test_watch_paths_none_on_missing_unit(self):
+        import json as _json
+        manifest = self.tmp / 'manifest.json'
+        manifest.write_text(_json.dumps({'units': {'other.service': {
+            'entrypoint': 'x.py', 'watch_paths': ['x.py']}}}))
+        self.assertIsNone(h._dashboard_api_watch_paths(manifest))
+
+    def test_watch_paths_none_on_empty_list(self):
+        import json as _json
+        manifest = self.tmp / 'manifest.json'
+        manifest.write_text(_json.dumps({'units': {h.UNIT: {
+            'entrypoint': 'scripts/dashboard_api.py', 'watch_paths': []}}}))
+        self.assertIsNone(h._dashboard_api_watch_paths(manifest))
+
+    def test_watch_paths_none_on_unreadable(self):
+        self.assertIsNone(
+            h._dashboard_api_watch_paths(self.tmp / 'does-not-exist.json'))
+
+    def test_drift_is_relevant_matrix(self):
+        w = {'scripts/dashboard_api.py'}
+        c = {'scripts/dashboard_api.py'}
+        self.assertTrue(h._drift_is_relevant(watch_paths=w, changed_paths=c))
+        self.assertFalse(h._drift_is_relevant(
+            watch_paths=w, changed_paths={'agents/x.json'}))
+        self.assertTrue(h._drift_is_relevant(watch_paths=None, changed_paths=c))
+        self.assertTrue(h._drift_is_relevant(watch_paths=w, changed_paths=None))
+
+
 class ConfidenceSeverityLockTest(_Base):
     """Slice 3 lock: this healer ALREADY threads confidence into severity
     (slice 2), so slice 3 makes NO code change here — but the invariant it
