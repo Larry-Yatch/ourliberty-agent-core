@@ -444,6 +444,7 @@ def run_check(
     events: list[QuotaEvent],
     costs: Optional[list[CostEntry]] = None,
     current_threshold_tokens: int,
+    gate_enabled: bool = True,
     now: Optional[datetime] = None,
     lookback_days: int = LOOKBACK_DAYS,
     deprecate_lookback_days: int = DEPRECATE_LOOKBACK_DAYS,
@@ -502,6 +503,21 @@ def run_check(
             as_of_iso=as_of_iso, week_anchor=week_anchor,
             tp_count_8w=tp_count_8w, event_count_8w=event_count_8w,
         )
+
+    # 0. Already deprecated — precedes ALL rules.
+    # A disabled gate emits no burn-rate DMs, so TP is structurally 0 forever
+    # while quota-events keep flowing: the deprecate rule would re-fire every
+    # cycle, re-proposing a terminal action that has already been applied.
+    # With the gate off there is no live signal to tune (no DMs) and nothing
+    # left to deprecate, so none of deprecate/insufficient_signal/defer/raise/
+    # lower are meaningful. Short-circuit to a no-DM, no-proposal result.
+    if gate_enabled is False:
+        rationale = (
+            'Token gate is disabled (tier1_quota.enabled=false): the healer '
+            'emits no burn-rate DMs, so there is no live signal to tune and '
+            'nothing to deprecate. No proposal this cycle.'
+        )
+        return _result('already_deprecated', proposed=None, rationale=rationale)
 
     # 1. Deprecate (highest priority).
     if tp_count_8w == 0 and event_count_8w >= MIN_EVENTS_FOR_DEPRECATE:
@@ -669,6 +685,7 @@ def format_digest(artifact: dict[str, Any]) -> str:
         'defer': 'Check VIII — metric tension (defer, no proposal)',
         'insufficient_signal': 'Check VIII — insufficient signal',
         'none': 'Check VIII — no proposal (healer calibrated)',
+        'already_deprecated': 'Check VIII — gate already deprecated (no proposal)',
     }
     header = header_map.get(rule, f'Check VIII — {rule}')
 
@@ -705,7 +722,7 @@ def _severity_for_rule(rule: str) -> str:
 
 def dm_digest(artifact: dict[str, Any]) -> bool:
     rule = artifact['rule_fired']
-    if rule in ('none', 'insufficient_signal'):
+    if rule in ('none', 'insufficient_signal', 'already_deprecated'):
         # No-op rules don't DM — they only land in the artifact file.
         return False
     body = format_digest(artifact)
@@ -764,6 +781,27 @@ def load_current_threshold(path: Path = AGENT_MODELS_CONFIG) -> int:
     return int(raw)
 
 
+def load_gate_enabled(path: Path = AGENT_MODELS_CONFIG) -> bool:
+    """Read tier1_quota.enabled. Fail SAFE to True on any read/parse error,
+    a missing block, or an absent key.
+
+    Defaulting True preserves the pre-existing behavior: it never accidentally
+    SUPPRESSES a genuine deprecate on a config read error, and an
+    accidentally-deleted `enabled` field can't silently blind the check. Only
+    an explicit `enabled: false` disables the gate (mirrors
+    heal_claude_max_burn_rate.gate_enabled)."""
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError) as e:
+        log(f'gate-enabled config read failed ({type(e).__name__}: {e}) — '
+            'assuming enabled', 'WARN')
+        return True
+    block = data.get('tier1_quota')
+    if not isinstance(block, dict):
+        return True
+    return block.get('enabled', True) is not False
+
+
 # -------------------- main --------------------
 
 
@@ -791,10 +829,12 @@ def main(argv: Optional[list[str]] = None) -> int:
         return 0
 
     current_threshold = load_current_threshold()
+    gate_enabled = load_gate_enabled()
 
     if args.fixture:
         with open(args.fixture) as fh:
             raw = json.load(fh)
+        gate_enabled = bool(raw.get('gate_enabled', True))
         dms = [
             BurnRateDM(
                 ts=_parse_ts(d['ts']) or now,
@@ -825,7 +865,8 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     result = run_check(
         dms=dms, events=events, costs=costs,
-        current_threshold_tokens=current_threshold, now=now,
+        current_threshold_tokens=current_threshold,
+        gate_enabled=gate_enabled, now=now,
     )
     artifact = build_artifact(result)
 

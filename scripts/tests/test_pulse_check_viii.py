@@ -167,11 +167,12 @@ class TestRunCheckRules(unittest.TestCase):
 
     CURRENT_THRESHOLD = 10_000_000
 
-    def _run(self, *, dms, events, costs=None):
+    def _run(self, *, dms, events, costs=None, gate_enabled=True):
         return p8.run_check(
             dms=dms, events=events,
             costs=costs or [],
             current_threshold_tokens=self.CURRENT_THRESHOLD,
+            gate_enabled=gate_enabled,
             now=NOW,
         )
 
@@ -317,6 +318,28 @@ class TestRunCheckRules(unittest.TestCase):
         dms = [_dm(hours_ago=24 + i * 24, usage=3_000_000) for i in range(5)]
         events = [_event(hours_ago=24 + i * 24 + 10) for i in range(6)]
         result = self._run(dms=dms, events=events)
+        self.assertEqual(result.rule_fired, 'deprecate')
+
+    # ---- already_deprecated (gate disabled) ----
+
+    def test_disabled_gate_short_circuits_deprecate(self):
+        # Same signal that would otherwise fire deprecate (TP_8w==0, ≥5
+        # events_8w), but with the gate disabled: the deprecate re-proposal is
+        # suppressed and no DM is emitted.
+        dms = [_dm(hours_ago=24 + i * 24, usage=3_000_000) for i in range(5)]
+        events = [_event(hours_ago=24 + i * 24 + 10) for i in range(6)]
+        result = self._run(dms=dms, events=events, gate_enabled=False)
+        self.assertEqual(result.rule_fired, 'already_deprecated')
+        self.assertIsNone(result.proposed_threshold_tokens)
+        # No DM for the no-op rule.
+        self.assertFalse(p8.dm_digest(p8.build_artifact(result)))
+
+    def test_enabled_gate_still_fires_deprecate_same_signal(self):
+        # Regression guard: the short-circuit is gated ONLY on the flag — the
+        # identical inputs still yield deprecate when the gate is enabled.
+        dms = [_dm(hours_ago=24 + i * 24, usage=3_000_000) for i in range(5)]
+        events = [_event(hours_ago=24 + i * 24 + 10) for i in range(6)]
+        result = self._run(dms=dms, events=events, gate_enabled=True)
         self.assertEqual(result.rule_fired, 'deprecate')
 
     # ---- none ----
@@ -483,6 +506,12 @@ class TestFormatDigest(unittest.TestCase):
         a = self._base_artifact('defer', proposed=None)
         digest = p8.format_digest(a)
         self.assertIn('tension', digest.lower())
+        self.assertNotIn('approve check-viii-update-', digest)
+
+    def test_already_deprecated_digest_no_approve(self):
+        a = self._base_artifact('already_deprecated', proposed=None)
+        digest = p8.format_digest(a)
+        self.assertIn('already deprecated', digest.lower())
         self.assertNotIn('approve check-viii-update-', digest)
 
 
