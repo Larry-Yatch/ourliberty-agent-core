@@ -10,15 +10,32 @@ Group=larry
 EnvironmentFile=/home/larry/credentials/.env.larry
 Environment="HOME=/home/larry"
 Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-# E1.3 activation gate. Per phase-e-plan: default OFF until verified live.
-# When unset (or != "true"), the healer runs in DRY-RUN mode — it logs
-# candidates and DMs Larry one-time activation instructions, but does not
-# call `gh pr merge`. To activate after verification:
+# E1.3 activation gate. ARMED — verified live and activated 2026-05-19; this
+# line said `false` until 2026-07-21 while a drop-in override held it `true`,
+# so the unit read as OFF to anyone inspecting it (including an audit that had
+# to ask). It now states the truth.
+#
+# When this is unset or != "true" the healer runs in DRY-RUN mode: it logs
+# candidates and DMs Larry one-time activation instructions, but never calls
+# `gh pr merge`.
+#
+# NEVER conclude the effective value from this file alone — `Environment=` is
+# cumulative and last-one-wins, so any drop-in under
+# /etc/systemd/system/<unit>.d/ silently overrides it. The authoritative read is:
+#   systemctl show ourliberty-heal-pr-auto-merge.service -p Environment
+#
+# To DISARM (back to dry-run) without editing this file:
 #   sudo systemctl edit ourliberty-heal-pr-auto-merge.service
-# then add a line in the [Service] section:
-#   Environment="OURLIBERTY_AUTOMERGE_ENABLED=true"
-# then `sudo systemctl restart ourliberty-heal-pr-auto-merge.timer`.
-Environment="OURLIBERTY_AUTOMERGE_ENABLED=false"
+# then in the [Service] section:
+#   Environment="OURLIBERTY_AUTOMERGE_ENABLED=false"
+# then `sudo systemctl daemon-reload`. The blanket stop for every healer is
+# `touch ~/agents/healers.disabled`.
+#
+# NOTE for a FRESH host: this now comes up ARMED on first install rather than
+# dry-run. Deliberate — auto-merge is a verified, load-bearing part of the
+# pipeline, not an experiment. Disarm as above before installing somewhere the
+# merge behaviour isn't wanted.
+Environment="OURLIBERTY_AUTOMERGE_ENABLED=true"
 ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/heal_pr_auto_merge.py
 TimeoutStartSec=120
 Nice=10
