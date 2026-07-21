@@ -80945,3 +80945,86 @@ PIDs 3801553/3801576 confirmed alive (~16h47m). NOMINAL ✅
 
 ---
 
+## Iteration ~5751 — 2026-07-21T09:35Z UTC (Larry /cycle chat, Tier 1)
+
+**Health:** ✅ Nominal. All mandatory + additive checks NOMINAL. Check 0: 2 new alerts (lines 815-816), both Tier-3 silence; watermark advanced 814→816. New pipeline activity: sort-once-tier4-cleanup-001 auto-approved + dispatched to Forge (09:29Z UTC); govern-loop-assessor-build-001 APPROVAL_REQUEST arrived in Approvals tab (09:32Z UTC); Larry posted XIV-b card message "so hit reject in this card?" → Beacon card-message task created (09:35Z UTC). **Tier 1** (consecutive_clean 0→1).
+
+**VERIFY-BEFORE-REASSERT (from iter ~5750 at 09:31Z UTC):**
+- **"zombie PID 1834248 (~53d14h8m)"**: CONFIRMED ⚠️ — etime=53-14:17:45. [carry, static]
+- **"sync-deploy-targets-missing-registry-001 [1/3]"**: CARRY (config unchanged). [carry]
+- **"HEAD=3778e492=origin/main"**: CONFIRMED ✅ — HEAD=0c2a191c=origin/main (Pulse cycle wrapper commit 20260721T093442Z). on main ✅, clean ✅, up to date ✅.
+- **"PR #971 MERGED ✅"**: RESOLVED [stable carry]
+- **"last_sync=08:54:00Z UTC (~37 min)"**: CARRY — ~48 min at 09:42Z check. Within 2h. NOMINAL ✅
+- **"xiv-b-build-timing-decision-001 APPROVAL_REQUEST pending"**: UPDATED — Larry posted "so hit reject in this card?" on XIV-b card (09:35Z UTC). Beacon card-message task `card-message-573f417a2f2718d986632f16e66f92747e93ea9c` in Beacon inbox. [yellow, updated]
+- **"Tier 1 (consecutive_clean=0)"**: UPDATED — consecutive_clean 0→1 (this iter clean). [stable Tier 1]
+
+**Check 0 — Alert triage:** `repair-watermark`: repaired=false (old_wm=814, file_length=817 per helper / wc=816). 2 new alerts at lines 815-816.
+- Line 815: source=doorbell, kind=notification, intent=doorbell (flip-readiness-gauge delivery confirmation, ts=09:28:49Z UTC). `triage-alert` → Tier-3 silence. ✅
+- Line 816: source=outbox-notifier, kind=notification, intent=review-pass (sort-once-tier4-cleanup-001 auto-approved by trust policy + dispatched to Forge, ts=09:29:04Z UTC). `triage-alert` → Tier-3 silence. ✅
+- Watermark advanced 814→816. Note: file_length discrepancy (helper=817, wc=816) — govern-loop-assessor-build-001 approval_request at ts=09:32:05Z was observed in prior tail but is no longer at line 817; delivered to Approvals tab (outbox-notifier confirmed delivery). NOMINAL ✅
+
+**Check 1 — Log noise:** outbox-notifier last log: 09:31:44Z UTC (sort-once-tier4-cleanup-001 auto-approved delivery; Beacon bot log `03:31:44 MDT notification idx=815 delivered (intent=review-pass)`). All INFO. heal-stale-daemon-code heartbeat 09:31:20Z UTC (~11 min at 09:42Z check; within normal healer cadence). NOMINAL ✅
+
+**Check 2 — Telegram sweep:** Last Larry message: 03:23:36 MDT (09:23:36Z UTC) "go" → approved flip-readiness-gauge-build-001. New: Larry posted "so hit reject in this card?" on XIV-b approval card (→ card-message task in Beacon inbox 09:35Z UTC). Pending approvals: xiv-b-build-timing-decision-001 (pending, Beacon handling via card-message) + govern-loop-assessor-build-001 (new, delivered to Approvals tab 09:32Z UTC). No orphan directives. NOMINAL ✅
+
+**Check 3 — Pipeline stall:** DRY-RUN (09:36Z UTC) → "no stalls detected". FORGE_NO_PR_SKIP entries all pr_exists (unchanged). NOMINAL ✅
+
+**Check 4 — Pending directives:** forge=3 (build-deep-review-stamp-triggers-automerge-001 ~17 min; flip-readiness-gauge-build-001 ~12 min; sort-once-tier4-cleanup-001 ~6 min — all within 1h), beacon=1 (card-message-573f417a2f2718d986632f16e66f92747e93ea9c ~35 sec, just arrived), mirror=0. NOMINAL ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-21T09:31:20Z UTC (~11 min at 09:42Z check). Within normal healer cadence. NOMINAL ✅
+
+**Check A — Source repo:** HEAD=0c2a191c=origin/main ✅; on main ✅; clean tree ✅. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-21T08:54:00Z UTC (~48 min at 09:42Z check), status=no-change, consecutive_push_failures=0. Within 2h threshold. NOMINAL ✅
+**Check C — Agent liveness:** outbox-notifier active (last log 09:31:44Z UTC); heal-stale-daemon-code heartbeat 09:31:20Z UTC. ⚠️ Zombie PID 1834248 (~53d14h18m, bash poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`). [carry, static] NOMINAL ✅
+**Check E — PR/merge state:** PR #976 (DRAFT, no label, created 09:14:46Z UTC, ~27 min old at 09:42Z check, within stall cooldown — draft PRs excluded from auto-merge policy). No open dashboard PRs. NOMINAL ✅
+**Check H — Forge/Beacon/Mirror inboxes:** forge=3 (see Check 4), beacon=1 (card-message), mirror=0. NOMINAL ✅
+**Rotations:** No rotations in 60-day window. NOMINAL ✅
+
+**§5.0:** audit_due_nudge: `[audit-due] no committed audit baseline; no-op.` ✅. distill_detector: `[distill-detector] no un-distilled audits; no-op.` ✅. audit_cadence_signal: `[audit-cadence] no post-seed decision-grade distill artifacts yet; no-op.` ✅.
+
+**Conditional checks:**
+- **Check I:** not a firing day (Tue 2026-07-21). Next firing Wed 2026-07-23. [carry]
+- **Check III:** OFF-WEEK ✅ — biweekly; next fire 2026-07-26. [carry]
+- **Check VIII:** RESOLVED ✅ — PR #964 merged 2026-07-20T17:42:22Z UTC. [carry]
+- **Check XIV:** xiv-b-build-timing-decision-001 APPROVAL_REQUEST pending. Larry posted "so hit reject?" on card (09:35Z UTC). Beacon card-message task created. govern-loop-assessor-build-001 new APPROVAL_REQUEST in Approvals tab. [yellow, updated]
+- **Check XI:** CLOSED ✅ — over_gate=false. [carry]
+- Check IV/VI/IX/X/XII: timer-managed. No new artifacts. ✅
+
+**G-rule assessment:** No new G-rule increments this iter. sort-once-tier4-cleanup-001 auto-approved (Tier-3 review-pass silence — not a G-rule signal). govern-loop-assessor-build-001 approval_request (Tier-3 approval_request silence — not a G-rule signal). All G-rule counts carry unchanged from ~5750.
+
+**Actions taken:**
+1. Check 0: repair-watermark no-op; 2 alerts (lines 815-816) triaged Tier-3 silence via triage-alert; watermark advanced 814→816. ✅
+2. §5.0: all three one-shots no-op. ✅
+3. PRIME ledger: `iter_clean` appended (tier=1, ts=2026-07-21T09:42:14Z UTC). ✅
+4. Tier state: `record --checks-clean true` → **Tier 1** (consecutive_clean 0→1; last_signal_at unchanged 2026-07-21T09:31:28Z UTC). ✅
+
+**Escalations:** 0 new Pulse DMs. (xiv-b Beacon card-message task handles Larry's "so hit reject?" query; govern-loop-assessor-build-001 delivered to Approvals tab by outbox-notifier; no duplicate from Pulse needed.)
+
+**Standing findings (updated):**
+- [yellow] **xiv-b-build-timing-decision-001** — APPROVAL_REQUEST pending. Larry: "so hit reject in this card?" (09:35Z UTC). Beacon has card-message task `card-message-573f417a2f2718d986632f16e66f92747e93ea9c` to respond. [updated]
+- [yellow] **zombie-bash-pid-1834248** — ~53d14h18m, bash poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`. ask-then-do: `kill 1834248`. [carry, static]
+- [yellow] **sync-deploy-targets-missing-registry-001 [1/3]** — deploy_targets=['ourliberty-dashboard']; rsdpm absent. [carry]
+- [yellow] **probe-blind:ourliberty-cycle.service** *(carry from iter ~5574)* — heal-claude-json-bind-drift healer blind for cycle.service mount namespace. [carry]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — Awaiting `approve check-vi-update-2026-07-07`. [carry]
+- [green] **govern-loop-assessor-build-001** — NEW APPROVAL_REQUEST delivered to Larry's Approvals tab 09:32Z UTC. Build shadow-first govern-loop assessor per merged spec. [new]
+- [green] **sort-once-tier4-cleanup-001** — Auto-approved by trust policy + dispatched to Forge 09:29Z UTC (task=delegate-cap-run-sort-once-cleanup-of-352-stale-tier-4-asks-a-bbf0). [new]
+- [green] **check-viii RESOLVED ✅** — PR #964 merged 2026-07-20T17:42:22Z UTC. [carry]
+- [green] **sync NOMINAL** — status=no-change, last_sync=08:54:00Z UTC; HEAD=0c2a191c=origin/main. [stable]
+- [green] **daemons healthy** — outbox-notifier 09:31:44Z UTC; heal-stale-daemon-code heartbeat 09:31:20Z UTC. [stable]
+- [green] **ourliberty-graph PR #8 MERGED ✅** — P4 complete. [stable]
+- [blue] **PR #976** — DRAFT, no label, fix(missions): conclude no-PR threads. ~27 min old at 09:42Z. [carry]
+- [blue] **Forge builds in-flight** — deep-review-stamp-triggers-automerge-001 (~24 min); flip-readiness-gauge-build-001 (~19 min); sort-once-tier4-cleanup-001 (~13 min). All within 1h. [active]
+- [blue] **Check I — next firing Wed 2026-07-23.** [carry]
+- [blue] **pulse-check-xiv-tier4-001 [2/3]** — Dispatch at 3/3 ~2026-07-27. [carry]
+- [blue] **Check I dm_route second-emission-Sunday** — 1st occurrence 2026-07-19T14:14Z. Monitor Wed 2026-07-23. [carry]
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch — DISPATCHED ✅ (3/3)** — verification_pending. [carry]
+- [blue] **G-rules (dispatched, vp):** forge-wip-redispatch-exhausted-genuine-no-pr-001; ourliberty-health-subject-key-mismatch-001; outbox-notifier-notification-intent-reject-tier4-001; forge-wip-redispatch-digest-tier4-001; forge-revision-preamble-missing-pr711-001; decision-needed-approval-forge-dispatch-no-target-repo-001; no-session-revision-active-mirror-session-fp-001; auto-dispatch-APPROVAL_REQUEST-task-id-mismatch (3/3 dispatched); **outbox-notifier-deep-review-stamp-no-retry-trigger-001 (DISPATCHED ✅, vp)**.
+- [blue] **G-rule 2/3:** outbox-notifier-notification-intent-review-escalate-tier4-001; outbox-notifier-auto-merge-stale-revalidation-tier4-001; pulse-check-xiv-tier4-001; heal-pipeline-stall-retry-exhausted-pr-exists-fp-001.
+- [blue] **G-rule 1/3:** sync-deploy-targets-missing-registry-001; medic-approval-request-tier4-001; mirror-malformed-verdict-heal-reap-path-001; mirror-queue-wait-gauge-tier4-001; inbox-watcher-tier-pool-all-unavailable-tier4-001; heal-pipeline-stall-unrouted-deep-review-required-fp-001; heal-pulse-check-staleness-single-flight-skip-fp-001; gate-parallelism-monitor-regression-data-001; pulse-rotation-check-source-tier4-001; pulse-auto-dispatch-null-reply-chat-id-post-pr950; regression-gate-non-standard-test-path-python-001.
+- [blue] **missions healer active** — HEAD=0c2a191c (Pulse cycle wrapper commit 20260721T093442Z). [stable]
+
+**PRIME DIRECTIVE:** 0 new interventions; 0 new systemic_fixes; iter_clean appended (2026-07-21T09:42:14Z UTC). ratio=22.65 (interventions=1404, systemic_fixes=62, vp=33; trailing-30d, trend=improving).
+**Tier end-of-iter:** **Tier 1** (clean iter; consecutive_clean 0→1; last_signal_at unchanged 2026-07-21T09:31:28Z UTC). 5-min cadence continuing.
+
+---
+
