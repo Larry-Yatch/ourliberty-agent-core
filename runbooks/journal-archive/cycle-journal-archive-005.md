@@ -80859,3 +80859,89 @@ PIDs 3801553/3801576 confirmed alive (~16h47m). NOMINAL ✅
 
 ---
 
+## Iteration ~5750 — 2026-07-21T09:31Z UTC (Larry /cycle chat, Tier 3→1)
+
+**Health:** ⚠️ Auto-fix. Check A: agent-core behind origin by 1 commit (PR #977 docs/spec: lease-proven fast path for orphaned Mirror claims). Fast-forwarded d6f747e2→3778e492. All other mandatory + additive checks NOMINAL. Post-~5749 pipeline fully resolved: PR #971 MERGED ✅ (09:11Z UTC — "do both" Beacon dispatch, `deep-review-stamp-triggers-automerge-001` Forge build dispatched 09:18Z); PR #977 MERGED ✅ (09:23:27Z UTC, auto-merge); dashboard PR #142 MERGED ✅ (09:23:04Z UTC); flip-readiness-gauge-build-001 Forge build dispatched 09:23Z (Larry "go" 09:23:36Z). 1 pending approval: xiv-b-build-timing-decision-001 (Beacon recommends HOLD until ~2026-08-07). PR #976 new (12 min, no label, missions-healer). **Tier 3→1** (Check A fast-forward; tier-reset per § 2.3; consecutive_clean reset to 0).
+
+**VERIFY-BEFORE-REASSERT (from iter ~5749 at 08:54Z UTC):**
+- **"zombie PID 1834248 (~53d13h35m)"**: CONFIRMED ⚠️ — etime=53-14:08:43. [carry, static]
+- **"sync-deploy-targets-missing-registry-001 [1/3]"**: CARRY (config unchanged). [carry]
+- **"HEAD=786ff946=origin/main"**: UPDATED ✅ — HEAD was d6f747e2 (behind origin), fast-forwarded to 3778e492=origin/main. ✅
+- **"PR #971 OPEN — 'do both' IN-FLIGHT"**: RESOLVED ✅ — PR #971 MERGED (outbox-notifier confirmed "deep-review-held entry cleared" at 09:11:21Z UTC). ✅
+- **"outbox-notifier-deep-review-stamp-no-retry-trigger-001 [2/3]"**: UPDATED — Forge build `deep-review-stamp-triggers-automerge-001` dispatched 09:18:22Z UTC. G-rule DISPATCHED → verification_pending. ✅
+- **"last_sync=07:53:59Z UTC (~60 min)"**: UPDATED ✅ — last_sync=2026-07-21T08:54:00Z UTC (~37 min at 09:31Z check). NOMINAL ✅
+- **"Tier 3 (consecutive_clean 3→4)"**: UPDATED — Tier reset 3→1 this iter (Check A fast-forward). consecutive_clean=0. ✅
+
+**Check 0 — Alert triage:** `repair-watermark`: repaired=false (old_wm=813, file_length=814). 1 new alert at line 814.
+- Line 814: source=outbox-notifier, kind=approval_request, approval_id=xiv-b-build-timing-decision-001, ts=09:24:17Z UTC. `triage-alert` → Tier-3 silence (known-pattern: kind=approval_request from outbox-notifier). Row resolved. ✅
+- Watermark advanced 813→814. NOMINAL ✅
+
+**Check 1 — Log noise:** outbox-notifier.log last entry [2026-07-21 03:24:17 MDT] (09:24:17 UTC) — "beacon pulse-auto-dispatch APPROVAL_REQUEST queued for force_ask: task=delegate-cap-spec-build-xiv-b-tier-4-alert-write-back-loop-f78b". Pipeline since ~5749: PR #971 deep-review-held cleared (09:11Z); `deep-review-stamp-triggers-automerge-001` Forge build dispatched (09:18Z); PR #977 Mirror review → REVIEW_PASS → AUTO_MERGE (09:23:27Z); dashboard PR #142 REVIEW_PASS → AUTO_MERGE (09:23:04Z); `flip-readiness-gauge-build-001` Forge build dispatched (09:23Z, Larry "go"); two pulse-auto-dispatch APPROVAL_REQUESTs queued for force_ask at 09:24Z. All INFO. NOMINAL ✅
+
+**Check 2 — Telegram sweep:** Last Larry message: 03:23:36 MDT (09:23:36 UTC) "go" → approved `flip-readiness-gauge-build-001`, Forge dispatched 09:23:38Z. Next queued: `delegate-cap-spec-build-xiv-b-tier-4-alert-write-back-loop-f78b` APPROVAL_REQUEST (xiv-b-build-timing-decision-001) delivered to Larry's Approvals tab 09:24:17Z UTC. Pending approvals: 1 — `xiv-b-build-timing-decision-001` (decision: build XIV-b now vs hold ~2026-08-07; Beacon recommends HOLD). No orphan directives. NOMINAL ✅
+
+**Check 3 — Pipeline stall:** DRY-RUN (09:26Z UTC) → "no stalls detected". FORGE_NO_PR_SKIP list carries + adds `update-build-check-contract-forge-mirror-001/pr=#969` (new); `route-ourliberty-graph-prs-to-mirror-001/pr=#971` still listed (PR #971 now merged; stall checker skips on pr_exists match). NOMINAL ✅
+
+**Check 4 — Pending directives:** forge=6 (`build-deep-review-stamp-triggers-automerge-001` ~13 min; `flip-readiness-gauge-build-001` ~8 min; `delegate-cap-govern-loop-assessor-operator-layer-roi-rank-bra-28b0` age TBD; `delegate-cap-run-sort-once-cleanup-of-352-stale-tier-4-asks-a-bbf0` age TBD; `notify-pr-ourliberty-agent-core-977`; `notify-pr-ourliberty-dashboard-142`), beacon=0, mirror=0. Active builds within 1h window. NOMINAL ✅
+
+**Check 5 — Stale daemon code:** heal-stale-daemon-code.heartbeat = 2026-07-21T09:21:11Z UTC (~10 min at 09:31Z check). Healer active. NOMINAL ✅
+
+**Check A — Source repo:** Was behind by 1 commit (PR #977). Fast-forwarded d6f747e2→3778e492. ⚠️ auto-fix executed. HEAD=3778e492=origin/main ✅; on main ✅; clean tree ✅. NOMINAL (post-fix) ✅
+**Check B — Sync health:** last_sync=2026-07-21T08:54:00Z UTC (~37 min at 09:31Z check), status=no-change, consecutive_push_failures=0. Within 2h threshold. NOMINAL ✅
+**Check C — Agent liveness:** outbox-notifier active (last log 09:24:17Z UTC); heal-stale-daemon-code heartbeat 09:21:11Z UTC; all services healthy via log activity. ⚠️ Zombie PID 1834248 (~53d14h8m, bash poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`). [carry, static] NOMINAL ✅
+**Check E — PR/merge state:** PR #971 MERGED ✅ (09:11Z UTC). PR #977 MERGED ✅ (09:23:27Z UTC). Dashboard PR #142 MERGED ✅ (09:23:04Z UTC). PR #976 (ourliberty-agent-core, "fix(missions): conclude no-PR threads; drop dismissed-source pipeline cards"): OPEN, no label, created 09:14:46Z UTC (~17 min old at 09:31Z check), within stall cooldown, MERGEABLE. [blue, new, within window] NOMINAL ✅
+**Check H — Forge/Beacon/Mirror inboxes:** forge=6 (see Check 4), beacon=0, mirror=0. NOMINAL ✅
+**Rotations:** No rotations in 60-day window. NOMINAL ✅
+
+**§5.0:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks:**
+- **Check I:** not a firing day (Tue 2026-07-21). Next firing Wed 2026-07-23. [carry]
+- **Check III:** OFF-WEEK ✅ — biweekly; next fire 2026-07-26. [carry]
+- **Check VIII:** RESOLVED ✅ — PR #964 merged 2026-07-20T17:42:22Z UTC. [carry]
+- **Check XIV:** 1 pending approval — xiv-b-build-timing-decision-001 (build XIV-b now vs hold ~2026-08-07). Beacon recommends HOLD (taxonomy still draft, only 15d pre-taxonomy traffic vs ~1mo tiered traffic needed). [yellow, pending Larry decision in Approvals tab]
+- **Check XI:** CLOSED ✅ — over_gate=false. [carry]
+- Check IV/VI/IX/X/XII: timer-managed. No new artifacts. ✅
+
+**G-rule assessment:**
+- **outbox-notifier-deep-review-stamp-no-retry-trigger-001** → **DISPATCHED ✅** (promoted from 2/3). Larry "do both" at 08:50:59Z UTC triggered Beacon to confirm gap + dispatch Forge build `deep-review-stamp-triggers-automerge-001` at 09:18:22Z UTC. verification_pending. (Note: fix dispatched via Larry's direct command before Pulse reached 3/3 — normal; pattern was real, fix is live in Forge inbox.)
+- All other G-rule counts carry unchanged from ~5749.
+
+**Actions taken:**
+1. Check A: Fast-forwarded agent-core d6f747e2→3778e492 (PR #977). Logged to cycle-actions.jsonl. ✅
+2. Check 0: repair-watermark no-op; 1 alert (line 814, approval_request/xiv-b) triaged Tier-3 silence via triage-alert; watermark advanced 813→814. ✅
+3. §5.0: all three one-shots no-op. ✅
+4. PRIME ledger: `intervention` appended (tier=1, template=ff-main-when-behind, 2026-07-21T09:31:14Z UTC). ✅
+5. Tier state: `record --checks-clean false` → **Tier 1** (tier reset 3→1; consecutive_clean=0; last_signal_at=2026-07-21T09:31:28Z UTC). ✅
+
+**Escalations:** 0 new Pulse DMs. (xiv-b-build-timing-decision-001 is already in Larry's Approvals tab via outbox-notifier delivery 09:24Z; no duplicate from Pulse needed.)
+
+**Standing findings (updated):**
+- [yellow] **xiv-b-build-timing-decision-001** — APPROVAL_REQUEST pending in Larry's Approvals tab. Decision: build XIV-b alert write-back loop now or hold deferral (~2026-08-07). Beacon recommends HOLD (taxonomy 'Draft awaiting design pass'; only 15d pre-taxonomy traffic; spec needs ~1mo of tiered traffic). [new]
+- [yellow] **sync-deploy-targets-missing-registry-001 [1/3]** — deploy_targets=['ourliberty-dashboard']; rsdpm absent. [carry]
+- [yellow] **probe-blind:ourliberty-cycle.service** *(carry from iter ~5574)* — heal-claude-json-bind-drift healer blind for cycle.service mount namespace. [ask-then-do, carry]
+- [yellow] **zombie-bash-pid-1834248** — ~53d14h8m, bash poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`. ask-then-do: `kill 1834248`. [carry, static]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — Awaiting `approve check-vi-update-2026-07-07`. [carry]
+- [green] **PR #971 MERGED ✅** — "do both" pipeline: Beacon confirmed gap → Forge build `deep-review-stamp-triggers-automerge-001` in-flight. [resolved from yellow]
+- [green] **PR #977 MERGED ✅** — docs(spec): lease-proven fast path for orphaned Mirror claims. 09:23:27Z UTC auto-merge. [new-resolved]
+- [green] **PR #142 (dashboard) MERGED ✅** — 09:23:04Z UTC auto-merge. [new-resolved]
+- [green] **sync NOMINAL** — status=no-change, last_sync=08:54:00Z UTC; HEAD=3778e492=origin/main. [stable]
+- [green] **daemons healthy** — outbox-notifier 09:24:17Z UTC; heal-stale-daemon-code heartbeat 09:21:11Z UTC. [stable]
+- [green] **check-viii RESOLVED ✅** — PR #964 merged 2026-07-20T17:42:22Z UTC. [carry]
+- [green] **ourliberty-graph PR #8 MERGED ✅** — P4 complete. [stable]
+- [blue] **PR #976** — fix(missions): conclude no-PR threads; drop dismissed-source pipeline cards. OPEN, no label, 17 min old at 09:31Z, within stall cooldown. Needs `auto-review` or `claude-*` label for Mirror routing. [new, monitor]
+- [blue] **Forge builds in-flight** — `deep-review-stamp-triggers-automerge-001` (09:18Z, ~13 min); `flip-readiness-gauge-build-001` (09:23Z, ~8 min). Within 1h window. [active]
+- [blue] **Check I — next firing Wed 2026-07-23.** [carry]
+- [blue] **pulse-check-xiv-tier4-001 [2/3]** — Dispatch at 3/3 ~2026-07-27. [carry]
+- [blue] **Check I dm_route second-emission-Sunday** — 1st occurrence 2026-07-19T14:14Z. Monitor Wed 2026-07-23. [carry]
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch — DISPATCHED ✅ (3/3)** — verification_pending. [carry]
+- [blue] **G-rules (dispatched, vp):** forge-wip-redispatch-exhausted-genuine-no-pr-001; ourliberty-health-subject-key-mismatch-001; outbox-notifier-notification-intent-reject-tier4-001; forge-wip-redispatch-digest-tier4-001; forge-revision-preamble-missing-pr711-001; decision-needed-approval-forge-dispatch-no-target-repo-001; no-session-revision-active-mirror-session-fp-001; auto-dispatch-APPROVAL_REQUEST-task-id-mismatch (3/3 dispatched); **outbox-notifier-deep-review-stamp-no-retry-trigger-001 (DISPATCHED ✅, vp)**.
+- [blue] **G-rule 2/3:** outbox-notifier-notification-intent-review-escalate-tier4-001; outbox-notifier-auto-merge-stale-revalidation-tier4-001; pulse-check-xiv-tier4-001; heal-pipeline-stall-retry-exhausted-pr-exists-fp-001.
+- [blue] **G-rule 1/3:** sync-deploy-targets-missing-registry-001; medic-approval-request-tier4-001; mirror-malformed-verdict-heal-reap-path-001; mirror-queue-wait-gauge-tier4-001; inbox-watcher-tier-pool-all-unavailable-tier4-001; heal-pipeline-stall-unrouted-deep-review-required-fp-001; heal-pulse-check-staleness-single-flight-skip-fp-001; gate-parallelism-monitor-regression-data-001; pulse-rotation-check-source-tier4-001; pulse-auto-dispatch-null-reply-chat-id-post-pr950; regression-gate-non-standard-test-path-python-001.
+- [blue] **missions healer active** — Pulse cycle wrapper commit 3778e492 (PR #977 docs/spec). [stable]
+
+**PRIME DIRECTIVE:** 1 intervention (ff-main-when-behind, tier=1); 0 new systemic_fixes; ratio=22.63→updated (interventions=1404, fixes=62, vp=33; trailing-30d, trend=improving).
+**Tier end-of-iter:** **Tier 1** (Check A fast-forward signal; consecutive_clean=0; last_signal_at=2026-07-21T09:31:28Z UTC). 5-min cadence until 3 consecutive clean iters.
+
+---
+
