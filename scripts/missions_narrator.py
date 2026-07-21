@@ -72,6 +72,7 @@ if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 
 import active_tier  # noqa: E402
+import routing_validator  # noqa: E402  # canonical_repo (origin.repo spelling drift)
 import trust_policy  # noqa: E402
 from heal_missions_card_gc import (  # noqa: E402
     atomic_write_captures,
@@ -140,7 +141,12 @@ def capture_to_task(capture: dict[str, Any]) -> dict[str, Any]:
         'source': 'beacon',
         'target_agent': 'forge',
         'task_type': capture.get('task_type') or 'feature-development',
-        'target_repo': origin.get('repo'),
+        # Canonicalized: origin.repo is derived from the emitting machine's checkout
+        # DIRECTORY NAME, so a droplet-emitted capture carries 'agent-core' while the
+        # desktop emits 'ourliberty-agent-core'. safe_write_inbox's repo-scope check
+        # compares target_repo against allowed_repos (full names only), so the bare
+        # form was rejected at dispatch. See routing_validator.canonical_repo.
+        'target_repo': routing_validator.canonical_repo(origin.get('repo')),
         'changed_files': capture.get('changed_files') or [],
     }
 

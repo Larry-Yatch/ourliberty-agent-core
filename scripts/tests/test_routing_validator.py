@@ -306,5 +306,46 @@ class ValidateRouteTest(unittest.TestCase):
         self.assertEqual(final, 'forge')
 
 
+class CanonicalRepoTests(unittest.TestCase):
+    """origin.repo arrives spelled however the emitting machine's checkout dir is
+    named. canonical_repo collapses those spellings WITHOUT widening authorization."""
+
+    def test_bare_checkout_name_canonicalizes(self):
+        # THE BUG: droplet checkout dir is `agent-core`, so every droplet-emitted
+        # capture carried a target_repo that failed the allowed_repos scope check.
+        self.assertEqual(rv.canonical_repo('agent-core'), 'ourliberty-agent-core')
+
+    def test_already_canonical_is_unchanged(self):
+        self.assertEqual(
+            rv.canonical_repo('ourliberty-agent-core'), 'ourliberty-agent-core')
+
+    def test_owner_qualified_form(self):
+        self.assertEqual(
+            rv.canonical_repo('Larry-Yatch/ourliberty-agent-core'),
+            'ourliberty-agent-core')
+
+    def test_worktree_suffix_stripped(self):
+        self.assertEqual(
+            rv.canonical_repo('agent-core.wt-forge-task-001'), 'ourliberty-agent-core')
+
+    def test_repo_without_namespace_prefix_survives(self):
+        # RSDPM has no `ourliberty-` prefix; naive prefix logic would mangle it.
+        self.assertEqual(rv.canonical_repo('RSDPM'), 'RSDPM')
+
+    def test_unknown_repo_returned_unchanged(self):
+        # Must NOT invent a repo. Spelling normalizer, not an authorizer.
+        self.assertEqual(
+            rv.canonical_repo('some-unrelated-repo'), 'some-unrelated-repo')
+
+    def test_does_not_widen_authorization(self):
+        # Canonicalizing an unknown name must not make it pass the scope check.
+        ok, _ = rv.check_target_repo('forge', rv.canonical_repo('some-unrelated-repo'))
+        self.assertFalse(ok)
+
+    def test_falsy_and_non_string_inputs_pass_through(self):
+        for value in (None, '', 0, [], {}):
+            self.assertEqual(rv.canonical_repo(value), value)
+
+
 if __name__ == '__main__':
     unittest.main()
