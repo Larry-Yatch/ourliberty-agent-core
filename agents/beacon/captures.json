@@ -1472,7 +1472,7 @@
       "id": "cap-govern-loop-assessor-operator-layer-roi-rank-bra-28b0",
       "title": "Govern-loop assessor (operator-layer ROI/rank brain) \u2014 consumes decision-outcome ledger",
       "note": "INITIATIVE placeholder so the build-outcome work has a home. Build the assessor that READS ~/agents/state/decision-outcome-ledger.jsonl (decision rows joined to build_outcome rows on decision_key, written by scripts/decision_outcome_ledger.py + scripts/decision_outcome_reconcile.py, shipped in PR #833 as Operator Feed Loop slice 2) and turns it into 'where do Larry's approvals pay off' \u2014 the triage/ROI/rank brain (ship shadow-first per operator-layer-readiness). GATING PREREQUISITE \u2014 do this FIRST, it travels with this initiative: capture cap-slice-2-reconciler-hardening-closed-unmerged-ter-8d9e \u2014 the reconciler currently records a CLOSED-unmerged PR as a PERMANENT 'closed_unmerged' outcome, but closed PRs can be reopened+merged, so has_build_outcome() locks in a wrong 'abandoned' signal the assessor would then learn from. Decide the fix (re-checkable CLOSED / settle-period / let a later merged row supersede) in the context of how the assessor weights outcomes; that card also bundles bounded-scan + efficiency + magic-string cleanups. Also note the reconciler is manual --once, not timer-wired, and only joins PR-coordinate decision keys (task_id-keyed decisions not joined yet).",
-      "state": "parked",
+      "state": "done",
       "label": null,
       "origin": {
         "source": "desktop-chat",
@@ -1499,9 +1499,12 @@
       "spawned": {
         "kind": "delegate",
         "task_id": "delegate-cap-govern-loop-assessor-operator-layer-roi-rank-bra-28b0",
-        "stamped_at": "2026-07-21T09:18:35.792390+00:00"
+        "stamped_at": "2026-07-21T09:18:35.792390+00:00",
+        "outcome": "merged"
       },
-      "aging": true
+      "closed_by": "heal_missions_card_gc:terminal-backstop",
+      "shipped_note": "shipped (linked work merged)",
+      "closed_at": "2026-07-21T11:52:20.107160+00:00"
     },
     {
       "id": "cap-rotate-the-cycle-journal-31mb-file-committed-eve-69e7",
