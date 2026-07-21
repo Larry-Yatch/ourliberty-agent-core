@@ -639,7 +639,7 @@
       "id": "cap-build-completion-auto-report-auto-verify-auto-ru-58c8",
       "title": "Build-completion auto-report + auto-verify + auto-run cleanups (P4 slice)",
       "note": "Root cause of the P1 'wasted hour' (2026-06-16): P1 finished 17:44 MDT but NEITHER notification fired. (1) My desktop completion-watcher died with the session (laptop-bound, unreliable for long waits). (2) The droplet sent NO sequence-COMPLETE DM \u2014 the per-step closing DM was suppressed on the AUTO_MERGE_DEFERRED_UNKNOWN path ('final DM fires on retry/conflict') and there is no whole-sequence-complete alert at all. So P1 sat done-but-unverified ~50min. ALSO recurring: cleanups (the drain) ship as code but don't auto-run (Phase S + P1 both needed a manual --apply). FIX = a droplet-side build-completion pass (slice of Projects-tab P4 closeout) that on sequence-complete: DMs Larry 'done + what shipped', runs go-live verification (dashboard-api restart + derive checks), and AUTO-RUNS one-time cleanups. Makes P2-P7 hands-free + self-reporting and ends reliance on fragile desktop watchers. RECOMMEND building BEFORE P2.",
-      "state": "parked",
+      "state": "dropped",
       "label": null,
       "origin": {
         "source": "desktop-chat",
@@ -651,17 +651,17 @@
       "last_touched": "2026-06-17T00:48:56.579090+00:00",
       "promoted_to": null,
       "briefing": {
-        "what": "An automatic system that tells you the moment a big job is finished, double-checks it actually went live, and finishes the leftover tidy-up steps on its own.",
-        "why": "Last time, a finished job sat unnoticed for nearly an hour because no one got the message and a cleanup step was skipped \u2014 wasting time and leaving work half-done.",
-        "suggest": "Worth building this next, before the upcoming round of projects, though I'd want to test it carefully first so we can trust it to report and verify on its own."
+        "what": "A hands-free way for the system to tell you the moment a big job is truly finished, double-check that it actually went live, and tidy up after itself \u2014 no manual follow-up needed.",
+        "why": "Last month a completed job sat unnoticed and unverified for nearly an hour because no alert ever fired, and routine cleanups still need someone to run them by hand \u2014 this closes both gaps so the next rounds of work run and report themselves.",
+        "suggest": "Worth doing, and ideally before the next round starts \u2014 but build it carefully and confirm the alerts and go-live checks work as promised before relying on it."
       },
       "risk": "careful",
-      "recommended_action": "delegate",
+      "recommended_action": "drop",
       "briefing_provenance": {
         "by": "beacon",
         "model": "claude-opus-4-8",
-        "at": "2026-06-17T00:56:19.915890+00:00",
-        "from_state": "parked"
+        "at": "2026-07-21T10:01:49.324182+00:00",
+        "from_state": "dropped"
       },
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
       "aging": true
