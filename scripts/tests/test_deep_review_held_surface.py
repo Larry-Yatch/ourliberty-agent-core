@@ -630,5 +630,61 @@ class HeadMovedSinceHoldTest(_SurfaceTestBase):
         self.assertEqual(len(self.on._load_deep_review_held()), 1)
 
 
+class ReHoldPreservesStampTest(_SurfaceTestBase):
+    """`_deep_review_required` fails conservatively (returns `not stamped`) when
+    gh can't list labels or the changed-files fetch is unresolvable, so a held +
+    STAMPED PR gets re-held at the same head on a transient blip. That re-hold
+    must not wipe `stamped_head_sha` — if it did, a later push would no longer
+    look like OUR stamp, the head-move guard would decline to revoke it, and the
+    stale `deep-review-passed` label would let the normal Mirror path auto-merge
+    a head that was never deep-reviewed.
+    """
+
+    HEAD = 'aaaaaaaa11112222'
+    NEW_HEAD = 'ffffffff99998888'
+
+    def _rehold(self, pr_n=823, head=HEAD) -> bool:
+        return self.on._record_deep_review_held(
+            REPO, pr_n, _pr_url(REPO, pr_n), f'task-{pr_n}', head)
+
+    def test_rehold_same_head_preserves_the_stamp(self):
+        self._seed_held(self._held_entry(823, self.HEAD))
+        self.on._mark_deep_review_stamped(REPO, 823, self.HEAD)
+        # A repeat hold of the unchanged head is not the first for this head.
+        self.assertFalse(self._rehold())
+        entry = self.on._find_deep_review_held(REPO, 823)
+        self.assertEqual(entry.get('stamped_head_sha'), self.HEAD)
+
+    def test_rehold_at_a_different_head_drops_the_stamp(self):
+        # A genuine new push must start unstamped — the stamp belonged to the
+        # old head, and inheriting it would make us revoke on a head we never
+        # stamped (and skip the revoke we owe on the old one).
+        self._seed_held(self._held_entry(823, self.HEAD))
+        self.on._mark_deep_review_stamped(REPO, 823, self.HEAD)
+        self.assertTrue(self._rehold(head=self.NEW_HEAD))
+        entry = self.on._find_deep_review_held(REPO, 823)
+        self.assertIsNone(entry.get('stamped_head_sha'))
+
+    def test_rehold_then_head_move_still_revokes_the_stale_stamp(self):
+        # End-to-end: stamp → transient re-hold at the same head → push.
+        # The revoke must still fire.
+        self.merge_outcome = 'held_for_blocker'
+        self._seed_held(self._held_entry(823, self.HEAD))
+        self.on._reconcile_deep_review_held_approvals()
+        self.approval.resolve(
+            f'deep-review-hold-pr823-{self.HEAD[:8]}', 'approved', note='ok')
+        self.on._reconcile_deep_review_held_approvals()   # stamps + drives once
+        self.assertIn('deep-review-passed', self.gh.pr_labels[(REPO, 823)])
+
+        self._rehold()                                    # the gh-blip re-hold
+
+        self.gh.pr_heads[(REPO, 823)] = self.NEW_HEAD
+        self.on._reconcile_deep_review_held_approvals()
+        self.assertEqual(
+            self.gh.remove_label_calls, [(REPO, 823, 'deep-review-passed')])
+        self.assertNotIn('deep-review-passed', self.gh.pr_labels[(REPO, 823)])
+        self.assertEqual(self.on._load_deep_review_held(), [])
+
+
 if __name__ == '__main__':
     unittest.main()
