@@ -21,7 +21,10 @@ Covered:
   - held entry clears (merged) → the approval resolves off the tab;
   - new head → old approval resolves, a fresh approval surfaces;
   - label-apply failure on approve → exactly one actionable repair alert; happy
-    path fires none.
+    path fires none;
+  - approved but the LIVE head has moved past the approved head → no stamp, no
+    merge; our stale stamp is revoked and the hold clears so Mirror re-reviews
+    at the new head (an unresolvable live head defers instead of merging).
 
 Run:
     python3 -m unittest scripts.tests.test_deep_review_held_surface
@@ -42,6 +45,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Optional
 from unittest import mock
 
 _REPO_SCRIPTS = Path(__file__).resolve().parent.parent
@@ -111,7 +115,11 @@ class _GhRouter:
         # PR liveness for the reconcile self-heal; default OPEN so entries that
         # aren't explicitly resolved behave as still-held (the prior behavior).
         self.pr_state: dict[tuple[str, int], str] = {}
+        # Live head per PR (headRefOid). `_seed_held` registers the held head by
+        # default; a test that simulates a new push overwrites it.
+        self.pr_heads: dict[tuple[str, int], Optional[str]] = {}
         self.edit_calls: list[tuple[str, int, str]] = []
+        self.remove_label_calls: list[tuple[str, int, str]] = []
         self.edit_fail = False
 
     def __call__(self, cmd, capture_output=True, text=True, timeout=None,
@@ -133,7 +141,20 @@ class _GhRouter:
                 ]
             if 'state' in fields:
                 payload['state'] = self.pr_state.get((repo, pr_n), 'OPEN')
+            if 'headRefOid' in fields:
+                head = self.pr_heads.get((repo, pr_n))
+                if head is not None:
+                    payload['headRefOid'] = head
             return _CompletedProc(stdout=json.dumps(payload), returncode=0)
+        if cmd[1] == 'pr' and cmd[2] == 'edit' and '--remove-label' in cmd:
+            pr_n = int(cmd[3])
+            repo = cmd[cmd.index('--repo') + 1]
+            label = cmd[cmd.index('--remove-label') + 1]
+            self.remove_label_calls.append((repo, pr_n, label))
+            labels = self.pr_labels.get((repo, pr_n))
+            if labels and label in labels:
+                labels.remove(label)
+            return _CompletedProc(returncode=0)
         if cmd[1] == 'pr' and cmd[2] == 'edit':
             pr_n = int(cmd[3])
             repo = cmd[cmd.index('--repo') + 1]
@@ -255,6 +276,10 @@ class _SurfaceTestBase(unittest.TestCase):
 
     def _seed_held(self, *entries: dict) -> None:
         self.on._save_deep_review_held(list(entries))
+        # Default the live head to the held head, so "nothing moved" is the
+        # baseline and a test opts INTO a new push by overwriting `pr_heads`.
+        for e in entries:
+            self.gh.pr_heads[(e['repo'], e['pr_number'])] = e.get('head_sha')
 
     def _pending(self) -> list[dict]:
         return self.approval.load_state().get('pending', [])
@@ -529,6 +554,67 @@ class MergeDriveTest(_SurfaceTestBase):
         self.assertEqual(len(alerts), 1)
         self.assertIn('deep-review-passed', alerts[0]['message'])
         self.assertEqual(self.merge_calls, [])
+
+
+class HeadMovedSinceHoldTest(_SurfaceTestBase):
+    """Larry approves a SPECIFIC head. The held entry's `head_sha` is persisted,
+    not live, so a non-terminal first drive (held_for_blocker) that re-drives on
+    the throttled cadence could otherwise stamp + merge a commit that landed
+    after the approval — never deep-reviewed, never approved.
+    """
+
+    def _surface_and_approve(self, pr_n=823, head='aaaaaaaa11112222'):
+        self._seed_held(self._held_entry(pr_n, head))
+        self.on._reconcile_deep_review_held_approvals()
+        self.approval.resolve(
+            f'deep-review-hold-pr{pr_n}-{head[:8]}', 'approved', note='ok')
+
+    def test_head_moved_since_hold_drives_no_merge(self):
+        # New commit lands after the approval → NO merge, and the hold clears so
+        # Mirror re-reviews + re-holds at the new head.
+        self._surface_and_approve()
+        self.gh.pr_heads[(REPO, 823)] = 'ffffffff99998888'
+        self.on._reconcile_deep_review_held_approvals()
+        self.assertEqual(self.merge_calls, [])
+        self.assertEqual(self.on._load_deep_review_held(), [])
+
+    def test_head_moved_after_stamp_revokes_the_stale_stamp(self):
+        # Non-terminal first drive (held_for_blocker) leaves the entry stamped
+        # and in place; a push in that window must revoke OUR stamp, else the
+        # label outlives it and the normal Mirror path merges the un-reviewed
+        # head.
+        self.merge_outcome = 'held_for_blocker'
+        self._surface_and_approve()
+        self.on._reconcile_deep_review_held_approvals()   # stamps + drives once
+        self.assertEqual(len(self.merge_calls), 1)
+        self.assertIn('deep-review-passed', self.gh.pr_labels[(REPO, 823)])
+        self.gh.pr_heads[(REPO, 823)] = 'ffffffff99998888'
+        self.on._reconcile_deep_review_held_approvals()
+        self.assertEqual(len(self.merge_calls), 1)          # no second drive
+        self.assertEqual(
+            self.gh.remove_label_calls, [(REPO, 823, 'deep-review-passed')])
+        self.assertNotIn('deep-review-passed', self.gh.pr_labels[(REPO, 823)])
+        self.assertEqual(self.on._load_deep_review_held(), [])
+
+    def test_head_moved_without_our_stamp_leaves_labels_alone(self):
+        # We only ever revoke a stamp WE applied for the stale head — a stamp
+        # from a human `/code-review high` at the new head must survive.
+        self._surface_and_approve()
+        self.gh.pr_labels[(REPO, 823)] = ['deep-review-passed']
+        self.gh.pr_heads[(REPO, 823)] = 'ffffffff99998888'
+        self.on._reconcile_deep_review_held_approvals()
+        self.assertEqual(self.gh.remove_label_calls, [])
+        self.assertEqual(self.merge_calls, [])
+
+    def test_unresolvable_head_defers_the_merge(self):
+        # gh can't resolve the head → cannot prove it is the approved commit.
+        # Fail CLOSED: no stamp, no merge, hold preserved for the next tick.
+        self._surface_and_approve()
+        self.gh.pr_heads[(REPO, 823)] = None
+        self.on._reconcile_deep_review_held_approvals()
+        self.assertEqual(self.merge_calls, [])
+        self.assertEqual(self.gh.edit_calls, [])
+        self.assertEqual(len(self.on._load_deep_review_held()), 1)
 
 
 if __name__ == '__main__':

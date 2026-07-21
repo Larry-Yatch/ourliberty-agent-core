@@ -8664,6 +8664,65 @@ def _clear_deep_review_held(repo_coords: str, pr_number: int) -> bool:
     return False
 
 
+def _mark_deep_review_stamped(
+    repo_coords: str, pr_number: int, head_sha: Optional[str],
+) -> None:
+    """Record on the held entry that WE mechanically stamped
+    `deep-review-passed` for `head_sha`.
+
+    The stamp is a PR-level label with no head binding of its own, so once
+    applied it outlives any later push. Remembering the head we stamped for
+    lets the head-move check below revoke exactly OUR stamp (and never a
+    stamp a human `/code-review high` applied at a newer head). Idempotent:
+    no write when the recorded head is already `head_sha`."""
+    entries = _load_deep_review_held()
+    changed = False
+    for e in entries:
+        if (
+            e.get('repo') == repo_coords
+            and e.get('pr_number') == pr_number
+            and e.get('stamped_head_sha') != head_sha
+        ):
+            e['stamped_head_sha'] = head_sha
+            changed = True
+    if changed:
+        _save_deep_review_held(entries)
+
+
+def _revoke_deep_review_pass_label(
+    repo_coords: str, pr_number: int, pr_url: str,
+) -> bool:
+    """Remove the `deep-review-passed` stamp from a PR. True iff gh succeeded.
+
+    Used when the head has advanced past the head WE stamped: leaving the
+    stale stamp in place would let `_deep_review_required` return False at the
+    NEW head, so the normal Mirror re-review path would auto-merge a head that
+    was never deep-reviewed. Best-effort — a gh failure only means the hold is
+    re-established one cycle later (the head-move check itself already refuses
+    to drive the merge)."""
+    try:
+        proc = subprocess.run(
+            ['gh', 'pr', 'edit', str(pr_number), '--repo', repo_coords,
+             '--remove-label', _DEEP_REVIEW_PASSED_LABEL],
+            capture_output=True, text=True, timeout=_AUTO_MERGE_TIMEOUT_S,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
+        log(
+            f'deep-review stamp revoke FAILED for pr={pr_url}: '
+            f'{type(e).__name__}: {e}',
+            'WARN',
+        )
+        return False
+    if proc.returncode != 0:
+        log(
+            f'deep-review stamp revoke returned {proc.returncode} for '
+            f'pr={pr_url}: {(proc.stderr or "").strip()[:200]}',
+            'WARN',
+        )
+        return False
+    return True
+
+
 def _deep_review_hold_suppresses_dispatch(
     pr_url: Optional[str], current_head_sha: Optional[str],
 ) -> bool:
@@ -9192,6 +9251,47 @@ def _reconcile_deep_review_held_approvals() -> None:
                 repo, pr_number, pr_url, task_id, head_sha, approval_id,
             )
         elif existing.get('status') == 'approved':
+            # HEAD-SCOPE the approval before anything fires. Larry approved a
+            # SPECIFIC head; `head_sha` here is the persisted one, not live. A
+            # non-terminal first drive (held_for_blocker / UNKNOWN) leaves the
+            # entry in place and re-drives on the throttled cadence, so a commit
+            # landing in that window would otherwise be stamped + merged at a
+            # head that was never deep-reviewed nor approved. Resolve the LIVE
+            # head and refuse to act unless it matches.
+            live_head = _gh_pr_head_sha(repo, pr_number)
+            if live_head is None:
+                # Unresolvable head → cannot prove it is the approved commit.
+                # Fail CLOSED (skip this tick, retry next); a delayed merge
+                # costs a cycle, a merge onto an unknown head costs the gate.
+                log(
+                    f'deep-review-hold approved but head unresolvable for '
+                    f'{repo}#{pr_number}; not driving the merge this tick',
+                    'WARN',
+                )
+                continue
+            if live_head != head_sha:
+                # Genuine new push since the hold. Revoke OUR stamp (if we
+                # applied one for the stale head) — otherwise the label would
+                # outlive the push and let the normal Mirror path auto-merge the
+                # un-reviewed head — then clear the record so the standard
+                # re-review → re-hold → re-surface cycle runs at the new head.
+                # Leaving `approval_id` out of `live_ids` lets
+                # `_resolve_cleared_deep_review_approvals` take the stale
+                # approval off the tab.
+                if entry.get('stamped_head_sha') == head_sha:
+                    _revoke_deep_review_pass_label(repo, pr_number, pr_url)
+                _clear_deep_review_held(repo, pr_number)
+                _deep_review_merge_driven.discard((repo, pr_number,
+                                                   head_sha or ''))
+                live_ids.pop(approval_id, None)
+                log(
+                    f'deep-review-hold approved at head={head_sha} but PR '
+                    f'{repo}#{pr_number} advanced to head={live_head}; NOT '
+                    f'merging — cleared the hold so Mirror re-reviews and '
+                    f're-holds at the new head',
+                    'WARN',
+                )
+                continue
             # Stamp the label, then ACTUALLY drive the merge. Stamping alone was
             # the handoff gap: `held_deep_review` is by-design NOT queued / NOT
             # retried, and the auto-merge queue sweep only retries QUEUE entries,
@@ -9204,6 +9304,9 @@ def _reconcile_deep_review_held_approvals() -> None:
                 repo, pr_number, pr_url, task_id,
             )
             if label_present:
+                # Remember the head this stamp belongs to, so a later push can
+                # revoke it (above) instead of inheriting a stale pass.
+                _mark_deep_review_stamped(repo, pr_number, head_sha)
                 # Idempotency (the reconcile runs every ~60s): fire the merge on
                 # the tick the stamp FIRST lands, then only on the throttled
                 # state-recheck cadence — never every tick, so a PR merely queued
