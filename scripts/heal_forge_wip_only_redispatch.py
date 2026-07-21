@@ -59,6 +59,27 @@ distinction from a genuine proceeded-then-died build is the terminal signal: a
 build that PROCEEDED emits ``preflight_proceed`` (never ``preflight_reject``), so
 its abandoned WIP-only branch is recovered/escalated exactly as before.
 
+BUILD ALREADY-MERGED SUPPRESSION — a build-phase dispatch can legitimately open
+NO PR when its target work was already merged OUT-OF-BAND between dispatch and the
+retry: Forge runs cleanly (``exit_code == 0``), recognizes the work is moot, and
+emits the canonical contract line ``NO PR — already merged: #<N>``. Its
+``forge/<task>`` branch carries only the ``[WIP][session-start]`` checkpoint, so it
+too trips the WIP-only / no-PR signature — and because a standalone dispatch is NOT
+a build-SEQUENCE step, the notifier's ``_maybe_reconcile`` reconciler (which folds
+this exact signal for sequence steps) never applied, and it fell through to a false
+'exhausted' escalation (2026-07-20 ``graph-pr8-merge-decision-001`` — PR #8 merged
+by Larry mid-flight). This is the BUILD-phase member of the same no-PR=false-failure
+class already closed for mirror-review/rebase/resolve (Gate 0) and preflight-REJECT
+(Gate 6). The healer SUPPRESSES it by reusing Forge's OWN authoritative outbox
+self-report through the SAME three-part gate the notifier uses: (1)
+``result['exit_code'] == 0``, (2) ``sequence_shortcut_helpers.parse_already_merged_
+pr_ref`` extracts a PR number (structured contract line first, prose cue fallback),
+(3) ``sequence_shortcut_helpers.gh_pr_merge_info`` confirms gh reports that PR
+MERGED. Any missing/unreadable outbox, non-zero exit, absent marker, or unconfirmed
+gh => NOT suppressed => today's bounded redispatch+escalate (err toward
+not-suppressing, matching the notifier). Recorded as ``suppressed-build-already-
+merged`` in the ledger so later ticks short-circuit at Gate 0b.
+
 DETECTION SIGNATURE — a branch is a candidate only when ALL hold; any ambiguous
 or indeterminate signal => SKIP, never redispatch:
   1. WIP-only: the branch tip adds NOTHING over its merge-base with origin/main
@@ -119,12 +140,14 @@ if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
 import cleanup_dispatch_branches as cdb  # noqa: E402  branch classifier + git/gh helpers
+import sequence_shortcut_helpers as ssh  # noqa: E402  canonical already-merged contract
 import task_terminal_state as tts  # noqa: E402  shared PR-coordinate parse + gh state
 from test_isolation_guard import refuse_under_test  # noqa: E402
 
 AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', '/home/larry/agents'))
 KILL_SWITCH = AGENTS_ROOT / 'healers.disabled'
 INBOXES_ROOT = AGENTS_ROOT / 'inboxes'
+OUTBOXES_ROOT = AGENTS_ROOT / 'outboxes'
 IN_FLIGHT_DIR = AGENTS_ROOT / 'state' / 'in-flight'
 LEDGER_PATH = AGENTS_ROOT / 'state' / 'forge_wip_redispatch_ledger.json'
 LOG_FILE = AGENTS_ROOT / 'logs' / 'heal_forge_wip_only_redispatch.log'
@@ -363,6 +386,98 @@ def _task_family_rejected(agent: str, branch_stem: str, base: str) -> bool:
         candidates.add(original_id)
         candidates.add(_ledger_base(original_id))
     return bool(_chain_events_has_preflight_reject(candidates))
+
+
+# ---------- build already-merged terminal-signal lookup ----------
+
+
+def _find_archived_outbox_result(agent: str, branch_stem: str,
+                                 base: str) -> Optional[Path]:
+    """The archived Forge OUTBOX result for a candidate's task family, or None.
+
+    Forge archives each dispatch's result to ``outboxes/<agent>/.archive/`` keyed
+    on the task_id — ``<id>.json`` for the first run, ``<id>.<k>.json`` for a same-
+    id re-run, and ``<id>-retry<N>.json`` for a healer retry. This candidate's own
+    self-report is the authoritative signal, so we match every archived file whose
+    name belongs to the family (the branch's exact stem, its retry-stripped base,
+    or any ``-retry<N>`` / ``.<k>`` sibling of that base) and return the MOST
+    RECENTLY MODIFIED — the latest word the family emitted. None when the archive
+    dir or a family match is absent (caller then falls through, never suppresses).
+
+    Mirrors ``_find_archived_original``'s sanitized-family matching but points at
+    the OUTBOX archive; the outbox filename is the raw task_id (no worktree
+    sanitization), so we compare against the sanitized family stems directly."""
+    archive = OUTBOXES_ROOT / agent / '.archive'
+    if not archive.is_dir():
+        return None
+    family = {branch_stem, base}
+    matches = [
+        f for f in archive.glob('*.json')
+        if _outbox_stem_family(f.stem) in family
+    ]
+    if not matches:
+        return None
+    return max(matches, key=lambda p: p.stat().st_mtime)
+
+
+def _outbox_stem_family(file_stem: str) -> str:
+    """The family key of an outbox filename stem: strip a same-id re-run counter
+    (``.<k>`` -> the stem carries it as a trailing ``.<k>`` which Path.stem already
+    removed once, so re-strip a trailing ``.<k>``) and a healer ``-retry<N>``
+    suffix, then re-sanitize the same way the dispatch branch is. ``foo-001`` and
+    ``foo-001.1`` and ``foo-001-retry1`` all collapse to the branch stem
+    ``foo-001``'s family so a candidate branch matches any of its own results."""
+    # Path.stem strips only the final ``.json``; a ``foo-001.1.json`` re-run leaves
+    # ``foo-001.1`` -> drop the trailing numeric ``.<k>`` re-run counter.
+    stripped = re.sub(r'\.\d+$', '', file_stem)
+    return cdb._sanitize_task_id(_ledger_base(stripped))
+
+
+def _family_build_already_merged(agent: str, branch_stem: str, base: str,
+                                 repo: Path) -> bool:
+    """True ONLY when this build family's own archived Forge outbox result proves a
+    clean already-merged terminal conclusion: ``exit_code == 0`` AND the result text
+    names a PR via ``parse_already_merged_pr_ref`` AND ``gh_pr_merge_info`` confirms
+    that PR is genuinely MERGED. Every other branch — no archived outbox, unreadable
+    JSON, non-zero exit, absent marker, or gh-unconfirmed/gh-error — returns False so
+    the candidate falls through to today's bounded redispatch+escalate.
+
+    Reuses the SAME canonical contract the outbox notifier's sequence reconciler
+    uses (``_maybe_reconcile``); the graph-pr8 task was a standalone dispatch, not a
+    sequence step, so that reconciler did not apply and its empty-wip branch reached
+    this healer. Err-toward-not-suppressing matches the notifier: a non-zero-exit
+    build that merely MENTIONS a merged PR is a genuine crash and is NOT suppressed."""
+    path = _find_archived_outbox_result(agent, branch_stem, base)
+    if path is None:
+        return False
+    try:
+        result = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return False
+    if not isinstance(result, dict):
+        return False
+    # (1) A genuine build crash exits non-zero; only a clean turn is an
+    # already-merged refusal. Gating here keeps a failing build that merely
+    # mentions a merged PR from being suppressed.
+    if result.get('exit_code') != 0:
+        return False
+    # (2) The result must name THE merged PR (structured contract line preferred).
+    pr_number = ssh.parse_already_merged_pr_ref(result.get('result', ''))
+    if pr_number is None:
+        return False
+    # (3) gh must confirm that PR is genuinely MERGED.
+    target = result.get('target_repo') or repo.name
+    repo_coords = ssh.qualify_repo(target)
+    if not repo_coords:
+        return False
+    if ssh.gh_pr_merge_info(repo_coords, pr_number) is None:
+        log('WARN', f'{agent}/{branch_stem}: outbox names already-merged '
+                    f'#{pr_number} ({repo_coords}) but gh did not confirm MERGED — '
+                    f'not suppressing, leaving to redispatch')
+        return False
+    log('INFO', f'{agent}/{branch_stem}: build concluded NO PR — already merged '
+                f'#{pr_number} ({repo_coords}), gh-confirmed MERGED')
+    return True
 
 
 # ---------- archived-original lookup (source of truth for re-dispatch) ----------
@@ -620,6 +735,19 @@ def evaluate(cand: Candidate, now: float, open_heads: set[str],
         return ('suppress-rejected',
                 'family concluded with a Forge preflight REJECT (no buildable delta)')
 
+    # Gate 7 (build already-merged terminal): this branch passed every abandoned-
+    # build gate — but if the family's own Forge outbox result CLEANLY concluded
+    # `NO PR — already merged: #N` against a gh-confirmed MERGED PR, `no PR` is the
+    # CORRECT terminal outcome (the target work shipped out-of-band), not a failed
+    # build. A standalone dispatch bypasses the notifier's sequence reconciler, so
+    # this is where that signal is honored. Reuses Forge's authoritative outbox
+    # self-report; any ambiguity (no outbox, non-zero exit, no marker, gh
+    # unconfirmed) returns False and falls through to redispatch unchanged.
+    if _family_build_already_merged(cand.agent, cand.branch_stem, base, cand.repo):
+        return ('suppress-already-merged',
+                'family build concluded NO PR — target PR already merged '
+                '(terminal-by-design)')
+
     # Ledger: bound auto-retries per family.
     entry = ledger.get(base) or {}
     attempts = int(entry.get('attempts', 0) or 0)
@@ -753,12 +881,15 @@ def _do_suppress(cand: Candidate, ledger: dict, reason: str,
                  suppress_reason: str) -> None:
     """Record a task whose no-PR outcome is TERMINAL-BY-DESIGN as suppressed, so
     it never redispatches, never escalates, and later ticks short-circuit before
-    any re-probe. Two classes use this:
-      * ``suppressed-reviewed-pr-terminal`` — a mirror-review whose reviewed PR is
-        already merged/closed (the review is moot); and
+    any re-probe. Three classes use this:
+      * ``suppressed-reviewed-pr-terminal`` — a mirror-review (or rebase/resolve op)
+        whose target PR is already merged/closed (the op is moot);
       * ``suppressed-task-rejected`` — a Forge dispatch that concluded with a
         preflight REJECT / no-buildable-delta (a rejected task is DONE, not a
-        failed build).
+        failed build); and
+      * ``suppressed-build-already-merged`` — a build that cleanly concluded
+        ``NO PR — already merged: #N`` against a gh-confirmed MERGED PR (the target
+        work shipped out-of-band; opening no PR is the correct terminal outcome).
     Deliberately carries NO ``attempts`` count — the escalate path keys on
     attempts>=MAX, which a suppressed entry can never reach, so a suppressed task
     can never contribute to an 'exhausted' alert."""
@@ -810,6 +941,10 @@ def sweep_repo(repo: Path, ledger: dict, now: float) -> SweepCounts:
             acted_bases.add(base)
         elif action == 'suppress-rejected':
             _do_suppress(cand, ledger, reason, 'suppressed-task-rejected')
+            counts.suppressed += 1
+            acted_bases.add(base)
+        elif action == 'suppress-already-merged':
+            _do_suppress(cand, ledger, reason, 'suppressed-build-already-merged')
             counts.suppressed += 1
             acted_bases.add(base)
         else:
