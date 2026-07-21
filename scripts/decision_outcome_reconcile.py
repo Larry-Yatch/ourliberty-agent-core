@@ -82,6 +82,7 @@ LOCK_FILE = AGENTS_ROOT / 'state' / 'decision-outcome-reconcile.lock'
 REPOS = [
     'Larry-Yatch/ourliberty-agent-core',
     'Larry-Yatch/ourliberty-dashboard',
+    'Larry-Yatch/ourliberty-graph',
     'Larry-Yatch/RSDPM',
 ]
 
