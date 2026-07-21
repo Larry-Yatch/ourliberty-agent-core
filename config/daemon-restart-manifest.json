@@ -244,6 +244,7 @@
       "watch_paths": [
         "scripts/active_tier.py",
         "scripts/agent_runner.py",
+        "scripts/agent_work_in_flight.py",
         "scripts/alert_outcomes.py",
         "scripts/alert_triage_state.py",
         "scripts/atomic_io.py",

@@ -77,6 +77,26 @@ def _agents_root() -> Path:
     return Path(root) if root else Path.home() / "agents"
 
 
+def cordon_file(unit: str, agents_root: Path | None = None) -> Path:
+    """CANONICAL path of the restart cordon for ``unit`` — the single definition
+    both the producer (a restarter) and the consumer (inbox_watcher) must use.
+
+    This lives here because the two sides previously derived it independently
+    and DISAGREED: ``heal_stale_daemon_code`` defaults ``AGENTS_ROOT`` to the
+    hardcoded ``/home/larry/agents`` while ``inbox_watcher`` derives it from
+    ``Path.home()``. Identical on the droplet under the normal user — but this
+    system SWAPS HOME for tier rotation, and under a swap the restarter would
+    write a cordon the watcher never reads: the cordon silently does nothing and
+    the restart kills live work again. It fails toward today's behavior rather
+    than a stall, which is the safe direction, but it fails SILENTLY, and a
+    safety mechanism that quietly stops working is worse than one that never
+    shipped.
+
+    One definition, one resolution order (explicit arg → env → ~/agents)."""
+    base = agents_root or _agents_root()
+    return base / "state" / "restart-cordon" / f"{unit}.json"
+
+
 def _pid_alive(pid) -> bool:
     """True if a process with this pid currently exists."""
     if not isinstance(pid, int) or pid <= 0:

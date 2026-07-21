@@ -62,6 +62,7 @@ from typing import Optional
 
 if str(Path(__file__).resolve().parent) not in sys.path:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
+import agent_work_in_flight  # noqa: E402  (shared live-session predicate, #994)
 from atomic_io import atomic_write_json  # noqa: E402
 
 AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', '/home/larry/agents'))
@@ -652,10 +653,115 @@ def is_stale(
     return (script_mtime - service_start) > race_avoidance_sec
 
 
+# -------------------- restart cordon + drain (spec: restart-inflight-guard) ---
+
+# Units that HOST Claude agent loops, i.e. where a restart SIGTERMs paid work
+# mid-session. Only these get cordon-and-drain. The *-bot units (telegram
+# front-ends) and dashboard-api host no sessions and must keep restarting
+# immediately — a needless drain wait on them would just delay a fix.
+# Must match inbox_watcher.CORDON_UNIT, which is what the watcher looks for.
+AGENT_HOSTING_UNITS = frozenset({'ourliberty-inbox-watcher.service'})
+
+# Short by design. A cordon is dangerous exactly in proportion to how long a
+# DEAD healer's copy survives: while it stands, the watcher accepts no work, so
+# an abandoned cordon is a silent full-queue stall. We keep the TTL short and
+# RENEW while draining instead of buying headroom with a long TTL — the same
+# trade dispatch_lease makes (180s TTL / 60s heartbeat).
+CORDON_TTL_SEC = int(os.environ.get('OL_CORDON_TTL_SEC', '600'))
+CORDON_RENEW_EVERY_SEC = max(1, CORDON_TTL_SEC // 3)
+DRAIN_POLL_SEC = int(os.environ.get('OL_DRAIN_POLL_SEC', '15'))
+
+# Backstop only. Normally the drain ends when the running session ends. This
+# bounds the pathological case — work that never stops — after which we restart
+# anyway and say so loudly. Above REVIEW_SESSION_CEILING_SECONDS (2100s) so a
+# single review can never exhaust it; only a continuous queue can.
+RESTART_DEFER_CEILING_SEC = int(
+    os.environ.get('OL_RESTART_DEFER_CEILING_SEC', '3600')
+)
+
+
+def _cordon_file(unit: str) -> Path:
+    """Canonical helper — see agent_work_in_flight.cordon_file for why this must
+    NOT be derived locally."""
+    return agent_work_in_flight.cordon_file(unit)
+
+
+def _boot_id() -> str:
+    try:
+        with open('/proc/sys/kernel/random/boot_id') as f:
+            return f.read().strip()
+    except OSError:
+        return ''
+
+
+def write_cordon(unit: str, reason: str) -> bool:
+    """Write/refresh the cordon for <unit>. True iff it landed.
+
+    Called once to raise the cordon and again on every drain poll to push
+    ``expires_at`` forward. Renewal is what makes a SHORT ttl safe: a review may
+    run to REVIEW_SESSION_CEILING_SECONDS (2100s), 3.5x the 600s TTL, so a
+    non-renewed cordon would EXPIRE MID-DRAIN — the watcher would resume taking
+    work and we would restart into a live session, reintroducing the exact bug
+    this exists to prevent."""
+    path = _cordon_file(unit)
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        atomic_write_json(path, {
+            'unit': unit,
+            'reason': reason,
+            'created_at': time.time(),
+            'expires_at': time.time() + CORDON_TTL_SEC,
+            'pid': os.getpid(),
+            'boot_id': _boot_id(),
+        })
+        return True
+    except (OSError, ValueError) as e:
+        log(f'cordon write failed for {unit}: {e}', 'WARN')
+        return False
+
+
+def clear_cordon(unit: str) -> None:
+    """Remove the cordon. Called from a `finally` on every non-fatal path — a
+    cordon we forget to clear stalls dispatch until its TTL."""
+    try:
+        _cordon_file(unit).unlink()
+    except OSError:
+        pass
+
+
+def drain_agent_work(unit: str, reason: str) -> tuple[bool, float]:
+    """Hold the cordon until no agent session is live. Return (drained, waited).
+
+    ``drained`` False means we hit RESTART_DEFER_CEILING_SEC with work still
+    running — the caller restarts anyway and logs it loudly.
+
+    The cordon is raised BEFORE the first liveness probe, which is what makes
+    this terminate: with new dispatch blocked, in-flight can only fall to zero.
+    Probing first and cordoning after would race the watcher's 5s poll forever
+    on a busy queue."""
+    started = time.time()
+    last_renew = started
+    while True:
+        if not agent_work_in_flight.agent_work_in_flight():
+            return True, time.time() - started
+        waited = time.time() - started
+        if waited >= RESTART_DEFER_CEILING_SEC:
+            return False, waited
+        time.sleep(DRAIN_POLL_SEC)
+        if time.time() - last_renew >= CORDON_RENEW_EVERY_SEC:
+            write_cordon(unit, reason)  # push expires_at forward
+            last_renew = time.time()
+
+
 # -------------------- auto-restart + PR-inference helpers --------------------
 
-def auto_restart_unit(unit: str) -> tuple[int, str]:
+def auto_restart_unit(unit: str, reason: str = 'stale-shared-lib') -> tuple[int, str]:
     """Restart <unit> and verify it came back. Return (returncode, stderr).
+
+    For AGENT_HOSTING_UNITS this first cordons the unit and waits for its live
+    Claude session to finish, so the restart lands in a quiet window instead of
+    SIGTERMing paid work mid-review (#971). Every other unit restarts
+    immediately, exactly as before.
 
     Prepended with `sudo -n systemctl daemon-reload` so a restart picks up
     unit-file edits that landed since systemd last parsed them. Without the
@@ -684,6 +790,38 @@ def auto_restart_unit(unit: str) -> tuple[int, str]:
     Sudoers contract on the droplet is `(ALL) NOPASSWD: ALL`; -n errors
     immediately if that ever changes rather than blocking on a prompt.
     """
+    if unit not in AGENT_HOSTING_UNITS:
+        return _restart_unit_now(unit)
+
+    # Cordon → drain → restart → uncordon.
+    if not write_cordon(unit, reason):
+        # Could not raise the cordon (disk full, perms). Restarting anyway is
+        # exactly today's behavior — no worse — and refusing would let a stale
+        # daemon run indefinitely on an unrelated IO fault. Never silent.
+        log(f'watchlist: cordon unavailable for {unit}; restarting WITHOUT '
+            f'drain (pre-#994 behavior — a live session may be killed)', 'WARN')
+        return _restart_unit_now(unit)
+    try:
+        drained, waited = drain_agent_work(unit, reason)
+        if drained:
+            log(f'RESTART_DRAINED unit={unit} waited={waited:.0f}s '
+                f'reason={reason} — restarting into a quiet window', 'INFO')
+        else:
+            # Backstop: work never stopped. Restart anyway (staleness must
+            # eventually win) but make it loud — this is the one path that can
+            # still kill a live session.
+            log(f'RESTART_FORCED_OVER_CEILING unit={unit} '
+                f'drained_for={waited:.0f}s ceiling={RESTART_DEFER_CEILING_SEC}s '
+                f'reason={reason} — restarting with work STILL in flight', 'WARN')
+        return _restart_unit_now(unit)
+    finally:
+        # Unconditional: an un-cleared cordon stalls dispatch until its TTL.
+        clear_cordon(unit)
+
+
+def _restart_unit_now(unit: str) -> tuple[int, str]:
+    """The original unconditional restart. Split out so cordon-and-drain wraps
+    it without duplicating the daemon-reload / settle / verify contract."""
     try:
         reload_result = subprocess.run(
             ['sudo', '-n', 'systemctl', 'daemon-reload'],
