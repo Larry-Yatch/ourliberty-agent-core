@@ -109,6 +109,28 @@ class DelegationTrailFieldTest(unittest.TestCase):
         self.assertEqual(got['delegation_build_phase'], 'handed_off')
         self.assertIsNone(got['delegation_pr_url'])
 
+    def test_forge_session_start_reads_building(self):
+        # Ledger bridge: the dispatched build's OWN session_start (not
+        # origin-tagged) is what proves Forge is mid-build.
+        native = {DELEGATE_ID: [{'event_type': 'session_start', 'agent': 'forge'}]}
+        got = da._delegation_trail_field(
+            _delegate_cap(), {}, None, native_build_events=native)
+        self.assertEqual(got['delegation_build_phase'], 'building')
+
+    def test_review_event_beats_building(self):
+        native = {DELEGATE_ID: [{'event_type': 'session_start', 'agent': 'forge'}]}
+        m = {DELEGATE_ID: [_ev('review_request')]}
+        got = da._delegation_trail_field(
+            _delegate_cap(), m, None, native_build_events=native)
+        self.assertEqual(got['delegation_build_phase'], 'in_review')
+
+    def test_open_approval_suppresses_building(self):
+        native = {DELEGATE_ID: [{'event_type': 'session_start', 'agent': 'forge'}]}
+        got = da._delegation_trail_field(
+            _delegate_cap(), {}, None, has_open_approval=True,
+            native_build_events=native)
+        self.assertIsNone(got['delegation_build_phase'])
+
     def test_open_approval_suppresses_handed_off(self):
         # Needs-you takes precedence — claiming "with the team" over a delegation
         # parked on Larry is the exact lie the Slice-1 review rejected.
