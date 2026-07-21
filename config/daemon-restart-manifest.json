@@ -11,6 +11,7 @@
       "watch_paths": [
         "scripts/active_tier.py",
         "scripts/agent_runner.py",
+        "scripts/alert_outcomes.py",
         "scripts/alert_triage_state.py",
         "scripts/atomic_io.py",
         "scripts/beacon_approval_handler.py",
@@ -91,6 +92,7 @@
     "ourliberty-chain-event-shipper.service": {
       "entrypoint": "scripts/chain_event_shipper.py",
       "watch_paths": [
+        "scripts/alert_outcomes.py",
         "scripts/alert_triage_state.py",
         "scripts/atomic_io.py",
         "scripts/beacon_approval_handler.py",
@@ -125,6 +127,7 @@
       "watch_paths": [
         "scripts/active_tier.py",
         "scripts/agent_runner.py",
+        "scripts/alert_outcomes.py",
         "scripts/alert_triage_state.py",
         "scripts/atomic_io.py",
         "scripts/beacon_approval_handler.py",
@@ -204,6 +207,7 @@
         "scripts/active_tier.py",
         "scripts/agent_runner.py",
         "scripts/agent_telegram_bot.py",
+        "scripts/alert_outcomes.py",
         "scripts/alert_triage_state.py",
         "scripts/atomic_io.py",
         "scripts/beacon_approval_handler.py",
@@ -240,6 +244,7 @@
       "watch_paths": [
         "scripts/active_tier.py",
         "scripts/agent_runner.py",
+        "scripts/alert_outcomes.py",
         "scripts/alert_triage_state.py",
         "scripts/atomic_io.py",
         "scripts/beacon_approval_handler.py",
@@ -285,6 +290,7 @@
         "scripts/active_tier.py",
         "scripts/agent_runner.py",
         "scripts/agent_telegram_bot.py",
+        "scripts/alert_outcomes.py",
         "scripts/alert_triage_state.py",
         "scripts/atomic_io.py",
         "scripts/beacon_approval_handler.py",
@@ -321,6 +327,7 @@
       "watch_paths": [
         "scripts/active_tier.py",
         "scripts/agent_runner.py",
+        "scripts/alert_outcomes.py",
         "scripts/alert_triage_state.py",
         "scripts/atomic_io.py",
         "scripts/beacon_approval_handler.py",
@@ -400,6 +407,7 @@
         "scripts/active_tier.py",
         "scripts/agent_runner.py",
         "scripts/agent_telegram_bot.py",
+        "scripts/alert_outcomes.py",
         "scripts/alert_triage_state.py",
         "scripts/atomic_io.py",
         "scripts/beacon_approval_handler.py",
@@ -434,6 +442,7 @@
     "ourliberty-spec-review-runner.service": {
       "entrypoint": "scripts/spec_review_runner.py",
       "watch_paths": [
+        "scripts/alert_outcomes.py",
         "scripts/alert_triage_state.py",
         "scripts/atomic_io.py",
         "scripts/beacon_approval_handler.py",
