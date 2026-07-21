@@ -5144,6 +5144,93 @@ def _delegation_trail_field(
     return {'delegation_build_phase': phase, 'delegation_pr_url': pr_url}
 
 
+def _capture_merge_stamped(cap: dict[str, Any]) -> bool:
+    """True when the GC healer has already recorded a real merge on this card.
+
+    Two stamps count as merge-truth, both written by the healer's own reconcile
+    sweeps (never by this read side):
+      - `spawned.outcome == 'merged'` (reconcile_terminal_captures), and
+      - a `shipped_note` / `shipped_pr_url` present (reconcile_completed_cards S3,
+        which does NOT set `spawned.outcome`).
+    Either is an honest merge signal — we never infer a merge from a bare
+    `review_passed` trail phase (that's GitHub-truth the trail already applies)."""
+    spawned = cap.get('spawned')
+    if isinstance(spawned, dict) and spawned.get('outcome') == 'merged':
+        return True
+    if cap.get('shipped_note') or cap.get('shipped_pr_url'):
+        return True
+    return False
+
+
+def _capture_merged_pr_url(
+    cap: dict[str, Any], trail_pr_url: Optional[str],
+) -> Optional[str]:
+    """Best PR url for a merged card: the shipped stamp wins (it's the merge
+    truth), else the trail's pr_url. May be None for a no-PR delegation that
+    still merged linked work — the narration copy handles the PR-less phrasing."""
+    shipped = cap.get('shipped_pr_url')
+    if isinstance(shipped, str) and shipped:
+        return shipped
+    return trail_pr_url
+
+
+def resolve_delegation_narrative_phase(
+    cap: dict[str, Any],
+    build_events_by_origin: Optional[dict[str, list[dict[str, Any]]]],
+    has_open_approval: bool = False,
+    native_build_events: Optional[dict[str, list[dict[str, Any]]]] = None,
+) -> dict[str, Any]:
+    """The ONE narrative-phase resolver the thread narrator and the dashboard
+    both read from — `{narrative_phase, narrative_pr_url}` over
+    {handed_off, waiting_approval, building, in_review, review_passed, merged,
+    closed_failed, None}.
+
+    Built by overlaying the GC healer's already-persisted terminal stamps
+    (`spawned.outcome`, `shipped_note`/`shipped_pr_url`, `failure_signaled`) and
+    `has_open_approval` onto the read-side `_delegation_trail_field` phase — no
+    second trail deriver, no GitHub re-probe (`pr_state_by_url=None`; merge-truth
+    comes from the healer stamps instead). Most-terminal-wins precedence:
+
+      1. merge-stamped        → `merged`  (honest: a real merge signal only)
+      2. outcome closed + failure_signaled → `closed_failed`
+      3. trail review_passed / in_review / building → that phase
+      4. has_open_approval    → `waiting_approval`
+      5. trail handed_off     → `handed_off`
+      6. else                 → None (nothing to narrate yet)
+    """
+    trail = _delegation_trail_field(
+        cap,
+        build_events_by_origin,
+        pr_state_by_url=None,
+        has_open_approval=has_open_approval,
+        native_build_events=native_build_events,
+    )
+    trail_phase = trail.get('delegation_build_phase')
+    trail_pr_url = trail.get('delegation_pr_url')
+
+    if _capture_merge_stamped(cap):
+        return {
+            'narrative_phase': 'merged',
+            'narrative_pr_url': _capture_merged_pr_url(cap, trail_pr_url),
+        }
+    spawned = cap.get('spawned')
+    outcome_closed = (
+        isinstance(spawned, dict) and spawned.get('outcome') == 'closed'
+    )
+    if outcome_closed and cap.get('failure_signaled'):
+        return {
+            'narrative_phase': 'closed_failed',
+            'narrative_pr_url': trail_pr_url,
+        }
+    if trail_phase in ('review_passed', 'in_review', 'building'):
+        return {'narrative_phase': trail_phase, 'narrative_pr_url': trail_pr_url}
+    if has_open_approval:
+        return {'narrative_phase': 'waiting_approval', 'narrative_pr_url': None}
+    if trail_phase == 'handed_off':
+        return {'narrative_phase': 'handed_off', 'narrative_pr_url': None}
+    return {'narrative_phase': None, 'narrative_pr_url': None}
+
+
 # Talk-with-the-team origin trail (approval cards). When Larry discusses an
 # Approvals-tab decision card ("Talk with the team") and that conversation makes
 # Beacon dispatch a build, the dashboard card-message door
