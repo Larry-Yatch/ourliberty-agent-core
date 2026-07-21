@@ -1662,6 +1662,266 @@ def _emit_summary(retire: RetireResult, aged: list[str], commit_status: str,
             suggested_action='Review the retired mission(s); re-open if the work is still wanted.')
 
 
+# ---------- delegate-thread narrator (delegate-thread-narrator-001) ----------
+#
+# Give every DELEGATED capture card a running narrative in its team thread: one
+# `team_to_larry` card_message per phase transition, in the team's single voice,
+# describing WHAT HAPPENED. Folded into this GC tick (no new timer) because it
+# needs the SAME phase resolver the dashboard reads AND the same ~10-min cadence.
+#
+# Three load-bearing invariants:
+#   - SINGLE WRITER: this sweep NEVER writes captures.json — it only READS the
+#     in-memory registry + chain_events/approval signals and EMITS card_message
+#     rows. The healer's captures.json write/commit is untouched.
+#   - IDEMPOTENT: the event_id is a DETERMINISTIC hash of (capture_id + phase)
+#     (phase passed as the `ts` seed, NOT wall-clock), so `ignore_duplicates` on
+#     event_id makes a re-tick a no-op and a skipped phase simply gets no post.
+#   - HONEST: a `merged` post fires ONLY on a real merge stamp (never inferred
+#     from a bare review_passed trail); a no-PR delegation never gets a merged
+#     post; posts are FYI (needs_reply False) so they never ring the doorbell.
+
+_NARRATION_ACTOR = 'beacon'
+_CARD_MSG_TEAM = 'team_to_larry'
+_CARD_MESSAGE_EVENT_TYPE = 'card_message'
+# The (capture_id, phase) event_id disambiguator — keeps these deterministic ids
+# from colliding with any real card_message that happens to share (id, phase).
+_NARRATION_ID_NAMESPACE = 'delegate-thread-narrator'
+# Bound the emits per tick so a huge board can't run unboundedly; the remainder
+# narrates next tick (idempotent — the same posts re-plan and re-emit).
+_NARRATION_MAX_PER_TICK = 40
+
+
+def _narration_text(phase: str, pr_url: Optional[str]) -> str:
+    """One team-voice line per narrative phase, describing WHAT HAPPENED.
+    `review_passed` / `merged` carry the PR link; `merged` degrades to a PR-less
+    phrasing when the merge stamp carried no URL (a no-PR linked-work merge)."""
+    if phase == 'handed_off':
+        return "Picked this up — we're scoping the work now."
+    if phase == 'waiting_approval':
+        return ("We've drafted the plan; it's waiting on your approval before "
+                "we start building.")
+    if phase == 'building':
+        return "We're building this now."
+    if phase == 'in_review':
+        base = 'The build is up as a PR and under review.'
+        return f'{base} {pr_url}' if pr_url else base
+    if phase == 'review_passed':
+        base = 'Review passed — the change is queued to merge.'
+        return f'{base} {pr_url}' if pr_url else base
+    if phase == 'merged':
+        return f'Merged and shipped. {pr_url}' if pr_url else (
+            'Merged and shipped (linked work merged).')
+    if phase == 'closed_failed':
+        return 'The linked PR was closed without merging — needs your eyes.'
+    return ''
+
+
+def _narration_event_id(capture_id: str, phase: str) -> str:
+    """Deterministic per-(card, phase) id: exactly one post per phase per card,
+    forever. The phase is the hash seed (NOT wall-clock ts), so a re-tick recomputes
+    the SAME id and `ignore_duplicates` no-ops it."""
+    from chain_event_shipper import compute_event_id  # noqa: PLC0415
+    return compute_event_id(
+        capture_id, _CARD_MESSAGE_EVENT_TYPE, phase,
+        extra=_NARRATION_ID_NAMESPACE)
+
+
+def plan_delegate_narrations(
+    captures: list[dict[str, Any]],
+    *,
+    build_events_by_origin: Optional[dict[str, list[dict[str, Any]]]],
+    open_delegate_approvals: dict[str, dict[str, Any]],
+    native_build_events: Optional[dict[str, list[dict[str, Any]]]],
+) -> list[dict[str, Any]]:
+    """Pure planner: for each DELEGATED capture, resolve its current narrative
+    phase (via the ONE shared `dashboard_api.resolve_delegation_narrative_phase`)
+    and build the post that narrates it. Returns a list of post dicts
+    ``{capture_id, phase, event_id, text}`` — one per card that has a narratable
+    phase. A card with phase None (nothing has happened yet) yields no post.
+
+    No side effects, no Supabase, no captures.json — the caller emits. Because the
+    event_id is deterministic on (capture_id, phase), the emit is idempotent: the
+    SAME card at the SAME phase re-plans the SAME event_id every tick, and only
+    the FIRST emit lands (later ones ignore_duplicates as no-ops)."""
+    import dashboard_api as dash  # noqa: PLC0415 — lazy: heavy module, read-only use
+    posts: list[dict[str, Any]] = []
+    for cap in captures:
+        if not isinstance(cap, dict):
+            continue
+        spawned = cap.get('spawned')
+        if not (isinstance(spawned, dict) and spawned.get('kind') == 'delegate'):
+            continue
+        cid = cap.get('id')
+        if not (isinstance(cid, str) and cid):
+            continue
+        origin_tid = spawned.get('task_id')
+        has_open_approval = bool(
+            isinstance(origin_tid, str)
+            and open_delegate_approvals.get(origin_tid))
+        resolved = dash.resolve_delegation_narrative_phase(
+            cap,
+            build_events_by_origin,
+            has_open_approval=has_open_approval,
+            native_build_events=native_build_events,
+        )
+        phase = resolved.get('narrative_phase')
+        if not phase:
+            continue
+        text = _narration_text(phase, resolved.get('narrative_pr_url'))
+        if not text:
+            continue
+        posts.append({
+            'capture_id': cid,
+            'phase': phase,
+            'event_id': _narration_event_id(cid, phase),
+            'text': text,
+        })
+    return posts
+
+
+def _emit_narration_post(
+    supabase_client: Any, post: dict[str, Any], now: datetime,
+) -> None:
+    """Upsert one FYI `team_to_larry` card_message for a post (idempotent on
+    event_id). The row's `ts` is the real wall-clock time (so the thread orders
+    naturally oldest-first) while the event_id is the deterministic (id, phase)
+    hash — the two are decoupled on purpose."""
+    from chain_event_shipper import sanitize_payload  # noqa: PLC0415
+    cid = post['capture_id']
+    payload = {
+        'capture_id': cid,
+        'direction': _CARD_MSG_TEAM,
+        'text': post['text'],
+        'actor': _NARRATION_ACTOR,
+        # FYI narration, never a question → never rings the blocked-on-you
+        # doorbell (which keys on needs_reply True). It's a chip echo, not a ping.
+        'needs_reply': False,
+    }
+    row = {
+        'event_id': post['event_id'],
+        'ts': now.isoformat(),
+        'agent': _NARRATION_ACTOR,
+        'event_type': _CARD_MESSAGE_EVENT_TYPE,
+        'task_id': cid,
+        'actor': _NARRATION_ACTOR,
+        'payload': sanitize_payload(payload),
+    }
+    supabase_client.table('chain_events').upsert(
+        [row], on_conflict='event_id', ignore_duplicates=True,
+    ).execute()
+
+
+def author_delegate_thread_narration(
+    registry: dict[str, Any],
+    *,
+    now: datetime,
+    dry_run: bool,
+    supabase_client: Any = None,
+    agents_root: Optional[Path] = None,
+) -> int:
+    """The folded sweep (delegate-thread-narrator-001). Reads the in-memory
+    captures registry + the delegation signals the dashboard reads, plans one
+    card_message per delegated card's current phase, and emits the FYI posts.
+    Returns the number of posts emitted (or, in dry-run, would emit).
+
+    NEVER writes captures.json — the healer's single write+commit is untouched.
+    Fail-safe: assembling inputs or emitting a post is guarded so one bad card /
+    one Supabase hiccup logs + skips, never aborts the tick."""
+    captures = registry.get('captures', [])
+    if not isinstance(captures, list):
+        return 0
+    delegated = [
+        c for c in captures
+        if isinstance(c, dict) and isinstance(c.get('spawned'), dict)
+        and c['spawned'].get('kind') == 'delegate'
+        and isinstance(c['spawned'].get('task_id'), str)
+        and isinstance(c.get('id'), str) and c.get('id')
+    ]
+    if not delegated:
+        return 0
+
+    import dashboard_api as dash  # noqa: PLC0415 — lazy: read-only helper reuse
+    if supabase_client is None:
+        import chain_event_emit  # noqa: PLC0415
+        supabase_client = chain_event_emit._get_client()
+    if supabase_client is None:
+        log('delegate-thread narration: supabase unavailable — skipping sweep')
+        return 0
+    if agents_root is None:
+        agents_root = dash._agents_root()
+
+    try:
+        spawned_ids = [c['spawned']['task_id'] for c in delegated]
+        open_delegate_approvals = dash._open_delegate_approvals(
+            spawned_ids, agents_root)
+        dispatched_by_origin = dash._delegate_dispatched_task_ids(
+            spawned_ids, agents_root)
+        # Origins for the review trail: the delegate ref (`delegate-<cid>`) AND
+        # the discuss key (`card-message-<cid>`) — a delegated card may ALSO have
+        # been discussed, and the resolver merges whichever join(s) hit.
+        trail_origin_ids = list(spawned_ids)
+        _seen = set(trail_origin_ids)
+        for c in delegated:
+            origin = f"{dash._CARD_MESSAGE_ORIGIN_PREFIX}{c['id']}"
+            if origin not in _seen:
+                _seen.add(origin)
+                trail_origin_ids.append(origin)
+        build_events_by_origin = dash._fetch_delegation_build_events(
+            supabase_client, trail_origin_ids)
+        # The ledger bridge → the build's OWN (never origin-tagged) session_start,
+        # which is the `building` signal for a card whose PR hasn't opened yet.
+        fetch_ids = list(dispatched_by_origin.values())
+        events_by_task_id = (
+            dash._fetch_events_for_task_ids(supabase_client, fetch_ids)
+            if fetch_ids else {})
+        native_build_events = {
+            origin: (events_by_task_id.get(fid) or [])
+            for origin, fid in dispatched_by_origin.items()
+        }
+    except Exception as e:  # noqa: BLE001 — fail-safe: skip the sweep, never abort
+        log(f'delegate-thread narration: input assembly failed: '
+            f'{type(e).__name__}: {e} — skipping sweep')
+        return 0
+
+    try:
+        posts = plan_delegate_narrations(
+            delegated,
+            build_events_by_origin=build_events_by_origin,
+            open_delegate_approvals=open_delegate_approvals,
+            native_build_events=native_build_events,
+        )
+    except Exception as e:  # noqa: BLE001 — fail-safe
+        log(f'delegate-thread narration: planning failed: '
+            f'{type(e).__name__}: {e} — skipping sweep')
+        return 0
+
+    if not posts:
+        return 0
+    if len(posts) > _NARRATION_MAX_PER_TICK:
+        log(f'delegate-thread narration: {len(posts)} posts exceed '
+            f'{_NARRATION_MAX_PER_TICK}/tick — emitting first '
+            f'{_NARRATION_MAX_PER_TICK}, rest next tick (idempotent)')
+        posts = posts[:_NARRATION_MAX_PER_TICK]
+
+    if dry_run:
+        for p in posts:
+            log(f"delegate-thread narration (dry-run): would post "
+                f"'{p['phase']}' for capture {p['capture_id']}")
+        return len(posts)
+
+    emitted = 0
+    for p in posts:
+        try:
+            _emit_narration_post(supabase_client, p, now)
+            emitted += 1
+        except Exception as e:  # noqa: BLE001 — per-post fail-safe
+            log(f"delegate-thread narration: emit failed for "
+                f"{p['capture_id']}/{p['phase']}: {type(e).__name__}: {e}")
+    log(f'delegate-thread narration: emitted {emitted}/{len(posts)} '
+        f'card_message post(s)')
+    return emitted
+
+
 # ---------- main ----------
 
 
@@ -1670,6 +1930,7 @@ def run_once(*, dry_run: bool,
              events_fetcher: Optional[Callable[[], Optional[list[dict[str, Any]]]]] = None,
              mission_probe_fn: Optional[Callable[[str], str]] = None,
              author_fn: Optional[Callable[..., tuple[int, int]]] = None,
+             narrate_fn: Optional[Callable[..., int]] = None,
              mission_author_fn: Optional[Callable[..., tuple[int, int]]] = None,
              completion_verify_fn: Optional[Callable[[str, Optional[str]], tuple[bool, Optional[str]]]] = None,
              completion_closeout_fn: Optional[Callable[[dict[str, Any], Optional[str], datetime], dict[str, Any]]] = None,
@@ -1864,6 +2125,18 @@ def run_once(*, dry_run: bool,
             except Exception as e:  # noqa: BLE001 — fail-safe: never abort the tick
                 log(f'narrator sweep raised: {type(e).__name__}: {e}')
                 briefed, deferred = 0, 0
+            # --- delegate-thread narrator (delegate-thread-narrator-001): narrate
+            # each delegated card's current phase as a FYI team_to_larry post.
+            # READS the registry + delegation signals and EMITS card_message rows;
+            # it NEVER writes captures.json, so it sits outside the write-condition
+            # below (its emits don't gate the healer's single captures.json write).
+            # Fail-isolated so a narration error never aborts the tick. ---
+            if narrate_fn is None:
+                narrate_fn = author_delegate_thread_narration
+            try:
+                narrate_fn(registry, now=now, dry_run=dry_run)
+            except Exception as e:  # noqa: BLE001 — fail-safe: never abort the tick
+                log(f'delegate-thread narration raised: {type(e).__name__}: {e}')
             if (completed.changed or failed.changed or terminal_backstop.changed
                     or deferred_actions.changed or aged or briefed) and not dry_run:
                 # The Narrator sweep can hold the registry for minutes (one claude
