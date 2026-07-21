@@ -1062,6 +1062,97 @@ class ReconcileTerminalCapturesTest(unittest.TestCase):
             self.assertEqual(cap['state'], 'parked')
             self.assertNotIn('outcome', cap['spawned'])
 
+    def test_delegate_card_probes_the_ledger_bridge_id(self):
+        # THE FIX: a delegated card's spawned.task_id is the ORIGIN id, which is
+        # never a PR branch. Probe the fresh dispatch id from the ledger instead,
+        # or the card can never clear (always UNKNOWN → always KEEP).
+        reg = self._registry(self._cap('c15', 'safe'))
+        probe = mock.Mock(return_value=h.tts.MERGED)
+        res = h.reconcile_terminal_captures(
+            reg, self._now(), terminal_fn=probe, ring_fn=mock.Mock(), dry_run=False,
+            bridge_fn=lambda ids: {'delegate-c15': 'real-build-task-001'})
+        probe.assert_called_once_with('real-build-task-001')
+        self.assertEqual(reg['captures'][0]['state'], 'done')
+        self.assertEqual([cid for cid, _ in res.completed], ['c15'])
+
+    def test_no_bridge_entry_falls_back_to_origin_id(self):
+        # Pre-origin_task_id delegations (and never-dispatched ones) have no
+        # bridge row: unchanged behavior — probe the origin, get UNKNOWN, KEEP.
+        reg = self._registry(self._cap('c16', 'safe'))
+        probe = mock.Mock(return_value=h.tts.UNKNOWN)
+        res = h.reconcile_terminal_captures(
+            reg, self._now(), terminal_fn=probe, ring_fn=mock.Mock(), dry_run=False,
+            bridge_fn=lambda ids: {})
+        probe.assert_called_once_with('delegate-c16')
+        self.assertEqual(reg['captures'][0]['state'], 'parked')
+        self.assertEqual(res.kept, 1)
+
+    def test_bridged_delegation_with_no_pr_still_keeps(self):
+        # Prose-verdict / investigation delegations dispatch but open no PR.
+        # UNKNOWN on the FRESH id is correct — 'no PR' is never 'done'.
+        reg = self._registry(self._cap('c17', 'safe'))
+        res = h.reconcile_terminal_captures(
+            reg, self._now(), terminal_fn=lambda t: h.tts.UNKNOWN,
+            ring_fn=mock.Mock(), dry_run=False,
+            bridge_fn=lambda ids: {'delegate-c17': 'prose-task-001'})
+        self.assertEqual(reg['captures'][0]['state'], 'parked')
+        self.assertFalse(res.changed)
+
+    def test_bridge_error_degrades_to_origin_probes(self):
+        def _boom(ids):
+            raise RuntimeError('ledger unreadable')
+        reg = self._registry(self._cap('c18', 'safe'))
+        probe = mock.Mock(return_value=h.tts.UNKNOWN)
+        res = h.reconcile_terminal_captures(
+            reg, self._now(), terminal_fn=probe, ring_fn=mock.Mock(),
+            dry_run=False, bridge_fn=_boom)
+        probe.assert_called_once_with('delegate-c18')
+        self.assertEqual(res.kept, 1)
+
+    def test_bridge_lookup_set_is_only_probeable_delegates(self):
+        # One store read per tick, asked only about cards this tick will probe:
+        # skips non-parked, already-stamped, failure_signaled and non-delegates.
+        stamped = self._cap('s1', 'safe')
+        stamped['spawned']['outcome'] = 'merged'
+        reg = self._registry(
+            self._cap('d1', 'safe'),
+            self._cap('n1', 'safe', state='done'),
+            stamped,
+            self._cap('f1', 'safe', failure_signaled={'reason': 'x'}),
+            {'id': 'k1', 'state': 'parked',
+             'spawned': {'kind': 'session', 'task_id': 'some-build-001'}},
+        )
+        seen = []
+        h.reconcile_terminal_captures(
+            reg, self._now(), terminal_fn=lambda t: h.tts.OPEN,
+            ring_fn=mock.Mock(), dry_run=False,
+            bridge_fn=lambda ids: (seen.append(list(ids)) or {}))
+        self.assertEqual(seen, [['delegate-d1']])
+
+    def test_bridge_reader_maps_origin_to_fresh_id(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / 'state').mkdir()
+            (root / 'state' / 'beacon-pending-approvals.json').write_text(json.dumps({
+                'pending': [{'id': 'fresh-pending-001',
+                             'origin_task_id': 'delegate-a'},
+                            {'id': 'no-origin-001'}],
+                'history': [{'id': 'fresh-approved-001',
+                             'origin_task_id': 'delegate-b'},
+                            {'id': 'fresh-dupe-001', 'origin_task_id': 'delegate-a'}],
+            }))
+            out = h.delegate_dispatched_task_ids(
+                ['delegate-a', 'delegate-b', 'delegate-missing'], agents_root=root)
+        self.assertEqual(out, {'delegate-a': 'fresh-pending-001',   # first wins
+                               'delegate-b': 'fresh-approved-001'})
+
+    def test_bridge_reader_is_fail_safe_on_missing_store(self):
+        with tempfile.TemporaryDirectory() as td:
+            self.assertEqual(
+                h.delegate_dispatched_task_ids(['delegate-a'], agents_root=Path(td)),
+                {})
+        self.assertEqual(h.delegate_dispatched_task_ids([]), {})
+
     def test_default_terminal_fn_wraps_shared_probe(self):
         with mock.patch.object(h.tts, 'task_terminal_state',
                                return_value=h.tts.MERGED) as probe:
