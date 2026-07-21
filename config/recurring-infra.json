@@ -1,0 +1,21 @@
+{
+  "_meta": {
+    "owner": "cost-attribution-by-repo (rsdpm-p5)",
+    "tweak_via": "edit this file + commit; scripts/cost_by_repo.py reads it on each run (no service reload).",
+    "rationale": "Config-driven inputs for per-repo cost attribution. `sources`/`source_suffixes` classify which costs.jsonl rows are recurring INFRA/chat spend (not attributable to a single build repo) — these are bucketed as INFRA with strict precedence over per-repo/unattributed. `monthly_usd` is a static line-item tally of recurring dollar infra (SaaS subscriptions) that never appears in costs.jsonl at all; it is reported alongside the LLM buckets as a separate fixed-cost line. All values are placeholders — edit freely."
+  },
+  "sources": [
+    "missions-narrator",
+    "dashboard-cleanup-verify",
+    "ceo_digest_generator.py",
+    "pulse_check_retrospective_author.py"
+  ],
+  "source_suffixes": [
+    "-telegram-bot"
+  ],
+  "monthly_usd": {
+    "supabase_pro": 25.0,
+    "vercel": 20.0,
+    "resend": 0.0
+  }
+}

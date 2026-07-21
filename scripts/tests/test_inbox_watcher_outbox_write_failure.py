@@ -68,6 +68,9 @@ class OutboxWriteFailureArchivesTest(unittest.TestCase):
             'task_id': 'real-paid-001',
             'prompt': 'do the work',
             'source': 'beacon',
+            # Per-repo cost attribution (approach A): a build task carries
+            # target_repo; it must be stamped onto the cost row.
+            'target_repo': 'ourliberty-agent-core',
         }
         p = iw.INBOXES_ROOT / self.AGENT / 'real-paid-001.json'
         p.write_text(json.dumps(task))
@@ -139,6 +142,9 @@ class OutboxWriteFailureArchivesTest(unittest.TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]['task_id'], 'real-paid-001')
         self.assertEqual(rows[0]['cost_usd'], 0.05)
+        # Per-repo cost attribution: the build task's target_repo is stamped
+        # onto the cost row (null-safe — absent when the outbox lacks one).
+        self.assertEqual(rows[0]['target_repo'], 'ourliberty-agent-core')
 
 
 class RunClaudeExceptionArchiveDestTest(unittest.TestCase):
