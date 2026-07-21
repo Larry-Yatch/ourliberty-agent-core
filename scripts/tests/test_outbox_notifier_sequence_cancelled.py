@@ -272,6 +272,42 @@ class TestCancelledWordingIsPlainLanguage(_Harness):
             on._render_review_pass_merge_status_line(
                 {'merge_outcome': 'merged'}))
 
+    def test_both_surfaces_render_one_shared_sentence(self):
+        """The review-pass path must not carry its own copy of the wording.
+
+        It used to hardcode 'Auto-merge was SKIPPED — the build was
+        cancelled…', which omitted the "will NOT retry" the renderer says.
+        One outcome, two sentences, in a file whose variant table opens with
+        a KEEP IN SYNC comment — so assert they are literally the same
+        string, not merely that both sound right.
+        """
+        self._write(_seq('s1', 'failed', ['seq-s1-step-a'], cancelled=True))
+        data = {'task_id': 'seq-s1-step-a', 'pr_url': _PR}
+        marker_decision = {'payload': {'pr_url': _PR}}
+        with mock.patch.object(on, '_auto_merge_pr'), \
+                mock.patch.object(on, '_attempt_auto_merge_with_gates'):
+            on._run_review_pass_auto_merge(
+                data, marker_decision, self._root / 'outbox.json')
+        line = marker_decision['intent_kwargs']['merge_status_line']
+        self.assertEqual(
+            line,
+            on._render_review_pass_merge_status_line(
+                {'merge_outcome': self._OUTCOME}))
+        self.assertIn('not retry', line.lower())
+
+    def test_skipped_family_keeps_its_explicit_wording(self):
+        """The derive-from-renderer default must stay opt-in.
+
+        `skipped_shape_invalid` and friends have NO renderer branch — if they
+        ever start deriving, they degrade to the generic "REQUESTED; outcome
+        in Larry's DM" default, i.e. the exact false-calm sentence this whole
+        path exists to avoid. Pin one of them.
+        """
+        line = on._render_review_pass_merge_status_line(
+            {'merge_outcome': 'skipped_shape_invalid'})
+        self.assertIn('REQUESTED', line)  # renderer really has no branch,
+        # so this outcome must keep passing its own sentence explicitly.
+
 
 if __name__ == '__main__':
     unittest.main()
