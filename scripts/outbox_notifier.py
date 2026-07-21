@@ -1397,6 +1397,23 @@ _REVIEW_PASS_DM_VARIANTS: dict[str, str] = {
         'needs a `/code-review high` first.\n'
         'Review, then merge: scripts/merge_reviewed_pr.sh {pr_number}'
     ),
+    # board-abort-dispatched-build — you stopped this build, so nothing it
+    # produced may land on main. This is the ONLY outcome here that is
+    # terminal-by-intent: every other held/failed variant is waiting on
+    # something and will retry. Without its own entry the DM fell back to the
+    # generic review-pass body, which says Mirror approved and never mentions
+    # that the merge was refused — leaving the impression something is still
+    # coming. Wording says the build was stopped (the thing you did), not
+    # "sequence cancelled" (the enum).
+    'skipped_sequence_cancelled': (
+        'Mirror approved PR {pr_url} on task `{task_id}`, but you stopped '
+        'this build.\n'
+        'Summary: {summary}\n'
+        'Auto-merge was REFUSED and will not retry — nothing from a stopped '
+        'build lands on main.\n'
+        'The PR is still open if you want it: {pr_url}\n'
+        'To merge it anyway: scripts/merge_reviewed_pr.sh {pr_number}'
+    ),
 }
 
 
@@ -1449,6 +1466,15 @@ def _render_review_pass_merge_status_line(
         return (
             'Auto-merge is HELD — the merge queue is fail-closed on a corrupt '
             'state file and an operator must clear it. The PR is NOT merged.'
+        )
+    if outcome == 'skipped_sequence_cancelled':
+        # Terminal by intent — unlike every other non-merged outcome here,
+        # nothing will retry this. Say so explicitly, or the generic fallback
+        # below ("REQUESTED; outcome in Larry's DM") leaves the receiver
+        # waiting on an outcome that is never coming.
+        return (
+            'Auto-merge was REFUSED because the build was stopped — the PR is '
+            'NOT merged and will NOT retry. The PR remains open.'
         )
     if outcome == 'deferred_unknown':
         return (

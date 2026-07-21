@@ -163,5 +163,115 @@ class TestAutoMergeGateBlocksCancelled(_Harness):
             marker_decision['merge_outcome'], 'skipped_sequence_cancelled')
 
 
+class TestQueueReleaseHonoursCancel(_Harness):
+    """609e item 3 — the RELEASE path.
+
+    A PR held behind a blocker is re-gated when that blocker merges. If the
+    operator stopped the build while it sat in the queue, the release must NOT
+    merge it. This path never ran through the review-pass gate — it re-enters
+    via `_attempt_auto_merge_with_gates` — so it needs its own coverage.
+    """
+
+    def _queue_entry(self):
+        return {
+            'pr_url': _PR, 'pr_number': 9,
+            'repo': 'Larry-Yatch/ourliberty-agent-core',
+            'task_id': 'seq-s1-step-a', 'summary': 's',
+            'blocker_pr_number': 4, 'reply_chat_id': None,
+            'changed_files': [], 'queued_at': '2026-07-21T00:00:00+00:00',
+        }
+
+    def test_release_of_a_stopped_build_does_not_merge(self):
+        self._write(_seq('s1', 'failed', ['seq-s1-step-a'], cancelled=True))
+        with mock.patch.object(
+                    on, '_load_auto_merge_queue',
+                    return_value=[self._queue_entry()]), \
+                mock.patch.object(on, '_queue_remove_pr'), \
+                mock.patch.object(on, '_auto_merge_pr') as merge_fn, \
+                mock.patch.object(on, '_fire_review_pass_outcome_dm') as dm:
+            on._queue_release(4, 'Larry-Yatch/ourliberty-agent-core')
+        merge_fn.assert_not_called()
+        # The release still closes the loop with Larry — a silent drop would
+        # strand the entry with no final word after its "queued behind #4" DM.
+        dm.assert_called_once()
+        self.assertEqual(
+            dm.call_args[0][1].get('merge_outcome'),
+            'skipped_sequence_cancelled')
+
+    def test_release_of_a_live_build_still_merges(self):
+        # The gate must not become a blanket refusal on the release path.
+        self._write(_seq('s1', 'active', ['seq-s1-step-a'], cancelled=False))
+        merge_fn = mock.Mock(return_value={'merge_outcome': 'merged'})
+        with mock.patch.object(
+                    on, '_load_auto_merge_queue',
+                    return_value=[self._queue_entry()]), \
+                mock.patch.object(on, '_queue_remove_pr'), \
+                mock.patch.object(
+                    on, '_AUTO_MERGE_SKIP_SERIALIZER_FOR_TEST', True), \
+                mock.patch.object(on, '_AUTO_MERGE_FN_OVERRIDE', merge_fn), \
+                mock.patch.object(on, '_fire_review_pass_outcome_dm'):
+            on._queue_release(4, 'Larry-Yatch/ourliberty-agent-core')
+        merge_fn.assert_called_once()
+
+
+class TestCancelledWordingIsPlainLanguage(_Harness):
+    """609e item 2 — both surfaces must SAY what happened.
+
+    Without their own entries, `skipped_sequence_cancelled` fell through to the
+    generic review-pass DM body (which only says Mirror approved) and to the
+    notify's default line ("REQUESTED; outcome in Larry's DM"). Both imply
+    something is still coming. This outcome is terminal by intent: nothing will
+    retry it, and the reader has to know that.
+    """
+
+    _OUTCOME = 'skipped_sequence_cancelled'
+
+    def test_dm_variant_exists_and_says_stopped_and_not_retrying(self):
+        body = on._REVIEW_PASS_DM_VARIANTS.get(self._OUTCOME)
+        self.assertIsNotNone(body, 'no DM variant — falls back to the generic '
+                                   'review-pass body that never mentions the stop')
+        lowered = body.lower()
+        self.assertIn('stopped', lowered)
+        self.assertIn('not retry', lowered)
+        # Must never imply the merge happened.
+        self.assertNotIn('auto-merged', lowered)
+
+    def test_dm_variant_renders_with_the_standard_fields(self):
+        # The variants are .format()-ed against the marker decision; a typo'd
+        # placeholder would KeyError mid-merge on the daemon.
+        rendered = on._REVIEW_PASS_DM_VARIANTS[self._OUTCOME].format(
+            pr_url=_PR, task_id='seq-s1-step-a', summary='did a thing',
+            pr_number=9, repo_coords='Larry-Yatch/ourliberty-agent-core',
+            merge_reason='', blocker_pr_number='', overlap_files='',
+            regression_detail='',
+        )
+        self.assertIn(_PR, rendered)
+        self.assertIn('seq-s1-step-a', rendered)
+
+    def test_notify_line_says_refused_and_will_not_retry(self):
+        line = on._render_review_pass_merge_status_line(
+            {'merge_outcome': self._OUTCOME})
+        lowered = line.lower()
+        self.assertIn('not merged', lowered)
+        self.assertIn('not retry', lowered)
+        # The generic fallback would claim it was merely "REQUESTED".
+        self.assertNotIn('requested', lowered)
+
+    def test_no_raw_enum_leaks_into_either_surface(self):
+        # The whole point of item 2: Larry reads these, not the enum.
+        for text in (on._REVIEW_PASS_DM_VARIANTS[self._OUTCOME],
+                     on._render_review_pass_merge_status_line(
+                         {'merge_outcome': self._OUTCOME})):
+            self.assertNotIn('skipped_sequence_cancelled', text)
+            self.assertNotIn('sequence_cancelled', text)
+
+    def test_merged_still_reads_as_merged(self):
+        # Guard against the new branch shadowing the success path.
+        self.assertIn(
+            'MERGED',
+            on._render_review_pass_merge_status_line(
+                {'merge_outcome': 'merged'}))
+
+
 if __name__ == '__main__':
     unittest.main()
