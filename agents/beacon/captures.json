@@ -1738,7 +1738,7 @@
       "id": "cap-update-forge-and-mirror-for-the-new-build-check-0181",
       "title": "Update Forge and Mirror for the new build_check contract",
       "note": "build_check's output contract changed and landed on ourliberty-graph main (f847ae9, 2026-07-20). The droplet pulls it hourly, so Forge and Mirror instructions are now stale and describe a verdict that no longer exists.\n\nWHAT CHANGED: build_check used to band a TF-IDF cosine score into STRONG / POSSIBLE / NONE and tell the builder whether reuse existed. It no longer emits any verdict. It now prints the top 3 catalogued candidates (id, profile, full capability statement, location) and asks the reader to judge each as REUSE (same job, extend it), ADAPT (same problem at a different altitude or shape, pattern transfers but work remains), or NONE (build net-new).\n\nWHY: cosine magnitude tracks term density and document length, not relevance. Measured: the 0.25 band passed only 14 of 30 in-domain eval cases that the same ranking placed at rank 1 (29/30), and 0 of 13 cross-product cases. It was discarding more than half the matches it had correctly found. Retrieval ranks well but cannot judge; the reader is an agent that can.\n\nCHANGE 1 \u2014 agents/forge/CLAUDE.md, the preflight consult step (currently near line 47-50). It says: \"It returns a SHELF verdict ... If the verdict is STRONG, your plan should reuse/extend the named component rather than reimplement it.\" Replace that with the judgment contract above: you receive candidates, you decide REUSE/ADAPT/NONE and record your call and reasoning in preflight_summary. Keep the existing fail-safe wording (\"build-check skipped\" on error, never block) and the skip-for-trivial-edits rule exactly as they are.\n\nCHANGE 2 \u2014 Mirror Lens I wording. It still refers to the librarian as \"v1 brittle\" and cites the old score bands. Replace with the same judgment contract. There is a pre-existing card for this wording fix (task_9e589a09); fold it in.\n\nGUIDANCE FOR BOTH: judge on substance, not shared vocabulary. Cross-altitude matches (a workflow card answering a schema need) are normal and frequently correct. \"None of these fit\" is a legitimate, expected outcome, not a failure.\n\nREFERENCE: ourliberty-graph docs/build-loop.md carries the full contract and the measurement behind it. Do not reintroduce a score threshold.",
-      "state": "parked",
+      "state": "done",
       "label": null,
       "origin": {
         "source": "desktop-chat",
@@ -1752,7 +1752,8 @@
       "spawned": {
         "kind": "delegate",
         "task_id": "delegate-cap-update-forge-and-mirror-for-the-new-build-check-0181",
-        "stamped_at": "2026-07-21T06:09:38.480595+00:00"
+        "stamped_at": "2026-07-21T06:09:38.480595+00:00",
+        "outcome": "merged"
       },
       "briefing": {
         "what": "Our automated reuse-checker used to give a simple yes/no on whether we already had something before building it new, and we're updating our two builder assistants to match its smarter new approach that shows them the best existing options and lets them judge the fit.",
@@ -1766,7 +1767,10 @@
         "model": "claude-opus-4-8",
         "at": "2026-07-21T06:10:17.128736+00:00",
         "from_state": "parked"
-      }
+      },
+      "closed_by": "heal_missions_card_gc:terminal-backstop",
+      "shipped_note": "shipped (linked work merged)",
+      "closed_at": "2026-07-21T08:20:50.959055+00:00"
     }
   ]
 }
