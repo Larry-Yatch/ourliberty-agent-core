@@ -76505,3 +76505,91 @@ heal-stale-daemon-code detected code drift in beacon_telegram_bot.py and outbox_
 
 ---
 
+## Iteration ~5699 — 2026-07-20T17:27Z UTC (Larry /cycle chat, Tier 2→3)
+
+**Health:** ✅ Nominal. 1 new alert (line 776: Tier 3 silence). Check 3 dry-run detected a confirmed FP stall. All checks classified nominal. **Tier promoted 2→3** (consecutive_clean=3).
+
+**VERIFY-BEFORE-REASSERT (from iter ~5698 status snapshot at 17:07Z UTC):**
+- **"HEAD=25430588==origin/main"**: UPDATED ✅ — wrapper committed a36c0d3b (Pulse cycle 20260720T170936Z). HEAD=a36c0d3b==origin/main ✅
+- **"zombie PID 1834248 (~52d21h48m)"**: UPDATED ⚠️ — etime=52-22:07:53 (~52d22h8m). [carry, static]
+- **"beacon PID 3801553 (~15h22m)"**: UPDATED ✅ — etime=15:42:20 (~15h42m) ✅
+- **"outbox-notifier PID 3801576 (~15h22m)"**: UPDATED ✅ — etime=15:42:20 (~15h42m) ✅
+- **"inbox_watcher PID 3801575 (~15h22m)"**: UPDATED ✅ — etime=15:42:20 (~15h42m) ✅
+- **"last_sync=2026-07-20T16:51:19Z UTC"**: CONFIRMED ✅ — still 16:51:19Z (~36 min at 17:27Z check). Within 2h. NOMINAL ✅
+- **"wm=775 (fl=775)"**: UPDATED — repair-watermark: repaired=false (old_wm=775, fl=776). 1 new alert at line 776 (heal-wedged-review-sessions, ts=17:23Z UTC). Watermark advanced 775→776. ✅
+- **"0 open PRs"**: UPDATED — PR #964 now OPEN: "fix(pulse): Check VIII stops re-proposing deprecate for an already-disabled gate" (MERGEABLE, Mirror review dispatched). ⬆️
+- **"Forge inbox: 1 active task (~15 min)"**: UPDATED — Forge inbox now empty. PR #964 was built and push completed. ✅
+- **"pending=0"**: UPDATED — pending=1 (dashboard-api-sha-drift-path-aware-restart-001, DMed Larry 11:14 MDT). ⬆️
+
+**Check 0 — Alert triage:**
+- `repair-watermark`: repaired=false (old_wm=775, fl=776). 1 new alert at line 776.
+- Line 776: `source=heal-wedged-review-sessions, ts=2026-07-20T17:23:23Z UTC, subject=wedged-review-reaped:wt-forge-check-viii-suppress-deprecate-when-already-disable, route=closure`. Triage helper: **Tier 3** (known-pattern match in alert-translations.json). Silence + journal note. Watermark advanced 775→776. NOMINAL ✅
+
+**Check 1 — Log noise:** outbox-notifier.log: last WARN at 08:21:37 MDT (14:21:37Z UTC) — known G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch (carry, verification_pending). No new WARNs since. NOMINAL ✅
+
+**Check 2 — Telegram sweep:** New Larry activity since iter ~5698 (17:07Z UTC):
+- 11:11 MDT (17:11Z UTC): Larry sent "draft the dashboard-api deploy-race fix" → Beacon dispatched tier1.
+- 11:14 MDT (17:14Z UTC): Beacon responded with APPROVAL_REQUEST for `dashboard-api-sha-drift-path-aware-restart-001`, approval DMed to Larry.
+- 11:26 MDT (17:26Z UTC): alert idx=775 delivered (source=heal-wedged-review-sessions, route=closure — auto-handled, no Larry DM).
+PIDs 3801553/3801576 confirmed alive (~15h42m). NOMINAL ✅ (Beacon handled direction-ask; no Pulse action)
+
+**Check 3 — Pipeline stall:** DRY-RUN (17:27Z UTC) detected `retry_exhausted:check-viii-suppress-deprecate-when-already-disabled-001`. **Diagnosed as FP:** PR #964 (fix(pulse): Check VIII stops re-proposing deprecate for an already-disabled gate) was successfully built by Forge, open MERGEABLE. Root cause: Forge build session went idle after creating PR (terminal marker, idle 958s > grace 300s); heal-wedged-review-sessions reaped it at 17:23Z UTC; wip-redispatch retry (forge.1.json) exhausted immediately. Mirror review dispatched at 11:20 MDT (17:20Z UTC); Mirror worktree `wt-mirror-check-viii-suppress-deprecate-when-already-disable` present + in progress. Pipeline is self-managing. **Classification: nominal (confirmed FP)**. **[NEW G-rule 1/3]** `heal-pipeline-stall-retry-exhausted-pr-exists-fp-001`: stall healer fires `retry_exhausted` when wip-redispatch retry exhausts after successful primary build (worktree wedge+reap path). Dispatch to Beacon at 3/3. NOMINAL ✅
+
+**Check 4 — Pending directives:** pending=1 (dashboard-api-sha-drift-path-aware-restart-001, DMed Larry 11:14 MDT, ~13 min old). Not stale. History=489. NOMINAL ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-20T17:23:20Z UTC (~4 min at 17:27Z check). NOMINAL ✅
+
+**Check A — Source repo:** HEAD=a36c0d3b==origin/main ✅; on main ✅; clean tree ✅. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-20T16:51:19Z UTC (~36 min), status=no-change, push_failures=0. NOMINAL ✅
+**Check C — Agent liveness:** beacon PID 3801553 ✅ (~15h42m); outbox-notifier PID 3801576 ✅ (~15h42m); inbox_watcher PID 3801575 ✅ (~15h42m). ⚠️ Zombie PID 1834248 (~52d22h8m, bash poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`). [carry, static]
+**Check E — PR/merge state:** PR #964 open (check-viii fix), MERGEABLE, Mirror review in progress (worktree present, dispatched 11:20 MDT). NOMINAL ✅
+**Check H — Forge/Beacon/Mirror inboxes:** all empty (0/0/0). Mirror processing from .claimed/. NOMINAL ✅
+**Rotations:** 0 overdue. NOMINAL ✅
+
+**§5.0:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks:**
+- **Check I:** FIRED Monday 2026-07-20 at 14:14Z UTC (iter ~5695). 1 proposal `pulse-cycle-model-downgrade-001` dispatched. Next firing Wed 2026-07-23. [carry]
+- **Check III:** OFF-WEEK ✅ — biweekly cadence. Next fire: 2026-07-26 04:42:51 MDT.
+- **Check VIII:** `build-check-viii-suppress-deprecate-when-already-disabled-001` → PR #964 open, Mirror reviewing. 2026-07-13 proposal still pending (reply `approve check-viii-update-2026-07-13`). [updated]
+- **Check XIV:** [2/3 carry]. Dispatch at 3/3 (next Check XIV firing). [carry]
+- **Check XI:** CLOSED ✅ — over_gate=false. [carry]
+- Check IV/VI/IX/X/XII: timer-managed. No new artifacts. ✅
+
+**G-rule assessment:**
+- **[NEW 1/3]** `heal-pipeline-stall-retry-exhausted-pr-exists-fp-001` — see Check 3 above. Dispatch to Beacon at 3/3.
+- All other active G-rule counts carry unchanged.
+
+**Actions taken:**
+1. Check 0: repair-watermark no-op; new alert (line 776) triaged Tier 3 (silence); watermark advanced 775→776. ✅
+2. §5.0: all three one-shots no-op. ✅
+3. PRIME ledger: `intervention` appended (FP stall diagnostic, tier=2, template=check3-pipeline-stall). ✅
+4. Tier state: `record --checks-clean true` → consecutive_clean 2→3 → **Tier promoted 2→3** (consecutive_clean reset to 0). ✅
+
+**Escalations:** 0 new Pulse DMs. `dashboard-api-sha-drift-path-aware-restart-001` approval already DMed by bot (11:14 MDT). All prior escalations carry.
+
+**Standing findings:**
+- [yellow] **sync-deploy-targets-missing-registry-001 [1/3]** — Vercel project `rsdpm` absent from `config/deploy_targets.json`. Bot DM'd Larry (idx=773). [ask-then-do, carry]
+- [yellow] **probe-blind:ourliberty-cycle.service** *(carry from iter ~5574)* — heal-claude-json-bind-drift healer blind for cycle.service mount namespace. Bot DM'd Larry 00:54Z UTC (idx=780). [ask-then-do]
+- [yellow] **check-viii — 2026-07-13 proposal still pending** — reply `approve check-viii-update-2026-07-13`. [carry]
+- [yellow] **zombie-bash-pid-1834248** — ~52d22h8m, bash poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`. ask-then-do: `kill 1834248`. [carry, static]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07`. [carry]
+- [yellow] **dashboard-api-sha-drift-path-aware-restart-001 pending approval** — Beacon drafted, bot DMed Larry 11:14 MDT 2026-07-20. [new, ask-then-do]
+- [green] **sync VERIFIED** — status=no-change, last_sync=16:51:19Z UTC; HEAD=a36c0d3b==origin/main. [stable]
+- [green] **daemons healthy** — beacon PID 3801553, outbox-notifier PID 3801576, inbox_watcher PID 3801575 (~15h42m). [stable]
+- [blue] **PR #964 in Mirror review** — "fix(pulse): Check VIII stops re-proposing deprecate for an already-disabled gate" — MERGEABLE, Mirror worktree active. [new]
+- [blue] **Check I — 2026-07-20 FIRED** — 1 proposal `pulse-cycle-model-downgrade-001` dispatched. Next Wed 2026-07-23. [carry]
+- [blue] **pulse-check-xiv-tier4-001 [2/3]** — Dispatch at 3/3 (next Check XIV firing). [carry]
+- [blue] **Check I dm_route second-emission-Sunday** — 1st occurrence 2026-07-19T14:14Z. Monitor Wed 2026-07-23. [carry]
+- [blue] **review-ceiling-fit ATTENTION** — 9 false-kills in 30d; recommends RAISE ceiling 35→45 min. No Pulse action. [carry]
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch — DISPATCHED ✅ (3/3)** — verification_pending. [carry]
+- [blue] **G-rules (dispatched, vp):** forge-wip-redispatch-exhausted-genuine-no-pr-001; ourliberty-health-subject-key-mismatch-001; outbox-notifier-notification-intent-reject-tier4-001; forge-wip-redispatch-digest-tier4-001; forge-revision-preamble-missing-pr711-001; forge-wip-redispatch-exhausted-pr-exists-fp-001; decision-needed-approval-forge-dispatch-no-target-repo-001; no-session-revision-active-mirror-session-fp-001.
+- [blue] **G-rule 2/3:** outbox-notifier-notification-intent-review-escalate-tier4-001; outbox-notifier-auto-merge-stale-revalidation-tier4-001; pulse-check-xiv-tier4-001.
+- [blue] **G-rule 1/3:** **heal-pipeline-stall-retry-exhausted-pr-exists-fp-001 [NEW]**; sync-deploy-targets-missing-registry-001; medic-approval-request-tier4-001; mirror-malformed-verdict-heal-reap-path-001; mirror-queue-wait-gauge-tier4-001; inbox-watcher-tier-pool-all-unavailable-tier4-001; heal-pipeline-stall-unrouted-deep-review-required-fp-001; heal-pulse-check-staleness-single-flight-skip-fp-001; gate-parallelism-monitor-regression-data-001; pulse-rotation-check-source-tier4-001; pulse-auto-dispatch-null-reply-chat-id-post-pr950.
+- [blue] **missions-autoregister: `proposed-no-session-revision-mirror-active-fp-001` flagged 14d+ no shipped-PR** — digest route; Tier-3 silence; missions healer owns decision flow. [carry]
+
+**PRIME DIRECTIVE:** 1 intervention (FP stall diagnostic); 0 new systemic_fixes. ratio≈22.87 (trailing-30d).
+**Tier end-of-iter:** **Tier 3** (promoted from 2; consecutive_clean reset to 0; 30-min cadence). ✅
+
+---
+

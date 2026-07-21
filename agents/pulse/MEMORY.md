@@ -661,4 +661,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 **Rule:** `source=outbox-notifier, subject^=auto-merge-stale-revalidation:` alerts classify Tier-4 (novel, no translation match). Fires when outbox-notifier detects a held PR's approval went stale after a base change (overlapping PR merged), then fails to re-validate the regression gate. Failing closed: notifier emits `held_stale_regression`. On persistence (3-cycles), promotes to route=escalate and DMs Larry. Pulse DM is duplicate noise (bot handles). Fix at 3/3: add `source=outbox-notifier, subject^=auto-merge-stale-revalidation:` → Tier-3 entry to `config/alert-translations.json`. Occurrences: iter ~5017 (L988, route=hold, SIGTERM during regression check, #918 merge cascade); iter ~5021 (L992, route=escalate, `::promoted` suffix, persistence:3-cycles, bot delivered idx=991 at 03:50:51Z UTC).
 
+---
+
+## G-rule heal-stale-daemon-entrypoint-blind-001 → DISPATCHED ✅ (iter ~5739), verification_pending
+
+**Rule:** `heal_stale_daemon_code.py` does not detect entrypoint-only changes. Root cause: the healer's staleness scan checks whether any IMPORTED shared library file has an mtime newer than the service start time. The entrypoint file itself (e.g., `scripts/outbox_notifier.py` for `ourliberty-outbox-notifier.service`) is not in its own import graph, so entrypoint-only changes are invisible. Observed 3 consecutive healer runs at 05:00Z, 05:10Z, 05:20Z (2026-07-21) — all three returned "current" despite PR #968 having changed `outbox_notifier.py` at 04:21Z. Fix: add entrypoint file mtime check to the staleness scan (entrypoint mtime > service start time → stale → restart). Dispatched `direction-ask-entrypoint-blind-heal-001.json` to Beacon inbox at iter ~5739. verification_pending. Occurrences: iter ~5737 (1/3, 05:00Z healer); iter ~5738 (2/3, 05:10Z healer); iter ~5739 (3/3, 05:20Z healer).
 
