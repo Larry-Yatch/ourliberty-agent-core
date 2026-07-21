@@ -9874,7 +9874,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-21T11:05:39.944043+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-21T11:05:13.779081+00:00"
+      "orphan_last_activity_ts": "2026-07-21T11:05:13.779081+00:00",
+      "briefing": {
+        "what": "A new quality-control tool your team started building on their own to automatically grade how well work follows the rules.",
+        "why": "It could save review time down the road, but right now it's effort going into something with no clear business goal attached to it yet.",
+        "suggest": "Have a quick word with the team to confirm this is worth the time before they go further \u2014 it's promising but currently unowned."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-21T11:12:16.165245+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-flip-readiness-gauge-build-001",
@@ -9891,7 +9905,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-21T11:05:39.944043+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-21T11:02:23.420734+00:00"
+      "orphan_last_activity_ts": "2026-07-21T11:02:23.420734+00:00",
+      "briefing": {
+        "what": "Your team has started building a new readiness gauge, but it isn't attached to any active project yet.",
+        "why": "Work that runs without being tied to a goal can quietly eat time and effort without a clear payoff for the business.",
+        "suggest": "Take a quick look to confirm it's worth pursuing and either give it a home in a real project or pause it before it grows further."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-21T11:12:16.165245+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
