@@ -1233,6 +1233,72 @@ def _default_ring_fn() -> Callable[..., dict[str, Any]]:
 TERMINAL_BACKSTOP_BY = 'heal_missions_card_gc:terminal-backstop'
 
 
+def _beacon_pending_approvals_path(agents_root: Optional[Path] = None) -> Path:
+    return (agents_root or _agents_root()) / 'state' / 'beacon-pending-approvals.json'
+
+
+def delegate_dispatched_task_ids(
+    origin_task_ids: list[str],
+    agents_root: Optional[Path] = None,
+) -> dict[str, str]:
+    """Map a delegate origin id (`delegate-<cid>`) → the FRESH task id its
+    dispatch actually runs under (the LEDGER BRIDGE).
+
+    A delegated card's `spawned.task_id` is the ORIGIN id — it is only ever the
+    envelope key; the build runs under a fresh id Beacon authors, so probing the
+    origin against GitHub can never match a PR (always UNKNOWN → always KEEP →
+    the card never auto-clears). The approval ledger records BOTH ids on one
+    entry (`origin_task_id` + `id`), and `dispatch_approved` uses that `id`
+    verbatim as the Forge envelope's task_id — so this is the deterministic
+    bridge from card to build.
+
+    Mirrors `dashboard_api._delegate_dispatched_task_ids` (same store, same
+    semantics) but stdlib-only, keeping this healer's probe seam free of the
+    dashboard import. Scans pending AND history (a dispatched delegation is
+    `approved` in history). Reads the store ONCE. Fail-safe: {} on a
+    missing/unreadable store — every card then falls back to today's behavior."""
+    if not origin_task_ids:
+        return {}
+    try:
+        data = json.loads(_beacon_pending_approvals_path(agents_root).read_text())
+    except (OSError, json.JSONDecodeError, ValueError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    wanted = set(origin_task_ids)
+    out: dict[str, str] = {}
+    for bucket in ('pending', 'history'):
+        for entry in (data.get(bucket) or []):
+            if not isinstance(entry, dict):
+                continue
+            origin = entry.get('origin_task_id')
+            fresh = entry.get('id')
+            if (isinstance(origin, str) and origin in wanted
+                    and isinstance(fresh, str) and fresh):
+                out.setdefault(origin, fresh)
+    return out
+
+
+def _delegate_origin_ids(registry: dict[str, Any]) -> list[str]:
+    """Origin ids of the parked, unreconciled DELEGATED captures this tick will
+    probe — the bridge lookup set (one store read for the whole tick)."""
+    out: list[str] = []
+    for cap in registry.get('captures', []):
+        if not isinstance(cap, dict) or cap.get('state') != 'parked':
+            continue
+        if cap.get('failure_signaled'):
+            continue
+        spawned = cap.get('spawned')
+        if not isinstance(spawned, dict) or spawned.get('outcome'):
+            continue
+        if spawned.get('kind') != 'delegate':
+            continue
+        task_id = spawned.get('task_id')
+        if isinstance(task_id, str) and task_id:
+            out.append(task_id)
+    return out
+
+
 @dataclass
 class TerminalReconcileResult:
     completed: list[tuple[str, str]] = field(default_factory=list)      # (id, note) → done
@@ -1253,6 +1319,7 @@ def reconcile_terminal_captures(
     terminal_fn: Callable[[str], str],
     ring_fn: Callable[..., dict[str, Any]],
     dry_run: bool,
+    bridge_fn: Callable[[list[str]], dict[str, str]] = delegate_dispatched_task_ids,
 ) -> TerminalReconcileResult:
     """Backstop reconcile (completeness-pr2 G3): stamp a parked capture whose
     spawned work reached an identity-grade terminal state that S3/S4 missed.
@@ -1278,8 +1345,24 @@ def reconcile_terminal_captures(
     in run_once detects and persists it — the same top-level-keys-only discipline
     S3/S4 follow. Effectful ONLY on the in-memory registry — the caller (run_once)
     owns the single write+commit (single-committer invariant). Fail-safe per
-    capture: a probe/ring error keeps the card (retried next tick)."""
+    capture: a probe/ring error keeps the card (retried next tick).
+
+    DELEGATED cards probe the LEDGER BRIDGE id, not the card's own
+    `spawned.task_id`: the latter is the `delegate-<cid>` ORIGIN id, which is an
+    envelope key and never a PR branch, so probing it always returned UNKNOWN
+    and delegated cards never auto-cleared. `bridge_fn` resolves origin → the
+    fresh id the dispatch actually ran under (one store read for the whole
+    tick); when no bridge entry exists (delegations older than the
+    origin_task_id stamp, or one that never dispatched) the card falls back to
+    today's exact behavior — probe the origin, get UNKNOWN, KEEP. A delegation
+    that legitimately produced no PR (investigation, "already fixed" prose
+    verdict) still probes UNKNOWN and is still KEPT: no PR is never 'done'."""
     res = TerminalReconcileResult()
+    try:
+        bridge = bridge_fn(_delegate_origin_ids(registry))
+    except Exception as e:  # noqa: BLE001 — fail-safe: degrade to origin-id probes
+        log(f'terminal-backstop: ledger bridge unavailable: {type(e).__name__}: {e}')
+        bridge = {}
     for cap in registry.get('captures', []):
         if not isinstance(cap, dict) or cap.get('state') != 'parked':
             continue
@@ -1293,10 +1376,11 @@ def reconcile_terminal_captures(
         task_id = spawned.get('task_id')
         if not (isinstance(task_id, str) and task_id):
             continue
+        probe_id = bridge.get(task_id, task_id)  # ledger bridge; origin as fallback
         try:
-            state = terminal_fn(task_id)
+            state = terminal_fn(probe_id)
         except Exception as e:  # noqa: BLE001 — per-capture fail-safe
-            log(f'terminal-backstop: probe failed for {task_id}: '
+            log(f'terminal-backstop: probe failed for {probe_id}: '
                 f'{type(e).__name__}: {e} — keep')
             res.kept += 1
             continue
@@ -1304,6 +1388,8 @@ def reconcile_terminal_captures(
             res.kept += 1
             continue
         cid = cap.get('id') if isinstance(cap.get('id'), str) else '<unknown>'
+        via = ('task_terminal_state' if probe_id == task_id
+               else f'task_terminal_state via ledger bridge {probe_id}')
         if state == tts.MERGED:
             decision = classify_completion(cap, verified_merged=True)
             note = shipped_note(None)  # tts gives no url; degrades to PR-less phrasing
@@ -1319,14 +1405,14 @@ def reconcile_terminal_captures(
                 cap['closed_at'] = now.isoformat()
                 res.completed.append((cid, note))
                 log(f'terminal-backstop: capture {cid} (safe) -> done '
-                    f'[MERGED via task_terminal_state]')
+                    f'[MERGED via {via}]')
             else:
                 cap['state'] = COMPLETED_STATE_REVIEW
                 cap['awaiting_ack'] = True
                 res.closeouts.append(cid)
                 log(f'terminal-backstop: capture {cid} '
                     f'({cap.get("risk") or "unbriefed"}) -> review_close '
-                    f'[MERGED via task_terminal_state]')
+                    f'[MERGED via {via}]')
             continue
         # state == CLOSED — abandoned/rejected work; surface loudly, keep parked.
         reason = 'linked PR was closed without merging (terminal-state backstop)'
@@ -1355,7 +1441,7 @@ def reconcile_terminal_captures(
         }
         res.closed_failed.append((cid, reason))
         log(f'terminal-backstop: capture {cid} rang blocked-on-you '
-            f'[CLOSED via task_terminal_state]')
+            f'[CLOSED via {via}]')
     return res
 
 
