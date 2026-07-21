@@ -696,7 +696,34 @@ def resolve_alert(
     # lines we just removed. Runs OUTSIDE the flock — a Supabase stall must never
     # serialize every appender behind this best-effort network write.
     _retract_shipped_alert_events(removed)
+    # XIV-b: a retracted alert self-healed before Larry engaged. Record it as
+    # `auto_resolved` so the write-back loop doesn't later read the absence of
+    # a click as "Larry ignored this" — the system took the alert away.
+    _record_auto_resolved_outcomes(removed)
     return len(removed)
+
+
+def _record_auto_resolved_outcomes(removed: list) -> None:
+    """Record one `auto_resolved` outcome per retracted alert line (XIV-b).
+
+    Lazy + fail-safe import, matching `_decision_key_for`: outcome bookkeeping
+    must never turn a fire-and-forget retraction into an exception. Fires once
+    per removed line, which the locked pass has already deleted, so the
+    retraction cannot double-record.
+    """
+    if not removed:
+        return
+    try:
+        import alert_outcomes
+    except Exception:  # noqa: BLE001 — no module → no ledger row; never fatal
+        return
+    for rec in removed:
+        try:
+            alert_outcomes.record_outcome_for_alert(
+                rec, 'auto_resolved', actor='system',
+            )
+        except Exception:  # noqa: BLE001 — one bad row must not stop the rest
+            continue
 
 
 def retract_with_standdown(
@@ -1551,9 +1578,44 @@ def format_dm(record: dict) -> str:
     subject = record.get('subject')
     translation = translate_alert(source, subject) if source != '?' else None
     if translation is not None:
-        return _render_translated_alert(record, translation)
-    raw = _render_raw_alert_body(record)
-    return f'{raw}\n\n{_NO_TRANSLATION_FOOTER}'
+        body = _render_translated_alert(record, translation)
+    else:
+        body = f'{_render_raw_alert_body(record)}\n\n{_NO_TRANSLATION_FOOTER}'
+    return body + _rating_footer(record, translation)
+
+
+# XIV-b: the rating surface lives on the dashboard (Telegram has no button
+# infrastructure — approvals are reply-grammar — and building one would be net
+# new). The DM stays the notification it already is and gains ONE line: a link
+# to this alert on the Approvals tab, where Handled it / Not useful live.
+_DASHBOARD_BASE = os.environ.get(
+    'OURLIBERTY_DASHBOARD_BASE', 'https://dashboard.ourliberty.dev')
+# Only NOW/SOON alerts are worth Larry's judgment; FYI is background and gets a
+# link-free DM so the informational lane stays uncluttered (the same NOW/SOON
+# gate the Approvals alert section applies).
+_RATED_TIERS = ('NOW', 'SOON')
+
+
+def _rating_footer(record: dict, translation: Optional[dict]) -> str:
+    """One trailing link line for a NOW/SOON alert; '' otherwise.
+
+    Uses the row's stamped `tier` when present and falls back to resolving the
+    translation, so an alert emitted before the tier stamp shipped still gets
+    the right footer. Never raises — a footer failure must not cost the DM.
+    """
+    try:
+        tier = record.get('tier')
+        if tier not in _RATED_TIERS:
+            resolved, _ = resolve_tier(translation)
+            tier = resolved
+        if tier not in _RATED_TIERS:
+            return ''
+        subject = record.get('subject') or record.get('source') or ''
+        from urllib.parse import quote
+        link = f'{_DASHBOARD_BASE}/approvals?q={quote(str(subject))}'
+        return f'\n\nWas this worth sending? {link}'
+    except Exception:  # noqa: BLE001 — rendering must never fail on a footer
+        return ''
 
 
 # ---------- CLI (shell-callable from sync_agent_core.sh, run_cycle.sh, etc.) ----------

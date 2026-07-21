@@ -1043,5 +1043,137 @@ class AuditWriteFailureTest(_LarryActionBase):
         self.assertEqual(envelope.stat().st_mtime_ns, mtime_after_first)
 
 
+# ---------- XIV-b: alert rating verbs (acted / not_useful) ----------
+
+class AlertRatingTest(_LarryActionBase):
+    """`acted` / `not_useful` dismiss an alert AND append an outcome row.
+
+    The rating is the whole point of the write-back loop: without it a
+    dismissed alert and a useless alert are indistinguishable, so nobody can
+    ever tell which alert sources are worth sending.
+    """
+
+    def setUp(self):
+        super().setUp()
+        import alert_outcomes
+        self.recorded: list[dict[str, Any]] = []
+        self._orig_record = alert_outcomes.record_outcome
+
+        def _capture(outcome, **kw):
+            self.recorded.append({'outcome': outcome, **kw})
+            return True
+
+        alert_outcomes.record_outcome = _capture  # type: ignore[assignment]
+        self._alert_outcomes = alert_outcomes
+
+    def tearDown(self):
+        self._alert_outcomes.record_outcome = self._orig_record  # type: ignore[assignment]
+        super().tearDown()
+
+    def _seed_alert(self, event_id: str, **over):
+        row = {
+            'event_id': event_id,
+            'task_id': 'task-alert-9',
+            'event_type': 'larry_alert',
+            'payload': {
+                'source': 'watchdog', 'subject': 'disk-full',
+                'tier': 'NOW', 'tier_source': 'translation',
+                'message': 'disk is full',
+            },
+            'read_at': None,
+        }
+        row.update(over)
+        return self._seed(**row)
+
+    def test_not_useful_records_outcome_and_dismisses(self):
+        self._seed_alert('ev-rate-1')
+        r = self.c.post(
+            '/api/larry/action', headers=AUTH,
+            json={'source_event_id': 'ev-rate-1', 'action': 'not_useful'},
+        )
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertIsNone(r.json()['envelope_written'])
+        self.assertEqual(len(self.recorded), 1)
+        rec = self.recorded[0]
+        self.assertEqual(rec['outcome'], 'not_useful')
+        self.assertEqual(rec['event_id'], 'ev-rate-1')
+        self.assertEqual(rec['source'], 'watchdog')
+        self.assertEqual(rec['subject'], 'disk-full')
+        self.assertEqual(rec['tier'], 'NOW')
+        self.assertEqual(rec['tier_source'], 'translation')
+        self.assertEqual(rec['actor'], ALLOWED_ACTOR)
+
+    def test_acted_records_outcome(self):
+        self._seed_alert('ev-rate-2')
+        r = self.c.post(
+            '/api/larry/action', headers=AUTH,
+            json={'source_event_id': 'ev-rate-2', 'action': 'acted'},
+        )
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(self.recorded[0]['outcome'], 'acted')
+
+    def test_rating_writes_no_envelope(self):
+        self._seed_alert('ev-rate-3')
+        self.c.post(
+            '/api/larry/action', headers=AUTH,
+            json={'source_event_id': 'ev-rate-3', 'action': 'not_useful'},
+        )
+        for agent in ('beacon', 'forge', 'mirror', 'pulse'):
+            self.assertEqual(list((self.tmp / 'inboxes' / agent).iterdir()), [])
+
+    def test_double_click_records_exactly_once(self):
+        # The atomic read_at claim is the mutex: the second click 409s before
+        # reaching the ledger, so a fat-fingered double-tap can't skew the data.
+        self._seed_alert('ev-rate-4')
+        first = self.c.post(
+            '/api/larry/action', headers=AUTH,
+            json={'source_event_id': 'ev-rate-4', 'action': 'not_useful'},
+        )
+        second = self.c.post(
+            '/api/larry/action', headers=AUTH,
+            json={'source_event_id': 'ev-rate-4', 'action': 'not_useful'},
+        )
+        self.assertEqual(first.status_code, 200, first.text)
+        self.assertEqual(second.status_code, 409, second.text)
+        self.assertEqual(len(self.recorded), 1)
+
+    def test_rating_an_approval_request_is_400(self):
+        # Guard: rating an approval would flip read_at on a real decision and
+        # never write its envelope — a silently swallowed approval.
+        self._seed(
+            event_id='ev-rate-bad', task_id='t', event_type='approval_request',
+            payload={'target_agent': 'forge'}, read_at=None,
+        )
+        r = self.c.post(
+            '/api/larry/action', headers=AUTH,
+            json={'source_event_id': 'ev-rate-bad', 'action': 'not_useful'},
+        )
+        self.assertEqual(r.status_code, 400, r.text)
+        self.assertEqual(self.recorded, [])
+        # read_at untouched — the decision is still actionable.
+        self.assertIsNone(
+            self.client_stub.rows_by_event_id['ev-rate-bad']['read_at'])
+
+    def test_sentinel_alert_is_ratable(self):
+        self._seed_alert('ev-rate-5', event_type='sentinel_alert')
+        r = self.c.post(
+            '/api/larry/action', headers=AUTH,
+            json={'source_event_id': 'ev-rate-5', 'action': 'acted'},
+        )
+        self.assertEqual(r.status_code, 200, r.text)
+
+    def test_ledger_failure_does_not_fail_the_click(self):
+        # The dismissal already happened (read_at is flipped); surfacing a 500
+        # would 409 the retry and leave the operator stuck on a dead card.
+        self._seed_alert('ev-rate-6')
+        self._alert_outcomes.record_outcome = mock.Mock(  # type: ignore[assignment]
+            side_effect=RuntimeError('ledger down'))
+        r = self.c.post(
+            '/api/larry/action', headers=AUTH,
+            json={'source_event_id': 'ev-rate-6', 'action': 'not_useful'},
+        )
+        self.assertEqual(r.status_code, 200, r.text)
+
+
 if __name__ == '__main__':
     unittest.main()
