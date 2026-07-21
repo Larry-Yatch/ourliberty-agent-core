@@ -429,10 +429,13 @@ class ScanDecisionTests(ScanFixture):
         self.assertEqual((cleared, reinjected, spared), (0, 0, 1))
         self.assertTrue(claim.exists())
 
-    def test_fresh_claim_is_spared(self):
+    def test_fresh_claim_is_spared_when_leases_disabled(self):
+        # Without real leases (GM_DEDUP_USE_LEASES=off) a free lease proves
+        # NOTHING, so the age floor is the only guard and must still hold.
         claim = self._claim("t1", old=False, head_sha="H1")
         self._archived_request("review-t1.json", head_sha="H1")
-        with mock.patch.object(h, "log"):
+        with mock.patch.object(h, "dispatch_leases_enabled", return_value=False), \
+                mock.patch.object(h, "log"):
             _, cleared, reinjected, spared = h.scan_agent("mirror", set())
         self.assertEqual((cleared, reinjected, spared), (0, 0, 1))
         self.assertTrue(claim.exists())
@@ -448,6 +451,134 @@ class ScanDecisionTests(ScanFixture):
             scanned, cleared, reinjected, spared = h.scan_agent("mirror", set())
         self.assertEqual((cleared, reinjected, spared), (0, 0, 1))
         self.assertTrue(claim.exists())
+
+    # ---- lease-proven fast path (PR #971) ----
+    # inbox_watcher acquires the slot lease BEFORE _claim_task and releases it
+    # only after process_task returns, so a claim under a lease-FREE numeric slot
+    # is owned by no dispatch. The 45-min age floor is then guarding a state that
+    # cannot exist and only delays recovery (#971 sat ~40 min this way).
+
+    def test_fresh_claim_reinjected_when_lease_proven_orphan(self):
+        # THE fix: fresh (age < grace), lease free, no process, no in-flight,
+        # not concluded, PR OPEN → re-injected THIS tick instead of in 45 min.
+        claim = self._claim("t1", old=False, pr_url="u", head_sha="H1")
+        with mock.patch.object(h, "dispatch_leases_enabled", return_value=True), \
+                mock.patch.object(h, "slot_dispatch_active", return_value=False), \
+                mock.patch.object(h, "pr_state", return_value="OPEN"), \
+                mock.patch.object(h, "log"):
+            _, cleared, reinjected, spared = h.scan_agent("mirror", set())
+        self.assertEqual((cleared, reinjected, spared), (0, 1, 0))
+        self.assertFalse(claim.exists())
+        self.assertTrue(self._live_inbox("review-t1.json").exists())
+
+    def test_fresh_concluded_claim_archived_when_lease_proven_orphan(self):
+        claim = self._claim("t1", old=False, head_sha="H1")
+        self._archived_request("review-t1.json", head_sha="H1")
+        with mock.patch.object(h, "dispatch_leases_enabled", return_value=True), \
+                mock.patch.object(h, "slot_dispatch_active", return_value=False), \
+                mock.patch.object(h, "log"):
+            _, cleared, reinjected, spared = h.scan_agent("mirror", set())
+        self.assertEqual((cleared, reinjected, spared), (1, 0, 0))
+        self.assertFalse(claim.exists())
+
+    def test_fast_path_does_not_defeat_live_worktree_process(self):
+        # LOAD-BEARING: the fast path removes the AGE floor only. A live review
+        # process must still spare, or the fix buys a duplicate paid review.
+        claim = self._claim("t1", old=False, pr_url="u", head_sha="H1")
+        wt = str(worktree_manager.worktree_path_for("mirror", "t1"))
+        with mock.patch.object(h, "dispatch_leases_enabled", return_value=True), \
+                mock.patch.object(h, "slot_dispatch_active", return_value=False), \
+                mock.patch.object(h, "pr_state", return_value="OPEN"), \
+                mock.patch.object(h, "log"):
+            _, cleared, reinjected, spared = h.scan_agent("mirror", {wt})
+        self.assertEqual((cleared, reinjected, spared), (0, 0, 1))
+        self.assertTrue(claim.exists())
+
+    def test_fast_path_does_not_defeat_live_in_flight(self):
+        claim = self._claim("t1", old=False, pr_url="u", head_sha="H1")
+        (h.IN_FLIGHT_DIR / "t1.json").write_text(json.dumps({"pid": os.getpid()}))
+        with mock.patch.object(h, "dispatch_leases_enabled", return_value=True), \
+                mock.patch.object(h, "slot_dispatch_active", return_value=False), \
+                mock.patch.object(h, "pr_state", return_value="OPEN"), \
+                mock.patch.object(h, "log"):
+            _, cleared, reinjected, spared = h.scan_agent("mirror", set())
+        self.assertEqual((cleared, reinjected, spared), (0, 0, 1))
+        self.assertTrue(claim.exists())
+
+    def test_fast_path_does_not_defeat_held_slot_lease(self):
+        # Lease HELD → the whole-slot defer must still short-circuit ahead of the
+        # age test; the fast path is reachable only on a lease-free slot.
+        claim = self._claim("t1", slot=1, old=False, pr_url="u", head_sha="H1")
+        with mock.patch.object(h, "dispatch_leases_enabled", return_value=True), \
+                mock.patch.object(h, "slot_dispatch_active", return_value=True), \
+                mock.patch.object(h, "pr_state", return_value="OPEN"), \
+                mock.patch.object(h, "log"):
+            _, cleared, reinjected, spared = h.scan_agent("mirror", set())
+        self.assertEqual((cleared, reinjected, spared), (0, 0, 1))
+        self.assertTrue(claim.exists())
+
+    def test_fast_path_skipped_for_non_numeric_slot_dir(self):
+        # No numeric slot → no lease identity → no proof → age floor stands.
+        d = h.INBOXES_ROOT / "mirror" / ".claimed" / "spare"
+        d.mkdir(parents=True, exist_ok=True)
+        p = d / "review-t1.json"
+        p.write_text(json.dumps({"task_id": "t1", "pr_url": "u"}))
+        with mock.patch.object(h, "dispatch_leases_enabled", return_value=True), \
+                mock.patch.object(h, "pr_state", return_value="OPEN"), \
+                mock.patch.object(h, "log"):
+            _, cleared, reinjected, spared = h.scan_agent("mirror", set())
+        self.assertEqual((cleared, reinjected, spared), (0, 0, 1))
+        self.assertTrue(p.exists())
+
+    def test_fast_path_reprobes_lease_against_toctou(self):
+        # The per-slot lease probe runs BEFORE the claim glob. A watcher that
+        # acquires the lease and claims a task in that window would look
+        # lease-free to the slot probe. The age floor used to absorb this; the
+        # fast path removes it, so the claim must be re-probed before acting.
+        # First probe (slot gate) False, second (pre-action) True → spare.
+        claim = self._claim("t1", old=False, pr_url="u", head_sha="H1")
+        with mock.patch.object(h, "dispatch_leases_enabled", return_value=True), \
+                mock.patch.object(h, "slot_dispatch_active",
+                                  side_effect=[False, True]), \
+                mock.patch.object(h, "pr_state", return_value="OPEN"), \
+                mock.patch.object(h, "log"):
+            _, cleared, reinjected, spared = h.scan_agent("mirror", set())
+        self.assertEqual((cleared, reinjected, spared), (0, 0, 1))
+        self.assertTrue(claim.exists())
+
+    def test_aged_claim_does_not_pay_for_the_reprobe(self):
+        # An AGED claim never depended on lease proof, so it must act on the
+        # single slot-gate probe — no second call, no new spare path.
+        claim = self._claim("t1", old=True, pr_url="u", head_sha="H1")
+        with mock.patch.object(h, "dispatch_leases_enabled", return_value=True), \
+                mock.patch.object(h, "slot_dispatch_active",
+                                  side_effect=[False, True]) as sda, \
+                mock.patch.object(h, "pr_state", return_value="OPEN"), \
+                mock.patch.object(h, "log"):
+            _, cleared, reinjected, spared = h.scan_agent("mirror", set())
+        self.assertEqual((cleared, reinjected, spared), (0, 1, 0))
+        self.assertEqual(sda.call_count, 1)
+        self.assertFalse(claim.exists())
+
+    def test_dispatch_leases_enabled_reads_mode(self):
+        import dispatch_lease
+        with mock.patch.object(dispatch_lease, "mode", return_value="off"):
+            self.assertFalse(h.dispatch_leases_enabled())
+        with mock.patch.object(dispatch_lease, "mode", return_value="shadow"):
+            self.assertTrue(h.dispatch_leases_enabled())
+
+    def test_lease_proven_action_is_labelled_in_log(self):
+        # An operator seeing age_min=0 must be able to tell a fast path from a
+        # clock bug, so the action line carries via=lease-proven.
+        self._claim("t1", old=False, pr_url="u", head_sha="H1")
+        with mock.patch.object(h, "dispatch_leases_enabled", return_value=True), \
+                mock.patch.object(h, "slot_dispatch_active", return_value=False), \
+                mock.patch.object(h, "pr_state", return_value="OPEN"), \
+                mock.patch.object(h, "log") as lg:
+            h.scan_agent("mirror", set())
+        healed = [c for c in lg.call_args_list if c.args and c.args[0] == "HEALED"]
+        self.assertTrue(healed, "expected a HEALED log line")
+        self.assertIn("via=lease-proven", healed[0].args[1])
 
     def test_non_review_claim_ignored(self):
         # Only review-*.json is in scope.
