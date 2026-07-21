@@ -9584,7 +9584,11 @@
         "at": "2026-07-21T06:20:18.704972+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-21T06:49:19.889736+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-pr-ourliberty-agent-core-970",
@@ -9615,7 +9619,28 @@
         "at": "2026-07-21T06:40:26.058444+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-21T06:49:19.889736+00:00",
+      "retired_reason": "orphan-terminal"
+    },
+    {
+      "id": "proposed-route-ourliberty-graph-prs-to-mirror-001",
+      "name": "Route Ourliberty Graph Prs To Mirror 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `route-ourliberty-graph-prs-to-mirror-001`. Last activity 2026-07-21T06:45:48.948897+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "route-ourliberty-graph-prs-to-mirror-001"
+      ],
+      "repo": null,
+      "created": "2026-07-21",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-21T06:49:19.889736+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-21T06:45:48.948897+00:00"
     }
   ]
 }
