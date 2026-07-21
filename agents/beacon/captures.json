@@ -1539,7 +1539,7 @@
       "id": "cap-run-sort-once-cleanup-of-352-stale-tier-4-asks-a-bbf0",
       "title": "Run sort-once cleanup of 352 stale tier-4 asks after completeness PR-1 lands",
       "note": "Larry decided 2026-07-07: one grouped sort-once pass over the open tier-4 alert asks (352 at decision time), AFTER completeness PR-1 merges so the decision-outcome ledger records the dispositions. One grouped approval per class (keep/retire/park), not per-item. Context: ol-work/completeness-architecture-design.md v2 + memory alert-system-default-deny-northstar.",
-      "state": "parked",
+      "state": "done",
       "label": null,
       "origin": {
         "source": "desktop-chat",
@@ -1566,9 +1566,12 @@
       "spawned": {
         "kind": "delegate",
         "task_id": "delegate-cap-run-sort-once-cleanup-of-352-stale-tier-4-asks-a-bbf0",
-        "stamped_at": "2026-07-21T09:18:35.731430+00:00"
+        "stamped_at": "2026-07-21T09:18:35.731430+00:00",
+        "outcome": "merged"
       },
-      "aging": true
+      "closed_by": "heal_missions_card_gc:terminal-backstop",
+      "shipped_note": "shipped (linked work merged)",
+      "closed_at": "2026-07-21T11:42:18.798022+00:00"
     },
     {
       "id": "cap-add-monthly-digest-line-for-proposed-mission-pil-7457",
