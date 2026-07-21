@@ -75,21 +75,32 @@ recently.
 `watchdog.py` solved this for its own stall detection and its reasoning is
 battle-tested. Reuse it rather than reinventing:
 
-- `_any_live_in_flight_session()` (`watchdog.py:410`) — any
-  `state/in-flight/*.json` with a live pid.
-- `_any_live_dispatch_lease()` (`watchdog.py:~444`) — any held+live
-  `inbox:<agent>` lease.
+- `_any_live_in_flight_session()` — any `state/in-flight/*.json` with a live pid.
+- `_any_live_dispatch_lease()` — any held+live `inbox:<agent>` lease.
 
-Both are needed. The docstring at `watchdog.py:454` records why the in-flight
-marker alone is **not** sufficient: a Mirror review reuses the Forge build's
-`task_id` as its `task_stem`, so both write the same
-`state/in-flight/<stem>.json`, and the build's `_unregister_in_flight` (keyed on
-stem only) can delete the review's marker while the review is still live. The
-per-agent lease is clobber-immune — keyed by agent, renewed on a 60s heartbeat,
-counted only within TTL with a live holder pid.
+Both are needed. watchdog's own docstring records why the in-flight marker alone
+is **not** sufficient: a Mirror review reuses the Forge build's `task_id` as its
+`task_stem`, so both write the same `state/in-flight/<stem>.json`, and the
+build's `_unregister_in_flight` (keyed on stem only) can delete the review's
+marker while the review is still live. The lease is clobber-immune — keyed by
+agent+slot, renewed on a 60s heartbeat (`dispatch_lease.HEARTBEAT_INTERVAL_SECONDS`)
+against a 180s `TTL_SECONDS`, counted only within TTL with a live holder pid.
 
-For the #971 kill specifically, the `inbox:mirror` lease was held at 06:50:46Z,
-so the lease signal alone would have caught it.
+> **CORRECTION (2026-07-21, found while building PR #994).** The original text
+> claimed *"for the #971 kill the `inbox:mirror` lease was held, so the lease
+> signal alone would have caught it."* **That was false**, and it was the
+> load-bearing justification for this whole approach.
+>
+> `_slot_identity` names slot 0 `inbox:<agent>` and higher slots
+> `inbox:<agent>:<n>`. watchdog's implementation opens only the **slot-0**
+> spelling. Mirror runs **two** slots, and #971's killed review was in **slot 1**
+> (`.claimed/1/`) — so the lease signal was blind to the exact incident cited as
+> proof it worked.
+>
+> The shared predicate therefore **globs every slot**, and extracting it is a
+> **behavior fix for watchdog**, not a port: watchdog's stall suppression is
+> blind to slot-1 reviews today. That also falsifies the "pure refactor" claim
+> below.
 
 ### Change
 
@@ -104,9 +115,22 @@ def agent_work_in_flight() -> bool:
     clobberable for Mirror reviews and the lease is absent in lease-'off' mode."""
 ```
 
-`watchdog.py` then imports it in place of its two private copies (behavior
-identical — this must be a pure refactor, asserted by watchdog's existing tests
-continuing to pass untouched).
+`watchdog.py` then imports it in place of its two private copies.
+
+> **CORRECTION.** This was specced as a pure refactor "asserted by watchdog's
+> existing tests continuing to pass untouched." Both halves are wrong:
+> (a) it is a **behavior change** — watchdog gains slot-awareness (above);
+> (b) watchdog's tests patch its private `_pid_alive`, which any delegation
+> bypasses, so they cannot pass untouched by construction.
+>
+> Consequently the watchdog extraction was **removed from PR #994** and becomes
+> its own **PR 1b** with test updates. Refactoring a critical health monitor
+> while calling it a no-op would have widened the blast radius of the PR that is
+> supposed to be the safest.
+>
+> The shared predicate also takes an optional `agents_root` so a caller that
+> freezes its own root at import (watchdog does; its tests patch that attribute)
+> stays authoritative.
 
 Restarters consult it before restarting an **agent-hosting** unit only. A
 dashboard-api or deploy-notifier restart is unaffected; those host no agent
@@ -118,9 +142,13 @@ sessions and must stay immediate.
 
 `inbox_watcher` already implements "stop taking new work, let in-flight finish"
 for a different trigger: tier-pool exhaustion. `_rotation_gate_block_reason`
-(`inbox_watcher.py:1525`, called at `:1061`) blocks NEW top-level dispatches
-while explicitly passing continuations through, and its contract is exactly what
-a cordon needs:
+blocks NEW top-level dispatches while explicitly passing continuations through,
+and its contract is exactly what a cordon needs:
+
+<!-- Cite functions, not line numbers. The original text pinned this to
+     `inbox_watcher.py:1525`, which PR #994's own additions immediately shifted
+     to :1622 — a spec that rots the moment it is implemented. -->
+
 
 > *the task stays in the inbox; the next poll re-evaluates. No archive, no
 > write_invalid — drain must NEVER drop work, only delay it.*
@@ -132,9 +160,21 @@ is already trusted in production. That materially lowers the risk of this change
 
 1. **Cordon** — healer writes `state/restart-cordon/<unit>.json`
    (`{"unit", "reason", "created_at", "expires_at", "pid", "boot_id"}`).
-2. **Watcher honors it** — the dispatch gate blocks NEW top-level tasks for the
-   cordoned unit's agents. Continuations pass, exactly as under the rotation
-   gate, so a `--resume`/revision round is never orphaned mid-chain.
+2. **Watcher honors it** — the loop takes NO new work for the cordoned unit's
+   agents.
+
+   > **CORRECTION.** The original said *"Continuations pass, exactly as under the
+   > rotation gate."* **Wrong, and self-defeating.** The rotation gate passes
+   > continuations so an in-flight chain finishes on its bound account; a cordon
+   > has the opposite goal — quiescence. A continuation that starts a NEW session
+   > keeps in-flight non-zero, so step 3's drain never observes quiet, the
+   > ceiling fires, and the work is SIGTERMed anyway: precisely the outcome the
+   > cordon exists to prevent. **A cordon blocks continuations too.** Nothing is
+   > lost — the task stays in the inbox and runs after the restart.
+   >
+   > As shipped in #994 this also means the check sits at the loop level, ahead
+   > of both the lease acquire and `_claim_task`, so a cordoned slot never
+   > touches a task file (no `.claimed/` churn every 5s).
 3. **Drain** — healer polls `agent_work_in_flight()` (below) until it reads
    False, i.e. the running session ended by itself.
 4. **Restart** — `systemctl restart` into a window where nothing is running and,
@@ -171,14 +211,41 @@ dispatch stall, no alarm, looks like a quiet queue.
 Non-negotiable mitigations, all three:
 
 1. **TTL in the file.** `expires_at` = created + `CORDON_TTL_SEC` (default
-   **600s**, comfortably past a normal drain). The watcher treats an expired
-   cordon as absent — a dead cordon cannot outlive its TTL by even one poll.
+   **600s**). The watcher treats an expired cordon as absent — a dead cordon
+   cannot outlive its TTL by even one poll.
 2. **Holder liveness.** The cordon records `pid` + `boot_id`; the watcher ignores
-   a cordon whose holder is not alive on the current boot. Same test
-   `dispatch_lease.is_held` already applies to leases. This clears a dead
-   cordon in seconds rather than waiting out the TTL.
+   a cordon whose holder is not alive on the current boot. This clears a dead
+   cordon in seconds rather than waiting out the TTL. As shipped in #994,
+   **unverifiable == not alive**: if `/proc` cannot be read we cannot prove the
+   cordon belongs to this boot, so it is not honored. (The original draft
+   *skipped* the comparison in that case, which would have honored a pre-reboot
+   cordon forever — the permanent stall this section exists to prevent.)
 3. **Unconditional release.** The healer writes the cordon in a `try` and removes
    it in `finally`, so every non-fatal path releases.
+
+### The cordon MUST be renewed while draining
+
+> **CORRECTION (found by the adversarial pass, before PR 2 was written).** The
+> original said the 600s TTL was *"comfortably past a normal drain."* **It is
+> not.** A review may run to `REVIEW_SESSION_CEILING_SECONDS` = **2100s**
+> (35 min) — three and a half times the TTL. Draining one would let the healer's
+> own cordon **expire mid-drain**: the watcher resumes taking new work, a fresh
+> session starts, and the healer — still believing it holds a cordon — restarts
+> into live work. **The bug this spec exists to fix, reintroduced by the fix.**
+
+Do **not** lengthen the TTL to cover it: a long TTL is exactly what makes a
+dead healer's cordon dangerous. Instead **renew while alive**, mirroring
+`dispatch_lease`, which solves the same tension with a 180s TTL and a 60s
+heartbeat:
+
+- the healer pushes `expires_at` forward on every drain poll (interval
+  ≤ `CORDON_TTL_SEC / 3`)
+- if the healer dies, renewal stops and the cordon expires within one TTL
+
+Short TTL **and** unbounded drain, with no window where a live drain looks
+expired. Two tests are mandatory: a drain longer than `CORDON_TTL_SEC` keeps the
+cordon continuously live, and a healer killed mid-drain leaves a cordon that
+goes inert within the TTL.
 
 Fail-open in every direction: an unreadable, malformed, expired, or
 dead-holder cordon means *not cordoned*, which degrades to exactly today's
@@ -256,8 +323,14 @@ the highest-consequence surface in this change, so it gets its own file:
 17. drain never clears → past `RESTART_DEFER_CEILING_SEC` restarts and logs
     `RESTART_FORCED_OVER_CEILING`, cordon still removed afterward
 
-`scripts/tests/test_watchdog.py`: existing tests pass **untouched** — proof the
-extraction is a pure refactor.
+`scripts/tests/test_watchdog.py`: **updated, not untouched** — the extraction is
+a behavior change (slot-awareness) and the existing tests patch watchdog's
+private `_pid_alive`. Deferred to PR 1b.
+
+Drain-renewal (PR 2), both mandatory:
+
+18. a drain longer than `CORDON_TTL_SEC` keeps the cordon continuously live
+19. a healer killed mid-drain leaves a cordon that goes inert within one TTL
 
 Full suite, diffed as a set against the untouched parent (same names, not just
 the same count).
