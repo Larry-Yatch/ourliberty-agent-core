@@ -6,6 +6,12 @@
 
 ---
 
+## G-rule root-cause synthesis must verify PR file scope before asserting "daemon running stale code" (learned 2026-07-21, iter ~5739 false positive)
+
+**Rule:** Before carrying a "daemon running pre-PR code" finding or dispatching an entrypoint-blind G-rule, verify: `git log --oneline -- <entrypoint_path>` to confirm the PR actually modified that specific file. If the file wasn't in the PR diff, the healer's "fresh" verdict is correct and the daemon is current. The false positive in iter ~5739: Pulse misattributed PR #968 (which modified `heal_forge_wip_only_redispatch.py`) to `outbox_notifier.py`, then misread "healer didn't restart" as "entrypoint blind spot in `heal_stale_daemon_code.py`." The entrypoint was never blind — it's the primary mtime target at L1057. The dispatch burned a Beacon session on a non-existent bug. A/B verdict: journal-discipline proportionate response; hardening spec warranted only if this class recurs ≥3 times.
+
+---
+
 ## Check I firing days are Mon/Wed/Fri/Sun — call WITHOUT --force on firing days (learned 2026-06-15 iter ~1899, updated iter ~2612)
 
 **Rule:** Check I fires on Mon/Wed/Fri/Sun per spec (UTC weekday ∈ {0,2,4,6}). Always invoke `python3 ~/agent-core/scripts/pulse_check_i.py` (no `--force`) on scheduled firing days — the weekday gate passes naturally and the dm_route journal-peek (PR #674) functions correctly, suppressing repeat same-week DMs. Use `--force` ONLY for `/optimize` (ad-hoc, any day). Using `--force` on a firing day bypasses dm_route and emits spurious route=escalate alerts (G-rule check-i-force-bypass-dm-route). Confirmed fixed at manual level iter ~2612; code-level dispatch to Beacon at 3/3.
@@ -180,9 +186,9 @@ Triage helper returned Tier-3 for source=heal-stale-daemon-code subject^=auto-re
 
 ---
 
-## G-rule forge-wip-redispatch-exhausted-pr-exists-fp-001 → PR #968 MERGED ✅ (iter ~5736), VERIFIED PENDING DAEMON RELOAD
+## G-rule forge-wip-redispatch-exhausted-pr-exists-fp-001 → VERIFIED/CLOSED ✅ (iter ~5740)
 
-**Rule:** `source=forge-wip-redispatch, route=escalate` exhaustion alerts ("WIP-only auto-recovery EXHAUSTED") fire for tasks whose original PRs already exist. FP class: wip-redispatch retried a task whose output already shipped; retry dying WIP-only is expected. **Root cause (Beacon-verified):** `evaluate()` Gate 3 only skips when the candidate branch is ITSELF a merged-PR head; a retry whose work shipped via a DIFFERENT merged PR (BUILD_ALREADY_MERGED path in outbox_notifier.py) leaves an empty-WIP branch that triggers the false EXHAUSTED. **Fix:** Gate 7 suppression in outbox_notifier.py — reuses Forge's archived outbox self-report via three-part contract (exit_code==0, parse_already_merged_pr_ref, gh_pr_merge_info MERGED). Fail-safe: non-zero exit, absent marker, gh-unconfirmed all fall through to redispatch. **PR #968 MERGED AUTO_MERGE at 04:21:18Z UTC 2026-07-21. Fix in repo (commit 6dbf8a33).** Outbox-notifier daemon restart pending ~05:00 UTC via heal-stale-daemon-code. Next milestone: 3 clean stall dry-runs post-restart with no false EXHAUSTED. Occurrences: iter ~2702 (L1130/1131); iter ~2705 (L1146); iter ~3124 (L1110).
+**Rule:** `source=forge-wip-redispatch, route=escalate` exhaustion alerts ("WIP-only auto-recovery EXHAUSTED") fire for tasks whose original PRs already exist. FP class: wip-redispatch retried a task whose output already shipped; retry dying WIP-only is expected. **Root cause (Beacon-verified):** `evaluate()` Gate 3 only skips when the candidate branch is ITSELF a merged-PR head; a retry whose work shipped via a DIFFERENT merged PR (BUILD_ALREADY_MERGED path) leaves an empty-WIP branch that triggers false EXHAUSTED. **Fix:** Gate 7 in `heal_forge_wip_only_redispatch.py` (a one-shot timer healer, NOT notifier daemon code) — reuses Forge's archived outbox self-report via three-part contract. PR #968 MERGED 04:21:18Z UTC 2026-07-21. **VERIFIED iter ~5740:** Gate 7 is a one-shot timer healer that reruns fresh each tick — no daemon restart was ever needed. Stall dry-run shows no false EXHAUSTED (graph-pr8-merge-decision-001-retry1 correctly handled via `already_merged_bridge`). Moving to Completed G-rules. Occurrences: iter ~2702 (L1130/1131); iter ~2705 (L1146); iter ~3124 (L1110).
 
 ---
 
@@ -663,7 +669,13 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 ---
 
-## G-rule heal-stale-daemon-entrypoint-blind-001 → DISPATCHED ✅ (iter ~5739), verification_pending
+## Verify git log before attributing PR changes to a file (learned iter ~5740, 2026-07-21)
 
-**Rule:** `heal_stale_daemon_code.py` does not detect entrypoint-only changes. Root cause: the healer's staleness scan checks whether any IMPORTED shared library file has an mtime newer than the service start time. The entrypoint file itself (e.g., `scripts/outbox_notifier.py` for `ourliberty-outbox-notifier.service`) is not in its own import graph, so entrypoint-only changes are invisible. Observed 3 consecutive healer runs at 05:00Z, 05:10Z, 05:20Z (2026-07-21) — all three returned "current" despite PR #968 having changed `outbox_notifier.py` at 04:21Z. Fix: add entrypoint file mtime check to the staleness scan (entrypoint mtime > service start time → stale → restart). Dispatched `direction-ask-entrypoint-blind-heal-001.json` to Beacon inbox at iter ~5739. verification_pending. Occurrences: iter ~5737 (1/3, 05:00Z healer); iter ~5738 (2/3, 05:10Z healer); iter ~5739 (3/3, 05:20Z healer).
+**Rule:** Before carrying "daemon running pre-PR code" or dispatching an entrypoint-blind G-rule, run `git log --oneline -- <file_path>` to confirm the PR actually modified that file. If the file's most-recent log entry predates the PR commit, the healer's "fresh" verdict is correct and the premise for a daemon-restart ask-then-do is false. One command prevents a multi-cycle false-positive chain (iters ~5737–5739: misattributed PR #968 changes to `outbox_notifier.py`; correct target was `heal_forge_wip_only_redispatch.py`).
+
+---
+
+## G-rule heal-stale-daemon-entrypoint-blind-001 → RETRACTED ✅ (iter ~5740), FALSE POSITIVE
+
+**Retraction:** Beacon returned verdict at ~05:27Z UTC 2026-07-21: direction-ask premise was factually wrong. `check_unit()` in `heal_stale_daemon_code.py` at L1046-L1057 already stats the **entrypoint's own mtime** and compares to service start via `is_stale()` — the entrypoint IS the primary scan target. PR #968 (commit 6dbf8a33) modified `heal_forge_wip_only_redispatch.py` + its test; **`outbox_notifier.py` was NOT in the diff** (`git log -- scripts/outbox_notifier.py` → last change `4a1f701e`, 2026-07-11, predates service start 2026-07-20). Healer correctly reported "fresh" each cycle. Root cause of false positive: G-rule synthesis misattributed PR #968's changes to `outbox_notifier.py`. **No code change needed.** `systemic_fix` row appended to PRIME ledger at iter ~5739 is a known false-positive row (ledger is append-only; journal-noted). Lesson: before carrying "daemon running pre-PR code," run `git log --oneline -- <file>` to confirm the PR actually changed that file.
 
