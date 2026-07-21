@@ -80,10 +80,16 @@ class DelegationBuildPrUrlTest(unittest.TestCase):
 # ---------- field + integration ----------
 
 
-def _delegate_cap():
+# A delegation that has a ledger RECEIPT — the team demonstrably took it.
+RECEIPT = {DELEGATE_ID: 'fresh-build-task-001'}
+
+
+def _delegate_cap(stamped_at=None):
+    spawned = {'kind': 'delegate', 'task_id': DELEGATE_ID}
+    if stamped_at:
+        spawned['stamped_at'] = stamped_at
     return {'id': 'cap-fix-the-thing-ab12', 'state': 'parked',
-            'title': 'Fix the thing',
-            'spawned': {'kind': 'delegate', 'task_id': DELEGATE_ID}}
+            'title': 'Fix the thing', 'spawned': spawned}
 
 
 class DelegationTrailFieldTest(unittest.TestCase):
@@ -102,12 +108,65 @@ class DelegationTrailFieldTest(unittest.TestCase):
         self.assertIsNone(got['delegation_build_phase'])
         self.assertIsNone(got['delegation_pr_url'])
 
-    def test_delegated_with_no_events_is_handed_off(self):
-        # The pre-review window: delegated, work is with the team, no build event
-        # yet. Must NOT render blank (the 2026-07-21 frozen-card report).
-        got = da._delegation_trail_field(_delegate_cap(), {})
+    def test_delegated_with_receipt_and_no_events_is_handed_off(self):
+        # The pre-review window: delegated, the ledger shows the team TOOK it,
+        # no build event yet. Must NOT render blank (2026-07-21 frozen-card).
+        got = da._delegation_trail_field(
+            _delegate_cap(), {}, dispatched_by_origin=RECEIPT)
         self.assertEqual(got['delegation_build_phase'], 'handed_off')
         self.assertIsNone(got['delegation_pr_url'])
+
+    def test_no_receipt_past_grace_is_stalled_not_handed_off(self):
+        # THE FIX: the spawned stamp only proves LARRY CLICKED. A delegation with
+        # no ledger receipt, no build and no PR, long past the grace window, was
+        # never picked up — claiming "handed to the team" reassures exactly the
+        # card that most needs attention.
+        cap = _delegate_cap(stamped_at='2026-06-28T00:00:00+00:00')
+        got = da._delegation_trail_field(cap, {}, now=NOW)
+        self.assertEqual(got['delegation_build_phase'], 'stalled')
+        self.assertIsNone(got['delegation_pr_url'])
+
+    def test_no_receipt_inside_grace_still_reads_handed_off(self):
+        # Beacon's own run happens BEFORE the ledger entry exists (600s timeout),
+        # so a just-clicked delegation must not flash a warning.
+        cap = _delegate_cap(stamped_at='2026-07-11T11:55:00+00:00')  # 5 min old
+        got = da._delegation_trail_field(cap, {}, now=NOW)
+        self.assertEqual(got['delegation_build_phase'], 'handed_off')
+
+    def test_missing_stamped_at_without_receipt_is_stalled(self):
+        # No receipt and no way to age it = no evidence of progress. The honest
+        # render is "worth a look", never a reassuring "handed off".
+        got = da._delegation_trail_field(_delegate_cap(), {}, now=NOW)
+        self.assertEqual(got['delegation_build_phase'], 'stalled')
+
+    def test_receipt_beats_age_no_matter_how_old(self):
+        # An old delegation the team genuinely took is handed_off, not stalled.
+        cap = _delegate_cap(stamped_at='2026-06-01T00:00:00+00:00')
+        got = da._delegation_trail_field(
+            cap, {}, dispatched_by_origin=RECEIPT, now=NOW)
+        self.assertEqual(got['delegation_build_phase'], 'handed_off')
+
+    def test_open_approval_beats_stalled(self):
+        # Needs-you still wins: a delegation parked on Larry is waiting on HIM,
+        # not stalled in the pipeline.
+        cap = _delegate_cap(stamped_at='2026-06-28T00:00:00+00:00')
+        got = da._delegation_trail_field(
+            cap, {}, None, has_open_approval=True, now=NOW)
+        self.assertIsNone(got['delegation_build_phase'])
+
+    def test_real_events_beat_stalled(self):
+        cap = _delegate_cap(stamped_at='2026-06-28T00:00:00+00:00')
+        got = da._delegation_trail_field(
+            cap, {DELEGATE_ID: [_ev('review_request')]}, now=NOW)
+        self.assertEqual(got['delegation_build_phase'], 'in_review')
+
+    def test_building_beats_stalled(self):
+        # Forge is demonstrably on it even though the ledger row is missing.
+        cap = _delegate_cap(stamped_at='2026-06-28T00:00:00+00:00')
+        native = {DELEGATE_ID: [{'event_type': 'session_start', 'agent': 'forge'}]}
+        got = da._delegation_trail_field(
+            cap, {}, None, native_build_events=native, now=NOW)
+        self.assertEqual(got['delegation_build_phase'], 'building')
 
     def test_forge_session_start_reads_building(self):
         # Ledger bridge: the dispatched build's OWN session_start (not
@@ -168,10 +227,17 @@ class DelegationTrailFieldTest(unittest.TestCase):
         self.assertEqual(len(parked), 1)
         self.assertEqual(parked[0]['delegation_build_phase'], 'in_review')
 
-    def test_parked_delegated_card_reads_handed_off_without_map(self):
-        parked = da._parked_from_captures([_delegate_cap()], NOW, {})
+    def test_parked_delegated_card_with_receipt_reads_handed_off(self):
+        parked = da._parked_from_captures(
+            [_delegate_cap()], NOW, {}, dispatched_by_origin=RECEIPT)
         self.assertEqual(parked[0]['delegation_build_phase'], 'handed_off')
         self.assertIsNone(parked[0]['delegation_pr_url'])
+
+    def test_parked_receiptless_old_delegation_reads_stalled(self):
+        # End-to-end through the parked derive: the 13-29-day-old orphan cards.
+        cap = _delegate_cap(stamped_at='2026-06-28T00:00:00+00:00')
+        parked = da._parked_from_captures([cap], NOW, {})
+        self.assertEqual(parked[0]['delegation_build_phase'], 'stalled')
 
     def test_parked_open_approval_shows_needs_you_not_handed_off(self):
         # End-to-end precedence through the parked derive.
