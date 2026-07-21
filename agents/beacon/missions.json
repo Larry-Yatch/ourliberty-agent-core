@@ -9473,7 +9473,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-21T02:17:23.318520+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-21T02:09:11.19918+00:00"
+      "orphan_last_activity_ts": "2026-07-21T02:09:11.19918+00:00",
+      "briefing": {
+        "what": "The team has started work on a decision about combining a batch of related changes, but it isn't tied to any current priority yet.",
+        "why": "Loose work that isn't connected to a goal can quietly consume time and attention without moving the business forward.",
+        "suggest": "Take a quick look to confirm this is worth pursuing before the team invests more; if it doesn't map to a current priority, hold it."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-21T02:19:20.086950+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
