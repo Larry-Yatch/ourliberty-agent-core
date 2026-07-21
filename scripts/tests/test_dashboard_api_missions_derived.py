@@ -703,6 +703,204 @@ class DeriveOrphanReadabilityUnitTest(unittest.TestCase):
         self.assertTrue(out['terminal'])
 
 
+class NoPrThreadConcludedTest(unittest.TestCase):
+    """A no-PR-by-design thread (triage question / card reply / review hold) is
+    terminal on its OWN conclusion evidence, since the PR-shaped derive can never
+    conclude it. Live 2026-07-21: all 22 orphans badged `building` had in fact
+    finished, several 9 days earlier.
+
+    The standing invariant is UNCHANGED and re-pinned below: any orphan carrying
+    a PR (or an unresolved PR state) can never reach terminal through this path,
+    at any age. The two rules are disjoint."""
+
+    _NOW = datetime(2026, 7, 21, 12, 0, 0, tzinfo=timezone.utc)
+    _RECENT = '2026-07-21T09:00:00+00:00'
+    _OLD = '2026-06-01T00:00:00+00:00'  # 30d+ quiet
+
+    # inbox_watcher writes success as the STRING 'True' (interpolated from a
+    # shell log line); hand-built envelopes use a real bool. Both must count.
+    _DONE_STR = {'event_type': 'session_done', 'payload': {'success': 'True'}}
+    _DONE_BOOL = {'event_type': 'session_done', 'payload': {'success': True}}
+    _APPROVE = {'event_type': 'larry_action', 'payload': {'action': 'approve'}}
+
+    def _derive(self, task_id, events, pr_state=None, pr_url=None,
+                last_ts=_RECENT):
+        orphan = {'task_id': task_id, 'last_event_ts': last_ts}
+        if pr_url:
+            orphan['pr_url'] = pr_url
+        return da._derive_orphan_readability(
+            orphan, events, self._NOW, pr_state=pr_state)
+
+    # ---- the three concluding classes ----
+
+    _REJECT = {'event_type': 'larry_action', 'payload': {'action': 'reject'}}
+
+    def test_each_class_concludes_on_its_own_evidence(self) -> None:
+        # A hold never emits session_done at all — Larry's decision IS its end.
+        cases = (
+            ('direction-ask-entrypoint-blind-heal-001', self._DONE_STR),
+            ('direction-ask-x-001', self._DONE_BOOL),
+            ('card-message-03c9ecb0', self._DONE_STR),
+            ('deep-review-hold-pr966-c5073db8', self._APPROVE),
+            ('deep-review-hold-pr1-abc', self._REJECT),
+        )
+        for task_id, ev in cases:
+            with self.subTest(task_id=task_id, event=ev['event_type']):
+                out = self._derive(task_id, [ev])
+                self.assertEqual(out['state_badge'], 'concluded')
+                self.assertTrue(out['terminal'])
+                self.assertFalse(out['stalled'])
+
+    # ---- gate 1: only these classes ----
+
+    def test_delegate_envelope_never_concludes(self) -> None:
+        # THE critical exclusion. A delegate envelope's session ends when Beacon
+        # finishes SCOPING; the build then runs under a fresh id via the ledger
+        # bridge. Proven live 2026-07-21: this exact task concluded at 06:08 and
+        # its build opened PR #971 at 06:45. Concluding it would hide live work.
+        out = self._derive(
+            'delegate-cap-route-ourliberty-graph-prs-to-mirror-review-1123',
+            [self._DONE_STR])
+        self.assertEqual(out['state_badge'], 'building')
+        self.assertFalse(out['terminal'])
+
+    def test_unprefixed_task_never_concludes(self) -> None:
+        out = self._derive('rebase-pr-860-001-retry1', [self._DONE_STR])
+        self.assertFalse(out['terminal'])
+
+    # ---- gate 2: any PR at all defers to the PR-shaped derive ----
+
+    def test_open_pr_on_a_concluding_class_is_never_terminal(self) -> None:
+        # The standing invariant, re-pinned through the new code path.
+        out = self._derive(
+            'direction-ask-x-001', [self._DONE_STR],
+            pr_state='OPEN',
+            pr_url='https://github.com/o/r/pull/1')
+        self.assertFalse(out['terminal'])
+        self.assertEqual(out['state_badge'], 'building')
+
+    def test_open_pr_stale_on_a_concluding_class_stays_stalled(self) -> None:
+        # Age must never be what concludes a thread: 30d+ quiet AND a successful
+        # session_done, but an OPEN PR keeps it visible and stalled.
+        out = self._derive(
+            'direction-ask-x-001', [self._DONE_STR],
+            pr_state='OPEN', pr_url='https://github.com/o/r/pull/1',
+            last_ts=self._OLD)
+        self.assertFalse(out['terminal'])
+        self.assertTrue(out['stalled'])
+
+    def test_pr_url_on_an_event_defers_even_without_resolved_state(self) -> None:
+        # No resolver result (token missing / network down) but an event carries
+        # a pr_url → the PR-shaped rules own it; fail safe, stay visible.
+        out = self._derive('direction-ask-x-001', [
+            dict(self._DONE_STR, pr_url='https://github.com/o/r/pull/2'),
+        ])
+        self.assertFalse(out['terminal'])
+
+    # ---- gate 3: a real conclusion, nothing weaker ----
+
+    def test_started_but_not_done_is_not_concluded(self) -> None:
+        out = self._derive(
+            'direction-ask-x-001', [{'event_type': 'session_start'}])
+        self.assertFalse(out['terminal'])
+        self.assertEqual(out['state_badge'], 'building')
+
+    def test_failed_session_is_not_concluded(self) -> None:
+        for bad in ('False', 'false', False, None, '', 'yes'):
+            with self.subTest(success=bad):
+                out = self._derive(
+                    'direction-ask-x-001',
+                    [{'event_type': 'session_done', 'payload': {'success': bad}}])
+                self.assertFalse(
+                    out['terminal'],
+                    f'success={bad!r} must not conclude the thread')
+
+    def test_malformed_payload_is_not_concluded(self) -> None:
+        for payload in (None, 'not-a-dict', [], 42):
+            with self.subTest(payload=payload):
+                out = self._derive(
+                    'direction-ask-x-001',
+                    [{'event_type': 'session_done', 'payload': payload}])
+                self.assertFalse(out['terminal'])
+
+    def test_no_events_is_not_concluded(self) -> None:
+        self.assertFalse(self._derive('direction-ask-x-001', [])['terminal'])
+
+    def test_merged_still_outranks_concluded(self) -> None:
+        # `shipped` is checked first: a real merge always wins the badge.
+        out = self._derive(
+            'direction-ask-x-001',
+            [self._DONE_STR, {'event_type': 'auto_merge'}])
+        self.assertEqual(out['state_badge'], 'shipped')
+        self.assertTrue(out['terminal'])
+
+
+class DismissedProjectSuppressionTest(unittest.TestCase):
+    """A project promoted from a mission that has since been DISMISSED must stop
+    drawing a pipeline card. `dismiss` only edits missions.json, so the promoted
+    project stays `active` forever — live 2026-07-21, 2 of 4 pipeline cards were
+    dismissed by MERGED PRs (#931, #957) 8-12 days earlier and still rendered."""
+
+    def _proj(self, pid, mission_id):
+        return {'id': pid, 'state': 'active',
+                'promoted_from': {'kind': 'mission', 'mission_id': mission_id}}
+
+    def test_dismissed_ids_reuses_the_shared_dead_test(self) -> None:
+        entries = [
+            {'id': 'ack', 'phase': 'proposed', 'acknowledged': True},
+            {'id': 'retired', 'phase': 'proposed', 'retired_at': '2026-07-01'},
+            {'id': 'closed-phase', 'phase': 'closed'},
+            {'id': 'live', 'phase': 'proposed'},
+            {'id': 'drafting', 'phase': 'drafting'},
+        ]
+        out = da._dismissed_mission_ids(entries)
+        self.assertEqual(out, {'ack', 'retired', 'closed-phase'})
+
+    def test_dismissed_ids_tolerates_junk_entries(self) -> None:
+        self.assertEqual(
+            da._dismissed_mission_ids(['x', None, {}, {'id': 42}]), set())
+
+    def test_project_from_dismissed_mission_is_collected(self) -> None:
+        self.assertEqual(
+            da._dismissed_source_project_ids([self._proj('p1', 'm1')], {'m1'}),
+            {'p1'})
+
+    def test_project_from_live_mission_is_not_collected(self) -> None:
+        self.assertEqual(
+            da._dismissed_source_project_ids(
+                [self._proj('p1', 'm1')], {'other'}),
+            set())
+
+    def test_only_mission_provenance_counts(self) -> None:
+        # kind != 'mission' — a dismissed MISSION id can't speak for a project
+        # promoted from a capture or a raw orphan, even on an id collision.
+        projects = [
+            {'id': 'p-orphan', 'state': 'active',
+             'promoted_from': {'kind': 'orphan', 'task_id': 'm1'}},
+            {'id': 'p-capture', 'state': 'active',
+             'promoted_from': {'kind': 'capture', 'capture_id': 'm1'}},
+        ]
+        self.assertEqual(
+            da._dismissed_source_project_ids(projects, {'m1'}), set())
+
+    def test_junk_never_collects_a_project(self) -> None:
+        # Positive evidence only — anything malformed is simply absent from the
+        # set, so its card is kept.
+        for proj in (
+            'not-a-dict', None, {}, {'id': ''}, {'id': 7},
+            {'id': 'p1'},
+            {'id': 'p1', 'promoted_from': None},
+            {'id': 'p1', 'promoted_from': 'junk'},
+            {'id': 'p1', 'promoted_from': {}},
+            {'id': 'p1', 'promoted_from': {'kind': 'mission'}},
+            {'id': 'p1', 'promoted_from': {'kind': 'mission',
+                                           'mission_id': None}},
+        ):
+            with self.subTest(project=proj):
+                self.assertEqual(
+                    da._dismissed_source_project_ids([proj], {'m1'}), set())
+
+
 class GithubTokenTest(unittest.TestCase):
     """`_github_token` env-first, then `gh auth token` fallback (the dashboard-api
     host has gh authed but no token env var)."""
