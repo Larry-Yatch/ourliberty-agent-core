@@ -12618,10 +12618,25 @@ def _run_review_pass_auto_merge(
     payload = marker_decision.get('payload') or {}
     pr_url = payload.get('pr_url') if isinstance(payload, dict) else None
 
-    def _skip(outcome: str, merge_reason: str, status_line: str) -> str:
+    def _skip(
+        outcome: str,
+        merge_reason: str,
+        status_line: Optional[str] = None,
+    ) -> str:
         """Record a non-merge (skipped / already-terminal) review-pass
         outcome and return the 'auto-merge-skipped' signal. The notify
-        renders `status_line`; the caller suppresses the DM on this signal."""
+        renders `status_line`; the caller suppresses the DM on this signal.
+
+        Omit `status_line` for any outcome that has its own branch in
+        `_render_review_pass_merge_status_line` — the sentence is derived from
+        there so this path and the queue-release path cannot drift into two
+        different wordings for one outcome (the KEEP IN SYNC contract at the
+        top of the variant table). Outcomes with NO branch there — the
+        `skipped_*` family below — MUST pass an explicit line: the renderer
+        would degrade them to its generic "REQUESTED; outcome in Larry's DM"
+        default, which is exactly the false-calm wording this path exists to
+        avoid.
+        """
         marker_decision['merge_result'] = {
             'merge_outcome': outcome,
             'merge_reason': merge_reason,
@@ -12629,6 +12644,10 @@ def _run_review_pass_auto_merge(
             'repo_coords': '?',
         }
         marker_decision['merge_outcome'] = outcome
+        if status_line is None:
+            status_line = _render_review_pass_merge_status_line(
+                marker_decision['merge_result'],
+            )
         marker_decision['intent_kwargs'] = {
             **(marker_decision.get('intent_kwargs') or {}),
             'merge_status_line': status_line,
@@ -12647,11 +12666,13 @@ def _run_review_pass_auto_merge(
             f'agent=forge',
             'WARN',
         )
+        # No explicit status line: `skipped_sequence_cancelled` has its own
+        # branch in the renderer, so this surface and the queue-release
+        # surface now say the same thing — including "will NOT retry", which
+        # this path's old hardcoded sentence omitted.
         return _skip(
             'skipped_sequence_cancelled',
             'build sequence was cancelled (aborted); auto-merge blocked',
-            'Auto-merge was SKIPPED — the build was cancelled; the PR is '
-            'NOT merged.',
         )
 
     # nervous-system-audit #15 (2026-06-05): the marker's `pr_url` is
