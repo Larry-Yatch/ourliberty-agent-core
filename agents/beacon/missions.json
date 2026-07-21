@@ -10123,7 +10123,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-21T22:54:33.778000+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-21T22:45:45.59296+00:00"
+      "orphan_last_activity_ts": "2026-07-21T22:45:45.59296+00:00",
+      "briefing": {
+        "what": "A piece of work your team kicked off on its own that hasn't been tied to any active project yet.",
+        "why": "Loose, unassigned work that sits waiting for review ties up your team's time and can quietly drift out of line with your priorities.",
+        "suggest": "Take a quick look to confirm it's worth pursuing and either fold it into a real priority or set it aside \u2014 worth a glance before it moves forward."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-21T22:58:09.250464+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
