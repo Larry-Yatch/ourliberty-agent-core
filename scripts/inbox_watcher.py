@@ -697,6 +697,10 @@ def _record_outbox_cost(agent: str, task_id: str, outbox: dict) -> None:
         "duration_sec": outbox.get("duration_sec"),
         "attempts": outbox.get("attempts"),
         "source": "inbox-watcher",
+        # Per-repo cost attribution (approach A): stamp the build's target repo
+        # at write-time so cost_by_repo can bucket LLM spend by repo. Null-safe:
+        # outbox lacks target_repo for non-build/older rows -> None (unattributed).
+        "target_repo": outbox.get("target_repo"),
     })
 
 
