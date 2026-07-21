@@ -77878,3 +77878,91 @@ PIDs 3801553/3801576 confirmed alive (~16h47m). NOMINAL ✅
 
 ---
 
+## Iteration ~5715 — 2026-07-20T23:41Z UTC (Larry /cycle chat, Tier 1)
+
+**Health:** ✅ Nominal. 0 new alerts (wm=785, fl=785). All mandatory + additive checks clean. Notable: PR #966 deep-review-hold carry; Larry posted card-message response to Beacon (~23:35Z UTC); 2 fresh RSDPM Forge tasks dispatched (rsdpm-p5, rsdpm-p6). Tier 1, consecutive_clean=0→1.
+
+**VERIFY-BEFORE-REASSERT (from iter ~5714 status snapshot at 23:36Z UTC):**
+- **"HEAD=ec7edb83==origin/main"**: UPDATED ✅ — wrapper committed 3937db16 (Pulse cycle 20260720T233836Z). HEAD=3937db16==origin/main ✅
+- **"zombie PID 1834248 (~53d4h12m)"**: UPDATED ⚠️ — etime=53-04:21:26 (~53d4h21m). [carry, static]
+- **"beacon PID 3801553 (~21h47m)"**: UPDATED ✅ — etime=21:55:53 (~21h56m) ✅
+- **"outbox-notifier PID 3801576 (~21h47m)"**: UPDATED ✅ — etime=21:55:52 (~21h56m) ✅
+- **"inbox_watcher PID 3801575 (~21h47m)"**: UPDATED ✅ — etime=21:55:52 (~21h56m) ✅
+- **"last_sync=22:51:33Z UTC (~40 min)"**: CONFIRMED ✅ — still 2026-07-20T22:51:33Z UTC (~50 min at 23:41Z check). NOMINAL (< 2h) ✅
+- **"wm=783→785 advanced"**: CONFIRMED ✅ — wm=785, fl=785; 0 new alerts. NOMINAL ✅
+- **"PR #966 OPEN — deep-review-hold-pr966-c5073db8 pending"**: CONFIRMED ✅ — gh pr view 966: OPEN, mergeable=MERGEABLE. pending=1. [carry]
+- **"pending=1 (history=490)"**: CONFIRMED ✅ — pending=1, history=490.
+- **"Tier 1, consecutive_clean=0"**: CONFIRMED ✅ — carried forward from tier-reset in iter ~5714.
+
+**Check 0 — Alert triage:**
+- `repair-watermark`: repaired=false (old_wm=785, fl=785). 0 new alerts.
+- Watermark unchanged at 785. ✅
+- NOMINAL ✅
+
+**Check 1 — Log noise:** outbox-notifier.log last entry 17:02:35 MDT (23:02:35Z UTC) — INFO deep-review-hold surfaced approval=deep-review-hold-pr966-c5073db8. No new WARN entries since iter ~5714. Carry WARN 08:21:37 MDT (G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch, vp). NOMINAL ✅
+
+**Check 2 — Telegram sweep:** Last bot log entry: 17:29:26-0600 (23:29:26Z UTC) — doorbell idx=784 delivered. No new Larry messages since iter ~5714. PIDs 3801553/3801576 confirmed alive (~21h56m). NOMINAL ✅
+
+**Check 3 — Pipeline stall:** DRY-RUN (23:40:06Z UTC) → "no stalls detected" (FORGE_NO_PR_SKIP check-viii-suppress-deprecate-when-already-disabled-001 reason=pr_exists pr=#964; FORGE_NO_PR_SKIP dashboard-api-sha-drift-path-aware-restart-001 reason=pr_exists pr=#965). NOMINAL ✅
+
+**Check 4 — Pending directives:** pending=1 (deep-review-hold-pr966-c5073db8). Larry posted card-message response to Beacon inbox at 23:35Z UTC (Beacon will process approval). No untracked orphaned Larry directives. NOMINAL ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-20T23:36:53Z UTC (~5 min at 23:41Z check). NOMINAL ✅
+
+**Check A — Source repo:** HEAD=3937db16==origin/main ✅; on main ✅; clean tree ✅. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-20T22:51:33Z UTC (~50 min), status=no-change, consecutive_push_failures=0. NOMINAL ✅
+**Check C — Agent liveness:** beacon PID 3801553 ✅ (~21h56m); outbox-notifier PID 3801576 ✅ (~21h56m); inbox_watcher PID 3801575 ✅ (~21h56m). ⚠️ Zombie PID 1834248 (~53d4h21m, bash poll loop). [carry, static]
+**Check E — PR/merge state:** PR #966 OPEN (22:42:36Z UTC, age ~59m at 23:41Z); Mirror PASS 23:02:03Z UTC; AUTO_MERGE_HELD_DEEP_REVIEW (no deep-review stamp); approval gate deep-review-hold-pr966-c5073db8 pending. Larry responded via card-message to Beacon. 0 open PRs dashboard. [carry]
+**Check H — Forge/Beacon/Mirror inboxes:** Beacon 1 task (card-message about PR #966 approval, ~6 min old); Forge 2 tasks (rsdpm-p5-cost-attribution-by-repo-001 + rsdpm-p6-board-client-lane-001, both ~2 min old, source=beacon, type=feature-development). Mirror 0 tasks. All fresh, not stale. NOMINAL ✅
+**Rotations:** SUPABASE_SERVICE_ROLE_KEY DM sent iter ~5707 (2026-07-20T20:00:15Z UTC); 14d dedup window active; no re-DM. NOMINAL ✅
+
+**§5.0:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks:**
+- **Check I:** FIRED Monday 2026-07-20 at 14:14Z UTC (iter ~5695). 1 proposal `pulse-cycle-model-downgrade-001` dispatched. Next firing Wed 2026-07-23. [carry]
+- **Check III:** OFF-WEEK ✅ — biweekly cadence; last artifact check-iii-2026-07-12.json. Next fire: 2026-07-26.
+- **Check VIII:** RESOLVED ✅ — proposals closed (already-satisfied). [carry]
+- **Check XIV:** [2/3 carry] — no new artifact. Dispatch at 3/3 (next firing ~2026-07-27). [carry]
+- **Check XI:** CLOSED ✅ — over_gate=false. [carry]
+- Check IV/VI/IX/X/XII: timer-managed. No new artifacts. ✅
+
+**G-rule assessment:**
+- **`heal-pipeline-stall-retry-exhausted-pr-exists-fp-001` [2/3]** — No new occurrences this iter. Carry at 2/3.
+- All other active G-rule counts carry unchanged.
+
+**Actions taken:**
+1. Check 0: repair-watermark no-op; 0 new alerts; watermark unchanged at 785. ✅
+2. §5.0: audit_due_nudge no-op, distill_detector no-op, audit_cadence_signal no-op. ✅
+3. PRIME ledger: `iter_clean` appended (23:41:32Z UTC). ✅
+4. Tier state: `record --checks-clean true` → consecutive_clean 0→1 (Tier 1). ✅
+
+**Escalations:** 0 new Pulse DMs.
+
+**Standing findings:**
+- [yellow] **sync-deploy-targets-missing-registry-001 [1/3]** — Vercel project `rsdpm` absent from `config/deploy_targets.json`. Bot DM'd Larry (idx=773). PR #966 appears to address RSDPM onboarding; card-message response in Beacon inbox suggests approval imminent. [ask-then-do, carry]
+- [yellow] **probe-blind:ourliberty-cycle.service** *(carry from iter ~5574)* — heal-claude-json-bind-drift healer blind for cycle.service mount namespace. Bot DM'd Larry 00:54Z UTC (idx=780). [ask-then-do]
+- [yellow] **zombie-bash-pid-1834248** — ~53d4h21m, bash poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`. ask-then-do: `kill 1834248`. [carry, static]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07`. [carry]
+- [yellow] **PR #966 OPEN — deep-review-hold-pr966-c5073db8 pending** — "chore(pipeline): onboard RSDPM as the 4th Forge-dispatch repo". Mirror PASS 23:02Z UTC. AUTO_MERGE_HELD_DEEP_REVIEW. Larry card-message response posted to Beacon inbox at 23:35Z UTC; Beacon processing. [carry, resolving]
+- [green] **check-viii RESOLVED** ✅ — proposals closed. [carry]
+- [green] **sync NOMINAL** — last_sync=22:51:33Z UTC; HEAD=3937db16==origin/main. [stable]
+- [green] **daemons healthy** — beacon PID 3801553, outbox-notifier PID 3801576, inbox_watcher PID 3801575 (~21h56m). [stable]
+- [green] **PR #965 MERGED** ✅ — c684bcb7 (carried). [carry]
+- [green] **PR #964 MERGED** ✅ — 0c57c6dc (carried). [carry]
+- [blue] **RSDPM pipeline active** — 2 fresh Forge tasks dispatched (rsdpm-p5-cost-attribution-by-repo-001, rsdpm-p6-board-client-lane-001). Pipeline in motion post-RSDPM onboarding approval path. [new]
+- [blue] **Check I — 2026-07-20 FIRED** — 1 proposal `pulse-cycle-model-downgrade-001` dispatched. Next Wed 2026-07-23. [carry]
+- [blue] **pulse-check-xiv-tier4-001 [2/3]** — Dispatch at 3/3 (next Check XIV firing ~2026-07-27). [carry]
+- [blue] **Check I dm_route second-emission-Sunday** — 1st occurrence 2026-07-19T14:14Z. Monitor Wed 2026-07-23. [carry]
+- [blue] **review-ceiling-fit ATTENTION** — 9 false-kills in 30d; recommends RAISE ceiling 35→45 min. No Pulse action. [carry]
+- [blue] **SUPABASE_SERVICE_ROLE_KEY rotation upcoming** — due 2026-08-22 (33d). DM sent iter ~5707. Next re-DM eligible 2026-08-03. Runbook: docs/runbooks/rotate-supabase-keys.md. [carry]
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch — DISPATCHED ✅ (3/3)** — verification_pending. [carry]
+- [blue] **G-rules (dispatched, vp):** forge-wip-redispatch-exhausted-genuine-no-pr-001; ourliberty-health-subject-key-mismatch-001; outbox-notifier-notification-intent-reject-tier4-001; forge-wip-redispatch-digest-tier4-001; forge-revision-preamble-missing-pr711-001; forge-wip-redispatch-exhausted-pr-exists-fp-001; decision-needed-approval-forge-dispatch-no-target-repo-001; no-session-revision-active-mirror-session-fp-001.
+- [blue] **G-rule 2/3:** outbox-notifier-notification-intent-review-escalate-tier4-001; outbox-notifier-auto-merge-stale-revalidation-tier4-001; pulse-check-xiv-tier4-001; heal-pipeline-stall-retry-exhausted-pr-exists-fp-001.
+- [blue] **G-rule 1/3:** sync-deploy-targets-missing-registry-001; medic-approval-request-tier4-001; mirror-malformed-verdict-heal-reap-path-001; mirror-queue-wait-gauge-tier4-001; inbox-watcher-tier-pool-all-unavailable-tier4-001; heal-pipeline-stall-unrouted-deep-review-required-fp-001; heal-pulse-check-staleness-single-flight-skip-fp-001; gate-parallelism-monitor-regression-data-001; pulse-rotation-check-source-tier4-001; pulse-auto-dispatch-null-reply-chat-id-post-pr950.
+- [blue] **missions-autoregister: `proposed-no-session-revision-mirror-active-fp-001` flagged 14d+ no shipped-PR** — digest route; Tier-3 silence. [carry]
+
+**PRIME DIRECTIVE:** 0 interventions; 0 systemic_fixes; iter_clean appended (23:41:32Z UTC). ratio≈22.93 (trailing-30d, improving).
+**Tier end-of-iter:** **Tier 1** (consecutive_clean=1; 2 clean iters needed to de-escalate to Tier 2). ✅
+
+---
+
