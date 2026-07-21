@@ -4912,6 +4912,35 @@ def _has_forge_build_started(events: Optional[list[dict[str, Any]]]) -> bool:
     return any(_is_session_start(e) for e in (events or []))
 
 
+# A delegation legitimately has NO ledger receipt for a while after the click:
+# Beacon's own run (scope → decide → dispatch/ask) happens BEFORE the approval
+# entry is written, and her dispatch timeout is 600s. So don't call a card
+# stalled inside this window — only after it has clearly had its chance.
+_DELEGATION_RECEIPT_GRACE_SEC = 15 * 60
+
+
+def _delegation_receipt_grace_active(
+    spawned: Any,
+    now: Optional[datetime] = None,
+) -> bool:
+    """True while a freshly-clicked delegation could still honestly be receipt-
+    less (Beacon mid-run). Outside the window, an absent receipt means nothing
+    has taken the work. A missing/unparseable `stamped_at` reads as NOT in grace:
+    we have no evidence of progress and no way to age it, and the honest render
+    for that is "worth a look", never a reassuring "handed off"."""
+    stamped = spawned.get('stamped_at') if isinstance(spawned, dict) else None
+    if not isinstance(stamped, str) or not stamped:
+        return False
+    try:
+        ts = datetime.fromisoformat(stamped)
+    except ValueError:
+        return False
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=timezone.utc)
+    _now = now or datetime.now(timezone.utc)
+    return (_now - ts).total_seconds() < _DELEGATION_RECEIPT_GRACE_SEC
+
+
 def _delegation_needs_you_field(
     cap: dict[str, Any],
     open_delegate_approvals: Optional[dict[str, dict[str, Any]]],
@@ -5022,6 +5051,8 @@ def _delegation_trail_field(
     pr_state_by_url: Optional[dict[str, str]] = None,
     has_open_approval: bool = False,
     native_build_events: Optional[dict[str, list[dict[str, Any]]]] = None,
+    dispatched_by_origin: Optional[dict[str, str]] = None,
+    now: Optional[datetime] = None,
 ) -> dict[str, Any]:
     """Surface a card's spawned-build review trail — `delegation_build_phase`
     (handed_off | building | in_review | review_passed | merged | None) + `delegation_pr_url` — joined
@@ -5045,6 +5076,11 @@ def _delegation_trail_field(
     bounded/fail-safe `pr_state_resolver` the orphan lane uses) the trail flips
     `review_passed` → `merged`.
 
+    `stalled` is the honest floor: a delegated card with no open approval, no
+    ledger receipt, no build events and past the grace window has nothing
+    carrying it. It replaces the old unconditional `handed_off` fallback, which
+    claimed the team had work that had in fact never been dispatched.
+
     Neutral None before any build event joins — never a misleading claim."""
     neutral = {'delegation_build_phase': None, 'delegation_pr_url': None}
     spawned = cap.get('spawned')
@@ -5060,10 +5096,25 @@ def _delegation_trail_field(
     # Honest precedence: `has_open_approval` is checked FIRST, so a delegation
     # parked on Larry shows "waiting on your approval" instead — which is exactly
     # the lie the Slice-1 antagonistic review rejected, now ruled out by evidence.
-    fallback = (
-        {'delegation_build_phase': 'handed_off', 'delegation_pr_url': None}
-        if (delegated and not has_open_approval) else neutral
-    )
+    # RECEIPT GATE: the spawned stamp only proves LARRY CLICKED. The ledger entry
+    # is the team's "I've got this" — written when the delegation actually reaches
+    # an approval/dispatch. Claiming `handed_off` off the stamp alone reassured
+    # exactly the cards that most needed attention (found 2026-07-21: every
+    # `handed_off` card on the board was a 13–29-day-old delegation that never
+    # dispatched — no receipt, no build, no PR). Outside the grace window, no
+    # receipt ⇒ `stalled`, not a calm "handed to the team".
+    # NOTE the wording this feeds must stay "no sign of progress", never "never
+    # started": delegations older than ~2026-07-11 predate the origin_task_id
+    # stamp, so a missing receipt doesn't PROVE nothing ran for those.
+    _has_receipt = bool((dispatched_by_origin or {}).get(_delegate_tid))
+    if delegated and not has_open_approval:
+        fallback = (
+            {'delegation_build_phase': 'handed_off', 'delegation_pr_url': None}
+            if (_has_receipt or _delegation_receipt_grace_active(spawned, now))
+            else {'delegation_build_phase': 'stalled', 'delegation_pr_url': None}
+        )
+    else:
+        fallback = neutral
     # `building` sits between handed_off and in_review: the dispatched build's OWN
     # session_start (reached via the ledger bridge, since those events aren't
     # origin-tagged) proves Forge is actually on it. Only consulted when the
@@ -5194,6 +5245,7 @@ def _parked_from_captures(
     build_events_by_origin: Optional[dict[str, list[dict[str, Any]]]] = None,
     pr_state_by_url: Optional[dict[str, str]] = None,
     native_build_events: Optional[dict[str, list[dict[str, Any]]]] = None,
+    dispatched_by_origin: Optional[dict[str, str]] = None,
 ) -> list[dict[str, Any]]:
     """Build the `parked[]` array (§ 3.3) from captures.json. Only state=='parked'
     captures; `aging` is the GC healer's persisted flag (Phase 1 — never
@@ -5234,7 +5286,8 @@ def _parked_from_captures(
         entry.update(_delegation_trail_field(
             cap, build_events_by_origin, pr_state_by_url,
             has_open_approval=_needs_you.get('delegation_needs_you') is not None,
-            native_build_events=native_build_events))
+            native_build_events=native_build_events,
+            dispatched_by_origin=dispatched_by_origin, now=now))
         out.append(entry)
     return out
 
@@ -5588,6 +5641,7 @@ def _build_derived_response(
     open_delegate_approvals: Optional[dict[str, dict[str, Any]]] = None,
     build_events_by_origin: Optional[dict[str, list[dict[str, Any]]]] = None,
     native_build_events: Optional[dict[str, list[dict[str, Any]]]] = None,
+    dispatched_by_origin: Optional[dict[str, str]] = None,
 ) -> dict[str, Any]:
     """Pure derive: build the full /api/missions/derived response (pre-filter).
 
@@ -5685,7 +5739,8 @@ def _build_derived_response(
 
     parked = _parked_from_captures(
         captures, now, events_by_task_id, open_delegate_approvals,
-        build_events_by_origin, pr_state_by_url, native_build_events)
+        build_events_by_origin, pr_state_by_url, native_build_events,
+        dispatched_by_origin)
     return {
         'schema_version': 1,
         'missions': missions,
@@ -5915,6 +5970,7 @@ def _handle_missions_derived(
         open_delegate_approvals=open_delegate_approvals,
         build_events_by_origin=build_events_by_origin,
         native_build_events=native_build_events,
+        dispatched_by_origin=_dispatched_by_origin,
     )
     response = _apply_derived_filters(
         response, repo=repo, task_id=task_id, now=now,
