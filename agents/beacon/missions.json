@@ -9936,7 +9936,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-21T11:20:46.511837+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-21T11:14:03.577109+00:00"
+      "orphan_last_activity_ts": "2026-07-21T11:14:03.577109+00:00",
+      "briefing": {
+        "what": "A behind-the-scenes tidy-up job the team picked up on their own, not yet attached to any active project.",
+        "why": "It's been sitting in line waiting for a sign-off, so it's tying up effort without being connected to a goal you've set.",
+        "suggest": "Take a quick look to confirm it's worth finishing \u2014 if it doesn't tie back to a current priority, park it rather than let it linger."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-21T11:22:17.643229+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
