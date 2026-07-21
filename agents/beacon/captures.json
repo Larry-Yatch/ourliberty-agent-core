@@ -97,7 +97,7 @@
       "id": "cap-projects-pm-layer-data-is-stale-separate-system-84ec",
       "title": "Projects (PM layer) data is stale \u2014 separate system from missions GC",
       "note": "The Supabase projects table (migrated from Mission Control) is NOT fed by the chain_events spine, so the missions GC healer never touches it. Its staleness needs its own freshness/cleanup mechanism. Track separately from the Missions tab; do not fold into missions GC.",
-      "state": "parked",
+      "state": "dropped",
       "origin": {
         "source": "desktop-chat",
         "session_id": null,
@@ -108,26 +108,26 @@
       "last_touched": "2026-06-10T06:35:24.627125+00:00",
       "promoted_to": null,
       "briefing": {
-        "what": "Our project-tracking list isn't being automatically kept up to date the way our mission list is, so it's slowly filling with stale entries.",
-        "why": "If the project list drifts out of date, the team and you end up making calls off information that's quietly wrong, which erodes trust in the system.",
-        "suggest": "Worth fixing, but let's scope it as its own small cleanup effort rather than bolting it onto the mission system \u2014 get a quick estimate first before committing."
+        "what": "The project-tracking board that shows the status of your initiatives is quietly going stale \u2014 nothing is keeping it current.",
+        "why": "You and the team make decisions off that board, so if it's showing outdated information, you're steering by a map that no longer matches the ground.",
+        "suggest": "Let's set up a simple routine to keep it fresh and cleaned up \u2014 it's low-stakes work we can schedule whenever there's a spare cycle, no rush."
       },
-      "risk": "medium",
-      "recommended_action": "delegate",
+      "risk": "safe",
+      "recommended_action": "drop",
       "briefing_provenance": {
         "by": "beacon",
         "model": "claude-opus-4-8",
-        "at": "2026-06-14T17:52:43.946307+00:00",
-        "from_state": "parked"
+        "at": "2026-07-21T17:45:16.459852+00:00",
+        "from_state": "dropped"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
       "aging": true,
       "spawned": {
         "kind": "delegate",
         "task_id": "delegate-cap-projects-pm-layer-data-is-stale-separate-system-84ec",
         "stamped_at": "2026-06-22T00:52:57.778041+00:00"
       },
-      "snoozed_until": "2026-07-01T00:00:00+00:00"
+      "snoozed_until": "2026-07-01T00:00:00+00:00",
+      "drop_reason": "Resolved by retirement, not repair: dashboard PR #143 (merged 2026-07-21) retired the Programs tab and the legacy Supabase PM layer entirely, completing the 10-nav-tabs-to-4 IA consolidation. Audit confirmed the programs/projects/tasks tables had NO writer (only the one-time migrate_mission_control.py) while / rendered straight through to them - 38 rows untouched since 2026-05-30."
     },
     {
       "id": "cap-operator-action-queue-is-full-of-benign-auto-han-3c39",
@@ -841,7 +841,7 @@
       "id": "cap-board-add-abort-for-a-dispatched-build-no-way-to-c22d",
       "title": "Board: add ABORT for a dispatched build (no way to stop auto-merge) \u2014 NEXT PRIORITY",
       "note": "Dogfood 2026-06-20 proved the board's most dangerous gap: once a build is dispatched there is NO way to abort it before it auto-merges. PR #602 auto-merged a build we'd tried to stop; the duplicate dispatched before we could cancel. FIX = a 'Cancel/Abort build' action on an active project/sequence that (1) marks the build-sequence cancelled, (2) stops the advancer, (3) GUARANTEES nothing from that build auto-merges (mark the dispatch cancelled so Mirror/auto-merge skip it, and/or auto-close its PR), (4) cleans up the Forge worktree/inbox. Invariant: after abort, no PR from that build can land on main. SECONDARY (same area, lower urgency): launch should show + require confirming repo+spec_docs before dispatch, and mission spec_docs should be editable post-create. Build this the CONTROLLED way (not through the board). Owner = Projects-tab-v3 board stream / next build.",
-      "state": "parked",
+      "state": "dropped",
       "label": null,
       "origin": {
         "source": "desktop-chat",
@@ -853,20 +853,21 @@
       "last_touched": "2026-06-20T02:00:29.992529+00:00",
       "promoted_to": null,
       "briefing": {
-        "what": "Right now, once we kick off an automated build there's no stop button \u2014 and last night one we tried to halt went live on its own anyway.",
-        "why": "Without a way to abort, a bad or duplicate build can ship to our live product before anyone can intervene, which is exactly how mistakes reach customers.",
-        "suggest": "Approve building a reliable 'Cancel build' button as the next priority, and have the team walk you through the safeguards before it goes in given the stakes."
+        "what": "Right now, once you kick off an automated project, there's no stop button \u2014 if you change your mind, it still finishes and goes live on its own.",
+        "why": "We already got burned: a project we tried to cancel went live anyway and shipped a duplicate, so today every launch is a decision we can't take back.",
+        "suggest": "Let's build a proper, tested 'Cancel' button that guarantees a stopped project can never go live \u2014 worth doing carefully and next, not rushed."
       },
       "risk": "medium",
-      "recommended_action": "delegate",
+      "recommended_action": "drop",
       "briefing_provenance": {
         "by": "beacon",
         "model": "claude-opus-4-8",
-        "at": "2026-06-20T02:04:48.404818+00:00",
-        "from_state": "parked"
+        "at": "2026-07-21T17:45:16.459852+00:00",
+        "from_state": "dropped"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
-      "aging": true
+      "aging": true,
+      "drop_reason": "Shipped 2026-07-21: agent-core PR #978 (cancel now writes the cancel marker so a dispatched build is actually halted, not just blocked from merging) + dashboard PR #144 (Stop control on the Building phase card). Root cause was that the cancel-marker kill switch had a reader in agent_runner and NO writer anywhere in the tree. Card could not auto-clear because it was never delegated, so no PR was linked to it."
     },
     {
       "id": "cap-abort-gate-fast-follow-close-heal-pr-auto-merge-609e",
