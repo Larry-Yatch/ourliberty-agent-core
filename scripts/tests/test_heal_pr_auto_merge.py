@@ -614,6 +614,108 @@ try:
 except ImportError:
     import _chokepoint_optout
 
+
+# -------------------- abort gate (the second merge path) --------------------
+
+_ABORT_PR = 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/9'
+
+
+class SequenceCancelledGateTest(_IsolatedAgentsRoot):
+    """The healer is the SECOND merge path. outbox_notifier has honoured an
+    aborted sequence since #606; this one never did, so a cancelled build whose
+    PR had a Mirror PASS and a FAILED primary merge would still land on main
+    within ~5 minutes. That is the hole this closes."""
+
+    def _write_seq(self, *, status, step_ids, cancelled):
+        audit = [{'ts': '2026-07-20T00:00:00+00:00',
+                  'event': 'sequence-created', 'actor': 'beacon'}]
+        if cancelled:  # exactly what apply_cancel appends
+            audit.append({'ts': '2026-07-20T01:00:00+00:00',
+                          'event': 'cancelled', 'actor': 'larry'})
+        seq_dir = Path(self._isolated_tmp) / 'blackboard' / 'build-sequences'
+        seq_dir.mkdir(parents=True, exist_ok=True)
+        (seq_dir / 'seq-1.json').write_text(json.dumps({
+            'seq_id': 'seq-1', 'status': status,
+            'steps': [{'step_id': s, 'status': 'dispatched'} for s in step_ids],
+            'audit_log': audit,
+        }))
+
+    def _process(self, task_id='step-a'):
+        """Drive process_pr for a Mirror-PASSed PR. Every gh round trip is
+        mocked, so reaching one at all means the abort gate did not fire."""
+        pr = {'_repo': 'Larry-Yatch/ourliberty-agent-core', 'number': 9,
+              'url': _ABORT_PR, 'title': 'x', 'labels': [], 'mergeable': 'MERGEABLE',
+              'statusCheckRollup': [], 'headRefName': 'forge/x'}
+        mirror_passed = {_ABORT_PR: {'task_id': task_id, 'reason': 'r',
+                                     'ts': '2026-07-20T02:00:00+00:00'}}
+        with patch.object(h, '_head_pushed_since_pass', return_value=False):
+            return h.process_pr(pr, mirror_passed, {'prs': {}}, dry_run=True)
+
+    def test_cancelled_sequence_blocks_the_merge(self):
+        self._write_seq(status='failed', step_ids=['step-a'], cancelled=True)
+        self.assertEqual(self._process(), 'sequence-cancelled')
+
+    def test_plain_failed_sequence_is_not_a_cancel(self):
+        # A build that failed on its own merits must stay mergeable once fixed.
+        # Both halves of apply_cancel's contract are required.
+        self._write_seq(status='failed', step_ids=['step-a'], cancelled=False)
+        self.assertNotEqual(self._process(), 'sequence-cancelled')
+
+    def test_active_sequence_does_not_block(self):
+        self._write_seq(status='active', step_ids=['step-a'], cancelled=True)
+        self.assertNotEqual(self._process(), 'sequence-cancelled')
+
+    def test_unrelated_cancelled_sequence_does_not_block(self):
+        # The cancel must be for THIS step, not any cancelled sequence on disk.
+        self._write_seq(status='failed', step_ids=['other-step'], cancelled=True)
+        self.assertNotEqual(self._process(), 'sequence-cancelled')
+
+    def test_fails_open_when_nothing_is_knowable(self):
+        # No sequences dir, no task_id, junk on disk — never block a legitimate
+        # merge on uncertainty. This gate only ever ADDS a skip.
+        self.assertFalse(h.sequence_cancelled_for_step('step-a'))
+        self.assertFalse(h.sequence_cancelled_for_step(None))
+        self.assertFalse(h.sequence_cancelled_for_step(''))
+        seq_dir = Path(self._isolated_tmp) / 'blackboard' / 'build-sequences'
+        seq_dir.mkdir(parents=True, exist_ok=True)
+        (seq_dir / 'junk.json').write_text('{not json')
+        self.assertFalse(h.sequence_cancelled_for_step('step-a'))
+
+    def test_gate_precedes_the_gh_round_trips(self):
+        # Ordering matters: an abort must short-circuit before any gh call and
+        # before the CANCELLED-workflow rescue can re-run checks on work nobody
+        # wants. (That rescue's "cancelled" is a GitHub Actions run - a
+        # different sense of the word entirely.)
+        self._write_seq(status='failed', step_ids=['step-a'], cancelled=True)
+        with patch.object(h, '_head_pushed_since_pass') as head, \
+                patch.object(h, 'find_cancelled_checks_to_rerun') as rerun:
+            pr = {'_repo': 'Larry-Yatch/ourliberty-agent-core', 'number': 9,
+                  'url': _ABORT_PR, 'title': 'x', 'labels': [],
+                  'mergeable': 'MERGEABLE', 'statusCheckRollup': [],
+                  'headRefName': 'forge/x'}
+            mp = {_ABORT_PR: {'task_id': 'step-a', 'reason': 'r', 'ts': ''}}
+            self.assertEqual(
+                h.process_pr(pr, mp, {'prs': {}}, dry_run=True),
+                'sequence-cancelled')
+            head.assert_not_called()
+            rerun.assert_not_called()
+
+    def test_both_merge_paths_agree(self):
+        # The whole point of sharing one predicate: the primary path and this
+        # healer must never disagree about what "aborted" means.
+        import outbox_notifier as on
+        self._write_seq(status='failed', step_ids=['step-a'], cancelled=True)
+        orig = on.AGENTS_ROOT
+        on.AGENTS_ROOT = Path(self._isolated_tmp)
+        try:
+            self.assertTrue(on._sequence_cancelled('step-a'))
+            self.assertTrue(h.sequence_cancelled_for_step('step-a'))
+            self.assertFalse(on._sequence_cancelled('other'))
+            self.assertFalse(h.sequence_cancelled_for_step('other'))
+        finally:
+            on.AGENTS_ROOT = orig
+
+
 _CHOKEPOINT_SAVED_SENTINEL = None
 
 

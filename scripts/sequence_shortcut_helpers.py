@@ -689,6 +689,66 @@ def _request_step_cancels(
     return out
 
 
+# -------------------- cancelled-state readback --------------------
+
+
+def sequence_cancelled_for_step(
+    task_id: Optional[str], agents_root: Optional[Path] = None,
+) -> bool:
+    """True iff `task_id` is a step of a build sequence that has been ABORTED.
+
+    This module WRITES the cancelled state (`apply_cancel` sets
+    `status: 'failed'` and appends an `audit_log` entry `event == 'cancelled'`),
+    so it owns the predicate that READS it back. Every merge path that must
+    honour "once aborted, nothing from that build lands on main" calls THIS —
+    a second hand-rolled copy is how one path silently stops honouring an abort.
+
+    **FAIL-OPEN.** Any uncertainty — no task_id, no sequences dir, an
+    unreadable/malformed file, or no sequence claiming this step — returns
+    False, so this NEVER blocks a legitimate merge; it only ever adds a skip
+    for a CONFIRMED cancellation. Matching is by `step_id == task_id` rather
+    than by parsing the id string, so it stays correct if the format changes.
+
+    A bare `status: 'failed'` is NOT a cancel — a build that failed on its own
+    merits must still be mergeable once fixed. Both halves of `apply_cancel`'s
+    contract are required.
+
+    `agents_root` defaults to this module's AGENTS_ROOT; callers with their own
+    root (outbox_notifier, the healers) pass theirs so each stays authoritative
+    over its own environment and test isolation.
+    """
+    if not isinstance(task_id, str) or not task_id:
+        return False
+    root = agents_root if agents_root is not None else AGENTS_ROOT
+    try:
+        seq_dir = Path(root) / 'blackboard' / 'build-sequences'
+        if not seq_dir.is_dir():
+            return False
+        for seq_path in sorted(seq_dir.glob('*.json')):
+            try:
+                seq = json.loads(seq_path.read_text())
+            except (OSError, json.JSONDecodeError):
+                continue  # unreadable sibling — fail-open, keep scanning
+            if not isinstance(seq, dict):
+                continue
+            steps = seq.get('steps') or []
+            if not any(
+                isinstance(s, dict) and s.get('step_id') == task_id
+                for s in steps
+            ):
+                continue
+            # Found the sequence owning this step.
+            if seq.get('status') != 'failed':
+                return False
+            return any(
+                isinstance(e, dict) and e.get('event') == 'cancelled'
+                for e in (seq.get('audit_log') or [])
+            )
+    except Exception:  # noqa: BLE001 — callers are daemons; never wedge them
+        return False
+    return False
+
+
 # -------------------- retry --------------------
 
 
@@ -1329,6 +1389,7 @@ __all__ = [
     'apply_pause',
     'apply_resume',
     'apply_cancel',
+    'sequence_cancelled_for_step',
     'apply_retry',
     'apply_skip',
     'apply_step_merged',
