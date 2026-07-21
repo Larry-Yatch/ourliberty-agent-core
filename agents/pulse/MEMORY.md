@@ -174,6 +174,12 @@ PR #796 MERGED at 14:08 MDT 2026-07-01 (REVIEW_PASS ×2, auto-merged). G-rule pi
 
 ---
 
+## G-rule outbox-notifier-deep-review-stamp-no-retry-trigger-001 → DISPATCHED ✅ (iter ~5750), verification_pending
+
+**Rule:** When Larry approves a PR via the dashboard `deep-review-passed` label, outbox-notifier applies the label but does NOT re-trigger `merge_reviewed_pr.sh`. PR stays OPEN indefinitely until manual Beacon intervention. Fix: `deep-review-stamp-triggers-automerge-001` Forge build dispatched to Beacon/Forge 09:18:22Z UTC 2026-07-21 (triggered by Larry "do both" command at 08:50:59Z → Beacon confirmed gap → Forge build). verification_pending. Occurrences: iter ~5746 (1/3 — PR #971 review interrupted then label applied, no auto-merge); iter ~5749 (2/3 — Larry applied label via dashboard, PR stayed open; Beacon confirmed gap); iter ~5750 (DISPATCHED — Forge build in-flight).
+
+---
+
 ## G-rule forge-wip-redispatch-digest-tier4-001 → DISPATCHED ✅ (iter ~2797), Beacon fix designed (iter ~2798), Forge dispatch pending
 
 **Rule:** `forge-wip-redispatch` healer fires alerts with `route=digest` (auto-redispatched retry1 notifications). Triage helper classifies Tier-4 (novel, no translation). But these are auto-remediated informational digests — per actionable-only discipline, no DM to Larry. **Beacon result (iter ~2798):** Naive `route=digest` catch-all would also silence critical `route=escalate` exhausted alerts. Two-part fix: (1) healer changes escalate subject `base` → `exhausted:{base}` for distinguishability; (2) `alert-translations.json` gets `forge-wip-redispatch` `"*"` catch-all PLUS `"exhausted": {never_silence: true}`. Forge dispatch pending trust-policy approval from Larry. verification_pending.
