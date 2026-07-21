@@ -1748,3 +1748,42 @@ class TTLCacheUnitTest(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+# ---- proposed-lane payload trim (2026-07-21) --------------------------------
+
+
+class WithoutProposedTest(unittest.TestCase):
+    """`proposed` missions are 81% of a 596KB endpoint every tab polls every
+    30s, and nothing renders them. Trimmed read-side; `?include_proposed=1`
+    still returns them."""
+
+    def test_drops_proposed_keeps_everything_else(self):
+        rows = [
+            {'id': 'm1', 'phase': 'proposed'},
+            {'id': 'm2', 'phase': 'drafting'},
+            {'id': 'm3', 'phase': 'shipped'},
+            {'id': 'm4', 'phase': 'proposed'},
+        ]
+        got = da._without_proposed(rows)
+        self.assertEqual([m['id'] for m in got], ['m2', 'm3'])
+
+    def test_drafting_survives(self):
+        # operator-queries.ts filters phase == 'drafting' off this array — the
+        # one consumer that would actually break.
+        got = da._without_proposed([{'id': 'd', 'phase': 'drafting'}])
+        self.assertEqual(len(got), 1)
+
+    def test_empty_and_none_are_safe(self):
+        self.assertEqual(da._without_proposed(None), [])
+        self.assertEqual(da._without_proposed([]), [])
+
+    def test_non_dict_rows_are_preserved_not_crashed(self):
+        # Fail-open: a malformed row is not a proposed row, so it passes through
+        # rather than exploding the always-200 derive.
+        got = da._without_proposed([{'id': 'ok', 'phase': 'ready'}, 'junk'])
+        self.assertEqual(len(got), 2)
+
+    def test_missing_phase_is_kept(self):
+        got = da._without_proposed([{'id': 'nophase'}])
+        self.assertEqual(len(got), 1)
