@@ -10018,7 +10018,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-21T18:38:49.914446+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-21T18:37:22.621827+00:00"
+      "orphan_last_activity_ts": "2026-07-21T18:37:22.621827+00:00",
+      "briefing": {
+        "what": "A new piece of work the team kicked off that isn't attached to any of our current projects yet.",
+        "why": "It's been sitting in line waiting for a sign-off, and unreviewed loose work tends to stall or drift out of scope.",
+        "suggest": "Have someone give it a careful look and confirm what it's for before we green-light it \u2014 worth a second set of eyes given it's unassigned."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-21T18:45:33.083120+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
