@@ -1,0 +1,17 @@
+[Unit]
+Description=Weekly (Monday) run of the flip-readiness gauge — 5-criteria autonomy doorbell
+
+[Timer]
+# OnCalendar (absolute wall-clock) per the OnUnitActiveSec-dies lesson. Weekly
+# Monday mirrors the cadence-config entry (cadence_hours=168). The gauge's own
+# same-day artifact sentinel (flip-readiness-<date>.json) makes a Persistent
+# catch-up or ad-hoc re-run within the same day a clean no-op.
+# 05:59 droplet-local: off-peak; >=10 min after check-xiv (05:49) so the 300s
+# RandomizedDelaySec jitter cannot overlap the Monday-cluster stagger.
+OnCalendar=Mon *-*-* 05:59:00
+Persistent=true
+RandomizedDelaySec=300
+Unit=ourliberty-flip-readiness-gauge.service
+
+[Install]
+WantedBy=timers.target
