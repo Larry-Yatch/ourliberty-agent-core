@@ -63,7 +63,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
 import bot_liveness_policy  # noqa: E402
-import dispatch_lease  # noqa: E402  # TTL constant for the dispatch-lease suppressor
+import agent_work_in_flight  # noqa: E402  # shared live-agent-session predicate
 import larry_alerts  # noqa: E402
 import marker_paths  # noqa: E402  # shared restart-coordination marker paths (Medic parity)
 from atomic_io import atomic_write_json  # noqa: E402
@@ -410,76 +410,43 @@ def _task_in_flight(task_id: str) -> bool:
 def _any_live_in_flight_session() -> bool:
     """True if any in-flight marker has an int pid that is currently alive.
 
-    A live in-flight pid is a direct proxy for the single inbox_watcher process
-    being blocked mid-session (it polls a spawned Claude session and writes zero
-    log lines for its whole duration), so a quiet watcher log is expected, not a
-    stall. Globbing errors or unparseable markers are skipped conservatively.
+    A live in-flight pid is a direct proxy for an inbox_watcher thread being
+    blocked mid-session (it polls a spawned Claude session and writes zero log
+    lines for its whole duration), so a quiet watcher log is expected, not a
+    stall.
+
+    Delegates to the shared predicate (PR #994) so this suppressor and the
+    restarters that gate on the same question cannot drift apart. AGENTS_ROOT is
+    passed explicitly because watchdog freezes its root at import and its tests
+    patch that attribute; the shared module would otherwise resolve the env
+    redirect independently and read a different tree.
     """
-    in_flight = AGENTS_ROOT / 'state' / 'in-flight'
-    try:
-        markers = list(in_flight.glob('*.json'))
-    except OSError:
-        return False
-    for marker in markers:
-        try:
-            with open(marker) as f:
-                data = json.load(f)
-        except (OSError, ValueError):
-            continue
-        pid = data.get('pid')
-        if isinstance(pid, int) and _pid_alive(pid):
-            return True
-    return False
-
-
-# inbox_watcher runs one thread per agent (scripts/inbox_watcher.py AGENTS),
-# each holding a per-agent `inbox:<agent>` dispatch lease for the whole duration
-# of the Claude session it spawns. Mirror is the case this list exists for, but
-# any agent's held lease is an equally valid "watcher mid-session" proxy.
-_INBOX_LEASE_AGENTS = ('beacon', 'forge', 'mirror', 'pulse')
+    return agent_work_in_flight.any_live_in_flight_marker(AGENTS_ROOT)
 
 
 def _any_live_dispatch_lease() -> bool:
     """True if any inbox dispatch lease is held by a live holder right now.
 
-    A held ``inbox:<agent>`` lease is the authoritative proxy for the watcher's
-    per-agent thread being blocked inside ``run_claude`` for the whole duration
-    of a spawned Claude session (it polls the session and writes zero log lines).
-    It is strictly more reliable than the in-flight marker for the Mirror-review
-    case: a Mirror review reuses the Forge build's ``task_id`` as its
-    ``task_stem`` (outbox_notifier._dispatch_mirror_review), so both write the
-    SAME ``state/in-flight/<stem>.json`` and the build's
+    A held ``inbox:<agent>[:<n>]`` lease is the authoritative proxy for a watcher
+    thread being blocked inside ``run_claude`` for a spawned Claude session. It is
+    strictly more reliable than the in-flight marker for the Mirror-review case: a
+    Mirror review reuses the Forge build's ``task_id`` as its ``task_stem``
+    (outbox_notifier._dispatch_mirror_review), so both write the SAME
+    ``state/in-flight/<stem>.json`` and the build's
     ``agent_runner._unregister_in_flight`` (keyed on stem only) can delete the
     review's marker while the review is still live — leaving
     ``_any_live_in_flight_session`` blind to the active review
-    (watchdog-mirror-active-stale-suppression-001). The per-agent lease cannot be
-    clobbered that way: it is keyed by agent, renewed on a 60s heartbeat, and
-    only counts when it is within TTL AND its holder pid is alive.
+    (watchdog-mirror-active-stale-suppression-001).
 
-    Read directly from ``AGENTS_ROOT`` (not via ``dispatch_lease.is_held``, whose
-    LEASES_DIR is fixed at import) so the suppressor stays scoped to the same
-    state root the rest of these checks use — which also keeps it test-isolated.
-    Conservative: an unreadable/half-written lease is skipped, never counted. In
-    lease 'off' mode no lease files exist and this is always False, degrading
-    cleanly to the in-flight-marker signal alone.
+    BEHAVIOR FIX, not a pure refactor (PR #994 / spec correction #995). The
+    previous implementation opened only ``inbox:<agent>.lease`` — the slot-0
+    spelling. ``inbox_watcher._slot_identity`` names higher slots
+    ``inbox:<agent>:<n>`` and Mirror runs TWO slots, so a review running in slot 1
+    was INVISIBLE to this suppressor: watchdog could read a busy slot-1 watcher as
+    stalled. (#971's killed review was in slot 1 precisely.) The shared predicate
+    globs every slot.
     """
-    leases_dir = AGENTS_ROOT / 'state' / 'dispatch-leases'
-    for agent in _INBOX_LEASE_AGENTS:
-        try:
-            with open(leases_dir / f'inbox:{agent}.lease') as f:
-                data = json.load(f)
-        except (OSError, ValueError):
-            continue
-        try:
-            age = time.time() - float(data.get('timestamp_renewed', 0))
-        except (TypeError, ValueError):
-            continue
-        if age >= dispatch_lease.TTL_SECONDS:
-            continue  # stale lease — holder died without releasing
-        pid = data.get('holder_pid')
-        if isinstance(pid, int) and _pid_alive(pid):
-            return True
-    return False
+    return agent_work_in_flight.any_live_inbox_lease(AGENTS_ROOT)
 
 
 def _inbox_has_queued_task(agent_dir: Path) -> bool:
