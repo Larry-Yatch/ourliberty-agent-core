@@ -9776,7 +9776,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-21T10:20:21.375975+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-21T10:10:14.183755+00:00"
+      "orphan_last_activity_ts": "2026-07-21T10:10:14.183755+00:00",
+      "briefing": {
+        "what": "When you approve a flagged piece of work from your dashboard, it gets marked approved but doesn't actually finish and go live \u2014 it just sits there waiting.",
+        "why": "One approved item already stalled for nearly an hour going nowhere, so your sign-offs aren't reliably turning into finished work, which slows the team and erodes trust in the approval button.",
+        "suggest": "Approve fixing this so an approval automatically completes the work, but have someone confirm it behaves correctly on a couple of real cases before trusting it fully."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-21T10:22:00.515187+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
