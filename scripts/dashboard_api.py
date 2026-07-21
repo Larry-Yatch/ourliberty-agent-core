@@ -6062,6 +6062,34 @@ def _apply_derived_filters(
     return response
 
 
+def _without_proposed(
+    missions: Optional[list[dict[str, Any]]],
+) -> list[dict[str, Any]]:
+    """Drop `phase == 'proposed'` entries from the derive's `missions[]`.
+
+    They are PAYLOAD BLOAT, not signal: nothing renders them. Measured live
+    2026-07-21 — 315 of 346 missions were `proposed`, 485KB of a 596KB response
+    (81.4%), on an endpoint every open tab polls every 30s (~58MB/hour/tab of
+    data that draws nothing). The Proposed affordance was retired with the
+    kanban (P1, #593 / dash #69); a stale `lib/types.ts` comment still describes
+    it, which is what makes this pile look load-bearing.
+
+    The dashboard reads `missions[]` for exactly two things and neither breaks:
+      * `page.tsx` collects ids to clear optimistic new-mission placeholders —
+        the + New mission route forwards only name/brief/repo/spec_docs, so a
+        new mission is always `drafting`, never `proposed` (and a TTL clears a
+        stale placeholder regardless).
+      * `operator-queries.ts` filters `phase === 'drafting'`.
+
+    READ-SIDE ONLY — missions.json is untouched, nothing is deleted, and
+    `?include_proposed=1` returns the full set for debugging or the day the
+    lane is rebuilt."""
+    return [
+        m for m in (missions or [])
+        if not (isinstance(m, dict) and m.get('phase') == 'proposed')
+    ]
+
+
 def _handle_missions_derived(
     *,
     missions_path: Path,
@@ -6075,6 +6103,7 @@ def _handle_missions_derived(
     ] = None,
     projects_path: Optional[Path] = None,
     build_sequences_root: Optional[Path] = None,
+    include_proposed: bool = False,
 ) -> dict[str, Any]:
     """Pure handler for GET /api/missions/derived. Reads the registry +
     captures, fetches chain_events, derives, applies filters.
@@ -6289,6 +6318,8 @@ def _handle_missions_derived(
     for phase in phase_cards:
         phase.pop('_project_id', None)
     response['pipeline'] = pipeline
+    if not include_proposed:
+        response['missions'] = _without_proposed(response.get('missions'))
     return response
 
 
@@ -11318,9 +11349,12 @@ _DERIVED_CACHE = _TTLCache(ttl_seconds=10.0)
 def get_missions_derived(
     repo: Optional[str] = Query(None),
     task_id: Optional[str] = Query(None),
+    include_proposed: bool = Query(False),
 ) -> dict[str, Any]:
+    # `include_proposed` is part of the cache key: the two variants are
+    # different payloads and must not serve each other from the TTL cache.
     return _DERIVED_CACHE.get_or_compute(
-        (repo, task_id),
+        (repo, task_id, include_proposed),
         lambda: _handle_missions_derived(
             missions_path=_missions_json_path(),
             captures_path=_captures_json_path(),
@@ -11329,6 +11363,7 @@ def get_missions_derived(
             task_id=task_id,
             pr_state_resolver=_resolve_orphan_pr_states,
             projects_path=_projects_json_path(),
+            include_proposed=include_proposed,
         ),
     )
 
