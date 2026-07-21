@@ -9640,7 +9640,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-21T06:49:19.889736+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-21T06:45:48.948897+00:00"
+      "orphan_last_activity_ts": "2026-07-21T06:45:48.948897+00:00",
+      "briefing": {
+        "what": "A new piece of work to automatically send the graph product's incoming changes to the right review team.",
+        "why": "It keeps changes from piling up unreviewed, so the team can move faster without things slipping through the cracks.",
+        "suggest": "Give it a quick look before greenlighting, since it's still early and not yet tied to a bigger goal."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-21T06:50:29.258336+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
