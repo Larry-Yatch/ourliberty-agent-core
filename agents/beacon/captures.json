@@ -873,7 +873,7 @@
       "id": "cap-abort-gate-fast-follow-close-heal-pr-auto-merge-609e",
       "title": "Abort-gate fast-follow: close heal_pr_auto_merge 2nd merge path + DM plain-language + queue-release test",
       "note": "From the /code-review of the board-abort PR (block auto-merge of cancelled builds). PRIMARY auto-merge path is closed + proven. Fast-follow: (1) MEDIUM \u2014 scripts/heal_pr_auto_merge.py (default-OFF detective healer) is a SECOND merge path that bypasses the new cancelled-gate: it scans outbox-notifier.log for outcome=failed (candidate scan ~L374) then shells 'gh pr merge' (merge_pr ~L443) with zero sequence/cancel awareness. Add a _sequence_cancelled-equivalent check before its merge (port the ~25-line scan, or share via sequence_shortcut_helpers) AND verify its live enabled state on the droplet (OURLIBERTY_AUTOMERGE_ENABLED) \u2014 if enabled there's a narrow race-window hole (PR logs outcome=failed, then gets cancelled, within 24h). (2) LOW \u2014 add 'skipped_sequence_cancelled' to outbox_notifier._REVIEW_PASS_DM_VARIANTS + _render_review_pass_merge_status_line so the queue-release/sweep DM uses plain language, not the raw enum. (3) LOW \u2014 add a test driving a cancelled seq's PR through _queue_release/sweep. Build controlled + human-gated merge (touches auto-merge path).",
-      "state": "parked",
+      "state": "dropped",
       "label": null,
       "origin": {
         "source": "desktop-chat",
@@ -885,20 +885,21 @@
       "last_touched": "2026-06-21T19:52:41.879605+00:00",
       "promoted_to": null,
       "briefing": {
-        "what": "A safety follow-up to fully close the last gap that could let cancelled or failed work slip out the door automatically.",
-        "why": "We already shut the main door, but a lesser-used automatic shortcut could still publish something we meant to stop \u2014 a rare but real chance of shipping the wrong thing.",
-        "suggest": "Worth doing soon, but handle it deliberately with a human checking the change and first confirming whether that shortcut is even switched on in production."
+        "what": "A small follow-up to make sure jobs you've told the system to cancel really can't sneak through and finish on their own.",
+        "why": "The main safeguard is already in place and working, but a rarely-used backup process could still let a cancelled job slip through in a narrow timing window, and it also reports these events in confusing internal shorthand instead of plain language.",
+        "suggest": "Worth doing soon, but carefully and with a human sign-off before anything goes live, since it touches the same sensitive area that decides what gets finalized."
       },
       "risk": "careful",
-      "recommended_action": "delegate",
+      "recommended_action": "drop",
       "briefing_provenance": {
         "by": "beacon",
         "model": "claude-opus-4-8",
-        "at": "2026-06-21T19:57:18.762273+00:00",
-        "from_state": "parked"
+        "at": "2026-07-21T19:16:02.663436+00:00",
+        "from_state": "dropped"
       },
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
-      "aging": true
+      "aging": true,
+      "drop_reason": "All three items from the /code-review that created this card are now shipped. (1) heal_pr_auto_merge - the SECOND merge path - now honours an aborted build sequence: PR #988, merged 2026-07-21T19:06Z. It had NO cancellation check at all, and was verified live-enabled in prod (base unit read false while a drop-in held true; armed since 2026-05-19). (2)+(3) plain-language wording for the skipped_sequence_cancelled outcome on BOTH surfaces (Larry DM + Beacon notify - they defaulted to merge requested, outcome pending, which reads as something is still coming for an outcome that is terminal by intent), plus test coverage driving a cancelled sequence PR through the queue-release path: PR #992, merged 2026-07-21T18:57Z. Related: PR #990 corrected the systemd unit so it states auto-merge is armed. The stop guarantee is now whole: cancel halts the running agent (#978), the primary path refuses the merge (#606), and the healer path refuses it too (#988)."
     },
     {
       "id": "cap-state-log-active-missions-panel-shows-stale-phas-3740",
