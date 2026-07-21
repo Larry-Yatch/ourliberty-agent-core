@@ -17,6 +17,7 @@ except ImportError:  # discover loads this module top-level (no package parent)
     import _bootstrap  # noqa: F401
 
 import json
+import os
 import signal
 import sys
 import tempfile
@@ -518,9 +519,11 @@ class CheckLogGrowthTest(_IsolatedRootsTest):
         # Inbox task that is actively building (marker + live pid) -> ok.
         self._stale_log()
         self._inbox_task('forge', 'task-build-001')
-        self._in_flight_marker('task-build-001', pid=4242)
+        # Real live pid rather than a fake one + a _pid_alive patch: liveness now
+        # lives in agent_work_in_flight, and mocking watchdog's private copy would
+        # no longer reach it (PR 1b). os.getpid() is unambiguously alive.
+        self._in_flight_marker('task-build-001', pid=os.getpid())
         with mock.patch.object(watchdog, 'is_service_alive', return_value=True), \
-                mock.patch.object(watchdog, '_pid_alive', return_value=True), \
                 mock.patch.object(watchdog, 'log') as logged:
             result = watchdog.check_log_growth()
         self.assertEqual(result['status'], 'ok')
@@ -533,10 +536,9 @@ class CheckLogGrowthTest(_IsolatedRootsTest):
         # non-in-flight queued task sitting in inbox B.
         self._stale_log()
         self._inbox_task('forge', 'task-build-001')
-        self._in_flight_marker('task-build-001', pid=4242)
+        self._in_flight_marker('task-build-001', pid=os.getpid())
         self._inbox_task('mirror', 'task-queued-elsewhere')
         with mock.patch.object(watchdog, 'is_service_alive', return_value=True), \
-                mock.patch.object(watchdog, '_pid_alive', return_value=True), \
                 mock.patch.object(watchdog, 'log') as logged:
             result = watchdog.check_log_growth()
         self.assertEqual(result['status'], 'ok')
@@ -590,14 +592,18 @@ class CheckLogGrowthTest(_IsolatedRootsTest):
 
     # ---- dispatch-lease suppression (active Mirror review) ----
 
-    def _dispatch_lease(self, agent: str, pid: int, age_seconds: float = 0.0):
+    def _dispatch_lease(self, agent: str, pid: int, age_seconds: float = 0.0,
+                        slot: int = 0):
         import time as _time
         d = self._tmp_path / 'state' / 'dispatch-leases'
         d.mkdir(parents=True, exist_ok=True)
+        # Mirrors inbox_watcher._slot_identity: slot 0 keeps the legacy
+        # `inbox:<agent>` spelling, higher slots suffix `:<n>`.
+        identity = f'inbox:{agent}' if slot == 0 else f'inbox:{agent}:{slot}'
         # Real lease filenames carry the literal colon (inbox:<agent>.lease) —
         # _safe_identity only rewrites '/' and '..', not ':'.
-        (d / f'inbox:{agent}.lease').write_text(json.dumps({
-            'identity': f'inbox:{agent}',
+        (d / f'{identity}.lease').write_text(json.dumps({
+            'identity': identity,
             'holder_pid': pid,
             'timestamp_renewed': _time.time() - age_seconds,
         }))
@@ -609,15 +615,42 @@ class CheckLogGrowthTest(_IsolatedRootsTest):
         # it). The dispatch lease is the suppression signal -> ok, no WARN.
         self._stale_log()
         self._inbox_task('mirror', 'pr-ourliberty-agent-core-713')
-        self._dispatch_lease('mirror', pid=4242)
+        self._dispatch_lease('mirror', pid=os.getpid())
         with mock.patch.object(watchdog, 'is_service_alive', return_value=True), \
-                mock.patch.object(watchdog, '_pid_alive', return_value=True), \
                 mock.patch.object(watchdog, 'log') as logged:
             result = watchdog.check_log_growth()
         self.assertEqual(result['status'], 'ok')
         self.assertIn('dispatch lease', result['reason'])
         for call in logged.call_args_list:
             self.assertNotIn('Watcher log stale', call.args[0])
+
+    def test_active_slot1_review_lease_suppresses_warn(self):
+        # REGRESSION (PR 1b, spec correction #995): higher review slots hold
+        # `inbox:mirror:<n>` leases, and the previous implementation opened only
+        # the slot-0 spelling — so a live review in Mirror slot 1 read as NO
+        # session and watchdog could call a busy watcher stalled. Mirror runs two
+        # slots and #971's killed review was in slot 1 precisely.
+        self._stale_log()
+        self._inbox_task('mirror', 'pr-ourliberty-agent-core-971')
+        self._dispatch_lease('mirror', pid=os.getpid(), slot=1)
+        with mock.patch.object(watchdog, 'is_service_alive', return_value=True), \
+                mock.patch.object(watchdog, 'log') as logged:
+            result = watchdog.check_log_growth()
+        self.assertEqual(result['status'], 'ok')
+        self.assertIn('dispatch lease', result['reason'])
+        for call in logged.call_args_list:
+            self.assertNotIn('Watcher log stale', call.args[0])
+
+    def test_expired_slot1_lease_does_not_suppress(self):
+        # Guardrail on the widened glob: slot-awareness must not weaken the TTL
+        # test — a stale slot-1 lease is not a live session.
+        self._stale_log()
+        self._inbox_task('mirror', 'pr-ourliberty-agent-core-971')
+        self._dispatch_lease('mirror', pid=os.getpid(), slot=1,
+                             age_seconds=dispatch_lease.TTL_SECONDS + 5)
+        with mock.patch.object(watchdog, 'is_service_alive', return_value=True):
+            result = watchdog.check_log_growth()
+        self.assertEqual(result['status'], 'warning')
 
     def test_mirror_review_envelope_no_session_still_warns(self):
         # Guardrail: a review-request envelope with NO held lease and NO marker
