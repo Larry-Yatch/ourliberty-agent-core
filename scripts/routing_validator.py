@@ -244,6 +244,65 @@ def allowed_repos_for(agent_id: str) -> list[str]:
     return [r for r in raw if isinstance(r, str) and r]
 
 
+def _known_repos() -> list[str]:
+    """Every canonical repo name any agent is allowed to target (deduped, ordered)."""
+    config = _load_models_config()
+    agents_block = config.get('agents', {})
+    seen: dict[str, None] = {}
+    if isinstance(agents_block, dict):
+        for agent_block in agents_block.values():
+            if not isinstance(agent_block, dict):
+                continue
+            for r in agent_block.get('allowed_repos') or []:
+                if isinstance(r, str) and r:
+                    seen.setdefault(r, None)
+    return list(seen)
+
+
+def _bare_repo(name: str) -> str:
+    """Strip the spellings that mean the same repo: owner prefix, worktree suffix,
+    and the `ourliberty-` namespace prefix. `Larry-Yatch/ourliberty-agent-core`,
+    `agent-core.wt-forge-x` and `ourliberty-agent-core` all reduce to `agent-core`."""
+    bare = name.rsplit('/', 1)[-1]      # owner/name -> name
+    bare = bare.split('.', 1)[0]        # worktree suffix -> base (mirrors
+                                        # emit_capture_impl._normalize_repo)
+    prefix = 'ourliberty-'
+    return bare[len(prefix):] if bare.startswith(prefix) else bare
+
+
+def canonical_repo(name: Optional[str]) -> Optional[str]:
+    """Resolve a repo name to the canonical spelling used in agent-models.json.
+
+    WHY THIS EXISTS: captures carry `origin.repo` derived from the local CHECKOUT
+    DIRECTORY NAME (emit_capture_impl._normalize_repo), which differs per machine —
+    the droplet checkout is `agent-core`, the desktop one is `ourliberty-agent-core`.
+    Same repo, two spellings. Three consumers need the canonical form:
+      * drain_board_to_beacon eligibility compares against AUTODISPATCH_REPO
+      * missions_narrator maps origin.repo -> the envelope's `target_repo`
+      * dashboard_api's delegate path does the same on the manual click
+    and safe_write_inbox's repo-scope check compares `target_repo` against
+    allowed_repos, which holds FULL names only. A droplet-emitted capture therefore
+    produced `target_repo='agent-core'`, failed that scope check, and the dispatch
+    was rejected — silently, since the card just stayed parked.
+
+    Resolution is against the CONFIGURED allowlist rather than a hardcoded alias
+    table, so it cannot drift as repos are onboarded.
+
+    This normalizes SPELLING ONLY. An unrecognised or ambiguous name is returned
+    unchanged, so this never invents a repo and never widens what any agent is
+    authorized to target — that gate remains check_target_repo/allowed_repos.
+    """
+    if not name or not isinstance(name, str):
+        return name
+    known = _known_repos()
+    if name in known:
+        return name
+    target = _bare_repo(name)
+    matches = [r for r in known if _bare_repo(r) == target]
+    # Exactly one match, or leave it alone: ambiguity must not be guessed at.
+    return matches[0] if len(matches) == 1 else name
+
+
 def check_target_repo(
     target_agent: str,
     target_repo: Optional[str],

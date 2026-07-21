@@ -207,8 +207,21 @@ def _save_state(state: dict[str, Any]) -> None:
 # ---------------- eligibility ----------------
 
 def _origin_repo(cap: dict[str, Any]) -> Optional[str]:
+    """The capture's origin repo, in CANONICAL spelling.
+
+    origin.repo comes from the emitting machine's checkout DIRECTORY NAME, so the
+    same repo arrives as 'agent-core' from the droplet and 'ourliberty-agent-core'
+    from the desktop. Before canonicalization every droplet-emitted capture failed
+    the AUTODISPATCH_REPO equality check below and was skipped as `repo=agent-core`
+    — silently, forever. Canonicalizing here fixes cards already on the board, not
+    just new ones. It normalizes spelling only; the restriction to a single
+    auto-dispatching repo is unchanged.
+    """
     origin = cap.get('origin')
-    return origin.get('repo') if isinstance(origin, dict) else None
+    if not isinstance(origin, dict):
+        return None
+    import routing_validator  # lazy; sibling module (matches this file's convention)
+    return routing_validator.canonical_repo(origin.get('repo'))
 
 
 def _is_eligible(cap: dict[str, Any], *, classify_careful, state: dict[str, Any],
@@ -225,7 +238,10 @@ def _is_eligible(cap: dict[str, Any], *, classify_careful, state: dict[str, Any]
     # Raw keyword escalator — independent of the (soon auto_approve) risk field.
     if classify_careful(cap):
         return False, 'careful'
-    if _origin_repo(cap) != AUTODISPATCH_REPO:
+    # Both sides canonicalized: AUTODISPATCH_REPO is env-overridable, so a bare
+    # override ('agent-core') would otherwise reintroduce the same spelling mismatch.
+    import routing_validator  # lazy; sibling module
+    if _origin_repo(cap) != routing_validator.canonical_repo(AUTODISPATCH_REPO):
         return False, f'repo={_origin_repo(cap)}'
     if isinstance(cap.get('spawned'), dict):
         return False, 'already-spawned'

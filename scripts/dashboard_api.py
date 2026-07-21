@@ -6701,7 +6701,15 @@ def _handle_capture_promote(
             or cap.get('title')
             or ''
         )
-        repo = overrides.get('repo') or cap_origin.get('repo') or None
+        # Canonicalized: cap_origin.repo is derived from the emitting machine's
+        # checkout DIRECTORY NAME ('agent-core' on the droplet, 'ourliberty-agent-core'
+        # on the desktop). The bare form fails safe_write_inbox's repo-scope check
+        # against allowed_repos, so delegating a droplet-emitted capture by hand
+        # produced a dispatch that was rejected. See routing_validator.canonical_repo.
+        import routing_validator  # noqa: PLC0415 — lazy; sibling module (jail-guarded)
+        repo = routing_validator.canonical_repo(
+            overrides.get('repo') or cap_origin.get('repo') or None
+        )
         north_star_ref = overrides.get('north_star_ref')
 
         # 1) Create the project on disk FIRST. If the capture flip then fails, a
