@@ -356,6 +356,19 @@ ALLOWED_TARGET_AGENTS: frozenset[str] = frozenset({
 })
 LARRY_ACTION_VALID_ACTIONS: frozenset[str] = frozenset({
     'approve', 'reject', 'comment', 'mark_done',
+    # XIV-b alert rating. Both dismiss the card exactly like mark_done AND
+    # append an outcome row; `not_useful` is the signal the loop exists for
+    # ("this alert should not have been sent"). Valid ONLY on alert event
+    # types — enforced in _build_envelope_for_action.
+    'acted', 'not_useful',
+})
+
+# The rating verbs above, and the event types they may be applied to. An alert
+# rating writes NO agent envelope: its entire effect is the read_at flip plus
+# the ledger row, so it never reaches the envelope builder's routing matrix.
+ALERT_RATING_ACTIONS: frozenset[str] = frozenset({'acted', 'not_useful'})
+ALERT_RATING_EVENT_TYPES: frozenset[str] = frozenset({
+    'larry_alert', 'sentinel_alert',
 })
 
 # Steering verbs for POST /api/system/build-sequences/{seq_id}/action
@@ -9930,6 +9943,39 @@ def _select_source_event(
     return row if isinstance(row, dict) else None
 
 
+def _record_alert_rating(
+    *, source: dict[str, Any], outcome: str, actor: str,
+) -> None:
+    """Append one XIV-b outcome row for a rated alert. Never raises.
+
+    The alert's `source` / `subject` / `tier` / `tier_source` all ride in the
+    chain_events payload (the shipper passes unknown alert-row keys through
+    verbatim), so the ledger row is denormalized straight from the event we
+    just claimed — no second lookup against a queue file that retention may
+    already have trimmed.
+    """
+    try:
+        import alert_outcomes
+        payload = source.get('payload')
+        if not isinstance(payload, dict):
+            payload = {}
+        alert_outcomes.record_outcome(
+            outcome,
+            event_id=source.get('event_id'),
+            source=payload.get('source') or source.get('agent'),
+            subject=payload.get('subject'),
+            tier=payload.get('tier'),
+            tier_source=payload.get('tier_source'),
+            task_id=source.get('task_id'),
+            actor=actor,
+        )
+    except Exception:  # noqa: BLE001 — bookkeeping never breaks the action
+        logger.exception(
+            'failed to record alert outcome for event %s',
+            source.get('event_id'),
+        )
+
+
 def _handle_larry_action(
     *,
     source_event_id: str,
@@ -9959,6 +10005,21 @@ def _handle_larry_action(
             detail='source event not found',
         )
 
+    # XIV-b: a rating verb is meaningful only on an alert. Applying one to an
+    # approval_request would flip read_at on a real decision without ever
+    # writing its envelope — a silently swallowed approval. Fail it as a 400
+    # BEFORE the claim, alongside the envelope builder's routing matrix.
+    is_alert_rating = action in ALERT_RATING_ACTIONS
+    if is_alert_rating and source.get('event_type') not in ALERT_RATING_EVENT_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                f'action={action!r} is only valid on '
+                f'{sorted(ALERT_RATING_EVENT_TYPES)} '
+                f'(got event_type={source.get("event_type")!r})'
+            ),
+        )
+
     # Already-acted-on lock: read_at IS NOT NULL blocks every action
     # except mark_done (which is idempotent against the read state). This is a
     # cheap fast-fail; the AUTHORITATIVE mutex is the atomic compare-and-set
@@ -9984,7 +10045,10 @@ def _handle_larry_action(
     is_medic_silence = medic_fp is not None and action in ('approve', 'reject')
     envelope_candidate: Optional[Path] = None
     envelope_payload: Optional[dict[str, Any]] = None
-    if not is_medic_silence and action != 'mark_done':
+    # An alert rating writes no envelope (its effect is the read_at flip + the
+    # ledger row), so it skips the routing matrix entirely — reaching the
+    # builder would 400 it as an unsupported (event_type, action) pair.
+    if not is_medic_silence and not is_alert_rating and action != 'mark_done':
         target_agent, filename, envelope_payload = _build_envelope_for_action(
             source=source, action=action, comment=comment, actor=actor,
         )
@@ -10066,6 +10130,14 @@ def _handle_larry_action(
                     'on event %s', source_event_id,
                 )
         raise
+
+    # XIV-b: record the rating. Runs AFTER the atomic claim, so a double-click
+    # can never double-record — the loser 409'd above and never reaches here.
+    # Best-effort by design: the claim IS the action (the card is dismissed
+    # either way), so a ledger write failure is logged, not surfaced as a 500
+    # that would 409 on retry with the alert already marked read.
+    if is_alert_rating:
+        _record_alert_rating(source=source, outcome=action, actor=actor)
 
     # mark_done flow flips read_at (idempotent — no claim was taken). The
     # non-mark_done flows already flipped it via the atomic claim above.
