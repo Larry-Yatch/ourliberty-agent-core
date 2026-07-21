@@ -13,9 +13,16 @@ running paid agent work. When it restarts `ourliberty-inbox-watcher.service`, an
 live Claude review dies on SIGTERM and its claim file is stranded under
 `.claimed/<slot>/`.
 
-This spec adds a pre-restart guard: if an agent-hosting unit has live work,
-defer the restart to the next tick — up to a bounded ceiling, after which
-staleness wins and the restart proceeds.
+This spec adds **cordon → drain → restart → uncordon**: stop the unit accepting
+*new* work, let the running session finish on its own, restart in the resulting
+quiet window, then release. Nothing is killed and no work is lost. A bounded
+ceiling remains, demoted to a backstop for the case where work never stops.
+
+> **Revision (2026-07-21, Larry).** The first draft deferred the restart on a
+> timer and retried next tick — which only ever *reduces the odds* of landing on
+> a live review, never eliminates them, and gets worse as the queue gets busier.
+> Cordon-and-drain removes the collision instead of dodging it. The mechanism
+> already exists in `inbox_watcher` (see below); this spec now reuses it.
 
 ## Incident
 
@@ -105,29 +112,101 @@ Restarters consult it before restarting an **agent-hosting** unit only. A
 dashboard-api or deploy-notifier restart is unaffected; those host no agent
 sessions and must stay immediate.
 
-## The deferral ceiling (the real design tension)
+## Cordon-and-drain — the primary path
 
-An unbounded defer is its own outage: if reviews run back-to-back, a stale unit
-never restarts and the staleness the healer exists to fix persists forever. The
-guard therefore needs a ceiling.
+### The mechanism already exists
 
-Proposed: defer while work is in flight, up to `RESTART_DEFER_CEILING_SEC`
-(default **3600s**, ~1h), tracked per unit in
-`state/restart-deferrals/<unit>.json` (first-deferred timestamp + count). Past the
-ceiling, restart anyway and log loudly:
+`inbox_watcher` already implements "stop taking new work, let in-flight finish"
+for a different trigger: tier-pool exhaustion. `_rotation_gate_block_reason`
+(`inbox_watcher.py:1525`, called at `:1061`) blocks NEW top-level dispatches
+while explicitly passing continuations through, and its contract is exactly what
+a cordon needs:
+
+> *the task stays in the inbox; the next poll re-evaluates. No archive, no
+> write_invalid — drain must NEVER drop work, only delay it.*
+
+So the switch is not new machinery, it is a second reason to throw a switch that
+is already trusted in production. That materially lowers the risk of this change.
+
+### Sequence
+
+1. **Cordon** — healer writes `state/restart-cordon/<unit>.json`
+   (`{"unit", "reason", "created_at", "expires_at", "pid", "boot_id"}`).
+2. **Watcher honors it** — the dispatch gate blocks NEW top-level tasks for the
+   cordoned unit's agents. Continuations pass, exactly as under the rotation
+   gate, so a `--resume`/revision round is never orphaned mid-chain.
+3. **Drain** — healer polls `agent_work_in_flight()` (below) until it reads
+   False, i.e. the running session ended by itself.
+4. **Restart** — `systemctl restart` into a window where nothing is running and,
+   because the cordon is still up, nothing new can start. **No race**: the
+   ~5-second gap between one review ending and the next claim is not something
+   we try to hit — the cordon holds it open.
+5. **Uncordon** — remove the file. The new process resumes normally.
+
+### Why the gap needs the cordon
+
+Without step 1, this design would be a race we lose: the watcher polls every
+`POLL_INTERVAL_SEC` (5s), so the idle window between sessions is seconds wide,
+and a healer that wakes every 10 minutes cannot reliably land in it. The cordon
+converts "hit a moving 5-second target" into "close the road, then work."
+
+### Implementation note — where to block
+
+The rotation gate blocks inside `process_task`, i.e. *after* `_claim_task`, so
+the loop's `finally` un-claims and the task returns to the inbox each poll.
+Correct but churny: a cordon held for minutes would claim/un-claim every 5s.
+Prefer blocking **before** the claim (in `scan_inbox`'s filter or immediately
+ahead of `_claim_task`) so a cordoned slot never touches the file at all. This
+also keeps `.claimed/` quiet, which matters because a claim file appearing and
+vanishing on a 5s cycle is exactly the noise that made #971 hard to read.
+
+## The cordon must expire on its own (the new top risk)
+
+Cordon-and-drain moves the danger rather than removing it. **If the healer dies
+between cordon and uncordon — crash, SIGKILL, the very restart storm this healer
+participates in — the cordon persists and the queue silently stops accepting
+work.** That is a worse outage than the killed reviews we are fixing: total
+dispatch stall, no alarm, looks like a quiet queue.
+
+Non-negotiable mitigations, all three:
+
+1. **TTL in the file.** `expires_at` = created + `CORDON_TTL_SEC` (default
+   **600s**, comfortably past a normal drain). The watcher treats an expired
+   cordon as absent — a dead cordon cannot outlive its TTL by even one poll.
+2. **Holder liveness.** The cordon records `pid` + `boot_id`; the watcher ignores
+   a cordon whose holder is not alive on the current boot. Same test
+   `dispatch_lease.is_held` already applies to leases. This clears a dead
+   cordon in seconds rather than waiting out the TTL.
+3. **Unconditional release.** The healer writes the cordon in a `try` and removes
+   it in `finally`, so every non-fatal path releases.
+
+Fail-open in every direction: an unreadable, malformed, expired, or
+dead-holder cordon means *not cordoned*, which degrades to exactly today's
+behavior. A cordon must never be able to stop the queue through corruption.
+
+## The ceiling, demoted to a backstop
+
+With cordon-and-drain the normal case needs no timer — the restart happens as
+soon as the current session ends, which may be two minutes or thirty.
+
+`RESTART_DEFER_CEILING_SEC` (default **3600s**) now covers only the pathological
+case: work that never stops, so the drain poll never reads False. Past it,
+restart anyway and log loudly:
 
 ```
-RESTART_FORCED_OVER_CEILING unit=<u> deferred_for=<n>min reason=<staleness>
+RESTART_FORCED_OVER_CEILING unit=<u> drained_for=<n>min reason=<staleness>
 ```
 
-Rationale for 1h: the review session ceiling is 35 min
-(`agent_runner.REVIEW_SESSION_CEILING_SECONDS`), so a single review can never
-exhaust it; only a genuinely continuous queue can, and that is exactly the case
-where a human should see the forced restart in the log.
+Rationale for 1h: a single review cannot exceed the 35-minute
+`agent_runner.REVIEW_SESSION_CEILING_SECONDS`, so one session can never exhaust
+it — only a genuinely continuous queue can, which is precisely when a human
+should see a forced restart in the log. Because this is now a backstop rather
+than the mechanism, the exact value matters much less than it did in the first
+draft.
 
-Deferral state is advisory — a missing or unparseable file means "not currently
-deferred", which fails toward the current (restart-now) behavior. It must never
-be able to *block* a restart through corruption.
+Deferral/drain state is advisory — missing or unparseable means "not currently
+deferred", failing toward restart-now. It must never *block* a restart through
+corruption.
 
 ## Logging
 
@@ -152,17 +231,30 @@ New `scripts/tests/test_agent_work_in_flight.py`:
 5. neither → False; unreadable/half-written marker or lease → skipped, never
    counted
 
+New `scripts/tests/test_restart_cordon.py` — the cordon's fail-open contract is
+the highest-consequence surface in this change, so it gets its own file:
+
+6. cordon present + live holder + unexpired → watcher blocks a NEW top-level
+   task; the task **stays in the inbox** (not archived, not `.invalid`)
+7. cordon present → a **continuation** (`--resume` / `phase=build|revision`)
+   passes through, so a revision round is never orphaned mid-chain
+8. cordon **expired** (`expires_at` in the past) → ignored, dispatch proceeds
+9. cordon whose **holder pid is dead** (or a different boot) → ignored
+10. cordon file unreadable / malformed / empty → ignored, dispatch proceeds
+11. healer raises mid-drain → `finally` removes the cordon (no persistent stall)
+12. cordoned slot never calls `_claim_task` — asserts the block sits ahead of the
+    claim, so `.claimed/` stays quiet across a long cordon
+
 `scripts/tests/test_heal_stale_daemon_code.py` (extend):
 
-6. stale unit + agent work in flight → **no** restart, deferral recorded, INFO
-   logged
-7. stale unit + no agent work → restarts (today's behavior, unchanged)
-8. stale **non-agent** unit (e.g. dashboard-api) + agent work in flight →
-   restarts anyway; the guard is scoped to agent-hosting units
-9. deferred past `RESTART_DEFER_CEILING_SEC` → restarts, logs
-   `RESTART_FORCED_OVER_CEILING`
-10. corrupt/missing deferral-state file → treated as not-deferred, restart
-    proceeds (fails toward current behavior)
+13. stale unit + agent work in flight → cordon written, **no** restart yet
+14. work finishes → drain observes it, restart fires, cordon removed
+15. stale unit + no agent work → restarts immediately (today's behavior for the
+    common case, unchanged — no cordon, no drain wait)
+16. stale **non-agent** unit (e.g. dashboard-api) + agent work in flight →
+    restarts anyway; cordon-and-drain is scoped to agent-hosting units
+17. drain never clears → past `RESTART_DEFER_CEILING_SEC` restarts and logs
+    `RESTART_FORCED_OVER_CEILING`, cordon still removed afterward
 
 `scripts/tests/test_watchdog.py`: existing tests pass **untouched** — proof the
 extraction is a pure refactor.
@@ -172,26 +264,42 @@ the same count).
 
 ## Rollout
 
-Land the shared helper + `heal_stale_daemon_code` first — it is the only one
-firing today, so it carries all the observed benefit and all the risk. The four
-latent peers (`heal_pipeline_stall`, `medic_actions`,
-`heal_systemd_install_drift`, `heal_claude_json_bind_drift`) follow in a second
-PR once the guard has soaked, so a bug in the predicate cannot take out five
-restart paths at once.
+Three PRs, smallest blast radius first:
+
+1. **Shared predicate + watcher cordon support.** `agent_work_in_flight.py`
+   extracted from `watchdog.py`, plus the watcher honoring a cordon file. No
+   healer writes one yet, so this lands **inert** — the cordon path is exercised
+   only by tests until step 2. Any bug here cannot stall the queue, because
+   nothing creates a cordon.
+2. **`heal_stale_daemon_code` cordons and drains.** The only restarter firing
+   today, so it carries all the observed benefit and all the live risk.
+3. **The four latent peers** (`heal_pipeline_stall`, `medic_actions`,
+   `heal_systemd_install_drift`, `heal_claude_json_bind_drift`) after step 2 has
+   soaked — so a bug in the predicate cannot take out five restart paths at once.
+
+Splitting 1 from 2 matters specifically because of the stuck-cordon risk: the
+consumer ships and soaks before anything can produce a cordon in production.
 
 ## Blast radius / rollback
 
-- Worst case if the predicate wrongly returns True: restarts defer up to the
-  ceiling, then force through. Staleness persists at most 1h longer than today,
-  and the forced restart is logged.
-- Worst case if it wrongly returns False: today's behavior exactly.
-- Rollback: set `RESTART_DEFER_CEILING_SEC=0` (every deferral immediately past
-  ceiling → restart now) without reverting code.
+- Predicate wrongly True → cordon + drain wait, then force through at the
+  ceiling. Staleness persists at most 1h longer than today; logged.
+- Predicate wrongly False → today's behavior exactly (restart now).
+- **Cordon stuck on** → the one genuinely bad outcome: dispatch stalls. Bounded
+  three ways (TTL, holder liveness, `finally`), each independently sufficient,
+  and every ambiguity resolves to "not cordoned."
+- Rollback without reverting code: `CORDON_TTL_SEC=0` makes every cordon
+  instantly expired (watcher ignores all cordons → today's behavior);
+  `RESTART_DEFER_CEILING_SEC=0` forces every restart through immediately.
 
 ## Out of scope
 
-- Graceful drain (letting the watcher finish the current session on SIGTERM
-  instead of killing it). That is the more complete fix and a much larger change
-  to `inbox_watcher`'s signal handling; deferring the restart gets most of the
-  benefit for a fraction of the risk.
+- Graceful drain on SIGTERM (the watcher finishing its session instead of dying).
+  Cordon-and-drain makes this mostly moot for the *planned* restart path, but it
+  would still help for unplanned kills — deploys, OOM, operator `systemctl`.
+  Larger change to `inbox_watcher` signal handling; worth revisiting if kills
+  keep showing up from paths this spec does not cover.
 - Why `routing_validator.py` staleness sat 348 minutes before triggering.
+- Cordoning for *operator* restarts (a human running `systemctl restart`). The
+  same file would work — `scripts/cordon.sh <unit>` as a pre-flight — but that is
+  a workflow change, not a healer fix.
