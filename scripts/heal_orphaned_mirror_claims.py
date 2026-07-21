@@ -35,7 +35,12 @@ review-*.json``. A claim is a candidate only when it is provably NOT live:
   1. age(mtime) >= ORPHAN_CLAIM_GRACE_SEC (default 45 min, comfortably above
      the 35-min agent_runner.REVIEW_SESSION_CEILING_SECONDS review wall) — so a
      just-claimed task whose in-flight entry / worktree process has not yet
-     appeared is never yanked out from under a live dispatch;
+     appeared is never yanked out from under a live dispatch. SKIPPED when the
+     claim is LEASE-PROVEN orphaned (PR #971): the slot lease is acquired before
+     the claim rename and released only after process_task returns, so a claim
+     under a lease-free numeric slot is owned by no dispatch and the floor is
+     guarding an impossible state. Gated on dispatch_leases_enabled() — in
+     mode()=='off' is_held is vacuously False and would fast-path everything;
   2. NO live claude process running in the task's worktree
      (``wt-mirror-<task_id>``) — the decisive "a review is executing right now"
      signal. This is LOAD-BEARING: a legitimate NEW review round can be running
@@ -261,6 +266,26 @@ def slot_dispatch_active(agent: str, slot: int) -> bool:
         return False
 
 
+def dispatch_leases_enabled() -> bool:
+    """True iff dispatch leases are actually being WRITTEN, so a free lease is
+    evidence of anything.
+
+    Gate for the lease-proven fast path below. ``dispatch_lease.is_held``
+    returns False UNCONDITIONALLY in ``mode() == 'off'`` (no lease files are
+    written at all), so an ungated fast path would read every freshly-claimed
+    task as provably-orphaned and re-inject it out from under a live dispatch —
+    a paid duplicate Opus review on EVERY claim. Default mode is 'shadow'
+    (leases written), but the gate is not optional.
+
+    Fails CLOSED (any import / probe error → False → keep the age floor):
+    losing the fast path costs latency, losing the gate costs money."""
+    try:
+        import dispatch_lease
+        return dispatch_lease.mode() != "off"
+    except Exception:  # noqa: BLE001 -- unavailable lease module → no fast path
+        return False
+
+
 # ==================== conclusion signals ====================
 
 def _claim_head_sha(claim: dict) -> Optional[str]:
@@ -337,7 +362,15 @@ def pr_state(pr_url: str) -> Optional[str]:
 
 # ==================== archive action ====================
 
-def archive_orphan(agent: str, claim_file: Path, reason: str, age_min: int) -> bool:
+def _via(lease_proven: bool) -> str:
+    """Log suffix naming WHY this claim was eligible. A lease-proven action can
+    fire minutes after the claim (by design), so an operator reading
+    ``age_min=2`` needs to see that as a fast path and not a clock bug."""
+    return " via=lease-proven" if lease_proven else ""
+
+
+def archive_orphan(agent: str, claim_file: Path, reason: str, age_min: int,
+                   *, lease_proven: bool = False) -> bool:
     ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     dest_dir = INBOXES_ROOT / agent / ARCHIVE_SUBDIR
     dest = dest_dir / f"{claim_file.stem}.orphan-cleared-{ts}.json"
@@ -349,12 +382,12 @@ def archive_orphan(agent: str, claim_file: Path, reason: str, age_min: int) -> b
         return False
     log("HEALED",
         f"{agent}/{claim_file.name} action=archive-orphan-claim reason={reason} "
-        f"age_min={age_min} dest={dest.name} — slot unblocked")
+        f"age_min={age_min}{_via(lease_proven)} dest={dest.name} — slot unblocked")
     return True
 
 
 def reinject_orphan(agent: str, claim_file: Path, age_min: int,
-                    *, ambiguous: bool = False) -> bool:
+                    *, ambiguous: bool = False, lease_proven: bool = False) -> bool:
     """Re-inject a stranded-but-NOT-concluded review claim on an OPEN PR back into
     the LIVE inbox so the running inbox_watcher re-claims and re-runs it.
 
@@ -379,8 +412,8 @@ def reinject_orphan(agent: str, claim_file: Path, age_min: int,
     note = " head_sha=ambiguous(fail-safe)" if ambiguous else ""
     log("HEALED",
         f"{agent}/{claim_file.name} action=reinject-orphan-claim "
-        f"reason=not-concluded-open-pr age_min={age_min} dest={dest.name}{note} "
-        f"— re-queued to live inbox")
+        f"reason=not-concluded-open-pr age_min={age_min}{_via(lease_proven)} "
+        f"dest={dest.name}{note} — re-queued to live inbox")
     return True
 
 
@@ -409,15 +442,40 @@ def scan_agent(agent: str, active_cwds: set[str], *, now: Optional[float] = None
             scanned += len(slot_files)
             spared += len(slot_files)
             continue
+        # LEASE-PROVEN ORPHAN (the #971 fast path). Reaching here means the slot
+        # lease is NOT held — the branch above continues while it is. inbox_watcher
+        # acquires that lease BEFORE _claim_task and releases it only after
+        # process_task returns (inbox_watcher.py:1606/1622/1667), so a claim under
+        # a lease-free slot is owned by NO dispatch: not spawning, not running.
+        # The age floor exists solely to cover the claim→spawn window where the
+        # live-process / in-flight guards read false; when the lease itself proves
+        # there is no dispatch, that floor is guarding a state that cannot exist
+        # and only delays recovery (PR #971 sat ~40 min this way).
+        # Requires a resolvable slot (non-numeric dir → no lease identity → no
+        # proof) AND leases actually written (see dispatch_leases_enabled).
+        lease_proven_orphan = slot is not None and dispatch_leases_enabled()
         for claim_file in sorted(slot_dir.glob(CLAIM_GLOB)):
             scanned += 1
             try:
                 age = now - claim_file.stat().st_mtime
             except OSError:
                 continue
-            if age < ORPHAN_CLAIM_GRACE_SEC:
+            # Is THIS claim relying on the fast path (i.e. under the age floor)?
+            # Tracked separately from lease_proven_orphan so the re-probe and the
+            # log label apply only where the floor was actually skipped.
+            fast_pathed = age < ORPHAN_CLAIM_GRACE_SEC
+            if fast_pathed and not lease_proven_orphan:
                 spared += 1
                 continue  # still within the just-claimed / live-review window
+            if fast_pathed and slot_dispatch_active(agent, slot):
+                # TOCTOU: the per-slot lease probe above ran BEFORE this glob, so
+                # a watcher that acquired the lease and claimed a task in between
+                # would look lease-free here. Previously the age floor absorbed
+                # that window; the fast path removes it, so re-probe (read-only,
+                # ~one stat) immediately before acting. Only for fast-pathed
+                # claims — an aged claim never depended on this proof.
+                spared += 1
+                continue
             try:
                 claim = json.loads(claim_file.read_text())
             except (OSError, json.JSONDecodeError):
@@ -441,7 +499,8 @@ def scan_agent(agent: str, active_cwds: set[str], *, now: Optional[float] = None
             head_sha = _claim_head_sha(claim)
             # THIS round's verdict already delivered (round-aware) → safe to drop.
             if round_verdict_delivered(agent, claim_file.name, head_sha):
-                if archive_orphan(agent, claim_file, "verdict-delivered", age_min):
+                if archive_orphan(agent, claim_file, "verdict-delivered", age_min,
+                                  lease_proven=fast_pathed):
                     cleared += 1
                 else:
                     spared += 1
@@ -450,7 +509,8 @@ def scan_agent(agent: str, active_cwds: set[str], *, now: Optional[float] = None
             state = pr_state(_claim_pr_url(claim))
             if state in ("MERGED", "CLOSED"):
                 # PR terminal → the review is moot; archive-drop (no re-review).
-                if archive_orphan(agent, claim_file, "pr-terminal", age_min):
+                if archive_orphan(agent, claim_file, "pr-terminal", age_min,
+                                  lease_proven=fast_pathed):
                     cleared += 1
                 else:
                     spared += 1
@@ -461,7 +521,8 @@ def scan_agent(agent: str, active_cwds: set[str], *, now: Optional[float] = None
                 # PR still re-injects (fail-safe: a duplicate review is cheap; a
                 # dropped review stalls the sequence forever) with a logged note.
                 if reinject_orphan(agent, claim_file, age_min,
-                                   ambiguous=head_sha is None):
+                                   ambiguous=head_sha is None,
+                                   lease_proven=fast_pathed):
                     reinjected += 1
                 else:
                     spared += 1
