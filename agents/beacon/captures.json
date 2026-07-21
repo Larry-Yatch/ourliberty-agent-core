@@ -1703,7 +1703,7 @@
       "id": "cap-route-ourliberty-graph-prs-to-mirror-review-1123",
       "title": "Route ourliberty-graph PRs to Mirror review",
       "note": "ourliberty-graph is an onboarded dispatch repo (Forge and Mirror build in it) but its PRs get ZERO automated review. heal_undispatched_pr_review.REPOS covers only agent-core, dashboard and RSDPM, so a graph PR is picked up by nothing and sits open indefinitely. Every graph change to date has relied on a human running /code-review by hand.\n\nCHANGE: add 'Larry-Yatch/ourliberty-graph' to heal_undispatched_pr_review.REPOS.\n\nDO NOT touch the merge path. outbox_notifier's auto-merge gate is already config-sourced: it captures a generic repo slug and validates it against routing_validator.allowed_repos_for('forge') from config/agent-models.json, which already contains ourliberty-graph. The old hardcoded (ourliberty-agent-core|ourliberty-dashboard) alternation drifted exactly this way once and was deliberately replaced. Do NOT re-hardcode a repo alternation there.\n\nALSO ADD graph, for parity, to:\n- heal_pr_auto_merge.REPOS  (the merge BACKSTOP; without it a failed graph merge has no recovery path)\n- heal_pipeline_stall.REPOS (without it a stuck graph PR is never detected)\n\nVERIFY RATHER THAN ASSUME for these three, which also carry repo lists: decision_outcome_reconcile.py, task_resolution.py, task_terminal_state.py. Determine whether each genuinely needs ourliberty-graph and state the reasoning per file in the PR body. Do NOT blanket-edit all repo lists.\n\nUpdate affected tests (scripts/tests/test_heal_undispatched_pr_review.py, test_heal_pipeline_stall.py, test_auto_merge_serializer.py, and any other asserting on repo lists).\n\nDECISION (Larry, 2026-07-20): FULL HANDS-FREE. Graph PRs get Mirror review AND auto-merge. Do not add a deep-review-required hold or any path glob for pipeline/.\n\nCONTEXT: found while fixing build_check, whose reuse verdict had been silently wrong for months in a repo nothing reviews.",
-      "state": "parked",
+      "state": "review_close",
       "label": null,
       "origin": {
         "source": "desktop-chat",
@@ -1731,8 +1731,12 @@
       "spawned": {
         "kind": "delegate",
         "task_id": "delegate-cap-route-ourliberty-graph-prs-to-mirror-review-1123",
-        "stamped_at": "2026-07-21T06:05:24.601102+00:00"
-      }
+        "stamped_at": "2026-07-21T06:05:24.601102+00:00",
+        "outcome": "merged"
+      },
+      "closed_by": "heal_missions_card_gc:terminal-backstop",
+      "shipped_note": "shipped (linked work merged)",
+      "awaiting_ack": true
     },
     {
       "id": "cap-update-forge-and-mirror-for-the-new-build-check-0181",
