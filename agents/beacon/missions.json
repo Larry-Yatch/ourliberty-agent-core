@@ -9858,6 +9858,40 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-govern-loop-assessor-build-001",
+      "name": "Govern Loop Assessor Build 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `govern-loop-assessor-build-001`. Last activity 2026-07-21T11:05:13.779081+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "govern-loop-assessor-build-001"
+      ],
+      "repo": null,
+      "created": "2026-07-21",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-21T11:05:39.944043+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-21T11:05:13.779081+00:00"
+    },
+    {
+      "id": "proposed-flip-readiness-gauge-build-001",
+      "name": "Flip Readiness Gauge Build 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `flip-readiness-gauge-build-001`. Last activity 2026-07-21T11:02:23.420734+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "flip-readiness-gauge-build-001"
+      ],
+      "repo": null,
+      "created": "2026-07-21",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-21T11:05:39.944043+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-21T11:02:23.420734+00:00"
     }
   ]
 }
