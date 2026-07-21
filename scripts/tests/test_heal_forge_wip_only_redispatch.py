@@ -60,6 +60,7 @@ class _Base(unittest.TestCase):
             mock.patch.object(h, 'AGENTS_ROOT', root),
             mock.patch.object(h, 'KILL_SWITCH', root / 'healers.disabled'),
             mock.patch.object(h, 'INBOXES_ROOT', root / 'inboxes'),
+            mock.patch.object(h, 'OUTBOXES_ROOT', root / 'outboxes'),
             mock.patch.object(h, 'IN_FLIGHT_DIR', root / 'state' / 'in-flight'),
             mock.patch.object(h, 'LEDGER_PATH',
                               root / 'state' / 'forge_wip_redispatch_ledger.json'),
@@ -75,6 +76,7 @@ class _Base(unittest.TestCase):
             p.start()
         self._alerts = h._emit_alert
         (h.INBOXES_ROOT / 'forge' / '.archive').mkdir(parents=True, exist_ok=True)
+        (h.OUTBOXES_ROOT / 'forge' / '.archive').mkdir(parents=True, exist_ok=True)
 
     def tearDown(self):
         for p in self._patches:
@@ -88,6 +90,19 @@ class _Base(unittest.TestCase):
         env = env or _ORIGINAL_ENVELOPE
         path = h.INBOXES_ROOT / 'forge' / '.archive' / f'{env["task_id"]}.json'
         path.write_text(json.dumps(env))
+
+    def _archive_outbox_result(self, task_id: str, *, exit_code: int = 0,
+                               result: str = '', target_repo: str = 'ourliberty-graph'):
+        """Write a Forge OUTBOX result into the sandbox archive, the authoritative
+        self-report the build-already-merged gate reads."""
+        path = h.OUTBOXES_ROOT / 'forge' / '.archive' / f'{task_id}.json'
+        path.write_text(json.dumps({
+            'task_id': task_id,
+            'exit_code': exit_code,
+            'result': result,
+            'target_repo': target_repo,
+        }))
+        return path
 
     def _write_live_inbox(self, task_id: str):
         path = h.INBOXES_ROOT / 'forge' / f'{task_id}.json'
@@ -544,6 +559,144 @@ class RejectSuppressionTest(_Base):
         self.assertEqual(escalate_calls, [])
         self.assertEqual(self._alerts.call_count, 0)
         probe.assert_not_called()
+
+
+class BuildAlreadyMergedSuppressionTest(_Base):
+    """A build-phase dispatch can legitimately open NO PR when its target work was
+    merged OUT-OF-BAND: Forge runs cleanly (exit_code=0) and emits the canonical
+    contract line `NO PR — already merged: #N`. Its `[WIP][session-start]`-only
+    branch trips the abandoned-build signature but must NOT be retried/escalated.
+    Regression for 2026-07-20 `graph-pr8-merge-decision-001` (ourliberty-graph PR #8
+    merged mid-flight). The signal is read from Forge's OWN archived outbox result
+    through the SAME contract the outbox notifier's sequence reconciler uses; every
+    ambiguous branch falls through to today's bounded redispatch (fail-safe)."""
+
+    # The lingering ORIGINAL branch is the sweep candidate (both it and the retry
+    # share the base + outbox family; the healer dedups to one per tick). The clean
+    # already-merged conclusion was emitted by the retry, whose outbox result is the
+    # most-recent family member the gate reads.
+    _STEM = 'graph-pr8-merge-decision-001'
+    _BRANCH = 'forge/graph-pr8-merge-decision-001'
+    _OUTBOX_ID = 'graph-pr8-merge-decision-001-retry1'
+    _MERGED_RESULT = ('The decision is moot — PR #8 is already MERGED.\n'
+                      'NO PR — already merged: #8')
+
+    def _run_build(self, *, exit_code=0, result=None, gh_merged=True,
+                   archive_original=True):
+        old = time.time() - 3600
+        if archive_original:
+            env = dict(_ORIGINAL_ENVELOPE, task_id=self._STEM,
+                       target_repo='ourliberty-graph')
+            self._archive_original(env)
+        self._archive_outbox_result(
+            self._OUTBOX_ID,
+            exit_code=exit_code,
+            result=self._MERGED_RESULT if result is None else result,
+            target_repo='ourliberty-graph')
+        gh_ret = ('https://github.com/Larry-Yatch/ourliberty-graph/pull/8',
+                  '2026-07-21T02:08:39Z') if gh_merged else None
+        with self._git_world([(self._BRANCH, old)]), \
+             mock.patch.object(h, '_task_family_rejected', return_value=False), \
+             mock.patch.object(h.ssh, 'gh_pr_merge_info',
+                               return_value=gh_ret) as gh:
+            self._run()
+        return gh
+
+    def test_clean_already_merged_suppresses(self):
+        gh = self._run_build()
+        # No retry envelope, no alert at all (neither digest nor escalate).
+        self.assertEqual(self._inbox_files(), [])
+        self.assertEqual(self._alerts.call_count, 0)
+        # Ledger records the suppression under the retry-suffix-stripped base.
+        ledger = self._ledger()
+        self.assertIn(self._STEM, ledger)
+        self.assertTrue(ledger[self._STEM]['suppressed'])
+        self.assertEqual(ledger[self._STEM]['suppress_reason'],
+                         'suppressed-build-already-merged')
+        self.assertNotIn('attempts', ledger[self._STEM])
+        # gh was consulted with the parsed PR number.
+        self.assertEqual(gh.call_args.args[1], 8)
+
+    def test_nonzero_exit_is_not_suppressed(self):
+        # A genuine crash that MENTIONS a merged PR exits non-zero -> NOT suppressed;
+        # recovered exactly as today (one retry envelope, one digest, attempts=1).
+        gh = self._run_build(exit_code=1)
+        gh.assert_not_called()  # gate 1 (exit_code) short-circuits before gh
+        self.assertIn('graph-pr8-merge-decision-001-retry1.json', self._inbox_files())
+        routes = [c.args[0] for c in self._alerts.call_args_list]
+        self.assertEqual(routes, ['digest'])
+        ledger = self._ledger()
+        self.assertEqual(ledger[self._STEM]['attempts'], 1)
+        self.assertNotIn('suppressed', ledger[self._STEM])
+
+    def test_no_marker_falls_through(self):
+        # A result with no already-merged marker -> parse returns None -> redispatch.
+        gh = self._run_build(result='Build failed midway; no PR opened.')
+        gh.assert_not_called()  # parse None short-circuits before gh
+        self.assertIn('graph-pr8-merge-decision-001-retry1.json', self._inbox_files())
+        self.assertEqual([c.args[0] for c in self._alerts.call_args_list], ['digest'])
+        self.assertNotIn('suppressed', self._ledger()[self._STEM])
+
+    def test_gh_unconfirmed_falls_through(self):
+        # Marker present but gh does NOT confirm MERGED -> fail-safe -> redispatch.
+        gh = self._run_build(gh_merged=False)
+        gh.assert_called_once()
+        self.assertEqual(gh.call_args.args[1], 8)
+        self.assertIn('graph-pr8-merge-decision-001-retry1.json', self._inbox_files())
+        self.assertEqual([c.args[0] for c in self._alerts.call_args_list], ['digest'])
+        self.assertNotIn('suppressed', self._ledger()[self._STEM])
+
+    def test_suppression_is_idempotent_and_skips_gh_on_later_ticks(self):
+        old = time.time() - 3600
+        self._archive_outbox_result(
+            self._OUTBOX_ID,
+            exit_code=0, result=self._MERGED_RESULT, target_repo='ourliberty-graph')
+        gh_ret = ('https://github.com/Larry-Yatch/ourliberty-graph/pull/8',
+                  '2026-07-21T02:08:39Z')
+        with self._git_world([(self._BRANCH, old)]), \
+             mock.patch.object(h, '_task_family_rejected', return_value=False), \
+             mock.patch.object(h.ssh, 'gh_pr_merge_info',
+                               return_value=gh_ret) as gh:
+            self._run()  # tick 1: suppress + record ledger
+            self.assertTrue(self._ledger()[self._STEM]['suppressed'])
+            self._run()  # tick 2: Gate 0b short-circuits BEFORE re-probing the outbox
+        # gh consulted exactly once across both ticks; no alert, no envelope ever.
+        gh.assert_called_once()
+        self.assertEqual(self._alerts.call_count, 0)
+        self.assertEqual(self._inbox_files(), [])
+
+    def test_no_outbox_result_falls_through(self):
+        # No archived outbox result at all -> gate returns False -> redispatch.
+        old = time.time() - 3600
+        self._archive_original(dict(_ORIGINAL_ENVELOPE, task_id=self._STEM))
+        with self._git_world([(self._BRANCH, old)]), \
+             mock.patch.object(h, '_task_family_rejected', return_value=False), \
+             mock.patch.object(h.ssh, 'gh_pr_merge_info') as gh:
+            self._run()
+        gh.assert_not_called()
+        self.assertIn('graph-pr8-merge-decision-001-retry1.json', self._inbox_files())
+
+
+class BuildAlreadyMergedHelperTest(_Base):
+    def test_outbox_stem_family_collapses_rerun_and_retry(self):
+        self.assertEqual(h._outbox_stem_family('foo-001'), 'foo-001')
+        self.assertEqual(h._outbox_stem_family('foo-001.1'), 'foo-001')
+        self.assertEqual(h._outbox_stem_family('foo-001.2'), 'foo-001')
+        self.assertEqual(h._outbox_stem_family('foo-001-retry1'), 'foo-001')
+
+    def test_find_archived_outbox_prefers_most_recent(self):
+        a = self._archive_outbox_result('foo-001', result='old')
+        b = self._archive_outbox_result('foo-001-retry1', result='new')
+        # Force a strictly newer mtime on the retry result.
+        os.utime(a, (1000, 1000))
+        os.utime(b, (2000, 2000))
+        got = h._find_archived_outbox_result('forge', 'foo-001-retry1', 'foo-001')
+        self.assertEqual(got, b)
+
+    def test_family_build_already_merged_false_when_no_archive(self):
+        self.assertFalse(
+            h._family_build_already_merged('forge', 'nope-001', 'nope-001',
+                                           self._repo))
 
 
 class RejectSignalHelperTest(_Base):
