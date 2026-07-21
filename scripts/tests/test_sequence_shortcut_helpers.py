@@ -39,6 +39,7 @@ if str(_REPO_SCRIPTS) not in sys.path:
 
 import build_sequence_validator as bsv  # noqa: E402
 import sequence_shortcut_helpers as ssh  # noqa: E402
+import task_cancel  # noqa: E402
 
 
 def _make_step(step_id, deps=None, status='pending', pr_url=None,
@@ -254,6 +255,110 @@ class ApplyCancelTests(_HelpersHarness):
                 result = ssh.apply_cancel(f'c-{status}')
                 self.assertFalse(result.applied)
                 self.assertEqual(self._read_sequence(f'c-{status}'), before)
+
+    # ---- cancel must STOP the work, not just the bookkeeping ----
+
+    def _marker(self, step_id):
+        return task_cancel.cancel_marker_path(self._root, step_id)
+
+    def test_cancel_requests_a_stop_for_every_in_flight_step(self):
+        seq = _make_sequence(
+            seq_id='c-inflight', status='active', current_steps=['s1', 's2'])
+        self._write_sequence(seq)
+        result = ssh.apply_cancel(
+            'c-inflight', actor='larry', reason='wrong direction')
+        self.assertTrue(result.applied)
+        for step_id in ('s1', 's2'):
+            with self.subTest(step_id=step_id):
+                path = self._marker(step_id)
+                self.assertTrue(path.exists(), f'no cancel marker for {step_id}')
+                body = json.loads(path.read_text())
+                self.assertEqual(body['reason'], 'wrong direction')
+                self.assertEqual(body['actor'], 'larry')
+                self.assertIn('requested_at', body)
+        # agent_runner must read back exactly what we wrote.
+        self.assertEqual(
+            task_cancel.is_cancel_requested(self._root, 's1'),
+            'wrong direction')
+        self.assertIn('2 in-flight step(s)', result.reason)
+
+    def test_cancel_without_reason_still_stops_the_work(self):
+        seq = _make_sequence(
+            seq_id='c-noreason-stop', status='active', current_steps=['s1'])
+        self._write_sequence(seq)
+        ssh.apply_cancel('c-noreason-stop', actor='larry')
+        self.assertEqual(
+            task_cancel.is_cancel_requested(self._root, 's1'),
+            'cancelled by request')
+
+    def test_no_in_flight_steps_writes_no_markers(self):
+        seq = _make_sequence(
+            seq_id='c-idle', status='active', current_steps=[])
+        self._write_sequence(seq)
+        result = ssh.apply_cancel('c-idle')
+        self.assertTrue(result.applied)
+        self.assertNotIn('in-flight', result.reason)
+        blackboard = self._root / 'blackboard'
+        self.assertEqual(
+            [p.name for p in blackboard.glob('cancel-task-*.json')], [])
+
+    def test_noop_cancel_does_not_stop_anything(self):
+        # Already-failed / terminal sequences short-circuit BEFORE the stop
+        # request — re-cancelling must not kill a worker that a later retry or
+        # an unrelated re-dispatch legitimately started on that step id.
+        for status in ('failed', 'complete', 'archived'):
+            with self.subTest(status=status):
+                seq = _make_sequence(
+                    seq_id=f'c-noop-{status}', status=status,
+                    current_steps=['s1'])
+                self._write_sequence(seq)
+                result = ssh.apply_cancel(f'c-noop-{status}')
+                self.assertFalse(result.applied)
+                self.assertFalse(self._marker('s1').exists())
+
+    def test_unsafe_step_id_is_refused_not_sanitized(self):
+        # A path-traversing step id must never write outside the blackboard.
+        # Refused rather than sanitized: agent_runner polls the RAW stem, so a
+        # sanitized filename would be a marker nobody ever reads.
+        seq = _make_sequence(
+            seq_id='c-unsafe', status='active',
+            current_steps=['../../state/pwned', 'ok-step'])
+        self._write_sequence(seq)
+        result = ssh.apply_cancel('c-unsafe')
+        self.assertTrue(result.applied)
+        self.assertFalse((self._root / 'state' / 'pwned.json').exists())
+        self.assertTrue(self._marker('ok-step').exists())
+        self.assertIn('1 in-flight step(s)', result.reason)
+
+    def test_marker_failure_never_costs_the_status_flip(self):
+        # The durable guarantee is status=failed (it blocks auto-merge). A
+        # marker write blowing up must not undo or error that.
+        seq = _make_sequence(
+            seq_id='c-writefail', status='active', current_steps=['s1'])
+        self._write_sequence(seq)
+        original = task_cancel.request_cancel
+
+        def _boom(*_a, **_k):
+            raise OSError('disk full')
+
+        task_cancel.request_cancel = _boom
+        try:
+            result = ssh.apply_cancel('c-writefail')
+        finally:
+            task_cancel.request_cancel = original
+        self.assertTrue(result.applied)
+        self.assertEqual(self._read_sequence('c-writefail')['status'], 'failed')
+
+    def test_malformed_current_steps_is_tolerated(self):
+        for bad in ('not-a-list', None, 42):
+            with self.subTest(current_steps=bad):
+                seq = _make_sequence(seq_id='c-bad', status='active')
+                seq['current_steps'] = bad
+                self._write_sequence(seq)
+                result = ssh.apply_cancel('c-bad')
+                self.assertTrue(result.applied)
+                self.assertEqual(
+                    self._read_sequence('c-bad')['status'], 'failed')
 
 
 # ============================================================================

@@ -39,6 +39,7 @@ def get_manager():
 from concurrency_guard import get_guard, MAX_CONCURRENT
 import active_tier
 from atomic_io import atomic_write_json  # noqa: E402  (shared durable atomic write, PR-E #366)
+import task_cancel  # noqa: E402  (shared cancel-marker contract; see its docstring)
 from test_isolation_guard import refuse_under_test  # noqa: E402
 
 AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT') or Path.home() / 'agents')
@@ -1153,7 +1154,8 @@ def review_bounded_step_reminder_args(phase, expected_agent):
     return ['--append-system-prompt', build_review_bounded_step_system_prompt()]
 
 
-CANCEL_DIR = AGENTS_ROOT / 'blackboard'
+# The cancel-marker directory + filename shape now live in `task_cancel`, so
+# the reader here and the sequence-cancel writer share one contract.
 CANCEL_POLL_INTERVAL = 5  # seconds between cancel checks during worker execution
 
 # === RESTART-INDEPENDENT WORKERS ===
@@ -1230,26 +1232,18 @@ def _is_task_in_flight(task_stem):
 
 
 def _check_cancel(task_stem):
-    """Check if a cancel marker exists for this task. Returns reason or None."""
-    cancel_file = CANCEL_DIR / f'cancel-task-{task_stem}.json'
-    if cancel_file.exists():
-        try:
-            with open(cancel_file) as f:
-                data = json.load(f)
-            return data.get('reason', 'cancelled by request')
-        except (OSError, json.JSONDecodeError):
-            return 'cancelled (marker found)'
-    return None
+    """Check if a cancel marker exists for this task. Returns reason or None.
+
+    Delegates to `task_cancel`, which owns the marker's path shape and payload
+    so this reader and the sequence-cancel writer can never drift. Behaviour is
+    unchanged, including treating a present-but-malformed marker as a cancel.
+    """
+    return task_cancel.is_cancel_requested(AGENTS_ROOT, task_stem)
 
 
 def _clear_cancel(task_stem):
     """Remove the cancel marker after processing."""
-    cancel_file = CANCEL_DIR / f'cancel-task-{task_stem}.json'
-    try:
-        if cancel_file.exists():
-            cancel_file.unlink()
-    except OSError:
-        pass
+    task_cancel.clear_cancel(AGENTS_ROOT, task_stem)
 
 
 def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,

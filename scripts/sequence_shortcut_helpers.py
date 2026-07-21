@@ -51,6 +51,7 @@ if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 
 import build_sequence_validator as bsv  # noqa: E402
+import task_cancel  # noqa: E402  (shared cancel-marker contract w/ agent_runner)
 from atomic_io import atomic_write_json  # noqa: E402
 
 
@@ -633,11 +634,59 @@ def apply_cancel(
     write_err = _atomic_write(path, seq)
     if write_err is not None:
         return write_err
+
+    # STOP THE WORK, not just the bookkeeping. Flipping the sequence to failed
+    # blocks auto-merge of anything it produces (#606), but on its own it leaves
+    # the dispatched Claude session running to its 4h ceiling — still burning
+    # tokens and still free to push to the branch. `agent_runner` polls for a
+    # cancel marker every 5s and SIGTERMs the worker; until now nothing in the
+    # tree ever wrote one. Request it for every step currently in flight.
+    #
+    # AFTER the sequence write, deliberately: the status flip is the durable
+    # guarantee, so it lands first and a marker failure can never cost us it.
+    # Best-effort by design — `request_cancel` fails quiet, and a step that has
+    # already finished simply leaves a marker nobody reads (agent_runner clears
+    # it on the next dispatch of that stem).
+    cancelled_steps = _request_step_cancels(seq, actor=actor, reason=reason)
+
+    detail = ''
+    if cancelled_steps:
+        detail = f'; stop requested for {len(cancelled_steps)} in-flight step(s)'
     return Result(
         applied=True,
-        reason=f'Sequence `{seq_id}` cancelled (was `{current}`)',
+        reason=f'Sequence `{seq_id}` cancelled (was `{current}`){detail}',
         sequence_path=path,
     )
+
+
+def _request_step_cancels(
+    seq: dict[str, Any], *, actor: str, reason: Optional[str],
+) -> list[str]:
+    """Write a cancel marker for each of the sequence's in-flight steps.
+    Returns the step ids a marker landed for.
+
+    `current_steps` is the sequence's own record of what is running right now —
+    the same list `apply_skip` / `apply_retry` / the merge signal filter on — so
+    it is the authoritative in-flight set rather than something re-derived from
+    step statuses. A step id that is unsafe as a filename (path separators) is
+    refused by `task_cancel` and simply absent from the return.
+
+    Never raises: cancel's contract is that the sequence status flip has already
+    landed, and no marker problem may turn that into an error.
+    """
+    steps = seq.get('current_steps')
+    if not isinstance(steps, list):
+        return []
+    out: list[str] = []
+    for step_id in steps:
+        try:
+            if task_cancel.request_cancel(
+                AGENTS_ROOT, step_id, reason=reason, actor=actor,
+            ):
+                out.append(step_id)
+        except Exception:  # noqa: BLE001 — bookkeeping already durable
+            continue
+    return out
 
 
 # -------------------- retry --------------------
