@@ -547,6 +547,28 @@ def _head_pushed_since_pass(repo: str, pr_num: int, passed_ts_iso: str) -> bool:
     return max(dates) > passed_dt + timedelta(seconds=2)
 
 
+def sequence_cancelled_for_step(task_id: Optional[str]) -> bool:
+    """True iff `task_id`'s build sequence was ABORTED by the operator.
+
+    Thin binding to `sequence_shortcut_helpers.sequence_cancelled_for_step` —
+    the module that WRITES the cancelled state and therefore owns the
+    definition of it. Deliberately not re-implemented here: a second copy is
+    how one merge path silently stops honouring an abort, which is the exact
+    defect this gate closes.
+
+    Imported lazily so a broken/absent sibling can't stop the healer from
+    loading, and FAIL-OPEN on any error to match the shared helper's contract —
+    this gate only ever ADDS a skip, it must never block a legitimate merge.
+    """
+    try:
+        import sequence_shortcut_helpers as ssh  # noqa: PLC0415 (scripts/ on path)
+        return ssh.sequence_cancelled_for_step(task_id, AGENTS_ROOT)
+    except Exception as e:  # noqa: BLE001 — healer must never wedge
+        log(f'sequence-cancelled-check raised {type(e).__name__}: {e}; '
+            f'fail-open (allowing merge)', 'WARN')
+        return False
+
+
 def process_pr(pr: dict, mirror_passed: dict[str, dict[str, str]],
                state: dict[str, Any], dry_run: bool) -> str:
     """Return one of: 'merged', 'rerun', 'budget-exhausted', 'skipped',
@@ -558,6 +580,27 @@ def process_pr(pr: dict, mirror_passed: dict[str, dict[str, str]],
 
     if pr_url not in mirror_passed:
         return 'no-mirror-pass'
+
+    # HIGHEST-PRIORITY GATE: never land work from a build that was ABORTED.
+    #
+    # outbox_notifier (the PRIMARY merge path) has checked this since #606, but
+    # THIS healer — the second, residual-gap path — never did. That left the
+    # "once aborted, nothing from that build lands on main" guarantee unheld in
+    # exactly the window this healer exists to cover: a build whose PR Mirror
+    # already PASSed, whose primary merge then FAILED, and which the operator
+    # then stopped. The primary path refuses it; five minutes later this healer
+    # would merge it anyway. Narrow, but live across all four repos.
+    #
+    # Placed FIRST so an abort short-circuits before any gh round trip, and
+    # before the CANCELLED-workflow rescue below can re-run checks on work
+    # nobody wants. (That rescue's "cancelled" is a GitHub Actions run — an
+    # entirely different sense of the word from an aborted sequence. Do not
+    # conflate them.)
+    task_id = mirror_passed[pr_url].get('task_id')
+    if sequence_cancelled_for_step(task_id):
+        log(f'PR {repo}#{pr_num}: build sequence for task={task_id} was '
+            f'CANCELLED (aborted); refusing to auto-merge', 'WARN')
+        return 'sequence-cancelled'
 
     # #15: the AUTO_MERGE log proves Mirror PASSed *some* HEAD of this URL, not
     # necessarily the current one. If the branch was pushed/rebased after the

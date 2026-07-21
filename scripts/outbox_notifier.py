@@ -7773,45 +7773,22 @@ def _sequence_cancelled(task_id: Optional[str]) -> bool:
     skip for a CONFIRMED cancellation. Mirrors `_signal_sequence_step_merged`'s
     scan convention (match a step by `step_id == task_id`) rather than parsing
     the task_id string, so it stays correct if the id format changes.
+
+    The scan itself now lives in `sequence_shortcut_helpers` — the module that
+    WRITES the cancelled state — so this path and `heal_pr_auto_merge` (the
+    second, healer-side merge path) can never disagree about what "aborted"
+    means. Behaviour here is unchanged; only the implementation moved.
     """
-    if not isinstance(task_id, str) or not task_id:
-        return False
     try:
-        seq_dir = AGENTS_ROOT / 'blackboard' / 'build-sequences'
-        if not seq_dir.is_dir():
-            return False
-        for seq_path in sorted(seq_dir.glob('*.json')):
-            if seq_path.suffix != '.json':
-                continue
-            try:
-                seq = json.loads(seq_path.read_text())
-            except (OSError, json.JSONDecodeError):
-                continue  # unreadable sibling — fail-open, keep scanning
-            if not isinstance(seq, dict):
-                continue
-            steps = seq.get('steps') or []
-            if not any(
-                isinstance(s, dict) and s.get('step_id') == task_id
-                for s in steps
-            ):
-                continue
-            # Found the sequence that owns this step. It is "cancelled" only
-            # under apply_cancel's exact contract: status failed + the audit
-            # event (a `failed` from a build error is NOT a cancel).
-            if seq.get('status') != 'failed':
-                return False
-            audit = seq.get('audit_log') or []
-            return any(
-                isinstance(e, dict) and e.get('event') == 'cancelled'
-                for e in audit
-            )
+        import sequence_shortcut_helpers as ssh  # noqa: PLC0415 (scripts/ on path)
+        return ssh.sequence_cancelled_for_step(task_id, AGENTS_ROOT)
     except Exception as e:  # noqa: BLE001 — daemon-never-wedge: fail-open
         log(
             f'sequence-cancelled-check raised {type(e).__name__}: {e}; '
             f'fail-open (allowing merge)',
             'WARN',
         )
-    return False
+        return False
 
 
 # ============================================================================
