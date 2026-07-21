@@ -7531,7 +7531,11 @@
         "at": "2026-07-08T07:47:48.457688+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-21T10:50:22.448436+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-card-message-8f4384fb2ee7c9ff297d3c69401e2fb3dfb64929",
@@ -7562,7 +7566,11 @@
         "at": "2026-07-08T07:47:48.457688+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-21T10:50:22.448436+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-mirror-review-pr-ourliberty-agent-core-845",
@@ -7624,7 +7632,11 @@
         "at": "2026-07-08T07:58:12.464923+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-21T10:50:22.448436+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-harden-specdoc-originmain-flaky-tests-001",
@@ -7761,7 +7773,11 @@
         "at": "2026-07-08T17:34:17.118128+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-21T10:50:22.448436+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-larry-reject-26c61ee4047b51a0a5238e2b752205afd2447567",
@@ -7889,7 +7905,11 @@
         "at": "2026-07-08T20:44:50.100031+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-21T10:50:22.448436+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-outbox-notifier-gh-ratelimit-backoff-001",
@@ -8270,7 +8290,11 @@
         "at": "2026-07-10T03:31:21.145894+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-21T10:50:22.448436+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-land-pr854-sentinel-stall-flaky-gate-001",
@@ -8513,7 +8537,11 @@
         "at": "2026-07-10T18:20:16.950433+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-21T10:50:22.448436+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-deep-review-held-surface-on-tab-001",
@@ -9066,7 +9094,11 @@
         "at": "2026-07-14T16:32:16.282339+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-21T10:50:22.448436+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-merge-509-510-direct-001",
@@ -9150,7 +9182,11 @@
         "at": "2026-07-15T13:45:21.785078+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-21T10:50:22.448436+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-one-time-stale-dispatch-branch-cleanup-001",
