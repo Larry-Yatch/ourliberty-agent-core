@@ -11,7 +11,18 @@ EnvironmentFile=/home/larry/credentials/.env.larry
 Environment="HOME=/home/larry"
 Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/heal_stale_daemon_code.py
-TimeoutStartSec=60
+# MUST exceed heal_stale_daemon_code.RESTART_DEFER_CEILING_SEC (3600s) plus a
+# margin for the restart itself. Since #999 this healer CORDONS the inbox
+# watcher and DRAINS — waits for a live Claude review to finish before
+# restarting — and a review runs up to 2100s (agent_runner.
+# REVIEW_SESSION_CEILING_SECONDS). At the old 60s, systemd SIGTERMed the healer
+# mid-drain on every busy tick: Python's `finally` does not run on SIGTERM, so
+# clear_cordon never fired, and the restart never happened. It failed SAFE (the
+# cordon's dead holder pid makes the watcher ignore it within one 5s poll, so no
+# dispatch stall) but the feature silently did nothing whenever the watcher was
+# busy — exactly when it is needed. test_stale_daemon_cordon_drain pins this
+# invariant so the two numbers cannot drift apart again.
+TimeoutStartSec=3900
 Nice=10
 StandardOutput=journal
 StandardError=journal

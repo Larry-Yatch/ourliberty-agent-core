@@ -197,6 +197,63 @@ class FailOpenTests(CordonDrainFixture):
         self.assertTrue(self._logged('cordon unavailable'))
 
 
+class UnitFileInvariantTests(CordonDrainFixture):
+    """The defect that shipped in #999 and was caught only by reviewing the
+    INTEGRATED result: the healer's systemd unit had TimeoutStartSec=60 while
+    the drain waits up to RESTART_DEFER_CEILING_SEC=3600. systemd SIGTERMed the
+    healer mid-drain on every busy tick, so a busy watcher was NEVER restarted —
+    the feature silently did nothing exactly when it was needed. It failed SAFE
+    (the cordon's dead holder pid makes the watcher ignore it) which is why
+    nothing alarmed. These pin the two numbers together."""
+
+    UNIT = (Path(__file__).resolve().parent.parent.parent
+            / 'systemd' / 'ourliberty-heal-stale-daemon-code.service')
+
+    def _timeout_start_sec(self) -> int:
+        for line in self.UNIT.read_text().splitlines():
+            line = line.strip()
+            if line.startswith('TimeoutStartSec='):
+                return int(line.split('=', 1)[1].strip())
+        self.fail('TimeoutStartSec not found in the healer unit file')
+
+    def test_unit_timeout_exceeds_drain_ceiling(self):
+        timeout = self._timeout_start_sec()
+        self.assertGreater(
+            timeout, h.RESTART_DEFER_CEILING_SEC,
+            f'TimeoutStartSec={timeout}s <= drain ceiling '
+            f'{h.RESTART_DEFER_CEILING_SEC}s: systemd will kill the healer '
+            f'mid-drain and the restart will never happen')
+
+    def test_unit_timeout_has_margin_for_the_restart_itself(self):
+        # The drain is not the last thing that happens — the restart, settle and
+        # verify follow it, all inside the same ExecStart.
+        timeout = self._timeout_start_sec()
+        needed = h.RESTART_DEFER_CEILING_SEC + h.RESTART_TIMEOUT_S + h.RESTART_SETTLE_S
+        self.assertGreaterEqual(timeout, needed,
+                                f'TimeoutStartSec={timeout}s leaves no room for '
+                                f'the restart after a full-ceiling drain '
+                                f'(needs >= {needed}s)')
+
+
+class SigtermGuardTests(CordonDrainFixture):
+    def test_sigterm_during_drain_clears_the_cordon(self):
+        # Defense in depth: `finally` does NOT run on the default SIGTERM
+        # disposition, so without this the cordon file outlives the healer.
+        h.write_cordon(AGENT_UNIT, 'test')
+        guard = h._CordonSigtermGuard(AGENT_UNIT)
+        guard._prev = lambda *a: None  # swallow the re-raise inside the test
+        guard._on_term(15, None)
+        self.assertIsNone(self._cordon())
+        self.assertTrue(self._logged('SIGTERM during drain'))
+
+    def test_guard_restores_previous_handler(self):
+        import signal as _sig
+        before = _sig.getsignal(_sig.SIGTERM)
+        with h._CordonSigtermGuard(AGENT_UNIT):
+            pass
+        self.assertEqual(_sig.getsignal(_sig.SIGTERM), before)
+
+
 class SeamTests(CordonDrainFixture):
     """Producer and consumer must agree on the contract, or the guard silently
     does nothing."""

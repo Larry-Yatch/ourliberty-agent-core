@@ -53,6 +53,7 @@ import json
 import os
 import re
 import shlex
+import signal
 import subprocess
 import sys
 import time
@@ -729,6 +730,53 @@ def clear_cordon(unit: str) -> None:
         pass
 
 
+class _CordonSigtermGuard:
+    """Clear the cordon if we are SIGTERMed mid-drain.
+
+    Belt-and-braces for the systemd kill path. A `finally` does NOT run when the
+    default SIGTERM disposition terminates the process, so a healer killed while
+    draining leaves its cordon file behind. Holder-liveness already makes that
+    cordon inert within one watcher poll (the pid is dead), so this is not what
+    prevents a stall — it removes the corpse promptly instead of leaving a
+    confusing file on disk for up to CORDON_TTL_SEC, and it re-raises via the
+    previous handler so systemd still sees a normal termination.
+
+    Restores the prior handler on exit; a non-main-thread install is a no-op
+    (signal.signal raises there) rather than an error."""
+
+    def __init__(self, unit: str):
+        self.unit = unit
+        self._prev = None
+        self._installed = False
+
+    def __enter__(self):
+        try:
+            self._prev = signal.getsignal(signal.SIGTERM)
+            signal.signal(signal.SIGTERM, self._on_term)
+            self._installed = True
+        except (ValueError, OSError):
+            pass  # not the main thread — holder-liveness still covers us
+        return self
+
+    def _on_term(self, signum, frame):
+        clear_cordon(self.unit)
+        log(f'SIGTERM during drain of {self.unit} — cordon cleared; the restart '
+            f'did NOT happen (raise TimeoutStartSec if this repeats)', 'WARN')
+        if callable(self._prev):
+            self._prev(signum, frame)
+        else:
+            signal.signal(signal.SIGTERM, signal.SIG_DFL)
+            os.kill(os.getpid(), signal.SIGTERM)
+
+    def __exit__(self, *exc):
+        if self._installed:
+            try:
+                signal.signal(signal.SIGTERM, self._prev)
+            except (ValueError, OSError):
+                pass
+        return False
+
+
 def drain_agent_work(unit: str, reason: str) -> tuple[bool, float]:
     """Hold the cordon until no agent session is live. Return (drained, waited).
 
@@ -802,7 +850,8 @@ def auto_restart_unit(unit: str, reason: str = 'stale-shared-lib') -> tuple[int,
             f'drain (pre-#994 behavior — a live session may be killed)', 'WARN')
         return _restart_unit_now(unit)
     try:
-        drained, waited = drain_agent_work(unit, reason)
+        with _CordonSigtermGuard(unit):
+            drained, waited = drain_agent_work(unit, reason)
         if drained:
             log(f'RESTART_DRAINED unit={unit} waited={waited:.0f}s '
                 f'reason={reason} — restarting into a quiet window', 'INFO')
