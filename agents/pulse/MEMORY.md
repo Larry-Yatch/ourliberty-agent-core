@@ -180,6 +180,12 @@ PR #796 MERGED at 14:08 MDT 2026-07-01 (REVIEW_PASS ×2, auto-merged). G-rule pi
 
 ---
 
+## G-rule auto-merge-deep-review-hold-tier3-001 → COMPLETE ✅ (PR #998, iter ~5797)
+
+**Rule:** `auto-merge-deep-review-hold:<repo>:<PR#>` alerts from outbox-notifier are redundant noise — the actionable gate already reaches Larry via the approval system. Tier-3 translation `subject^=auto-merge-deep-review-hold:` added to config/alert-translations.json. **PR #998 MERGED 14:17:39 MDT = 20:17:39Z UTC** (chore(alerts): Tier-3 translation silences redundant auto-merge-deep-review-hold WARN). verification_pending promoted to systemic_fix in ledger (verified_at=2026-07-21T20:24:58Z UTC). Moving to Completed G-rules. Occurrences: iter ~5786 (1/3, PR #992); iter ~5788 (2/3→3/3, dispatched); iter ~5797 (VERIFIED).
+
+---
+
 ## G-rule auto-merge-deep-review-hold-tier4-001 → DISPATCHED ✅ (iter ~5788), verification_pending
 
 **Rule:** When a critical-path PR passes Mirror without a deep-review stamp, outbox-notifier fires (1) a WARNING to larry-alerts.jsonl with subject `auto-merge-deep-review-hold:<repo>:<PR#>` AND (2) registers a formal approval gate `deep-review-hold-pr<N>-<uuid>` in beacon-pending-approvals.json that DMs Larry via the approval system. The larry-alerts.jsonl line is redundant — the actionable gate already reaches Larry. Pulse triages as Tier-4 (novel), forces tier-reset, correctly suppresses duplicate DM, but the noise is unnecessary. Fix: add Tier-3 translation for `subject^=auto-merge-deep-review-hold:` in config/alert-translations.json. **direction-ask-auto-merge-deep-review-hold-tier3-001.json dispatched to Beacon inbox iter ~5788.** verification_pending. Occurrences: iter ~5786 (1/3, PR #992); iter ~5788 (2/3→3/3, PR #988).
