@@ -75777,3 +75777,92 @@ heal-stale-daemon-code detected code drift in beacon_telegram_bot.py and outbox_
 
 ---
 
+## Iteration ~5690 — 2026-07-20T14:34Z UTC (Larry /loop /cycle, Tier 3)
+
+**Health:** ✅ Nominal. 2 new alerts (L770–L771), both Tier 3. All mandatory + additive checks clean. wm=771 (fl=771). **Tier 3**, consecutive_clean=2.
+
+**VERIFY-BEFORE-REASSERT (from iter ~5689 status snapshot at 13:56Z UTC):**
+- **"HEAD=1fff104c==origin/main"**: UPDATED ✅ — wrapper committed 8c4b7822 (Pulse cycle 20260720T135920Z). HEAD=8c4b7822==origin/main ✅
+- **"zombie PID 1834248 (~52d18h38m)"**: UPDATED ⚠️ — etime=52-19:13:01 (~52d19h13m). [carry, static]
+- **"beacon PID 3801553 (~12h12m)"**: UPDATED ✅ — etime=12:47:28 (~12h47m) ✅
+- **"outbox-notifier PID 3801576 (~12h12m)"**: UPDATED ✅ — etime=12:47:27 (~12h47m) ✅
+- **"inbox_watcher PID 3801575 (~12h12m)"**: UPDATED ✅ — etime=12:47:27 (~12h47m) ✅
+- **"last_sync=2026-07-20T13:51:15Z UTC (~5 min)"**: UPDATED ✅ — still 13:51:15Z UTC (~43 min at ~14:34Z check). Within 2h. NOMINAL ✅
+- **"wm=769 stable"**: UPDATED ✅ — 2 new alerts at L770–L771; both Tier-3; wm advanced 769→771. ✅
+- **"0 open PRs"**: CONFIRMED ✅ — 0 open PRs both repos. NOMINAL ✅
+- **"Check I Monday firing expected ~14:14Z UTC, dedup-skip anticipated"**: UPDATED — Check I DID fire at 14:14Z UTC (on schedule). New artifact check-i-2026-07-20.json (26501 bytes). 1 NEW proposal (not same `pr3-staged-autonomy` from prior week) — NO dedup-skip. New proposal auto-dispatched as `pulse-cycle-model-downgrade-001`. ✅
+
+**Check 0 — Alert triage:**
+- `repair-watermark`: repaired=false (old_wm=769, fl=771). 2 new alerts.
+- **L770** (`ts=2026-07-20T14:01:21Z, source=heal-dashboard-api-sha-drift, subject=dashboard-api-sha-drift-healed, route=digest`): healer auto-restarted ourliberty-dashboard-api.service (running 1fff104c, on-disk HEAD 8c4b7822). Bot route=digest, skipped DM (idx=769 at 08:05:26 MDT). **Triage: Tier 3** (known-pattern match, verbatim JSON confirmed). ✅
+- **L771** (`ts=2026-07-20T14:14:40Z, source=pulse, subject=check-i-2026-07-20, route=escalate`): Check I Monday 2026-07-20 delivery confirmation. Bot delivered idx=770 at 08:15:32 MDT. **Triage: Tier 3** (source=pulse known-pattern match in alert-translations.json). ✅
+- wm advanced 769→771. NOMINAL ✅
+
+**Check I — Monday 2026-07-20 (new artifact):**
+- Fired 14:14:40Z UTC (on schedule, Monday ∈ firing days). New artifact: `check-i-2026-07-20.json`.
+- Ledger total: $392.22 (−$1554.66, −79.8% vs prior week). 80 σ-flagged anomalies.
+- **1 proposal:** `[small]` "Review high-σ anomaly task `cycle-202607151042380000`" — $1.64 vs $0.87 baseline (26.1σ above). Rationale: read chain archive; propose fast-path, prompt-discipline fix, or model downgrade if depth unwarranted.
+- Auto-dispatched to Beacon as `pulse-cycle-model-downgrade-001` (small effort, auto-eligible). Envelope archived in Beacon outbox .archive at 08:21 MDT.
+- **Note:** Known G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch fired again (envelope=pulse-auto-462991079d-20260720, marker='pulse-cycle-model-downgrade-001'). Dispatch succeeded via fallback. verification_pending on fix. [carry]
+- dm_route: NOT dedup-skipped (new week, new content differs from prior `pr3-staged-autonomy` proposal). ✅
+
+**Check 1 — Log noise:** outbox-notifier.log: 1 WARN — `pulse-auto-dispatch APPROVAL_REQUEST task_id mismatch (envelope=pulse-auto-462991079d-20260720, marker='pulse-cycle-model-downgrade-001')` at 08:21:37 MDT. Known G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch (dispatched 3/3, verification_pending). Dispatch succeeded via fallback. Not a new signal. NOMINAL ✅
+
+**Check 2 — Telegram sweep:** Bot log last delivery: idx=770 (source=pulse, subject=check-i-2026-07-20) at 08:15:32 MDT (14:15:32Z UTC). No Larry messages. PIDs 3801553/3801576 confirmed alive (~12h47m). pending=0, history=488. NOMINAL ✅
+
+**Check 3 — Pipeline stall:** DRY-RUN (14:31:03Z UTC) → "no stalls detected." NOMINAL ✅
+
+**Check 4 — Pending directives:** pending=0, history=488. All inboxes empty (beacon=0, forge=0, mirror=0). NOMINAL ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-20T14:21:35Z UTC (~12 min at ~14:34Z check). NOMINAL ✅
+
+**Check A — Source repo:** HEAD=8c4b7822==origin/main ✅; on main ✅; M runbooks/cycle-journal.md (this session's pending journal write — normal) ✅; 0 behind/0 ahead ✅. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-20T13:51:15Z UTC (~43 min), status=no-change, push_failures=0. NOMINAL ✅
+**Check C — Agent liveness:** beacon PID 3801553 ✅ (~12h47m); outbox-notifier PID 3801576 ✅ (~12h47m); inbox_watcher PID 3801575 ✅ (~12h47m). ⚠️ Zombie PID 1834248 (~52d19h13m, bash poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`). [carry, static]
+**Check E — PR/merge state:** 0 open PRs agent-core; 0 open PRs dashboard. NOMINAL ✅
+**Check H — Forge/Beacon/Mirror activity:** All inboxes empty (0/0/0). NOMINAL ✅
+**Rotations:** 0 overdue. NOMINAL ✅
+
+**§5.0:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks:**
+- **Check I:** ✅ FIRED Monday 2026-07-20 at 14:14Z UTC. 1 proposal auto-dispatched (`pulse-cycle-model-downgrade-001`). New week — no dedup-skip. See Check I block above. dm_route second-emission-Sunday carry (1st occurrence 2026-07-19T14:14Z; monitor Wed 2026-07-23). [carry]
+- **Check III:** OFF-WEEK ✅ — biweekly cadence. Next fire: 2026-07-26 04:42:51 MDT.
+- **Check VIII:** TWO proposals pending (2026-07-13 + 2026-07-20). Awaiting Larry response. [carry yellow]
+- **Check XIV:** [2/3 carry]. Dispatch at 3/3 (next Check XIV firing). [carry]
+- **Check XI:** CLOSED ✅ — over_gate=false. [carry]
+- Check IV/VI/IX/X/XII: timer-managed. No new artifacts. ✅
+
+**G-rule assessment:** 0 new occurrences this iter. G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch: 4th+ post-dispatch occurrence confirmed (verification_pending, carry). All active G-rule counts carry unchanged.
+
+**Actions taken:**
+1. Check 0: 2 new alerts triaged Tier 3 (L770 heal-dashboard-api-sha-drift; L771 pulse/check-i-2026-07-20). wm advanced 769→771. ✅
+2. §5.0: all three one-shots no-op. ✅
+3. PRIME ledger: `iter_clean` appended (14:34:00Z UTC). ✅
+4. Tier state: `record --checks-clean true` → Tier 3, consecutive_clean=2. ✅
+
+**Escalations:** 0 new Pulse DMs. All prior escalations carry.
+
+**Standing findings:**
+- [yellow] **probe-blind:ourliberty-cycle.service** *(carry from iter ~5574)* — heal-claude-json-bind-drift healer blind for cycle.service mount namespace. Bot DM'd Larry 00:54Z UTC (idx=780). [ask-then-do]
+- [yellow] **check-viii — TWO proposals pending (2026-07-13 + 2026-07-20)** — TP=0 across 8w/3648 quota-events, recommend DEPRECATE token gate. Bot DM'd both. Reply `approve check-viii-update-2026-07-13` or `approve check-viii-update-2026-07-20`. [carry]
+- [yellow] **zombie-bash-pid-1834248** — ~52d19h13m, bash poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`. ask-then-do: `kill 1834248`. [carry, static]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — idx=990. Awaiting `approve check-vi-update-2026-07-07`. [carry]
+- [green] **sync VERIFIED** — status=no-change, last_sync=13:51:15Z UTC; HEAD=8c4b7822==origin/main. [stable]
+- [green] **daemons healthy** — beacon PID 3801553, outbox-notifier PID 3801576, inbox_watcher PID 3801575 (~12h47m). [stable]
+- [blue] **Check I — 2026-07-20 FIRED** — 1 new proposal `pulse-cycle-model-downgrade-001` auto-dispatched. Ledger $392.22 (−79.8%). Next firing Wed 2026-07-23.
+- [blue] **pulse-check-xiv-tier4-001 [2/3]** — Dispatch at 3/3 (next Check XIV firing). [carry]
+- [blue] **Check I dm_route second-emission-Sunday** — 1st occurrence 2026-07-19T14:14Z. Monitor at Wed 2026-07-23 next firing. [carry]
+- [blue] **Ledger weekly 2026-07-20** — $392.22 total, −79.8% vs prior week. No Pulse action. [carry]
+- [blue] **review-ceiling-fit ATTENTION** — 9 false-kills in 30d; recommends RAISE ceiling 35→45 min. No Pulse action. [carry]
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch — DISPATCHED ✅ (3/3)** — verification_pending. 4th+ post-dispatch occurrence confirmed this iter (marker='pulse-cycle-model-downgrade-001'). [carry]
+- [blue] **G-rules (dispatched, vp):** forge-wip-redispatch-exhausted-genuine-no-pr-001; ourliberty-health-subject-key-mismatch-001; outbox-notifier-notification-intent-reject-tier4-001; forge-wip-redispatch-digest-tier4-001; forge-revision-preamble-missing-pr711-001; forge-wip-redispatch-exhausted-pr-exists-fp-001; decision-needed-approval-forge-dispatch-no-target-repo-001; no-session-revision-active-mirror-session-fp-001.
+- [blue] **G-rule 2/3:** outbox-notifier-notification-intent-review-escalate-tier4-001; outbox-notifier-auto-merge-stale-revalidation-tier4-001; pulse-check-xiv-tier4-001.
+- [blue] **G-rule 1/3:** medic-approval-request-tier4-001; mirror-malformed-verdict-heal-reap-path-001; mirror-queue-wait-gauge-tier4-001; inbox-watcher-tier-pool-all-unavailable-tier4-001; heal-pipeline-stall-unrouted-deep-review-required-fp-001; heal-pulse-check-staleness-single-flight-skip-fp-001; gate-parallelism-monitor-regression-data-001; pulse-rotation-check-source-tier4-001; pulse-auto-dispatch-null-reply-chat-id-post-pr950 [carry].
+- [blue] **missions-autoregister: proposed card `proposed-no-session-revision-mirror-active-fp-001` flagged 14d+ no shipped-PR** — digest route; Tier-3 silence; missions healer owns decision flow. [carry]
+
+**PRIME DIRECTIVE:** 0 new interventions; 0 new systemic_fixes; iter_clean appended (14:34:00Z UTC). ratio≈22.85 (trailing-30d, trend=improving).
+**Tier end-of-iter:** **Tier 3** (consecutive_clean=2; last_signal_at=2026-07-20T12:14:47Z UTC). Cadence 30 min. One more clean iter de-escalates consecutive_clean to 3 (no further tier-drop — already at Tier 3 floor).
+
+---
+
