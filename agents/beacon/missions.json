@@ -9535,7 +9535,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-21T04:18:19.825084+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-21T04:09:44.768564+00:00"
+      "orphan_last_activity_ts": "2026-07-21T04:09:44.768564+00:00",
+      "briefing": {
+        "what": "The team started a piece of behind-the-scenes cleanup to stop repeat work that's already been finished, but it isn't attached to any active project yet.",
+        "why": "Loose, unassigned work quietly ties up people's time and can drift without anyone owning the outcome or knowing if it's still needed.",
+        "suggest": "Take a quick look to confirm this is still worth finishing and, if so, tie it to a real priority before it goes further \u2014 otherwise set it aside."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-21T04:20:04.416777+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
