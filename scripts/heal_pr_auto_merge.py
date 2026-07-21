@@ -43,8 +43,13 @@ What we added on top of upstream:
     (b) retry budget exhausts (one-time per PR, tells Larry to investigate
         manually)
   - Two-layer kill-switch: ~/agents/healers.disabled (blanket) AND
-    OURLIBERTY_AUTOMERGE_ENABLED env var (default OFF -> dry-run mode).
+    OURLIBERTY_AUTOMERGE_ENABLED env var (unset -> dry-run mode).
     Per phase-e-plan: "default off until verified."
+    NOTE: verified and ARMED since 2026-05-19 — the shipped systemd unit sets
+    this to "true", so in production this healer really does merge. The
+    "default off" above describes the CODE's fallback when the env var is
+    absent, not the deployed posture. Authoritative check:
+    `systemctl show ourliberty-heal-pr-auto-merge.service -p Environment`.
 
 Safe-by-construction:
   - Kill-switch aware (exits immediately on healers.disabled)
