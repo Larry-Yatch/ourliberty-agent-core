@@ -10088,7 +10088,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-21T20:54:16.668396+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-21T20:50:34.008229+00:00"
+      "orphan_last_activity_ts": "2026-07-21T20:50:34.008229+00:00",
+      "briefing": {
+        "what": "A new piece of work the team kicked off on its own that hasn't been tied to any of our current priorities yet.",
+        "why": "Unassigned work can quietly eat time and drift from what the business actually needs, and it's now waiting on your sign-off to move forward.",
+        "suggest": "Take a quick look before it goes further \u2014 confirm it fits a real priority and is worth continuing, rather than waving it through."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-21T20:56:33.426881+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
