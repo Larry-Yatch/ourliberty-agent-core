@@ -9671,7 +9671,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-21T08:04:51.224521+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-21T08:01:52.987448+00:00"
+      "orphan_last_activity_ts": "2026-07-21T08:01:52.987448+00:00",
+      "briefing": {
+        "what": "Your team started building a feature that keeps a running, plain-English story of who's working on what, but it isn't tied to any specific goal yet.",
+        "why": "Loose work that isn't linked to a clear business goal can quietly eat time and effort without a payoff you can point to.",
+        "suggest": "Give it a quick look before it goes further \u2014 decide whether it serves a real priority and, if so, attach it to one; otherwise pause it."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-21T08:10:50.710394+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-pr-ourliberty-agent-core-973",
@@ -9688,7 +9702,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-21T08:04:51.224521+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-21T07:55:59.202042+00:00"
+      "orphan_last_activity_ts": "2026-07-21T07:55:59.202042+00:00",
+      "briefing": {
+        "what": "A new piece of work your team started on its own that's now waiting for a sign-off before it can move forward.",
+        "why": "It's been sitting in line for review, so it can't deliver any value until someone gives it the green light, and it isn't yet attached to a clear goal.",
+        "suggest": "Have someone give it a careful look to confirm it's worth pursuing and tie it to a real objective before approving it to continue."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-21T08:10:50.710394+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-delegate-card-thread-narration-part1-001",
@@ -9705,7 +9733,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-21T08:04:51.224521+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-21T07:50:22.684806+00:00"
+      "orphan_last_activity_ts": "2026-07-21T07:50:22.684806+00:00",
+      "briefing": {
+        "what": "The team began work on a new feature that shows a clearer play-by-play of what's happening as tasks get handed off, but it isn't attached to any current project.",
+        "why": "Loose work that isn't tied to a goal can quietly eat time and effort without moving anything that matters to the business.",
+        "suggest": "Hold off on pushing this forward until we decide whether it belongs to a real priority \u2014 worth a quick check before investing more."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-21T08:10:50.710394+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
