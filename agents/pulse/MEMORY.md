@@ -174,9 +174,15 @@ PR #796 MERGED at 14:08 MDT 2026-07-01 (REVIEW_PASS ×2, auto-merged). G-rule pi
 
 ---
 
-## G-rule outbox-notifier-deep-review-stamp-no-retry-trigger-001 → FIX LIVE (PR #980 MERGED iter ~5782), verification_pending
+## G-rule outbox-notifier-deep-review-stamp-no-retry-trigger-001 → VERIFIED ✅ (PR #980, iter ~5788)
 
-**Rule:** When Larry approves a PR via the dashboard `deep-review-passed` label, outbox-notifier applies the label but does NOT re-trigger `merge_reviewed_pr.sh`. PR stays OPEN indefinitely until manual Beacon intervention. Fix: PR #980 (`fix(auto-merge): dashboard deep-review approval actually fires the merge after stamping`) MERGED 2026-07-21T17:05:07Z UTC. Evidence: post-merge outbox-notifier immediately resolved deep-review-hold approvals for PRs #980 and #982 at 11:06 MDT (detected "PR no longer OPEN"). Fix is in production. Verification_pending: need to observe a fresh deep-review-hold stamp → auto-merge cycle via the new code path to fully verify end-to-end. Occurrences: iter ~5746 (1/3); iter ~5749 (2/3); iter ~5750 (DISPATCHED); iter ~5782 (fix merged).
+**Rule:** When Larry approves a PR via the dashboard `deep-review-passed` label, outbox-notifier now re-triggers `merge_reviewed_pr.sh` and auto-merges the PR. Fix: PR #980 MERGED 2026-07-21T17:05:07Z UTC. **VERIFIED iter ~5788:** PR #992 deep-review approved by Larry via dashboard → outbox-notifier auto-merged at 18:57:35Z UTC — end-to-end confirmed via PR #980 fix path. Moving to Completed G-rules. Occurrences: iter ~5746 (1/3); iter ~5749 (2/3); iter ~5750 (DISPATCHED); iter ~5782 (fix merged); iter ~5788 (VERIFIED).
+
+---
+
+## G-rule auto-merge-deep-review-hold-tier4-001 → DISPATCHED ✅ (iter ~5788), verification_pending
+
+**Rule:** When a critical-path PR passes Mirror without a deep-review stamp, outbox-notifier fires (1) a WARNING to larry-alerts.jsonl with subject `auto-merge-deep-review-hold:<repo>:<PR#>` AND (2) registers a formal approval gate `deep-review-hold-pr<N>-<uuid>` in beacon-pending-approvals.json that DMs Larry via the approval system. The larry-alerts.jsonl line is redundant — the actionable gate already reaches Larry. Pulse triages as Tier-4 (novel), forces tier-reset, correctly suppresses duplicate DM, but the noise is unnecessary. Fix: add Tier-3 translation for `subject^=auto-merge-deep-review-hold:` in config/alert-translations.json. **direction-ask-auto-merge-deep-review-hold-tier3-001.json dispatched to Beacon inbox iter ~5788.** verification_pending. Occurrences: iter ~5786 (1/3, PR #992); iter ~5788 (2/3→3/3, PR #988).
 
 ---
 
