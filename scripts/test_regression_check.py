@@ -82,7 +82,6 @@ AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', '/home/larry/agents'
 # inside the run_review_step wrapper and the 2100s review-session ceiling. See
 # memory regression-gate-cant-conclude (contention-hypothesis-refuted entry).
 DEFAULT_TIMEOUT_PER_SHA_S = 800
-TEST_DISCOVERY_TARGET = 'scripts.tests'
 
 # Real (non-jailed) tree paths, captured from the gate's OWN process at module
 # load. The gate parent never swaps HOME, so Path.home() here is the real HOME —
@@ -375,6 +374,34 @@ def _discover_wall_prefix(workdir: Path) -> list[str]:
     return []
 
 
+def discover_start_dir(workdir: Path) -> str:
+    """Return the repo-relative `unittest discover -s` start dir for ``workdir``.
+
+    Detection is driven by worktree CONTENTS, not a repo-name allowlist, so it
+    generalizes to any Python repo with a supported layout:
+
+      - ``scripts/tests/`` present  -> ``'scripts/tests'`` (agent-core's layout;
+        byte-for-byte the historical default).
+      - else ``pipeline/`` present AND holding ``test_*.py`` -> ``'pipeline'``
+        (the ourliberty-graph layout — tests live in ``pipeline/test_*.py`` with
+        no ``scripts/tests`` dir). Without this branch the gate discovered
+        nothing and exited 2 (analysis-fail) at BOTH SHAs, producing no verdict.
+      - neither -> fall back to ``'scripts/tests'`` so any repo that is neither
+        shape keeps the historical behavior exactly (no new code path for it).
+
+    The returned value is used both as the ``-s`` argument (a filesystem path
+    relative to ``workdir``) and, via ``s.replace('/', '.')``, as the dotted
+    module prefix ``run_single_test_in_dir`` strips. scripts/tests -> the
+    ``scripts.tests.`` prefix it already used; pipeline -> ``pipeline.``.
+    """
+    if (Path(workdir) / 'scripts' / 'tests').is_dir():
+        return 'scripts/tests'
+    pipeline_dir = Path(workdir) / 'pipeline'
+    if pipeline_dir.is_dir() and any(pipeline_dir.glob('test_*.py')):
+        return 'pipeline'
+    return 'scripts/tests'
+
+
 def run_tests_in_dir(
     workdir: Path,
     timeout_s: int,
@@ -402,8 +429,9 @@ def run_tests_in_dir(
     if env is None:
         env = build_sandbox_env(isolated_agents_root)
     wall_prefix = _discover_wall_prefix(workdir)
+    start_dir = discover_start_dir(workdir)
     discover_cmd = ['python3', '-m', 'unittest', 'discover',
-                    '-s', 'scripts/tests', '-v']
+                    '-s', start_dir, '-v']
     try:
         result = subprocess.run(
             wall_prefix + discover_cmd,
@@ -466,8 +494,9 @@ def run_single_test_in_dir(
 
     ``test_id`` is a dotted id as emitted by ``parse_unittest_failures`` /
     ``collect_failures_at_sha`` (e.g. ``scripts.tests.test_foo.TestBar.test_x``).
-    Isolation runs from ``<workdir>/scripts/tests`` where each ``test_*.py``
-    self-adds ``scripts/`` to ``sys.path``, so the ``scripts.tests.`` prefix is
+    Isolation runs from ``<workdir>/<start_dir>`` — the layout ``discover_start_dir``
+    detects (``scripts/tests`` for agent-core, ``pipeline`` for the graph-class
+    repo) — so the matching dotted prefix (``scripts.tests.`` / ``pipeline.``) is
     stripped to a bare module id before invoking unittest.
 
     Fail-closed like ``run_tests_in_dir``: raises AnalysisError on timeout, a
@@ -475,10 +504,11 @@ def run_single_test_in_dir(
     lines), so a broken isolation run can never masquerade as "passed alone".
     """
     bare_id = test_id
-    prefix = TEST_DISCOVERY_TARGET + '.'  # 'scripts.tests.'
+    start_dir = discover_start_dir(workdir)  # 'scripts/tests' or 'pipeline'
+    prefix = start_dir.replace('/', '.') + '.'  # 'scripts.tests.' | 'pipeline.'
     if bare_id.startswith(prefix):
         bare_id = bare_id[len(prefix):]
-    tests_dir = Path(workdir) / 'scripts' / 'tests'
+    tests_dir = Path(workdir) / start_dir
     wall_prefix = _discover_wall_prefix(tests_dir)
     cmd = ['python3', '-m', 'unittest', '-v', bare_id]
     try:
