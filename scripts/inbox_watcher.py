@@ -50,6 +50,7 @@ import mirror_review_handler  # noqa: E402
 import routing_validator  # noqa: E402
 import safe_write_inbox  # noqa: E402
 import task_terminal_state  # noqa: E402
+import agent_work_in_flight  # noqa: E402  (canonical cordon path, #994)
 import worktree_manager  # noqa: E402
 
 HOME = Path.home()
@@ -1437,11 +1438,14 @@ CORDON_UNIT = "ourliberty-inbox-watcher.service"
 
 
 def _restart_cordon_file() -> Path:
-    """Resolved at CALL time to honor the OURLIBERTY_AGENTS_ROOT sandbox
-    redirect (AGENTS_ROOT is frozen at import)."""
-    root = os.environ.get("OURLIBERTY_AGENTS_ROOT")
-    base = Path(root) if root else AGENTS_ROOT
-    return base / "state" / "restart-cordon" / f"{CORDON_UNIT}.json"
+    """Delegates to the CANONICAL path helper so producer and consumer cannot
+    disagree. They previously derived it independently: heal_stale_daemon_code
+    hardcodes /home/larry/agents while this module derived it from Path.home() —
+    identical normally, but this system swaps HOME for tier rotation, and under a
+    swap the restarter would write a cordon this watcher never reads (the guard
+    silently does nothing). Resolved at CALL time to honor the sandbox
+    redirect."""
+    return agent_work_in_flight.cordon_file(CORDON_UNIT)
 
 
 def _restart_cordon_active() -> str | None:
