@@ -47,6 +47,7 @@ GH_TIMEOUT_S = 15
 DEFAULT_REPOS = (
     'Larry-Yatch/ourliberty-agent-core',
     'Larry-Yatch/ourliberty-dashboard',
+    'Larry-Yatch/ourliberty-graph',
     'Larry-Yatch/RSDPM',
 )
 

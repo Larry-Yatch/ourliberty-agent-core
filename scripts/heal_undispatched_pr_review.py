@@ -160,16 +160,18 @@ LOG_FILE = AGENTS_ROOT / 'logs' / 'heal-undispatched-pr-review.log'
 HEARTBEAT_FILE = AGENTS_ROOT / 'blackboard' / 'heal-undispatched-pr-review.heartbeat'
 STATE_FILE = AGENTS_ROOT / 'state' / 'heal-undispatched-pr-review.json'
 
-# Repos this backstop sweeps. The Forge→Mirror→auto-merge pipeline is repo-agnostic
-# (routing allowlist + repo_paths in config/agent-models.json cover both; the merge
-# path derives its repo from the PR URL), so a labeled PR opened against EITHER repo
-# auto-flows. Dashboard coverage closes the gap where a desktop-opened dashboard PR
-# (e.g. #80/#81) was flagged unrouted but never auto-routed (this healer was
-# agent-core-only). Kept as an explicit pair (mirrors heal_pipeline_stall.REPOS)
+# Repos this backstop sweeps (agent-core, dashboard, graph, RSDPM). The
+# Forge→Mirror→auto-merge pipeline is repo-agnostic (routing allowlist +
+# repo_paths in config/agent-models.json cover all; the merge path derives its
+# repo from the PR URL), so a labeled PR opened against ANY of them auto-flows.
+# Dashboard coverage closes the gap where a desktop-opened dashboard PR (e.g.
+# #80/#81) was flagged unrouted but never auto-routed (this healer was
+# agent-core-only). Kept as an explicit list (mirrors heal_pipeline_stall.REPOS)
 # rather than config-derived to keep this backstop dependency-light.
 REPOS = (
     'Larry-Yatch/ourliberty-agent-core',
     'Larry-Yatch/ourliberty-dashboard',
+    'Larry-Yatch/ourliberty-graph',
     'Larry-Yatch/RSDPM',
 )
 # Three classes of open PR get auto-routed to a Mirror review:
