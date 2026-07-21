@@ -9923,7 +9923,11 @@
         "at": "2026-07-21T11:12:16.165245+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-21T12:51:18.787261+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-sort-once-tier4-cleanup-001",
