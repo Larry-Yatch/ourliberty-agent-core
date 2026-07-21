@@ -13,6 +13,13 @@ Design notes:
     warning (60 min). The cooldown key is `source:subject` (subject-specific
     so e.g. "bots:mirror" and "bots:forge" each have their own bucket; M3
     fix from the design review).
+  - Every appended alert row carries `tier` (NOW/SOON/FYI) and `tier_source`
+    ("translation" when the alert-translations entry classified it,
+    "default" for the conservative FYI fallback), resolved at WRITE time by
+    the same `resolve_tier` the DM glyph header uses. Stamped at emit because
+    the (source, subject) → tier join is not reliably recoverable later — a
+    source whose translation block spans several tiers is ambiguous once the
+    row is on disk — and retention trims the queue at 14 days.
   - The bot's offset file lives at ~/agents/state/beacon-alerts-offset.txt
     and is read/written by the bot — this module never advances it. Per-line
     ack on the bot side ensures at-least-once delivery (M2 fix).
@@ -472,12 +479,21 @@ def append_alert(
         return False
     if in_cooldown(severity, key):
         return False
+    # Stamp the resolved operator tier at WRITE time. The (source, subject) →
+    # tier join is not reliably recoverable after the fact — a source whose
+    # translation block holds several subjects with different tiers is
+    # ambiguous once the row is on disk — and the queue is trimmed at 14 days,
+    # so an unstamped day is a day of tier history permanently gone. Same
+    # `resolve_tier` the DM glyph uses, so glyph and stamp always agree.
+    tier, tier_source = resolve_tier_for(source, subject)
     record = {
         'ts': datetime.now(timezone.utc).isoformat(),
         'source': source,
         'severity': severity,
         'message': message,
         'route': route,
+        'tier': tier,
+        'tier_source': tier_source,
     }
     if subject:
         record['subject'] = subject
@@ -546,13 +562,20 @@ def append_promotion(
     can treat a False as "leave un-promoted, retry next cycle".
     """
     refuse_under_test('larry-alerts')
+    promoted_subject = f'{subject}{PROMOTION_SUBJECT_SUFFIX}'
+    # Resolve against the SUFFIXED subject the record actually carries — that
+    # is what the DM renderer looks up, and translate_alert's prefix-strip
+    # recovers the original entry — so glyph and stamp agree here too.
+    tier, tier_source = resolve_tier_for(source, promoted_subject)
     record = {
         'ts': datetime.now(timezone.utc).isoformat(),
         'source': source,
         'severity': severity,
         'message': message,
         'route': 'escalate',
-        'subject': f'{subject}{PROMOTION_SUBJECT_SUFFIX}',
+        'tier': tier,
+        'tier_source': tier_source,
+        'subject': promoted_subject,
         'promotion': True,
         'promoted_from': f'{source}:{subject}',
         'promotion_reason': reason,
@@ -1331,6 +1354,43 @@ def translate_alert(source: str, subject: Optional[str]) -> Optional[dict]:
 _TIER_GLYPHS = {'NOW': '🔴', 'SOON': '🟡', 'FYI': '⚪'}
 _TIER_DEFAULT = 'FYI'
 
+# `tier_source` values stamped alongside the tier at write time.
+TIER_SOURCE_TRANSLATION = 'translation'
+TIER_SOURCE_DEFAULT = 'default'
+
+
+def resolve_tier(translation: Optional[dict]) -> tuple:
+    """Resolve a translation entry to ``(tier, tier_source)``.
+
+    THE single tier resolution for both the DM glyph header and the tier
+    stamped onto the appended row — one lookup means the rendered glyph and
+    the recorded tier can never disagree.
+
+    Returns the entry's `tier` with ``tier_source='translation'`` when it is
+    one of NOW/SOON/FYI. Everything else — no translation matched, entry
+    missing `tier`, or an unrecognized value (a typo in the config) — is the
+    conservative FYI default with ``tier_source='default'``, so a
+    misclassification under-notifies rather than crying wolf. Downstream
+    consumers (XIV-b's lapse-window tuning) gate on `tier_source` to tell a
+    real classification apart from the fallback."""
+    if isinstance(translation, dict):
+        tier = translation.get('tier')
+        if isinstance(tier, str) and tier in _TIER_GLYPHS:
+            return tier, TIER_SOURCE_TRANSLATION
+    return _TIER_DEFAULT, TIER_SOURCE_DEFAULT
+
+
+def resolve_tier_for(source: str, subject: Optional[str]) -> tuple:
+    """``resolve_tier`` over a fresh (source, subject) translation lookup.
+
+    Write-path entry point: never raises (a broken/unreadable translations
+    config degrades to the FYI default), because `append_alert`'s contract is
+    fire-and-forget."""
+    try:
+        return resolve_tier(translate_alert(source, subject))
+    except Exception:
+        return _TIER_DEFAULT, TIER_SOURCE_DEFAULT
+
 
 def _render_translated_alert(record: dict, translation: dict) -> str:
     """Render a matched alert with the new layered shape:
@@ -1349,9 +1409,7 @@ def _render_translated_alert(record: dict, translation: dict) -> str:
     operator can still see source, subject, original message, and any
     suggested_action that the producer wrote."""
     severity_label = translation.get('severity', 'WARNING')
-    tier = translation.get('tier', _TIER_DEFAULT)
-    if tier not in _TIER_GLYPHS:
-        tier = _TIER_DEFAULT
+    tier, _tier_source = resolve_tier(translation)
     glyph = _TIER_GLYPHS[tier]
     subject = record.get('subject') or ''
     tier_line = f'{glyph} {tier}'
