@@ -1752,6 +1752,14 @@ _last_reconcile_ts = 0.0
 # Last time the deep-review-held self-heal ran its live PR-state recheck. 0.0 →
 # first reconcile after startup rechecks once (clears any stale-on-restart hold).
 _last_deep_review_held_state_recheck_ts = 0.0
+# (repo, pr_number, head_sha) tuples whose dashboard-approved deep-review hold has
+# already had the auto-merge re-driven once. Gates the merge re-attempt in
+# `_reconcile_deep_review_held_approvals` so `gh pr merge` fires on the tick the
+# `deep-review-passed` stamp FIRST lands (prompt merge) and thereafter only on the
+# throttled state-recheck cadence — never every 60s tick. In-memory only: a daemon
+# restart re-fires at most one harmless re-drive (an already-merged PR returns
+# already_merged; a still-blocked PR idempotently re-queues).
+_deep_review_merge_driven: set[tuple[str, int, str]] = set()
 
 
 def log(msg: str, level: str = 'INFO', ts: Optional[str] = None) -> None:
@@ -9019,11 +9027,16 @@ def _alert_deep_review_label_failure(
 
 def _apply_deep_review_pass_label(
     repo_coords: str, pr_number: int, pr_url: str, task_id: str,
-) -> None:
+) -> bool:
     """Mechanically stamp `deep-review-passed` on an APPROVED held PR so the
-    EXISTING merge gate releases it on its next sweep — the approve action is
-    done in the notifier, NOT by a downstream LLM turn (mechanical-recovery
-    discipline).
+    merge gate no longer holds it — the approve action is done in the notifier,
+    NOT by a downstream LLM turn (mechanical-recovery discipline).
+
+    Returns True iff the label is now PRESENT (already-present no-op, or a
+    successful stamp this call) — the reconcile uses this to gate the follow-on
+    auto-merge re-drive. Returns False when the stamp could not be confirmed (gh
+    failure), so a merge is never driven onto a PR whose deep-review gate would
+    still hold.
 
     Idempotent: if the label is already present (a prior tick applied it, or
     the merge simply hasn't fired yet) this is a no-op with no gh write and no
@@ -9032,7 +9045,7 @@ def _apply_deep_review_pass_label(
     approve."""
     labels = _gh_pr_labels(repo_coords, pr_number)
     if labels is not None and _DEEP_REVIEW_PASSED_LABEL in labels:
-        return
+        return True
     try:
         proc = subprocess.run(
             ['gh', 'pr', 'edit', str(pr_number), '--repo', repo_coords,
@@ -9043,17 +9056,18 @@ def _apply_deep_review_pass_label(
         _alert_deep_review_label_failure(
             repo_coords, pr_number, pr_url, f'{type(e).__name__}: {e}',
         )
-        return
+        return False
     if proc.returncode != 0:
         _alert_deep_review_label_failure(
             repo_coords, pr_number, pr_url,
             (proc.stderr or '').strip()[:200] or f'exit {proc.returncode}',
         )
-        return
+        return False
     log(
         f'deep-review-hold APPROVED → stamped `{_DEEP_REVIEW_PASSED_LABEL}` on '
-        f'pr={pr_url}; existing gate will auto-merge on its next sweep',
+        f'pr={pr_url}; driving the auto-merge now that the gate is cleared',
     )
+    return True
 
 
 def _resolve_cleared_deep_review_approvals(
@@ -9178,7 +9192,45 @@ def _reconcile_deep_review_held_approvals() -> None:
                 repo, pr_number, pr_url, task_id, head_sha, approval_id,
             )
         elif existing.get('status') == 'approved':
-            _apply_deep_review_pass_label(repo, pr_number, pr_url, task_id)
+            # Stamp the label, then ACTUALLY drive the merge. Stamping alone was
+            # the handoff gap: `held_deep_review` is by-design NOT queued / NOT
+            # retried, and the auto-merge queue sweep only retries QUEUE entries,
+            # so a dashboard-approved hold sat OPEN forever waiting on a gate that
+            # never fired. With the label present, `_attempt_auto_merge_with_gates`
+            # no longer re-holds on deep review — it runs the serializer gates and
+            # either merges, enqueues behind a real overlap (whose sweep then owns
+            # retry), or DMs on a genuine conflict.
+            label_present = _apply_deep_review_pass_label(
+                repo, pr_number, pr_url, task_id,
+            )
+            if label_present:
+                # Idempotency (the reconcile runs every ~60s): fire the merge on
+                # the tick the stamp FIRST lands, then only on the throttled
+                # state-recheck cadence — never every tick, so a PR merely queued
+                # behind a blocker or momentarily UNKNOWN can't spam `gh pr merge`.
+                drive_key = (repo, pr_number, head_sha or '')
+                first_drive = drive_key not in _deep_review_merge_driven
+                if first_drive or _do_state_recheck:
+                    _deep_review_merge_driven.add(drive_key)
+                    merge_result = _attempt_auto_merge_with_gates(
+                        pr_url=pr_url,
+                        repo_coords=repo,
+                        pr_number=pr_number,
+                        task_id=task_id,
+                        summary='',
+                        chat_id=None,
+                        changed_files=None,
+                    )
+                    outcome = (merge_result or {}).get('merge_outcome')
+                    if outcome in ('merged', 'already_merged'):
+                        # Done — drop the held record now (the top-of-loop
+                        # is-open recheck would clear it too, just later).
+                        _clear_deep_review_held(repo, pr_number)
+                        _deep_review_merge_driven.discard(drive_key)
+                    # held_for_blocker → now in the auto-merge queue; its sweep
+                    # owns the retry. held_conflict / failed / held_stale_regression
+                    # → held entry stays; the next throttled tick re-drives (a DM
+                    # already fired where applicable). No extra handling needed.
     _resolve_cleared_deep_review_approvals(live_ids)
 
 

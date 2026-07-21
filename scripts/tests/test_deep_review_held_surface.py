@@ -202,12 +202,37 @@ class _SurfaceTestBase(unittest.TestCase):
         # Keep the Supabase tab feed out of the test; record calls to assert on.
         self._emit = mock.patch('outbox_notifier.chain_event_emit.emit_event')
         self.emit = self._emit.start()
+        # Stub the merge chokepoint the approved-branch now drives, so stamp-
+        # focused tests stay hermetic (the real gate is exercised elsewhere).
+        # `merge_outcome` is per-test tunable; every call is recorded.
+        self.merge_calls: list[dict] = []
+        self.merge_outcome = 'merged'
+
+        def _fake_merge(*, pr_url, repo_coords, pr_number, task_id, summary,
+                        chat_id, changed_files, **kwargs):
+            self.merge_calls.append({
+                'pr_url': pr_url, 'repo': repo_coords,
+                'pr_number': pr_number, 'task_id': task_id,
+            })
+            return {
+                'merge_outcome': self.merge_outcome,
+                'pr_number': pr_number, 'repo_coords': repo_coords,
+            }
+
+        self._merge = mock.patch(
+            'outbox_notifier._attempt_auto_merge_with_gates',
+            side_effect=_fake_merge)
+        self._merge.start()
+        # Per-process drive-tracking set: reset so tests never leak drive-state.
+        on._deep_review_merge_driven.clear()
         on._invalidate_deep_review_paths_cache()
 
     def tearDown(self):
+        self._merge.stop()
         self._emit.stop()
         self._env.stop()
         self._patcher.stop()
+        self.on._deep_review_merge_driven.clear()
         on = self.on
         for k, v in self._orig.items():
             setattr(on, k, v)
@@ -430,6 +455,80 @@ class MergedOutOfBandTest(_SurfaceTestBase):
         self.on._reconcile_deep_review_held_approvals()
         self.assertEqual(len(self.on._load_deep_review_held()), 1)
         self.assertEqual(len(self._pending()), 1)
+
+
+class MergeDriveTest(_SurfaceTestBase):
+    """After a dashboard APPROVE stamps `deep-review-passed`, the reconcile must
+    ACTUALLY drive the merge — stamping alone left the PR OPEN forever because
+    `held_deep_review` is by-design NOT queued / NOT retried and the queue sweep
+    only retries QUEUE entries (deep-review-stamp-triggers-automerge-001).
+    """
+
+    def _surface_and_approve(self, pr_n=823, head='aaaaaaaa11112222'):
+        self._seed_held(self._held_entry(pr_n, head))
+        self.on._reconcile_deep_review_held_approvals()
+        approval_id = f'deep-review-hold-pr{pr_n}-{head[:8]}'
+        self.approval.resolve(approval_id, 'approved', note='larry approved')
+
+    def test_approved_clean_pr_stamps_then_merges_and_clears(self):
+        # (1) approved + CLEAN/MERGEABLE + stampable → stamp AND invoke the merge
+        # gate (stub returns 'merged'); the held entry clears.
+        self.merge_outcome = 'merged'
+        self._surface_and_approve()
+        self.on._reconcile_deep_review_held_approvals()
+        # Stamped.
+        self.assertIn('deep-review-passed', self.gh.pr_labels[(REPO, 823)])
+        # Drove the real merge chokepoint exactly once, for this PR.
+        self.assertEqual(len(self.merge_calls), 1)
+        self.assertEqual(self.merge_calls[0]['pr_number'], 823)
+        self.assertEqual(self.merge_calls[0]['repo'], REPO)
+        # Held entry cleared on the 'merged' outcome.
+        self.assertEqual(self.on._load_deep_review_held(), [])
+
+    def test_merged_pr_fires_no_second_gh_merge(self):
+        # (2) idempotency: once merged (PR no longer open / held entry gone), a
+        # subsequent reconcile tick fires NO second merge.
+        self.merge_outcome = 'merged'
+        self._surface_and_approve()
+        self.on._reconcile_deep_review_held_approvals()   # merges, clears entry
+        self.gh.pr_state[(REPO, 823)] = 'MERGED'          # realistic: PR closed
+        self.on._reconcile_deep_review_held_approvals()   # must NOT re-merge
+        self.assertEqual(len(self.merge_calls), 1)
+
+    def test_overlap_blocker_enqueues_once_no_per_tick_redrive(self):
+        # (3) overlap blocker → outcome 'held_for_blocker' → entry now owned by
+        # the auto-merge queue; the reconcile does NOT re-drive the merge every
+        # tick (only on the throttled state-recheck cadence).
+        self.merge_outcome = 'held_for_blocker'
+        # Production-like throttle: first tick rechecks, the next does not.
+        self.on._DEEP_REVIEW_HELD_STATE_RECHECK_INTERVAL_S = 600
+        self.on._last_deep_review_held_state_recheck_ts = 0.0
+        self._surface_and_approve()
+        self.on._reconcile_deep_review_held_approvals()   # recheck tick → drives
+        self.on._reconcile_deep_review_held_approvals()   # throttled → no re-drive
+        self.assertEqual(len(self.merge_calls), 1)
+        # Held entry stays (queue sweep owns the retry; nothing cleared it here).
+        self.assertEqual(len(self.on._load_deep_review_held()), 1)
+
+    def test_pending_approval_never_drives_a_merge(self):
+        # (4) approval still 'pending' → only surfacing happens; NO stamp, NO
+        # merge attempt.
+        self._seed_held(self._held_entry(823, 'aaaaaaaa11112222'))
+        self.on._reconcile_deep_review_held_approvals()   # surfaces (pending)
+        self.on._reconcile_deep_review_held_approvals()
+        self.assertEqual(self.gh.edit_calls, [])
+        self.assertEqual(self.merge_calls, [])
+
+    def test_label_stamp_failure_alerts_and_drives_no_merge(self):
+        # (5) label-stamp gh failure → the existing repair-failure alert fires and
+        # NO merge is attempted (never merge onto a still-gated PR).
+        self.gh.edit_fail = True
+        self._surface_and_approve()
+        self.on._reconcile_deep_review_held_approvals()
+        alerts = self._alerts()
+        self.assertEqual(len(alerts), 1)
+        self.assertIn('deep-review-passed', alerts[0]['message'])
+        self.assertEqual(self.merge_calls, [])
 
 
 if __name__ == '__main__':
