@@ -9570,7 +9570,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-21T06:19:12.173575+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-21T06:17:15.654201+00:00"
+      "orphan_last_activity_ts": "2026-07-21T06:17:15.654201+00:00",
+      "briefing": {
+        "what": "The team started tightening how we double-check our work before it ships, but it isn't attached to a specific project goal yet.",
+        "why": "Solid checks catch mistakes early and keep our releases reliable, but effort spent without a clear purpose can quietly drift and waste time.",
+        "suggest": "Give it a quick look to confirm it's worth continuing and tie it to a real goal before letting it move forward."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-21T06:20:18.704972+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
