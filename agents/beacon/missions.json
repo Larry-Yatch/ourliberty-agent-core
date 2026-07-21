@@ -9488,6 +9488,23 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-graph-pr8-merge-decision-001-retry1",
+      "name": "Graph Pr8 Merge Decision 001 Retry1",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `graph-pr8-merge-decision-001-retry1`. Last activity 2026-07-21T02:41:09.490336+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "graph-pr8-merge-decision-001-retry1"
+      ],
+      "repo": null,
+      "created": "2026-07-21",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-21T02:47:49.670181+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-21T02:41:09.490336+00:00"
     }
   ]
 }
