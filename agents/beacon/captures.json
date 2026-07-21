@@ -449,7 +449,7 @@
       "id": "cap-investigate-retry-clarification-cost-sources-d121",
       "title": "Investigate retry / clarification cost sources",
       "note": "~$3.00/wk reclaimable (22.0% of total spend is retries/clarifications)\n\nRetry overhead is above the 15% threshold. Audit the outbox-notifier log for the dominant retry shapes (revision, clarification, cycle-fix) and tighten the upstream preflight / spec template that caused them.",
-      "state": "parked",
+      "state": "dropped",
       "label": "pulse-check-i",
       "origin": {
         "source": "agent",
@@ -461,17 +461,17 @@
       "last_touched": "2026-06-11T17:47:05.211097+00:00",
       "promoted_to": null,
       "briefing": {
-        "what": "About a fifth of our weekly tool spend is going to redo-work \u2014 the system asking again or re-doing tasks instead of getting them right the first time.",
-        "why": "It's roughly $3 a week of waste today, and that share is creeping past the level where it's worth a look before it grows.",
-        "suggest": "Worth a focused look at what's triggering the repeats and fixing the most common cause \u2014 but scope it tightly first, since the dollar amount is still small."
+        "what": "About a fifth of what we spend on the work goes to do-overs \u2014 tasks that get kicked back for corrections or extra questions before they finish.",
+        "why": "That waste is running higher than we'd like, and cleaning it up would put roughly $3 a week back in our pocket while making the work flow smoother.",
+        "suggest": "Worth a closer look, but let's scope it deliberately first \u2014 take time to pin down what's actually driving the do-overs before changing anything, so we fix the real cause and don't create new problems."
       },
       "risk": "careful",
-      "recommended_action": "delegate",
+      "recommended_action": "drop",
       "briefing_provenance": {
         "by": "beacon",
         "model": "claude-opus-4-8",
-        "at": "2026-06-14T17:52:43.946307+00:00",
-        "from_state": "parked"
+        "at": "2026-07-21T09:51:34.756932+00:00",
+        "from_state": "dropped"
       },
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
       "aging": true,
@@ -810,7 +810,7 @@
       "id": "cap-board-card-doesn-t-reflect-a-successful-launch-d-4c0e",
       "title": "Board: card doesn't reflect a successful Launch -> duplicate launches 409 (dogfood)",
       "note": "Dogfood 2026-06-19. After a SUCCESSFUL 'Launch build', the project card stays on 'Brainstorm' with the 'Launch build' button still active (no Building/dispatched state shown). Clicking again POSTs /api/projects/launch -> 409 Conflict (sequence already exists), silently reverting to 'Launch build'. Verified via /api/system/build-sequences: sequence 'launch-system-self-awareness-slice-1-state-log' exists, status 'pending'. So the launch worked the first time but the UI gives zero feedback, causing confusing repeated clicks. Suggest: on a successful launch advance the card to Building/dispatched (or disable the button + show queued), and surface the 409 instead of silently reverting. Owner = Projects-tab-v3 board stream.",
-      "state": "parked",
+      "state": "dropped",
       "label": null,
       "origin": {
         "source": "desktop-chat",
@@ -822,17 +822,17 @@
       "last_touched": "2026-06-20T01:14:16.782341+00:00",
       "promoted_to": null,
       "briefing": {
-        "what": "After you successfully kick off a project build, the board card doesn't change and still shows the 'Launch' button, so it looks like nothing happened.",
-        "why": "People click 'Launch' again thinking it failed, which throws a confusing error and makes a working feature feel broken \u2014 eroding trust in the tool.",
-        "suggest": "Worth fixing soon: have the card clearly move to a 'Building' state once a launch succeeds, but validate the change carefully before shipping so we don't introduce new confusion."
+        "what": "When you launch a project from the board, the button works but the card never updates, so it looks like nothing happened and you're tempted to click again.",
+        "why": "That confusing dead-click makes people re-launch the same project and hit errors, eroding trust in the board right where dogfooding should be building it.",
+        "suggest": "Worth fixing soon: have a successful launch visibly move the card to 'Building' and show a clear message when a repeat click is blocked \u2014 but scope it carefully since it touches the live board."
       },
       "risk": "medium",
-      "recommended_action": "delegate",
+      "recommended_action": "drop",
       "briefing_provenance": {
         "by": "beacon",
         "model": "claude-opus-4-8",
-        "at": "2026-06-20T01:14:19.913222+00:00",
-        "from_state": "parked"
+        "at": "2026-07-21T09:51:34.756932+00:00",
+        "from_state": "dropped"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
       "aging": true
