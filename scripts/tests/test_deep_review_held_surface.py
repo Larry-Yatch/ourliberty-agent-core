@@ -606,6 +606,19 @@ class HeadMovedSinceHoldTest(_SurfaceTestBase):
         self.assertEqual(self.gh.remove_label_calls, [])
         self.assertEqual(self.merge_calls, [])
 
+    def test_hold_recorded_with_no_head_never_revokes_a_stamp(self):
+        # An entry held when gh couldn't resolve the head records head_sha=None,
+        # and an entry we never stamped has stamped_head_sha=None. Those two
+        # Nones must not compare equal into a revoke of someone else's stamp.
+        self._seed_held(self._held_entry(823, None))
+        self.on._reconcile_deep_review_held_approvals()
+        self.approval.resolve('deep-review-hold-pr823', 'approved', note='ok')
+        self.gh.pr_labels[(REPO, 823)] = ['deep-review-passed']
+        self.gh.pr_heads[(REPO, 823)] = 'ffffffff99998888'
+        self.on._reconcile_deep_review_held_approvals()
+        self.assertEqual(self.gh.remove_label_calls, [])
+        self.assertEqual(self.merge_calls, [])
+
     def test_unresolvable_head_defers_the_merge(self):
         # gh can't resolve the head → cannot prove it is the approved commit.
         # Fail CLOSED: no stamp, no merge, hold preserved for the next tick.

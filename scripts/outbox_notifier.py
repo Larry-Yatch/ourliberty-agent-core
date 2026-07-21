@@ -9278,7 +9278,12 @@ def _reconcile_deep_review_held_approvals() -> None:
                 # Leaving `approval_id` out of `live_ids` lets
                 # `_resolve_cleared_deep_review_approvals` take the stale
                 # approval off the tab.
-                if entry.get('stamped_head_sha') == head_sha:
+                # `head_sha` truthiness matters: an entry held with an
+                # unresolvable head records None, and an entry we never stamped
+                # has no `stamped_head_sha` (also None) — without this guard the
+                # two Nones would compare equal and we'd revoke a stamp that
+                # isn't ours.
+                if head_sha and entry.get('stamped_head_sha') == head_sha:
                     _revoke_deep_review_pass_label(repo, pr_number, pr_url)
                 _clear_deep_review_held(repo, pr_number)
                 _deep_review_merge_driven.discard((repo, pr_number,
