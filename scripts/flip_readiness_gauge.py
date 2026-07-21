@@ -71,6 +71,27 @@ heartbeats + exits 0. ``all_green`` requires every criterion GENUINELY green —
 indeterminate is never green. A substrate dark for 2 consecutive runs escalates
 once. Only an artifact-write failure is non-zero.
 
+Runbook (read + decommission) — spec § 7 AC / § 9 handoff:
+  * READ the current gauge state without asking anyone: the latest dated artifact
+    at ``~/agents/blackboard/flip-readiness/flip-readiness-<date>.json`` carries
+    the five booleans, each criterion's number + threshold + gap, ``all_green``,
+    the ``window`` block, and a per-substrate ``substrate`` status block (which
+    inputs were readable). ``gauge-state.json`` in the same directory holds the
+    persisted last level (``last_all_green``, ``last_doorbell_as_of``, the
+    consecutive-dark counters). A read-only ``--dry-run`` recomputes + prints the
+    artifact to stdout without writing anything or ringing any DM.
+  * DECOMMISSION in this ORDER (order matters — skipping a step leaves
+    ``heal_pulse_check_staleness`` firing ``pulse-check-stale:flip-readiness``
+    alerts forever): (1) ``systemctl stop --now ourliberty-flip-readiness-gauge.timer``
+    then ``systemctl disable ourliberty-flip-readiness-gauge.timer`` to stop the
+    weekly firing; (2) remove the ``"flip-readiness"`` entry from
+    ``config/pulse-check-cadence.json`` so the staleness watcher stops expecting a
+    heartbeat (leaving it in with no firings is the exact "healer keeps alerting"
+    failure this order prevents); (3) delete the heartbeat file
+    ``~/agents/state/pulse-check-flip-readiness.heartbeat`` (and, if desired, the
+    ``~/agents/blackboard/flip-readiness/`` artifact tree). After all three the
+    next healer run is silent — zero flip-readiness alerts.
+
 Stdlib only. No LLM calls. Deterministic.
 """
 from __future__ import annotations
