@@ -4158,6 +4158,89 @@ _STALE_AFTER_DAYS = 14
 # Trailing window for orphan detection (matches the dashboard route).
 _ORPHAN_WINDOW_DAYS = 30
 
+# Task-id prefixes for thread classes that NEVER open a PR by design: a Beacon
+# triage question (`direction-ask-`), a reply posted into a card thread
+# (`card-message-`), and a deep-review hold resolved by Larry's approve/reject
+# (`deep-review-hold-`). Their whole lifecycle is a conversation, so the
+# PR-shaped terminal derive below can never conclude them and they sit on the
+# Orphaned lane badged `building` forever (live 2026-07-21: 22 of 22 "building"
+# orphans were in fact finished, several for 9 days).
+#
+# DELIBERATELY EXCLUDED — `delegate-`: a delegate envelope's OWN session ends
+# when Beacon finishes SCOPING, but the build then runs under a fresh task id
+# (the ledger bridge). Treating its session_done as terminal would hide work
+# that is actively building — proven live the same day (delegate-cap-route-
+# ourliberty-graph-prs-to-mirror-review-1123 concluded at 06:08 and its build
+# opened PR #971 at 06:45). Likewise `rebase-`/`forge-`: those DO open PRs.
+#
+# SIBLING REGISTRY, deliberately NOT shared: heal_missions_card_gc's
+# `REVIEW_SHAPED_TASK_ID_PREFIXES` ('dag-preflight-', 'notify-', 'review-') also
+# lists ids that never open a PR, but it answers a different question — which
+# task_ids to EXCLUDE from a mission's all-terminal ship gate — and it is not
+# safe to import here: it has no reason to carry the `delegate-` exclusion this
+# rule depends on. If you add a class to one, consider whether the other needs
+# it too; they are related, not interchangeable.
+_NO_PR_THREAD_PREFIXES: tuple[str, ...] = (
+    'direction-ask-',
+    'card-message-',
+    'deep-review-hold-',
+)
+
+
+def _session_done_succeeded(payload: dict[str, Any]) -> bool:
+    """`session_done.success` is written by inbox_watcher as the STRING 'True'
+    (it is interpolated from a shell-side log line), while hand-built envelopes
+    and tests use a real bool. Accept both spellings and NOTHING else — absent,
+    False/'False', or any other value means the run did not verifiably succeed,
+    so the thread stays visible."""
+    success = payload.get('success')
+    if isinstance(success, bool):
+        return success
+    if isinstance(success, str):
+        return success.strip().lower() == 'true'
+    return False
+
+
+def _is_thread_conclusion(ev: dict[str, Any]) -> bool:
+    """A real end-of-thread signal for a no-PR class: the agent's session
+    finished successfully, or Larry decided the hold. A `session_done` that did
+    not verifiably succeed is NOT a conclusion — an errored or truncated run
+    must stay visible."""
+    event_type = ev.get('event_type')
+    payload = _ev_payload(ev)
+    if event_type == 'session_done':
+        return _session_done_succeeded(payload)
+    if event_type == 'larry_action':
+        return payload.get('action') in ('approve', 'reject')
+    return False
+
+
+def _no_pr_thread_concluded(
+    orphan: dict[str, Any],
+    events: list[dict[str, Any]],
+    pr_state: Optional[str],
+) -> bool:
+    """True when this orphan is a no-PR-by-design thread that has verifiably
+    concluded. Evidence-based, never a clock.
+
+    The no-PR gate is what keeps the standing invariant intact: an orphan
+    carrying an OPEN or unresolved PR can never reach terminal through this
+    path, at any age. This adds a SECOND, disjoint terminal rule for threads the
+    PR-shaped rule is structurally unable to conclude — it does not weaken it."""
+    task_id = orphan.get('task_id') or ''
+    if not task_id.startswith(_NO_PR_THREAD_PREFIXES):
+        return False
+    if orphan.get('pr_url') or pr_state:
+        return False
+    # Deliberately redundant with the line above: `orphan['pr_url']` is folded
+    # from these same events by `summarize_task_events`. This is the gate that
+    # decides whether to stop showing something, so it re-reads the source
+    # rather than trusting the fold — and it also covers callers that hand us
+    # events without a folded orphan.
+    if any(ev.get('pr_url') for ev in events):
+        return False
+    return any(_is_thread_conclusion(ev) for ev in events)
+
 
 def _ev_payload(ev: dict[str, Any]) -> dict[str, Any]:
     p = ev.get('payload')
@@ -4677,6 +4760,10 @@ def _derive_orphan_readability(
 
     if derived_phase == 'shipped':
         state_badge, terminal, stalled = 'shipped', True, False
+    elif _no_pr_thread_concluded(orphan, events, pr_state):
+        # Second, disjoint terminal rule — see `_no_pr_thread_concluded`. Ranked
+        # below `shipped` so a real merge always wins the badge.
+        state_badge, terminal, stalled = 'concluded', True, False
     elif pr_state == 'CLOSED':
         # PR explicitly closed without merging — deliberately dropped → terminal
         # (distinct badge). An explicit close is a human action, unlike a stall.
@@ -5548,6 +5635,49 @@ def _promoted_mission_ids(projects: list[dict[str, Any]]) -> set[str]:
     return out
 
 
+def _dismissed_mission_ids(entries: list[dict[str, Any]]) -> set[str]:
+    """Mission ids whose proposed thread has been DISMISSED — i.e. the registry
+    says this work is settled (`acknowledged: true`, or retired/archived/closed).
+    Reuses `_proposed_mission_is_dead`, the same terminal test the funnel's
+    secondary lane already trusts, so the two lanes can never disagree about
+    what 'dead' means."""
+    out: set[str] = set()
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        mid = entry.get('id')
+        if isinstance(mid, str) and mid and _proposed_mission_is_dead(entry):
+            out.add(mid)
+    return out
+
+
+def _dismissed_source_project_ids(
+    projects: list[dict[str, Any]],
+    dismissed_mission_ids: set[str],
+) -> set[str]:
+    """Project ids whose source mission has been dismissed. One pass over
+    `projects`, so the pipeline filter is a set membership test rather than a
+    rescan per card. Provenance is matched with `_promoted_from_matches`, the
+    same kind→id-key join the promote/idempotency paths use.
+
+    Only positive evidence lands in the set: a project with no provenance, or
+    provenance of another kind (capture/orphan), is simply absent — so an
+    unknown card is always kept. Never hide work on missing information."""
+    out: set[str] = set()
+    for proj in projects:
+        if not isinstance(proj, dict):
+            continue
+        pid = proj.get('id')
+        if not isinstance(pid, str) or not pid:
+            continue
+        pf = proj.get('promoted_from')
+        mid = pf.get('mission_id') if isinstance(pf, dict) else None
+        if mid in dismissed_mission_ids and _promoted_from_matches(
+                proj, {'kind': 'mission', 'mission_id': mid}):
+            out.add(pid)
+    return out
+
+
 def _promoted_orphan_task_ids(projects: list[dict[str, Any]]) -> set[str]:
     """The orphan task_ids that SUPPRESSING projects were promoted from (projects-
     v3 P3 follow-up, p3f-reversibility-and-orphan). Read from each suppressing
@@ -5952,6 +6082,30 @@ def _handle_missions_derived(
         projects, now, sequence_status_by_id)
     if repo:
         pipeline = [p for p in pipeline if p.get('repo') == repo]
+    # A project promoted from a mission that has since been DISMISSED is dead
+    # work still drawing a card. `dismiss` is a missions.json-only edit (it opens
+    # a PR against the registry and never touches projects.json), so the promoted
+    # project stays `active` and its brainstorm card renders forever. Live
+    # 2026-07-21: 2 of the 4 pipeline cards were dismissed by MERGED PRs (#931,
+    # #957) 8-12 days earlier and were still on the board.
+    #
+    # This is a READ-SIDE PATCH, and the store stays wrong underneath it. The
+    # store is already asymmetric about dismissal: `mirror_missions_as_projects`
+    # refuses to MINT a project for an `acknowledged` mission, but
+    # `reconcile_terminal_mission_projects` — whose terminal set is
+    # ('shipped','retired') — will happily KEEP one. Closing that asymmetry
+    # inside heal_projects_store (the sole COMMITTER; note the dashboard's own
+    # promote/launch/archive handlers already write this file on disk, so a
+    # write here would not have raced) is the real fix, and every reader of
+    # projects.json would then agree instead of just this endpoint. Filtering
+    # here buys the board back today and is reversible — un-dismiss the mission
+    # and the card returns. Follow-up card: "reconcile dismissed-source projects
+    # in heal_projects_store".
+    if pipeline:
+        _dismissed_projects = _dismissed_source_project_ids(
+            projects, _dismissed_mission_ids(entries))
+        pipeline = [p for p in pipeline
+                    if p.get('id') not in _dismissed_projects]
     # projects-v3 P6.1: project the collapsed-card team-reply badge onto each
     # phase, keyed by its composite thread ref ``project_id::phase_id`` (the key
     # `_handle_phase_thread` / `_card_thread_messages` store the phase
