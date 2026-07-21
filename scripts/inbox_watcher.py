@@ -1428,6 +1428,103 @@ def _is_continuation_task(task: dict) -> bool:
     return False
 
 
+# ==================== restart cordon (spec: restart-inflight-guard) ====================
+
+# The systemd unit this process runs as. A cordon is written per-UNIT by the
+# restarter that intends to restart it; every agent thread in this process is
+# hosted by that one unit, so one cordon quiesces the whole watcher.
+CORDON_UNIT = "ourliberty-inbox-watcher.service"
+
+
+def _restart_cordon_file() -> Path:
+    """Resolved at CALL time to honor the OURLIBERTY_AGENTS_ROOT sandbox
+    redirect (AGENTS_ROOT is frozen at import)."""
+    root = os.environ.get("OURLIBERTY_AGENTS_ROOT")
+    base = Path(root) if root else AGENTS_ROOT
+    return base / "state" / "restart-cordon" / f"{CORDON_UNIT}.json"
+
+
+def _restart_cordon_active() -> str | None:
+    """Reason string iff a LIVE cordon is in force for this unit, else None.
+
+    A restarter that wants to restart this unit without killing paid work writes
+    a cordon, waits for in-flight sessions to drain, restarts, then removes it
+    (spec: restart-inflight-guard). While it is up we take NO new work; sessions
+    already running finish untouched, which is what lets the drain terminate.
+
+    Blocks continuations TOO — deliberately unlike the rotation gate. The
+    rotation gate passes continuations so in-flight chains finish on their bound
+    account; a cordon has the opposite goal. Letting continuations start new
+    sessions would keep in-flight non-zero indefinitely, so the drain would never
+    observe quiescence and the ceiling would fire and SIGTERM the work anyway —
+    the exact outcome the cordon exists to prevent. A blocked continuation is not
+    lost: like every other gate here the task stays in the inbox and runs after
+    the restart (drain must never drop work, only delay it).
+
+    FAIL-OPEN in every direction — a stuck cordon would silently stall all
+    dispatch, which is worse than the killed reviews this prevents. Missing,
+    unreadable, malformed, EXPIRED, or dead-holder → None (not cordoned):
+
+      * expires_at in the past      → a dead cordon cannot outlive its TTL
+      * holder pid/boot not alive   → clears in seconds, without waiting the TTL
+    """
+    try:
+        data = json.loads(_restart_cordon_file().read_text())
+    except (OSError, ValueError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    try:
+        if float(data.get("expires_at", 0)) <= time.time():
+            return None  # expired
+    except (TypeError, ValueError):
+        return None  # unparseable expiry is NOT a valid cordon
+    pid = data.get("pid")
+    boot = data.get("boot_id")
+    if not _cordon_holder_alive(pid, boot):
+        return None
+    reason = data.get("reason")
+    return str(reason) if reason else "restart-pending"
+
+
+def _current_boot_id() -> str | None:
+    """This boot's id, or None where it cannot be read (non-Linux dev boxes)."""
+    try:
+        with open("/proc/sys/kernel/random/boot_id") as f:
+            return f.read().strip() or None
+    except OSError:
+        return None
+
+
+def _cordon_holder_alive(pid, boot_id) -> bool:
+    """True iff the cordon's writer is still alive on the CURRENT boot.
+
+    Boot-scoped because pids are reused across reboots: a cordon written by pid
+    1234 before a reboot must not be kept alive by an unrelated pid 1234 after
+    one.
+
+    UNVERIFIABLE == NOT ALIVE. A cordon missing either field, or one we cannot
+    boot-check because /proc is unreadable, is NOT trusted. This is the fail-open
+    direction for a cordon (fewer cordons honored → at worst we restart during a
+    review, today's behavior) whereas trusting it would risk honoring a cordon
+    from a previous boot forever — a silent, permanent dispatch stall. It also
+    means the cordon only functions on Linux, which is where the unit runs."""
+    if not isinstance(pid, int) or pid <= 0 or not boot_id:
+        return False
+    current_boot = _current_boot_id()
+    if current_boot is None or str(boot_id) != current_boot:
+        return False
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    return True
+
+
 def _tier_pool_hold_file() -> Path:
     """State file recording when the tier pool first went all-unavailable, so
     the § 9 escalation only fires after a PERSISTENT hold (not a transient
@@ -1597,6 +1694,21 @@ def agent_loop(agent: str, models_config: dict, slot: int = 0,
                     _clear_tier_pool_hold()
             except Exception:
                 pass
+            _shutdown.wait(POLL_INTERVAL_SEC)
+            continue
+
+        # Restart cordon: a restarter intends to restart this unit and is waiting
+        # for us to go quiet. Take NO new work — checked BEFORE the lease acquire
+        # and BEFORE _claim_task, so a cordoned slot never touches a task file at
+        # all. (Blocking inside process_task like the rotation gate would claim
+        # and un-claim every 5s poll for the whole cordon, filling .claimed/ with
+        # exactly the churn that made #971 hard to read.) Sessions already
+        # running are untouched and finish normally — that is what lets the
+        # restarter's drain observe quiescence.
+        cordon_reason = _restart_cordon_active()
+        if cordon_reason:
+            log(f"[{agent}] restart-cordon active ({cordon_reason}); holding "
+                f"{len(tasks)} task(s) in inbox, taking no new work this poll")
             _shutdown.wait(POLL_INTERVAL_SEC)
             continue
 
