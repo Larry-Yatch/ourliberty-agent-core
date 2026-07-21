@@ -174,9 +174,9 @@ PR #796 MERGED at 14:08 MDT 2026-07-01 (REVIEW_PASS ×2, auto-merged). G-rule pi
 
 ---
 
-## G-rule outbox-notifier-deep-review-stamp-no-retry-trigger-001 → DISPATCHED ✅ (iter ~5750), verification_pending
+## G-rule outbox-notifier-deep-review-stamp-no-retry-trigger-001 → FIX LIVE (PR #980 MERGED iter ~5782), verification_pending
 
-**Rule:** When Larry approves a PR via the dashboard `deep-review-passed` label, outbox-notifier applies the label but does NOT re-trigger `merge_reviewed_pr.sh`. PR stays OPEN indefinitely until manual Beacon intervention. Fix: `deep-review-stamp-triggers-automerge-001` Forge build dispatched to Beacon/Forge 09:18:22Z UTC 2026-07-21 (triggered by Larry "do both" command at 08:50:59Z → Beacon confirmed gap → Forge build). verification_pending. Occurrences: iter ~5746 (1/3 — PR #971 review interrupted then label applied, no auto-merge); iter ~5749 (2/3 — Larry applied label via dashboard, PR stayed open; Beacon confirmed gap); iter ~5750 (DISPATCHED — Forge build in-flight).
+**Rule:** When Larry approves a PR via the dashboard `deep-review-passed` label, outbox-notifier applies the label but does NOT re-trigger `merge_reviewed_pr.sh`. PR stays OPEN indefinitely until manual Beacon intervention. Fix: PR #980 (`fix(auto-merge): dashboard deep-review approval actually fires the merge after stamping`) MERGED 2026-07-21T17:05:07Z UTC. Evidence: post-merge outbox-notifier immediately resolved deep-review-hold approvals for PRs #980 and #982 at 11:06 MDT (detected "PR no longer OPEN"). Fix is in production. Verification_pending: need to observe a fresh deep-review-hold stamp → auto-merge cycle via the new code path to fully verify end-to-end. Occurrences: iter ~5746 (1/3); iter ~5749 (2/3); iter ~5750 (DISPATCHED); iter ~5782 (fix merged).
 
 ---
 
