@@ -88,9 +88,14 @@ Runbook (read + decommission) — spec § 7 AC / § 9 handoff:
     ``config/pulse-check-cadence.json`` so the staleness watcher stops expecting a
     heartbeat (leaving it in with no firings is the exact "healer keeps alerting"
     failure this order prevents); (3) delete the heartbeat file
-    ``~/agents/state/pulse-check-flip-readiness.heartbeat`` (and, if desired, the
-    ``~/agents/blackboard/flip-readiness/`` artifact tree). After all three the
-    next healer run is silent — zero flip-readiness alerts.
+    ``~/agents/blackboard/pulse-check-flip-readiness.heartbeat`` (written by
+    ``pulse_check_heartbeat.run_check`` — see ``heartbeat_path`` — and read by
+    ``heal_pulse_check_staleness`` from that same blackboard dir), and if desired
+    the ``~/agents/blackboard/flip-readiness/`` artifact tree. Do steps 2 and 3
+    together: removing the cadence entry while the heartbeat still exists on disk
+    briefly orphans it, and the healer fires ``pulse-check-no-cadence:flip-readiness``
+    for any heartbeat with no cadence entry. After all three the next healer run
+    is silent — zero flip-readiness alerts.
 
 Stdlib only. No LLM calls. Deterministic.
 """
