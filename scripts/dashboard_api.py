@@ -4972,9 +4972,10 @@ def _delegation_trail_field(
     cap: dict[str, Any],
     build_events_by_origin: Optional[dict[str, list[dict[str, Any]]]],
     pr_state_by_url: Optional[dict[str, str]] = None,
+    has_open_approval: bool = False,
 ) -> dict[str, Any]:
     """Surface a card's spawned-build review trail — `delegation_build_phase`
-    (in_review | review_passed | merged | None) + `delegation_pr_url` — joined
+    (handed_off | in_review | review_passed | merged | None) + `delegation_pr_url` — joined
     against chain_events tagged with `payload.origin_task_id`.
 
     Two origins feed the trail, both read-side (no ref stamped for the second):
@@ -4997,14 +4998,28 @@ def _delegation_trail_field(
 
     Neutral None before any build event joins — never a misleading claim."""
     neutral = {'delegation_build_phase': None, 'delegation_pr_url': None}
-    if not build_events_by_origin:
-        return neutral
-    origins: list[str] = []
     spawned = cap.get('spawned')
-    if isinstance(spawned, dict) and spawned.get('kind') == 'delegate':
-        tid = spawned.get('task_id')
-        if isinstance(tid, str) and tid:
-            origins.append(tid)
+    _delegate_tid = (
+        spawned.get('task_id') if isinstance(spawned, dict)
+        and spawned.get('kind') == 'delegate' else None
+    )
+    delegated = isinstance(_delegate_tid, str) and bool(_delegate_tid)
+    # BASELINE `handed_off` — a delegated card with no open approval and no build
+    # event YET is with the team (scoping / building), not idle. Without this the
+    # card renders blank for the entire pre-review window (the 2026-07-21 "nothing
+    # changed status-wise" report: ~25min from click to PR with a frozen card).
+    # Honest precedence: `has_open_approval` is checked FIRST, so a delegation
+    # parked on Larry shows "waiting on your approval" instead — which is exactly
+    # the lie the Slice-1 antagonistic review rejected, now ruled out by evidence.
+    fallback = (
+        {'delegation_build_phase': 'handed_off', 'delegation_pr_url': None}
+        if (delegated and not has_open_approval) else neutral
+    )
+    if not build_events_by_origin:
+        return fallback
+    origins: list[str] = []
+    if delegated:
+        origins.append(_delegate_tid)
     cid = cap.get('id')
     if isinstance(cid, str) and cid:
         origins.append(f'{_CARD_MESSAGE_ORIGIN_PREFIX}{cid}')
@@ -5014,7 +5029,7 @@ def _delegation_trail_field(
     phase, pr_url = _best_spawned_trail(
         [build_events_by_origin.get(o) or [] for o in origins])
     if phase is None:
-        return neutral
+        return fallback
     if pr_url and (pr_state_by_url or {}).get(pr_url) == 'MERGED':
         phase = 'merged'
     return {'delegation_build_phase': phase, 'delegation_pr_url': pr_url}
@@ -5155,9 +5170,11 @@ def _parked_from_captures(
         }
         entry.update(_meaning_layer_fields(cap))
         entry.update(_spawned_fields(cap, events_by_task_id))
-        entry.update(_delegation_needs_you_field(cap, open_delegate_approvals))
+        _needs_you = _delegation_needs_you_field(cap, open_delegate_approvals)
+        entry.update(_needs_you)
         entry.update(_delegation_trail_field(
-            cap, build_events_by_origin, pr_state_by_url))
+            cap, build_events_by_origin, pr_state_by_url,
+            has_open_approval=_needs_you.get('delegation_needs_you') is not None))
         out.append(entry)
     return out
 
@@ -11765,6 +11782,13 @@ def _project_delegation_fields(
         if phase is not None:
             e['delegation_build_phase'] = phase
             e['delegation_pr_url'] = pr_url
+        elif (evidence and evidence.get('status') == 'resolved'
+                and not e['delegation_needs_you']):
+            # BASELINE `handed_off` — the delegation was approved/dispatched (the
+            # ledger's durable evidence) but no build event has joined yet, so the
+            # work is with the team rather than idle. Without this the card reads
+            # blank for the whole pre-review window. Needs-you takes precedence.
+            e['delegation_build_phase'] = 'handed_off'
 
     # Merged-state (GitHub truth): flip review_passed → merged for entries whose
     # PR has merged, so the operator queue completes the arc through ✅ Merged

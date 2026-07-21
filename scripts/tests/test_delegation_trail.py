@@ -102,10 +102,30 @@ class DelegationTrailFieldTest(unittest.TestCase):
         self.assertIsNone(got['delegation_build_phase'])
         self.assertIsNone(got['delegation_pr_url'])
 
-    def test_no_join_is_neutral(self):
+    def test_delegated_with_no_events_is_handed_off(self):
+        # The pre-review window: delegated, work is with the team, no build event
+        # yet. Must NOT render blank (the 2026-07-21 frozen-card report).
         got = da._delegation_trail_field(_delegate_cap(), {})
-        self.assertIsNone(got['delegation_build_phase'])
+        self.assertEqual(got['delegation_build_phase'], 'handed_off')
         self.assertIsNone(got['delegation_pr_url'])
+
+    def test_open_approval_suppresses_handed_off(self):
+        # Needs-you takes precedence — claiming "with the team" over a delegation
+        # parked on Larry is the exact lie the Slice-1 review rejected.
+        got = da._delegation_trail_field(
+            _delegate_cap(), {}, None, has_open_approval=True)
+        self.assertIsNone(got['delegation_build_phase'])
+
+    def test_non_delegate_card_never_handed_off(self):
+        cap = {'id': 'c', 'state': 'parked',
+               'spawned': {'kind': 'orphan', 'task_id': 't-1'}}
+        self.assertIsNone(
+            da._delegation_trail_field(cap, {})['delegation_build_phase'])
+
+    def test_events_win_over_handed_off(self):
+        m = {DELEGATE_ID: [_ev('review_request')]}
+        got = da._delegation_trail_field(_delegate_cap(), m)
+        self.assertEqual(got['delegation_build_phase'], 'in_review')
 
     def test_merged_pr_flips_review_passed_to_merged(self):
         pr = 'https://github.com/o/r/pull/7'
@@ -126,10 +146,18 @@ class DelegationTrailFieldTest(unittest.TestCase):
         self.assertEqual(len(parked), 1)
         self.assertEqual(parked[0]['delegation_build_phase'], 'in_review')
 
-    def test_parked_neutral_without_map(self):
+    def test_parked_delegated_card_reads_handed_off_without_map(self):
         parked = da._parked_from_captures([_delegate_cap()], NOW, {})
-        self.assertIsNone(parked[0]['delegation_build_phase'])
+        self.assertEqual(parked[0]['delegation_build_phase'], 'handed_off')
         self.assertIsNone(parked[0]['delegation_pr_url'])
+
+    def test_parked_open_approval_shows_needs_you_not_handed_off(self):
+        # End-to-end precedence through the parked derive.
+        approvals = {DELEGATE_ID: {'approval_id': 'a1', 'created_at': None}}
+        parked = da._parked_from_captures(
+            [_delegate_cap()], NOW, {}, approvals)
+        self.assertIsNotNone(parked[0]['delegation_needs_you'])
+        self.assertIsNone(parked[0]['delegation_build_phase'])
 
 
 # ---------- discuss trail (approval-card-build-trail Phase 2) ----------
