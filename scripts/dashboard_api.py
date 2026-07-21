@@ -4864,6 +4864,54 @@ def _open_delegate_approvals(
     return out
 
 
+def _delegate_dispatched_task_ids(
+    origin_task_ids: list[str],
+    agents_root: Optional[Path] = None,
+) -> dict[str, str]:
+    """Map a delegate origin id → the FRESH task id its dispatch actually runs
+    under (the ledger bridge).
+
+    The approval ledger records BOTH on one entry (`origin_task_id` + `id`), and
+    `dispatch_approved` uses that `id` verbatim as the Forge envelope's task_id.
+    So this is the deterministic bridge from a delegated card to the build's OWN
+    chain_events — `session_start` / markers / auto_merge — none of which are
+    origin-tagged (the journal source can't carry the origin). That's what lets a
+    card read `building` while Forge is mid-build, instead of sitting on
+    `handed_off` until the PR opens.
+
+    Scans pending AND history (a dispatched delegation is `approved` in history).
+    Reads the store ONCE. Fail-safe: {} on a missing/unreadable store — the card
+    simply keeps its coarser phase."""
+    if not origin_task_ids:
+        return {}
+    root = agents_root or _agents_root()
+    try:
+        data = json.loads(_beacon_pending_approvals_path(root).read_text())
+    except (OSError, json.JSONDecodeError, ValueError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    wanted = set(origin_task_ids)
+    out: dict[str, str] = {}
+    for bucket in ('pending', 'history'):
+        for entry in (data.get(bucket) or []):
+            if not isinstance(entry, dict):
+                continue
+            origin = entry.get('origin_task_id')
+            fresh = entry.get('id')
+            if (isinstance(origin, str) and origin in wanted
+                    and isinstance(fresh, str) and fresh):
+                out.setdefault(origin, fresh)
+    return out
+
+
+def _has_forge_build_started(events: Optional[list[dict[str, Any]]]) -> bool:
+    """True when the dispatched build's own events show Forge/Mirror actually
+    working it (`session_start`) — the `building` signal. Reuses the existing
+    `_is_session_start` agent gate so there's one definition of 'a build ran'."""
+    return any(_is_session_start(e) for e in (events or []))
+
+
 def _delegation_needs_you_field(
     cap: dict[str, Any],
     open_delegate_approvals: Optional[dict[str, dict[str, Any]]],
@@ -4972,9 +5020,11 @@ def _delegation_trail_field(
     cap: dict[str, Any],
     build_events_by_origin: Optional[dict[str, list[dict[str, Any]]]],
     pr_state_by_url: Optional[dict[str, str]] = None,
+    has_open_approval: bool = False,
+    native_build_events: Optional[dict[str, list[dict[str, Any]]]] = None,
 ) -> dict[str, Any]:
     """Surface a card's spawned-build review trail — `delegation_build_phase`
-    (in_review | review_passed | merged | None) + `delegation_pr_url` — joined
+    (handed_off | building | in_review | review_passed | merged | None) + `delegation_pr_url` — joined
     against chain_events tagged with `payload.origin_task_id`.
 
     Two origins feed the trail, both read-side (no ref stamped for the second):
@@ -4997,14 +5047,37 @@ def _delegation_trail_field(
 
     Neutral None before any build event joins — never a misleading claim."""
     neutral = {'delegation_build_phase': None, 'delegation_pr_url': None}
-    if not build_events_by_origin:
-        return neutral
-    origins: list[str] = []
     spawned = cap.get('spawned')
-    if isinstance(spawned, dict) and spawned.get('kind') == 'delegate':
-        tid = spawned.get('task_id')
-        if isinstance(tid, str) and tid:
-            origins.append(tid)
+    _delegate_tid = (
+        spawned.get('task_id') if isinstance(spawned, dict)
+        and spawned.get('kind') == 'delegate' else None
+    )
+    delegated = isinstance(_delegate_tid, str) and bool(_delegate_tid)
+    # BASELINE `handed_off` — a delegated card with no open approval and no build
+    # event YET is with the team (scoping / building), not idle. Without this the
+    # card renders blank for the entire pre-review window (the 2026-07-21 "nothing
+    # changed status-wise" report: ~25min from click to PR with a frozen card).
+    # Honest precedence: `has_open_approval` is checked FIRST, so a delegation
+    # parked on Larry shows "waiting on your approval" instead — which is exactly
+    # the lie the Slice-1 antagonistic review rejected, now ruled out by evidence.
+    fallback = (
+        {'delegation_build_phase': 'handed_off', 'delegation_pr_url': None}
+        if (delegated and not has_open_approval) else neutral
+    )
+    # `building` sits between handed_off and in_review: the dispatched build's OWN
+    # session_start (reached via the ledger bridge, since those events aren't
+    # origin-tagged) proves Forge is actually on it. Only consulted when the
+    # origin-tagged review trail has nothing yet — a real review event always wins.
+    if (delegated and not has_open_approval
+            and _has_forge_build_started(
+                (native_build_events or {}).get(_delegate_tid))):
+        fallback = {'delegation_build_phase': 'building',
+                    'delegation_pr_url': None}
+    if not build_events_by_origin:
+        return fallback
+    origins: list[str] = []
+    if delegated:
+        origins.append(_delegate_tid)
     cid = cap.get('id')
     if isinstance(cid, str) and cid:
         origins.append(f'{_CARD_MESSAGE_ORIGIN_PREFIX}{cid}')
@@ -5014,7 +5087,7 @@ def _delegation_trail_field(
     phase, pr_url = _best_spawned_trail(
         [build_events_by_origin.get(o) or [] for o in origins])
     if phase is None:
-        return neutral
+        return fallback
     if pr_url and (pr_state_by_url or {}).get(pr_url) == 'MERGED':
         phase = 'merged'
     return {'delegation_build_phase': phase, 'delegation_pr_url': pr_url}
@@ -5120,6 +5193,7 @@ def _parked_from_captures(
     open_delegate_approvals: Optional[dict[str, dict[str, Any]]] = None,
     build_events_by_origin: Optional[dict[str, list[dict[str, Any]]]] = None,
     pr_state_by_url: Optional[dict[str, str]] = None,
+    native_build_events: Optional[dict[str, list[dict[str, Any]]]] = None,
 ) -> list[dict[str, Any]]:
     """Build the `parked[]` array (§ 3.3) from captures.json. Only state=='parked'
     captures; `aging` is the GC healer's persisted flag (Phase 1 — never
@@ -5155,9 +5229,12 @@ def _parked_from_captures(
         }
         entry.update(_meaning_layer_fields(cap))
         entry.update(_spawned_fields(cap, events_by_task_id))
-        entry.update(_delegation_needs_you_field(cap, open_delegate_approvals))
+        _needs_you = _delegation_needs_you_field(cap, open_delegate_approvals)
+        entry.update(_needs_you)
         entry.update(_delegation_trail_field(
-            cap, build_events_by_origin, pr_state_by_url))
+            cap, build_events_by_origin, pr_state_by_url,
+            has_open_approval=_needs_you.get('delegation_needs_you') is not None,
+            native_build_events=native_build_events))
         out.append(entry)
     return out
 
@@ -5510,6 +5587,7 @@ def _build_derived_response(
     collapsed_task_ids: Optional[set[str]] = None,
     open_delegate_approvals: Optional[dict[str, dict[str, Any]]] = None,
     build_events_by_origin: Optional[dict[str, list[dict[str, Any]]]] = None,
+    native_build_events: Optional[dict[str, list[dict[str, Any]]]] = None,
 ) -> dict[str, Any]:
     """Pure derive: build the full /api/missions/derived response (pre-filter).
 
@@ -5607,7 +5685,7 @@ def _build_derived_response(
 
     parked = _parked_from_captures(
         captures, now, events_by_task_id, open_delegate_approvals,
-        build_events_by_origin, pr_state_by_url)
+        build_events_by_origin, pr_state_by_url, native_build_events)
     return {
         'schema_version': 1,
         'missions': missions,
@@ -5758,6 +5836,14 @@ def _handle_missions_derived(
     # waiting on Larry (join by the `origin_task_id` the approval handler stamps).
     # Delegate-only: the needs-you-approval join belongs to the Delegate action.
     open_delegate_approvals = _open_delegate_approvals(parked_spawned_ids)
+    # Ledger bridge (delegate origin → the FRESH task id its dispatch runs under)
+    # so a delegated card can read `building` off the build's OWN session_start —
+    # those events are never origin-tagged, so this is the only join to them.
+    _dispatched_by_origin = _delegate_dispatched_task_ids(parked_spawned_ids)
+    for _fid in _dispatched_by_origin.values():
+        if _fid not in seen:
+            seen.add(_fid)
+            fetch_ids.append(_fid)
     # Slice 2b + approval-card-build-trail Phase 2: the spawned builds' review
     # trail — chain_events keyed by payload.origin_task_id back to each parked
     # card. Two origin families, both read-side: the delegate ref
@@ -5783,6 +5869,10 @@ def _handle_missions_derived(
         supabase_client, trail_origin_ids)
 
     events_by_task_id = _fetch_events_for_task_ids(supabase_client, fetch_ids)
+    native_build_events = {
+        origin: (events_by_task_id.get(fid) or [])
+        for origin, fid in _dispatched_by_origin.items()
+    }
     recent_events = _fetch_recent_chain_events(
         supabase_client, _ORPHAN_WINDOW_DAYS, now,
     )
@@ -5824,6 +5914,7 @@ def _handle_missions_derived(
         collapsed_task_ids=collapsed_task_ids,
         open_delegate_approvals=open_delegate_approvals,
         build_events_by_origin=build_events_by_origin,
+        native_build_events=native_build_events,
     )
     response = _apply_derived_filters(
         response, repo=repo, task_id=task_id, now=now,
@@ -11737,6 +11828,14 @@ def _project_delegation_fields(
         build_events = _fetch_delegation_build_events(supabase_client, origin_ids)
     except Exception:  # noqa: BLE001 — never 500 the always-200 operator queue
         build_events = {}
+    # Ledger bridge → the dispatched build's OWN events, so a card can read
+    # `building` while Forge works it (those events are never origin-tagged).
+    try:
+        _dispatched = _delegate_dispatched_task_ids(origin_ids)
+        _native = _fetch_events_for_task_ids(
+            supabase_client, sorted(set(_dispatched.values())))
+    except Exception:  # noqa: BLE001 — never 500 the always-200 operator queue
+        _dispatched, _native = {}, {}
     for e in ranked:
         e['delegation_needs_you'] = None
         e['delegation_build_phase'] = None
@@ -11765,6 +11864,17 @@ def _project_delegation_fields(
         if phase is not None:
             e['delegation_build_phase'] = phase
             e['delegation_pr_url'] = pr_url
+        elif (evidence and evidence.get('status') == 'resolved'
+                and not e['delegation_needs_you']):
+            _fid = _dispatched.get(delegate_origin)
+            if _fid and _has_forge_build_started(_native.get(_fid)):
+                e['delegation_build_phase'] = 'building'
+                continue
+            # BASELINE `handed_off` — the delegation was approved/dispatched (the
+            # ledger's durable evidence) but no build event has joined yet, so the
+            # work is with the team rather than idle. Without this the card reads
+            # blank for the whole pre-review window. Needs-you takes precedence.
+            e['delegation_build_phase'] = 'handed_off'
 
     # Merged-state (GitHub truth): flip review_passed → merged for entries whose
     # PR has merged, so the operator queue completes the arc through ✅ Merged
