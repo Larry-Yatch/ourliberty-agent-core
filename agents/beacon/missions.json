@@ -10181,7 +10181,12 @@
         "at": "2026-07-22T02:31:00.400590+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-22T03:42:01.584889+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#1004"
     },
     {
       "id": "proposed-fix-pulse-auto-dispatch-null-chat-chain-event-001",
