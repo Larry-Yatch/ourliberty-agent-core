@@ -10473,7 +10473,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-22T14:02:19.836482+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-09T12:45:17.236858+00:00"
+      "orphan_last_activity_ts": "2026-07-09T12:45:17.236858+00:00",
+      "briefing": {
+        "what": "Your team kicked off a small piece of exploratory work to test whether a health-check feature is translating and reporting correctly, but it isn't attached to any active project yet.",
+        "why": "Loose, unassigned work can quietly eat time and attention if it drifts, so it's worth deciding now whether it earns a place on the roadmap or gets set aside.",
+        "suggest": "Hold off on committing resources until someone confirms what problem this is meant to solve and ties it to a real goal \u2014 a quick check before it grows."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-22T14:08:16.424323+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-spec-orchestrator-terminal-signal-hardening-001",
