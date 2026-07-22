@@ -10526,7 +10526,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-22T14:32:40.059530+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-22T14:27:42.058789+00:00"
+      "orphan_last_activity_ts": "2026-07-22T14:27:42.058789+00:00",
+      "briefing": {
+        "what": "A quality-check feature your team already finished and shipped, but the system still thinks it's unbuilt.",
+        "why": "Because it keeps firing false reminders that it's 'ready to build' and 'looks unfinished,' which clutters your funnel and wastes attention on work that's already done.",
+        "suggest": "Confirm it as finished so the duplicate alerts stop, after a quick check that the feature is truly in place and nothing else depends on those reminders."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-22T14:38:20.951521+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
