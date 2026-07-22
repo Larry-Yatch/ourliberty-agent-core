@@ -12,9 +12,9 @@
 
 ---
 
-## Check I firing days are Mon/Wed/Fri/Sun — call WITHOUT --force on firing days (learned 2026-06-15 iter ~1899, updated iter ~2612)
+## Check I firing days are Mon/Wed/Fri/Sun — call WITHOUT --force on firing days (learned 2026-06-15 iter ~1899, updated iter ~2612, timing corrected iter ~5871)
 
-**Rule:** Check I fires on Mon/Wed/Fri/Sun per spec (UTC weekday ∈ {0,2,4,6}). Always invoke `python3 ~/agent-core/scripts/pulse_check_i.py` (no `--force`) on scheduled firing days — the weekday gate passes naturally and the dm_route journal-peek (PR #674) functions correctly, suppressing repeat same-week DMs. Use `--force` ONLY for `/optimize` (ad-hoc, any day). Using `--force` on a firing day bypasses dm_route and emits spurious route=escalate alerts (G-rule check-i-force-bypass-dm-route). Confirmed fixed at manual level iter ~2612; code-level dispatch to Beacon at 3/3.
+**Rule:** Check I fires on Mon/Wed/Fri/Sun per spec (UTC weekday ∈ {0,2,4,6}). Always invoke `python3 ~/agent-core/scripts/pulse_check_i.py` (no `--force`) on scheduled firing days — the weekday gate passes naturally and the dm_route journal-peek (PR #674) functions correctly, suppressing repeat same-week DMs. Use `--force` ONLY for `/optimize` (ad-hoc, any day). Using `--force` on a firing day bypasses dm_route and emits spurious route=escalate alerts (G-rule check-i-force-bypass-dm-route). Confirmed fixed at manual level iter ~2612; code-level dispatch to Beacon at 3/3. **Timing:** The systemd timer fires at ~08:13 MDT (UTC-6) = ~14:13 UTC. Artifact timestamps in `pulse-check-i/` are local MDT, NOT UTC. Do NOT confuse "artifact written at 08:13 local time" with "08:13Z UTC" — prior iters made this error (iter ~5870 said "timer fired ~08:13Z UTC" when the timer actually fires mid-afternoon UTC). Correct assertion: "Check I timer fires ~14:13 UTC on Mon/Wed/Fri/Sun."
 
 ---
 
