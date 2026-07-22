@@ -7563,3 +7563,87 @@ Watermark advanced 837→839 via `set-watermark --line 839`. NOMINAL ✅ (Tier-3
 
 ---
 
+## Iteration ~5854 — 2026-07-22T06:35Z UTC (Larry /cycle chat, Tier 1)
+
+**Health:** ⚠️ Zombie PID 1834248 carry (etime=54-11:13:09). 1 new alert (line 853: sequence-kickoff-rsdpm-v0-001 re-fire — Tier 4, known standing, Larry already notified via idx=852 at 06:32Z UTC). Beacon responded to Larry's 'Check that the DAG started then move onto A' directive at 06:32:14Z UTC — DAG did NOT start; rsdpm-v0-001 still pending. notify-dag-revision-rsdpm-v0-001.json in Beacon inbox (6 min old, in-flight). All 9 daemons healthy. 0 open PRs. 0 pending approvals. sync=05:56:04Z (~40 min old); HEAD=6bfd8e80=origin/main.
+
+**VERIFY-BEFORE-REASSERT (from iter ~5853 at ~06:22Z UTC):**
+- **"zombie-bash-pid-1834248 etime=54-11:02:41"**: CONFIRMED — PID 1834248 bash Ss etime=54-11:13:09 at ~06:35Z UTC. [carry]
+- **"daemons healthy (PIDs 1463081/1464995/1465437/1465654/1465874)"**: CONFIRMED — all 9 PIDs alive (primary 5 + bot 4). [carry]
+- **"sync NOMINAL, last_sync=2026-07-22T05:56:04Z"**: CONFIRMED — ~40 min old at ~06:35Z; status=no-change; consecutive_push_failures=0. Under 2h. [carry]
+- **"beacon-pending-approvals.json: 0 entries"**: CONFIRMED — pending=0 history=516. [carry]
+- **"Tier 1, consecutive_clean=0"**: CONFIRMED — tier=1, consecutive_clean=0, last_signal_at=2026-07-22T06:34:56Z UTC. [carry]
+- **"0 open PRs"**: CONFIRMED — `gh pr list --state open` → []. ✅ [carry]
+- **"HEAD=cd4e30aa=origin/main"**: UPDATED → HEAD=6bfd8e80=origin/main (2 new missions-healer auto-commits + iter ~5853 wrapper commit 70c7ff50 all on origin/main). ✅ [UPDATED]
+- **"Check I today Wed 2026-07-22; timer fires ~08:13 UTC"**: CONFIRMED — no new artifact; last artifact check-i-2026-07-20.json; ~1h38m away at ~06:35Z. [carry]
+- **"sequence-kickoff-rsdpm-v0-001 FAILED — BUILD_PLAN.md not found"**: CONFIRMED — line 853 is a re-fire of the same kickoff failure at 06:23:44Z UTC. BUILD_PLAN.md still absent on origin/main. [carry + 2nd re-fire]
+
+**Check 0 — Alert triage:** `repair-watermark` → `{"repaired": false, "old_watermark": 852, "file_length": 853}`. 1 new alert at line 853: `source=outbox-notifier, subject=sequence-kickoff-rsdpm-v0-001, severity=warning` (re-fire at 06:23:44Z UTC — "BUILD_PLAN.md not found"). Helper → Tier 4 (novel: no registry template or translation match), route=escalate. Actionable-only discipline: Larry was JUST notified via idx=852 (same subject, delivered 06:32:15Z UTC, ~3 min prior). Suppressing redundant DM; journal note only. Watermark advanced to 853. G-rule: sequence-kickoff-rsdpm-v0-001-tier4 **2/3** (1/3 = iter ~5850 line 850; 2/3 = this iter line 853). NON-NOMINAL (known standing, no new DM) ⚠️
+
+**Check 1 — Log noise:** outbox-notifier.log last entry [2026-07-21 22:45:08] MDT (04:45:08Z UTC) — MIRROR_DAG_PREFLIGHT seq=rsdpm-v0-001-retry1 verdict=REVISION. Quiescent ~1h50m at ~06:35Z UTC. No WARNs or ERRORs above threshold. NOMINAL ✅
+
+**Check 2 — Telegram sweep:** beacon_telegram_bot.log last entry [2026-07-22T00:32:15-0600] (06:32:15Z UTC) — idx=852 delivered (source=outbox-notifier, subject=sequence-kickoff-rsdpm-v0-001::promoted). Most recent Larry directive: 06:23:28Z UTC 'Check that the DAG started then move onto A' — dispatched to Beacon; Beacon responded at 06:32:14Z UTC ("Done. To summarize: Checked B: the DAG did NOT start — rsdpm-v0-001 still pending, m1-pr1 not created"). Directive tracked + responded. NOMINAL ✅
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → FORGE_NO_PR_SKIP ×13 (pr-exists/task-closed/merged) + rsdpm-v0-001 suppressed (cooldown). "0 alert(s) would fire, 0 recovery(ies) would be attempted." NOMINAL ✅
+
+**Check 4 — Pending directives:** Beacon inbox: `notify-dag-revision-rsdpm-v0-001.json` (written 06:27Z UTC, 8 min old, in-flight — Mirror REVISION verdict routing to Beacon for autonomous spec amend). Forge/Mirror/Pulse inboxes: empty. 0 pending approvals. Larry's 06:23Z directive 'Check that the DAG started then move onto A' tracked by Beacon response at 06:32Z. NOMINAL ✅
+
+**Check 5 — Stale daemon code:** Heartbeat=2026-07-22T06:23:44Z UTC (~12 min old at ~06:35Z). Within 60-min threshold. NOMINAL ✅
+
+**Check A — Source repo:** HEAD=6bfd8e80=origin/main (autoregister healer + missions GC + iter ~5853 wrapper, all on origin). On main; clean tree; git fetch: 0 ahead, 0 behind. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-22T05:56:04Z UTC (~40 min old at ~06:35Z); status=no-change; consecutive_push_failures=0. Under 2h. NOMINAL ✅
+**Check C — Agent liveness:** dashboard_api PID 1463081 Ssl ✅; outbox_notifier PID 1464995 Ss ✅; beacon_telegram_bot PID 1465437 Ss ✅; chain_event_shipper PID 1465654 SNs ✅; inbox_watcher PID 1465874 Ssl ✅. All 5 primary daemons alive. forge-bot PID 1465744 Ss ✅; mirror-bot PID 1465968 Ss ✅; pulse-bot PID 1466047 Ss ✅; spec-review-runner PID 1466129 Ss ✅. ⚠️ **Zombie PID 1834248** (bash Ss, etime=54-11:13:09, poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`). NON-NOMINAL ⚠️
+**Check E — PR/merge state:** 0 open PRs. NOMINAL ✅
+
+**§5.0:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Conditional checks:**
+- **Check I:** firing day (Wed 2026-07-22). Timer fires ~08:13 UTC (~1h38m away at ~06:35Z). Last artifact: check-i-2026-07-20.json. No new artifact. [carry]
+- **Check III:** OFF-WEEK ✅ — next fire 2026-07-27. [carry]
+- Check IV/VI/IX/X/XII: timer-managed. No new artifacts. ✅
+
+**G-rule assessment:**
+- **sequence-kickoff-rsdpm-v0-001-tier4 [2/3]**: 1/3 = iter ~5850 (line 850); 2/3 = this iter (line 853). Both route=escalate but Larry already notified each time via promoted alerts. At 3/3 dispatch to Beacon: propose Tier-3 translation for `source=outbox-notifier, subject^=sequence-kickoff-rsdpm-v0-001`. [NEW 2/3]
+- **forge-wip-redispatch-exhausted-genuine-no-pr-001 [dispatched, vp]**: no new occurrence. [carry]
+- **pulse-check-xiv-tier4-001 [2/3]**: no change. [carry]
+- **Check I dm_route second-emission-Sunday**: Monitor ~08:13 UTC today. [carry]
+- All other G-rules: no new occurrences this iter.
+
+**Actions taken:**
+1. Check 0: 1 new alert (line 853) triaged Tier 4; watermark advanced 852→853. ✅
+2. §5.0 one-shots: all no-ops. ✅
+3. PRIME ledger: 1 intervention row appended (zombie-pid-carry; tier=1, ts=2026-07-22T06:34:49Z UTC). ✅
+4. Tier state: `record --checks-clean false` → Tier 1 (consecutive_clean=0; last_signal_at=2026-07-22T06:34:56Z UTC). ✅
+
+**Escalations:** None new. Zombie PID ask-then-do: Larry already aware (`kill 1834248`). rsdpm-v0-001 kickoff still blocked (BUILD_PLAN.md missing); idx=852 already delivered to Larry. Beacon in-flight on DAG-revision + 'move onto A' actions.
+
+**Standing findings (updated):**
+- [yellow] **zombie-bash-pid-1834248** — Ss etime=54-11:13:09 at ~06:35Z UTC. Bash poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`. Ask-then-do: `kill 1834248`. [carry]
+- [yellow] **sequence-kickoff-rsdpm-v0-001 FAILED** — BUILD_PLAN.md not on origin/main. Line 853 = 2nd re-fire. Larry notified via idx=852 at 06:32Z UTC. Actionable: author+merge BUILD_PLAN.md then re-dispatch kickoff. [carry]
+- [yellow] **probe-blind:ourliberty-cycle.service** — heal-claude-json-bind-drift healer blind for cycle.service mount namespace. [carry]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — Awaiting `approve check-vi-update-2026-07-07`. [carry]
+- [yellow] **dag-preflight-rsdpm-v0-001 EXHAUSTED + stall** — stall in healer cooldown. rsdpm-v0-001 kickoff blocked by missing BUILD_PLAN.md. DAG did NOT start (confirmed by Beacon at 06:32Z UTC). [carry]
+- [green] **heal-systemd-install-drift resolved** — ourliberty-heal-stale-daemon-code.service file drifted; auto-reconciled ~06:00Z UTC; confirmed clean. ✅ [carry resolved]
+- [green] **PR #1003 MERGED ✅** — fix(routing): seed pulse-auto-dispatch approval_request chain event with resolved chat_id. [carry ✅]
+- [green] **PR #1005 MERGED ✅** — fix(notifier): preserve head + stamp across unresolvable-head re-hold. [carry ✅]
+- [green] **PR #1004 MERGED ✅** — chore(deploy-targets): register rsdpm Vercel project. [carry ✅]
+- [green] **daemons healthy** — primary 5: dashboard_api PID 1463081; outbox_notifier PID 1464995; beacon_telegram_bot PID 1465437; chain_event_shipper PID 1465654; inbox_watcher PID 1465874. Bots: forge PID 1465744; mirror PID 1465968; pulse PID 1466047; spec-review-runner PID 1466129. [carry]
+- [green] **sync NOMINAL** — last_sync=2026-07-22T05:56:04Z UTC; no-change; consecutive_push_failures=0; ~40 min old. [carry]
+- [green] **HEAD=6bfd8e80** — chore(missions): autoregister healer (latest missions-healer commit) = origin/main. ✅ [UPDATED]
+- [blue] **Check I — today Wed 2026-07-22; timer fires ~08:13 UTC.** [carry]
+- [blue] **SUPABASE_SERVICE_ROLE_KEY rotation** — due 2026-08-22 (~31 days). [carry]
+- [blue] **pulse-check-xiv-tier4-001 [2/3]** — Dispatch at 3/3 ~2026-07-27. [carry]
+- [blue] **Check I dm_route second-emission-Sunday** — Monitor Wed 2026-07-22 Check I run (~08:13 UTC). [carry]
+- [blue] **merged-pr-reconcile:govern-loop-assessor** — doorbell delivered 06:02:15Z (idx=851); action: confirm shipped / dismiss in Missions. [carry]
+- [blue] **Beacon in-flight:** notify-dag-revision-rsdpm-v0-001.json (8 min old); 'move onto A' action per Larry's 06:23Z directive. [NEW]
+- [blue] **G-rule sequence-kickoff-rsdpm-v0-001-tier4 [2/3]** — at 3/3 dispatch Tier-3 silence proposal to Beacon. [NEW]
+- [blue] **G-rules (dispatched, vp):** forge-wip-redispatch-exhausted-genuine-no-pr-001; ourliberty-health-subject-key-mismatch-001; outbox-notifier-notification-intent-reject-tier4-001; forge-wip-redispatch-digest-tier4-001; forge-revision-preamble-missing-pr711-001; decision-needed-approval-forge-dispatch-no-target-repo-001; no-session-revision-active-mirror-session-fp-001; auto-dispatch-APPROVAL_REQUEST-task-id-mismatch (3/3); fix-pulse-auto-dispatch-null-chat-chain-event-001 (3/3 ✅ FULLY RESOLVED).
+- [blue] **G-rule 2/3:** outbox-notifier-notification-intent-review-escalate-tier4-001; outbox-notifier-auto-merge-stale-revalidation-tier4-001; pulse-check-xiv-tier4-001; heal-pipeline-stall-retry-exhausted-pr-exists-fp-001; sequence-kickoff-rsdpm-v0-001-tier4.
+- [blue] **G-rule 1/3:** medic-approval-request-tier4-001; mirror-malformed-verdict-heal-reap-path-001; mirror-queue-wait-gauge-tier4-001; inbox-watcher-tier-pool-all-unavailable-tier4-001; heal-pipeline-stall-unrouted-deep-review-required-fp-001; heal-pulse-check-staleness-single-flight-skip-fp-001; gate-parallelism-monitor-regression-data-001; pulse-rotation-check-source-tier4-001; doorbell-tier4-novel-001.
+- [blue] **missions healer active** — HEAD=6bfd8e80. [UPDATED]
+
+**PRIME DIRECTIVE:** 1 intervention (zombie-pid-carry, tier=1); 0 new systemic_fixes. ratio=22.06 (interventions=1456+1=1457, systemic_fixes=66, vp=34; trend=improving).
+**Tier end-of-iter:** **Tier 1** (consecutive_clean=0; 5-min cadence; last_signal_at=2026-07-22T06:34:56Z UTC; non-clean: zombie PID 1834248 confirmed alive etime=54d+).
+
+---
+
