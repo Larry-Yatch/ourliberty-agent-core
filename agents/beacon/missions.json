@@ -10323,7 +10323,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-22T06:13:57.595939+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-10T03:55:37.178247+00:00"
+      "orphan_last_activity_ts": "2026-07-10T03:55:37.178247+00:00",
+      "briefing": {
+        "what": "A piece of work the team started on its own that hasn't been tied to any active project or goal yet.",
+        "why": "It passed its quality checks and merged itself in, so effort is going out the door without a clear business reason attached.",
+        "suggest": "Have someone confirm what this work was for and link it to a real goal before letting more like it through unsupervised."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-22T06:23:44.904058+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
