@@ -2604,6 +2604,45 @@ def check_stalled_pending_sequence(state: dict) -> list[dict]:
     return alerts
 
 
+def _resolve_build_anchor(step_id: str, disp_ts: datetime,
+                          now: datetime) -> datetime:
+    """Return the instant Forge ACTUALLY started building `step_id`, from which
+    `check_stalled_active_step` should time the stall.
+
+    A sequence step's `dispatched_at` is stamped at the advancer->Beacon handoff,
+    but the step then flows through Beacon (headless-approval LLM turn +
+    APPROVAL_REQUEST emit) -> outbox_notifier -> the real Forge build — a
+    ~15-20 min hop. Timing the 30-min stall from `dispatched_at` therefore trips
+    the alarm on a healthy build only ~13-23 min into its real work.
+
+    The durable "Forge started building" signal is a `session_start` chain_event
+    under `task_id == step_id` (the bare step id, e.g. `m1-pr4`; the
+    `seq-...-step-...` form carries only Beacon-side events). `_get_chain_events_for_task`
+    already filters `ts > disp_ts`, so every returned `session_start` is a
+    build-side (or preflight) start after the handoff.
+
+    Anchor:
+      * >=1 `session_start` row → the LATEST such ts (drops Beacon's processing
+        overhead; if preflight + build both present, the build start wins).
+      * None (infra failure / no Supabase env — the unit-test path) OR a list
+        with no `session_start` (the build never reached Forge — a genuine stall
+        at the Beacon/notifier stage) → `disp_ts`, preserving today's
+        fire-on-dispatched_at behavior. This keeps BOTH the failsafe AND the
+        genuine "never dispatched" catch."""
+    rows = _get_chain_events_for_task(step_id, disp_ts)
+    if not rows:
+        return disp_ts  # None (infra/no-env failsafe) or [] (never reached Forge)
+    starts = [
+        ts for r in rows
+        if r.get('event_type') == 'session_start'
+        and isinstance(r.get('ts'), str)
+        and (ts := _parse_ts(r['ts'])) is not None
+    ]
+    if not starts:
+        return disp_ts  # only Beacon-side events → build never started
+    return max(starts)
+
+
 # ---------- Check 11: Stalled active-sequence step, no PR (sequence-step-stall-recovery Fix A) ----------
 def check_stalled_active_step(state: dict) -> list[dict]:
     """Scan build-sequences for an `active` sequence carrying a step stuck
@@ -2671,7 +2710,12 @@ def check_stalled_active_step(state: dict) -> list[dict]:
                 continue  # unparseable / absent → can't time the stall (fail safe)
             if not _within_scan_window(disp_ts, now):
                 continue  # ancient dispatch in a stale file, not a live stall
-            elapsed_min = int((now - disp_ts).total_seconds() / 60)
+            # `dispatched_at` marks the advancer->Beacon handoff, ~15-20 min
+            # before the real Forge build starts. Time the stall from when Forge
+            # ACTUALLY started building (latest `session_start` chain_event),
+            # falling back to `dispatched_at` on infra failure / never-dispatched.
+            build_anchor = _resolve_build_anchor(step_id, disp_ts, now)
+            elapsed_min = int((now - build_anchor).total_seconds() / 60)
             if elapsed_min < STALLED_ACTIVE_STEP_MIN:
                 continue  # give a healthy build time to open its PR
             key = f'stalled_active_step:{seq_id}:{step_id}:{disp_ts.isoformat()}'
