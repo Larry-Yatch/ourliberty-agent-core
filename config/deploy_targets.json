@@ -14,6 +14,19 @@
       "production_enabled": false,
       "created_at": "2026-05-20",
       "notes": "First E2.3 deploy target. Hobby tier Vercel account (larry-yatch personal). Scaffolded with Next.js + TypeScript + Tailwind + App Router on 2026-05-20. Will host the read-only dashboard B in E3."
+    },
+    {
+      "name": "rsdpm",
+      "github_repo": "Larry-Yatch/RSDPM",
+      "vercel_project_id": "prj_Yxqyk19dzUmAfdb0pd6azsimlIcX",
+      "vercel_org_id": "team_8ED9iFho5H5MTxImDHD6eGBE",
+      "framework": "nextjs",
+      "env_var_keys": [],
+      "branch_filter": null,
+      "preview_enabled": true,
+      "production_enabled": false,
+      "created_at": "2026-07-22",
+      "notes": "RSDPM - Larry's first external product (operator-portfolio weight 0.7, active-build). Team-scoped Vercel project (vercel_org_id team_8ED9iFho5H5MTxImDHD6eGBE), unlike the personal-account ourliberty-dashboard. GitHub Larry-Yatch/RSDPM, production branch main. Runtime env vars (NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, ZOOM_WEBHOOK_SECRET_TOKEN) are managed directly on the Vercel project and are absent from .env.larry, so env_var_keys is intentionally empty. Registered to clear recurring MISSING_FROM_REGISTRY drift (G-rule sync-deploy-targets-missing-registry-001)."
     }
   ],
   "known_frameworks": ["nextjs", "sveltekit", "vite", "astro", "remix", "other"]
