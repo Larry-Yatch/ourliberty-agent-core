@@ -10306,7 +10306,11 @@
         "at": "2026-07-22T06:03:36.232936+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-22T09:30:16.588210+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-pr-ourliberty-agent-core-903",
@@ -10369,6 +10373,45 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-dashboard-api-sha-drift-path-aware-restart-001",
+      "name": "Dashboard API Sha Drift Path Aware Restart 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `dashboard-api-sha-drift-path-aware-restart-001`. Last activity 2026-07-20T17:14:05.252728+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "dashboard-api-sha-drift-path-aware-restart-001"
+      ],
+      "repo": null,
+      "created": "2026-07-22",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-22T09:30:16.588210+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-20T17:14:05.252728+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-22T09:30:16.588210+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#965"
+    },
+    {
+      "id": "proposed-kickoff-pulse-check-xii",
+      "name": "Kickoff Pulse Check Xii",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `kickoff-pulse-check-xii`. Last activity 2026-07-07T20:36:35.740828+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "kickoff-pulse-check-xii"
+      ],
+      "repo": null,
+      "created": "2026-07-22",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-22T09:30:16.588210+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-07T20:36:35.740828+00:00"
     }
   ]
 }
