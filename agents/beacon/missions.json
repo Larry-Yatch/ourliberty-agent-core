@@ -10354,7 +10354,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-22T06:29:19.902424+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-11T22:16:51.465524+00:00"
+      "orphan_last_activity_ts": "2026-07-11T22:16:51.465524+00:00",
+      "briefing": {
+        "what": "A routine health-check keeps mistaking a properly-finished-and-rejected job for a stuck one, so it re-launches the same work every couple of hours without end.",
+        "why": "This wastes the team's time and computing effort on phantom re-runs and creates false alarms that make it harder to spot real problems.",
+        "suggest": "Approve the fix so the checker treats a rejection as a finished outcome, but have someone confirm it stops the repeat runs without silencing genuine stall warnings before you move on."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-22T06:33:46.842279+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
