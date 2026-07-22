@@ -686,5 +686,100 @@ class ReHoldPreservesStampTest(_SurfaceTestBase):
         self.assertEqual(self.on._load_deep_review_held(), [])
 
 
+class ReHoldWithUnresolvableHeadTest(_SurfaceTestBase):
+    """`_gh_pr_head_sha` returns None on any gh error AND on the
+    `_gh_backoff_skip` early return, so the hold call site can re-hold an
+    already-stamped entry with `head_sha=None`. That must not drop the recorded
+    head or `stamped_head_sha`: a later genuine push would otherwise hit the
+    head-move guard's `if head_sha and ...` with a falsy head, decline to
+    revoke, and leave a stale `deep-review-passed` on a never-deep-reviewed
+    head — the #1001 hole reached through the null-head door.
+    """
+
+    HEAD = 'aaaaaaaa11112222'
+    NEW_HEAD = 'ffffffff99998888'
+
+    def _rehold(self, head, pr_n=823) -> bool:
+        return self.on._record_deep_review_held(
+            REPO, pr_n, _pr_url(REPO, pr_n), f'task-{pr_n}', head)
+
+    def test_null_head_rehold_preserves_head_and_stamp(self):
+        self._seed_held(self._held_entry(823, self.HEAD))
+        self.on._mark_deep_review_stamped(REPO, 823, self.HEAD)
+        # A blind tick is not evidence of a push — no re-DM.
+        self.assertFalse(self._rehold(None))
+        entry = self.on._find_deep_review_held(REPO, 823)
+        self.assertEqual(entry.get('head_sha'), self.HEAD)
+        self.assertEqual(entry.get('stamped_head_sha'), self.HEAD)
+
+    def test_null_head_rehold_on_unstamped_entry_invents_no_stamp(self):
+        # Preserving must not manufacture a stamp we never applied.
+        self._seed_held(self._held_entry(823, self.HEAD))
+        self.assertFalse(self._rehold(None))
+        entry = self.on._find_deep_review_held(REPO, 823)
+        self.assertEqual(entry.get('head_sha'), self.HEAD)
+        self.assertIsNone(entry.get('stamped_head_sha'))
+
+    def test_null_head_rehold_refreshes_the_mutable_bookkeeping(self):
+        # Preserving the head must not freeze the whole record — the caller's
+        # current task_id / pr_url still win, so the surfaced approval and the
+        # DM text never go stale against a re-dispatched task.
+        self._seed_held(self._held_entry(823, self.HEAD))
+        self.assertFalse(self.on._record_deep_review_held(
+            REPO, 823, _pr_url(REPO, 823), 'task-refreshed', None))
+        entry = self.on._find_deep_review_held(REPO, 823)
+        self.assertEqual(entry.get('task_id'), 'task-refreshed')
+        self.assertEqual(entry.get('head_sha'), self.HEAD)
+        self.assertIsNotNone(entry.get('held_at'))
+
+    def test_null_head_with_no_prior_still_records_a_first_hold(self):
+        # No entry to preserve — unchanged behavior, and it IS a first hold.
+        self.assertTrue(self._rehold(None))
+        entry = self.on._find_deep_review_held(REPO, 823)
+        self.assertIsNone(entry.get('head_sha'))
+
+    def test_null_head_rehold_keeps_the_approval_id_stable(self):
+        # `_deep_review_hold_approval_id` is head-scoped and DEGRADES to an
+        # unsuffixed id when the head is None. So a blind re-hold used to swap
+        # `…-pr823-aaaaaaaa` for `…-pr823`: Larry's live head-scoped card drops
+        # out of `live_ids`, and `_resolve_cleared_deep_review_approvals`
+        # resolves an orphan as 'approved' whenever the PR carries the stamp —
+        # silently marking a card approved that Larry never touched, while a
+        # duplicate unsuffixed card takes its place. Preserving the head keeps
+        # the id stable, so the one live card stays the one live card.
+        self._seed_held(self._held_entry(823, self.HEAD))
+        self.on._reconcile_deep_review_held_approvals()
+        before = [e.get('id')
+                  for e in self.approval.load_state().get('pending', [])]
+        self.assertEqual(before, [f'deep-review-hold-pr823-{self.HEAD[:8]}'])
+
+        self._rehold(None)
+        self.on._reconcile_deep_review_held_approvals()
+
+        after = [e.get('id')
+                 for e in self.approval.load_state().get('pending', [])]
+        self.assertEqual(after, before)
+
+    def test_null_head_rehold_then_push_still_revokes_the_stale_stamp(self):
+        # End-to-end: stamp → blind (null-head) re-hold → real push.
+        # The revoke must still fire; on main the stale label survives.
+        self.merge_outcome = 'held_for_blocker'
+        self._seed_held(self._held_entry(823, self.HEAD))
+        self.on._reconcile_deep_review_held_approvals()
+        self.approval.resolve(
+            f'deep-review-hold-pr823-{self.HEAD[:8]}', 'approved', note='ok')
+        self.on._reconcile_deep_review_held_approvals()   # stamps + drives once
+        self.assertIn('deep-review-passed', self.gh.pr_labels[(REPO, 823)])
+
+        self._rehold(None)                                # the blind re-hold
+
+        self.gh.pr_heads[(REPO, 823)] = self.NEW_HEAD
+        self.on._reconcile_deep_review_held_approvals()
+        self.assertEqual(
+            self.gh.remove_label_calls, [(REPO, 823, 'deep-review-passed')])
+        self.assertNotIn('deep-review-passed', self.gh.pr_labels[(REPO, 823)])
+        self.assertEqual(self.on._load_deep_review_held(), [])
+
+
 if __name__ == '__main__':
     unittest.main()
