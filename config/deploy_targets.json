@@ -25,7 +25,7 @@
       "branch_filter": null,
       "preview_enabled": true,
       "production_enabled": false,
-      "created_at": "2026-07-19",
+      "created_at": "2026-07-22",
       "notes": "RSDPM - Larry's first external product (operator-portfolio weight 0.7, active-build). Team-scoped Vercel project (vercel_org_id team_8ED9iFho5H5MTxImDHD6eGBE), unlike the personal-account ourliberty-dashboard. GitHub Larry-Yatch/RSDPM, production branch main. Runtime env vars (NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, ZOOM_WEBHOOK_SECRET_TOKEN) are managed directly on the Vercel project and are absent from .env.larry, so env_var_keys is intentionally empty. Registered to clear recurring MISSING_FROM_REGISTRY drift (G-rule sync-deploy-targets-missing-registry-001)."
     }
   ],
