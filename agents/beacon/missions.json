@@ -10457,6 +10457,45 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-direction-ask-pr-fanout-probe-health-tier3-translation-002",
+      "name": "Direction Ask PR Fanout Probe Health Tier3 Translation 002",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `direction-ask-pr-fanout-probe-health-tier3-translation-002`. Last activity 2026-07-09T12:45:17.236858+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "direction-ask-pr-fanout-probe-health-tier3-translation-002"
+      ],
+      "repo": null,
+      "created": "2026-07-22",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-22T14:02:19.836482+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-09T12:45:17.236858+00:00"
+    },
+    {
+      "id": "proposed-spec-orchestrator-terminal-signal-hardening-001",
+      "name": "Spec Orchestrator Terminal Signal Hardening 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `spec-orchestrator-terminal-signal-hardening-001`. Last activity 2026-06-23T22:11:35.837609+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "spec-orchestrator-terminal-signal-hardening-001"
+      ],
+      "repo": null,
+      "created": "2026-07-22",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-22T14:02:19.836482+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-23T22:11:35.837609+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-22T14:02:19.836482+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#657"
     }
   ]
 }
