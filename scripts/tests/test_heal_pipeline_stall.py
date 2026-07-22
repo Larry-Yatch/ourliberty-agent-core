@@ -3750,6 +3750,68 @@ class TestStalledActiveStep(_TempAgentsRootMixin, unittest.TestCase):
         self.hps.record_alert(state, a1['key'])
         self.assertFalse(self.hps.should_alert(state, a1['key']))
 
+    # --- build-dispatch anchor (time the stall from Forge's real build start,
+    # not the advancer->Beacon handoff). See _resolve_build_anchor. ---
+
+    def test_silent_when_build_anchor_recent(self) -> None:
+        # False-positive fixed: dispatched 40 min ago (past the 30m handoff
+        # threshold), but Forge actually started building 20 min ago → the real
+        # build is only 20 min in, under threshold → NO alert.
+        self._write_seq('seq', steps=[self._step(dispatched_min_ago=40)])
+        rows = [_row('session_start', minutes_ago=20)]
+        with patch.object(self.hps, '_get_chain_events_for_task',
+                          return_value=rows):
+            self.assertEqual(self.hps.check_stalled_active_step({}), [])
+
+    def test_anchor_uses_latest_session_start(self) -> None:
+        # Latest-of-many: a preflight session_start (50 min ago) + the build
+        # session_start (20 min ago). The anchor must be the MAX (build, 20m) —
+        # if it wrongly used the earlier preflight (50m) the alert would fire.
+        self._write_seq('seq', steps=[self._step(dispatched_min_ago=55)])
+        rows = [
+            _row('session_start', minutes_ago=50),  # preflight start
+            _row('session_start', minutes_ago=20),  # real build start
+        ]
+        with patch.object(self.hps, '_get_chain_events_for_task',
+                          return_value=rows):
+            self.assertEqual(self.hps.check_stalled_active_step({}), [])
+
+    def test_fires_when_build_anchor_past_threshold(self) -> None:
+        # Genuine dead build: dispatched 40 min ago, latest session_start 35 min
+        # ago → the real build has itself been stuck 35 min → alert FIRES, and
+        # the message reports the anchor-based 35 min (not the 40 min handoff).
+        self._write_seq('seq', steps=[self._step('dead-build',
+                                                 dispatched_min_ago=40)])
+        rows = [_row('session_start', minutes_ago=35)]
+        with patch.object(self.hps, '_get_chain_events_for_task',
+                          return_value=rows):
+            alerts = self.hps.check_stalled_active_step({})
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(alerts[0]['subject'], 'stalled-active-step:seq:dead-build')
+        self.assertIn('35 min', alerts[0]['message'])
+
+    def test_fires_when_build_never_reached_forge(self) -> None:
+        # Never-reached-Forge: the helper returns [] (only Beacon-side events, no
+        # session_start) → anchor falls back to dispatched_at (40 min) → the
+        # genuine Beacon/notifier-stage stall still FIRES on the 40 min number.
+        self._write_seq('seq', steps=[self._step(dispatched_min_ago=40)])
+        with patch.object(self.hps, '_get_chain_events_for_task',
+                          return_value=[]):
+            alerts = self.hps.check_stalled_active_step({})
+        self.assertEqual(len(alerts), 1)
+        self.assertIn('40 min', alerts[0]['message'])
+
+    def test_fires_on_chain_events_infra_failure(self) -> None:
+        # Infra failsafe: the helper returns None (missing Supabase env / query
+        # error) → anchor falls back to dispatched_at (40 min) → the alert still
+        # FIRES. A chain_events outage must never silently swallow a real stall.
+        self._write_seq('seq', steps=[self._step(dispatched_min_ago=40)])
+        with patch.object(self.hps, '_get_chain_events_for_task',
+                          return_value=None):
+            alerts = self.hps.check_stalled_active_step({})
+        self.assertEqual(len(alerts), 1)
+        self.assertIn('40 min', alerts[0]['message'])
+
 
 class TestCheckRedMirrorStatusNoArtifact(_TempAgentsRootMixin, unittest.TestCase):
     """mirror-review-visibility Contract E (spec §8 / §10-E). The backstop for
