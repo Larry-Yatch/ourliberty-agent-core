@@ -7495,7 +7495,7 @@
       "prior_phase": "drafting",
       "shipped_at": "2026-07-21T11:44:20+00:00",
       "shipped_by": "forge-manual-reconcile",
-      "shipped_note": "Shipped via PR #984 'feat: govern-loop assessor (shadow-first operator-layer ROI/rank scorer)' (merged 2026-07-21 11:44:20Z; scripts/govern_loop_assessor.py live in tree). Board phase was stale because the assessor shipped OUTSIDE scripts/kick_govern_loop_assessor.sh and task_ids is empty, so heal_missions_card_gc had nothing to probe and heal_merged_pr_board_reconcile only surfaces (never flips) — the 'Mission looks shipped' escalation had no auto-reconcile path. Manually reconciled by Forge per task reconcile-govern-loop-assessor-shipped-001.",
+      "shipped_note": "Shipped via PR #984 'feat: govern-loop assessor (shadow-first operator-layer ROI/rank scorer)' (merged 2026-07-21 11:44:20Z; scripts/govern_loop_assessor.py live in tree). Board phase was stale because the assessor shipped OUTSIDE scripts/kick_govern_loop_assessor.sh and task_ids is empty, so heal_missions_card_gc had nothing to probe and heal_merged_pr_board_reconcile only surfaces (never flips) \u2014 the 'Mission looks shipped' escalation had no auto-reconcile path. Manually reconciled by Forge per task reconcile-govern-loop-assessor-shipped-001.",
       "brief": "Shadow-first read-only assessor over the decision-outcome ledger that ranks where Larry's approvals pay off (merged vs regressed vs abandoned); mirrors the mission_staleness scorer pattern, auto-acts on nothing.",
       "spec_docs": [
         "agents/beacon/specs/govern-loop-assessor.md"
@@ -10345,7 +10345,11 @@
         "at": "2026-07-22T06:23:44.904058+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-22T15:33:17.865096+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-heal-stall-forge-reject-no-pr-skip-001",
@@ -10544,7 +10548,12 @@
         "at": "2026-07-22T14:38:20.951521+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-22T15:33:17.865096+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#1009"
     },
     {
       "id": "proposed-pr-fanout-probe-health-tier3-translation-002",
