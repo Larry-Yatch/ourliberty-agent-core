@@ -1368,3 +1368,111 @@ Watermark advanced 808→811. No tier-reset. NOMINAL ✅
 
 ---
 
+## Iteration ~5784 — 2026-07-21T18:30Z UTC (Larry /cycle chat, Tier 3 → Tier 1)
+
+**Health:** ⚠️ Drift. Repo was 1 commit behind origin/main — fast-forwarded (always-fix). All other checks nominal. Active pipeline: Mirror reviewing #987/#988/#991/#992 simultaneously; #993/#994/dashboard-#147 queued. 4 new PRs since last iter (feat(alerts) XIV-b #991, fix(notifier) #992, perf(missions) 597KB→11KB #993, feat(cordon) PR1/3 #994). Tier 3 → Tier 1 (tier-reset due to Check A finding).
+
+**VERIFY-BEFORE-REASSERT (from iter ~5783 at 18:00Z UTC):**
+- **"zombie PID 1834248 (~53d-22h38m)"**: CONFIRMED ⚠️ — etime=53-23:09:25 at ~18:27Z check. [carry, static]
+- **"sync-deploy-targets-missing-registry-001 [2/3]"**: CARRY — new alerts at 812-813 are heal-systemd-install-drift, not sync-deploy-targets. No new occurrence. [carry, 2/3]
+- **"xiv-b-build-timing-decision-001 RESOLVED"**: CARRY — stable. [carry]
+- **"PR #982 MERGED"**: CARRY — stable. [carry]
+- **"last_sync=17:07:17Z UTC"**: UPDATED → last_sync=2026-07-21T18:05:12Z UTC, status=no-change; HEAD was 531b0988, fast-forwarded to c794248c=origin/main. ✅
+- **"PR #984 MERGED"**: CARRY — stable. [carry]
+- **"graph PR #9 → PR #986 MERGED"**: CARRY — gate fix live; Beacon handling Larry's "status now?" card. Pending approval mirror-review-pr-ourliberty-graph-9 still in state (plan_summary's gate precondition now resolved). [carry, beacon-active]
+- **"G-rule regression-gate-non-standard-test-path-python-001 RESOLVED"**: CARRY — stable, resolved. [carry]
+- **"PR #980 MERGED"**: CARRY — stable. [carry]
+- **"Tier 3, consecutive_clean=1"**: UPDATED → tier-reset to Tier 1 (consecutive_clean=0) due to Check A fast-forward. ✅
+
+**Check 0 — Alert triage:** `repair-watermark`: repaired=false (wm=811, file_length=813). 2 new alerts at lines 812-813:
+- Line 812: source=heal-systemd-install-drift, subject=install-healed:ourliberty-flip-readiness-gauge.service (PR #983 feat(autonomy): flip-readiness-gauge shipped; systemd-install-drift auto-installed missing unit). Triage helper: **Tier 3** (known-pattern). Silenced. ✅
+- Line 813: source=heal-systemd-install-drift, subject=install-healed:ourliberty-flip-readiness-gauge.timer (same deployment, timer unit auto-installed and enabled; next fire Mon 2026-07-27 06:00 MDT). Triage helper: **Tier 3** (known-pattern). Silenced. ✅
+Watermark advanced 811→813. No tier-reset. NOMINAL ✅
+
+**Check 1 — Log noise:** outbox-notifier: at 12:21 MDT (18:21Z UTC) — auto-merge worktree teardown for dashboard PR #146 (Mirror REVIEW_PASS + auto-merged), BASELINE_WARM spawned. At 12:25 MDT — Mirror review dispatched for PR #994. No WARN/ERROR above threshold. NOMINAL ✅
+
+**Check 2 — Telegram sweep:** Last bot delivery idx=812 (12:00:36 MDT, heal-systemd-install-drift digest-skipped). Larry last message "status" at 04:08 MDT (10:08Z UTC). No new directives. Pending approvals: 1 (mirror-review-pr-ourliberty-graph-9; gate fix #986 now live; Beacon handling). NOMINAL ✅
+
+**Check 3 — Pipeline stall:** DRY-RUN (18:27Z UTC) → "no stalls detected". All FORGE_NO_PR_SKIP correctly classified. NOMINAL ✅
+
+**Check 4 — Pending directives:** forge=0, beacon=0 (Larry's "status now?" on graph PR #9 handled by Beacon active task from prior iter), mirror=0. No orphan directives. NOMINAL ✅
+
+**Check 5 — Stale daemon code:** heartbeat=2026-07-21T18:25:21Z UTC (~5 min at check). NOMINAL ✅
+
+**Check A — Source repo:** ⚠️ Repo was behind origin/main by 1 commit (531b0988 vs c794248c). Tree clean, on main. **always-fix applied**: `git pull --ff-only` → c794248c `chore(automerge): the unit file now states that auto-merge is armed (#990)`. Files: scripts/heal_pr_auto_merge.py, systemd/ourliberty-heal-pr-auto-merge.service. **TIER-RESET** ✅. Post-fix: HEAD=c794248c=origin/main ✅.
+**Check B — Sync health:** last_sync=2026-07-21T18:05:12Z UTC (~25 min at check), status=no-change, consecutive_push_failures=0. NOMINAL ✅
+**Check C — Agent liveness:** inbox_watcher PID 935426 ✅; beacon_telegram_bot PID 973130 ✅; outbox_notifier PID 973243 ✅. ⚠️ Zombie PID 1834248 (~53d-23h09m, bash poll loop). [carry, static]
+**Check E — PR/merge state:** Active review pipeline — Mirror working on #987/#988/#991/#992 simultaneously (4 worktrees active); #993/#994/dashboard-#147 queued in Mirror inbox. PR #989 MERGED 18:02:35Z ✅ (docs(spec): cordon-and-drain). PR #990 MERGED 18:17:18Z ✅ (chore(automerge): unit file armed). Dashboard PR #146 MERGED (Mirror REVIEW_PASS at 12:21 MDT). No PRs > 72h without merge. NOMINAL ✅
+**Check H — Forge/Beacon/Mirror inboxes:** forge=0 ✅; beacon=0 ✅; mirror=3 queued (993, 994, dashboard-147), 4 active worktrees (987, 988, 991, 992). Normal pipeline depth. NOMINAL ✅
+**Rotations:** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~31 days). Last DM 2026-07-20; within 14d dedup. [carry]
+
+**§5.0:** audit_due_nudge: `[audit-due] no committed audit baseline; no-op.` ✅. distill_detector: `[distill-detector] no un-distilled audits; no-op.` ✅. audit_cadence_signal: `[audit-cadence] no post-seed decision-grade distill artifacts yet; no-op.` ✅.
+
+**Conditional checks:**
+- **Check I:** not a firing day (Tue 2026-07-21). Next firing Wed 2026-07-23. [carry]
+- **Check III:** OFF-WEEK ✅ — biweekly; next fire 2026-07-26. [carry]
+- **Check VIII:** RESOLVED ✅ — PR #964 merged 2026-07-20. [carry]
+- **Check XIV:** pending=1 (mirror-review-pr-ourliberty-graph-9 carry; plan_summary gate precondition now resolved post-#986). [carry]
+- **Check XI:** CLOSED ✅ — over_gate=false. [carry]
+- Check IV/VI/IX/X/XII: timer-managed. No new artifacts. ✅
+
+**G-rule assessment:**
+- **outbox-notifier-deep-review-stamp-no-retry-trigger-001**: fix-live (PR #980 merged), verification_pending. No new deep-review-hold cycle observed this iter to verify end-to-end. [carry, vp]
+- **regression-gate-non-standard-test-path-python-001**: RESOLVED ✅ — PR #986 merged (prior iter). [carry, resolved]
+- **sync-deploy-targets-missing-registry-001 [2/3]**: CARRY — no new occurrence at lines 812-813. [carry]
+- All other G-rule counts carry from ~5783.
+
+**Actions taken:**
+1. Check A: fast-forward 531b0988→c794248c (always-fix: ff-main-when-behind). ✅
+2. Check 0: repair-watermark no-op; 2 new alerts (both Tier-3 silenced: flip-readiness-gauge.service, flip-readiness-gauge.timer); watermark advanced 811→813. ✅
+3. §5.0: all three one-shots no-op. ✅
+4. PRIME ledger: 1 intervention row appended (ff-main-when-behind, Tier 1). ✅
+5. Tier state: `record --checks-clean false` → **Tier 1** (reset from Tier 3; consecutive_clean=0; 5-min cadence). ✅
+
+**Escalations:** None.
+
+**Standing findings (updated):**
+- [yellow] **zombie-bash-pid-1834248** — ~53d-23h09m, bash poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`. ask-then-do: `kill 1834248`. [carry, static]
+- [yellow] **sync-deploy-targets-missing-registry-001 [2/3]** — rsdpm (prj_Yxqyk19dzUmAfdb0pd6azsimlIcX) absent from config/deploy_targets.json. Dispatch to Beacon at 3/3. [carry]
+- [yellow] **probe-blind:ourliberty-cycle.service** *(carry from iter ~5574)* — heal-claude-json-bind-drift healer blind for cycle.service mount namespace. [carry]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — Awaiting `approve check-vi-update-2026-07-07`. [carry]
+- [yellow] **mirror-review-pr-ourliberty-graph-9** — APPROVAL_REQUEST pending. Gate fix (#986) live; plan_summary precondition resolved. Beacon handling. [carry]
+- [green] **PR #989 MERGED** ✅ — docs(spec): revise restart guard to cordon-and-drain. [new]
+- [green] **PR #990 MERGED** ✅ — chore(automerge): unit file now states auto-merge is armed. [new]
+- [green] **dashboard PR #146 MERGED** ✅ — Mirror REVIEW_PASS auto-merge at 18:21Z UTC. [new]
+- [green] **PR #986 MERGED** ✅ — fix(gate): discover pipeline/test_*.py layout in test_regression_check. [stable]
+- [green] **PR #980 MERGED** ✅ — fix(auto-merge): dashboard deep-review approval fires merge after stamping. [stable]
+- [green] **PR #982 MERGED** ✅ — feat(alerts): stamp operator tier on every alert row at write time. [stable]
+- [green] **PR #983 MERGED** ✅ — feat(autonomy): flip-readiness gauge. [stable] (systemd units auto-installed this iter via heal-systemd-install-drift)
+- [green] **PR #984 MERGED** ✅ — feat: govern-loop assessor. [stable]
+- [green] **PR #985 MERGED** ✅ — feat(alerts): sort-once grouped cleanup. [stable]
+- [green] **PR #978 MERGED** ✅ — feat(cancel). [stable]
+- [green] **PR #971 MERGED** ✅ — feat: route ourliberty-graph PRs through Mirror pipeline. [stable]
+- [green] **xiv-b-build-timing-decision-001 RESOLVED** ✅. [stable]
+- [green] **check-viii RESOLVED** ✅ — PR #964 merged 2026-07-20. [stable]
+- [green] **sync NOMINAL** — status=no-change, last_sync=18:05:12Z UTC; HEAD=c794248c=origin/main. [updated]
+- [green] **daemons healthy** — beacon PID 973130; outbox-notifier PID 973243; inbox_watcher PID 935426; heal-stale-daemon-code heartbeat 18:25:21Z UTC. [updated]
+- [green] **ourliberty-graph PR #8 MERGED** ✅. [stable]
+- [blue] **PR #987 in Mirror review** — fix(notifier): head-scope the deep-review approval before driving a merge. wt-mirror-#987 ACTIVE. [active]
+- [blue] **PR #988 in Mirror review** — fix(auto-merge): the healer path now honours an aborted build sequence. wt-mirror-#988 ACTIVE. [active]
+- [blue] **PR #991 in Mirror review** — feat(alerts): capture alert outcomes — XIV-b write-back loop. wt-mirror-#991 ACTIVE. [new-active]
+- [blue] **PR #992 in Mirror review** — fix(notifier): plain-language wording + release-path cover. wt-mirror-#992 ACTIVE. [new-active]
+- [blue] **PR #993 queued** — perf(missions): stop shipping the proposed pile (597KB→11KB payload reduction). Mirror inbox. [new]
+- [blue] **PR #994 queued** — feat(cordon): shared live-session predicate + watcher restart cordon (PR 1/3). Mirror inbox. [new]
+- [blue] **dashboard PR #147 queued** — feat(approvals): Alerts section — rate the alerts you were already sent. Mirror inbox. [new]
+- [blue] **graph PR #9** — OPEN, pending Larry approval. Gate fix live. Beacon handling. [carry]
+- [blue] **Check I — next firing Wed 2026-07-23.** [carry]
+- [blue] **SUPABASE_SERVICE_ROLE_KEY rotation** — due 2026-08-22 (~31 days). DM sent 2026-07-20; within 14d dedup. [carry]
+- [blue] **pulse-check-xiv-tier4-001 [2/3]** — Dispatch at 3/3 ~2026-07-27. [carry]
+- [blue] **Check I dm_route second-emission-Sunday** — 1st occurrence 2026-07-19T14:14Z. Monitor Wed 2026-07-23. [carry]
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch — DISPATCHED ✅ (3/3)** — verification_pending. [carry]
+- [blue] **G-rules (dispatched, vp):** forge-wip-redispatch-exhausted-genuine-no-pr-001; ourliberty-health-subject-key-mismatch-001; outbox-notifier-notification-intent-reject-tier4-001; forge-wip-redispatch-digest-tier4-001; forge-revision-preamble-missing-pr711-001; decision-needed-approval-forge-dispatch-no-target-repo-001; no-session-revision-active-mirror-session-fp-001; auto-dispatch-APPROVAL_REQUEST-task-id-mismatch (3/3); outbox-notifier-deep-review-stamp-no-retry-trigger-001 (fix-live, vp).
+- [blue] **G-rule 2/3:** outbox-notifier-notification-intent-review-escalate-tier4-001; outbox-notifier-auto-merge-stale-revalidation-tier4-001; pulse-check-xiv-tier4-001; heal-pipeline-stall-retry-exhausted-pr-exists-fp-001; sync-deploy-targets-missing-registry-001.
+- [blue] **G-rule 1/3:** medic-approval-request-tier4-001; mirror-malformed-verdict-heal-reap-path-001; mirror-queue-wait-gauge-tier4-001; inbox-watcher-tier-pool-all-unavailable-tier4-001; heal-pipeline-stall-unrouted-deep-review-required-fp-001; heal-pulse-check-staleness-single-flight-skip-fp-001; gate-parallelism-monitor-regression-data-001; pulse-rotation-check-source-tier4-001; pulse-auto-dispatch-null-reply-chat-id-post-pr950; auto-merge-deep-review-hold-tier4-001 [1/3].
+- [blue] **missions healer active** — HEAD=c794248c. [updated]
+
+**PRIME DIRECTIVE:** 1 intervention (ff-main-when-behind); 0 systemic_fixes; 1 ledger row appended. ratio≈22.74 (systemic_fixes=62, vp=33; trailing-30d, trend=improving).
+**Tier end-of-iter:** **Tier 1** (reset from Tier 3; consecutive_clean=0; 5-min cadence; last_signal_at=2026-07-21T18:30:21Z UTC).
+
+---
+
