@@ -10510,6 +10510,23 @@
       "retired_at": "2026-07-22T14:02:19.836482+00:00",
       "retired_reason": "orphan-terminal",
       "retired_signal": "pr_merged:#657"
+    },
+    {
+      "id": "proposed-reconcile-govern-loop-assessor-shipped-001",
+      "name": "Reconcile Govern Loop Assessor Shipped 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `reconcile-govern-loop-assessor-shipped-001`. Last activity 2026-07-22T14:27:42.058789+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "reconcile-govern-loop-assessor-shipped-001"
+      ],
+      "repo": null,
+      "created": "2026-07-22",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-22T14:32:40.059530+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-22T14:27:42.058789+00:00"
     }
   ]
 }
