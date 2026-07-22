@@ -6,6 +6,16 @@
 
 ---
 
+## pulse-heartbeat.json is a phantom file — Check 5 real substrate is heal-stale-daemon-code.heartbeat (learned 2026-07-22, Beacon investigation)
+
+**Rule:** `pulse-heartbeat.json` does NOT exist and never has a writer. It never appeared in tracked code (`git log -S` empty). Only Pulse's own journal/ledger/G-rule ever referenced it — the name was invented. **Check 5's correct substrate** is `/home/larry/agents/blackboard/heal-stale-daemon-code.heartbeat` (plain-text ISO 8601 UTC timestamp, NOT JSON). If `heal-stale-daemon-code.heartbeat` is fresh and the healer daemon is alive, Check 5 is NOMINAL — do not report missing `pulse-heartbeat.json`.
+
+**[blue] doc-drift in cycle-prompt § 3.5:** names `heal-stale-daemon-code-state.json` (also does not exist). Actual files: `heal-stale-daemon-code.heartbeat` + `state/heal-stale-daemon-code-cooldowns.json`. Non-blocking but worth correcting.
+
+**G-rule pulse-heartbeat-missing-001: RETRACTED.** Phantom target. G-rule dispatched 3/3, Beacon confirmed phantom. Do NOT re-open this G-rule.
+
+---
+
 ## G-rule root-cause synthesis must verify PR file scope before asserting "daemon running stale code" (learned 2026-07-21, iter ~5739 false positive)
 
 **Rule:** Before carrying a "daemon running pre-PR code" finding or dispatching an entrypoint-blind G-rule, verify: `git log --oneline -- <entrypoint_path>` to confirm the PR actually modified that specific file. If the file wasn't in the PR diff, the healer's "fresh" verdict is correct and the daemon is current. The false positive in iter ~5739: Pulse misattributed PR #968 (which modified `heal_forge_wip_only_redispatch.py`) to `outbox_notifier.py`, then misread "healer didn't restart" as "entrypoint blind spot in `heal_stale_daemon_code.py`." The entrypoint was never blind — it's the primary mtime target at L1057. The dispatch burned a Beacon session on a non-existent bug. A/B verdict: journal-discipline proportionate response; hardening spec warranted only if this class recurs ≥3 times.
