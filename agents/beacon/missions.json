@@ -10239,7 +10239,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-22T05:28:19.796432+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-08T08:10:01.9909+00:00"
+      "orphan_last_activity_ts": "2026-07-08T08:10:01.9909+00:00",
+      "briefing": {
+        "what": "A piece of work the team picked up on its own that hasn't been attached to any of your active priorities yet.",
+        "why": "It's already consumed several rounds of effort and hit a snag that needed extra attention, so it's spending time and focus without a clear payoff to the business.",
+        "suggest": "Have someone confirm what this is meant to accomplish and tie it to a real priority before more time goes in \u2014 worth a quick check rather than an automatic green light."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-22T05:33:27.697037+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
