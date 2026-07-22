@@ -4896,3 +4896,97 @@ Watermark advanced 833→836. NOMINAL ✅ (no tier reset; all Tier 3)
 
 ---
 
+## Iteration ~5822 — 2026-07-22T02:37Z UTC (Larry /cycle chat, Tier 1)
+
+**Health:** ⚠️ Zombie PID 1834248 carry (etime=54-07:18:18). All 5 mandatory checks clean. 0 open PRs in agent-core. 2 new alerts (838: doorbell Tier-3 silenced; 839: fix-pulse-auto-dispatch approval_request Tier-3 silenced); watermark advanced 837→839. Pending approvals: 3 entries (graph-9 + rsdpm + fix-null-chat). New [blue] finding: merged-pr-reconcile:govern-loop-assessor (PR #984 appears shipped, mission card still 'drafting'). Tier 1 continues (zombie non-clean carry).
+
+**VERIFY-BEFORE-REASSERT (from iter ~5821 at 02:33Z UTC):**
+- **"zombie-bash-pid-1834248 etime=54-07:10:55"**: CONFIRMED — PID 1834248 etime=54-07:18:18 at 02:37Z check; bash poll loop alive. [carry]
+- **"daemons healthy"**: CONFIRMED — all 5 PIDs alive (1377962/Ss 1377967/Ssl 1377976/Ss 1181199/SNs 1240698/Ssl). ✅
+- **"sync NOMINAL"**: CONFIRMED — last_sync=2026-07-22T02:00:49Z UTC (~36 min old at 02:37Z); status=success; consecutive_push_failures=0. Under 2h. ✅
+- **"beacon-pending-approvals.json: 2 entries"**: UPDATED → 3 entries — file is at `~/agents/state/beacon-pending-approvals.json` (was reading wrong path `~/agents/blackboard/` in prior iters; state/ is authoritative). mirror-review-pr-ourliberty-graph-9 (carry) + rsdpm-deploy-target-registry-001 (carry) + NEW: fix-pulse-auto-dispatch-null-chat-chain-event-001 (Beacon processed ~5821 direction-ask). [UPDATED from 2]
+- **"Tier 1, consecutive_clean=0"**: CONFIRMED — cycle-tier.json tier=1, consecutive_clean=0, last_signal_at=2026-07-22T02:33:17Z UTC. ✅
+- **"Check I today is Wed 2026-07-22"**: CONFIRMED — most recent artifact: check-i-2026-07-20.json (Sunday). Timer fires ~08:13 UTC (~5h36m away at 02:37Z). No new artifact yet. [carry]
+- **"sync-deploy-targets-missing-registry-001 [3/3] DISPATCHED ✅"**: CONFIRMED + CHAIN PROGRESSING — rsdpm still absent from config/deploy_targets.json (grep returned 0). Beacon processed direction-ask; rsdpm-deploy-target-registry-001 pending-approval created. doorbell (alert 838) confirmed "Approve — Add RSDPM entry" listed as pending for Larry. vp. [carry]
+- **"0 open PRs in agent-core"**: CONFIRMED — gh pr list returned `[]`. ✅
+- **"HEAD=e6614e54"**: UPDATED → HEAD=2c37207e (Pulse cycle 20260722T023604Z; run_cycle.sh wrapper committed + pushed iter ~5821 output). HEAD=origin/main. ✅
+- **"pulse-auto-dispatch-null-reply-chat-id-post-pr950 [3/3] DISPATCHED ✅"**: CONFIRMED + CHAIN PROGRESSING — Beacon processed direction-ask (direction-ask-pulse-auto-dispatch-null-reply-chat-id-3of3-001.json gone from inbox); generated fix-pulse-auto-dispatch-null-chat-chain-event-001 approval_request (alert 839, ts=02:36:52Z UTC). vp. [UPDATED: chain advanced from direction-ask-in-inbox to approval_request pending]
+
+**Check 0 — Alert triage:** `repair-watermark` no-op (`{"repaired": false, "old_watermark": 837, "file_length": 839}`). 2 new alerts:
+- Line 838 (ts=02:31:59Z): source=doorbell, kind=notification, intent=doorbell — 3-item digest (govern-loop-assessor escalation + graph PR #9 + rsdpm approval). Already delivered to Larry via Telegram. alert-translations.json "doorbell:doorbell" match → **Tier 3 silenced** (route=digest). No secondary DM.
+- Line 839 (ts=02:36:52Z): source=outbox-notifier, kind=approval_request, approval_id=fix-pulse-auto-dispatch-null-chat-chain-event-001 — Beacon's plan-ready delivery confirmation for null-chat fix. Same pattern as line 837 (rsdpm). → **Tier 3 silenced** (route=digest). No secondary DM.
+Watermark advanced 837→839 via `set-watermark --line 839`. NOMINAL ✅ (Tier-3 silences; no tier-reset)
+
+**Check 1 — Log noise:** beacon_telegram_bot.log last entry: [2026-07-21T20:36:07-0600] (02:36:07Z UTC) — "notification idx=837 delivered (intent=doorbell)". ~1 min old at 02:37Z. Most recent WARN in journalctl 30min: heal-stale-daemon-code tick at 02:31:10Z UTC (fresh=438, unparseable=97 — routine INFO). No WARN patterns above threshold. NOMINAL ✅
+
+**Check 2 — Telegram sweep:** Bot log last entry: [2026-07-21T20:36:07-0600] (02:36:07Z UTC) — doorbell delivered. No new Larry messages since last scan. Last directive: "Where are we with pr0ourliberty-graph-9?" at 13:05–13:07 MDT 2026-07-21 → Beacon responded 13:08:35 MDT. No orphan directives. NOMINAL ✅
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → FORGE_NO_PR_SKIP ×4 (task-closed/merged/branch-exists), "no stalls detected". NOMINAL ✅
+
+**Check 4 — Pending directives:** No orphan Larry directives. New [blue] finding: `for-larry-escalations.json` entry `merged-pr-reconcile:govern-loop-assessor` (ts=2026-07-22T02:38:59Z UTC, for_larry=true, needs_larry=false) — "Mission looks shipped: Govern-Loop Assessor (operator-layer ROI/rank). PR #984 appears to carry this mission's work, card still 'drafting'. Confirm shipped/dismiss in Missions." Doorbell already delivered this to Larry. Informational carry only. NOMINAL ✅
+
+**Check 5 — Stale daemon code:** journalctl heal-stale-daemon-code last tick: 2026-07-22T02:31:10Z UTC (~6 min old at 02:37Z). fresh=438, unparseable=97. Well within 60-min threshold. NOMINAL ✅
+
+**Check A — Source repo:** HEAD=2c37207e=origin/main; on main; clean tree. NOMINAL ✅ (latest: `Pulse cycle 20260722T023604Z`)
+**Check B — Sync health:** last_sync=2026-07-22T02:00:49Z UTC (~36 min old at 02:37Z); status=success; consecutive_push_failures=0. Under 2h. NOMINAL ✅
+**Check C — Agent liveness:** beacon_telegram_bot PID 1377962 Ss (35:54) ✅; dashboard_api PID 1377967 Ssl (35:54) ✅; outbox_notifier PID 1377976 Ss (35:53) ✅; chain_event_shipper PID 1181199 SNs (6h50m) ✅; inbox_watcher PID 1240698 Ssl (5h50m) ✅. All 5 expected daemons alive. ⚠️ **Zombie PID 1834248** (bash poll loop, etime=54-07:18:18, awaiting absent `build-check-viii-pr-2b-analyzer-001.json`). NON-NOMINAL ⚠️
+**Check E — PR/merge state:**
+- **agent-core**: 0 open PRs. All clear ✅
+- **graph PR #9** (OPEN, MERGEABLE, reviewDecision=""): Awaiting Larry approval (mirror-review-pr-ourliberty-graph-9). No change. NOMINAL carry ✅
+**Check H — Forge/Beacon/Mirror/Pulse inboxes:** All empty. Beacon: direction-ask-pulse-auto-dispatch-null-reply-chat-id-3of3-001.json processed (generated fix-pulse-auto-dispatch approval). Forge/Mirror/Pulse: empty. NOMINAL ✅
+
+**§5.0:** audit_due_nudge: `[audit-due] no committed audit baseline; no-op.` ✅. distill_detector: `[distill-detector] no un-distilled audits; no-op.` ✅. audit_cadence_signal: `[audit-cadence] no post-seed decision-grade distill artifacts yet; no-op.` ✅
+
+**Conditional checks:**
+- **Check I:** firing day (Wed 2026-07-22, UTC weekday=2 ∈ {0,2,4,6}). Most recent artifact: check-i-2026-07-20.json (Sunday). Timer fires ~08:13 UTC (~5h36m away at 02:37Z). No new artifact yet; fold when timer fires. [carry]
+- **Check III:** OFF-WEEK ✅ — next fire 2026-07-26 (last artifact: check-iii-2026-07-12.json). [carry]
+- **Check VIII:** RESOLVED ✅ — PR #964 merged 2026-07-20. [carry]
+- **Check XIV:** pending=3 (mirror-review-pr-ourliberty-graph-9 + rsdpm-deploy-target-registry-001 + fix-pulse-auto-dispatch-null-chat-chain-event-001). [UPDATED from 2]
+- **Check XI:** CLOSED ✅ — over_gate=false. [carry]
+- Check IV/VI/IX/X/XII: timer-managed. No new artifacts. ✅
+
+**G-rule assessment:**
+- **pulse-auto-dispatch-null-reply-chat-id-post-pr950 [3/3] DISPATCHED ✅**: Beacon processed direction-ask; fix-pulse-auto-dispatch-null-chat-chain-event-001 approval_request generated (alert 839, ts=02:36:52Z UTC). Pending approval now in beacon-pending-approvals.json. Chain progressing. vp. [UPDATED: approval_request now pending]
+- **doorbell-tier4-novel-001 [1/3]**: Alert 838 is a doorbell notification — alert-translations.json "doorbell:doorbell" match → Tier 3 (known pattern). NOT advancing counter; prior 1/3 occurrence stands. [carry at 1/3; no recurrence]
+- **sync-deploy-targets-missing-registry-001 [3/3] DISPATCHED ✅**: rsdpm still absent from config/deploy_targets.json; rsdpm-deploy-target-registry-001 approval pending in beacon-pending-approvals.json. Chain progressing. vp. [carry]
+- All other G-rules: no new occurrences this iter.
+
+**Actions taken:**
+1. Check 0: `repair-watermark` no-op; 2 new alerts (838 doorbell Tier-3, 839 approval_request Tier-3); watermark advanced 837→839 via set-watermark. ✅
+2. PRIME ledger: 1 intervention row (tier=1, kind=intervention, template=zombie-pid-carry, ts=2026-07-22T02:42:40Z UTC). ✅
+3. Tier state: `record --checks-clean false` → **Tier 1** (consecutive_clean=0; last_signal_at=2026-07-22T02:42:28Z UTC). ✅
+
+**Escalations:** [yellow] zombie PID 1834248 bash poll loop carry (etime=54-07:18:18); ask-then-do: `kill 1834248`. [unchanged from ~5821]
+
+**Standing findings (updated):**
+- [yellow] **zombie-bash-pid-1834248** — etime=54-07:18:18 at 02:37Z UTC. Bash poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`. Ask-then-do: `kill 1834248`. [carry]
+- [green] **PR #1001 MERGED ✅** — `fix(notifier): preserve stamped_head_sha across a same-head re-hold` (9922fb54). [carry]
+- [green] **PR #1000 MERGED** ✅ — fix(healer): raise TimeoutStartSec above drain ceiling. [carry]
+- [green] **PR #999 MERGED** ✅ — feat(healer): cordon and drain before restarting the inbox watcher. [carry]
+- [green] **PR #998 MERGED** ✅ — chore(alerts): Tier-3 translation silences redundant auto-merge-deep-review-hold WARN. G-rule COMPLETE. [carry]
+- [green] **daemons healthy** — beacon PID 1377962; dashboard_api PID 1377967; outbox_notifier PID 1377976; chain_event_shipper PID 1181199; inbox_watcher PID 1240698. NOMINAL. [carry]
+- [green] **sync NOMINAL** — last_sync=2026-07-22T02:00:49Z UTC; success; ~36 min old; under 2h. [carry]
+- [yellow] **beacon-pending-approvals.json: 3 entries** — mirror-review-pr-ourliberty-graph-9 (carry) + rsdpm-deploy-target-registry-001 (carry) + NEW: fix-pulse-auto-dispatch-null-chat-chain-event-001 (Beacon processed null-chat G-rule direction-ask). [UPDATED from 2; also NOTE: file is at ~/agents/state/, not ~/agents/blackboard/ — prior iters read wrong path]
+- [yellow] **sync-deploy-targets-missing-registry-001 [3/3] DISPATCHED ✅** — rsdpm-deploy-target-registry-001 pending-approval in beacon-pending-approvals.json. Chain progressing. vp. [carry]
+- [yellow] **pulse-auto-dispatch-null-reply-chat-id-post-pr950 [3/3] DISPATCHED ✅** — fix-pulse-auto-dispatch-null-chat-chain-event-001 approval_request in beacon-pending-approvals.json. Chain progressing. vp. [UPDATED: approval now in pending-approvals]
+- [yellow] **probe-blind:ourliberty-cycle.service** *(carry from iter ~5574)* — heal-claude-json-bind-drift healer blind for cycle.service. [carry]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — Awaiting `approve check-vi-update-2026-07-07`. [carry]
+- [yellow] **mirror-review-pr-ourliberty-graph-9** — APPROVAL_REQUEST pending. [carry]
+- [blue] **merged-pr-reconcile:govern-loop-assessor** — NEW: PR #984 appears to carry Govern-Loop Assessor mission (operator-layer ROI/rank), but mission card is still 'drafting'. for_larry=true, needs_larry=false. Doorbell delivered to Larry at 02:31:59Z UTC. Action: confirm shipped / dismiss in Missions board. (Source: heal_merged_pr_board_reconcile, ts=02:38:59Z UTC)
+- [blue] **graph PR #9** — OPEN, MERGEABLE, pending Larry approval. [carry]
+- [blue] **Check I — today is Wed 2026-07-22; timer fires ~08:13 UTC.** Fold artifact when available. [carry]
+- [blue] **SUPABASE_SERVICE_ROLE_KEY rotation** — due 2026-08-22 (~31 days). [carry]
+- [blue] **pulse-check-xiv-tier4-001 [2/3]** — Dispatch at 3/3 ~2026-07-27. [carry]
+- [blue] **Check I dm_route second-emission-Sunday** — 1st occurrence 2026-07-19T14:14Z. Monitor Wed 2026-07-22 Check I run (~08:13 UTC today). [carry]
+- [blue] **beacon-pending-approvals.json path correction** — file is at `~/agents/state/beacon-pending-approvals.json`, NOT `~/agents/blackboard/`. Prior iters reported "MISSING" for the blackboard path; state path shows 3 pending entries. [NEW — should update MEMORY.md]
+- [blue] **G-rule auto-dispatch-APPROVAL_REQUEST-task-id-mismatch — DISPATCHED ✅ (3/3)** — vp. [carry]
+- [blue] **doorbell-tier4-novel-001 [1/3]** — alert 838 is Tier-3 (doorbell:doorbell translation match). No recurrence. Dispatch at 3/3. [carry]
+- [blue] **G-rules (dispatched, vp):** forge-wip-redispatch-exhausted-genuine-no-pr-001; ourliberty-health-subject-key-mismatch-001; outbox-notifier-notification-intent-reject-tier4-001; forge-wip-redispatch-digest-tier4-001; forge-revision-preamble-missing-pr711-001; decision-needed-approval-forge-dispatch-no-target-repo-001; no-session-revision-active-mirror-session-fp-001; auto-dispatch-APPROVAL_REQUEST-task-id-mismatch (3/3); auto-merge-deep-review-hold-tier4-001 (5+, vp); sync-deploy-targets-missing-registry-001 (3/3, vp); pulse-auto-dispatch-null-reply-chat-id-3of3 (3/3, vp).
+- [blue] **G-rule 2/3:** outbox-notifier-notification-intent-review-escalate-tier4-001; outbox-notifier-auto-merge-stale-revalidation-tier4-001; pulse-check-xiv-tier4-001; heal-pipeline-stall-retry-exhausted-pr-exists-fp-001.
+- [blue] **G-rule 1/3:** medic-approval-request-tier4-001; mirror-malformed-verdict-heal-reap-path-001; mirror-queue-wait-gauge-tier4-001; inbox-watcher-tier-pool-all-unavailable-tier4-001; heal-pipeline-stall-unrouted-deep-review-required-fp-001; heal-pulse-check-staleness-single-flight-skip-fp-001; gate-parallelism-monitor-regression-data-001; pulse-rotation-check-source-tier4-001; doorbell-tier4-novel-001.
+
+**PRIME DIRECTIVE:** 1 intervention (zombie-pid-carry); 0 systemic_fixes this iter; NOT iter_clean. ratio=21.58 (trailing-30d; trend=improving; 1424 interventions / 66 systemic_fixes).
+**Tier end-of-iter:** **Tier 1** (consecutive_clean=0; cadence 5 min; last_signal_at=2026-07-22T02:42:28Z UTC; non-clean: zombie PID 1834248 confirmed alive etime=54d+).
+
+---
+
