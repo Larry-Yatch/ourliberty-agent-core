@@ -48,7 +48,7 @@ Inbox tasks come in two phases. Read the envelope's `phase` field:
    ```
 
    Its SHELF section surfaces the **3 closest catalogued components as candidates** — id, profile, full capability statement, location — and renders **no verdict**. *You* judge each candidate: **REUSE** (same job — extend it instead of rebuilding), **ADAPT** (same problem at a different altitude or shape — the pattern transfers but work remains), or **NONE** (not relevant — build net-new). Judge on substance, not shared vocabulary; cross-altitude matches (e.g. a workflow card answering a schema need) are normal and frequently correct, and "none of these fit" is a legitimate, expected outcome, not a failure. Record the call and your reasoning in `preflight_summary` — if you judged REUSE/ADAPT, name the component and what you'll extend rather than reimplement. The GRAPH section prints the blast radius of the files you'll touch. **Skip this for trivial edits** (a single-file localized fix, a config/doc/typo edit, a test-mock fix) — the check should earn its tokens. **Fail-safe:** if the ourliberty-graph checkout is absent or the command errors, note "build-check skipped" and proceed — never block on it. Advisory: it informs the plan, it does not gate PROCEED. See `ourliberty-graph/docs/build-loop.md`.
-5. **Decide.** End your response with EXACTLY one marker:
+5. **Decide.** End your response with EXACTLY one marker (`<id-from-envelope>` = the envelope's `task_id` field copied verbatim — bare, no `forge-` prefix, never derived from the worktree dir or branch name; see Marker discipline below):
 
 ```
 === PROCEED ===
@@ -118,6 +118,21 @@ You CAN still hand-type a marker, and the parser will accept correctly-formatted
     === END_PROCEED ===
     ```
     Narrative above for Beacon. JSON below for the parser. Clean cascade.
+- **`task_id` is the envelope's `task_id` field VERBATIM.** Copy it exactly from the dispatch envelope — never derive, reconstruct, or infer it from anything else. In particular it is NOT the worktree directory name (`~/agent-worktrees/wt-forge-<task_id>/`) with only the `wt-` stripped, and NOT the branch name (`forge/<task_id>`). Those paths embed a `forge-` / `forge/` fragment that is part of the *worktree/branch naming convention*, not part of the task_id. Stripping only `wt-` from the directory yields `forge-<task_id>` — a wrong, prefixed id. The envelope's own `task_id` field is the single source of truth.
+  - ❌ **WRONG** — `forge-` prefix inferred from the worktree/branch name:
+    ```
+    === PROCEED ===
+    {"task_id": "forge-m4-pr2", "preflight_summary": "..."}
+    === END_PROCEED ===
+    ```
+    The worktree is `wt-forge-m4-pr2/` and the branch is `forge/m4-pr2`, but the envelope's `task_id` is `m4-pr2`. This mismatch is rejected as a malformed marker and costs a marker-error retry.
+  - ✓ **RIGHT** — bare id copied straight from the envelope:
+    ```
+    === PROCEED ===
+    {"task_id": "m4-pr2", "preflight_summary": "..."}
+    === END_PROCEED ===
+    ```
+  - **Enforcement:** the outbox notifier's task_id-match gate (`scripts/outbox_notifier.py` L2454-2470) compares the marker's `task_id` against the envelope's and raises `MalformedForgeMarker` (`marker task_id (...) does not match envelope task_id (...)`) on any mismatch, firing the marker-error cascade so you re-emit with the correct id. Routing may *appear* to work via the outbox filename stem, but you cannot rely on that path — the bare envelope id is required.
 - **Marker is the last meaningful thing in your response.** Brief reasoning above it is fine (and useful — Beacon sees it). Don't continue narrating after the marker block.
 - **Never include literal marker delimiters inside narrative text** — the parser doesn't unwrap code fences. If you need to discuss markers in your reasoning (e.g., "I considered REJECT but..."), describe them without the `=== ... ===` delimiters.
 - **Marker-error retries cap at 3.** If the notifier dead-letters your marker three times in a row, the dispatch closes and goes back to Beacon. Don't waste retries — read the parse error carefully and fix the structural issue.
