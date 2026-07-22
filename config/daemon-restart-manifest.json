@@ -261,6 +261,7 @@
         "scripts/event_briefing.py",
         "scripts/file_lock.py",
         "scripts/fixture_patterns.py",
+        "scripts/forge_preflight_handler.py",
         "scripts/gh_budget.py",
         "scripts/gh_pr_snapshot.py",
         "scripts/id_match.py",
