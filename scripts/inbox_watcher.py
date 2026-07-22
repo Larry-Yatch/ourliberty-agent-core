@@ -43,6 +43,7 @@ import agent_runner  # noqa: E402
 import dispatch_lease  # noqa: E402
 import dispatch_validator  # noqa: E402
 import fixture_patterns  # noqa: E402
+import forge_preflight_handler as fph  # noqa: E402
 from inbox_dispatch_order import order_pending, read_fast_tracked_at  # noqa: E402
 import larry_alerts  # noqa: E402
 import mirror_review_conclusion  # noqa: E402
@@ -1000,6 +1001,153 @@ def _mirror_marker_self_validate(
     return output_text, session_id
 
 
+# forge-preflight-marker-self-validate-gate-001: default cap on the in-process
+# preflight-marker self-validation re-prompt loop. Overridable via
+# config/agent-models.json loop_bounds.forge_preflight_marker_self_validate_retries.
+DEFAULT_FORGE_PREFLIGHT_MARKER_SELF_VALIDATE_RETRIES = 2
+
+# Diagnostic used when a Forge preflight response carries no marker block at all
+# (parse_forge_marker returns marker_type None). Defined module-local rather than
+# imported from outbox_notifier — that module is a heavy import and pulling it in
+# here would add an import cycle for one string.
+FORGE_PREFLIGHT_NO_MARKER_MSG = (
+    "No canonical preflight marker block found in the response. A Forge preflight "
+    "verdict must end with exactly one `=== PROCEED ===` (or CLARIFY_REQUEST / "
+    "REJECT) block with a JSON body and matching `=== END_XXX ===` delimiter."
+)
+
+
+def _load_forge_preflight_marker_self_validate_retries(models_config: dict) -> int:
+    """Cap on in-process Forge preflight-marker self-validation re-prompts.
+
+    Read from config/agent-models.json
+    `loop_bounds.forge_preflight_marker_self_validate_retries`. Falls back to
+    DEFAULT_FORGE_PREFLIGHT_MARKER_SELF_VALIDATE_RETRIES for a missing key, a
+    non-int, a bool (json `true`/`false`), or a negative value — same defensive
+    shape as the Mirror loader.
+    """
+    loop_bounds = models_config.get("loop_bounds") if isinstance(models_config, dict) else None
+    if not isinstance(loop_bounds, dict):
+        return DEFAULT_FORGE_PREFLIGHT_MARKER_SELF_VALIDATE_RETRIES
+    raw = loop_bounds.get("forge_preflight_marker_self_validate_retries")
+    if isinstance(raw, bool) or not isinstance(raw, int) or raw < 0:
+        return DEFAULT_FORGE_PREFLIGHT_MARKER_SELF_VALIDATE_RETRIES
+    return raw
+
+
+def _forge_preflight_marker_is_clean(output_text: str) -> tuple[bool, str | None]:
+    """True iff `output_text` carries exactly one valid preflight marker.
+
+    Detection is forge_preflight_handler.parse_forge_marker — no new validation
+    logic. A missing marker (the parser returns marker_type None) OR any parse
+    failure (MalformedForgeMarker / MultipleForgeMarkers) is treated as "not
+    clean" and carries a diagnostic as err_msg.
+    """
+    try:
+        marker_type, _payload, _narrative = fph.parse_forge_marker(output_text)
+    except (fph.MalformedForgeMarker, fph.MultipleForgeMarkers) as e:
+        return False, str(e)
+    if marker_type is None:
+        return False, FORGE_PREFLIGHT_NO_MARKER_MSG
+    return True, None
+
+
+def _forge_preflight_marker_self_validate(
+    *,
+    agent: str,
+    task: dict,
+    output_text: str,
+    session_id: str | None,
+    working_dir: str | None,
+    model: str | None,
+    timeout: int,
+    task_id: str,
+    meta: dict,
+    models_config: dict,
+) -> tuple[str, str | None]:
+    """Bounded SAME-PROCESS preflight-marker self-validation for Forge preflights.
+
+    forge-preflight-marker-self-validate-gate-001. On dense multi-section specs
+    (RSDPM sequence preflights especially) Forge can narrate her verdict in bold
+    prose ('Preflight decision: **PROCEED**.') and end the turn WITHOUT the
+    machine-readable `=== PROCEED ===` block. The existing outbox_notifier
+    marker-error path corrects this, but each round costs a cross-process notify
+    cycle. This gate is a fast loop in FRONT of that slow one: when a
+    malformed/missing marker is detected here, re-invoke run_claude under
+    --resume with a terse correction prompt (capped, config-driven),
+    substituting the corrected output_text/session_id BEFORE the single existing
+    outbox write. On exhaust the best-effort output flows through unchanged and
+    the outbox_notifier net stays as the outer backstop.
+
+    Exact structural mirror of _mirror_marker_self_validate. Only fires for
+    agent=="forge" + phase=="preflight" (the caller additionally gates on
+    run_claude success). Adds no new outbox; only substitutes output_text and
+    session_id.
+    """
+    if not (agent == "forge" and task.get("phase") == "preflight"):
+        return output_text, session_id
+
+    clean, err_msg = _forge_preflight_marker_is_clean(output_text)
+    if clean:
+        return output_text, session_id
+
+    max_retries = _load_forge_preflight_marker_self_validate_retries(models_config)
+    attempt = 0
+    while attempt < max_retries:
+        attempt += 1
+        correction = (
+            f"Your previous preflight output on task `{task_id}` could not be "
+            f"parsed as a valid preflight marker (in-process self-validation retry "
+            f"{attempt} of {max_retries}). Error: {err_msg} Re-emit EXACTLY one "
+            f"valid marker block — PROCEED, CLARIFY_REQUEST, or REJECT — via "
+            f"`python3 ~/agent-core/scripts/marker.py render forge <type>` and "
+            f"paste the rendered block verbatim. Put your narrative ABOVE the "
+            f"block; JSON ONLY inside the `=== <TYPE> ===` / `=== END_<TYPE> ===` "
+            f"delimiters."
+        )
+        log(f"[{agent}] forge-preflight-marker self-validate retry "
+            f"{attempt}/{max_retries} task={task_id}: {err_msg}")
+        try:
+            ok, new_output, new_session = agent_runner.run_claude(
+                agent_id=agent,
+                prompt=correction,
+                working_dir=working_dir,
+                session_id=session_id,
+                timeout=timeout,
+                context="inbox",
+                model_override=model,
+                task_stem=task_id,
+                out_meta=meta,
+                expected_agent=agent,
+                phase=task.get("phase"),
+            )
+        except Exception as e:
+            log(f"[{agent}] forge-preflight-marker self-validate run_claude raised "
+                f"task={task_id} attempt={attempt}: {e!r}; keeping prior output")
+            break
+        # Carry the latest session id forward so the next --resume continues the
+        # corrected conversation (run_claude may rotate the session id).
+        if new_session:
+            session_id = new_session
+        if not ok:
+            log(f"[{agent}] forge-preflight-marker self-validate run_claude "
+                f"non-success task={task_id} attempt={attempt}; keeping prior "
+                f"output, falling through to notifier net")
+            break
+        output_text = new_output
+        clean, err_msg = _forge_preflight_marker_is_clean(output_text)
+        if clean:
+            log(f"[{agent}] forge-preflight-marker self-validate RESOLVED "
+                f"in-process task={task_id} after {attempt} re-prompt(s) — zero "
+                f"cross-process marker-error round-trips")
+            return output_text, session_id
+
+    log(f"[{agent}] forge-preflight-marker self-validate exhausted task={task_id} "
+        f"({attempt}/{max_retries}); writing best-effort outbox, outbox_notifier "
+        f"marker-error net is the outer backstop")
+    return output_text, session_id
+
+
 def process_task(agent: str, task_file: Path, models_config: dict,
                  slot: int = 0) -> None:
     try:
@@ -1337,6 +1485,22 @@ def process_task(agent: str, task_file: Path, models_config: dict,
     # write below; adds no new outbox.
     if success:
         output_text, session_id = _mirror_marker_self_validate(
+            agent=agent,
+            task=task,
+            output_text=output_text,
+            session_id=session_id,
+            working_dir=working_dir,
+            model=model,
+            timeout=timeout,
+            task_id=task_id,
+            meta=meta,
+            models_config=models_config,
+        )
+        # forge-preflight-marker-self-validate-gate-001: symmetric to the Mirror
+        # gate above. Both are mutually exclusive by their internal agent/phase
+        # guards, so calling both is safe and order-independent; kept as two
+        # sequential calls for symmetry and readability.
+        output_text, session_id = _forge_preflight_marker_self_validate(
             agent=agent,
             task=task,
             output_text=output_text,

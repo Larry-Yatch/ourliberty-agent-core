@@ -34,6 +34,8 @@ Every numeric or boolean knob in the agent system, in one place. The values list
 | `max_replans` | `config/agent-models.json` `loop_bounds` | 2 | 1–4 | Beacon's replans usually land in 1 → lower to 1 (one revision is enough). 2 replans rarely enough to resolve → raise to 3 OR escalate to Larry sooner. |
 | `cost_per_task_usd` | `config/agent-models.json` `loop_bounds` | 15.0 | 1.0–20.0 | Stuck loops burn $15 before pause → lower. Real long-running tasks legitimately exceed → raise. After 10+ live D3.5 runs, retune to actual p95 cost × 2. |
 | `DEFAULT_MAX_REVISIONS` (handler default) | `scripts/mirror_review_handler.py` | 3 | 1–5 | Should match `loop_bounds.max_revisions`; drift between the two is a bug. |
+| `mirror_marker_self_validate_retries` | `config/agent-models.json` `loop_bounds` | 2 | 0–4 | mirror-marker-self-validate-gate-001. Caps the SAME-PROCESS verdict-marker re-prompt loop in `inbox_watcher.process_task` for phase=review Mirror dispatches. Mirror keeps emitting malformed verdicts past 2 in-process corrections → raise. Gate never fires / cross-process marker-error notifies vanished → lower toward 0 (0 disables, notifier net is the outer backstop). |
+| `forge_preflight_marker_self_validate_retries` | `config/agent-models.json` `loop_bounds` | 2 | 0–4 | forge-preflight-marker-self-validate-gate-001. Caps the SAME-PROCESS preflight-marker re-prompt loop in `inbox_watcher.process_task` for phase=preflight Forge dispatches (prose-verdict-no-block on dense specs). Forge still lands prose past 2 in-process corrections → raise. MalformedForgeMarker preflight notifies vanished → lower toward 0 (0 disables, outbox_notifier cascade is the outer backstop). |
 
 ---
 
