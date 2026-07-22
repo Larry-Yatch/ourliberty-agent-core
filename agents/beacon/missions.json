@@ -9299,6 +9299,11 @@
         "model": "claude-opus-4-8",
         "at": "2026-07-20T13:20:31.181276+00:00",
         "from_state": "proposed"
+      },
+      "spawned": {
+        "kind": "delegate",
+        "task_id": "delegate-retrospective-heal-claude-json-bind-drift-probe-blind-2026-07-20",
+        "stamped_at": "2026-07-22T17:59:12.457050+00:00"
       }
     },
     {
@@ -9333,6 +9338,11 @@
         "model": "claude-opus-4-8",
         "at": "2026-07-20T13:20:31.181276+00:00",
         "from_state": "proposed"
+      },
+      "spawned": {
+        "kind": "delegate",
+        "task_id": "delegate-retrospective-ledger-weekly-2026-07-20",
+        "stamped_at": "2026-07-22T17:58:41.428242+00:00"
       }
     },
     {
