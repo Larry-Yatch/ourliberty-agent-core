@@ -7491,7 +7491,11 @@
     {
       "id": "govern-loop-assessor",
       "name": "Govern-Loop Assessor (operator-layer ROI/rank)",
-      "phase": "drafting",
+      "phase": "shipped",
+      "prior_phase": "drafting",
+      "shipped_at": "2026-07-21T11:44:20+00:00",
+      "shipped_by": "forge-manual-reconcile",
+      "shipped_note": "Shipped via PR #984 'feat: govern-loop assessor (shadow-first operator-layer ROI/rank scorer)' (merged 2026-07-21 11:44:20Z; scripts/govern_loop_assessor.py live in tree). Board phase was stale because the assessor shipped OUTSIDE scripts/kick_govern_loop_assessor.sh and task_ids is empty, so heal_missions_card_gc had nothing to probe and heal_merged_pr_board_reconcile only surfaces (never flips) — the 'Mission looks shipped' escalation had no auto-reconcile path. Manually reconciled by Forge per task reconcile-govern-loop-assessor-shipped-001.",
       "brief": "Shadow-first read-only assessor over the decision-outcome ledger that ranks where Larry's approvals pay off (merged vs regressed vs abandoned); mirrors the mission_staleness scorer pattern, auto-acts on nothing.",
       "spec_docs": [
         "agents/beacon/specs/govern-loop-assessor.md"

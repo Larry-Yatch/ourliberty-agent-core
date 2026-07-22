@@ -48,6 +48,10 @@ LEDGER_FILE = AGENTS_ROOT / 'state' / 'decision-outcome-ledger.jsonl'
 STATE_FILE = AGENTS_ROOT / 'state' / 'govern-loop-kickoff.json'
 LOG_FILE = AGENTS_ROOT / 'logs' / 'govern-loop-readiness.log'
 
+# The assessor script itself, in this repo tree — the durable 'already built'
+# signal (see _assessor_built).
+ASSESSOR_SCRIPT = Path(__file__).resolve().parent / 'govern_loop_assessor.py'
+
 # Readiness thresholds. Rationale: the assessor buckets by area and scores the
 # decision->build_outcome JOIN; below ~15 joined keys every bucket is a
 # coin-flip, and Larry's standing prove-bar for judgment loops is ~2 weeks of
@@ -140,6 +144,19 @@ def measure(rows: list[dict[str, Any]],
     }
 
 
+def _assessor_built() -> bool:
+    """True once slice 7 (the assessor) is shipped into the repo tree.
+
+    The nudge normally self-silences via the kick script's `kicked` stamp, but
+    the assessor can ship OUTSIDE the kick path — PR #984 merged
+    scripts/govern_loop_assessor.py directly, leaving no stamp — so the nudge
+    would otherwise fire forever for a thing already built. The assessor
+    script's presence is the repo-local 'already built' signal that closes that
+    gap regardless of how it shipped. Seam for tests (monkeypatch this name).
+    """
+    return ASSESSOR_SCRIPT.exists()
+
+
 def _read_state() -> dict[str, Any]:
     try:
         with open(STATE_FILE, encoding='utf-8') as f:
@@ -199,6 +216,13 @@ def run_once(now: Optional[datetime] = None,
     now_dt = now or datetime.now(timezone.utc)
     now_ts = now_dt.timestamp()
     state = _read_state()
+
+    if _assessor_built():
+        # Slice 7 is already in the tree (e.g. PR #984 merged it outside the
+        # kick path, so no `kicked` stamp exists). Nudging to build a thing that
+        # already exists is a false signal — short-circuit before any emit.
+        _log('INFO', 'assessor already shipped; nudge silenced')
+        return state
 
     if state.get('kicked'):
         # The build was dispatched — this watcher's job is done, forever.
