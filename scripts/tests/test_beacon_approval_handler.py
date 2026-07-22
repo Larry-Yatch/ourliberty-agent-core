@@ -1221,6 +1221,41 @@ class BuildApprovalRequestChainEventTest(unittest.TestCase):
         row = ah.build_approval_request_chain_event(p)
         self.assertEqual(row['payload']['target_agent'], 'forge')
 
+    def test_reply_chat_id_omitted_by_default(self):
+        # No reply_chat_id kw (replan/headless callers) → key absent everywhere,
+        # byte-identical to pre-fix output.
+        row = ah.build_approval_request_chain_event(self._payload())
+        self.assertNotIn('reply_chat_id', row['payload'])
+        self.assertNotIn(
+            'reply_chat_id', row['payload']['suggested_envelope_for_approve'])
+        self.assertNotIn(
+            'reply_chat_id', row['payload']['suggested_envelope_for_reject'])
+
+    def test_reply_chat_id_none_omitted(self):
+        # Explicit None is treated identically to absent — omitted, not set falsy.
+        row = ah.build_approval_request_chain_event(
+            self._payload(), reply_chat_id=None)
+        self.assertNotIn('reply_chat_id', row['payload'])
+        self.assertNotIn(
+            'reply_chat_id', row['payload']['suggested_envelope_for_approve'])
+        self.assertNotIn(
+            'reply_chat_id', row['payload']['suggested_envelope_for_reject'])
+
+    def test_reply_chat_id_int_seeds_payload_and_both_envelopes(self):
+        # An int reply_chat_id (valid inbound int, or the notifier's Larry
+        # fallback for a null inbound) lands in the chain payload AND both
+        # suggested envelopes so a dashboard Approve/Reject POST seeds the
+        # downstream dispatch with a valid chat.
+        row = ah.build_approval_request_chain_event(
+            self._payload(), reply_chat_id=7998341473)
+        self.assertEqual(row['payload']['reply_chat_id'], 7998341473)
+        self.assertEqual(
+            row['payload']['suggested_envelope_for_approve']['reply_chat_id'],
+            7998341473)
+        self.assertEqual(
+            row['payload']['suggested_envelope_for_reject']['reply_chat_id'],
+            7998341473)
+
 
 class IsCompletionClaimTest(unittest.TestCase):
     """Prose guard: gate fait-accompli dispatch claims, not intent/normal talk.

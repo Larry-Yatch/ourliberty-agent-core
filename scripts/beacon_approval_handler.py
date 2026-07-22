@@ -983,6 +983,7 @@ def build_approval_request_chain_event(
     *,
     ts: Optional[str] = None,
     origin_task_id: Optional[str] = None,
+    reply_chat_id: Optional[int] = None,
 ) -> dict[str, Any]:
     """Build kwargs for `chain_event_emit.emit_event` for an approval_request.
 
@@ -1039,6 +1040,18 @@ def build_approval_request_chain_event(
     # untouched.
     if origin_task_id and origin_task_id != task_id:
         chain_payload['origin_task_id'] = origin_task_id
+    # Null-chat leg (fix-pulse-auto-dispatch-null-chat-chain-event-001): when the
+    # notifier resolved a chat destination (a valid inbound int, or the Larry
+    # fallback for a null reply_chat_id), thread it into the chain event AND both
+    # suggested envelopes so the dashboard Approvals tab renders it and a
+    # dashboard Approve/Reject POST seeds the downstream dispatch with a valid
+    # chat — closing the same null-chat class PR #933/#950 fixed on adjacent legs.
+    # When None (replan/headless callers), the key is omitted everywhere so their
+    # output stays byte-identical.
+    if isinstance(reply_chat_id, int):
+        chain_payload['reply_chat_id'] = reply_chat_id
+        suggested_envelope_for_approve['reply_chat_id'] = reply_chat_id
+        suggested_envelope_for_reject['reply_chat_id'] = reply_chat_id
     return {
         'event_type': 'approval_request',
         'agent': 'beacon',
