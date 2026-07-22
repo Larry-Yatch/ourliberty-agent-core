@@ -10182,6 +10182,23 @@
         "from_state": "proposed"
       },
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+    },
+    {
+      "id": "proposed-fix-pulse-auto-dispatch-null-chat-chain-event-001",
+      "name": "Fix Pulse Auto Dispatch Null Chat Chain Event 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `fix-pulse-auto-dispatch-null-chat-chain-event-001`. Last activity 2026-07-22T02:36:52.707265+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "fix-pulse-auto-dispatch-null-chat-chain-event-001"
+      ],
+      "repo": null,
+      "created": "2026-07-22",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-22T02:41:30.392985+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-22T02:36:52.707265+00:00"
     }
   ]
 }
