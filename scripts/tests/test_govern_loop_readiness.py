@@ -137,6 +137,14 @@ class ReadLedgerTest(SandboxedTest):
 
 
 class RunOnceTest(SandboxedTest):
+    def setUp(self):
+        super().setUp()
+        # These exercise the readiness state machine for the NOT-yet-built
+        # assessor. The assessor script now lives in the repo tree, so the
+        # default `_assessor_built()` would short-circuit every pass; pin the
+        # seam off here. The built=True short-circuit has its own test below.
+        gr._assessor_built = lambda: False
+
     def test_not_ready_records_progress_no_alert(self):
         self._write_ledger([_decision('k1', days_ago=1)])
         state = gr.run_once(now=NOW, alert_fn=self._alert)
@@ -208,6 +216,32 @@ class RunOnceTest(SandboxedTest):
         self._write_ledger(_ready_rows())
         gr.run_once(now=NOW, alert_fn=self._alert)
         self.assertEqual(len(self.calls), 1)
+
+
+class AssessorBuiltGuardTest(SandboxedTest):
+    """The self-silence guard: once the assessor is shipped (built outside the
+    kick path, so no `kicked` stamp), the nudge stops firing regardless of the
+    ledger thresholds — and it is gated ONLY on 'already built'."""
+
+    def test_already_built_silences_nudge_even_when_ready(self):
+        gr._assessor_built = lambda: True
+        self._write_ledger(_ready_rows())  # thresholds all met
+        state = gr.run_once(now=NOW, alert_fn=self._alert)
+        self.assertEqual(self.calls, [])
+        self.assertNotIn('last_nudge_ts', state)
+
+    def test_not_built_and_ready_still_nudges(self):
+        gr._assessor_built = lambda: False
+        self._write_ledger(_ready_rows())
+        gr.run_once(now=NOW, alert_fn=self._alert)
+        self.assertEqual(len(self.calls), 1)
+        self.assertTrue(self.calls[0]['needs_larry'])
+
+    def test_default_signal_detects_shipped_assessor_in_repo_tree(self):
+        # PR #984 merged scripts/govern_loop_assessor.py; the default (unpatched)
+        # signal must see it so the nudge self-silences in production.
+        importlib.reload(gr)
+        self.assertTrue(gr._assessor_built())
 
 
 if __name__ == '__main__':
