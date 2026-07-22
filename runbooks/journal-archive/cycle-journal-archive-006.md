@@ -15274,3 +15274,106 @@ All INFO. No WARNs. NOMINAL
 
 ---
 
+## Iteration ~5942 — 2026-07-22T17:05Z UTC (Larry /cycle chat, Tier 1)
+
+**Health:** ⚠️ Zombie PID 1834248 carry (etime=54-21:44:54). All 9 daemons alive. RSDPM: m7-pr1 revision-1 in Forge (~10 min); m1-pr4 build active (~12 min). PR #1010 (forge-preflight-marker-self-validate-gate-001): Mirror review-request dispatched 16:56:17Z UTC. 0 new alerts (watermark 789=file_length 789). HEAD=b42022b2.
+
+**VERIFY-BEFORE-REASSERT (from iter ~5941 at ~16:55Z UTC):**
+- **"zombie-bash-pid-1834248 etime=54-21:38:06"**: CONFIRMED — PID 1834248 bash Ss etime=54-21:44:54. ~6.8 min etime growth. [carry alive]
+- **"daemons healthy (9 PIDs)"**: CONFIRMED — all 9 PIDs alive (etimes ~09:08–09:13). [carry, aging updated]
+- **"sync NOMINAL, last_sync=2026-07-22T16:14:47Z UTC (~41 min old)"**: CONFIRMED same timestamp; ~50 min old at 17:05Z. Still under 2h. [carry]
+- **"beacon-pending-approvals: pending=0, history=520"**: CONFIRMED. [carry]
+- **"Tier 1, consecutive_clean=0"**: CONFIRMED — tier=1, consecutive_clean=0, last_signal_at=2026-07-22T16:59:18Z. [carry]
+- **"HEAD=32271222=origin/main"**: UPDATED — HEAD=b42022b2 ("Pulse cycle 20260722T170208Z"). [UPDATED]
+- **"Check I FIRED — artifact check-i-2026-07-22.json at 14:11Z UTC"**: No re-fire. [carry]
+- **"larry-alerts.jsonl watermark=789"**: CONFIRMED — 789 lines, watermark=789. 0 new alerts. [carry]
+- **"RSDPM m7-pr1 Mirror REVISION active"**: CONFIRMED — revision-m7-pr1-1.json in Forge inbox (~10 min at 17:05Z). [carry, aging updated]
+- **"agent-core PR #1010 open — Beacon notify pending → Mirror review dispatch expected"**: UPDATED — Beacon notify processed; Mirror review-request dispatched 16:56:17Z UTC (review-forge-preflight-marker-self-validate-gate-001.json in Mirror inbox). PR #1010 MERGEABLE, reviewDecision="". [UPDATED]
+- **"m1-pr4 build active (~3 min at 16:55Z)"**: CONFIRMED — build-m1-pr4.json in Forge inbox since 16:52:27Z (~12 min at 17:05Z). [carry, aging updated]
+- **"forge-wip-redispatch-exhausted-genuine-no-pr-001 [DISPATCHED VP]"**: No new occurrence. [carry]
+- **"mirror-queue-wait-gauge G-rule 2/3"**: No new occurrence. [carry]
+- **"Check 5 heartbeat NOMINAL (16:49:20Z)"**: UPDATED — new heartbeat 2026-07-22T16:59:21Z UTC (~6 min old at 17:05Z). [UPDATED]
+
+**Check 0 — Alert triage:** repair-watermark no-op (repaired=false, old=789, file_length=789). 0 new alerts. NOMINAL
+
+**Check 1 — Log noise (outbox-notifier.log since 16:55Z UTC):**
+- 10:56:17 MDT (16:56:17Z UTC): review-request dispatched mirror ← beacon (task=forge-preflight-marker-self-validate-gate-001, file=review-forge-preflight-marker-self-validate-gate-001.json, pr=PR #1010) [INFO]
+All INFO. No WARNs. NOMINAL
+
+**Check 2 — Telegram sweep:** Last bot entry 10:31:07 MDT (16:31:07Z UTC) — alert idx=788 (heal-pipeline-stall, stalled-active-step:rsdpm-v0-001:m7-pr1). No new entries. Last Larry message 10:15:59 MDT (16:15:59Z UTC) — "go". NOMINAL
+
+**Check 3 — Pipeline stall (17:03:33Z UTC):** FORGE_NO_PR_SKIP ×7 (pr-ourliberty-agent-core-991 merged; silence-deep-review-hold-alert-001 #998; fix-pulse-auto-dispatch-null-chat-chain-event-001 #1003; rsdpm-deploy-target-registry-001 #1004; dag-spec-doc-resolve-against-target-repo-001 #1007; reconcile-govern-loop-assessor-shipped-001 #1009; m1-pr1 pr=#5 RSDPM). "no stalls detected". NOMINAL
+
+**Check 4 — Pending directives:** beacon-pending-approvals: pending=0, history=520. Beacon inbox: empty. Forge inbox: revision-m7-pr1-1.json (16:54:15Z, ~10 min) + build-m1-pr4.json (16:52:27Z, ~12 min). Mirror inbox: review-forge-preflight-marker-self-validate-gate-001.json (16:56:17Z, ~8 min). Pulse inbox: empty. NOMINAL
+
+**Check 5 — Stale daemon code:** Heartbeat 2026-07-22T16:59:21Z UTC (~6 min old at 17:05Z). Well within 60-min threshold. NOMINAL [UPDATED]
+
+**Check A — Source repo:** HEAD=b42022b2=origin/main ("Pulse cycle 20260722T170208Z"); on main; clean tree; 0 ahead, 0 behind. NOMINAL [UPDATED]
+**Check B — Sync health:** last_sync=2026-07-22T16:14:47Z UTC (~50 min at 17:05Z); status=no-change; 0 consecutive_push_failures. NOMINAL (under 2h)
+**Check C — Agent liveness:** dashboard_api PID 1588263 Ssl (etime=~09:13); beacon_telegram_bot PID 1590420 Ss; chain_event_shipper PID 1590654 SNs; agent_telegram_bot(forge) PID 1590875 Ss; inbox_watcher PID 1590956 Ssl; agent_telegram_bot(mirror) PID 1591041 Ss; outbox_notifier PID 1591117 Ss; agent_telegram_bot(pulse) PID 1591194 Ss; spec_review_runner PID 1591274 Ss. Zombie PID 1834248 (bash Ss, etime=54-21:44:54, poll loop awaiting absent build-check-viii-pr-2b-analyzer-001.json). NON-NOMINAL
+**Check E — PR/merge state:** agent-core PR #1010 open ("feat(inbox-watcher): in-process marker self-validate gate for Forge preflight"; MERGEABLE, reviewDecision="", autoMerge=null; Mirror review active since 16:56:17Z). RSDPM PR #9 open ("feat(M7): PR-1 Bones — ledger + config + heartbeat + Zoom webhook receiver"; MERGEABLE, reviewDecision=""; revision-1 in Forge ~10 min). Both in active work. NOMINAL
+**Check H — Forge digest:** revision-m7-pr1-1.json (16:54:15Z, ~10 min); build-m1-pr4.json (16:52:27Z, ~12 min). Both active. NOMINAL
+
+**§5.0:** repair-watermark ran (no-op). audit_due_nudge no-op. distill_detector no-op. audit_cadence_signal no-op.
+
+**Rotations:** SUPABASE_SERVICE_ROLE_KEY last_dm=2026-07-20 (~2 days ago); 14-day dedup window; no new DM. [carry]
+
+**Conditional checks:**
+- **Check I:** Already fired today (Wed 2026-07-22) at 14:11Z UTC. Next: Fri 2026-07-24. OFF.
+- **Check III:** OFF-WEEK — next fire 2026-07-27. OFF.
+- Check IV/VI/IX/X/XII: timer-managed. No new artifacts.
+
+**G-rule assessment:**
+- **MalformedForgeMarker-preflight-rsdpm-sequence-001 [MIRROR REVIEW ACTIVE]**: UPDATED — Beacon notify processed; Mirror review-request dispatched 16:56:17Z UTC for PR #1010 (review-forge-preflight-marker-self-validate-gate-001.json in Mirror inbox). [UPDATED from PR-OPEN PHASE]
+- **forge-wip-redispatch-exhausted-genuine-no-pr-001 [DISPATCHED VP]**: No new occurrence. [carry]
+- **mirror-queue-wait-gauge-tier4-001 [2/3]**: PR #1010 now under Mirror review + m7-pr1 revision pending Forge. [carry]
+- **MIRROR_DAG_PREFLIGHT already-kicked-off-001 [1/3]**: No new occurrence. [carry]
+- All other G-rules: carry unchanged from iter ~5941.
+
+**Actions taken:**
+1. Check 0: repair-watermark no-op. 0 new alerts.
+2. §5.0 one-shots: all no-ops.
+3. PRIME ledger: 1 intervention row appended (zombie-pid-1834248-etime54d-m7pr1-revision-1-in-forge-m1pr4-build-active-pr1010-mirror-review-active; ts=2026-07-22T17:05:43Z UTC).
+4. Tier state: record --checks-clean false → consecutive_clean=0; last_signal_at=2026-07-22T17:05:44Z UTC.
+
+**Escalations:**
+- [yellow] **zombie-bash-pid-1834248**: Larry already aware. Ask-then-do: kill 1834248. [carry — no new DM]
+- [yellow] **mirror-queue-wait-gauge**: p95=548.1m (threshold 90m), 33 reviews/24h. G-rule 2/3. [carry — no new DM]
+
+**Standing findings (updated):**
+- [yellow] **zombie-bash-pid-1834248** — bash Ss etime=54-21:44:54 at 17:05Z UTC. Poll loop awaiting absent build-check-viii-pr-2b-analyzer-001.json. Ask-then-do: kill 1834248. [carry]
+- [yellow] **probe-blind:ourliberty-cycle.service** — heal-claude-json-bind-drift healer blind for cycle.service mount namespace. [carry]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — Awaiting approve check-vi-update-2026-07-07. [carry]
+- [yellow] **mirror-queue-wait-gauge** — p95=548.1m (threshold 90m), 33 reviews/24h. G-rule 2/3. [carry]
+- [yellow] **dag-preflight-rsdpm-v0-001-postsync1 EXHAUSTED** — forge-wip-redispatch exhausted. VP dispatched; awaiting translation fix. [carry]
+- [blue] **forge-preflight-marker-self-validate-gate-001 MIRROR REVIEW ACTIVE** — Mirror review-request dispatched 16:56:17Z UTC for PR #1010. [UPDATED from COMPLETE]
+- [blue] **RSDPM m7-pr1 revision-1 in Forge** — revision-m7-pr1-1.json in Forge inbox since 16:54:15Z (~10 min at 17:05Z). [carry, aging updated]
+- [blue] **m1-pr4 build active** — build-m1-pr4.json in Forge inbox since 16:52:27Z (~12 min at 17:05Z). [carry, aging updated]
+- [green] **RSDPM m7-pr1 PR #9 OPENED** — 16:49:15Z UTC. Mirror REVISION returned → revision-1 in Forge. [carry]
+- [green] **RSDPM m1-pr3 PR #8 MERGED** — AUTO_MERGED 16:30:34Z UTC. [carry ✓]
+- [green] **RSDPM m2 MERGED** — RSDPM PR #7 AUTO_MERGED 16:16:57Z UTC. [carry ✓]
+- [green] **RSDPM PR #6 (m1-pr2) MERGED** — AUTO_MERGED 15:48:17Z UTC. [carry ✓]
+- [green] **RSDPM PR #5 (m1-pr1) MERGED** — AUTO_MERGED 15:29:13Z UTC. [carry ✓]
+- [green] **rsdpm-v0-001 ACTIVE** — 4/20 steps merged; m7-pr1 PR #9 open (revision-1 in Forge ~10m); m1-pr4 build active (~12m). [carry]
+- [green] **PR #1010 open** — Mirror review active since 16:56:17Z UTC. [carry]
+- [green] **PR #1009 MERGED** [carry ✓]
+- [green] **PR #1008/#1007/#1005/#1001/#1003/#1004 MERGED** [carry]
+- [green] **heal-systemd-install-drift resolved** — clean. [carry]
+- [green] **daemons healthy** — PIDs: dashboard_api=1588263; outbox_notifier=1591117; beacon_telegram_bot=1590420; chain_event_shipper=1590654; inbox_watcher=1590956; spec_review_runner=1591274; bots=1590875/1591041/1591194. [carry, aging updated ~09:08–09:13]
+- [green] **sync NOMINAL** — last_sync=2026-07-22T16:14:47Z UTC; ~50 min old. [carry]
+- [green] **HEAD=b42022b2** — origin/main ("Pulse cycle 20260722T170208Z"). [UPDATED]
+- [green] **Check 5 heartbeat NOMINAL** — heal-stale-daemon-code.heartbeat=2026-07-22T16:59:21Z UTC (~6 min old). [UPDATED]
+- [blue] **Check I FIRED** — artifact check-i-2026-07-22.json (week 2026-07-20). Next: Fri 2026-07-24. [carry]
+- [blue] **SUPABASE_SERVICE_ROLE_KEY rotation** — due 2026-08-22 (~31 days). [carry]
+- [blue] **pulse-check-xiv-tier4-001 [2/3]** — Dispatch at 3/3 ~2026-07-27. [carry]
+- [blue] **mirror-queue-wait-gauge-tier4-001 [2/3]** — G-rule. p95=548.1m, 33 reviews/24h. [carry]
+- [blue] **G-rules (dispatched, advancing):** MalformedForgeMarker-preflight-rsdpm-sequence-001 [MIRROR REVIEW ACTIVE PR #1010]; forge-wip-redispatch-exhausted-genuine-no-pr-001; ourliberty-health-subject-key-mismatch-001; outbox-notifier-notification-intent-reject-tier4-001; forge-wip-redispatch-digest-tier4-001; forge-revision-preamble-missing-pr711-001; decision-needed-approval-forge-dispatch-no-target-repo-001; no-session-revision-active-mirror-session-fp-001; auto-dispatch-APPROVAL_REQUEST-task-id-mismatch (3/3); fix-pulse-auto-dispatch-null-chat-chain-event-001 (3/3 FULLY RESOLVED); sequence-kickoff-rsdpm-v0-001-tier4 (3/3 ROUTING CONFIRMED FIXED).
+- [blue] **G-rule 2/3:** outbox-notifier-notification-intent-review-escalate-tier4-001; outbox-notifier-auto-merge-stale-revalidation-tier4-001; pulse-check-xiv-tier4-001; heal-pipeline-stall-retry-exhausted-pr-exists-fp-001; mirror-queue-wait-gauge-tier4-001.
+- [blue] **G-rule 1/3:** MIRROR_DAG_PREFLIGHT-already-kicked-off-001; medic-approval-request-tier4-001; mirror-malformed-verdict-heal-reap-path-001; inbox-watcher-tier-pool-all-unavailable-tier4-001; heal-pipeline-stall-unrouted-deep-review-required-fp-001; heal-pulse-check-staleness-single-flight-spark-fp-001; gate-parallelism-monitor-regression-data-001; pulse-rotation-check-source-tier4-001; doorbell-tier4-novel-001; sync-deploy-targets-missing-registry-001.
+- [blue] **missions healer active** — HEAD=b42022b2. [UPDATED]
+
+**PRIME DIRECTIVE:** 1 intervention (zombie-pid-1834248-etime54d-m7pr1-revision-1-in-forge-m1pr4-build-active-pr1010-mirror-review-active; ts=2026-07-22T17:05:43Z UTC). Trailing 30d: interventions=1542, systemic_fixes=66, vp=34; ratio=23.36 (stable, trend=improving).
+**Tier end-of-iter:** **Tier 1** (consecutive_clean=0; 5-min cadence; last_signal_at=2026-07-22T17:05:44Z UTC; non-clean: zombie PID 1834248 etime=54d+).
+
+---
+
