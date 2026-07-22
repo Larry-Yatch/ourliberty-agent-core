@@ -7255,6 +7255,33 @@ class BeaconPulseAutoDispatchTest(unittest.TestCase):
         self.assertEqual(rec['chat_id'], 7998341473)
         self.assertIn('real-001', rec['body'])
 
+    # ----- null-chat leg: resolved chat_id threads into the chain event -----
+
+    def test_approval_request_chain_event_carries_reply_chat_id(self):
+        # fix-pulse-auto-dispatch-null-chat-chain-event-001: a valid inbound
+        # reply_chat_id must propagate into the approval_request chain event's
+        # payload AND both suggested envelopes so the dashboard Approvals tab
+        # renders it and an Approve/Reject POST seeds a valid downstream chat.
+        emitted = []
+
+        def _spy_emit(**kwargs):
+            emitted.append(kwargs)
+
+        body = self._pulse_auto_dispatch_outbox()
+        f = self._write_outbox('beacon', 'beacon-pad-chain.json', body)
+        with mock.patch.object(on.chain_event_emit, 'emit_event', _spy_emit):
+            result = on.process_outbox(f)
+        self.assertEqual(result, 'notified-pulse-auto-dispatch')
+        approval_events = [
+            e for e in emitted if e.get('event_type') == 'approval_request']
+        self.assertEqual(len(approval_events), 1)
+        cp = approval_events[0]['payload']
+        self.assertEqual(cp['reply_chat_id'], 7998341473)
+        self.assertEqual(
+            cp['suggested_envelope_for_approve']['reply_chat_id'], 7998341473)
+        self.assertEqual(
+            cp['suggested_envelope_for_reject']['reply_chat_id'], 7998341473)
+
     # ----- no marker → falls through to default routing -----
 
     def test_no_marker_falls_through(self):
@@ -7576,6 +7603,20 @@ class BeaconPulseDirectionAskTest(unittest.TestCase):
             any(e.get('event_type') == 'approval_request' for e in emitted),
             f'expected an approval_request chain_event, got {emitted!r}',
         )
+        # fix-pulse-auto-dispatch-null-chat-chain-event-001: the null inbound
+        # reply_chat_id resolved to the fallback Larry chat threads into the
+        # chain event payload AND both suggested envelopes (not just add_pending).
+        approval_events = [
+            e for e in emitted if e.get('event_type') == 'approval_request']
+        self.assertEqual(len(approval_events), 1)
+        cp = approval_events[0]['payload']
+        self.assertEqual(cp['reply_chat_id'], self._DEFAULT_LARRY_CHAT)
+        self.assertEqual(
+            cp['suggested_envelope_for_approve']['reply_chat_id'],
+            self._DEFAULT_LARRY_CHAT)
+        self.assertEqual(
+            cp['suggested_envelope_for_reject']['reply_chat_id'],
+            self._DEFAULT_LARRY_CHAT)
         # force_ask alert reached Larry on the fallback chat.
         alerts = self._read_alerts()
         approval_records = [a for a in alerts if a.get('kind') == 'approval_request']
