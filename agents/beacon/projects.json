@@ -979,12 +979,12 @@
           "id": "govern-loop-assessor",
           "title": "Govern-Loop Assessor (operator-layer ROI/rank)",
           "desired_end_state": "Shadow-first read-only assessor over the decision-outcome ledger that ranks where Larry's approvals pay off (merged vs regressed vs abandoned); mirrors the mission_staleness scorer pattern, auto-acts on nothing.",
-          "lifecycle_state": "brainstorm",
+          "lifecycle_state": "done",
           "order": 0,
           "spec_ref": "agents/beacon/specs/govern-loop-assessor.md",
           "sequence_ref": null,
           "created_at": "2026-07-08T06:16:38.415287+00:00",
-          "updated_at": "2026-07-08T06:16:38.415287+00:00",
+          "updated_at": "2026-07-21T11:44:20+00:00",
           "brainstorm": {
             "is_ai_draft": true,
             "draft": {
@@ -1023,7 +1023,7 @@
       ],
       "one_off": true,
       "created_at": "2026-07-08T06:16:38.415287+00:00",
-      "updated_at": "2026-07-08T06:16:38.415287+00:00",
+      "updated_at": "2026-07-22T15:29:02.379771+00:00",
       "promoted_from": {
         "kind": "mission",
         "mission_id": "govern-loop-assessor"
