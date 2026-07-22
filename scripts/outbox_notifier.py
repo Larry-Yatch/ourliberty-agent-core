@@ -8642,14 +8642,27 @@ def _record_deep_review_held(
             continue
         kept.append(e)
     first_for_head = prior is None or prior.get('head_sha') != head_sha
-    kept.append({
+    entry: dict[str, Any] = {
         'repo': repo_coords,
         'pr_number': pr_number,
         'pr_url': pr_url,
         'task_id': task_id,
         'head_sha': head_sha,
         'held_at': datetime.now(timezone.utc).isoformat(),
-    })
+    }
+    if not first_for_head and prior is not None:
+        # Same head being re-held (e.g. `_deep_review_required` failed
+        # conservatively on a gh blip while the stamp is still on the PR).
+        # Carry OUR stamp forward — a fresh dict would drop
+        # `stamped_head_sha`, and the head-move guard would then decline to
+        # revoke the stale label after a push, letting the normal Mirror path
+        # auto-merge a head that was never deep-reviewed. On a genuine new
+        # push (`first_for_head`) the stamp is deliberately NOT carried: a
+        # different head must start unstamped.
+        stamped = prior.get('stamped_head_sha')
+        if stamped is not None:
+            entry['stamped_head_sha'] = stamped
+    kept.append(entry)
     _save_deep_review_held(kept)
     return first_for_head
 
