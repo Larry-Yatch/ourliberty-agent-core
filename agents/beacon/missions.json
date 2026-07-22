@@ -10292,7 +10292,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-22T05:58:57.695181+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-11T22:14:21.982932+00:00"
+      "orphan_last_activity_ts": "2026-07-11T22:14:21.982932+00:00",
+      "briefing": {
+        "what": "The team began working on a fix for cases where a request stalls out and never gets a proper response, but it isn't attached to any active project yet.",
+        "why": "Loose ends like this can quietly waste effort and create confusion about what's actually being delivered, so it's worth knowing where it fits.",
+        "suggest": "Before letting it continue, take a moment to confirm it's worth pursuing and assign it to the right project \u2014 or set it aside if it isn't a priority."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-22T06:03:36.232936+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
