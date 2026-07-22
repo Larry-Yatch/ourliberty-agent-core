@@ -726,6 +726,61 @@ class KickoffFailureModes(_KickoffHandlerHarness):
         self.assertEqual(len(alerts), 1)
         self.assertIn('author', alerts[0]['message'].lower())
 
+    def test_cross_repo_kickoff_resolves_spec_doc_against_target_checkout(self):
+        """dag-spec-doc-resolve-against-target-repo-001: a sequence whose
+        steps target a repo OTHER than agent-core (rsdpm-v0-001's shape:
+        target_repo=RSDPM, spec_doc=BUILD_PLAN.md living in the RSDPM
+        checkout) resolves its spec_doc presence against that repo's checkout,
+        not agent-core. Assert the guard passes the mapped RSDPM root into
+        check_spec_doc_presence — so BUILD_PLAN.md is looked for where it
+        exists — and the sequence transitions pending→active."""
+        steps = [
+            _make_step('m1-pr1', deps=[]),
+            _make_step('m1-pr2', deps=['m1-pr1']),
+        ]
+        for s in steps:
+            s['target_repo'] = 'RSDPM'
+        seq = _make_sequence(seq_id='rsdpm-cross-repo-001', status='pending',
+                             steps=steps, current_steps=['m1-pr1'])
+        seq['spec_doc'] = 'BUILD_PLAN.md'
+        self._write_sequence(seq)
+        fake = bsv.SpecDocPresence(
+            status=bsv.SPEC_DOC_PRESENT,
+            spec_doc='BUILD_PLAN.md',
+            message='spec_doc `BUILD_PLAN.md` is present in the working copy.',
+        )
+        body = self._make_envelope(
+            result_text=(
+                'Sequence authored.\n\n'
+                + self._make_marker(
+                    prompt='kickoff rsdpm-cross-repo-001',
+                    task_id='kickoff-rsdpm-cross-repo-001',
+                )
+            ),
+        )
+        with mock.patch.object(
+            bsv_handler_mod, 'check_spec_doc_presence', return_value=fake,
+        ) as patched:
+            result = on._handle_build_sequence_advancer_kickoff(
+                body, body['result'],
+            )
+        # The guard resolved the spec_doc against the RSDPM checkout, not
+        # agent-core: the repo_root kwarg is the config-mapped RSDPM path.
+        self.assertEqual(patched.call_count, 1)
+        _, kwargs = patched.call_args
+        self.assertEqual(
+            kwargs.get('repo_root'),
+            bsv.resolve_spec_doc_repo_root(seq),
+        )
+        self.assertEqual(
+            kwargs.get('repo_root'),
+            bsv._load_repo_paths().get('RSDPM'),
+        )
+        # Guard passed → sequence armed.
+        self.assertIsNotNone(result)
+        self.assertEqual(
+            self._read_sequence('rsdpm-cross-repo-001')['status'], 'active')
+
     def test_prompt_without_kickoff_verb_warns_and_archives(self):
         """target_agent=build_sequence_advancer but prompt isn't
         `kickoff <seq-id>` — handler claims the marker (returns

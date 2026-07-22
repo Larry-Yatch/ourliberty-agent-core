@@ -61,6 +61,17 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 # ambient checkout's fetch state (the recurring regression-gate flake).
 SPEC_DOC_REPO_ROOT_ENV = 'OURLIBERTY_SPEC_DOC_REPO_ROOT'
 
+# The canonical agent-core repo name in config/agent-models.json `repo_paths`.
+# A sequence whose effective target_repo is agent-core resolves its spec_doc
+# against REPO_ROOT (the ambient checkout / worktree), NOT the canonical
+# repo_paths path — so behavior for the common agent-core case stays
+# byte-for-byte identical to before the target_repo resolution was added.
+AGENT_CORE_REPO_NAME = 'ourliberty-agent-core'
+
+# config/agent-models.json lives at <scripts>/../config/agent-models.json —
+# the same canonical block routing/dispatch and the advancer validate against.
+AGENT_MODELS_CONFIG = REPO_ROOT / 'config' / 'agent-models.json'
+
 # Per spec § 5.1: sequence-level status enum.
 VALID_SEQUENCE_STATUS = frozenset({
     'pending', 'active', 'paused', 'complete', 'failed', 'archived',
@@ -596,6 +607,93 @@ def _default_git_runner(repo_root: Path) -> GitRunner:
     return run
 
 
+def _load_repo_paths(config_path: Path = AGENT_MODELS_CONFIG) -> dict[str, Path]:
+    """Repo name → checkout Path from config/agent-models.json `repo_paths`.
+
+    Same canonical block routing/dispatch and the advancer read. Best-effort:
+    any read/parse/shape error returns an EMPTY map, which callers treat as
+    "can't map target_repo this run" and fall back to the agent-core default
+    (never a hard failure just because the config was briefly unreadable)."""
+    try:
+        data = json.loads(config_path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return {}
+    block = data.get('repo_paths') if isinstance(data, dict) else None
+    if not isinstance(block, dict):
+        return {}
+    out: dict[str, Path] = {}
+    for name, raw in block.items():
+        if isinstance(name, str) and name and isinstance(raw, str) and raw:
+            out[name] = Path(raw)
+    return out
+
+
+def effective_target_repo(seq: Any) -> Optional[str]:
+    """The repo a sequence's steps predominantly target, or None.
+
+    Returns the majority `target_repo` across the sequence's steps (tie-break:
+    first-seen). Steps with a non-string / empty target_repo are ignored. A
+    sequence with no steps (or no usable target_repo) returns None so the
+    caller falls back to the agent-core default. Cross-repo sequences are not
+    expected in V1 (rsdpm-v0-001's 20 steps are uniformly RSDPM); majority is
+    the defensive choice if steps ever disagree."""
+    if not isinstance(seq, dict):
+        return None
+    steps = seq.get('steps')
+    if not isinstance(steps, list):
+        return None
+    counts: dict[str, int] = {}
+    order: list[str] = []
+    for step in steps:
+        if not isinstance(step, dict):
+            continue
+        repo = step.get('target_repo')
+        if not isinstance(repo, str) or not repo.strip():
+            continue
+        repo = repo.strip()
+        if repo not in counts:
+            counts[repo] = 0
+            order.append(repo)
+        counts[repo] += 1
+    if not order:
+        return None
+    # Majority, tie-broken by first-seen (order preserves insertion).
+    return max(order, key=lambda r: (counts[r], -order.index(r)))
+
+
+def resolve_spec_doc_repo_root(
+    seq: Any,
+    *,
+    env: Optional[dict[str, str]] = None,
+    repo_paths: Optional[dict[str, Path]] = None,
+) -> Optional[Path]:
+    """Which checkout root a sequence's `spec_doc` should resolve against.
+
+    Resolution order:
+      1. SPEC_DOC_REPO_ROOT_ENV set → that path. The test override wins so
+         SpecDocCliTest's hermetic /tmp fixture keeps working regardless of
+         the sequence's target_repo.
+      2. Effective target_repo is agent-core (the common case), unset, or not
+         in `repo_paths` → None. The caller then anchors at REPO_ROOT exactly
+         as before — agent-core sequences are byte-for-byte unchanged, and an
+         unmappable repo degrades to the old behavior rather than failing.
+      3. Effective target_repo maps to a checkout in `repo_paths` → that path.
+         A cross-repo sequence (e.g. rsdpm-v0-001, target_repo=RSDPM) resolves
+         its spec_doc inside the RSDPM checkout where the file actually lives.
+
+    `env` / `repo_paths` are injectable for hermetic tests; they default to the
+    process environment and the on-disk config map."""
+    environ = env if env is not None else os.environ
+    override = environ.get(SPEC_DOC_REPO_ROOT_ENV)
+    if override:
+        return Path(override)
+    target = effective_target_repo(seq)
+    if not target or target == AGENT_CORE_REPO_NAME:
+        return None
+    paths = repo_paths if repo_paths is not None else _load_repo_paths()
+    return paths.get(target)
+
+
 def check_spec_doc_presence(
     spec_doc: Any,
     repo_root: Optional[Path] = None,
@@ -733,12 +831,14 @@ def _cli_check_spec_doc(seq_id_or_path: str) -> int:
       1  not_authored — genuinely missing; author + merge first
       3  behind_origin — spec exists on main; run sync, don't re-author
 
-    Repo-root seam: when SPEC_DOC_REPO_ROOT_ENV is set in the environment, the
-    presence check anchors local-file resolution and its `git -C <root>` probes
-    at that path instead of REPO_ROOT. UNSET (the production default) is inert —
-    `repo_root=None` falls through to REPO_ROOT, so production callers behave
-    exactly as before. Only SpecDocCliTest sets it, to a hermetic /tmp git
-    fixture with a resolvable `origin/main`.
+    Repo-root resolution (resolve_spec_doc_repo_root): SPEC_DOC_REPO_ROOT_ENV,
+    when set, wins and anchors local-file resolution + the `git -C <root>`
+    probes at that path (the SpecDocCliTest /tmp-fixture seam). Otherwise the
+    sequence's effective target_repo picks the checkout: agent-core / unset /
+    unmappable → None (falls through to REPO_ROOT, unchanged); a mapped
+    cross-repo target (e.g. RSDPM) → that repo's local checkout, so a spec_doc
+    living in the target repo (rsdpm-v0-001's BUILD_PLAN.md) resolves where it
+    actually exists instead of false-failing NOT_AUTHORED against agent-core.
     """
     token = seq_id_or_path
     if token.endswith('.json') or '/' in token or os.sep in token:
@@ -749,8 +849,7 @@ def _cli_check_spec_doc(seq_id_or_path: str) -> int:
     if seq is None:
         return rc
     spec_doc = seq.get('spec_doc') if isinstance(seq, dict) else None
-    root_override = os.environ.get(SPEC_DOC_REPO_ROOT_ENV)
-    repo_root = Path(root_override) if root_override else None
+    repo_root = resolve_spec_doc_repo_root(seq)
     presence = check_spec_doc_presence(spec_doc, repo_root=repo_root)
     if presence.status == SPEC_DOC_PRESENT:
         sys.stdout.write(f'OK: {presence.message}\n')

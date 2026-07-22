@@ -388,7 +388,16 @@ def apply_kickoff_transition(
     # references hasn't synced into this checkout yet. Placed AFTER the
     # idempotency no-op so a re-dispatched kickoff on an already-active
     # sequence still dedups silently rather than tripping this guard.
-    presence = bsv.check_spec_doc_presence(seq.get('spec_doc'))
+    #
+    # Resolve the spec_doc against the sequence's target_repo checkout (via
+    # resolve_spec_doc_repo_root) so a cross-repo sequence — e.g. rsdpm-v0-001,
+    # whose steps target RSDPM and whose BUILD_PLAN.md lives in the RSDPM
+    # checkout, not agent-core — no longer false-fails NOT_AUTHORED here. An
+    # agent-core-targeted sequence resolves to None → REPO_ROOT, unchanged.
+    presence = bsv.check_spec_doc_presence(
+        seq.get('spec_doc'),
+        repo_root=bsv.resolve_spec_doc_repo_root(seq),
+    )
     if presence.status == bsv.SPEC_DOC_BEHIND_ORIGIN:
         msg = (
             f'Sequence `{seq_id}` kickoff deferred: this checkout is behind '

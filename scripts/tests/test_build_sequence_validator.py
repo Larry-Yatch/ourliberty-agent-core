@@ -732,5 +732,172 @@ class SpecDocCliTest(unittest.TestCase):
         self.assertIn('OK', proc.stdout)
 
 
+def _seq_with_target(target_repo: str, spec_doc: str = 'BUILD_PLAN.md',
+                     n_steps: int = 3) -> dict:
+    """A valid sequence whose steps all declare `target_repo` and whose
+    top-level spec_doc is `spec_doc`. Used by the target_repo resolution
+    tests (mirrors rsdpm-v0-001's uniform-target shape)."""
+    steps = []
+    for i in range(n_steps):
+        step = _valid_step(f's{i}', deps=[f's{i-1}'] if i else [])
+        step['target_repo'] = target_repo
+        steps.append(step)
+    seq = _valid_sequence(steps=steps, current_steps=['s0'], status='pending')
+    seq['spec_doc'] = spec_doc
+    return seq
+
+
+class EffectiveTargetRepoTest(unittest.TestCase):
+    """effective_target_repo — the repo a sequence's steps predominantly hit."""
+
+    def test_uniform_steps(self):
+        seq = _seq_with_target('RSDPM', n_steps=20)
+        self.assertEqual(bsv.effective_target_repo(seq), 'RSDPM')
+
+    def test_majority_wins(self):
+        s0 = _valid_step('s0'); s0['target_repo'] = 'RSDPM'
+        s1 = _valid_step('s1', deps=['s0']); s1['target_repo'] = 'RSDPM'
+        s2 = _valid_step('s2', deps=['s1']); s2['target_repo'] = 'ourliberty-dashboard'
+        seq = _valid_sequence(steps=[s0, s1, s2], current_steps=['s0'])
+        self.assertEqual(bsv.effective_target_repo(seq), 'RSDPM')
+
+    def test_tie_breaks_to_first_seen(self):
+        s0 = _valid_step('s0'); s0['target_repo'] = 'RSDPM'
+        s1 = _valid_step('s1', deps=['s0']); s1['target_repo'] = 'ourliberty-graph'
+        seq = _valid_sequence(steps=[s0, s1], current_steps=['s0'])
+        self.assertEqual(bsv.effective_target_repo(seq), 'RSDPM')
+
+    def test_no_steps_returns_none(self):
+        seq = _valid_sequence()
+        seq['steps'] = []
+        self.assertIsNone(bsv.effective_target_repo(seq))
+
+    def test_non_string_target_ignored(self):
+        s0 = _valid_step('s0'); s0['target_repo'] = ''
+        s1 = _valid_step('s1', deps=['s0']); s1['target_repo'] = 'RSDPM'
+        seq = _valid_sequence(steps=[s0, s1], current_steps=['s0'])
+        self.assertEqual(bsv.effective_target_repo(seq), 'RSDPM')
+
+    def test_non_dict_input_returns_none(self):
+        self.assertIsNone(bsv.effective_target_repo('nope'))
+
+
+class ResolveSpecDocRepoRootTest(unittest.TestCase):
+    """resolve_spec_doc_repo_root — which checkout a spec_doc resolves against.
+
+    The env override wins; agent-core / unset / unmappable → None (REPO_ROOT,
+    unchanged); a mapped cross-repo target → its checkout path."""
+
+    REPO_PATHS = {
+        'ourliberty-agent-core': Path('/home/larry/agent-core'),
+        'RSDPM': Path('/home/larry/RSDPM'),
+    }
+
+    def test_env_override_wins_over_target_repo(self):
+        seq = _seq_with_target('RSDPM')
+        root = bsv.resolve_spec_doc_repo_root(
+            seq,
+            env={bsv.SPEC_DOC_REPO_ROOT_ENV: '/tmp/fixture'},
+            repo_paths=self.REPO_PATHS,
+        )
+        self.assertEqual(root, Path('/tmp/fixture'))
+
+    def test_agent_core_target_resolves_none(self):
+        # The common case MUST stay byte-for-byte: None → REPO_ROOT downstream.
+        seq = _seq_with_target('ourliberty-agent-core')
+        root = bsv.resolve_spec_doc_repo_root(
+            seq, env={}, repo_paths=self.REPO_PATHS)
+        self.assertIsNone(root)
+
+    def test_mapped_cross_repo_target_resolves_checkout(self):
+        seq = _seq_with_target('RSDPM')
+        root = bsv.resolve_spec_doc_repo_root(
+            seq, env={}, repo_paths=self.REPO_PATHS)
+        self.assertEqual(root, Path('/home/larry/RSDPM'))
+
+    def test_unmapped_target_falls_back_to_none(self):
+        seq = _seq_with_target('some-unknown-repo')
+        root = bsv.resolve_spec_doc_repo_root(
+            seq, env={}, repo_paths=self.REPO_PATHS)
+        self.assertIsNone(root)
+
+    def test_no_target_falls_back_to_none(self):
+        seq = _valid_sequence()
+        seq['steps'] = []
+        root = bsv.resolve_spec_doc_repo_root(
+            seq, env={}, repo_paths=self.REPO_PATHS)
+        self.assertIsNone(root)
+
+
+class TargetRepoSpecDocPresenceTest(unittest.TestCase):
+    """Integration: a cross-repo sequence resolves its spec_doc against the
+    target repo's local checkout — present there → PRESENT; absent there and
+    on its origin/main → NOT_AUTHORED. Reuses SpecDocCliTest's hermetic /tmp
+    git-fixture pattern so origin/main resolves deterministically."""
+
+    PRESENT_SPEC = 'BUILD_PLAN.md'
+    ABSENT_SPEC = '__no_such_spec__.md'
+    REPO_X = 'RSDPM'
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.tmpdir = Path(self._tmp.name)
+        self._git_env = {
+            **os.environ,
+            'GIT_CONFIG_GLOBAL': os.devnull,
+            'GIT_CONFIG_SYSTEM': os.devnull,
+            'GIT_AUTHOR_NAME': 'Forge Test',
+            'GIT_AUTHOR_EMAIL': 'forge-test@example.invalid',
+            'GIT_COMMITTER_NAME': 'Forge Test',
+            'GIT_COMMITTER_EMAIL': 'forge-test@example.invalid',
+        }
+        self.checkout = self._build_fixture_repo()
+        self.repo_paths = {self.REPO_X: self.checkout}
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _git(self, cwd: Path, *args: str) -> None:
+        subprocess.run(['git', '-C', str(cwd), *args], check=True,
+                       capture_output=True, text=True, env=self._git_env,
+                       timeout=30)
+
+    def _build_fixture_repo(self) -> Path:
+        """A repoX checkout with PRESENT_SPEC committed + pushed to a local
+        bare origin (so origin/main resolves), and ABSENT_SPEC in neither."""
+        work = self.tmpdir / 'repoX'
+        origin = self.tmpdir / 'origin.git'
+        work.mkdir()
+        self._git(work, 'init', '-q')
+        self._git(work, 'symbolic-ref', 'HEAD', 'refs/heads/main')
+        (work / self.PRESENT_SPEC).write_text('# BUILD_PLAN\n')
+        self._git(work, 'add', self.PRESENT_SPEC)
+        self._git(work, 'commit', '-m', 'add build plan')
+        subprocess.run(['git', 'init', '-q', '--bare', str(origin)],
+                       check=True, capture_output=True, text=True,
+                       env=self._git_env, timeout=30)
+        self._git(work, 'remote', 'add', 'origin', str(origin))
+        self._git(work, 'push', '-q', '-u', 'origin', 'main')
+        return work
+
+    def test_spec_present_in_target_checkout_is_present(self):
+        seq = _seq_with_target(self.REPO_X, spec_doc=self.PRESENT_SPEC)
+        root = bsv.resolve_spec_doc_repo_root(
+            seq, env={}, repo_paths=self.repo_paths)
+        self.assertEqual(root, self.checkout)
+        presence = bsv.check_spec_doc_presence(seq['spec_doc'], repo_root=root)
+        self.assertEqual(presence.status, bsv.SPEC_DOC_PRESENT)
+        self.assertTrue(presence)
+
+    def test_spec_absent_in_target_checkout_and_origin_is_not_authored(self):
+        seq = _seq_with_target(self.REPO_X, spec_doc=self.ABSENT_SPEC)
+        root = bsv.resolve_spec_doc_repo_root(
+            seq, env={}, repo_paths=self.repo_paths)
+        self.assertEqual(root, self.checkout)
+        presence = bsv.check_spec_doc_presence(seq['spec_doc'], repo_root=root)
+        self.assertEqual(presence.status, bsv.SPEC_DOC_NOT_AUTHORED)
+        self.assertFalse(presence)
+
+
 if __name__ == '__main__':
     unittest.main()
