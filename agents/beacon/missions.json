@@ -10411,7 +10411,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-22T09:30:16.588210+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-07T20:36:35.740828+00:00"
+      "orphan_last_activity_ts": "2026-07-07T20:36:35.740828+00:00",
+      "briefing": {
+        "what": "Your team has kicked off a small standalone health-check effort that isn't yet part of any larger project.",
+        "why": "Loose work that isn't tied to a clear goal can quietly eat time and drift without anyone owning the outcome.",
+        "suggest": "Give it a quick green light to continue, but ask the team to tie it to a named goal before it grows any bigger."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-22T09:35:50.162288+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
