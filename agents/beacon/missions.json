@@ -10563,6 +10563,28 @@
       "retired_at": "2026-07-22T15:02:49.461119+00:00",
       "retired_reason": "orphan-terminal",
       "retired_signal": "pr_merged:#894"
+    },
+    {
+      "id": "proposed-watchdog-stale-session-aware-suppression-001",
+      "name": "Watchdog Stale Session Aware Suppression 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `watchdog-stale-session-aware-suppression-001`. Last activity 2026-06-25T00:56:53.168199+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "watchdog-stale-session-aware-suppression-001"
+      ],
+      "repo": null,
+      "created": "2026-07-22",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-22T15:18:15.861737+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-25T00:56:53.168199+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-22T15:18:15.861737+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#694"
     }
   ]
 }
