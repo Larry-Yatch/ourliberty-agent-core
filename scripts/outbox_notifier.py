@@ -8632,6 +8632,11 @@ def _record_deep_review_held(
     False when an entry for this same head already exists (a repeat hold
     of the unchanged head). Callers gate the Larry-DM on the True return
     so a re-hold of the same head never re-notifies.
+
+    An UNRESOLVABLE head (`head_sha is None`) against an existing entry is
+    NOT treated as a new head: the prior head and `stamped_head_sha` are
+    preserved and False is returned. See the inline note below — dropping
+    them would let a stale `deep-review-passed` survive a later push.
     """
     entries = _load_deep_review_held()
     kept: list[dict[str, Any]] = []
@@ -8641,6 +8646,27 @@ def _record_deep_review_held(
             prior = e
             continue
         kept.append(e)
+    if head_sha is None and prior is not None:
+        # UNRESOLVABLE head (`_gh_pr_head_sha` returns None on any gh error AND
+        # on the `_gh_backoff_skip` early return, so this fires in exactly the
+        # busy/quota-pressured windows where merges stack up). Rewriting the
+        # record with head=None would DROP both the recorded head and our
+        # `stamped_head_sha`; a later genuine push would then hit the head-move
+        # guard's `if head_sha and ...` with a falsy head, decline to revoke,
+        # and leave a stale `deep-review-passed` on a head that was never
+        # deep-reviewed — the same hole by a different door.
+        #
+        # A blind tick is not evidence of a push, so preserve the prior head +
+        # stamp verbatim and only refresh the mutable bookkeeping. The next
+        # resolvable tick re-establishes truth. Returns False: we cannot prove
+        # a new head, and re-DMing Larry on a transient blip is pure noise.
+        refreshed = dict(prior)
+        refreshed['pr_url'] = pr_url
+        refreshed['task_id'] = task_id
+        refreshed['held_at'] = datetime.now(timezone.utc).isoformat()
+        kept.append(refreshed)
+        _save_deep_review_held(kept)
+        return False
     first_for_head = prior is None or prior.get('head_sha') != head_sha
     entry: dict[str, Any] = {
         'repo': repo_coords,
