@@ -11543,3 +11543,91 @@ Watermark advanced 837→839 via `set-watermark --line 839`. NOMINAL ✅ (Tier-3
 
 ---
 
+## Iteration ~5904 — 2026-07-22T12:23Z UTC (Larry /cycle chat, Tier 1)
+
+**Health:** ⚠️ Zombie PID 1834248 carry (etime=54-17:02:59). All 9 daemons alive. 0 new alerts (watermark=778=file_length). 0 open PRs. HEAD=9315a175=origin/main. sync=11:56:19Z UTC (~27 min old). RSDPM parked/exhausted (carry — watcher 8e97ee6f fired post-PR #1007 merge, sequence still REVISION). mirror-queue-wait-gauge G-rule 2/3 (no new occurrence this iter).
+
+**VERIFY-BEFORE-REASSERT (from iter ~5903 at ~12:21Z UTC):**
+- **"zombie-bash-pid-1834248 etime=54-16:53:34"**: CONFIRMED — PID 1834248 bash Ss etime=54-17:02:59 at ~12:23Z UTC. ~9 min etime growth. [carry alive]
+- **"daemons healthy (9 PIDs)"**: CONFIRMED — all 9 PIDs alive (etimes ~04:26:32–04:32:01). [carry]
+- **"sync NOMINAL, last_sync=2026-07-22T11:56:19Z UTC"**: CONFIRMED — still 11:56:19Z; ~27 min old at ~12:23Z UTC; under 2h. [carry]
+- **"beacon-pending-approvals.json: 0 entries"**: CONFIRMED — pending=0, history=517. [carry]
+- **"Tier 1, consecutive_clean=0"**: CONFIRMED — tier=1, consecutive_clean=0, last_signal_at=2026-07-22T12:13:22Z. [carry]
+- **"HEAD=cc93158b=origin/main"**: UPDATED → HEAD=9315a175 (wrapper commit "Pulse cycle 20260722T121505Z"). 0 ahead, 0 behind. ✅ [UPDATED]
+- **"Check I timer fires ~14:13 UTC today (Wed 2026-07-22); ~1.83h away"**: UPDATED — ~1.6h away at ~12:23Z UTC. No new artifact (last: check-i-2026-07-20.json). [carry, timing updated]
+- **"rsdpm-v0-001 sequence exhausted/parked"**: CONFIRMED — watcher 8e97ee6f DID fire post-PR #1007 merge: refire attempted dag-preflight-rsdpm-v0-001-direct1 (REVISION 08:31:08Z UTC) + retry1 (REVISION 09:07:20Z UTC). Beacon inbox empty. outbox-notifier.log quiescent since 03:07:20 MDT (09:07:20Z UTC). Sequence remains exhausted — RSDPM is still 40 commits behind origin/main per memory. [carry, watcher confirmed fired, result still REVISION]
+- **"larry-alerts.jsonl watermark=778"**: CONFIRMED — repair-watermark: repaired=false, old_watermark=778, file_length=778. 0 new alerts. [carry]
+- **"mirror-queue-wait-gauge Tier-4 alert (idx=777, 11:06:03Z UTC)"**: No new occurrence this iter (0 new alerts). G-rule stays at 2/3. [carry]
+- **"audit-cadence-signal-script-missing-001 CLOSED"**: CONFIRMED closed — script at `review/distill/audit_cadence_signal.py` runs no-op ✅ this iter. [carry]
+- **"0 open PRs"**: CONFIRMED — `gh pr list --state open` returns []. [carry]
+
+**Check 0 — Alert triage:** `repair-watermark` → `{"repaired": false, "old_watermark": 778, "file_length": 778}`. 0 new alerts. Watermark unchanged at 778. NOMINAL ✅
+
+**Check 1 — Log noise:** outbox-notifier.log last entry [2026-07-22 03:07:20 MDT (09:07:20Z UTC)]. ~3h15m quiescent at ~12:23Z UTC. All recent lines INFO. NOMINAL ✅
+
+**Check 2 — Telegram sweep:** beacon_telegram_bot.log last entry [2026-07-22T05:06:03-0600 (11:06:03Z UTC)]: alert idx=777 mirror-queue-wait-gauge delivered. No new entries since iter ~5903. No new Larry directives. NOMINAL ✅
+
+**Check 3 — Pipeline stall:** `heal_pipeline_stall.py --dry-run` → FORGE_NO_PR_SKIP ×6 (pr-exists/merged); stalled_pending_sequence:rsdpm-v0-001 suppressed (cooldown). "0 alert(s) would fire." NOMINAL ✅
+
+**Check 4 — Pending directives:** beacon-pending-approvals.json: pending=0, history=517. Pulse inbox: empty. Beacon inbox: empty. NOMINAL ✅
+
+**Check 5 — Stale daemon code:** `heal-stale-daemon-code.heartbeat` updated 2026-07-22T12:17:20Z UTC (~6 min old at ~12:23Z UTC). Within 60-min threshold. State file absent (heartbeat-only = all-clean). NOMINAL ✅
+
+**Check A — Source repo:** HEAD=9315a175=origin/main; on main; clean tree; 0 ahead, 0 behind. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-22T11:56:19Z UTC (~27 min old); status=no-change; 0 consecutive_push_failures. Under 2h. NOMINAL ✅
+**Check C — Agent liveness:** dashboard_api PID 1588263 Ssl ✅ (etime=04:32:01); beacon_telegram_bot PID 1590420 Ss ✅ (04:27:00); chain_event_shipper PID 1590654 SNs ✅ (04:26:55); agent_telegram_bot(forge) PID 1590875 Ss ✅ (04:26:51); inbox_watcher PID 1590956 Ssl ✅ (04:26:47); agent_telegram_bot(mirror) PID 1591041 Ss ✅ (04:26:44); outbox_notifier PID 1591117 Ss ✅ (04:26:40); agent_telegram_bot(pulse) PID 1591194 Ss ✅ (04:26:36); spec_review_runner PID 1591274 Ss ✅ (04:26:32). ⚠️ **Zombie PID 1834248** (bash Ss, etime=54-17:02:59, poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`). NON-NOMINAL ⚠️
+**Check E — PR/merge state:** 0 open PRs. NOMINAL ✅
+
+**§5.0:** audit_due_nudge no-op ✅. distill_detector no-op ✅. audit_cadence_signal (`review/distill/audit_cadence_signal.py`) no-op ✅.
+
+**Rotations:** [carry — SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (~31 days); within 14-day DM window from prior notification; no new DM]
+
+**Conditional checks:**
+- **Check I:** firing day (Wed 2026-07-22). Timer fires ~14:13 UTC (~1.6h away at ~12:23Z). No new artifact yet (last: check-i-2026-07-20.json). ✅
+- **Check III:** OFF-WEEK — next fire 2026-07-27. ✅
+- Check IV/VI/IX/X/XII: timer-managed. No new artifacts. ✅
+
+**G-rule assessment:**
+- **mirror-queue-wait-gauge-tier4-001: 2/3** — no new occurrence this iter (0 new alerts). Stays at 2/3. Dispatch at 3/3.
+- **audit-cadence-signal-script-missing-001: CLOSED** — confirmed from iter ~5903 (false alarm).
+- All other G-rules: carried unchanged from iter ~5903.
+
+**Actions taken:**
+1. Check 0: repair-watermark no-op (file_length=778=watermark=778); 0 new alerts; watermark unchanged. ✅
+2. §5.0 one-shots: all no-ops ✅.
+3. PRIME ledger: 1 intervention row appended (zombie-pid-carry:zombie-bash-pid-1834248-carry:iter-5904:etime=54-17:02:59; ts=2026-07-22T12:23:01Z UTC). ✅
+4. Tier state: `record --checks-clean false` → Tier 1 (consecutive_clean=0; last_signal_at=2026-07-22T12:23:02Z UTC). ✅
+
+**Escalations:**
+- [yellow] **zombie-bash-pid-1834248**: Larry already aware. Ask-then-do: `kill 1834248`. [carry]
+- [yellow] **rsdpm-v0-001 exhausted/parked**: Watcher 8e97ee6f fired and confirmed RSDPM still REVISION (40 commits behind). Action: `git -C /home/larry/RSDPM pull --ff-only` then tell Beacon to re-fire. [carry]
+- [yellow] **mirror-queue-wait-gauge**: p95 queue-wait=548.1m (threshold 90m), worst=1041.6m, 33 reviews/24h. Bot DM delivered (alert idx=777) at 11:06:03Z UTC. G-rule 2/3; no new DM this iter. [carry]
+
+**Standing findings (updated):**
+- [yellow] **zombie-bash-pid-1834248** — bash Ss etime=54-17:02:59 at ~12:23Z UTC. Poll loop awaiting absent `build-check-viii-pr-2b-analyzer-001.json`. Ask-then-do: `kill 1834248`. [carry]
+- [yellow] **probe-blind:ourliberty-cycle.service** — heal-claude-json-bind-drift healer blind for cycle.service mount namespace. [carry]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — Awaiting `approve check-vi-update-2026-07-07`. [carry]
+- [yellow] **rsdpm-v0-001 sequence exhausted/parked** — Watcher 8e97ee6f fired post-PR #1007 merge; dag-preflight-rsdpm-v0-001-direct1 REVISION 08:31:08Z UTC; retry1 REVISION 09:07:20Z UTC. Sequence exhausted. Root: RSDPM 40 commits behind origin/main. Action: `git -C /home/larry/RSDPM pull --ff-only` then tell Beacon to re-fire. [carry]
+- [yellow] **mirror-queue-wait-gauge** — p95=548.1m (threshold 90m), 33 reviews/24h, two slots saturating. Bot DM delivered 11:06:03Z UTC. G-rule 2/3. [carry]
+- [green] **PR #1007 MERGED** ✅ — `fix(build-seq): resolve sequence spec_doc against the steps' target_repo checkout`. [carry]
+- [green] **heal-systemd-install-drift resolved** — clean. [carry]
+- [green] **PR #1001/#1003/#1004/#1005 MERGED** ✅ [carry]
+- [green] **daemons healthy** — PIDs: dashboard_api=1588263; outbox_notifier=1591117; beacon_telegram_bot=1590420; chain_event_shipper=1590654; inbox_watcher=1590956; spec_review_runner=1591274; bots=1590875/1591041/1591194. [carry]
+- [green] **sync NOMINAL** — last_sync=2026-07-22T11:56:19Z UTC; ~27 min old. [carry]
+- [green] **HEAD=9315a175** — origin/main. ✅ [UPDATED]
+- [blue] **Check I — fires ~14:13 UTC today (Wed 2026-07-22); ~1.6h away.** [carry, timing updated]
+- [blue] **SUPABASE_SERVICE_ROLE_KEY rotation** — due 2026-08-22 (~31 days). [carry]
+- [blue] **pulse-check-xiv-tier4-001 [2/3]** — Dispatch at 3/3 ~2026-07-27. [carry]
+- [blue] **Check I dm_route second-emission-Sunday** — Monitor Wed 2026-07-22. [carry]
+- [blue] **merged-pr-reconcile:govern-loop-assessor** — doorbell delivered 06:02Z (idx=851) + repeat at 10:03Z (idx=775). Action: confirm shipped / dismiss in Missions. [carry]
+- [blue] **mirror-queue-wait-gauge-tier4-001 [2/3]** — G-rule. p95=548.1m threshold crossed, 33 reviews/24h. Dispatch at 3/3.
+- [blue] **G-rules (dispatched, vp):** forge-wip-redispatch-exhausted-genuine-no-pr-001; ourliberty-health-subject-key-mismatch-001; outbox-notifier-notification-intent-reject-tier4-001; forge-wip-redispatch-digest-tier4-001; forge-revision-preamble-missing-pr711-001; decision-needed-approval-forge-dispatch-no-target-repo-001; no-session-revision-active-mirror-session-fp-001; auto-dispatch-APPROVAL_REQUEST-task-id-mismatch (3/3); fix-pulse-auto-dispatch-null-chat-chain-event-001 (3/3 ✅ FULLY RESOLVED); **sequence-kickoff-rsdpm-v0-001-tier4 (3/3 ✅ ROUTING CONFIRMED FIXED)**.
+- [blue] **G-rule 2/3:** outbox-notifier-notification-intent-review-escalate-tier4-001; outbox-notifier-auto-merge-stale-revalidation-tier4-001; pulse-check-xiv-tier4-001; heal-pipeline-stall-retry-exhausted-pr-exists-fp-001; **mirror-queue-wait-gauge-tier4-001**.
+- [blue] **G-rule 1/3:** medic-approval-request-tier4-001; mirror-malformed-verdict-heal-reap-path-001; inbox-watcher-tier-pool-all-unavailable-tier4-001; heal-pipeline-stall-unrouted-deep-review-required-fp-001; heal-pulse-check-staleness-single-flight-skip-fp-001; gate-parallelism-monitor-regression-data-001; pulse-rotation-check-source-tier4-001; doorbell-tier4-novel-001; sync-deploy-targets-missing-registry-001.
+- [blue] **missions healer active** — HEAD=9315a175. [carry, updated]
+
+**PRIME DIRECTIVE:** 1 intervention (zombie-pid-carry:iter-5904; ts=12:23:01Z UTC); 0 new systemic_fixes. Trailing 30d: interventions=1502, systemic_fixes=65, vp=34; ratio=23.11.
+**Tier end-of-iter:** **Tier 1** (consecutive_clean=0; 5-min cadence; last_signal_at=2026-07-22T12:23:02Z UTC; non-clean: zombie PID 1834248 etime=54d+).
+
+---
+
