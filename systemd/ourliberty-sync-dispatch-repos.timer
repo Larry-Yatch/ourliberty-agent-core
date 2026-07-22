@@ -1,0 +1,19 @@
+[Unit]
+Description=Fast-forward the dispatch-repo checkouts every 30 minutes
+
+[Timer]
+# OnCalendar (not OnUnitActiveSec) per the OnUnitActiveSec-dies lesson: a missed
+# tick must still fire on the next wall-clock slot. Offset off :00/:30 and off
+# the other git/gh healer slots (:07 board-reconcile, :22 pr-escalations) so the
+# fetches don't contend.
+#
+# 30 minutes, not hourly: this is what a working-tree consumer reads, and the
+# RSDPM-2026-07-22 case cost a whole night parked on a stale checkout. A fetch
+# of one branch across four repos is cheap enough to run twice an hour.
+OnCalendar=*-*-* *:11/30:00
+RandomizedDelaySec=120
+Persistent=true
+Unit=ourliberty-sync-dispatch-repos.service
+
+[Install]
+WantedBy=timers.target

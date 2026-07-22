@@ -1,0 +1,50 @@
+[Unit]
+Description=Fast-forward the registered dispatch-repo checkouts (repo_paths) to origin/main — keeps working-tree consumers like the Mirror DAG-preflight from reading a stale clone
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/sync_dispatch_repo_clones.py
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+WorkingDirectory=/home/larry/agent-core
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/sync_dispatch_repo_clones.py --apply
+
+TimeoutStartSec=600
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-sync-dispatch-repos
+
+# One fetch + ff-merge per repo. Tiny.
+MemoryMax=256M
+MemoryHigh=128M
+
+# Hardening. ProtectHome=read-only would block the merge, so each checkout this
+# job may advance is listed explicitly below.
+#
+# ⚠ ADDING A DISPATCH REPO: a new entry in config/agent-models.json repo_paths
+# ALSO needs its checkout path added here, or the fast-forward fails on a
+# read-only filesystem and the script reports it as an error every tick. The
+# unit must then be reinstalled to /etc/systemd (daemon-reload alone loads the
+# stale copy).
+#
+# agent-core is deliberately NOT writable here — sync_agent_core.sh owns that
+# tree, and the script skips it for the same reason.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/larry/ourliberty-dashboard /home/larry/ourliberty-graph /home/larry/RSDPM /home/larry/.cache /tmp
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target
