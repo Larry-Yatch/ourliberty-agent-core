@@ -27,6 +27,7 @@ import os
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -602,6 +603,75 @@ class MainEndToEndTests(unittest.TestCase):
         # journal still gets a failure entry
         self.assertTrue(self.journal.exists())
         self.assertIn("🔴 Failed", self.journal.read_text())
+
+
+class DmSeverityRoutingTests(unittest.TestCase):
+    """Drive main() WITHOUT --no-dm; capture the severity passed into
+    larry_alerts.append_alert. Routine weeks emit `info` (append_alert maps
+    info->digest, no DM); anomaly weeks emit `warning` (->escalate, DMs Larry).
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.costs = self.root / "costs.jsonl"
+        self.outbox = self.root / "outboxes"
+        self.output_dir = self.root / "ledger"
+        self.journal = self.root / "ledger-journal.md"
+        self.halt = self.root / "EMERGENCY_HALT"
+
+    def _argv(self) -> list[str]:
+        return [
+            "--week-ending", "2026-05-18",
+            "--costs-file", str(self.costs),
+            "--outbox-root", str(self.outbox),
+            "--output-dir", str(self.output_dir),
+            "--journal", str(self.journal),
+            "--halt-flag", str(self.halt),
+        ]
+
+    def _run_and_capture_severity(self) -> str:
+        import larry_alerts  # noqa: E402
+
+        captured = {}
+
+        def _fake_append_alert(*args, **kwargs):
+            captured.update(kwargs)
+            return True
+
+        with mock.patch.object(larry_alerts, "append_alert", _fake_append_alert):
+            rc = lw.main(self._argv())
+        self.assertEqual(rc, 0)
+        self.assertEqual(captured.get("source"), "ledger")
+        self.assertEqual(captured.get("subject"), "weekly-2026-05-18")
+        return captured["severity"]
+
+    def test_routine_week_emits_info_severity(self):
+        # Single cheap cost, no priors → heartbeat shape, is_anomaly False.
+        _write_costs(self.costs, [{
+            "ts": "2026-05-12T10:00:00+00:00", "agent": "forge",
+            "task_id": "t-routine", "model": "claude-opus-4-7",
+            "cost_usd": 0.42, "source": "inbox-watcher",
+        }])
+        _write_archive(self.outbox, "forge", "t-routine", "feature-development")
+        self.assertEqual(self._run_and_capture_severity(), "info")
+
+    def test_anomaly_week_emits_warning_severity(self):
+        # 4 stable priors then a spike → real σ anomaly, is_anomaly True.
+        for i, mean_cost in enumerate([1.0, 1.1, 0.95, 1.05], start=1):
+            d = (WEEK_ENDING - lw.timedelta(days=7 * i)).date().isoformat()
+            _write_prior_sidecar(
+                self.output_dir, d, mean_cost * 2,
+                by_task_type={"feature-development": {"usd": mean_cost * 2, "task_count": 2}},
+            )
+        _write_costs(self.costs, [{
+            "ts": "2026-05-12T10:00:00+00:00", "agent": "forge",
+            "task_id": "t-spike", "model": "claude-opus-4-7",
+            "cost_usd": 10.0, "source": "inbox-watcher",
+        }])
+        _write_archive(self.outbox, "forge", "t-spike", "feature-development")
+        self.assertEqual(self._run_and_capture_severity(), "warning")
 
 
 if __name__ == "__main__":

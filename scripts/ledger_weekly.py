@@ -788,15 +788,20 @@ def main(argv: Optional[list[str]] = None) -> int:
     atomic_write(json_path, json.dumps(sidecar, indent=2) + "\n")
     touch_sentinel(sentinel_path)
 
-    dm_message, _is_anomaly = render_dm_headline(report, md_path)
+    dm_message, is_anomaly = render_dm_headline(report, md_path)
     dm_result = "skipped (--no-dm)"
     if not args.no_dm:
         try:
             sys.path.insert(0, str(Path(__file__).resolve().parent))
             import larry_alerts  # type: ignore
+            # Routine weeks (no real anomaly, drift within threshold) emit at
+            # `info`, which append_alert's severity->route default maps to the
+            # digest lane (dashboard-only, no DM). A genuine cost anomaly emits
+            # at `warning`, which defaults to escalate and DMs Larry.
+            severity = "warning" if is_anomaly else "info"
             ok = larry_alerts.append_alert(
                 source="ledger",
-                severity="warning",
+                severity=severity,
                 message=dm_message,
                 subject=f"weekly-{week_str}",
             )
