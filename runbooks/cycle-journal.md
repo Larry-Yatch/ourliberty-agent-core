@@ -4,6 +4,74 @@
 
 ---
 
+## Iteration ~6043 — 2026-07-23T05:31Z UTC (Larry /cycle chat, Tier 1)
+
+**Health:** ⚠️ Non-nominal (zombie PID carry only). All substantive checks NOMINAL. Two active sessions in flight: m3-pr2 Forge build (PID 2336891, ~16 min) + PR #1014 Mirror review (PID 2342377, ~2 min).
+
+**VERIFY-BEFORE-REASSERT (from iter ~6042 at ~05:25Z UTC):**
+- **"zombie-bash-pid-1834248 etime=55-10:01:56"**: CONFIRMED — PID 1834248 alive (etime=55-10:09:11, bash Ss). [carry ⚠️]
+- **"daemons healthy (9 PIDs)"**: CONFIRMED — all 9 PIDs alive (1588263 Ssl, 1590420 Ss, 1590654 SNs, 1590875 Ss, 1591041 Ss, 1591117 Ss, 1591194 Ss, 1591274 Ss, 1971090 Ssl). [carry NOMINAL ✅]
+- **"sync NOMINAL, last_sync=2026-07-23T05:16:17Z UTC"**: CONFIRMED — ~11 min from 05:27Z. NOMINAL ✅
+- **"beacon-pending-approvals pending=0"**: CONFIRMED — pending=0, history=525. NOMINAL ✅
+- **"HEAD=b2915e97=origin/main"**: UPDATED — HEAD=e7d0e3bb=origin/main ("Pulse cycle 20260723T052652Z"). NOMINAL ✅
+- **"larry-alerts.jsonl watermark=812"**: CONFIRMED — repair-watermark: repaired=false (old=812, file_length=812). 0 new alerts. Watermark stays 812. NOMINAL ✅
+- **"m3-pr2 build-phase in progress (Forge PID 2336891, session 4a773e9e)"**: CONFIRMED ACTIVE — PID 2336891 alive (etime=16:17, claude Ssl), build-m3-pr2.json in forge inbox, 0 open RSDPM PRs (build still in progress, no PR yet). [carry 🔄 ACTIVE]
+- **"PR #1014 opened, Mirror dispatch expected"**: RESOLVED/CONFIRMED — outbox-notifier dispatched review-pr-ourliberty-agent-core-1014.json to mirror at 05:25:51Z UTC; inbox_watcher claimed at 05:25:57Z (slot .claimed/0/); Mirror PID 2342377 started (etime=~4 min at check time, model=claude-opus-4-8). [carry ACTIVE → RESOLVED ✅, mirror review in flight]
+- **"probe-blind:ourliberty-cycle.service"**: UPDATED — direct check: `systemctl is-active ourliberty-cycle.service` returns "active" (active running since 23:26:54 MDT = 05:26:54Z UTC, triggered by ourliberty-cycle.timer; this IS the current session). Service accessible from within running session. External probe-blind concern may have been context-specific. [carry — Larry to decide if still open]
+
+**NEW findings:**
+- **Mirror review PID 2342377 launched** — inbox_watcher started Mirror at 05:25:57Z UTC on worktree wt-mirror-pr-ourliberty-agent-core-1014 (read-only detached checkout of feat/deep-review-sha-token-slice1 at origin tip). PR #1014 (MERGEABLE, state=OPEN, age ~5 min at dispatch) now in Mirror review pipeline. Expected to complete within 5–15 min. [positive, monitoring]
+- **ourliberty-cycle.service confirmed accessible** — `systemctl status` returns active running, triggered by ourliberty-cycle.timer. "active" = this current session. The service exists and is correctly registered.
+
+**Check 0 — Alert triage (~05:27Z UTC):** repair-watermark: repaired=false (old=812, file_length=812). 0 new alerts since watermark=812. Watermark stays 812. NOMINAL ✅
+
+**Check 1 — Log noise (~05:27Z UTC):** outbox-notifier.log last entries at 23:25:51 MDT = 05:25:51Z UTC (review-request dispatched for PR #1014; mirror review pipeline active). 0 WARNs since last iter. NOMINAL ✅
+
+**Check 2 — Telegram sweep (~05:27Z UTC):** Bot PID 1590420 alive (Ss). Last log entry: [2026-07-22T23:20:53-0600] MDT = 05:20:53Z UTC (notification idx=811 delivered: medic-diagnosis). No new Larry messages since 23:10:45Z MDT (the m3-pr2 "go" approval). No orphan directives. NOMINAL ✅
+
+**Check 3 — Pipeline stall (~05:27Z UTC):** dry-run at 05:27:51Z UTC: all tasks FORGE_NO_PR_SKIP (pr_exists or preflight_non_proceed). m3-pr2: CLARIFY_REQUEST in old archive (build phase active separately, not a stall). m5-pr2: pr_exists. "no stalls detected." NOMINAL ✅
+
+**Check 4 — Pending directives (~05:27Z UTC):** Forge inbox: build-m3-pr2.json (ACTIVE, Forge PID 2336891 running ~16 min). Mirror inbox: review-pr-ourliberty-agent-core-1014.json claimed (.claimed/0/), Mirror PID 2342377 active (~4 min). Beacon/pulse inboxes EMPTY. beacon-pending-approvals: pending=0, history=525. NOMINAL ✅
+
+**Check 5 — Stale daemon code (~05:27Z UTC):** heartbeat=2026-07-23T05:25:46Z UTC (~1 min from 05:27Z). Fresh (<60 min). All 9 daemon PIDs alive. NOMINAL ✅
+
+**Check A — Source repo:** HEAD=e7d0e3bb=origin/main ("Pulse cycle 20260723T052652Z"); on main; clean; 0 ahead, 0 behind. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-23T05:16:17Z UTC (~11 min from 05:27Z); status=no-change; consecutive_push_failures=0. NOMINAL ✅
+**Check C — Agent liveness:** All 9 daemon PIDs alive (1588263 uvicorn/Ssl, 1590420 beacon_telegram_bot/Ss, 1590654 chain_event_shipper/SNs, 1590875/1591041/1591194 agent_telegram_bot×3/Ss, 1591117 outbox_notifier/Ss, 1591274 spec_review_runner/Ss, 1971090 inbox_watcher/Ssl). Active build sessions: Forge PID 2336891 (m3-pr2, ~16 min); Mirror PID 2342377 (PR #1014 review, ~4 min). Zombie PID 1834248 ALIVE (etime=55-10:09:11, bash Ss — loop waiting for nonexistent build-check-viii-pr-2b-analyzer-001.json). NON-NOMINAL [zombie-bash-1834248 carry only]
+**Check E — PR/merge state:** agent-core: 1 open PR — #1014 (feat/deep-review-sha-token-slice1, age ~7 min at check, MERGEABLE, reviewDecision="" — Mirror review just launched, normal). RSDPM: 0 open PRs (m3-pr2 build in progress; no PR yet). NOMINAL ✅
+**Check H — Forge activity digest:** m3-pr2 build ACTIVE — Forge PID 2336891 running session 4a773e9e on RSDPM (started 05:13:36Z UTC, ~16 min elapsed). No RSDPM PR opened yet — still building. PR #1014 Mirror review ACTIVE — PID 2342377 started 05:25:57Z UTC (~4 min). Both sessions on track. [Monitoring]
+
+**§5.0:** audit_due_nudge: no-op. distill_detector: no-op. audit_cadence_signal: no-op. MEMORY.md >>18k threshold; pending judgment-based condensation [carry].
+
+**Rotations:** SUPABASE_SERVICE_ROLE_KEY due=2026-08-22 (~30 days). Last DM=2026-07-20T20:00:15Z; 14-day dedup; no new DM. [carry]
+
+**Conditional checks:**
+- **Check I:** OFF today (Thu 2026-07-23 UTC). Next: Fri 2026-07-24.
+- **Check III:** OFF-WEEK — last artifact 2026-07-12; next fire 2026-07-27.
+- Check IV/VI/IX/X: timer-managed. No new artifacts this iter.
+
+**G-rule assessment:**
+- **mirror-ghost-retry-m5-pr2**: 1st occurrence (sub-threshold; carry). Downstream alert already Tier-3 resolved. Monitor.
+- **heal-stall-retry-exhausted-after-pr-merge**: 1st occurrence (sub-threshold). Tier-3 translation correct. Monitor.
+- All other G-rules unchanged.
+
+**Actions taken:**
+1. Check 0: repair-watermark no-op (repaired=false, old=812, file_length=812). 0 alerts triaged. Watermark stays 812.
+2. §5.0 one-shots: all no-ops.
+3. PRIME ledger: 1 intervention appended (zombie-bash-pid-1834248-carry at 05:31:15Z UTC). Trailing 30d: ratio≈24.46 (interventions=1712, systemic_fixes=70, verification_pending=35, trend=improving).
+4. Tier state: record --checks-clean false → consecutive_clean=0; last_signal_at=2026-07-23T05:31:30Z UTC.
+5. Watermark: 812 (no-op).
+
+**Escalations:**
+- [yellow] **zombie-bash-pid-1834248** — etime=55-10:09:11; still alive (loop waiting for `build-check-viii-pr-2b-analyzer-001.json`, file never created). Ask-then-do: kill 1834248. [carry — no new DM]
+- [yellow] **probe-blind:ourliberty-cycle.service** — UPDATED: service confirmed active (current session). External probe-blind concern may be context-specific. Larry to decide if carry should be retired. [carry — no new DM]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — 3 proposals pending. Awaiting Larry approve. [carry]
+
+**PRIME DIRECTIVE:** 1 intervention appended. 0 new systemic_fix. Trailing 30d: ratio≈24.46 (interventions=1712, systemic_fixes=70, verification_pending=35, trend=improving).
+**Tier end-of-iter:** **Tier 1** (consecutive_clean=0; non-clean: zombie PID 1834248; all substantive checks NOMINAL; m3-pr2 build + PR #1014 review both in flight).
+
+---
+
 ## Iteration ~6042 — 2026-07-23T05:25Z UTC (Larry /cycle chat, Tier 1)
 
 **Health:** ⚠️ Non-nominal (zombie PID carry only). All substantive checks NOMINAL. m3-pr2 build ACTIVE (Forge PID 2336891 running). PR #1014 opened fresh on agent-core.
@@ -3178,108 +3246,6 @@
 
 **PRIME DIRECTIVE:** 2 interventions appended (zombie-bash-pid-carry; m5-pr2-mirror-escalate-stall-monitor). 0 new systemic_fix. Trailing 30d: interventions=1631, systemic_fixes=70, ratio=23.3, trend=improving.
 **Tier end-of-iter:** **Tier 1** (consecutive_clean=0; non-clean: zombie PID 1834248 + m5-pr2 Mirror ESCALATE 228 min + m3-pr2 BLOCKED).
-
----
-
-## Iteration ~6003 — 2026-07-23T00:55Z UTC (Larry /cycle chat, Tier 1)
-
-**Health:** ⚠️ Non-nominal. Active carries: zombie PID 1834248 (etime=55-05:22:10); m5-pr2 PR #18 Mirror ESCALATE (~217 min; unreg-approval DM pending ~113 min, reminders_sent=[]); m3-pr2 BLOCKED (PARK P8). All other subsystems NOMINAL.
-
-**VERIFY-BEFORE-REASSERT (from iter ~6002 at ~00:37Z UTC):**
-- **"zombie-bash-pid-1834248 etime=55-05:17:38"**: CONFIRMED — PID 1834248 alive (etime=55-05:22:10, bash Ss). [carry ⚠️]
-- **"daemons healthy (8 PIDs)"**: CONFIRMED — all 8 PIDs alive (1588263, 1590420, 1590654, 1590875, 1591041, 1591194, 1591274, 1971090). [carry NOMINAL ✅]
-- **"sync NOMINAL, last_sync=2026-07-23T00:15:29Z UTC"**: CONFIRMED — still 00:15:29Z UTC (~39 min). Under 2h. NOMINAL ✅
-- **"beacon-pending-approvals pending=1 (unreg-approval-1e3188240916)"**: CONFIRMED — pending=1, status=pending, chat_id=7998341473, created 23:00:32Z UTC (~113 min), reminders_sent=[]. [carry ⚠️] NOTE: file path is ~/agents/state/beacon-pending-approvals.json (not blackboard/).
-- **"HEAD=d5b6580f=origin/main"**: UPDATED — HEAD=30a605c1=origin/main ("Pulse cycle 20260723T003915Z"). On main, clean. [UPDATED ✓]
-- **"larry-alerts.jsonl watermark=807"**: CONFIRMED — repair-watermark: repaired=false (old=807, file_length=807). 0 new alerts. NOMINAL ✅
-- **"m5-pr2 PR #18 Mirror ESCALATE ~197 min"**: CONFIRMED ONGOING — PR #18 OPEN (reviewDecision="", updatedAt=2026-07-22T21:18:11Z UTC). Now ~217 min. [carry ⚠️]
-- **"m8-pr2 PR #23 MERGED ✅"**: CONFIRMED. [carry ✅]
-
-**Check 0 — Alert triage (~00:55Z UTC):** repair-watermark: repaired=false (old=807, file_length=807). 0 new alerts since watermark=807. Triage: 0 alerts. NOMINAL ✅
-
-**Check 1 — Log noise (~00:55Z UTC):** outbox-notifier.log last entry 17:27:51 MDT (23:27:51Z UTC, ~87 min before cycle). No new WARNs or ERRORs since iter ~6002. Log silent post-m8-pr2 merge chain completion. NOMINAL ✅
-
-**Check 2 — Telegram sweep (~00:55Z UTC):** Bot PID 1590420 alive. Last bot delivery: idx=806 missions-autoregister route=digest at 18:11:34 MDT (00:11:34Z UTC). Last Larry message: 15:06:48 MDT (21:06:48Z UTC, ~3h48m ago). No new directives. NOMINAL ✅
-
-**Check 3 — Pipeline stall (~00:55Z UTC):** DRY-RUN at 00:41:31Z UTC: all tasks FORGE_NO_PR_SKIP (pr_exists or preflight_non_proceed). m3-pr2: CLARIFY_REQUEST. m5-pr2: pr_exists #18. "no stalls detected." NOMINAL ✅
-
-**Check 4 — Pending directives (~00:55Z UTC):** Forge inbox: EMPTY. Beacon inbox: EMPTY. Mirror inbox: EMPTY. beacon-pending-approvals: pending=1 (unreg-approval-1e3188240916, m5-pr2 Mirror escalation "Session-less PR needs you: m5-pr2", created 23:00:32Z UTC, ~113 min, chat_id=7998341473, reminders_sent=[]). NON-NOMINAL [m5-pr2 Mirror ESCALATE ~217 min; unreg-approval DM pending ~113 min]
-
-**Check 5 — Stale daemon code (~00:55Z UTC):** heartbeat=2026-07-23T00:33:19Z UTC (~21 min). Fresh (<60 min). All 8 daemon PIDs alive. NOMINAL ✅
-
-**Check A — Source repo:** HEAD=30a605c1=origin/main; on main; clean; 0 ahead, 0 behind. NOMINAL ✅
-**Check B — Sync health:** last_sync=2026-07-23T00:15:29Z UTC (~39 min); status=no-change; consecutive_push_failures=0. Under 2h. NOMINAL ✅
-**Check C — Agent liveness:** 8 daemon PIDs alive. PID 1590420 (beacon_telegram_bot.py) alive. No active Forge/Mirror sessions. Zombie PID 1834248 ALIVE (etime=55-05:22:10, bash Ss). NON-NOMINAL [zombie carry]
-**Check E — PR/merge state:** RSDPM: PR #18 (m5-pr2) OPEN (reviewDecision="", updatedAt=2026-07-22T21:18:11Z UTC; Mirror ESCALATE ~217 min). agent-core: 0 open Forge PRs. NON-NOMINAL [m5-pr2 ESCALATE carry]
-**Check H — Forge activity digest:** 0 open Forge PRs. m5-pr2 PR #18: OPEN (Mirror ESCALATE ~217 min). m3-pr2: BLOCKED (PARK P8). m8-pr2 PR #23: MERGED ✅. RSDPM V0 sequence: 19/20 merged.
-
-**§5.0:** audit_due_nudge: no-op. distill_detector: no-op. audit_cadence_signal: no-op.
-
-**Rotations:** SUPABASE_SERVICE_ROLE_KEY last_dm=2026-07-20 (~3 days); 14-day dedup; no new DM. [carry]
-
-**Conditional checks:**
-- **Check I:** OFF today (Thu 2026-07-23). Last artifact check-i-2026-07-22.json. Next: Fri 2026-07-24. OFF.
-- **Check III:** OFF-WEEK — last artifact 2026-07-12; next fire 2026-07-27. OFF.
-- Check IV/VI/IX/X: timer-managed. No new artifacts this iter.
-
-**G-rule assessment:** All unchanged from iter ~6002.
-- **forge-marker-taskid-verbatim-001: COMPLETE ✅** — PR #1012 MERGED. [carry COMPLETE]
-- **m3-pr2-preflight-reject-park-precondition-001 [1/3]**: BLOCKED PARK P8. [carry 1/3]
-- **stall-dry-run-rebase_obligation-mirror-review-fp [2/3]**: dry-run clean. [carry 2/3]
-- **mirror-queue-wait-gauge-tier4-001 [2/3]**: No new alert this iter. [carry 2/3]
-- **stall-fp-build-in-flight-no-pr-001 [2/3]**: m8-pr2 merged; class instance resolved. [carry 2/3]
-
-**Actions taken:**
-1. Check 0: repair-watermark no-op; 0 alerts triaged; watermark stays at 807.
-2. §5.0 one-shots: all no-ops.
-3. PRIME ledger: 2 interventions appended (zombie-bash-pid-carry:PID-1834248-etime-55d05h22m-carry at 00:43Z; m5-pr2-mirror-escalate-stall-monitor:m5-pr2-PR18-escalate-21h18z-217min-carry at 00:43Z). Trailing 30d: interventions=1631, systemic_fixes=70, ratio=23.3, trend=improving.
-4. Tier state: record --checks-clean false → consecutive_clean=0; last_signal_at=2026-07-23T00:43:07Z UTC.
-5. Watermark: 807 (no-op).
-
-**Escalations:**
-- [yellow] **zombie-bash-pid-1834248** — etime=55-05:22:10; still alive. Larry already aware; ask-then-do: kill 1834248. [carry — no new DM]
-- [yellow] **m5-pr2 PR #18 Mirror ESCALATE** — ~217 min elapsed; unreg-approval DM pending (~113 min, reminders_sent=[]). [carry — no new DM]
-- [yellow] **m3-pr2 SEQUENCE_STEP_FAILED** — PARK P8; Larry working Resend provisioning externally. [carry]
-- [yellow] **probe-blind:ourliberty-cycle.service** — Larry to decide. [carry]
-- [yellow] **check-vi-posture-proposals-2026-07-07** — Awaiting approve. [carry]
-
-**Standing findings (updated):**
-- [yellow] **zombie-bash-pid-1834248** — bash Ss etime=55-05:22:10; loop waiting for nonexistent forge archive file. Ask-then-do: kill 1834248. [carry ⚠️]
-- [yellow] **m5-pr2 PR #18 Mirror ESCALATE** — ~217 min elapsed; unreg-approval DM pending ~113 min (reminders_sent=[]). [carry ⚠️]
-- [yellow] **m3-pr2 SEQUENCE_STEP_FAILED** — PARK P8 (Resend INBOUND unconfirmed). [carry]
-- [yellow] **probe-blind:ourliberty-cycle.service** — Larry to decide. [carry]
-- [yellow] **check-vi-posture-proposals-2026-07-07** — Awaiting approve. [carry]
-- [yellow] **mirror-queue-wait-gauge** — p95=548.1m. G-rule 2/3. [carry]
-- [yellow] **dag-preflight-rsdpm-v0-001-postsync1 EXHAUSTED** — VP dispatched. [carry]
-- [yellow] **MEMORY.md distill needed** — 83k bytes >> 18k threshold; pending judgment-based condensation.
-- [green] **forge-marker-taskid-verbatim-001 COMPLETE ✅** — PR #1012 MERGED. [carry COMPLETE]
-- [green] **PR #1013 MERGED ✅** — fix-ledger-weekly-routine-digest-001. [carry]
-- [green] **m8-pr2 PR #23 MERGED ✅** — at 23:27:49Z UTC (RSDPM V0 19/20). [carry]
-- [green] **m6-pr2 PR #22 MERGED ✅** — [carry]
-- [green] **m8-pr1 PR #21 MERGED ✅** — [carry]
-- [green] **m4-pr3 PR #20 MERGED ✅** — [carry]
-- [green] **m6-pr1 PR #19 MERGED ✅** — [carry]
-- [green] **m4-pr2 PR #17 MERGED ✅** — [carry]
-- [green] **m7-pr3 MERGED ✅** — PR #16. [carry]
-- [green] **m5-pr1 MERGED ✅** — PR #14. [carry]
-- [green] **m4-pr1 MERGED ✅** — PR #13. [carry]
-- [green] **m3-pr1 MERGED ✅** — PR #15. [carry]
-- [green] **m1-pr5 MERGED ✅** — PR #12. [carry]
-- [green] **m7-pr2 MERGED ✅** — PR #11. [carry]
-- [green] **daemons healthy** — all 8 daemon PIDs alive. [carry]
-- [green] **sync NOMINAL** — last_sync=2026-07-23T00:15:29Z UTC (~39 min). [carry]
-- [green] **HEAD=30a605c1** — origin/main ("Pulse cycle 20260723T003915Z"). [UPDATED ✓]
-- [blue] **stall-fp-build-in-flight-no-pr-001 [2/3]** — m8-pr2 merged; class instance resolved. [carry 2/3]
-- [blue] **pulse-heartbeat-missing-001 RETRACTED** — phantom file. [carry]
-- [blue] **routing-denied-dashboard-forge-001 DISPATCHED VP** — Forge build forthcoming. [carry]
-- [blue] **Check I FIRED** — artifact check-i-2026-07-22.json. Next: Fri 2026-07-24. [carry]
-- [blue] **SUPABASE_SERVICE_ROLE_KEY rotation** — due 2026-08-22 (~30 days). [carry]
-- [blue] **G-rules (dispatched/active):** forge-wip-redispatch-exhausted-genuine-no-pr-001; ourliberty-health-subject-key-mismatch-001; outbox-notifier-notification-intent-reject-tier4-001; forge-wip-redispatch-digest-tier4-001; forge-revision-preamble-missing-pr711-001; decision-needed-approval-forge-dispatch-no-target-repo-001; no-session-revision-active-mirror-session-fp-001; auto-dispatch-APPROVAL_REQUEST-task-id-mismatch (3/3 VP); routing-denied-dashboard-forge-001 (DISPATCHED ✅ VP); pulse-heartbeat-missing-001 (RETRACTED ✅); forge-marker-taskid-verbatim-001 (COMPLETE ✅).
-- [blue] **G-rule 2/3:** outbox-notifier-notification-intent-review-escalate-tier4-001; outbox-notifier-auto-merge-stale-revalidation-tier4-001; pulse-check-xiv-tier4-001; heal-pipeline-stall-retry-exhausted-pr-exists-fp-001; mirror-queue-wait-gauge-tier4-001; stall-dry-run-rebase_obligation-mirror-review-fp-001; stall-fp-build-in-flight-no-pr-001.
-- [blue] **G-rule 1/3:** m3-pr2-preflight-reject-park-precondition-001; MIRROR_DAG_PREFLIGHT-already-kicked-off-001; medic-approval-request-tier4-001; mirror-malformed-verdict-heal-reap-path-001; inbox-watcher-tier-pool-all-unavailable-tier4-001; heal-pipeline-stall-unrouted-deep-review-required-fp-001; heal-pulse-check-staleness-single-flight-spark-fp-001; gate-parallelism-monitor-regression-data-001; pulse-rotation-check-source-tier4-001; doorbell-tier4-novel-001; sync-deploy-targets-missing-registry-001.
-
-**PRIME DIRECTIVE:** 2 interventions appended (zombie-bash-pid-carry; m5-pr2-mirror-escalate-stall-monitor). 0 new systemic_fix. Trailing 30d: interventions=1631, systemic_fixes=70, ratio=23.3, trend=improving.
-**Tier end-of-iter:** **Tier 1** (consecutive_clean=0; non-clean: zombie PID 1834248 + m5-pr2 Mirror ESCALATE 217 min + m3-pr2 BLOCKED).
 
 ---
 
