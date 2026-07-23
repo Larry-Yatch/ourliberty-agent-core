@@ -107,6 +107,16 @@ class _GhRouter:
         self.merge_calls: list[tuple[str, int]] = []
         self.labels_fail = False
         self.files_fail = False
+        # deep-review-sha-bound-approval slice 1. `commit_statuses` maps a head
+        # SHA → the list of `deep-review`-context states GitHub would return for
+        # that commit; default empty → not stamped (all prior tests unaffected).
+        # `status_read_calls` / `status_post_calls` let tests assert the
+        # zero-cost short-circuit and the dual-write.
+        self.commit_statuses: dict[str, list[str]] = {}
+        self.status_read_calls: list[str] = []
+        self.status_post_calls: list[tuple[str, str, str]] = []
+        self.status_post_fail = False
+        self.status_read_fail = False
 
     def __call__(self, cmd, capture_output=True, text=True, timeout=None,
                  **kwargs):
@@ -153,6 +163,34 @@ class _GhRouter:
             pr_n = int(cmd[3])
             repo = cmd[cmd.index('--repo') + 1]
             self.merge_calls.append((repo, pr_n))
+            return _CompletedProc(returncode=0)
+        # deep-review-sha-bound-approval slice 1 — commit-status READ:
+        #   gh api repos/{repo}/commits/{sha}/status --jq '[...]'
+        # The router returns the post-jq array of states directly.
+        if (cmd[1] == 'api' and len(cmd) > 2
+                and '/commits/' in cmd[2] and cmd[2].endswith('/status')):
+            sha = cmd[2].split('/commits/')[1].rsplit('/status', 1)[0]
+            self.status_read_calls.append(sha)
+            if self.status_read_fail:
+                return _CompletedProc(stdout='', stderr='api boom',
+                                      returncode=1)
+            return _CompletedProc(
+                stdout=json.dumps(self.commit_statuses.get(sha, [])),
+                returncode=0)
+        # commit-status WRITE:  gh api repos/{repo}/statuses/{sha} -f state=...
+        if (cmd[1] == 'api' and len(cmd) > 2 and '/statuses/' in cmd[2]):
+            sha = cmd[2].split('/statuses/')[1]
+            state = next((cmd[i + 1].split('=', 1)[1]
+                          for i, a in enumerate(cmd)
+                          if a == '-f' and cmd[i + 1].startswith('state=')),
+                         '')
+            self.status_post_calls.append((sha, state, cmd[2]))
+            if self.status_post_fail:
+                return _CompletedProc(stdout='', stderr='status boom',
+                                      returncode=1)
+            self.commit_statuses.setdefault(sha, [])
+            if state and state not in self.commit_statuses[sha]:
+                self.commit_statuses[sha].append(state)
             return _CompletedProc(returncode=0)
         return _CompletedProc(stdout='', stderr='unknown gh', returncode=1)
 
@@ -429,6 +467,106 @@ class PredicateUnitTest(_GateTestBase):
         self.on._invalidate_deep_review_paths_cache()
         self.assertEqual(self.on._load_deep_review_paths(),
                          self.on._DEFAULT_DEEP_REVIEW_PATHS)
+
+
+class ShaBoundTokenSlice1Test(_GateTestBase):
+    """deep-review-sha-bound-approval slice 1 — the gate accepts a SHA-bound
+    `deep-review` success commit status as a stamp equivalent to the legacy
+    `deep-review-passed` label (dual-read), the label short-circuits so the
+    common path pays no extra gh cost, the status reader fails CLOSED, and the
+    approval path writes both tokens (dual-write, status POST checked).
+
+    The router models the head SHA as `head{pr:012d}`, so a status seeded under
+    that key is what the lazily-resolved head will read.
+    """
+
+    FILE = 'scripts/for_larry_signal.py'  # on the code-default fileset
+
+    def _head(self, pr_n: int) -> str:
+        return f'head{pr_n:012d}'
+
+    # ---- dual-read: status is a stamp-equivalent -----------------------------
+
+    def test_sha_status_stamps_a_critical_pr_without_the_label(self):
+        # File-critical, NO `deep-review-passed` label, but the head carries a
+        # success `deep-review` status → NOT required (flows through to merge).
+        self.gh.commit_statuses[self._head(1)] = ['success']
+        self.assertFalse(self.on._deep_review_required(
+            REPO, 1, [self.FILE], labels=['auto-review']))
+
+    def test_no_token_at_all_still_holds(self):
+        # Behavior-preserving: file-critical, no label, no status → HELD.
+        self.assertTrue(self.on._deep_review_required(
+            REPO, 1, [self.FILE], labels=['auto-review']))
+        # And it did pay for one status read on the hold path.
+        self.assertEqual(self.gh.status_read_calls, [self._head(1)])
+
+    def test_label_short_circuits_no_status_read(self):
+        # The legacy label present → stamped WITHOUT any commit-status gh call.
+        self.assertFalse(self.on._deep_review_required(
+            REPO, 1, [self.FILE], labels=['deep-review-passed']))
+        self.assertEqual(self.gh.status_read_calls, [])
+
+    def test_passed_head_sha_avoids_a_second_head_resolve(self):
+        # When a caller already has the head, the gate uses it verbatim.
+        self.gh.commit_statuses[self._head(1)] = ['success']
+        self.assertFalse(self.on._deep_review_required(
+            REPO, 1, [self.FILE], labels=['auto-review'],
+            head_sha=self._head(1)))
+        self.assertEqual(self.gh.status_read_calls, [self._head(1)])
+
+    # ---- reader fails CLOSED --------------------------------------------------
+
+    def test_non_success_status_does_not_stamp(self):
+        for bad in (['failure'], ['pending'], ['error'], []):
+            with self.subTest(states=bad):
+                self.gh.commit_statuses[self._head(2)] = bad
+                self.assertTrue(self.on._deep_review_required(
+                    REPO, 2, [self.FILE], labels=[]))
+
+    def test_reader_false_on_gh_error(self):
+        self.gh.status_read_fail = True
+        self.gh.commit_statuses[self._head(3)] = ['success']  # ignored on error
+        self.assertTrue(self.on._deep_review_required(
+            REPO, 3, [self.FILE], labels=[]))
+
+    def test_reader_false_on_unresolvable_head_no_call(self):
+        self.assertFalse(
+            self.on._head_has_deep_review_pass_status(REPO, ''))
+        self.assertEqual(self.gh.status_read_calls, [])
+
+    def test_reader_true_only_on_success(self):
+        self.gh.commit_statuses['abc'] = ['success']
+        self.assertTrue(
+            self.on._head_has_deep_review_pass_status(REPO, 'abc'))
+
+    # ---- dual-write: checked status POST -------------------------------------
+
+    def test_post_status_writes_success_and_returns_true(self):
+        ok = self.on._post_deep_review_pass_status(
+            REPO, 4, _pr_url(REPO, 4), self._head(4))
+        self.assertTrue(ok)
+        self.assertEqual(len(self.gh.status_post_calls), 1)
+        sha, state, _ = self.gh.status_post_calls[0]
+        self.assertEqual((sha, state), (self._head(4), 'success'))
+        # Round-trips: the reader now sees it.
+        self.assertTrue(
+            self.on._head_has_deep_review_pass_status(REPO, self._head(4)))
+
+    def test_post_status_failure_returns_false_and_alerts(self):
+        self.gh.status_post_fail = True
+        ok = self.on._post_deep_review_pass_status(
+            REPO, 5, _pr_url(REPO, 5), self._head(5))
+        self.assertFalse(ok)
+        alerts = self._read_alerts()
+        self.assertEqual(len(alerts), 1)
+
+    def test_post_status_unresolvable_head_alerts_no_call(self):
+        ok = self.on._post_deep_review_pass_status(
+            REPO, 6, _pr_url(REPO, 6), '')
+        self.assertFalse(ok)
+        self.assertEqual(self.gh.status_post_calls, [])
+        self.assertEqual(len(self._read_alerts()), 1)
 
 
 class ConfigConstantSyncTest(unittest.TestCase):

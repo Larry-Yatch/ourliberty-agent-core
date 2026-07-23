@@ -121,6 +121,12 @@ class _GhRouter:
         self.edit_calls: list[tuple[str, int, str]] = []
         self.remove_label_calls: list[tuple[str, int, str]] = []
         self.edit_fail = False
+        # deep-review-sha-bound-approval slice 1 — the approval path now ALSO
+        # posts a SHA-bound `deep-review` success status (dual-write). Model the
+        # write so it doesn't fall through to `unknown gh` (which would make the
+        # checked POST alert). `status_post_calls` records (sha, state).
+        self.status_post_calls: list[tuple[str, str]] = []
+        self.commit_statuses: dict[str, list[str]] = {}
 
     def __call__(self, cmd, capture_output=True, text=True, timeout=None,
                  **kwargs):
@@ -164,6 +170,23 @@ class _GhRouter:
                 return _CompletedProc(stdout='', stderr='label boom',
                                       returncode=1)
             self.pr_labels.setdefault((repo, pr_n), []).append(label)
+            return _CompletedProc(returncode=0)
+        # deep-review-sha-bound-approval slice 1 — commit-status READ / WRITE.
+        if (cmd[1] == 'api' and len(cmd) > 2
+                and '/commits/' in cmd[2] and cmd[2].endswith('/status')):
+            sha = cmd[2].split('/commits/')[1].rsplit('/status', 1)[0]
+            return _CompletedProc(
+                stdout=json.dumps(self.commit_statuses.get(sha, [])),
+                returncode=0)
+        if cmd[1] == 'api' and len(cmd) > 2 and '/statuses/' in cmd[2]:
+            sha = cmd[2].split('/statuses/')[1]
+            state = next((cmd[i + 1].split('=', 1)[1]
+                          for i, a in enumerate(cmd)
+                          if a == '-f' and cmd[i + 1].startswith('state=')), '')
+            self.status_post_calls.append((sha, state))
+            self.commit_statuses.setdefault(sha, [])
+            if state and state not in self.commit_statuses[sha]:
+                self.commit_statuses[sha].append(state)
             return _CompletedProc(returncode=0)
         return _CompletedProc(stdout='', stderr='unknown gh', returncode=1)
 
@@ -352,6 +375,18 @@ class ApproveActionTest(_SurfaceTestBase):
         self.assertEqual(
             self.gh.edit_calls, [(REPO, 823, 'deep-review-passed')])
         self.assertIn('deep-review-passed', self.gh.pr_labels[(REPO, 823)])
+
+    def test_approve_dual_writes_the_sha_bound_status(self):
+        # deep-review-sha-bound-approval slice 1 — the SAME approve that stamps
+        # the label ALSO posts a success `deep-review` status bound to the head
+        # the approval was scoped to. This is the end-to-end proof the dual-write
+        # is wired at the reconcile call site, not just in the helper.
+        head = 'aaaaaaaa11112222'
+        self._surface_and_approve(head=head)
+        self.on._reconcile_deep_review_held_approvals()
+        self.assertIn((head, 'success'), self.gh.status_post_calls)
+        # A happy-path dual-write raises no repair alert.
+        self.assertEqual(self._alerts(), [])
 
     def test_approve_label_apply_is_idempotent(self):
         self._surface_and_approve()
