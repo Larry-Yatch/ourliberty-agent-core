@@ -70,7 +70,11 @@ alone until marked ready, so an unfinished PR is never auto-merged.
 
 Key design points (follows the heal_* conventions):
   - GitHub-truth: `gh pr list --state open` → keep Forge build PRs (`forge/*`
-    head) and non-draft PRs labeled `auto-review`; everything else is skipped.
+    head), non-draft Claude Code PRs (`claude/*` head), and non-draft PRs labeled
+    `auto-review`; everything else is skipped. See the three-class comment above
+    ROUTABLE selection for the authoritative rules — an unlabeled PR on any other
+    branch (`fix/*`, `feat/*`, `chore/*`) is skipped BY DESIGN and will sit open
+    indefinitely until a human routes it, because a Mirror PASS auto-merges.
   - "Already reviewed" is decided by `outbox_notifier._review_request_already_dispatched`
     (the SAME predicate the inline dispatch + outbox reconcile use), NOT GitHub's
     `reviewDecision` — Mirror emits marker blocks, never a GitHub review, so
@@ -91,13 +95,15 @@ Key design points (follows the heal_* conventions):
     fail-safe (gh/dispatch errors are logged, NEVER crash the timer).
   - Read-only on GitHub (lists PRs; never merges, closes, comments, or reviews).
 
-Multi-repo (2026-06-22): sweeps both Larry-Yatch/ourliberty-agent-core AND
-Larry-Yatch/ourliberty-dashboard (REPOS). The whole pipeline is repo-agnostic —
-the routing allowlist + repo_paths in config/agent-models.json cover both, and the
-auto-merge path derives its repo from the PR URL — so a labeled PR opened against
-EITHER repo auto-flows (a real dashboard PR, #72, has gone through Mirror
-auto-merge). This closes the gap where a desktop-opened dashboard PR (#80/#81) was
-flagged unrouted but never auto-routed, because this backstop was agent-core-only.
+Multi-repo (2026-06-22; widened since): sweeps ALL FOUR Larry-Yatch repos —
+ourliberty-agent-core, ourliberty-dashboard, ourliberty-graph, and RSDPM. REPOS
+below is the authority; keep this paragraph in step with it. The whole pipeline is
+repo-agnostic — the routing allowlist + repo_paths in config/agent-models.json
+cover all four, and the auto-merge path derives its repo from the PR URL — so a
+labeled PR opened against ANY of them auto-flows (proven live: dashboard #72 and
+RSDPM #26 both went through Mirror auto-merge). This closes the gap where a
+desktop-opened dashboard PR (#80/#81) was flagged unrouted but never auto-routed,
+because this backstop was agent-core-only.
 Per-PR task_id for the opt-in path is repo-qualified (`pr-<repo>-<number>`) so a
 PR #N present in both repos can't collide onto one review-request dedup key.
 
