@@ -9153,6 +9153,58 @@ def _alert_deep_review_label_failure(
         pass
 
 
+def _alert_deep_review_status_post_failure(
+    repo_coords: str, pr_number: int, pr_url: str, head_sha: str, detail: str,
+) -> None:
+    """Repair alert for a failed SHA-bound `deep-review` commit-status POST —
+    the sibling of `_alert_deep_review_label_failure`, but for the STATUS token,
+    not the label.
+
+    Kept distinct on purpose (deep-review-sha-bound-approval): the two failures
+    have different descriptions AND different remediations, and must NOT collapse
+    into one DM. The label-apply alert says the merge is HELD and hands a
+    `gh pr edit … --add-label` fix; a status-POST failure is a different story —
+    in slice 1 the label is what drives the merge, so a failed status POST is
+    NON-blocking: the PR still merges, and this is an early-warning that the
+    migration's new token isn't landing, not a stuck gate. The remediation is a
+    `gh api … statuses` one-liner (or, on an unresolvable head, none). A distinct
+    subject key keeps this from subject-deduping against a genuine label-apply
+    failure, so a real label failure and a status-POST failure never merge into a
+    single DM."""
+    if head_sha:
+        remediation = (
+            f'Non-blocking today (the `{_DEEP_REVIEW_PASSED_LABEL}` label still '
+            f'drives the merge in slice 1) — an early-warning that the SHA-bound '
+            f'`{_DEEP_REVIEW_PASS_STATUS_CONTEXT}` token is not landing. Hand-post '
+            f'it if you want the token present now: '
+            f'gh api repos/{repo_coords}/statuses/{head_sha} '
+            f'-f state=success -f context={_DEEP_REVIEW_PASS_STATUS_CONTEXT}'
+        )
+        sha_note = f' at head {head_sha[:12]}'
+    else:
+        remediation = (
+            f'Non-blocking today (the `{_DEEP_REVIEW_PASSED_LABEL}` label still '
+            f'drives the merge in slice 1) — an early-warning that the SHA-bound '
+            f'`{_DEEP_REVIEW_PASS_STATUS_CONTEXT}` token is not landing. No manual '
+            f'post is possible without a resolvable head SHA.'
+        )
+        sha_note = ''
+    try:
+        larry_alerts.append_alert(
+            source='outbox-notifier',
+            severity='warning',
+            message=(
+                f'Deep-review hold APPROVED for PR {pr_url}: posting the '
+                f'SHA-bound `{_DEEP_REVIEW_PASS_STATUS_CONTEXT}` commit status'
+                f'{sha_note} failed: {detail}.\n{remediation}'
+            ),
+            subject=f'deep-review-hold-status-post:{repo_coords}:{pr_number}',
+            route='escalate',
+        )
+    except Exception:  # noqa: BLE001 — daemon-never-wedge
+        pass
+
+
 def _head_has_deep_review_pass_status(
     repo_coords: str, head_sha: str,
 ) -> bool:
@@ -9212,11 +9264,14 @@ def _post_deep_review_pass_status(
     recreate the #980 'stamped but never merges' class — Larry re-approving into
     a void (spec §10 Q3). On any failure it raises exactly one actionable repair
     alert (mirroring `_apply_deep_review_pass_label`) and returns False so the
-    caller does not treat the approval as effective."""
+    caller does not treat the approval as effective. The repair alert is the
+    status-POST-specific one (accurate description + `gh api … statuses`
+    remediation + its own subject key), NOT the label-apply alert — the two must
+    not subject-dedupe into a single DM (deep-review-sha-bound-approval)."""
     if not head_sha:
-        _alert_deep_review_label_failure(
-            repo_coords, pr_number, pr_url,
-            'deep-review status POST skipped: head unresolvable',
+        _alert_deep_review_status_post_failure(
+            repo_coords, pr_number, pr_url, head_sha,
+            'head unresolvable',
         )
         return False
     try:
@@ -9234,16 +9289,16 @@ def _post_deep_review_pass_status(
             capture_output=True, text=True, timeout=_AUTO_MERGE_TIMEOUT_S,
         )
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
-        _alert_deep_review_label_failure(
-            repo_coords, pr_number, pr_url,
-            f'deep-review status POST: {type(e).__name__}: {e}',
+        _alert_deep_review_status_post_failure(
+            repo_coords, pr_number, pr_url, head_sha,
+            f'{type(e).__name__}: {e}',
         )
         return False
     if proc.returncode != 0:
-        _alert_deep_review_label_failure(
-            repo_coords, pr_number, pr_url,
+        _alert_deep_review_status_post_failure(
+            repo_coords, pr_number, pr_url, head_sha,
             (proc.stderr or '').strip()[:200]
-            or f'deep-review status POST exit {proc.returncode}',
+            or f'exit {proc.returncode}',
         )
         return False
     log(
