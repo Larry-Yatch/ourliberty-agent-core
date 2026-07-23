@@ -10772,7 +10772,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-23T20:29:54.899795+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-10T19:51:02.40171+00:00"
+      "orphan_last_activity_ts": "2026-07-10T19:51:02.40171+00:00",
+      "briefing": {
+        "what": "A piece of cleanup work the team started on its own to fix a stalled process, but it isn't attached to any active project or goal yet.",
+        "why": "Loose work with no clear owner or purpose can quietly eat time and create confusion, and right now there's nothing showing it's worth the effort.",
+        "suggest": "Hold off on green-lighting it until someone confirms what problem it actually solves for the business \u2014 if there's no clear answer, park it."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-23T20:35:16.296923+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
