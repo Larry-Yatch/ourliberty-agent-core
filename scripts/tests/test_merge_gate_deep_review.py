@@ -560,13 +560,49 @@ class ShaBoundTokenSlice1Test(_GateTestBase):
         self.assertFalse(ok)
         alerts = self._read_alerts()
         self.assertEqual(len(alerts), 1)
+        rec = alerts[0]
+        # Status-POST-specific alert: its OWN subject key, so it never
+        # subject-dedupes against a genuine label-apply failure.
+        self.assertEqual(
+            rec['subject'], f'deep-review-hold-status-post:{REPO}:5')
+        msg = rec['message']
+        # Accurate description of a STATUS-post failure — not a label failure.
+        self.assertIn('commit status', msg)
+        self.assertNotIn('--add-label', msg)
+        # Correct, non-no-op remediation: the real gh api statuses one-liner.
+        self.assertIn(
+            f'gh api repos/{REPO}/statuses/{self._head(5)}', msg)
+        self.assertIn('-f state=success', msg)
+        self.assertIn('-f context=deep-review', msg)
+
+    def test_status_post_subject_distinct_from_label_apply(self):
+        """A status-POST failure and a label-apply failure on the SAME PR carry
+        different subjects, so the two never collapse into one DM."""
+        self.gh.status_post_fail = True
+        self.on._post_deep_review_pass_status(
+            REPO, 9, _pr_url(REPO, 9), self._head(9))
+        status_subj = self._read_alerts()[-1]['subject']
+        # `gh pr edit --add-label` is unhandled by the router → exit 1 → the
+        # label-apply failure path fires (the PR has no pre-existing label).
+        self.on._apply_deep_review_pass_label(
+            REPO, 9, _pr_url(REPO, 9), 'task-9')
+        label_subj = self._read_alerts()[-1]['subject']
+        self.assertNotEqual(status_subj, label_subj)
+        self.assertEqual(status_subj, f'deep-review-hold-status-post:{REPO}:9')
+        self.assertEqual(label_subj, f'deep-review-hold-label-apply:{REPO}:9')
 
     def test_post_status_unresolvable_head_alerts_no_call(self):
         ok = self.on._post_deep_review_pass_status(
             REPO, 6, _pr_url(REPO, 6), '')
         self.assertFalse(ok)
         self.assertEqual(self.gh.status_post_calls, [])
-        self.assertEqual(len(self._read_alerts()), 1)
+        alerts = self._read_alerts()
+        self.assertEqual(len(alerts), 1)
+        rec = alerts[0]
+        self.assertEqual(
+            rec['subject'], f'deep-review-hold-status-post:{REPO}:6')
+        # No head → no manual post is possible; no bogus gh command handed out.
+        self.assertNotIn('gh api repos/', rec['message'])
 
 
 class ConfigConstantSyncTest(unittest.TestCase):
