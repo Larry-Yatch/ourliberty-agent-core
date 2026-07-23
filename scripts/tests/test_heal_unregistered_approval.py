@@ -156,6 +156,33 @@ class IsApprovalClassTest(unittest.TestCase):
         }
         self.assertFalse(h.is_approval_class(rec, DEFAULT_HEURISTICS))
 
+    def test_needs_larry_signal_promotes_without_decision_phrasing(self):
+        # The unrouted-PR nudge has no decision verb/phrase — it qualifies
+        # SOLELY on the explicit needs_larry signal (the non-whack-a-mole path).
+        self.assertTrue(h.is_approval_class(UNROUTED_PR_ALERT, DEFAULT_HEURISTICS))
+
+    def test_needs_larry_still_excluded_when_not_escalate(self):
+        # The signal never overrides the route gate.
+        rec = dict(UNROUTED_PR_ALERT, route='digest')
+        self.assertFalse(h.is_approval_class(rec, DEFAULT_HEURISTICS))
+
+    def test_needs_larry_notification_kind_still_excluded(self):
+        # A notification carrying needs_larry is still a follow-up, not a card.
+        self.assertFalse(
+            h.is_approval_class(MEDIC_NOTIFICATION_PR28, DEFAULT_HEURISTICS))
+
+    def test_escalate_without_signal_or_phrase_not_promoted(self):
+        # No needs_larry, no decision verb/phrase -> stays off the tab (no flood).
+        self.assertFalse(
+            h.is_approval_class(ESCALATE_NO_SIGNAL_ALERT, DEFAULT_HEURISTICS))
+
+    def test_dispatch_prefix_promotes_without_needs_larry(self):
+        # Defense-in-depth: even if an actionable alert forgot needs_larry, the
+        # 'Dispatch' suggested_action prefix catches it (shipped config).
+        rec = {k: v for k, v in UNROUTED_PR_ALERT.items() if k != 'needs_larry'}
+        cfg = h.load_heuristics()  # real config/unregistered-approval-heuristics.json
+        self.assertTrue(h.is_approval_class(rec, cfg))
+
 
 class ParseBinaryOptionsTest(unittest.TestCase):
     def test_choose_or(self):
@@ -455,6 +482,53 @@ INCIDENTAL_REF_ALERT = {
     'suggested_action': 'Choose option-A or option-B',
 }
 
+# The real heal-pipeline-stall unrouted-PR nudge: an ACTIONABLE alert (only Larry
+# can route the review) whose suggested_action carries no decision verb/phrase, so
+# it promotes ONLY via the explicit needs_larry signal. Its subject anchors PR #28
+# so the card auto-retires when the PR routes/merges.
+UNROUTED_PR_ALERT = {
+    'ts': _ts(1),
+    'source': 'heal-pipeline-stall',
+    'severity': 'warning',
+    'route': 'escalate',
+    'needs_larry': True,
+    'subject': 'pipeline-stall:unrouted-pr:PR#28',
+    'message': (
+        'PR #28 (ourliberty-agent-core) on branch `foo` opened 40 min ago has NO '
+        'review-request dispatch logged. Mirror will not review until Larry '
+        'manually routes it.'
+    ),
+    'suggested_action': (
+        'Dispatch a Mirror review via Beacon chat: '
+        '`dispatch mirror review pr=https://github.com/x/y/pull/28`.'
+    ),
+}
+
+# A route=escalate alert with NO needs_larry and no decision verb/phrase — an
+# informational-critical escalate that must stay OFF the Approvals tab (no flood).
+ESCALATE_NO_SIGNAL_ALERT = {
+    'ts': _ts(1),
+    'source': 'heal-pipeline-stall',
+    'severity': 'warning',
+    'route': 'escalate',
+    'subject': 'pipeline-stall:cycle-timer-lag',
+    'message': 'The cycle timer is running 12 min behind schedule; still firing.',
+    'suggested_action': 'On the droplet: check `systemctl status ourliberty-cycle.timer`.',
+}
+
+# A medic-diagnosis follow-up about the SAME PR #28, written as a notification —
+# excluded at the front door so it can never mint a second card.
+MEDIC_NOTIFICATION_PR28 = {
+    'ts': _ts(1),
+    'source': 'medic-diagnosis',
+    'kind': 'notification',
+    'route': 'escalate',
+    'needs_larry': True,
+    'subject': 'medic-diagnosis:PR#28-unrouted-followup',
+    'message': 'Diagnosed PR #28 as unrouted; see the unrouted-PR nudge.',
+    'suggested_action': 'Dispatch a Mirror review for PR #28.',
+}
+
 
 def _gh_merged(numbers):
     """Fake gh probe: True for the given resolved PR/issue numbers, else None
@@ -655,6 +729,65 @@ class ReconcileRetireTest(unittest.TestCase):
             gh_probe=_gh_merged([294]))
         self.assertEqual([t for t, _ in retired], [task_id])
         self.assertEqual(remaining, {})
+
+
+class UnroutedPrPromotionTest(unittest.TestCase):
+    """The needs_larry signal path end-to-end: an actionable alert with no
+    decision phrasing becomes exactly ONE Approvals-tab card that dedups on
+    re-fire and auto-retires when its PR resolves — reusing the SAME dedup/retire
+    machinery as the phrasing-based decision-asks."""
+
+    def _empty(self):
+        return {'pending': [], 'history': []}
+
+    def test_unrouted_pr_promoted_to_one_card(self):
+        out = h.evaluate([UNROUTED_PR_ALERT], DEFAULT_HEURISTICS,
+                         self._empty(), {}, now=NOW)
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0]['target_agent'], 'beacon')
+
+    def test_refired_alert_not_duplicated(self):
+        # A second identical fire for PR #28 in the same tick -> one card.
+        out = h.evaluate([UNROUTED_PR_ALERT, dict(UNROUTED_PR_ALERT)],
+                         DEFAULT_HEURISTICS, self._empty(), {}, now=NOW)
+        self.assertEqual(len(out), 1)
+
+    def test_already_registered_alert_not_duplicated(self):
+        # An already-pending card for PR #28 -> the re-fire is skipped.
+        key = h.alert_dedup_key(UNROUTED_PR_ALERT)
+        state = {'pending': [{'id': 'x', 'plan_summary': key}], 'history': []}
+        out = h.evaluate([UNROUTED_PR_ALERT], DEFAULT_HEURISTICS, state, {},
+                         now=NOW)
+        self.assertEqual(out, [])
+
+    def test_medic_notification_not_a_second_card(self):
+        # The medic follow-up about the same PR is a notification -> never a card.
+        out = h.evaluate([MEDIC_NOTIFICATION_PR28], DEFAULT_HEURISTICS,
+                         self._empty(), {}, now=NOW)
+        self.assertEqual(out, [])
+
+    def test_escalate_without_needs_larry_not_promoted(self):
+        # An informational-critical escalate stays off the tab (no flood).
+        out = h.evaluate([ESCALATE_NO_SIGNAL_ALERT], DEFAULT_HEURISTICS,
+                         self._empty(), {}, now=NOW)
+        self.assertEqual(out, [])
+
+    def test_resolved_pr_card_is_retired(self):
+        # When PR #28 routes/merges, the promoted card auto-retires — same
+        # gh_ref_resolved-driven retire path as the decision-ask cards.
+        identity = h.decision_identity(UNROUTED_PR_ALERT)
+        self.assertEqual(identity, 'ref:28')
+        task_id = h.derive_task_id(identity)
+        state = {'pending': [{'id': task_id, 'status': 'pending'}], 'history': []}
+        promoted = {identity: {
+            'task_id': task_id, 'subject': UNROUTED_PR_ALERT['subject'],
+            'promoted_at': _ts(1)}}
+        retired, remaining = h.reconcile_retire(
+            promoted, state, [], DEFAULT_HEURISTICS, now=NOW,
+            gh_probe=_gh_merged([28]))
+        self.assertEqual([t for t, _ in retired], [task_id])
+        self.assertEqual(remaining, {})
+        self.assertEqual(state['pending'], [])
 
 
 class IncidentalRefAnchorTest(unittest.TestCase):

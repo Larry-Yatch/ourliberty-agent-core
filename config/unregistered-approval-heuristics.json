@@ -10,7 +10,8 @@
     "Reply",
     "Tell Beacon",
     "Choose",
-    "Pick"
+    "Pick",
+    "Dispatch"
   ],
   "decision_phrases": [
     "holding APPROVAL_REQUEST",
