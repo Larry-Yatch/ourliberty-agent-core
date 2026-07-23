@@ -10637,6 +10637,111 @@
       "retired_at": "2026-07-22T17:49:20.821585+00:00",
       "retired_reason": "orphan-terminal",
       "retired_signal": "pr_merged:#939"
+    },
+    {
+      "id": "proposed-doorbell-tab-approval-reconciler-001",
+      "name": "Doorbell Tab Approval Reconciler 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `doorbell-tab-approval-reconciler-001`. Last activity 2026-07-10T16:23:26.095728+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "doorbell-tab-approval-reconciler-001"
+      ],
+      "repo": null,
+      "created": "2026-07-23",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-23T09:25:17.818608+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-10T16:23:26.095728+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-23T09:25:17.818608+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#908"
+    },
+    {
+      "id": "proposed-gh-api-burn-phase1-measure-and-backoff-001",
+      "name": "GH API Burn Phase1 Measure And Backoff 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `gh-api-burn-phase1-measure-and-backoff-001`. Last activity 2026-07-09T16:38:20.66452+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "gh-api-burn-phase1-measure-and-backoff-001"
+      ],
+      "repo": null,
+      "created": "2026-07-23",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-23T09:25:17.818608+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-09T16:38:20.66452+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-23T09:25:17.818608+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#896"
+    },
+    {
+      "id": "proposed-heal-forge-no-pr-pr-task-id-closed-001",
+      "name": "Heal Forge No PR PR Task ID Closed 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `heal-forge-no-pr-pr-task-id-closed-001`. Last activity 2026-06-26T17:49:32.518901+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "heal-forge-no-pr-pr-task-id-closed-001"
+      ],
+      "repo": null,
+      "created": "2026-07-23",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-23T09:25:17.818608+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-26T17:49:32.518901+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-23T09:25:17.818608+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#725"
+    },
+    {
+      "id": "proposed-board-new-mission-confirmation-placeholder-001",
+      "name": "Board New Mission Confirmation Placeholder 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `board-new-mission-confirmation-placeholder-001`. Last activity 2026-06-25T19:15:59.235084+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "board-new-mission-confirmation-placeholder-001"
+      ],
+      "repo": null,
+      "created": "2026-07-23",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-23T09:25:17.818608+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-25T19:15:59.235084+00:00"
+    },
+    {
+      "id": "proposed-add-676-mirror-visibility-crossref-001",
+      "name": "Add 676 Mirror Visibility Crossref 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `add-676-mirror-visibility-crossref-001`. Last activity 2026-06-24T19:21:39.658852+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "add-676-mirror-visibility-crossref-001"
+      ],
+      "repo": null,
+      "created": "2026-07-23",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-23T09:25:17.818608+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-24T19:21:39.658852+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-23T09:25:17.818608+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#681"
     }
   ]
 }
