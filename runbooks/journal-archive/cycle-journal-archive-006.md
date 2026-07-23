@@ -24976,3 +24976,81 @@ Triage: 2 alerts, 0 Tier-1 dispatched, 0 Tier-2 DMs, 2 Tier-3 silenced. Watermar
 
 ---
 
+## Iteration ~6047 — 2026-07-23T06:08Z UTC (Larry /cycle chat, Tier 1)
+
+**Health:** ⚠️ Non-nominal (zombie PID carry only). All substantive checks NOMINAL. **MILESTONE: RSDPM V0 COMPLETE** — seq rsdpm-v0-001 closed at 06:00:26Z UTC (all 20 PRs merged). Pipeline is idle. 3 daemons auto-restarted (expected, post-PR #1014 code deploy).
+
+**VERIFY-BEFORE-REASSERT (from iter ~6046 at ~05:51Z UTC):**
+- **"zombie-bash-pid-1834248 etime=55-10:31:55"**: CONFIRMED — PID 1834248 alive (etime=55-10:44:10, bash Ss). [carry ⚠️]
+- **"daemons healthy (9 PIDs)"**: UPDATED — all 9 daemons alive; 3 restarted with new PIDs: uvicorn→2365187 (heal-dashboard-api-sha-drift), outbox_notifier→2365662 (heal-stale-daemon-code), beacon_telegram_bot→2366272 (heal-stale-daemon-code). PIDs 1590654/1590875/1591041/1591194/1591274/1971090 unchanged. Expected post-PR #1014 code-deploy restart cycle. [carry NOMINAL ✅]
+- **"sync NOMINAL, last_sync=2026-07-23T05:16:17Z UTC"**: CONFIRMED — ~47 min from 06:03Z. Within 2h. NOMINAL ✅
+- **"beacon-pending-approvals pending=0"**: CONFIRMED — pending=0. NOMINAL ✅
+- **"HEAD=fddd0241=origin/main"**: UPDATED — HEAD=1d4ad93e=origin/main ("Pulse cycle 20260723T060124Z", wrapper committed iter ~6046 journal). NOMINAL ✅
+- **"larry-alerts.jsonl watermark=813"**: UPDATED — repair-watermark: repaired=false (old=813, file_length=818). 5 new alerts (idx 813-817). All triaged (see Check 0). Watermark advanced 813→818. NOMINAL ✅
+- **"m3-pr2 Forge revision-1 (PID 2364412)"**: COMPLETED → Forge revision-1 submitted, Mirror re-review REVIEW_PASS (session 12e94799, round=1), PR #25 AUTO_MERGED at 06:00:20Z UTC (--squash --delete-branch). SEQUENCE_COMPLETE rsdpm-v0-001 emitted at 06:00:26Z UTC. DM delivered to Larry (idx=816, 06:01:17Z UTC). [RESOLVED ✅]
+- **"probe-blind:ourliberty-cycle.service"**: CARRY — Larry to decide. [carry]
+
+**NEW findings:**
+- **RSDPM V0 COMPLETE 🎉** — seq rsdpm-v0-001 finished 06:00:26Z UTC. All 20 PRs merged across all modules (m1-pr1 through m8-pr2, PR #5–#25 except gaps in RSDPM numbering). m3-pr2 (Resend inbound route, PR #25) was the final step. Larry DM'd at 06:01:17Z UTC (idx=816). Pipeline now idle: 0 active Forge/Mirror sessions, all inboxes EMPTY.
+- **PR #1015 opened (Forge, fix(deep-review))** — "fix(deep-review): status-POST failure gets its own alert, not the label one". Created 05:56:21Z UTC. Age at check time ~7 min. No Mirror review dispatched yet (mirror inbox empty; outbox-notifier just restarted at 05:56:05Z, needs a poll cycle to pick up new PR). Not yet stale (< 30-min threshold). [monitoring]
+- **3 daemon restarts post-PR #1014 deploy** — heal-dashboard-api-sha-drift restarted uvicorn (idx=813, 05:55:18Z), heal-stale-daemon-code restarted outbox-notifier (idx=814, 05:56:07Z) and beacon-bot (idx=815, 05:56:17Z). All Tier-FYI/digest; no DM warranted. Auto-healed correctly. NOMINAL ✅
+
+**Check 0 — Alert triage (~06:03Z UTC):** repair-watermark: repaired=false (old=813, file_length=818). 5 new alerts:
+  - idx=813: heal-dashboard-api-sha-drift / dashboard-api-sha-drift-healed (05:55:18Z) → Tier-FYI/digest, silence. uvicorn reloaded on fddd0241 HEAD.
+  - idx=814: heal-stale-daemon-code / auto-restarted:ourliberty-outbox-notifier.service (05:56:07Z) → Tier-FYI/digest, silence. Bot log: route=digest, skipping DM. ✅
+  - idx=815: heal-stale-daemon-code / auto-restarted:ourliberty-beacon-bot.service (05:56:17Z) → Tier-FYI/digest, silence. ✅
+  - idx=816: outbox-notifier / sequence-complete:rsdpm-v0-001 (06:00:26Z) → route=escalate, tier=FYI, DELIVERED by bot at 06:01:17Z UTC (chat_id=7998341473). Larry notified. ✅
+  - idx=817: notification/review-pass m3-pr2 (06:00:28Z) → DELIVERED. ✅
+  Watermark advanced 813→818. NOMINAL ✅
+
+**Check 1 — Log noise (~06:03Z UTC):** outbox-notifier.log — new notifier started at [23:56:05] MDT; last entry [00:00:28] MDT (review-pass notify). All WARNs in log are pre-restart (forge marker task-id mismatches for RSDPM build tasks, mirror malformed-marker for m5-pr2 — all resolved, PRs merged). 0 new WARNs post-restart. NOMINAL ✅
+
+**Check 2 — Telegram sweep (~06:03Z UTC):** Beacon bot PID 2366272 alive (Ss). Last Larry message: 05:10:45Z UTC ("go" m3-pr2). Last notification: idx=816 (sequence-complete:rsdpm-v0-001) DELIVERED 06:01:17Z UTC. No new Larry messages. No orphan directives. NOMINAL ✅
+
+**Check 3 — Pipeline stall (~06:04Z UTC):** dry-run at 06:04:05Z UTC: all tasks FORGE_NO_PR_SKIP. "no stalls detected." NOMINAL ✅
+
+**Check 4 — Pending directives (~06:05Z UTC):** All inboxes EMPTY (forge, mirror, beacon, pulse). beacon-pending-approvals: pending=0. NOMINAL ✅
+
+**Check 5 — Stale daemon code (~06:03Z UTC):** heartbeat=2026-07-23T05:56:00Z UTC (~7 min from 06:03Z). Fresh (<60 min). All 9 daemon PIDs alive (new PIDs confirmed). NOMINAL ✅
+
+**Check A — Source repo:** HEAD=1d4ad93e=origin/main; on main; clean tree; 0 ahead, 0 behind. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-23T05:16:17Z UTC (~47 min from 06:03Z); status=no-change; consecutive_push_failures=0. NOMINAL ✅
+**Check C — Agent liveness:** All 9 daemon PIDs alive. 3 new PIDs (uvicorn 2365187, outbox_notifier 2365662, beacon_telegram_bot 2366272) from auto-restart post-PR #1014 deploy — expected. Zombie PID 1834248 ALIVE (etime=55-10:44:10, bash Ss — loop waiting for nonexistent build-check-viii-pr-2b-analyzer-001.json). NON-NOMINAL [zombie carry only]
+**Check E — PR/merge state:** agent-core: 1 open PR — #1015 (fix(deep-review): status-POST failure gets its own alert, not the label one; created 05:56:21Z UTC, 7 min old, no review yet, no auto-merge — sub-30min, monitoring). RSDPM: 0 open PRs (V0 COMPLETE; all 20 PRs merged). NOMINAL ✅
+**Check H — Forge activity digest:** Pipeline idle. 0 active sessions. Last completed: m3-pr2 revision-1 → PR #25 AUTO_MERGED 06:00:20Z UTC → SEQUENCE_COMPLETE. PR #1015 is a new Forge-built follow-up (fix/deep-review-status-post-alert); no active session. [Monitoring PR #1015 for Mirror review dispatch]
+
+**§5.0:** audit_due_nudge: no committed baseline; no-op. distill_detector: no un-distilled audits; no-op. audit_cadence_signal: no-op. MEMORY.md >>18k threshold; judgment-based condensation still pending [carry].
+
+**Rotations:** SUPABASE_SERVICE_ROLE_KEY due=2026-08-22 (~30 days). Last DM=2026-07-20T20:00:15Z; 14-day dedup; no new DM. [carry]
+
+**Conditional checks:**
+- **Check I:** OFF today (Thu 2026-07-23 UTC). Next: Fri 2026-07-24 (~14:13 UTC).
+- **Check III:** OFF-WEEK — last artifact 2026-07-12; next fire 2026-07-27.
+- Check IV/VI/IX/X: timer-managed. No new artifacts this iter.
+
+**G-rule assessment:**
+- **zombie-bash-pid-1834248**: carry (etime=55-10:44:10). Monitor.
+- **pr-merged-without-deep-review-shortcut-001**: 1/3 (carry). Sub-threshold. Monitor.
+- **mirror-ghost-retry-m5-pr2**: 1/3 (carry). m5-pr2 now MERGED (PR #18 in V0 complete list); this anomaly did not recur in build completion flow. Sub-threshold; monitoring but likely self-resolved.
+- **heal-stall-retry-exhausted-after-pr-merge**: 1/3 (carry). Monitor.
+- All other G-rules unchanged.
+
+**Actions taken:**
+1. Check 0: repair-watermark no-op (repaired=false). 5 alerts triaged (idx 813-817, all Tier-FYI/digest or DELIVERED). Watermark advanced 813→818.
+2. §5.0 one-shots: all no-ops.
+3. PRIME ledger: 1 intervention appended (zombie-bash-loop-carry at 06:08:42Z UTC). Trailing 30d: ratio=24.5 (systemic_fixes=70, verification_pending=35, trend=improving).
+4. Tier state: record --checks-clean false → consecutive_clean=0; last_signal_at=2026-07-23T06:08:42Z UTC.
+5. Watermark: advanced 813→818.
+
+**Escalations:**
+- [yellow] **zombie-bash-pid-1834248** — etime=55-10:44:10; still alive (loop waiting for `build-check-viii-pr-2b-analyzer-001.json`, file never created). Ask-then-do: `kill 1834248`. [carry — no new DM]
+- [yellow] **probe-blind:ourliberty-cycle.service** — carry. Larry to decide if retire. [carry — no new DM]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — 3 proposals pending. Awaiting Larry approval. [carry — no new DM]
+- [blue] **RSDPM V0 COMPLETE** — seq rsdpm-v0-001 closed 06:00:26Z UTC, all 20 PRs merged; DM delivered to Larry. [informational — no further action]
+- [blue] **PR #1015** — fix(deep-review): status-POST follow-up; 7 min old, monitoring for Mirror review dispatch. [informational — no action]
+
+**PRIME DIRECTIVE:** 1 intervention (zombie-bash-loop-carry). 0 new systemic_fix. Trailing 30d: ratio=24.5 (systemic_fixes=70, verification_pending=35, trend=improving).
+**Tier end-of-iter:** **Tier 1** (consecutive_clean=0; non-clean: zombie PID 1834248; all substantive checks NOMINAL; pipeline idle post-RSDPM V0 complete).
+
+---
+
