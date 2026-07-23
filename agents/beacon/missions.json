@@ -10803,7 +10803,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-23T21:30:17.072449+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-10T02:05:04.81876+00:00"
+      "orphan_last_activity_ts": "2026-07-10T02:05:04.81876+00:00",
+      "briefing": {
+        "what": "When someone on your team taps 'decline' on a request in the dashboard, the request doesn't actually get cleared \u2014 it stays sitting in the approval queue as if no decision was made.",
+        "why": "Declined items pile up and look like they still need action, which erodes trust in the dashboard and risks someone acting on a request you already turned down.",
+        "suggest": "Worth fixing so 'decline' truly clears the item, but have someone confirm the fix end-to-end before shipping since it touches how approvals are recorded."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-23T21:35:24.576293+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
