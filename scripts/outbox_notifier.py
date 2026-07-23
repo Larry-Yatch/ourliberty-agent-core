@@ -313,6 +313,14 @@ _DEEP_REVIEW_PATHS_CONFIG_PATH = (
 # the stamp is applied immediately before hand-off with no third-party push.
 _DEEP_REVIEW_REQUIRED_LABEL = 'deep-review-required'
 _DEEP_REVIEW_PASSED_LABEL = 'deep-review-passed'
+# deep-review-sha-bound-approval slice 1 — the SHA-scoped twin of the
+# `deep-review-passed` label. A commit status is bound to a specific head, so
+# (unlike the label) it cannot outlive a push: a new head simply has no status,
+# and the gate holds. Slice 1 writes this ALONGSIDE the label (dual-write) and
+# the gate accepts EITHER token (dual-read); later slices drop the label and the
+# whole `stamped_head_sha` side-note machinery it needs. See
+# specs/deep-review-sha-bound-approval-spec.md.
+_DEEP_REVIEW_PASS_STATUS_CONTEXT = 'deep-review'
 
 # D3.5 commit 5d — extract repo coords + PR number from a github.com PR URL.
 # Mirror's REVIEW_PASS marker carries `pr_url`; auto-merge needs the
@@ -8932,6 +8940,7 @@ def _deep_review_required(
     pr_number: int,
     changed_files: Optional[list[str]],
     labels: Optional[list[str]] = None,
+    head_sha: Optional[str] = None,
 ) -> bool:
     """Return True (→ HOLD the auto-merge for a human `/code-review high`) when
     a PASS'd PR is a critical-path change that has NOT been deep-reviewed.
@@ -8968,7 +8977,25 @@ def _deep_review_required(
     # None (gh failure) → empty for trigger/stamp reads (conservative: absent).
     label_names = labels or []
     label_critical = _DEEP_REVIEW_REQUIRED_LABEL in label_names
-    stamped = _DEEP_REVIEW_PASSED_LABEL in label_names
+    label_stamped = _DEEP_REVIEW_PASSED_LABEL in label_names
+
+    # deep-review-sha-bound-approval slice 1 — dual-read. A PR counts as
+    # stamped if EITHER the legacy `deep-review-passed` label OR a success
+    # `deep-review` commit status on its current head is present. The label is
+    # checked first and short-circuits, so the common path (legacy label
+    # present, or genuinely non-critical) pays ZERO extra gh cost — the status
+    # read fires only when we would otherwise HOLD a critical PR, exactly the
+    # path already resigned to extra gh work. Head is resolved lazily and once.
+    _status_stamp_cache: dict[str, bool] = {}
+
+    def _is_stamped() -> bool:
+        if label_stamped:
+            return True
+        if 'v' not in _status_stamp_cache:
+            hsha = head_sha or _gh_pr_head_sha(repo_coords, pr_number)
+            _status_stamp_cache['v'] = bool(hsha) and \
+                _head_has_deep_review_pass_status(repo_coords, hsha)
+        return _status_stamp_cache['v']
 
     files = changed_files
     if not files:
@@ -8983,7 +9010,7 @@ def _deep_review_required(
                 f'({repo_coords}); holding conservatively unless stamped',
                 'WARN',
             )
-            return not stamped
+            return not _is_stamped()
 
     paths = _load_deep_review_paths()
     file_critical = any(
@@ -8991,7 +9018,7 @@ def _deep_review_required(
     )
     if not (file_critical or label_critical):
         return False
-    return not stamped
+    return not _is_stamped()
 
 
 # ----- deep-review-held-surface-on-tab (deep-review-held-surface-on-tab-001) --
@@ -9124,6 +9151,106 @@ def _alert_deep_review_label_failure(
         )
     except Exception:  # noqa: BLE001 — daemon-never-wedge
         pass
+
+
+def _head_has_deep_review_pass_status(
+    repo_coords: str, head_sha: str,
+) -> bool:
+    """Does this exact head carry a SUCCESS `deep-review` commit status?
+
+    The SHA-scoped twin of the `deep-review-passed` label
+    (deep-review-sha-bound-approval slice 1). Ported from
+    `heal_undispatched_pr_review.head_has_passing_review_status`: one combined
+    commit-status call, and — critically — it returns True ONLY on a
+    definitively observed success. A failure status, no status yet, an
+    unresolvable head, OR any gh error all return False. That fail-CLOSED
+    posture is the whole point of the migration: an unreadable token means "not
+    confirmed approved at this head" → the gate HOLDS, never merges. It matches
+    `_deep_review_required`'s existing conservative-fail doctrine exactly."""
+    if not head_sha:
+        return False
+    cmd = [
+        'gh', 'api', f'repos/{repo_coords}/commits/{head_sha}/status',
+        '--jq', f'[.statuses[] | '
+                f'select(.context=="{_DEEP_REVIEW_PASS_STATUS_CONTEXT}") '
+                f'| .state]',
+    ]
+    try:
+        proc = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=_AUTO_MERGE_TIMEOUT_S,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
+        log(
+            f'deep-review status read ({repo_coords}@{head_sha[:12]}) FAILED: '
+            f'{type(e).__name__}: {e}',
+            'WARN',
+        )
+        return False
+    if proc.returncode != 0:
+        log(
+            f'deep-review status read ({repo_coords}@{head_sha[:12]}) gh '
+            f'exit={proc.returncode}: {(proc.stderr or "").strip()[:200]}',
+            'WARN',
+        )
+        return False
+    try:
+        states = json.loads(proc.stdout or '[]')
+    except (json.JSONDecodeError, ValueError):
+        return False
+    return isinstance(states, list) and 'success' in states
+
+
+def _post_deep_review_pass_status(
+    repo_coords: str, pr_number: int, pr_url: str, head_sha: str,
+) -> bool:
+    """POST a SUCCESS `deep-review` commit status to `head_sha`. Return True
+    iff the status is now CONFIRMED present (a successful POST this call).
+
+    Unlike `_post_mirror_review_commit_status` (best-effort, swallows all
+    errors, returns None), this is a CHECKED write: the approval path must know
+    the token landed, because approving into a silently-failed POST would
+    recreate the #980 'stamped but never merges' class — Larry re-approving into
+    a void (spec §10 Q3). On any failure it raises exactly one actionable repair
+    alert (mirroring `_apply_deep_review_pass_label`) and returns False so the
+    caller does not treat the approval as effective."""
+    if not head_sha:
+        _alert_deep_review_label_failure(
+            repo_coords, pr_number, pr_url,
+            'deep-review status POST skipped: head unresolvable',
+        )
+        return False
+    try:
+        # Plain subprocess.run (not gh_write) to match the deep-review sibling
+        # writes `_apply_deep_review_pass_label` / `_revoke_deep_review_pass_label`
+        # exactly: same local convention, and — critically — the same mock
+        # surface, so every harness that patches `outbox_notifier.subprocess.run`
+        # covers this POST too (a gh_write here would escape those mocks and
+        # shell out to real GitHub from the held-surface tests).
+        proc = subprocess.run(
+            ['gh', 'api', f'repos/{repo_coords}/statuses/{head_sha}',
+             '-f', 'state=success',
+             '-f', f'context={_DEEP_REVIEW_PASS_STATUS_CONTEXT}',
+             '-f', 'description=Deep review approved (Larry sign-off)'],
+            capture_output=True, text=True, timeout=_AUTO_MERGE_TIMEOUT_S,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
+        _alert_deep_review_label_failure(
+            repo_coords, pr_number, pr_url,
+            f'deep-review status POST: {type(e).__name__}: {e}',
+        )
+        return False
+    if proc.returncode != 0:
+        _alert_deep_review_label_failure(
+            repo_coords, pr_number, pr_url,
+            (proc.stderr or '').strip()[:200]
+            or f'deep-review status POST exit {proc.returncode}',
+        )
+        return False
+    log(
+        f'deep-review-hold APPROVED → posted `{_DEEP_REVIEW_PASS_STATUS_CONTEXT}`'
+        f' success status on pr={pr_url} sha={head_sha[:12]}',
+    )
+    return True
 
 
 def _apply_deep_review_pass_label(
@@ -9354,6 +9481,18 @@ def _reconcile_deep_review_held_approvals() -> None:
                 # Remember the head this stamp belongs to, so a later push can
                 # revoke it (above) instead of inheriting a stale pass.
                 _mark_deep_review_stamped(repo, pr_number, head_sha)
+                # deep-review-sha-bound-approval slice 1 — DUAL-WRITE. Post the
+                # SHA-bound `deep-review` status alongside the label. In slice 1
+                # the label stays the source of truth that drives the merge
+                # below, so a status-POST failure is NON-blocking here (the
+                # checked helper still raises one repair alert — useful signal
+                # that the migration's new token isn't landing, not merge-path
+                # noise). Later slices flip the drive onto this token and drop
+                # the label + the `stamped_head_sha` side-note entirely.
+                if head_sha:
+                    _post_deep_review_pass_status(
+                        repo, pr_number, pr_url, head_sha,
+                    )
                 # Idempotency (the reconcile runs every ~60s): fire the merge on
                 # the tick the stamp FIRST lands, then only on the throttled
                 # state-recheck cadence — never every tick, so a PR merely queued
