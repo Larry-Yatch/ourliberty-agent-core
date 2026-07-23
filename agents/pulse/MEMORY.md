@@ -6,6 +6,12 @@
 
 ---
 
+## beacon-pending-approvals.json is at ~/agents/state/ NOT ~/agents/blackboard/ (learned 2026-07-23, iter ~6020)
+
+**Rule:** `beacon-pending-approvals.json` lives at `/home/larry/agents/state/beacon-pending-approvals.json` (state dir), NOT `~/agents/blackboard/`. Schema: `{"version": 1, "pending": [...], "history": [...]}` — pending items use key `"pending"` (not `"approvals"`). Prior iters that checked the wrong path got `No such file or directory` → treated as pending=0 → false-clear. Always read from `state/` path and iterate `d["pending"]`.
+
+---
+
 ## pulse-heartbeat.json is a phantom file — Check 5 real substrate is heal-stale-daemon-code.heartbeat (learned 2026-07-22, Beacon investigation)
 
 **Rule:** `pulse-heartbeat.json` does NOT exist and never has a writer. It never appeared in tracked code (`git log -S` empty). Only Pulse's own journal/ledger/G-rule ever referenced it — the name was invented. **Check 5's correct substrate** is `/home/larry/agents/blackboard/heal-stale-daemon-code.heartbeat` (plain-text ISO 8601 UTC timestamp, NOT JSON). If `heal-stale-daemon-code.heartbeat` is fresh and the healer daemon is alive, Check 5 is NOMINAL — do not report missing `pulse-heartbeat.json`.
