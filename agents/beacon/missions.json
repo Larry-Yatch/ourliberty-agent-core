@@ -10756,6 +10756,23 @@
       "retired_at": "2026-07-23T09:25:17.818608+00:00",
       "retired_reason": "orphan-terminal",
       "retired_signal": "pr_merged:#681"
+    },
+    {
+      "id": "proposed-rebase-pr909-sentinel-stale-lease-001-retry1",
+      "name": "Rebase Pr909 Sentinel Stale Lease 001 Retry1",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `rebase-pr909-sentinel-stale-lease-001-retry1`. Last activity 2026-07-10T19:51:02.40171+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "rebase-pr909-sentinel-stale-lease-001-retry1"
+      ],
+      "repo": null,
+      "created": "2026-07-23",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-23T20:29:54.899795+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-10T19:51:02.40171+00:00"
     }
   ]
 }
