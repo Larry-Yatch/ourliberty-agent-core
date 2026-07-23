@@ -4,6 +4,65 @@
 
 ---
 
+## Iteration ~6113 — 2026-07-23T11:12Z UTC (Larry /cycle chat, Tier 1)
+
+**Health:** ⚠️ Non-nominal (zombie PID carry only). All substantive checks NOMINAL. Pipeline idle.
+
+**VERIFY-BEFORE-REASSERT (from iter ~6112 at ~11:09Z UTC):**
+- **"zombie-bash-pid-1834248 etime=55-15:48:38"**: CONFIRMED — PID 1834248 ALIVE (etime=55-15:52:38, bash Ss). [carry ⚠️]
+- **"daemons healthy (9 PIDs)"**: CONFIRMED — all 9 daemons alive (1590654/chain_event_shipper/SNs etime=1-03:16:36, 1590875+1591041+1591194/agent_telegram_bot×3/Ss, 1591274/spec_review_runner/Ss, 1971090/inbox_watcher/Ssl etime=17:08:43, 2437535/uvicorn/Ssl etime=02:56:22, 2438915/outbox_notifier/Ss etime=02:53:42, 2439513/beacon_telegram_bot/Ss etime=02:53:33). NOMINAL ✅
+- **"sync NOMINAL, last_sync=2026-07-23T10:16:19Z UTC"**: CONFIRMED — same value; ~57 min from 11:13Z check. Within 2h. NOMINAL ✅
+- **"beacon-pending-approvals pending=0"**: CONFIRMED — pending=0, history=527. NOMINAL ✅
+- **"HEAD=5e7c63b9=origin/main"**: UPDATED — HEAD=26a72fe3=origin/main ("Pulse cycle 20260723T110940Z"; wrapper committed iter ~6112 journal). NOMINAL ✅
+- **"larry-alerts.jsonl watermark=725"**: CONFIRMED — repair-watermark: repaired=false (old=725, file_length=725). 0 new alerts. NOMINAL ✅
+
+**Check 0 — Alert triage (~11:12Z UTC):** repair-watermark: repaired=false (old=725, file_length=725). 0 new alerts since watermark=725. Watermark stays 725. NOMINAL ✅ [No tier-reset]
+
+**Check 1 — Log noise (~11:12Z UTC):** outbox-notifier.log last entry [2026-07-23 02:17:21 MDT = 08:17:21Z UTC] — "outbox-notifier starting". 0 new WARNs/ERRORs since restart (~3h clean). Pipeline idle. NOMINAL ✅
+
+**Check 2 — Telegram sweep (~11:12Z UTC):** Beacon bot PID 2439513 alive (Ss, etime=02:53:33). Last Larry message: 00:42:39 MDT [06:42:39Z UTC] "where is pr 1015" — answered. No new Larry messages in ~4.5h window. No orphan directives. NOMINAL ✅
+
+**Check 3 — Pipeline stall (~11:11Z UTC):** dry-run: all tasks FORGE_NO_PR_SKIP (pr_exists). unrouted_open_pr:RSDPM:26 and :27 suppressed (cooldown). "0 alert(s) would fire, 0 recovery(ies)." NOMINAL ✅
+
+**Check 4 — Pending directives (~11:12Z UTC):** All inboxes EMPTY (forge=0, beacon=0, mirror=0, pulse=0). beacon-pending-approvals: pending=0 (history=527). No orphan directives. NOMINAL ✅
+
+**Check 5 — Stale daemon code (~11:12Z UTC):** heartbeat=2026-07-23T11:08:56Z UTC (~4 min from check). Fresh (<60 min). All 9 daemon PIDs alive. NOMINAL ✅
+
+**Check A — Source repo:** HEAD=26a72fe3=origin/main; on main; clean tree; 0 ahead, 0 behind. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-23T10:16:19Z UTC (~57 min from check); status=no-change; consecutive_push_failures=0. NOMINAL ✅
+**Check C — Agent liveness:** All 9 daemons alive (1590654/chain_event_shipper/SNs, 1590875+1591041+1591194/agent_telegram_bot×3/Ss, 1591274/spec_review_runner/Ss, 1971090/inbox_watcher/Ssl, 2437535/uvicorn/Ssl, 2438915/outbox_notifier/Ss, 2439513/beacon_telegram_bot/Ss). Zombie PID 1834248 ALIVE (etime=55-15:52:38, bash Ss — loop waiting for nonexistent build-check-viii-pr-2b-analyzer-001.json). NON-NOMINAL [zombie carry only]
+**Check E — PR/merge state:** ourliberty-agent-core: 0 open PRs. RSDPM: #26 (fix/definer-create-on-public-schema, MERGEABLE) and #27 (fix/m4-extractor-runpath, MERGEABLE) — Larry-authored fix/* branches, unrouted by-design (label-gated), cooldown active. NOMINAL ✅
+**Check H — Forge activity digest:** Pipeline idle post-RSDPM V0. 0 active Forge/Mirror sessions. outbox-notifier idle since 08:17Z UTC.
+
+**§5.0:** audit_due_nudge: no committed audit baseline; no-op. distill_detector: no un-distilled audits; no-op. NOMINAL ✅
+
+**Rotations:** SUPABASE_SERVICE_ROLE_KEY due=2026-08-22 (~30 days). 14-day dedup active; no new DM. [carry]
+
+**Conditional checks:**
+- **Check I:** OFF today (Thu 2026-07-23 UTC). Next fire: Fri 2026-07-24 (~14:13Z UTC).
+- **Check III:** OFF-WEEK — last artifact 2026-07-12; next fire 2026-07-27.
+- Check IV/VI/IX/X: timer-managed. No new artifacts this iter.
+
+**G-rule assessment:** All unchanged. Active carries: zombie-bash-pid-1834248 (carry); forge-revision-preamble-missing (vp); forge-wip-redispatch-digest (Forge pending); forge-wip-redispatch-exhausted-no-pr (vp); outbox-notifier-intent-reject (Forge vp); check-i-force-bypass-dm-route (2/3); auto-dispatch-APPROVAL_REQUEST-mismatch (vp). Sub-threshold: pr-merged-without-deep-review-shortcut-001 (1/3); mirror-ghost-retry-m5-pr2 (1/3); heal-stall-retry-exhausted-after-pr-merge (1/3).
+
+**Actions taken:**
+1. Check 0: repair-watermark no-op (repaired=false, old=725=file_length=725). 0 alerts triaged. Watermark stays 725.
+2. §5.0 one-shots: all no-ops.
+3. PRIME ledger: 1 intervention appended (zombie-bash-loop-carry at 11:12:37Z UTC). Trailing 30d: ratio=25.1 (systemic_fixes=70, verification_pending=35, trend=improving).
+4. Tier state: record --checks-clean false → consecutive_clean=0; last_signal_at=2026-07-23T11:12:38Z UTC.
+5. Watermark: stays 725 (no new alerts).
+
+**Escalations:**
+- [yellow] **zombie-bash-pid-1834248** — etime=55-15:52:38; bash loop waiting for `build-check-viii-pr-2b-analyzer-001.json` (never created). Ask-then-do: `kill 1834248`. [carry — no new DM; DM outstanding from prior iters]
+- [yellow] **probe-blind:ourliberty-cycle.service** — carry. Larry to decide if retire. [carry — no new DM]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — 3 proposals pending Larry approval. [carry — no new DM]
+- [blue] **RSDPM #26/#27** — fix/* branches open, unrouted by design; cooldown active. [informational]
+
+**PRIME DIRECTIVE:** 1 intervention (zombie-bash-loop-carry). 0 new systemic_fix. Trailing 30d: ratio=25.1 (systemic_fixes=70, verification_pending=35, trend=improving).
+**Tier end-of-iter:** **Tier 1** (consecutive_clean=0; non-clean: zombie PID 1834248 only; all substantive checks NOMINAL; pipeline idle post-RSDPM V0).
+
+---
+
 ## Iteration ~6112 — 2026-07-23T11:09Z UTC (Larry /loop /cycle chat, Tier 1)
 
 **Health:** ⚠️ Non-nominal (zombie PID carry only). All substantive checks NOMINAL. Pipeline idle.
@@ -2396,73 +2455,6 @@
 
 **Escalations:**
 - [yellow] **zombie-bash-pid-1834248** — etime=55-11:22:34; still alive (loop waiting for `build-check-viii-pr-2b-analyzer-001.json`, file never created). Ask-then-do: `kill 1834248`. [carry — no new DM]
-- [yellow] **probe-blind:ourliberty-cycle.service** — carry. Larry to decide if retire. [carry — no new DM]
-- [yellow] **check-vi-posture-proposals-2026-07-07** — 3 proposals pending. Awaiting Larry approval. [carry — no new DM]
-
-**PRIME DIRECTIVE:** 1 intervention (zombie-bash-loop-carry). 0 new systemic_fix. Trailing 30d: ratio=24.6 (systemic_fixes=70, verification_pending=35, trend=improving).
-**Tier end-of-iter:** **Tier 1** (consecutive_clean=0; non-clean: zombie PID 1834248; all substantive checks NOMINAL; pipeline idle post-RSDPM V0 complete).
-
----
-
-## Iteration ~6051 — 2026-07-23T06:32Z UTC (Larry /cycle chat, Tier 1)
-
-**Health:** ⚠️ Non-nominal (zombie PID carry only). All substantive checks NOMINAL. Pipeline idle post-RSDPM V0 complete.
-
-**VERIFY-BEFORE-REASSERT (from iter ~6050 at ~06:24Z UTC):**
-- **"zombie-bash-pid-1834248 etime=55-11:05:26"**: CONFIRMED — PID 1834248 alive (etime=55-11:12:38, bash Ss). [carry ⚠️]
-- **"daemons healthy (9 PIDs)"**: CONFIRMED — all 9 PIDs alive (2365187/uvicorn Ssl, 2366272/beacon_telegram_bot Ss, 1590654/chain_event_shipper SNs, 1590875+1591041+1591194/agent_telegram_bot×3 Ss, 1591274/spec_review_runner Ss, 2365662/outbox_notifier Ss, 1971090/inbox_watcher Ssl). NOMINAL ✅
-- **"sync NOMINAL, last_sync=2026-07-23T06:16:17Z UTC"**: CONFIRMED — last_sync=2026-07-23T06:16:17Z UTC (~16 min from 06:32Z). Within 2h. NOMINAL ✅
-- **"beacon-pending-approvals pending=0"**: CONFIRMED — pending=0. NOMINAL ✅
-- **"HEAD=2d1a621c=origin/main"**: CONFIRMED — HEAD=2d1a621c=origin/main ("Pulse cycle 20260723T062713Z", wrapper committed iter ~6050 journal). NOMINAL ✅
-- **"larry-alerts.jsonl watermark=818"**: CONFIRMED — repair-watermark: repaired=false (old=818, file_length=818). 0 new alerts. Watermark stays 818. NOMINAL ✅
-- **"PR #1015 [monitoring]"**: CARRY — now ~36 min old (created 05:56:21Z UTC); author=Larry-Yatch, fix/deep-review-status-post-alert branch, reviewDecision='', autoMerge=false, mergeable=MERGEABLE. No review dispatched — expected per unrouted-PR-by-design MEMORY (auto-route label-gated on fix/* branches). [monitoring]
-- **"probe-blind:ourliberty-cycle.service"**: CARRY — Larry to decide. [carry]
-
-**NEW findings:** None. Pipeline idle.
-
-**Check 0 — Alert triage (~06:32Z UTC):** repair-watermark: repaired=false (old=818, file_length=818). 0 new alerts since watermark=818. Watermark stays 818. NOMINAL ✅
-
-**Check 1 — Log noise (~06:32Z UTC):** outbox-notifier.log last entry [2026-07-23 00:00:28 MDT = 06:00:28Z UTC] — completion DM queued for m3-pr2 review-pass (~32 min of idle). 0 new WARNs. Pipeline idle post-RSDPM V0. NOMINAL ✅
-
-**Check 2 — Telegram sweep (~06:32Z UTC):** Beacon bot PID 2366272 alive (Ss). Last notification: idx=817 at [00:01:17 MDT = 06:01:17Z UTC] (review-pass m3-pr2). Last Larry message: 23:10:45 MDT [05:10:45Z UTC] ("go" m3-pr2, resolved). No new Larry messages. No orphan directives. No agent distress. NOMINAL ✅
-
-**Check 3 — Pipeline stall (~06:31Z UTC):** dry-run at 06:31:28Z UTC: all tasks FORGE_NO_PR_SKIP (pr_exists for all RSDPM + agent-core tasks). "no stalls detected." NOMINAL ✅
-
-**Check 4 — Pending directives (~06:32Z UTC):** All inboxes EMPTY (forge=0, mirror=0, beacon=0, pulse=0). beacon-pending-approvals: pending=0. No orphan directives. NOMINAL ✅
-
-**Check 5 — Stale daemon code (~06:32Z UTC):** heartbeat=2026-07-23T06:26:18Z UTC (~6 min from 06:32Z). Fresh (<60 min). All 9 daemon PIDs alive. NOMINAL ✅
-
-**Check A — Source repo:** HEAD=2d1a621c=origin/main; on main; clean tree; 0 ahead, 0 behind. NOMINAL ✅
-**Check B — Sync health:** last_sync=2026-07-23T06:16:17Z UTC (~16 min from 06:32Z); status=no-change; consecutive_push_failures=0. NOMINAL ✅
-**Check C — Agent liveness:** All 9 daemon PIDs alive (2365187/uvicorn/Ssl, 2366272/beacon_telegram_bot/Ss, 1590654/chain_event_shipper/SNs, 1590875+1591041+1591194/agent_telegram_bot×3/Ss, 1591274/spec_review_runner/Ss, 2365662/outbox_notifier/Ss, 1971090/inbox_watcher/Ssl). Zombie PID 1834248 ALIVE (etime=55-11:12:38, bash Ss — loop waiting for nonexistent build-check-viii-pr-2b-analyzer-001.json). NON-NOMINAL [zombie carry only]
-**Check E — PR/merge state:** 1 open PR #1015 (fix/deep-review-status-post-alert, created 05:56:21Z UTC = ~36 min old at 06:32Z, author=Larry-Yatch, reviewDecision='', autoMerge=false, mergeable=MERGEABLE). Non-forge/* branch — unrouted by-design (auto-route label-gated per MEMORY). No auto-merge concern. NOMINAL ✅
-**Check H — Forge activity digest:** Pipeline idle post-RSDPM V0 complete. 0 active Forge/Mirror sessions. PR #1015 monitoring (Larry-Yatch authored, fix/* non-forge/* branch).
-
-**§5.0:** audit_due_nudge: no committed baseline; no-op. distill_detector: no un-distilled audits; no-op. NOMINAL ✅
-
-**Rotations:** SUPABASE_SERVICE_ROLE_KEY due=2026-08-22 (~30 days). Last DM=2026-07-20T20:00:15Z; 14-day dedup active; no new DM. [carry]
-
-**Conditional checks:**
-- **Check I:** OFF today (Thu 2026-07-23 UTC). Next: Fri 2026-07-24 (~14:13 UTC).
-- **Check III:** OFF-WEEK — last artifact 2026-07-12; next fire 2026-07-27.
-- Check IV/VI/IX/X: timer-managed. No new artifacts this iter.
-
-**G-rule assessment:**
-- **zombie-bash-pid-1834248**: carry (etime=55-11:12:38). Monitor.
-- **pr-merged-without-deep-review-shortcut-001**: 1/3 (carry). Sub-threshold. Monitor.
-- **mirror-ghost-retry-m5-pr2**: 1/3 (carry). m5-pr2 MERGED; self-resolved. Sub-threshold; monitoring.
-- **heal-stall-retry-exhausted-after-pr-merge**: 1/3 (carry). Monitor.
-- All other G-rules unchanged.
-
-**Actions taken:**
-1. Check 0: repair-watermark no-op (repaired=false). 0 alerts triaged. Watermark stays 818.
-2. §5.0 one-shots: all no-ops.
-3. PRIME ledger: 1 intervention appended (zombie-bash-loop-carry at 06:32:56Z UTC). Trailing 30d: ratio=24.6 (systemic_fixes=70, verification_pending=35, trend=improving).
-4. Tier state: record --checks-clean false → consecutive_clean=0; last_signal_at=2026-07-23T06:32:57Z UTC.
-5. Watermark: stays 818 (no-op).
-
-**Escalations:**
-- [yellow] **zombie-bash-pid-1834248** — etime=55-11:12:38; still alive (loop waiting for `build-check-viii-pr-2b-analyzer-001.json`, file never created). Ask-then-do: `kill 1834248`. [carry — no new DM]
 - [yellow] **probe-blind:ourliberty-cycle.service** — carry. Larry to decide if retire. [carry — no new DM]
 - [yellow] **check-vi-posture-proposals-2026-07-07** — 3 proposals pending. Awaiting Larry approval. [carry — no new DM]
 
