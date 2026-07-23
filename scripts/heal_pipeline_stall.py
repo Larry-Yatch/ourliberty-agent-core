@@ -318,6 +318,13 @@ REBASE_STUCK_MIN = 45  # grace before a stuck rebase obligation alerts
 ROUTING_EVENTS_LOG = AGENTS_ROOT / 'logs' / 'routing-events.jsonl'
 ROUTING_EVENTS_LOOKBACK_HOURS = 24 * 7  # PRs aren't routed faster than this
 PR_UNROUTED_MIN_AGE_MIN = 60            # don't race with in-flight auto-dispatch
+# Stranded-PR nudge (heal-unrouted-owner-pr-nudge-001): a clean unrouted PR the
+# owner forgot to label ages out of the 24h scan window and is then never nudged
+# again (agent-core #1015, RSDPM #27). We surface it exactly ONCE past the
+# window, keyed on the head SHA so a new commit re-nudges once and nothing else
+# does. The head-SHA-in-key already makes it once-per-head; this very large
+# re-DM window is the belt-and-suspenders that stops a same-head repeat.
+STRANDED_UNROUTED_PR_REDM_HOURS = 24 * 365 * 10  # effectively "never re-DM same head"
 # Dashboard "+New mission" PRs (branch prefix below) are reconciled into
 # missions.json by heal_orphan_autoregister (it ingests the named mission and
 # closes the PR), NOT by a Mirror review — so an open one is not "unrouted" and
@@ -556,7 +563,8 @@ def gh_pr_list(repo: str, state: str = 'all', limit: int = 50) -> list[dict]:
         result = subprocess.run(
             ['gh', 'pr', 'list', '--repo', repo, '--state', state,
              '--limit', str(limit), '--json',
-             'number,title,state,mergedAt,closedAt,headRefName,createdAt'],
+             'number,title,state,mergedAt,closedAt,headRefName,'
+             'headRefOid,createdAt'],
             capture_output=True, text=True, timeout=GH_TIMEOUT_S,
             env={**os.environ, 'PATH': '/usr/bin:/usr/local/bin:' + os.environ.get('PATH', '')},
         )
@@ -2938,6 +2946,13 @@ def check_unrouted_open_prs(open_prs: list[dict],
     Chain discipline v3 GAP 3 (2026-05-26). Catches externally-authored
     PRs (Claude-as-Forge, manual pushes) that skip the notifier's
     auto-dispatch entirely. Same 6h-cooldown idempotency as other checks.
+
+    Stranded-PR extension (heal-unrouted-owner-pr-nudge-001): a PR that is
+    still genuinely unrouted once it ages PAST the 24h scan window is nudged
+    exactly ONCE more, keyed on head SHA (a new commit -> one fresh nudge).
+    This closes the "clean PR the owner forgot to label sits stranded forever"
+    gap without adding a parallel healer, an author filter, or any auto-route
+    — nudge-only, preserving Larry's 2026-07-11 label opt-in.
     """
     review_dispatch_task_ids: set[str] = set()
     for rec in routing_events:
@@ -2963,11 +2978,14 @@ def check_unrouted_open_prs(open_prs: list[dict],
         created = _parse_ts(pr.get('createdAt', ''))
         if not created:
             continue
-        if not _within_scan_window(created, now=now):
-            # PR is older than SCAN_WINDOW_SECONDS — long-standing
-            # un-routed PR has had ample alert cycles; another DM here
-            # is noise. Skip per Scan window.
-            continue
+        # Past the 24h scan window we DON'T skip outright anymore: the in-window
+        # episode nudge has aged out, but a clean unrouted PR the owner forgot
+        # to label can sit forever. `in_window` selects which nudge shape to
+        # emit at the append step below — everything between here and there
+        # (routing-match, out-of-band resolution, active-Mirror suppression) is
+        # identical for both, so a stranded PR is only nudged if it is *still*
+        # genuinely unrouted right now.
+        in_window = _within_scan_window(created, now=now)
         elapsed_min = int((now - created).total_seconds() / 60)
         if elapsed_min < PR_UNROUTED_MIN_AGE_MIN:
             continue
@@ -3032,6 +3050,50 @@ def check_unrouted_open_prs(open_prs: list[dict],
                 f'reason={mirror_reason}',
                 'INFO',
             )
+            continue
+        if not in_window:
+            # Stranded past the 24h window (heal-unrouted-owner-pr-nudge-001).
+            # The in-window episode nudge below has aged out, so a clean
+            # unrouted PR the owner forgot to label would otherwise never be
+            # nudged again (agent-core #1015, RSDPM #27). Surface it exactly
+            # ONCE more, keyed on the head SHA so a new commit (new head) earns
+            # a single fresh nudge and nothing else re-fires. Nudge-only: NO
+            # recovery partial is attached, so this never auto-routes,
+            # auto-labels, or auto-merges — it stays inside Larry's 2026-07-11
+            # label opt-in carve-out.
+            head_sha = pr.get('headRefOid') or ''
+            if not head_sha:
+                # No head SHA means no stable once-per-head key; skip rather
+                # than risk an un-dedupable repeat nudge on every tick.
+                continue
+            age_days = elapsed_min // (60 * 24)
+            alerts.append({
+                'key': (
+                    f'unrouted_open_pr_stranded:{pr["_repo"]}:'
+                    f'{pr["number"]}:{head_sha}'
+                ),
+                'message': (
+                    f'PR #{pr["number"]} ({pr["_repo"]}) "{pr.get("title", "")}" '
+                    f'on branch `{branch}` has been open ~{age_days}d — past the '
+                    f'24h unrouted-PR scan window — and STILL has no Mirror '
+                    f'review. A clean PR that was never labeled can sit stranded '
+                    f'forever; this is a one-time nudge (it will only re-nudge if '
+                    f'you push a new commit).'
+                ),
+                'subject': (
+                    f'pipeline-stall:unrouted-pr-stranded:PR#{pr["number"]}'
+                ),
+                'suggested_action': (
+                    f'Add the `auto-review` label to send it through Mirror, or '
+                    f'dispatch a review via Beacon chat: '
+                    f'`dispatch mirror review pr={pr_html_url}`.'
+                ),
+                # Head SHA is in the key, so once-per-head is already enforced;
+                # this large window guarantees no same-head repeat.
+                're_dm_hours': STRANDED_UNROUTED_PR_REDM_HOURS,
+                # Merge-truth gate: suppress at fire time if since merged/closed.
+                'pr_url': pr_html_url,
+            })
             continue
         key = f'unrouted_open_pr:{pr["_repo"]}:{pr["number"]}'
         alert = {
