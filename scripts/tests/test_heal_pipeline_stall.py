@@ -2777,6 +2777,104 @@ class TestCheckUnroutedOpenPrs(_TempAgentsRootMixin, unittest.TestCase):
         self.assertFalse(active)
         self.assertEqual(reason, '')
 
+    # ---- Stranded-PR extension (heal-unrouted-owner-pr-nudge-001): a PR still
+    # genuinely unrouted PAST the 24h scan window gets exactly ONE more nudge,
+    # keyed on head SHA. Nudge-only — never a recovery/auto-route. ----
+
+    def _make_stranded_pr(self, number, branch, head_sha,
+                          age_min=25 * 60, title='feat: forgot to label'):
+        pr = self._make_pr(number, branch, age_min=age_min)
+        pr['title'] = title
+        pr['headRefOid'] = head_sha
+        return pr
+
+    def test_stranded_pr_past_window_nudges_once(self):
+        pr = self._make_stranded_pr(1015, 'fix/some-clean-fix', 'abc123def')
+        with patch('pipeline_live_state._claude_pids', return_value=[]), \
+                patch.object(self.hps, '_resolution_signal_present',
+                             return_value=(False, '')):
+            alerts = self.hps.check_unrouted_open_prs([pr], [], {})
+        self.assertEqual(len(alerts), 1)
+        alert = alerts[0]
+        self.assertEqual(
+            alert['subject'], 'pipeline-stall:unrouted-pr-stranded:PR#1015')
+        # Key is head-SHA-scoped so it nudges once per head.
+        self.assertEqual(
+            alert['key'],
+            'unrouted_open_pr_stranded:Larry-Yatch/ourliberty-agent-core:'
+            '1015:abc123def')
+        self.assertIn('PR #1015', alert['message'])
+        self.assertIn('one-time nudge', alert['message'])
+        # Nudge-only: NEVER a recovery/auto-route partial.
+        self.assertNotIn('recovery', alert)
+        self.assertEqual(
+            alert['re_dm_hours'], self.hps.STRANDED_UNROUTED_PR_REDM_HOURS)
+        self.assertTrue(alert['pr_url'].endswith('/pull/1015'))
+
+    def test_stranded_pr_without_head_sha_is_skipped(self):
+        # No head SHA -> no stable once-per-head key -> skip rather than risk
+        # an un-dedupable repeat nudge every tick.
+        pr = self._make_pr(1016, 'fix/no-oid', age_min=25 * 60)
+        pr['title'] = 'feat: x'  # note: no headRefOid key at all
+        with patch('pipeline_live_state._claude_pids', return_value=[]), \
+                patch.object(self.hps, '_resolution_signal_present',
+                             return_value=(False, '')):
+            alerts = self.hps.check_unrouted_open_prs([pr], [], {})
+        self.assertEqual(alerts, [])
+
+    def test_stranded_pr_head_advance_yields_new_key(self):
+        # A new commit (new head SHA) produces a DIFFERENT dedup key, so the
+        # PR earns exactly one fresh nudge; same head reuses the same key.
+        pr_a = self._make_stranded_pr(1015, 'fix/clean', 'sha-aaa')
+        pr_b = self._make_stranded_pr(1015, 'fix/clean', 'sha-bbb')
+        with patch('pipeline_live_state._claude_pids', return_value=[]), \
+                patch.object(self.hps, '_resolution_signal_present',
+                             return_value=(False, '')):
+            key_a = self.hps.check_unrouted_open_prs([pr_a], [], {})[0]['key']
+            key_b = self.hps.check_unrouted_open_prs([pr_b], [], {})[0]['key']
+        self.assertNotEqual(key_a, key_b)
+
+    def test_stranded_dedup_once_per_head_via_should_alert(self):
+        # The main loop's should_alert + head-SHA key give "exactly once per
+        # head": first fire True, same-head re-fire suppressed, new head True.
+        state: dict = {}
+        key = ('unrouted_open_pr_stranded:repo:1015:sha-aaa')
+        window = self.hps.STRANDED_UNROUTED_PR_REDM_HOURS
+        self.assertTrue(self.hps.should_alert(state, key, window))
+        self.hps.record_alert(state, key)
+        self.assertFalse(self.hps.should_alert(state, key, window))
+        new_key = 'unrouted_open_pr_stranded:repo:1015:sha-bbb'
+        self.assertTrue(self.hps.should_alert(state, new_key, window))
+
+    def test_stranded_pr_that_is_routed_does_not_nudge(self):
+        # Past-window but a matching review-request event exists -> routed ->
+        # no nudge (same routing-match discipline as the in-window path).
+        pr = self._make_stranded_pr(1017, 'forge/routed-strand-001', 'sha-z')
+        events = [{
+            'source_agent': 'beacon',
+            'target_agent_final': 'mirror',
+            'phase': 'review',
+            'task_id': 'routed-strand-001',
+            'timestamp': datetime.now(timezone.utc).isoformat(),
+        }]
+        with patch('pipeline_live_state._claude_pids', return_value=[]):
+            alerts = self.hps.check_unrouted_open_prs([pr], events, {})
+        self.assertEqual(alerts, [])
+
+    def test_in_window_pr_keeps_original_shape(self):
+        # Regression: an in-window unrouted PR is UNCHANGED by the extension —
+        # original subject + recovery partial (branch yields a task_id).
+        pr = self._make_pr(504, 'forge/some-task-abc', age_min=180)
+        pr['headRefOid'] = 'sha-inwindow'
+        with patch('pipeline_live_state._claude_pids', return_value=[]), \
+                patch.object(self.hps, '_resolution_signal_present',
+                             return_value=(False, '')):
+            alerts = self.hps.check_unrouted_open_prs([pr], [], {})
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(
+            alerts[0]['subject'], 'pipeline-stall:unrouted-pr:PR#504')
+        self.assertIn('recovery', alerts[0])
+
 
 class TestReadRecentRoutingEvents(_TempAgentsRootMixin, unittest.TestCase):
     """Chain discipline v3 GAP 3 — the routing-events.jsonl reader."""
