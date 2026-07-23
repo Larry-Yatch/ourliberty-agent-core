@@ -2807,6 +2807,8 @@ class TestCheckUnroutedOpenPrs(_TempAgentsRootMixin, unittest.TestCase):
         self.assertIn('one-time nudge', alert['message'])
         # Nudge-only: NEVER a recovery/auto-route partial.
         self.assertNotIn('recovery', alert)
+        # Still a Larry-must-route action -> promotable onto the Approvals tab.
+        self.assertIs(alert['needs_larry'], True)
         self.assertEqual(
             alert['re_dm_hours'], self.hps.STRANDED_UNROUTED_PR_REDM_HOURS)
         self.assertTrue(alert['pr_url'].endswith('/pull/1015'))
@@ -2874,6 +2876,9 @@ class TestCheckUnroutedOpenPrs(_TempAgentsRootMixin, unittest.TestCase):
         self.assertEqual(
             alerts[0]['subject'], 'pipeline-stall:unrouted-pr:PR#504')
         self.assertIn('recovery', alerts[0])
+        # Actionable (Larry must route) -> stamped needs_larry so it promotes
+        # onto the Approvals tab via heal_unregistered_approval.is_approval_class.
+        self.assertIs(alerts[0]['needs_larry'], True)
 
 
 class TestReadRecentRoutingEvents(_TempAgentsRootMixin, unittest.TestCase):

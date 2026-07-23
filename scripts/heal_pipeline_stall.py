@@ -3088,6 +3088,10 @@ def check_unrouted_open_prs(open_prs: list[dict],
                     f'dispatch a review via Beacon chat: '
                     f'`dispatch mirror review pr={pr_html_url}`.'
                 ),
+                # Same Larry-must-route action as the unrouted-PR alert above —
+                # stamp needs_larry so a long-stranded PR also promotes onto the
+                # Approvals tab.
+                'needs_larry': True,
                 # Head SHA is in the key, so once-per-head is already enforced;
                 # this large window guarantees no same-head repeat.
                 're_dm_hours': STRANDED_UNROUTED_PR_REDM_HOURS,
@@ -3112,6 +3116,11 @@ def check_unrouted_open_prs(open_prs: list[dict],
                 f'Verify routing fires: '
                 f'`tail -50 ~/agents/logs/routing-events.jsonl | grep "{branch}"`.'
             ),
+            # Larry-must-route action: only he can dispatch the review, so stamp
+            # needs_larry so it promotes onto the Approvals tab (heal_unregistered
+            # _approval.is_approval_class) as a single card that auto-retires when
+            # the PR is routed/merged.
+            'needs_larry': True,
             # Episode-dedup (spec §1): the dominant false-alert pattern — a slow
             # but progressing PR traversing the routing path re-DMed hourly
             # (PR #86: 8 fires, then merged). Alert once per episode.
@@ -3850,6 +3859,10 @@ def run(dry_run: bool = False) -> int:
             message=message,
             subject=alert['subject'],
             suggested_action=alert['suggested_action'],
+            # Per-alert: only alerts that stamp needs_larry (unrouted-PR nudges)
+            # forward it; append_alert persists the flag only when True, so the
+            # ~150 other healer alerts stay off the "Needs You" surface.
+            needs_larry=alert.get('needs_larry', False),
         )
         if ok:
             record_alert(state, alert['key'])

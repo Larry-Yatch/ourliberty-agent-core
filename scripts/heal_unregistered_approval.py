@@ -319,12 +319,19 @@ def within_window(record: dict[str, Any], now: datetime, window_hours: float) ->
 
 def is_approval_class(record: dict[str, Any], heuristics: dict[str, Any]) -> bool:
     """Conservative decision-signal test. Requires route == 'escalate' AND
-    either a decision-verb suggested_action prefix or a decision phrase in the
-    message/subject. Notifications / non-escalate routes never qualify."""
+    either an explicit `needs_larry` signal, a decision-verb suggested_action
+    prefix, or a decision phrase in the message/subject. Notifications /
+    non-escalate routes never qualify."""
     if record.get('kind') in ('notification', 'approval_request'):
         return False
     if record.get('route', approval_default_route()) != 'escalate':
         return False
+    # Signal-based promotion: an emitter that stamps `needs_larry` has already
+    # classified this as an action only Larry can take, so promote it regardless
+    # of phrasing. This is the extensible path — an actionable alert reaches the
+    # tab by setting the flag, not by matching a growing list of decision verbs.
+    if record.get('needs_larry') is True:
+        return True
     suggested = record.get('suggested_action')
     if isinstance(suggested, str):
         stripped = suggested.lstrip()
