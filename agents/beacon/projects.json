@@ -973,7 +973,7 @@
       "title": "Govern-Loop Assessor (operator-layer ROI/rank)",
       "north_star_ref": null,
       "repo": "ourliberty-agent-core",
-      "state": "active",
+      "state": "retired",
       "phases": [
         {
           "id": "govern-loop-assessor",
@@ -1023,10 +1023,17 @@
       ],
       "one_off": true,
       "created_at": "2026-07-08T06:16:38.415287+00:00",
-      "updated_at": "2026-07-22T15:29:02.379771+00:00",
+      "updated_at": "2026-07-23T11:49:16.496470+00:00",
       "promoted_from": {
         "kind": "mission",
         "mission_id": "govern-loop-assessor"
+      },
+      "gc": {
+        "prior_state": "active",
+        "retired_at": "2026-07-23T11:49:16.496470+00:00",
+        "retired_by": "projects-store-gc",
+        "done_at": "2026-07-21T11:44:20+00:00",
+        "window_sec": 172800
       }
     },
     {
