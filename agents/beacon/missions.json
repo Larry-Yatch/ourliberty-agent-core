@@ -11036,6 +11036,28 @@
       "retired_at": "2026-07-24T19:25:09.905312+00:00",
       "retired_reason": "orphan-terminal",
       "retired_signal": "pr_merged:#751"
+    },
+    {
+      "id": "proposed-kickoff-approve-routing-gap-001",
+      "name": "Kickoff Approve Routing Gap 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `kickoff-approve-routing-gap-001`. Last activity 2026-07-07T21:32:14.935859+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "kickoff-approve-routing-gap-001"
+      ],
+      "repo": null,
+      "created": "2026-07-24",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-24T23:41:37.116913+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-07T21:32:14.935859+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-24T23:41:37.116913+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#840"
     }
   ]
 }
