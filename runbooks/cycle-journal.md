@@ -2599,3 +2599,12 @@ Watermark advanced from 733 → 735. NO tier-reset from Check 0 (both Tier 3). N
 
 ---
 
+
+**Check I (2026-07-20):**
+
+- Ledger total: $392.22; 80 anomaly(ies)
+- Retry overhead: $0.00 (0.0%)
+- Forge marker-discipline: 0 misses (retry-depth 0/0/0, 0% retry-2+), trend flat (+0 vs prior wk)
+- Mode: digest — 1 proposal(s):
+  1. [small] Review high-σ anomaly task `cycle-202607151042380000` — $1.64 task vs $0.87 baseline (26.1σ above)
+     Rationale: Ledger flagged this task at 26.1σ above baseline. Read the chain archive and propose either: a fast-path for the shape, a prompt-discipline fix, or a model downgrade if the depth wasn't warranted.
