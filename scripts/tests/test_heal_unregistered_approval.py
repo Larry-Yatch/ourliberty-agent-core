@@ -664,6 +664,84 @@ class SkipBeforePromoteTest(unittest.TestCase):
                          now=NOW, resolution_check=check)
         self.assertEqual(len(out), 1)
 
+    def test_pulse_source_escalation_not_promoted(self):
+        # Guard 2: a source=pulse operational escalation (Pulse observing its
+        # OWN prior stale-approval notice) must NOT be promoted; the
+        # SKIP_PULSE_SOURCE path is exercised.
+        pulse_alert = {
+            'ts': _ts(1),
+            'source': 'pulse',
+            'route': 'escalate',
+            'needs_larry': True,
+            'subject': 'stale-pending-approval-unreg-approval-ce90b1a4c981',
+            'message': 'A prior healer-created approval is still pending.',
+            'suggested_action': 'Choose retire-it or keep-it',
+        }
+        with mock.patch.object(h, 'log') as mock_log:
+            out = h.evaluate([pulse_alert], DEFAULT_HEURISTICS,
+                             self._empty(), {}, now=NOW)
+        self.assertEqual(out, [])
+        self.assertTrue(any(
+            'SKIP_PULSE_SOURCE' in call.args[0] for call in mock_log.call_args_list),
+            'SKIP_PULSE_SOURCE should be logged for a source=pulse escalation')
+
+    def test_non_pulse_source_escalation_still_promoted(self):
+        # Guard 2 is source-SCOPED, not blanket: an identically-shaped alert from
+        # a non-pulse source (incl. a Pulse-relayed 'pulse/<origin>-result') is
+        # still promoted.
+        control_alert = {
+            'ts': _ts(1),
+            'source': 'pulse/beacon-result',
+            'route': 'escalate',
+            'needs_larry': True,
+            'subject': 'stale-pending-approval-unreg-approval-ce90b1a4c981',
+            'message': 'A prior healer-created approval is still pending.',
+            'suggested_action': 'Choose retire-it or keep-it',
+        }
+        out = h.evaluate([control_alert], DEFAULT_HEURISTICS,
+                         self._empty(), {}, now=NOW)
+        self.assertEqual(len(out), 1)
+
+    def test_merged_pr_in_message_body_not_promoted(self):
+        # Guard 1: a merged PR referenced in the message/suggested_action (NOT
+        # the subject) triggers the skip; SKIP_MERGED_PR is surfaced in the log.
+        merged_body_alert = {
+            'ts': _ts(1),
+            'source': 'heal-dispatch-router',
+            'route': 'escalate',
+            'needs_larry': True,
+            'subject': 'm3-pr2-re-dispatch-routing-gap',
+            'message': 'The m3-pr2 re-dispatch never routed; see PR #25.',
+            'suggested_action': 'Reply with how to close the re-dispatch gap',
+        }
+        state = self._empty()
+        check = self._check(state, [merged_body_alert], _gh_merged([25]))
+        with mock.patch.object(h, 'log') as mock_log:
+            out = h.evaluate([merged_body_alert], DEFAULT_HEURISTICS, state, {},
+                             now=NOW, resolution_check=check)
+        self.assertEqual(out, [])
+        self.assertTrue(any(
+            'SKIP_MERGED_PR' in call.args[0] for call in mock_log.call_args_list),
+            'SKIP_MERGED_PR should be logged for a merged-ref skip')
+
+    def test_merged_ref_in_body_undetermined_probe_still_promoted(self):
+        # Guard 1 tri-state contract: an undetermined probe (None) over the same
+        # body-referenced PR must NOT skip — the ask is still surfaced.
+        merged_body_alert = {
+            'ts': _ts(1),
+            'source': 'heal-dispatch-router',
+            'route': 'escalate',
+            'needs_larry': True,
+            'subject': 'm3-pr2-re-dispatch-routing-gap',
+            'message': 'The m3-pr2 re-dispatch never routed; see PR #25.',
+            'suggested_action': 'Reply with how to close the re-dispatch gap',
+        }
+        state = self._empty()
+        check = self._check(state, [merged_body_alert], lambda n: None)
+        out = h.evaluate([merged_body_alert], DEFAULT_HEURISTICS, state, {},
+                         now=NOW, resolution_check=check)
+        self.assertEqual(len(out), 1)
+
 
 class ReconcileRetireTest(unittest.TestCase):
     def test_merged_pr_card_is_retired(self):

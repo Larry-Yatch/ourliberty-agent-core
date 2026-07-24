@@ -614,10 +614,18 @@ def resolution_signal(
     else:
         subject = str(record_or_key)
         identity = decision_identity({'subject': subject})
-    # (a) referenced PR/issue merged or closed
-    for n in parse_ref_numbers(subject):
+    # (a) referenced PR/issue merged or closed. Scan the subject plus (when a
+    # full alert dict is available) the message + suggested_action, so a merged
+    # PR named anywhere in the alert triggers the skip — not just the subject.
+    ref_numbers = list(parse_ref_numbers(subject))
+    if isinstance(record_or_key, dict):
+        for field in ('message', 'suggested_action'):
+            for n in parse_ref_numbers(record_or_key.get(field)):
+                if n not in ref_numbers:
+                    ref_numbers.append(n)
+    for n in ref_numbers:
         if gh_probe(n) is True:
-            return f'referenced #{n} is merged/closed'
+            return f'SKIP_MERGED_PR referenced #{n} is merged/closed'
     # (b) a resolved entry for the same decision in beacon history
     if history_resolution_match(subject, identity, state):
         return 'resolved entry in beacon-pending-approvals history'
@@ -1016,6 +1024,16 @@ def evaluate(
         subject = alert_dedup_key(record)
         identity = decision_identity(record)
         if identity in promoted or subject in promoted or identity in seen_keys:
+            continue
+        # Guard: Pulse is an OBSERVER — it reports decisions that originate in
+        # Beacon/Forge/Mirror, and those originators emit their own alerts, so a
+        # Pulse operational escalation (incl. Pulse's own stale-approval notices)
+        # must never be promoted into an approval entry. Pulse's genuine approval
+        # shapes reach Larry via Telegram shortcuts, not this healer. Exact match
+        # so a relayed 'pulse/<origin>-result' alert still promotes normally.
+        if record.get('source') == 'pulse':
+            log(f'SKIP_PULSE_SOURCE: {identity!r} (source=pulse observer escalation)')
+            seen_keys.add(identity)
             continue
         task_id = derive_task_id(identity)
         if is_already_registered(subject, task_id, state):
