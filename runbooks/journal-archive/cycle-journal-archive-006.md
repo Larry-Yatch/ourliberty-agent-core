@@ -28593,3 +28593,68 @@ Triage: 2 alerts, 0 Tier-1 dispatched, 0 Tier-2 DMs, 2 Tier-3 silenced. Watermar
 
 ---
 
+## Iteration ~6127 — 2026-07-23T13:27Z UTC (Larry /cycle chat, Tier 2 → Tier 1)
+
+**Health:** ⚠️ Signal. 1 Tier-4 alert (ourliberty-health timing-window FP, self-resolved). Tier reset Tier 2 → Tier 1.
+
+**VERIFY-BEFORE-REASSERT (from iter ~6126 at ~13:08Z UTC):**
+- **"daemons healthy (9 PIDs)"**: CONFIRMED — all 9 PIDs alive (1590654/SNs, 1590875+1591041+1591194/Ss×3, 1591274/Ss, 1971090/Ssl, 2437535/Ssl, 2438915/Ss, 2439513/Ss). NOMINAL ✅
+- **"sync NOMINAL, last_sync=2026-07-23T12:16:57Z UTC"**: UPDATED — last_sync=2026-07-23T13:17:00Z UTC (~10 min from 13:27Z check); status=no-change. NOMINAL ✅
+- **"beacon-pending-approvals pending=0"**: CONFIRMED — pending=0, history=527. NOMINAL ✅
+- **"HEAD=3ca7c273=origin/main"**: UPDATED — HEAD=b63ae871=origin/main ("Pulse cycle 20260723T130927Z"; wrapper committed iter ~6126). On main; clean tree; 0 ahead, 0 behind. NOMINAL ✅
+- **"larry-alerts.jsonl watermark=726"**: 1 new alert at line 727 — see Check 0 below.
+- **"RSDPM #26/#27 carry — unrouted by-design"**: CONFIRMED — pipeline-stall dry-run: both cooldown-suppressed. NOMINAL ✅
+- **"probe-blind:ourliberty-cycle.service"**: CARRY — no new info. [carry — no new DM]
+- **"check-vi-posture-proposals-2026-07-07 — 2 proposals"**: CARRY — no new artifact. [carry — no new DM]
+
+**NEW findings this iter:** 1 Tier-4 alert (ourliberty-health, self-resolved timing FP). Tier-reset to Tier 1.
+
+**Check 0 — Alert triage (~13:27Z UTC):** repair-watermark: repaired=false (old=726, file_length=727). 1 new alert at line 727:
+`source=ourliberty-health, subject="ourliberty-agent-core health: 1 issue(s) need attention", severity=warning, route=escalate, clean_tree:1 modified 0 untracked, ts=2026-07-23T13:09:20Z UTC`
+Triage helper: **Tier-4** (novel; no translation match — G-rule `ourliberty-health-subject-key-mismatch-001` fix dispatched to Beacon iter ~4488 but never shipped; config/alert-translations.json ourliberty-health entry only matches `sync_agent_core: auto-commit push failed`).
+VERIFY: git status at 13:27Z UTC → `nothing to commit, working tree clean` (HEAD=b63ae871). Alert fired at 13:09Z UTC = timing window between iter ~6126 journal write and run_cycle.sh wrapper commit. **Self-resolved FP.** No DM sent (tree clean, actionable-only discipline). Watermark advanced to 727. **Tier-reset** (Tier-4 mechanics). ⚠️ [tier-reset]
+
+**Check 1 — Log noise (~13:27Z UTC):** outbox-notifier.log: prior-cycle WARNs (AUTO_MERGE_HELD_DEEP_REVIEW for PR #1014 [Jul 22 23:39 MDT] and PR #1015 [Jul 23 01:22 MDT]) pre-date the 02:17Z MDT restart; 0 WARN/ERROR since restart. journalctl --since "30 minutes ago": 0 WARN/ERROR entries (only healer-probe audit entries, expected). NOMINAL ✅
+
+**Check 2 — Telegram sweep (~13:27Z UTC):** Beacon bot PID 2439513 alive (Ss). Last Larry message: 2026-07-23T00:42:39-0600 MDT [06:42:39Z UTC] "where is pr 1015" (Beacon replied 06:43Z UTC). No new Larry messages since. No orphan directives. NOMINAL ✅
+
+**Check 3 — Pipeline stall (~13:27Z UTC):** dry-run: all RSDPM tasks FORGE_NO_PR_SKIP (pr_exists — 26 RSDPM PRs mapped, incl. RSDPM #11/12/13/14/15/16/17/18/19/20/21/22/23/24/25 + agent-core #1012/1013). unrouted_open_pr:RSDPM:26 and :27 suppressed (cooldown). "DRY-RUN: 0 alert(s) would fire, 0 recovery(ies) would be attempted." NOMINAL ✅
+
+**Check 4 — Pending directives (~13:27Z UTC):** All inboxes EMPTY (forge=0, beacon=0, mirror=0, pulse=0). beacon-pending-approvals: pending=0 (history=527). No orphan directives. NOMINAL ✅
+
+**Check 5 — Stale daemon code (~13:27Z UTC):** heartbeat=2026-07-23T13:20:16Z UTC (~7 min from check). Fresh (<60 min). All 9 daemon PIDs alive. NOMINAL ✅
+
+**Check A — Source repo:** HEAD=b63ae871=origin/main; on main; clean tree; 0 ahead, 0 behind. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-23T13:17:00Z UTC (~10 min from check); status=no-change; consecutive_push_failures=0. NOMINAL ✅
+**Check C — Agent liveness:** All 9 daemons alive (1590654/chain_event_shipper/SNs, 1590875+1591041+1591194/agent_telegram_bot×3/Ss, 1591274/spec_review_runner/Ss, 1971090/inbox_watcher/Ssl, 2437535/uvicorn/Ssl, 2438915/outbox_notifier/Ss, 2439513/beacon_telegram_bot/Ss). NOMINAL ✅
+**Check E — PR/merge state:** ourliberty-agent-core: 0 open PRs. RSDPM: #26 (fix/M1-definer-create-on-schema-public, MERGEABLE) and #27 (feat/M4-extractor-runpath, MERGEABLE) — Larry-authored, label-gated, unrouted by-design, cooldown active. NOMINAL ✅
+**Check H — Forge activity digest:** Pipeline idle post-RSDPM V0. 0 active Forge/Mirror sessions. outbox-notifier idle since 08:17Z UTC restart.
+
+**§5.0:** audit_due_nudge: no committed baseline; no-op. distill_detector: no un-distilled audits; no-op. audit_cadence_signal: no post-seed distill artifacts; no-op. NOMINAL ✅
+
+**Rotations:** SUPABASE_SERVICE_ROLE_KEY due=2026-08-22 (~30 days). 14-day dedup active; no new DM. [carry]
+
+**Conditional checks:**
+- **Check I:** OFF today (Thu 2026-07-23 UTC). Next fire: Fri 2026-07-24 (~14:13Z UTC).
+- **Check III:** OFF-WEEK — last artifact 2026-07-12; next fire 2026-07-27 (Sun).
+- Check IV/VI/IX/X: timer-managed. No new artifacts this iter.
+
+**G-rule assessment:** Active carries: forge-revision-preamble-missing (vp); forge-wip-redispatch-digest (vp); forge-wip-redispatch-exhausted-no-pr (vp); outbox-notifier-intent-reject (Forge vp); check-i-force-bypass-dm-route (2/3); auto-dispatch-APPROVAL_REQUEST-mismatch (vp). Sub-threshold: pr-merged-without-deep-review-shortcut-001 (1/3); mirror-ghost-retry-m5-pr2 (1/3); heal-stall-retry-exhausted-after-pr-merge (1/3). **ourliberty-health-subject-key-mismatch-001: RECURRING** (fix dispatched to Beacon iter ~4488; still no translation match ~1639 iters later; translation gap confirmed in config/alert-translations.json). No other new occurrences.
+
+**Actions taken:**
+1. Check 0: repair-watermark no-op (repaired=false, old=726, file_length=727). 1 alert triaged (ourliberty-health Tier-4 self-resolved timing FP; no DM). Watermark advanced to 727.
+2. §5.0 one-shots: all no-ops.
+3. PRIME ledger: intervention appended (ourliberty-health-timing-fp-tier4; 13:30:07Z UTC). Trailing 30d: ratio=25.24 (systemic_fixes=70, verification_pending=35+1 intervention, trend=improving).
+4. Tier state: record --checks-clean false → **Tier 2 → Tier 1** (tier-reset, Tier-4 alert; consecutive_clean reset to 0; last_signal_at=2026-07-23T13:30:08Z UTC).
+5. Watermark: advanced to 727.
+
+**Escalations:**
+- [yellow] **probe-blind:ourliberty-cycle.service** — carry. Larry to decide if retire. [carry — no new DM]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — 2 proposals pending Larry approval (tighten_masking + stricter_unverifiable). [carry — no new DM]
+- **ourliberty-health-subject-key-mismatch translation gap**: fix dispatched to Beacon iter ~4488 (direction-ask-ourliberty-health-subject-key-mismatch-3of3-001.json), still unverified ~1639 iters later. The alert class will keep classifying Tier-4 until the `subject^='ourliberty-agent-core health:'` catch-all translation lands. No new DM (prior dispatch is still the action; this is a note for pattern awareness). [carry]
+
+**PRIME DIRECTIVE:** 1 intervention (ourliberty-health-timing-fp-tier4). Trailing 30d: ratio computed from 70 systemic_fixes / 35+1 interventions.
+**Tier end-of-iter:** **Tier 1** (reset from Tier 2; Tier-4 alert observed; consecutive_clean=0; last_signal_at=13:30Z UTC; cadence back to 5-min).
+
+---
+
