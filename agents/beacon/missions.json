@@ -10281,7 +10281,11 @@
         "at": "2026-07-22T05:33:27.697037+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-24T09:21:11.520503+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-collapse-sequence-owned-orphans-001",
@@ -10829,6 +10833,84 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-task-no-pr-legitimacy-classifier-001",
+      "name": "Task No PR Legitimacy Classifier 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `task-no-pr-legitimacy-classifier-001`. Last activity 2026-07-11T22:47:15.195379+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "task-no-pr-legitimacy-classifier-001"
+      ],
+      "repo": null,
+      "created": "2026-07-24",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-24T09:21:11.520503+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-11T22:47:15.195379+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-24T09:21:11.520503+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_closed:#945"
+    },
+    {
+      "id": "proposed-larry-reject-dfbb594c3e5498993c31b966cee6ee0f2d359025",
+      "name": "Larry Reject Dfbb594c3e5498993c31b966cee6ee0f2d359025",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `larry-reject-dfbb594c3e5498993c31b966cee6ee0f2d359025`. Last activity 2026-07-11T22:37:13.723724+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "larry-reject-dfbb594c3e5498993c31b966cee6ee0f2d359025"
+      ],
+      "repo": null,
+      "created": "2026-07-24",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-24T09:21:11.520503+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-11T22:37:13.723724+00:00"
+    },
+    {
+      "id": "proposed-rebase-pr874-onto-main-001",
+      "name": "Rebase Pr874 Onto Main 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `rebase-pr874-onto-main-001`. Last activity 2026-07-10T22:46:27.090808+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "rebase-pr874-onto-main-001"
+      ],
+      "repo": null,
+      "created": "2026-07-24",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-24T09:21:11.520503+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-10T22:46:27.090808+00:00"
+    },
+    {
+      "id": "proposed-deprecate-burn-rate-gate-checkviii-001",
+      "name": "Deprecate Burn Rate Gate Checkviii 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `deprecate-burn-rate-gate-checkviii-001`. Last activity 2026-06-29T14:36:09.892362+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "deprecate-burn-rate-gate-checkviii-001"
+      ],
+      "repo": null,
+      "created": "2026-07-24",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-24T09:21:11.520503+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-29T14:36:09.892362+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-24T09:21:11.520503+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#750"
     }
   ]
 }
