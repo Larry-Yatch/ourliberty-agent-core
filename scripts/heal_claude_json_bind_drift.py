@@ -148,11 +148,12 @@ _PROBE_OK = 0       # opened O_RDWR cleanly → mount writable (healthy)
 _PROBE_EROFS = 2    # OSError errno == EROFS → mount dangled (repair)
 _PROBE_OTHER = 3    # any other OSError (e.g. ENOENT) → probe-error (no repair)
 # Not an nsenter exit code — a caller-side classification of a non-OK/non-EROFS
-# result where the target process has exited between MainPID enumeration and the
-# probe (a benign TOCTOU race on short-lived Type=simple units). nsenter fails
-# with ENOENT on /proc/<pid>/ns/mnt, indistinguishable at the exit-code level
-# from a real probe-blind failure — process liveness is the discriminator.
-_PROBE_GONE = 4     # target process exited mid-probe → benign skip (re-probe next tick)
+# result where the target's mount namespace is already gone (the process has
+# exited / is mid-reap between MainPID enumeration and the probe — a benign
+# TOCTOU race on short-lived Type=simple units). nsenter fails with ENOENT on
+# /proc/<pid>/ns/mnt, indistinguishable at the exit-code level from a real
+# probe-blind failure — /proc/<pid>/ns/mnt existence is the discriminator.
+_PROBE_GONE = 4     # target namespace already gone mid-probe → benign skip (re-probe next tick)
 
 # The in-namespace probe: open the file O_RDWR (write-intent, but NO create and
 # NO truncate) and close it immediately. On a read-only mount the open(2) itself
@@ -353,14 +354,20 @@ def target_main_pid(unit: str) -> Optional[int]:
 
 # -------------------- in-namespace write probe --------------------
 
-def _process_alive(pid: int) -> bool:
-    """True iff /proc/<pid> still exists — the target has not exited.
+def _namespace_probeable(pid: int) -> bool:
+    """True iff /proc/<pid>/ns/mnt still exists — the mount-namespace handle
+    nsenter needs is still present, so a non-OK/non-EROFS probe result reflects a
+    genuine failure to enter/probe rather than a vanished target.
 
-    Used to discriminate a benign mid-probe exit (short-lived Type=simple unit
-    whose process died between MainPID enumeration and the nsenter probe) from a
-    genuine probe-blind failure (process alive, but sudo/nsenter rejected).
+    This is the correct discriminator for the non-EROFS fallback: /proc/<pid>
+    existence is too coarse because a just-exited / zombie process retains its
+    /proc/<pid> dir during the kernel reaping window while its /proc/<pid>/ns/mnt
+    has ALREADY been released. Such a process satisfies os.path.exists('/proc/N')
+    yet has no namespace to enter — nsenter fails ENOENT on ns/mnt — which is a
+    benign mid-probe exit race, NOT a broken sudo/nsenter contract. Keying on
+    ns/mnt matches that failing signature directly and is locale-independent.
     """
-    return os.path.exists(f'/proc/{pid}')
+    return os.path.exists(f'/proc/{pid}/ns/mnt')
 
 
 def probe_namespace_writable(pid: int) -> int:
@@ -368,9 +375,10 @@ def probe_namespace_writable(pid: int) -> int:
 
     Returns one of _PROBE_OK / _PROBE_EROFS / _PROBE_OTHER / _PROBE_GONE. nsenter
     into another process's mount namespace needs CAP_SYS_ADMIN, hence `sudo -n`.
-    A non-OK/non-EROFS result is classified by target liveness: if the process
-    has exited (a benign TOCTOU race), _PROBE_GONE; otherwise _PROBE_OTHER — never
-    a dangle, so a blind healer cannot trigger a restart.
+    A non-OK/non-EROFS result is classified by namespace probeability: if the
+    target's /proc/<pid>/ns/mnt is already gone (a benign mid-probe exit/reap
+    race), _PROBE_GONE; otherwise _PROBE_OTHER — never a dangle, so a blind
+    healer cannot trigger a restart.
     """
     snippet = _PROBE_SNIPPET.format(path=CLAUDE_JSON_PATH)
     try:
@@ -392,17 +400,19 @@ def probe_namespace_writable(pid: int) -> int:
             f'({result.stderr.strip()[:120]})', 'WARN')
         return _PROBE_EROFS
     # Any other exit code (3 = non-EROFS OSError; 1 = sudo/nsenter rejection;
-    # 126/127 = exec failure). Before treating this as probe-blind, re-check
-    # target liveness: a short-lived Type=simple unit (e.g. ourliberty-cycle)
-    # can exit between MainPID enumeration and the probe, and nsenter then fails
-    # with ENOENT on /proc/<pid>/ns/mnt — a benign race, NOT a broken sudo/nsenter
-    # contract. Process gone → benign skip (re-probe next tick, INFO not WARN);
-    # process alive → genuine probe-blind (_PROBE_OTHER, WARN). Liveness is the
-    # robust primary signal; the ns/mnt-ENOENT stderr is only corroborating
-    # (locale/format-fragile), so we don't gate on it.
+    # 126/127 = exec failure). Before treating this as probe-blind, check whether
+    # the mount namespace nsenter needs is even still there: a short-lived
+    # Type=simple unit (e.g. ourliberty-cycle) can exit between MainPID
+    # enumeration and the probe, and nsenter then fails with ENOENT on
+    # /proc/<pid>/ns/mnt — a benign race, NOT a broken sudo/nsenter contract. A
+    # just-exited / zombie process retains /proc/<pid> during the reaping window
+    # while its /proc/<pid>/ns/mnt is already released, so we key on the ns/mnt
+    # handle (which is exactly what nsenter opens) rather than the coarser
+    # /proc/<pid> dir. ns/mnt gone → benign skip (re-probe next tick, INFO not
+    # WARN); ns/mnt present → genuine probe-blind (_PROBE_OTHER, WARN).
     stderr = result.stderr.strip()
-    if not _process_alive(pid):
-        log(f'probe pid={pid}: process exited mid-probe '
+    if not _namespace_probeable(pid):
+        log(f'probe pid={pid}: mount namespace gone mid-probe '
             f'(rc={result.returncode} stderr={stderr[:160]!r}); skipping, '
             f'will re-probe next tick', 'INFO')
         return _PROBE_GONE
@@ -566,7 +576,7 @@ def dm_probe_blind(unit: str) -> bool:
 def check_unit(unit: str, state: dict, now: Optional[float] = None) -> str:
     """Inspect one unit. Returns one of:
        'skip'            — not a persistent/active/carve-out unit, OR the target
-                           process exited mid-probe (benign race, no action).
+                           namespace vanished mid-probe (benign race, no action).
        'healthy'         — mount writable in namespace (no action).
        'probe-error'     — couldn't probe (sudo/nsenter); escalation (6h-gated).
        'rebound'         — dangle detected, restart succeeded + verified.
@@ -581,9 +591,10 @@ def check_unit(unit: str, state: dict, now: Optional[float] = None) -> str:
     if outcome == _PROBE_OK:
         return 'healthy'
     if outcome == _PROBE_GONE:
-        # Target exited between MainPID enumeration and the probe (benign TOCTOU
-        # race on a short-lived unit). Treat exactly like skip: no probe-blind
-        # DM, no escalation-cooldown state write — just re-probe next tick.
+        # Target's mount namespace vanished between MainPID enumeration and the
+        # probe (benign exit/reap race on a short-lived unit). Treat exactly like
+        # skip: no probe-blind DM, no escalation-cooldown state write — just
+        # re-probe next tick.
         return 'skip'
     if outcome == _PROBE_OTHER:
         # Blind on this unit. Escalate at most once per ESCALATION window so a
