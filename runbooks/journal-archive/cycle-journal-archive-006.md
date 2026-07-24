@@ -28782,3 +28782,65 @@ VERIFY: git status at 13:27Z UTC → `nothing to commit, working tree clean` (HE
 
 ---
 
+## Iteration ~6130 — 2026-07-23T13:47Z UTC (Larry /cycle chat, Tier 1 → Tier 2)
+
+**Health:** ✅ Nominal. Third consecutive clean Tier-1 iter → de-escalation to Tier 2. All checks NOMINAL.
+
+**VERIFY-BEFORE-REASSERT (from iter ~6129 at ~13:39Z UTC):**
+- **"daemons healthy (9 PIDs)"**: CONFIRMED — all 9 PIDs alive (1590654/SNs, 1590875+1591041+1591194/Ss×3, 1591274/Ss, 1971090/Ssl, 2437535/Ssl, 2438915/Ss, 2439513/Ss). NOMINAL ✅
+- **"sync NOMINAL, last_sync=2026-07-23T13:17:00Z UTC"**: CONFIRMED — still 13:17:00Z UTC (~30 min from 13:47Z check); within 2h; status=no-change. NOMINAL ✅
+- **"beacon-pending-approvals pending=0"**: CONFIRMED — pending=0, history=527. NOMINAL ✅
+- **"HEAD=153848bb=origin/main"**: UPDATED — HEAD=4432d21f=origin/main ("Pulse cycle 20260723T134059Z"; wrapper committed iter ~6129). On main; clean tree; 0 ahead, 0 behind. NOMINAL ✅
+- **"larry-alerts.jsonl watermark=727"**: CONFIRMED — repair-watermark: repaired=false (old=727, file_length=727). 0 new alerts. NOMINAL ✅
+- **"RSDPM #26/#27 carry — unrouted by-design"**: CONFIRMED — stall dry-run: both cooldown-suppressed. NOMINAL ✅
+- **"probe-blind:ourliberty-cycle.service"**: CARRY — no new info. [carry — no new DM]
+- **"check-vi-posture-proposals-2026-07-07 — 2 proposals"**: CARRY — no new artifact. [carry — no new DM]
+
+**NEW findings this iter:** None. All checks NOMINAL.
+
+**Check 0 — Alert triage (~13:47Z UTC):** repair-watermark: repaired=false (old=727, file_length=727). 0 new alerts since watermark=727. Watermark stays 727. NOMINAL ✅ [No tier-reset]
+
+**Check 1 — Log noise (~13:47Z UTC):** outbox-notifier.log: pre-restart WARNs (AUTO_MERGE_HELD_DEEP_REVIEW PR #1014 [Jul 22 23:39 MDT] + PR #1015 [Jul 23 01:22 MDT]) already resolved before restart at 02:17Z MDT; 0 WARN/ERROR since restart. journalctl --since "30 minutes ago": ourliberty-decision-outcome-reconcile (checked=27, errors=0) + ourliberty-sync-dispatch-repos (0 advanced) — both INFO-level expected entries. 0 WARN/ERROR. NOMINAL ✅
+
+**Check 2 — Telegram sweep (~13:47Z UTC):** Beacon bot PID 2439513 alive (Ss). Last Larry message: 2026-07-23T00:42:39-0600 MDT [06:42:39Z UTC] "where is pr 1015" (Beacon replied 06:43Z UTC). No new Larry messages in last ~7h. No orphan directives. NOMINAL ✅
+
+**Check 3 — Pipeline stall (~13:47Z UTC):** dry-run: all RSDPM tasks FORGE_NO_PR_SKIP (pr_exists — 26 RSDPM PRs mapped). unrouted_open_pr:RSDPM:26 and :27 suppressed (cooldown). "DRY-RUN: 0 alert(s) would fire, 0 recovery(ies) would be attempted." NOMINAL ✅
+
+**Check 4 — Pending directives (~13:47Z UTC):** All inboxes EMPTY (forge=0, beacon=0, mirror=0, pulse=0). beacon-pending-approvals: pending=0 (history=527). No orphan directives. NOMINAL ✅
+
+**Check 5 — Stale daemon code (~13:47Z UTC):** heartbeat=2026-07-23T13:40:29Z UTC (~7 min from check). Fresh (<60 min). All 9 daemon PIDs alive. NOMINAL ✅
+
+**Check A — Source repo:** HEAD=4432d21f=origin/main; on main; clean tree; 0 ahead, 0 behind. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-23T13:17:00Z UTC (~30 min from check); status=no-change; consecutive_push_failures=0. NOMINAL ✅
+**Check C — Agent liveness:** All 9 daemons alive (1590654/chain_event_shipper/SNs, 1590875+1591041+1591194/agent_telegram_bot×3/Ss, 1591274/spec_review_runner/Ss, 1971090/inbox_watcher/Ssl, 2437535/uvicorn/Ssl, 2438915/outbox_notifier/Ss, 2439513/beacon_telegram_bot/Ss). NOMINAL ✅
+**Check E — PR/merge state:** ourliberty-agent-core: 0 open PRs. RSDPM: #26 (fix/M1-definer-create-on-schema-public, MERGEABLE) and #27 (feat/M4-extractor-runpath, MERGEABLE) — Larry-authored, label-gated, unrouted by-design, cooldown active. NOMINAL ✅
+**Check H — Forge activity digest:** Pipeline idle post-RSDPM V0. 0 active Forge/Mirror sessions. outbox-notifier idle since 08:17Z UTC.
+
+**§5.0:** audit_due_nudge: no committed baseline; no-op. distill_detector: no un-distilled audits; no-op. audit_cadence_signal: no post-seed distill artifacts; no-op. NOMINAL ✅
+
+**Rotations:** SUPABASE_SERVICE_ROLE_KEY due=2026-08-22 (~30 days). 14-day dedup active; no new DM. [carry]
+
+**Conditional checks:**
+- **Check I:** OFF today (Thu 2026-07-23 UTC). Next fire: Fri 2026-07-24 (~14:13Z UTC).
+- **Check III:** OFF-WEEK — last artifact 2026-07-12; next fire 2026-07-27 (Sun).
+- Check IV/VI/IX/X: timer-managed. No new artifacts this iter.
+
+**G-rule assessment:** Active carries: forge-revision-preamble-missing (vp); forge-wip-redispatch-digest (vp); forge-wip-redispatch-exhausted-no-pr (vp); outbox-notifier-intent-reject (Forge vp); check-i-force-bypass-dm-route (2/3); auto-dispatch-APPROVAL_REQUEST-mismatch (vp). Sub-threshold: pr-merged-without-deep-review-shortcut-001 (1/3); mirror-ghost-retry-m5-pr2 (1/3); heal-stall-retry-exhausted-after-pr-merge (1/3). No new occurrences this iter.
+
+**Actions taken:**
+1. Check 0: repair-watermark no-op (repaired=false, old=727, file_length=727). 0 alerts triaged. Watermark stays 727.
+2. §5.0 one-shots: all no-ops.
+3. PRIME ledger: iter_clean appended (nominal-tier1; 13:47:36Z UTC). Trailing 30d: ratio=25.24 (systemic_fixes=70, verification_pending=33, trend=improving).
+4. Tier state: record --checks-clean true → consecutive_clean=3 → **Tier 1 → Tier 2** (de-escalation; consecutive_clean reset to 0; last_signal_at unchanged at 13:30:08Z UTC from iter ~6127).
+5. Watermark: stays 727 (no new alerts).
+
+**Escalations:**
+- [yellow] **probe-blind:ourliberty-cycle.service** — carry. Larry to decide if retire. [carry — no new DM]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — 2 proposals pending Larry approval (tighten_masking + stricter_unverifiable). [carry — no new DM]
+- **ourliberty-health-subject-key-mismatch translation gap**: fix dispatched to Beacon iter ~4488, still unverified ~1642 iters later. [carry — no new DM]
+
+**PRIME DIRECTIVE:** 0 interventions (clean iter). iter_clean logged. Trailing 30d: ratio=25.24 (systemic_fixes=70, verification_pending=33, trend=improving).
+**Tier end-of-iter:** **Tier 2** (de-escalated from Tier 1; consecutive_clean reset to 0; last_signal_at=13:30:08Z UTC; cadence now 15-min).
+
+---
+
