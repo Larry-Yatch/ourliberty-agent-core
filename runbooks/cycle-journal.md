@@ -2453,3 +2453,38 @@ Watermark advanced 739→742. NOMINAL ✅
 
 ---
 
+
+## Iter ~6250 — 2026-07-24T23:08Z UTC (Tier 3, consecutive_clean=34)
+**Health:** ✅ Nominal
+
+**Check 0 — Alert triage (~23:05Z UTC):** repair-watermark: no-op (watermark=657=file_length). No new alerts since watermark. NOMINAL ✅
+
+**Check 1 — Log noise (~23:06Z UTC):** systemd logs show only routine nsenter probes (heal-stale-daemon-code .claude.json writability checks). No WARN/ERROR above threshold. NOMINAL ✅
+
+**Check 2 — Telegram sweep (~23:06Z UTC):** Last beacon bot activity: idx=656 dispatch-branch-cleanup digest at 15:54 MDT (=21:54Z UTC). Last Larry message: 'go' at 19:14 MDT Jul 23 (=01:14Z UTC Jul 24). No orphan directives. URL error from 00:27Z UTC Jul 24 (~23h ago) self-resolved — subsequent deliveries confirmed normal. NOMINAL ✅
+
+**Check 3 — Pipeline stall (~23:05Z UTC):** FORGE_NO_PR_SKIP for heal-unreg-approval-guards-001/#1019, heal-bind-drift-probe-blind-fp-001/#1020, check-i-digest-weekly-dedup-001/#1021 (all pr_exists — merged PRs still matching branch skip, correct). No stalls detected. NOMINAL ✅
+
+**Check 4 — Pending directives (~23:05Z UTC):** beacon-pending-approvals: pending=0. All inboxes (forge/mirror/beacon) empty. NOMINAL ✅
+
+**Check 5 — Stale daemon code (~23:05Z UTC):** Heartbeat=2026-07-24T22:58:19Z UTC (~7 min old, fresh). All 9 daemon PIDs alive (1590654/SNs, 1590875+1591041+1591194/Ss×3, 1591274/Ss, 1971090/Ssl, 2437535/Ssl, 2438915/Ss, 2439513/Ss). NOMINAL ✅
+
+**Check A — Source repo:** HEAD=b3e80bebb5=origin/main; on main; clean tree; 0 ahead/behind. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-24T22:19:19Z UTC (~49 min from check); status=no-change; push_failures=0. Within 2h. NOMINAL ✅
+**Check C — Agent liveness:** All 9 daemons alive. NOMINAL ✅
+**Check E — PR/merge state:** 0 open PRs. NOMINAL ✅
+**Check H — Forge activity:** All inboxes empty. Pipeline fully drained. NOMINAL ✅
+
+**§5.0:** audit_due_nudge: no committed baseline; no-op. distill_detector: no-op. audit_cadence_signal: no-op. NOMINAL ✅
+
+**Conditional checks:**
+- Check I: Fired today (Friday 2026-07-24) at ~14:11Z UTC via systemd timer. Ledger week-of-2026-07-20: $392.22 total, −79.8% vs prior week. 1 proposal [small]: review cycle-202607151042380000 anomaly ($1.64 vs $0.87 baseline, 26.1σ). Delivered Telegram idx=653+654. Triaged in earlier iters; watermark already past. No new action this iter.
+- Check III: Last artifact 2026-07-12. Next fire: Sunday 2026-07-26. No new artifact. NOMINAL ✅
+
+**PRIME DIRECTIVE ratio:** systemic_fixes=63, verification_pending=28, ratio=27.49 (improving).
+
+**Rotations:** [carry] SUPABASE_SERVICE_ROLE_KEY due=2026-08-22 (~29d). 14-day dedup active; no DM.
+
+**Tier:** Tier 3 → consecutive_clean=34. No signals.
+**Did:** Nothing (nominal iter).
+**Escalations:** None.
