@@ -138,17 +138,17 @@ class ProbeMappingTests(unittest.TestCase):
             self.assertEqual(h.probe_namespace_writable(123), h._PROBE_EROFS)
 
     def test_rc3_is_other(self):
-        # Process alive (real in-namespace OSError) → genuine probe-error.
+        # Namespace present (real in-namespace OSError) → genuine probe-error.
         with mock.patch.object(h.subprocess, 'run', self._mock_run(3, stderr='2:No such file')), \
-             mock.patch.object(h, '_process_alive', return_value=True):
+             mock.patch.object(h, '_namespace_probeable', return_value=True):
             self.assertEqual(h.probe_namespace_writable(123), h._PROBE_OTHER)
 
     def test_sudo_rejection_rc1_is_other_never_erofs(self):
-        # sudo -n failing (NOPASSWD revoked) with the process alive must NOT read
-        # as a dangle — and must not read as a benign mid-probe exit either.
+        # sudo -n failing (NOPASSWD revoked) with the namespace still present must
+        # NOT read as a dangle — and must not read as a benign mid-probe exit.
         with mock.patch.object(h.subprocess, 'run',
                                self._mock_run(1, stderr='sudo: a password is required')), \
-             mock.patch.object(h, '_process_alive', return_value=True):
+             mock.patch.object(h, '_namespace_probeable', return_value=True):
             self.assertEqual(h.probe_namespace_writable(123), h._PROBE_OTHER)
 
     def test_timeout_is_other(self):
@@ -162,42 +162,66 @@ class ProbeMappingTests(unittest.TestCase):
                                self._mock_run(0, raises=FileNotFoundError())):
             self.assertEqual(h.probe_namespace_writable(123), h._PROBE_OTHER)
 
-    def test_ns_mnt_enoent_with_process_gone_is_probe_gone(self):
+    def test_ns_mnt_enoent_namespace_gone_is_probe_gone(self):
         # Arm (a): short-lived unit exited mid-probe. nsenter fails ENOENT on
-        # /proc/<pid>/ns/mnt AND the process is no longer alive → benign skip.
+        # /proc/<pid>/ns/mnt AND the namespace handle is gone → benign skip.
         stderr = ('nsenter: cannot open /proc/123/ns/mnt: '
                   'No such file or directory')
         with mock.patch.object(h.subprocess, 'run',
                                self._mock_run(1, stderr=stderr)), \
-             mock.patch.object(h, '_process_alive', return_value=False):
+             mock.patch.object(h, '_namespace_probeable', return_value=False):
             self.assertEqual(h.probe_namespace_writable(123), h._PROBE_GONE)
 
-    def test_ns_mnt_enoent_with_process_alive_is_other(self):
-        # Arm (b): same nsenter ENOENT stderr, but the process is STILL alive →
-        # genuine probe-blind (_PROBE_OTHER). Liveness, not stderr text, decides.
+    def test_ns_mnt_enoent_zombie_proc_lingers_is_probe_gone(self):
+        # Regression for the false positive this PR fixes: same nsenter ENOENT
+        # stderr, and even though /proc/<pid> still lingers as a zombie during
+        # the reaping window, its /proc/<pid>/ns/mnt is already released →
+        # _namespace_probeable False → benign _PROBE_GONE (NOT probe-blind). The
+        # old proc-dir liveness check misread this exact case as _PROBE_OTHER.
         stderr = ('nsenter: cannot open /proc/123/ns/mnt: '
                   'No such file or directory')
         with mock.patch.object(h.subprocess, 'run',
                                self._mock_run(1, stderr=stderr)), \
-             mock.patch.object(h, '_process_alive', return_value=True):
-            self.assertEqual(h.probe_namespace_writable(123), h._PROBE_OTHER)
+             mock.patch.object(h, '_namespace_probeable', return_value=False):
+            self.assertEqual(h.probe_namespace_writable(123), h._PROBE_GONE)
 
-    def test_sudo_rejection_process_alive_is_other(self):
-        # Arm (b), sudo-revoked variant: process alive, sudo -n rejected.
+    def test_genuine_blind_namespace_present_sudo_rejected_is_other(self):
+        # A truly blind probe on a LIVE unit: the namespace handle still exists
+        # but sudo -n is rejected (NOPASSWD revoked) → genuine _PROBE_OTHER, so a
+        # real "healer is blind" incident still escalates.
         with mock.patch.object(
                 h.subprocess, 'run',
                 self._mock_run(1, stderr='sudo: a password is required')), \
-             mock.patch.object(h, '_process_alive', return_value=True):
+             mock.patch.object(h, '_namespace_probeable', return_value=True):
             self.assertEqual(h.probe_namespace_writable(123), h._PROBE_OTHER)
 
 
-class ProcessAliveTests(unittest.TestCase):
-    def test_current_process_is_alive(self):
-        self.assertTrue(h._process_alive(os.getpid()))
+class NamespaceProbeableTests(unittest.TestCase):
+    def test_current_process_has_namespace(self):
+        self.assertTrue(h._namespace_probeable(os.getpid()))
 
-    def test_pid_1_over_9_digits_is_gone(self):
-        # A pid far above the kernel's pid_max has no /proc entry.
-        self.assertFalse(h._process_alive(2_000_000_123))
+    def test_pid_far_above_pid_max_is_not_probeable(self):
+        # A pid far above the kernel's pid_max has no /proc entry at all.
+        self.assertFalse(h._namespace_probeable(2_000_000_123))
+
+    def test_zombie_proc_dir_present_but_ns_mnt_gone_is_not_probeable(self):
+        # The discriminator must key on /proc/<pid>/ns/mnt, not /proc/<pid>: a
+        # zombie/mid-reap process keeps its proc dir while its namespace handle
+        # is already released. The helper reports NOT probeable even though the
+        # proc dir lingers — the whole point of the fix.
+        real_exists = os.path.exists
+
+        def fake_exists(p):
+            if p == '/proc/424242':
+                return True   # zombie proc dir still present
+            if p == '/proc/424242/ns/mnt':
+                return False  # namespace handle already gone
+            return real_exists(p)
+
+        with mock.patch.object(h.os.path, 'exists', side_effect=fake_exists):
+            self.assertFalse(h._namespace_probeable(424242))
+            # sanity: a proc-dir-only check WOULD have (wrongly) said alive here.
+            self.assertTrue(h.os.path.exists('/proc/424242'))
 
 
 # -------------------- carveout_present + target filtering --------------------
