@@ -735,7 +735,8 @@ class DmSuppressionTests(unittest.TestCase):
 class DmRouteTests(unittest.TestCase):
     """G-rule check-i-repeat-dm: the first scheduled run of a week DMs
     (route='escalate'); later same-week scheduled runs are silenced to
-    route='digest' (no repeat DM). --force always escalates.
+    route='digest' (no repeat DM) via the durable per-week state record.
+    --force always escalates.
     """
 
     def setUp(self):
@@ -770,7 +771,9 @@ class DmRouteTests(unittest.TestCase):
         )
 
     def _scheduled_argv(self, *extra: str) -> list[str]:
-        # No --force → exercises the journal-peek routing branch.
+        # No --force → exercises the durable-state routing branch. Point the
+        # dedup state file into this test's tmp so cases stay isolated (the
+        # module default lives on the shared sandbox state mount).
         return [
             "--week-ending", WEEK_ENDING,
             "--sidecar-dir", str(self.sidecar_dir),
@@ -778,11 +781,12 @@ class DmRouteTests(unittest.TestCase):
             "--output-dir", str(self.output_dir),
             "--journal", str(self.journal),
             "--halt-flag", str(self.halt_flag),
+            "--dm-sent-state-file", str(self.root / "dm-sent.json"),
             *extra,
         ]
 
     def test_first_scheduled_run_escalates_and_journals(self):
-        # Case (a): week not yet in the journal → escalate, block written.
+        # Case (a): no durable record for the week → escalate; block written.
         rc = pci.main(self._scheduled_argv())
         self.assertEqual(rc, 0)
         self.assertEqual(len(self.append_calls), 1)
@@ -792,32 +796,135 @@ class DmRouteTests(unittest.TestCase):
                       self.journal.read_text())
 
     def test_second_same_week_scheduled_run_routes_digest(self):
-        # Case (b): the second scheduled firing of the same week sees the
-        # header already journaled → digest (no repeat DM).
+        # Case (b): the second same-week firing sees the durable record from
+        # the first → digest (no repeat DM).
         self.assertEqual(pci.main(self._scheduled_argv()), 0)
         self.assertEqual(pci.main(self._scheduled_argv()), 0)
         self.assertEqual(len(self.append_calls), 2)
         self.assertEqual(self.append_calls[0].get("route"), "escalate")
         self.assertEqual(self.append_calls[1].get("route"), "digest")
 
-    def test_force_always_escalates_even_when_week_journaled(self):
-        # Case (c): journal the week first, then a --force run must still
-        # escalate — /optimize callers expect a reply regardless.
+    def test_force_always_escalates_even_when_week_recorded(self):
+        # Case (c): record the week first, then a --force run must still
+        # escalate — /optimize callers expect a reply regardless of state.
         self.assertEqual(pci.main(self._scheduled_argv()), 0)
         self.assertEqual(self.append_calls[0].get("route"), "escalate")
-        self.assertIn(f"**Check I ({WEEK_ENDING}):**",
-                      self.journal.read_text())
         self.assertEqual(pci.main(self._scheduled_argv("--force")), 0)
         self.assertEqual(len(self.append_calls), 2)
         self.assertEqual(self.append_calls[1].get("route"), "escalate")
 
     def test_no_journal_run_escalates(self):
-        # Case (d): --no-journal means the journal isn't the source of
-        # truth → preserve current behavior (escalate).
+        # Case (d): --no-journal is orthogonal to the durable-state route;
+        # a first firing with no record still escalates.
         rc = pci.main(self._scheduled_argv("--no-journal"))
         self.assertEqual(rc, 0)
         self.assertEqual(len(self.append_calls), 1)
         self.assertEqual(self.append_calls[0].get("route"), "escalate")
+
+
+class DmDurableDedupTests(unittest.TestCase):
+    """retrospective-pulse-check-i-2026-07-20: the escalate-vs-digest routing
+    keys on a DURABLE per-week record on ~/agents/state/ (not the uncommitted
+    cycle-journal.md, which rotates/uncommits between the four independent
+    weekly timer firings). Enforces "<=1 escalate DM per week_ending".
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.sidecar_dir = self.root / "ledger"
+        self.outbox_root = self.root / "outboxes"
+        self.output_dir = self.root / "out"
+        self.journal = self.root / "cycle-journal.md"
+        self.halt_flag = self.root / "halt-not-set"
+        self.dm_state = self.root / "dm-sent.json"
+        self.sidecar_dir.mkdir(parents=True)
+
+        self.append_calls: list[dict] = []
+        outer = self
+
+        class _FakeLarryAlerts:
+            @staticmethod
+            def append_alert(**kwargs):
+                outer.append_calls.append(kwargs)
+                return True
+
+        self._sys_modules_patch = mock.patch.dict(
+            sys.modules, {"larry_alerts": _FakeLarryAlerts}
+        )
+        self._sys_modules_patch.start()
+        self.addCleanup(self._sys_modules_patch.stop)
+
+        self._write_signal_sidecar(WEEK_ENDING)
+
+    def _write_signal_sidecar(self, week_ending: str) -> None:
+        # Retry overhead 22% → proposal → digest mode → DM fires.
+        (self.sidecar_dir / f"weekly-{week_ending}.json").write_text(
+            json.dumps(_sidecar(retry_pct=22.0, retry_usd=3.0))
+        )
+
+    def _argv(self, week_ending: str, *extra: str) -> list[str]:
+        return [
+            "--week-ending", week_ending,
+            "--sidecar-dir", str(self.sidecar_dir),
+            "--outbox-root", str(self.outbox_root),
+            "--output-dir", str(self.output_dir),
+            "--journal", str(self.journal),
+            "--halt-flag", str(self.halt_flag),
+            "--dm-sent-state-file", str(self.dm_state),
+            *extra,
+        ]
+
+    def _routes(self) -> list[str]:
+        return [c.get("route") for c in self.append_calls]
+
+    def test_four_same_week_firings_emit_exactly_one_escalate(self):
+        # Success criterion 1: a simulated Mon/Wed/Fri/Sun week emits exactly
+        # ONE escalate DM; the other three route digest. Between each firing
+        # the journal is rotated away (the production defect) to prove the
+        # durable state file — not the journal — is what de-dupes.
+        argv = self._argv(WEEK_ENDING)
+        for _ in range(4):
+            if self.journal.exists():
+                self.journal.unlink()  # simulate rotation/uncommit between runs
+            self.assertEqual(pci.main(argv), 0)
+        routes = self._routes()
+        self.assertEqual(len(routes), 4, routes)
+        self.assertEqual(routes.count("escalate"), 1, routes)
+        self.assertEqual(routes.count("digest"), 3, routes)
+        self.assertEqual(routes[0], "escalate", routes)
+
+    def test_new_week_ending_resets_and_escalates_once(self):
+        # Success criterion 2: a different week_ending has no record → escalate
+        # exactly once for the new week.
+        self.assertEqual(pci.main(self._argv(WEEK_ENDING)), 0)
+        self.assertEqual(pci.main(self._argv(WEEK_ENDING)), 0)  # → digest
+        week_b = "2026-05-25"
+        self._write_signal_sidecar(week_b)
+        self.assertEqual(pci.main(self._argv(week_b)), 0)
+        self.assertEqual(pci.main(self._argv(week_b)), 0)  # → digest
+        self.assertEqual(
+            self._routes(), ["escalate", "digest", "escalate", "digest"]
+        )
+
+    def test_force_always_escalates_regardless_of_state(self):
+        # Success criterion 3: --force always escalates even with a record.
+        self.assertEqual(pci.main(self._argv(WEEK_ENDING)), 0)  # records week
+        self.assertEqual(self.append_calls[0].get("route"), "escalate")
+        self.assertEqual(pci.main(self._argv(WEEK_ENDING, "--force")), 0)
+        self.assertEqual(pci.main(self._argv(WEEK_ENDING, "--force")), 0)
+        self.assertEqual(self._routes(), ["escalate", "escalate", "escalate"])
+
+    def test_state_read_failure_fails_open_to_escalate(self):
+        # Success criterion 4: a state read/write failure fails OPEN → escalate.
+        # Point the state file at a directory so both the read (open() on a
+        # dir) and the write (atomic replace onto a dir) raise → the record
+        # never persists → every firing re-escalates rather than dropping.
+        self.dm_state.mkdir()
+        self.assertEqual(pci.main(self._argv(WEEK_ENDING)), 0)
+        self.assertEqual(pci.main(self._argv(WEEK_ENDING)), 0)
+        self.assertEqual(self._routes(), ["escalate", "escalate"])
 
 
 class WeekdayGateTests(unittest.TestCase):
