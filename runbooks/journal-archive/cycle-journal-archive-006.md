@@ -30376,3 +30376,82 @@ Both rows resolved. Watermark advanced to 730. NOMINAL ✅ [No tier-reset — al
 
 ---
 
+## Iteration ~6155 — 2026-07-24T00:21Z UTC (Larry /cycle chat, Tier 3→1 TIER-RESET)
+
+**Health:** ⚠️ Tier-reset. Tier 3→**1** (Check 4: beacon-pending-approvals pending=1, stale approval for m3-pr2 re-dispatch; m3-pr2 already merged). All other checks NOMINAL. 2 new alerts (both Tier 3 silence). 9 daemons alive. 0 open PRs across all T0 repos.
+
+**VERIFY-BEFORE-REASSERT (from iter ~6154 at ~23:54Z UTC):**
+- **"daemons healthy (9 PIDs)"**: CONFIRMED — all 9 PIDs alive (1590654/SNs, 1590875+1591041+1591194/Ss×3, 1591274/Ss, 1971090/Ssl, 2437535/Ssl, 2438915/Ss, 2439513/Ss). NOMINAL ✅
+- **"sync NOMINAL, last_sync=2026-07-23T23:17:27Z UTC"**: UPDATED — now 2026-07-24T00:17:29Z UTC (~3 min from check); within 2h; status=no-change; consecutive_push_failures=0. NOMINAL ✅
+- **"beacon-pending-approvals pending=0"**: UPDATED — pending=1 (unreg-approval-ce90b1a4c981 created 00:01:13Z UTC by heal-unregistered-approval). NEW finding — stale approval. [yellow]
+- **"HEAD=8ffbd580=origin/main"**: UPDATED — HEAD now eec113b5 ("chore(missions): autoregister healer — reconcile proposed lane"; auto-committed by heal_orphan_autoregister at 00:00:35Z UTC via wrapper after iter ~6154). On main; clean tree; 0 ahead, 0 behind. NOMINAL ✅
+- **"larry-alerts.jsonl watermark=733"**: UPDATED — repair-watermark: repaired=false (old=733, file_length=735). 2 new alerts triaged (both Tier 3 silence); watermark advanced to 735. NOMINAL ✅
+- **"RSDPM 0 open PRs / dashboard 0 open PRs"**: CONFIRMED — RSDPM: 0 open PRs (PR #29 also merged 22:04:29Z UTC Jul 23). dashboard: 0 open PRs. agent-core: 0 open PRs. NOMINAL ✅
+- **"probe-blind:ourliberty-cycle.service"**: CARRY — no new info. [carry — no new DM]
+- **"check-vi-posture-proposals-2026-07-07 — 2 proposals"**: CARRY — no new artifact. [carry — no new DM]
+- **"PR #1018 fully merged"**: CONFIRMED — pipeline complete. No change. NOMINAL ✅
+
+**NEW findings this iter:**
+1. **[yellow] beacon-pending-approvals pending=1 (stale)** — `unreg-approval-ce90b1a4c981` created at 00:01:13Z UTC by heal-unregistered-approval, promoting a missed marker from iter ~6040. Plan summary: "Approve = Ask Beacon to re-dispatch m3-pr2; Reject = verify APPROVAL_REQUEST marker location." BUT m3-pr2 (RSDPM PR #25: "feat(M3): PR-2 Resend inbound email route + Svix verify + MIME assembly") **already merged 2026-07-23T06:00:19Z**. Approval is obsolete. Recommend: REJECT via Dashboard Approvals tab. DM'd via larry_alerts (warning/needs_larry). Tier-reset to 1.
+2. **missions-autoregister commit eec113b5 (00:00:35Z UTC)** — heal_orphan_autoregister auto-committed: flagged-stuck=2 (`proposed-land-pr854-sentinel-stall-flaky-gate-001`, `proposed-mirror-review-pr-ourliberty-dashboard-114` sat >14d with no shipped-PR match). Alert line 734 (Tier 3 silence; route=digest/FYI). These 2 proposed missions need Larry's keep/drop decision. Journal note only — missions healer handled the autoregister.
+
+**Check 0 — Alert triage (~00:21Z UTC):** repair-watermark: repaired=false (old=733, file_length=735). 2 new alerts (lines 734-735):
+- L734: source=missions-autoregister, subject=proposed:needs-decision, tier_source=translation → Tier 3 silence (known-pattern). Journal note: 2 proposed missions flagged-stuck (see finding #2). Watermark stays at 735 post-advance.
+- L735: source=doorbell, kind=notification, intent=doorbell → Tier 3 silence (known-pattern). Corresponds to unreg-approval-ce90b1a4c981 already in beacon-pending-approvals. No additional DM from Check 0 (doorbell already delivered to dashboard).
+Watermark advanced from 733 → 735. NO tier-reset from Check 0 (both Tier 3). NOMINAL ✅
+
+**Check 1 — Log noise (~00:21Z UTC):** outbox-notifier.log: last entry 17:42:08 MDT [23:42:08Z UTC] Jul 23 (AUTO_MERGE_WORKTREE_TEARDOWN + marker-notified for actionable-alerts-reach-approvals-tab-001). inbox_watcher.log: last entry 23:42:40Z UTC (beacon notify done for actionable-alerts-reach-approvals-tab-001). All INFO. 0 new unresolved WARNs. NOMINAL ✅
+
+**Check 2 — Telegram sweep (~00:21Z UTC):** Beacon bot PID 2439513 alive. Last Larry message: 16:31:40 MDT [22:31:40Z UTC] "Go" (captured iter ~6151; unchanged). No new Larry messages. No orphan directives. NOMINAL ✅
+
+**Check 3 — Pipeline stall (~00:21Z UTC):** heal_pipeline_stall dry-run: FORGE_NO_PR_SKIP for m1-amend-quote-redact/#24, m5-pr2/#18, m3-pr2/#25, heal-unrouted-owner-pr-nudge-001/#1016 (all pr_exists). "no stalls detected." NOMINAL ✅
+
+**Check 4 — Pending directives (~00:21Z UTC):** beacon-pending-approvals: **pending=1** (unreg-approval-ce90b1a4c981 — STALE; m3-pr2 RSDPM PR #25 already merged). NON-NOMINAL → `ask-then-do` + tier-reset. Forge inbox: build-actionable-alerts-reach-approvals-tab-001.json (lingering post-merge; PR #1018 merged 23:42:07Z UTC; pending inbox_watcher archive). All other inboxes EMPTY (beacon=0, mirror=0, pulse=0). [yellow] escalated to Larry.
+
+**Check 5 — Stale daemon code (~00:21Z UTC):** heartbeat=2026-07-24T00:16:49Z UTC (~4 min from check). Fresh (<60 min). All 9 daemon PIDs alive. heal-stale-daemon-code-state.json absent (no stale daemons). cooldowns=1. NOMINAL ✅
+
+**Check A — Source repo:** HEAD=eec113b5=origin/main; on main; clean tree; 0 ahead, 0 behind. New commit eec113b5 already at origin (auto-committed by heal_orphan_autoregister). No ff needed. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-24T00:17:29Z UTC (~3 min from check); status=no-change; consecutive_push_failures=0. Within 2h threshold. NOMINAL ✅
+**Check C — Agent liveness:** All 9 daemons alive (1590654/chain_event_shipper/SNs, 1590875+1591041+1591194/agent_telegram_bot×3/Ss, 1591274/spec_review_runner/Ss, 1971090/inbox_watcher/Ssl, 2437535/uvicorn/Ssl, 2438915/outbox_notifier/Ss, 2439513/beacon_telegram_bot/Ss). NOMINAL ✅
+**Check E — PR/merge state:** agent-core: 0 open PRs. RSDPM: 0 open PRs (PR #29 merged 22:04:29Z UTC Jul 23). dashboard: 0 open PRs. NOMINAL ✅
+**Check H — Forge activity digest:** Forge inbox: build-actionable-alerts-reach-approvals-tab-001.json (active Forge session completed; PR #1018 merged; pending inbox_watcher archive). Note: inbox_watcher logged no [forge] done line for this task (resume+worktree path; completion tracked via AUTO_MERGE_WORKTREE_TEARDOWN in outbox-notifier). All other inboxes empty. System idle.
+
+**§5.0:** audit_due_nudge: no committed baseline; no-op. distill_detector: no un-distilled audits; no-op. audit_cadence_signal: no post-seed distill artifacts; no-op. NOMINAL ✅
+
+**Rotations:** SUPABASE_SERVICE_ROLE_KEY due=2026-08-22 (~29 days). 14-day dedup active; no new DM. [carry]
+
+**Conditional checks:**
+- **Check I:** Fri 2026-07-24 UTC is a firing day (Mon/Wed/Fri/Sun). Timer fires ~14:13Z UTC (~14h from this iter). No new artifact yet (latest: check-i-2026-07-22.json). Will surface when timer fires. [pending timer]
+- **Check III:** OFF-WEEK — last artifact 2026-07-12; next fire 2026-07-27 (Sun).
+- Check IV/VI/IX/X: timer-managed. No new artifacts this iter.
+
+**G-rule assessment:** Active carries: forge-revision-preamble-missing (vp); forge-wip-redispatch-digest (vp); forge-wip-redispatch-exhausted-no-pr (vp); outbox-notifier-intent-reject (Forge vp); check-i-force-bypass-dm-route (2/3); auto-dispatch-APPROVAL_REQUEST-mismatch (vp). Sub-threshold: pr-merged-without-deep-review-shortcut-001 (1/3); mirror-ghost-retry-m5-pr2 (1/3); heal-stall-retry-exhausted-after-pr-merge (1/3); forge-marker-taskid-suffix-increment-001 (1/3). MalformedForgeMarker WARN (1/3). **New sub-threshold:** stale-pending-approval-from-heal-unregistered-approval (1/3) — if recurs 2 more times, propose systemic fix to clean up stale approvals automatically. No changes to active G-rules.
+
+**Actions taken:**
+1. Check 0: triaged 2 alerts (L734 missions-autoregister Tier 3, L735 doorbell Tier 3). Watermark 733 → 735.
+2. Check 4: [yellow] escalation appended to larry_alerts (warning/needs_larry) for stale pending approval unreg-approval-ce90b1a4c981.
+3. §5.0 one-shots: all no-ops.
+4. PRIME ledger: intervention appended (stale-pending-approval; tier=1). Trailing 30d: ratio=26.64 (systemic_fixes=66, verification_pending=32, trend=improving).
+5. Tier state: record --checks-clean false → tier-reset 3→1 (consecutive_clean=0; last_signal_at=2026-07-24T00:25:40Z UTC).
+
+**Escalations:**
+- [yellow] **Stale pending approval unreg-approval-ce90b1a4c981** — m3-pr2 (RSDPM PR #25) already merged 2026-07-23T06:00:19Z. REJECT via Dashboard Approvals tab. DM sent via larry_alerts. [NEW]
+- [yellow] **2 proposed missions flagged-stuck >14d** — `proposed-land-pr854-sentinel-stall-flaky-gate-001` + `proposed-mirror-review-pr-ourliberty-dashboard-114` need keep/drop decision. [yellow] [new — first appearance, no DM; route=digest]
+- [yellow] **probe-blind:ourliberty-cycle.service** — carry. Larry to decide if retire. [carry — no new DM]
+- [yellow] **check-vi-posture-proposals-2026-07-07** — 2 proposals pending Larry approval (tighten_masking + stricter_unverifiable). [carry — no new DM]
+- **ourliberty-health-subject-key-mismatch translation gap**: fix dispatched to Beacon iter ~4488, still unverified ~1667 iters later. [carry — no new DM]
+
+**PRIME DIRECTIVE:** 1 intervention (stale-pending-approval; Check 4 non-nominal). Trailing 30d: ratio=26.64 (systemic_fixes=66, verification_pending=32, trend=improving).
+**Tier end-of-iter:** **Tier 1** (tier-reset from 3; consecutive_clean=0; last_signal_at=2026-07-24T00:25:40Z UTC).
+
+---
+
+
+**Check I (2026-07-20):**
+
+- Ledger total: $392.22; 80 anomaly(ies)
+- Retry overhead: $0.00 (0.0%)
+- Forge marker-discipline: 0 misses (retry-depth 0/0/0, 0% retry-2+), trend flat (+0 vs prior wk)
+- Mode: digest — 1 proposal(s):
+  1. [small] Review high-σ anomaly task `cycle-202607151042380000` — $1.64 task vs $0.87 baseline (26.1σ above)
+     Rationale: Ledger flagged this task at 26.1σ above baseline. Read the chain archive and propose either: a fast-path for the shape, a prompt-discipline fix, or a model downgrade if the depth wasn't warranted.
