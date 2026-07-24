@@ -719,3 +719,19 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 **State:** Larry approved kickoff-rsdpm-v0-001 at 05:54:19Z UTC 2026-07-22 (Telegram 'Go'). outbox-notifier dispatched to `/home/larry/agents/blackboard/build-sequences/rsdpm-v0-001.json`; kickoff immediately failed: `spec_doc BUILD_PLAN.md not found in the working copy or on origin/main`. This is the build-sequence layer blocking — distinct from the earlier DAG-preflight layer (Mirror REVISION / cross-repo spec_doc guard false-negative). The rsdpm-v0-001.json has `spec_doc: "BUILD_PLAN.md"` which outbox-notifier requires on origin/main before dispatching step m1-pr1. Alert line 850, Tier-4 triaged this iter. **Actionable: Beacon must author + merge BUILD_PLAN.md to origin/main; then Larry re-dispatches kickoff-rsdpm-v0-001.** The 'A' part of Larry's "B then A" decision (the cross-repo DAG-preflight fix) has not yet manifested as a directive.
 
+---
+
+## G-rule stale-pending-approval-from-heal-unregistered-approval — DISPATCHED ✅ (iter ~6157, verification_pending)
+
+**Rule:** heal-unregistered-approval generates unreg-approval entries that are immediately stale or that create a meta-loop. Two patterns observed across iters ~6155–6157:
+
+1. **Stale-PR approvals**: Healer created unreg-approval-ce90b1a4c981 for m3-pr2 re-dispatch after RSDPM PR #25 was already merged (2026-07-23T06:00:19Z). The missed-marker was for completed work — approval was obsolete on creation.
+
+2. **Meta-loop**: At iter ~6157, heal-unregistered-approval created unreg-approval-a75741feced6 from Pulse's own `source=pulse, subject=stale-pending-approval-*` escalation alert (an operational DM, not an APPROVAL_REQUEST marker). This created a second approval about the first approval.
+
+**Fix dispatched (3/3, iter ~6157):** `direction-ask-unregistered-approval-stale-pr-meta-loop-001.json` → Beacon inbox. Proposed two guards in `scripts/heal_unregistered_approval.py`: (1) Guard 1 — SKIP_MERGED_PR: check PR merge status before creating an approval for a missed marker; (2) Guard 2 — SKIP_PULSE_SOURCE: filter `source=pulse` alerts from the healer pipeline. Estimated effort: small (<30 lines + tests). verification_pending.
+
+**Escalation carry:** Both stale approvals (ce90b1a4c981 + a75741feced6) need REJECT via Dashboard Approvals tab.
+
+Occurrences: iter ~6155 (1/3); iter ~6156 (2/3); iter ~6157 (3/3 + meta-loop new pattern, DISPATCHED).
+
