@@ -10939,6 +10939,23 @@
       "retired_at": "2026-07-24T09:21:11.520503+00:00",
       "retired_reason": "orphan-terminal",
       "retired_signal": "pr_merged:#750"
+    },
+    {
+      "id": "proposed-rebase-forge-post-open-mergeable-687-001",
+      "name": "Rebase Forge Post Open Mergeable 687 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `rebase-forge-post-open-mergeable-687-001`. Last activity 2026-06-25T06:00:10.559365+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "rebase-forge-post-open-mergeable-687-001"
+      ],
+      "repo": null,
+      "created": "2026-07-24",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-24T15:54:10.124975+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-06-25T06:00:10.559365+00:00"
     }
   ]
 }
