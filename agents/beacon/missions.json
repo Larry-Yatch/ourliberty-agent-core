@@ -10955,7 +10955,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-24T15:54:10.124975+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-06-25T06:00:10.559365+00:00"
+      "orphan_last_activity_ts": "2026-06-25T06:00:10.559365+00:00",
+      "briefing": {
+        "what": "A piece of automation your team built to let the system untangle its own traffic jams is finished and just needs a final sign-off to go live.",
+        "why": "This work has been stuck waiting on something else for hours, and once it's in, this whole category of hold-ups fixes itself automatically going forward.",
+        "suggest": "Give it the green light to finish and go live, but have someone confirm it's working cleanly right after before moving on."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-24T16:04:26.614616+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
