@@ -117,6 +117,13 @@ DEFAULT_DISPATCH_STATE_FILE = _AGENTS / "state" / "pulse-check-i-dispatched.json
 # mirroring DEFAULT_DISPATCH_STATE_FILE. Keys on _proposal_dedup_key; records
 # the returned capture_id so DM suppression is earned by durable capture.
 DEFAULT_PARKED_STATE_FILE = _AGENTS / "state" / "pulse-check-i-parked.json"
+# Durable once-per-week dedup for the escalate-routed digest DM, keyed by
+# `week_ending`. Mirrors DEFAULT_DISPATCH_STATE_FILE and lives on the same
+# ~/agents/state/ mount so it survives the git resets / journal rotation that
+# happen between the four independent weekly timer-service firings — which an
+# uncommitted repo file (runbooks/cycle-journal.md) does not. This state, not
+# the journal header, is the source of truth for escalate-vs-digest routing.
+DEFAULT_DM_SENT_STATE_FILE = _AGENTS / "state" / "pulse-check-i-dm-sent.json"
 
 
 # --- IO helpers ---
@@ -822,6 +829,39 @@ def _save_dispatch_state(path: Path, state: dict[str, dict[str, Any]]) -> None:
         print(f"[pulse-check-i] WARN: dispatch state write failed ({e})")
 
 
+def _load_dm_sent_state(path: Path) -> dict[str, dict[str, Any]]:
+    """Read the durable per-week DM-sent record. Fail-open on any error — an
+    unreadable/missing record means "not sent this week yet", so the DM routes
+    escalate (over-notifying once beats silently dropping a week's only real
+    DM). Returns {week_ending: {sent_at}}.
+    """
+    if not path.exists():
+        return {}
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data if isinstance(data, dict) else {}
+    except (json.JSONDecodeError, OSError) as e:
+        print(f"[pulse-check-i] WARN: DM-sent state read failed ({e}); "
+              f"treating as empty (routing escalate)")
+        return {}
+
+
+def _mark_dm_sent(path: Path, week_ending: str, now: datetime) -> None:
+    """Record that this week's escalate DM was sent. Best-effort + atomic,
+    mirroring _save_dispatch_state — a failed write logs a WARN but does not
+    propagate (the DM already queued; a missed record just means the next
+    same-week firing re-escalates, which is recoverable over-notification,
+    never a silent drop).
+    """
+    state = _load_dm_sent_state(path)
+    state[week_ending] = {"sent_at": now.isoformat()}
+    try:
+        _atomic_write(path, json.dumps(state, indent=2) + "\n")
+    except OSError as e:
+        print(f"[pulse-check-i] WARN: DM-sent state write failed ({e})")
+
+
 def _is_within_dedup_window(
     entry: dict[str, Any], now: datetime, window_days: int,
 ) -> bool:
@@ -1495,6 +1535,13 @@ def main(argv: Optional[list[str]] = None) -> int:
         help="Dedup state file for parked proposals (Contract B §5.2).",
     )
     p.add_argument(
+        "--dm-sent-state-file",
+        default=str(DEFAULT_DM_SENT_STATE_FILE),
+        help="Durable per-week dedup state file for the escalate-routed "
+             "digest DM. Keyed by week_ending; source of truth for "
+             "escalate-vs-digest routing.",
+    )
+    p.add_argument(
         "--dispatch",
         type=int,
         metavar="N",
@@ -1648,26 +1695,30 @@ def main(argv: Optional[list[str]] = None) -> int:
         dm_result = "suppressed (no signal, scheduled run)"
     else:
         # Route the DM so the same weekly digest isn't DM'd 4-5×/week. The
-        # predicate mirrors append_journal's dedup exactly: is this week's
-        # `**Check I (YYYY-MM-DD):**` header already in the journal? The
-        # journal is written AFTER this DM, so the first scheduled run of a
-        # week sees the week absent → escalate (DM now), and every later
-        # same-week scheduled run sees it present → digest (no DM; the daily
-        # CEO digest still surfaces it).
-        #   - --force (on-demand /optimize): always escalate — Larry expects
-        #     a reply regardless of journal state.
-        #   - --no-journal / missing journal / read failure: escalate
-        #     (fail-loud — a routing slip must over-notify, never drop).
+        # source of truth is a DURABLE per-week record on ~/agents/state/
+        # (DEFAULT_DM_SENT_STATE_FILE), keyed by `week_ending`, mirroring the
+        # auto-dispatch dedup. It survives the git resets / journal rotation
+        # between the four independent weekly timer-service firings — which an
+        # uncommitted repo file (cycle-journal.md) does not, so the old
+        # journal-header peek re-escalated on every firing (the defect this
+        # replaces).
+        #   - No record for week_ending (first firing, OR a fail-open empty
+        #     read) → escalate (DM now) + record the send.
+        #   - Record present → digest (no escalate DM; the daily CEO digest
+        #     still surfaces it).
+        #   - New week_ending → no record → escalate once, then record.
+        #   - --force (on-demand /optimize): always escalate — Larry expects a
+        #     reply regardless of state.
+        #   - State read/write failure: fail OPEN → escalate (a routing slip
+        #     must over-notify, never drop; matches the dispatch-state
+        #     fail-open contract).
+        dm_state_path = Path(args.dm_sent_state_file)
         dm_route = "escalate"
-        if not args.force and not args.no_journal:
-            try:
-                if journal_path.exists():
-                    journal_text = journal_path.read_text(encoding="utf-8")
-                    if week_ending in _CHECK_I_HEADER_RE.findall(journal_text):
-                        dm_route = "digest"
-            except Exception as e:  # noqa: BLE001 — never silently suppress
-                print(f"[pulse-check-i] WARN: journal read for DM route "
-                      f"crashed ({type(e).__name__}: {e}); routing escalate")
+        if not args.force:
+            # _load_dm_sent_state fails open to {} on any error, so a read
+            # failure leaves week_ending absent → escalate.
+            if week_ending in _load_dm_sent_state(dm_state_path):
+                dm_route = "digest"
         try:
             sys.path.insert(0, str(Path(__file__).resolve().parent))
             import larry_alerts  # type: ignore
@@ -1681,6 +1732,12 @@ def main(argv: Optional[list[str]] = None) -> int:
             dm_result = f"queued (route={dm_route})" if ok else (
                 "cooldown-suppressed or write failed"
             )
+            # Earn the dedup only on an accepted escalate send: record so later
+            # same-week firings route digest. A cooldown-suppressed / failed
+            # queue write (ok=False) must NOT record — else the week's only
+            # real DM would be silently dropped.
+            if ok and dm_route == "escalate":
+                _mark_dm_sent(dm_state_path, week_ending, now)
         except Exception as e:  # noqa: BLE001
             dm_result = f"larry_alerts unavailable ({e})"
 
