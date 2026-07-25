@@ -11340,7 +11340,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-25T00:11:59.863725+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-23T03:52:01.214993+00:00"
+      "orphan_last_activity_ts": "2026-07-23T03:52:01.214993+00:00",
+      "briefing": {
+        "what": "Your team started a small piece of work to hide sensitive quote details before they're sent out, but it isn't attached to any active project yet.",
+        "why": "Making sure private numbers don't leak into customer-facing quotes protects your reputation and keeps you clear of costly disclosure mistakes.",
+        "suggest": "Have someone confirm which project this belongs to and whether it's still needed before letting it go further, so it doesn't ship half-finished."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-25T00:29:50.188501+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-dispatch-m5-pr2-revision",
@@ -11357,7 +11371,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-25T00:11:59.863725+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-23T03:51:25.659778+00:00"
+      "orphan_last_activity_ts": "2026-07-23T03:51:25.659778+00:00",
+      "briefing": {
+        "what": "A revision to a piece of work your team recently kicked off that hasn't yet been tied to a specific project or goal.",
+        "why": "Unassigned work can quietly consume time and effort without clearly advancing anything the business is prioritizing.",
+        "suggest": "Take a moment to confirm this is worth continuing and connect it to a real goal before the team invests more into it."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-25T00:29:50.188501+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-m5-pr2-mirror-escalate-stalled-66min",
@@ -11374,7 +11402,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-25T00:11:59.863725+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-22T22:27:25.284524+00:00"
+      "orphan_last_activity_ts": "2026-07-22T22:27:25.284524+00:00",
+      "briefing": {
+        "what": "A piece of work the team picked up on their own has been sitting stuck for a little over an hour, waiting on a review that never moved.",
+        "why": "Every hour it sits idle is stalled progress and a sign the work may be drifting without a clear owner or goal behind it.",
+        "suggest": "Take a quick look to confirm it's worth finishing and give it a home before deciding whether to push it forward or set it aside."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-25T00:29:50.188501+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-cycle-fix-forge-marker-task-id-prefix-mismatch-001",
@@ -11391,7 +11433,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-25T00:11:59.863725+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-22T20:25:27.367394+00:00"
+      "orphan_last_activity_ts": "2026-07-22T20:25:27.367394+00:00",
+      "briefing": {
+        "what": "Some in-house automation was started to fix a small mismatch that was causing a few internal handoffs to miss each other.",
+        "why": "Left unfinished, it can quietly drop work items between systems, which means missed steps and wasted rework down the line.",
+        "suggest": "Worth finishing, but have someone confirm it's working end-to-end before we count on it \u2014 take a quick look before sign-off."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-25T00:29:50.188501+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-seq-rsdpm-v0-001",
@@ -11408,7 +11464,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-25T00:11:59.863725+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-22T20:15:56.821033+00:00"
+      "orphan_last_activity_ts": "2026-07-22T20:15:56.821033+00:00",
+      "briefing": {
+        "what": "A new piece of work your team kicked off on its own that hasn't been tied to a specific project or goal yet.",
+        "why": "Unassigned work can quietly consume time and money without a clear payoff, and right now it's waiting on your say-so to move forward.",
+        "suggest": "Take a quick look to confirm it's worth pursuing before greenlighting it \u2014 if the purpose isn't clear, pause it until someone explains what it's for."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-25T00:29:50.188501+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-delegate-retrospective-ledger-weekly-2026-07-20",
@@ -11425,7 +11495,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-25T00:11:59.863725+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-22T18:08:55.925872+00:00"
+      "orphan_last_activity_ts": "2026-07-22T18:08:55.925872+00:00",
+      "briefing": {
+        "what": "A weekly review of how the team's delegated work is going, started on its own without being connected to a bigger initiative yet.",
+        "why": "Regular check-ins like this can catch problems early and keep the team aligned, but loose work that isn't tied to a goal can also quietly drift and eat time.",
+        "suggest": "Take a quick look to confirm it's worth continuing, and if so, attach it to a clear goal before it grows further."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-25T00:29:50.188501+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
