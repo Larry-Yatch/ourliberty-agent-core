@@ -14,7 +14,15 @@ Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/heal_claude_json_bind_drift.py
 # Probes are fast (one open()/close() per persistent unit); a tick that has to
 # restart several dangled units costs ~RESTART_SETTLE_S each, so allow headroom.
-TimeoutStartSec=120
+#
+# 1200s covers heal_claude_json_bind_drift.AGENT_DRAIN_CEILING_SEC (900) plus
+# that per-unit restart overhead. Rebinding a unit that hosts Claude sessions now
+# cordons it and waits for the live session to finish (PR 3), and that drain can
+# run to the ceiling. Raised from 120s, which is the #1000 bug: systemd SIGTERMs
+# the healer mid-drain, Python's `finally` does not run on SIGTERM, so the
+# restart silently never happens — it fails safe and does nothing.
+# test_restart_guard.CallerCeilingBudgetTests pins this against the ceiling.
+TimeoutStartSec=1200
 Nice=10
 # NOTE: deliberately NO ProtectHome/NoNewPrivileges hardening block. This healer
 # must `sudo -n nsenter -m -t <pid>` into other units' mount namespaces (needs

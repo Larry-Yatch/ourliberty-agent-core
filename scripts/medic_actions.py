@@ -77,6 +77,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
 import medic_ledger  # noqa: E402
 import larry_alerts  # noqa: E402
 import marker_paths  # noqa: E402  # shared restart-coordination marker paths (watchdog parity)
+import restart_guard  # noqa: E402  # cordon-and-drain so a restart never SIGTERMs a live review
 
 HOME = Path.home()
 REPO_DIR = Path(os.environ.get('OURLIBERTY_REPO_DIR', str(HOME / 'agent-core')))
@@ -91,6 +92,19 @@ ENABLE_ENV_VAR = 'OURLIBERTY_MEDIC_ENABLED'
 
 RESTART_TIMEOUT_SEC = 180
 IS_ACTIVE_TIMEOUT_SEC = 10
+
+# Cordon-and-drain ceiling for a restart of an agent-hosting unit (PR 3).
+#
+# MUST stay well inside Medic's own time budget, which is the tightest of any
+# restarter: medic_actions runs inside `timeout 10m claude` (run_medic.sh
+# CLAUDE_TIMEOUT), nested in medic_dispatcher's TimeoutStartSec=1500. Copying
+# heal_stale_daemon_code's 3600s ceiling would reproduce the #1000 failure
+# exactly — timeout(1) would kill the session mid-drain and the restart would
+# silently never happen. 120s waits out a session that is already finishing
+# while leaving the rest of the 10-minute budget intact.
+AGENT_DRAIN_CEILING_SEC = int(
+    os.environ.get('OL_MEDIC_DRAIN_CEILING_SEC', '120')
+)
 
 ACTION_RESTART_DAEMON = 'restart-daemon'
 ACTION_RETRIGGER_INBOX = 'retrigger-inbox'
@@ -589,10 +603,39 @@ def _act_restart(action: str, target: str, fingerprint: str, attempt: int,
             return _refuse(action, target, fp, attempt_int, peer_reason,
                            peer_detail)
 
-        # (d) perform
+        # (d) perform — via cordon-and-drain, so restarting an agent-hosting
+        # unit cannot SIGTERM a live Claude session mid-review (PR 3; the #971
+        # incident class). For every other unit this is a pass-through.
+        #
+        # on_ceiling='refuse' rather than 'force': Medic re-runs every 3 minutes
+        # and the triggering alert persists, so declining costs a delay, while
+        # forcing would kill the very review the guard exists to protect. A
+        # refusal here is recorded 'skipped' like the other pre-action gates, so
+        # the one-action-per-fingerprint recurrence gate stays UN-armed and
+        # Medic can legitimately act on a later cycle.
         _log('INFO', f'{action}: restarting {target} (fp={fp}, '
                      f'attempt={attempt_int})')
-        rc = _run_restart(target)
+        guarded = restart_guard.guarded_restart(
+            target, f'medic-{action}', lambda: _run_restart(target),
+            ceiling_sec=AGENT_DRAIN_CEILING_SEC,
+            on_ceiling='refuse',
+            log=lambda msg, level='INFO': _log(level, msg),
+        )
+        if not guarded.performed:
+            if guarded.outcome == restart_guard.OUTCOME_SKIPPED_PEER_ACTIVE:
+                return _refuse(
+                    action, target, fp, attempt_int, 'peer-restart-in-flight',
+                    f'Another restarter already holds the cordon lock for '
+                    f'{target} and is draining it; its restart serves this '
+                    f'need. Took no action; will re-evaluate next cycle.')
+            return _refuse(
+                action, target, fp, attempt_int, 'agent-work-in-flight',
+                f'A live Claude agent session was still running in {target} '
+                f'after a {guarded.waited:.0f}s cordoned drain '
+                f'(ceiling {AGENT_DRAIN_CEILING_SEC}s). Restarting would have '
+                f'SIGTERMed paid work mid-session, so Medic stood down; will '
+                f're-evaluate next cycle.')
+        rc = guarded.result
 
         # (e) verify
         active_state = _is_active(target)

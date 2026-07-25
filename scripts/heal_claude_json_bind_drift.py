@@ -92,6 +92,7 @@ from typing import Optional
 
 if str(Path(__file__).resolve().parent) not in sys.path:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
+import restart_guard  # noqa: E402  (shared cordon-and-drain, PR 3)
 from atomic_io import atomic_write_json  # noqa: E402
 
 AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', '/home/larry/agents'))
@@ -132,6 +133,20 @@ RESTART_SETTLE_S = 3
 # again), so a recurrence inside this window means either a restart storm bug or
 # a structural problem; either way we suppress and escalate rather than hammer.
 RESTART_COOLDOWN_SEC = 15 * 60
+
+# Cordon-and-drain ceiling for an agent-hosting unit (PR 3). Shorter than
+# heal_stale_daemon_code's 3600s because this healer ticks every 2 minutes and a
+# dangled mount is an ACTIVE outage — every session in that unit is failing with
+# `[claude exit 1]` until the rebind. The cordon is what makes the drain
+# terminate here: with the mount broken the watcher would otherwise keep
+# dispatching fresh sessions that fail instantly, so in-flight would never reach
+# zero on its own. Requires TimeoutStartSec >= this + restart overhead on
+# ourliberty-heal-claude-json-bind-drift.service (raised 120 -> 1200 in this PR);
+# undersizing it is the #1000 failure — SIGTERM mid-drain, restart silently
+# skipped.
+AGENT_DRAIN_CEILING_SEC = int(
+    os.environ.get('OL_BIND_DRIFT_DRAIN_CEILING_SEC', '900')
+)
 
 # Per-subject DM cooldown for the escalation paths (still-dangled-after-restart,
 # persistent probe-error). Larger than larry_alerts' built-in 60-min window so
@@ -582,6 +597,9 @@ def check_unit(unit: str, state: dict, now: Optional[float] = None) -> str:
        'rebound'         — dangle detected, restart succeeded + verified.
        'repair-failed'   — dangle detected, restart failed; escalation.
        'cooldown-dangled' — dangle but inside restart cooldown; escalation.
+       'repair-skipped-peer-active' — dangle detected, but a peer restarter
+                           already holds this unit's cordon lock; no action,
+                           no cooldown burned, re-checked next tick.
     """
     pid = target_main_pid(unit)
     if pid is None:
@@ -617,8 +635,24 @@ def check_unit(unit: str, state: dict, now: Optional[float] = None) -> str:
             f'restart', 'WARN')
         return 'cooldown-dangled'
 
-    # Attempt the repair.
-    rc, detail = restart_unit(unit)
+    # Attempt the repair — cordoned, so rebinding a unit that hosts Claude
+    # sessions doesn't SIGTERM one mid-review (PR 3). Pass-through for any unit
+    # that hosts no sessions, which is most of what UNIT_GLOB matches.
+    guarded = restart_guard.guarded_restart(
+        unit, 'claude-json-bind-drift', lambda: restart_unit(unit),
+        ceiling_sec=AGENT_DRAIN_CEILING_SEC,
+        on_ceiling='force',  # a dangled mount is an outage; it must be repaired
+        log=log,
+    )
+    if not guarded.performed:
+        # Peer-active skip only (on_ceiling='force' always restarts otherwise).
+        # No cooldown is marked: we did not act, so the next 2-minute tick must
+        # be free to repair this unit if the peer's restart didn't land.
+        log(f'{unit}: repair skipped — a peer restarter holds the cordon lock; '
+            f'its restart rebinds the mount too. Re-checking next tick.')
+        return 'repair-skipped-peer-active'
+
+    rc, detail = guarded.result
     mark_restarted(state, unit, now=now)
     save_state(state)
 

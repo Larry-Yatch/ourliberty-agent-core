@@ -29,6 +29,7 @@ from typing import Any, Optional
 _SCRIPTS_DIR = Path(__file__).resolve().parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
+import restart_guard  # noqa: E402  (shared cordon-and-drain, PR 3)
 from atomic_io import atomic_write_json  # noqa: E402
 
 AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', '/home/larry/agents'))
@@ -920,20 +921,62 @@ def _remediate_content_drift(unit: str) -> tuple[int, str]:
         return 0, ''
 
     if unit.endswith('.service') and _service_is_long_running(unit):
-        try:
-            restart_result = subprocess.run(
-                ['sudo', '-n', 'systemctl', 'restart', unit],
-                capture_output=True, text=True, timeout=RESTART_TIMEOUT_S,
-            )
-        except subprocess.TimeoutExpired:
-            return -1, f'restart {unit} timed out'
-        except FileNotFoundError:
-            return -1, 'sudo or systemctl not found in PATH'
-        if restart_result.returncode != 0:
-            return restart_result.returncode, (
-                f'restart failed: {(restart_result.stderr or "").strip()}'
-            )
+        # This is the ONE path in this healer that can restart a unit hosting
+        # live Claude sessions (ourliberty-inbox-watcher.service is a
+        # long-running .service), so it goes through cordon-and-drain (PR 3).
+        # The .timer branch above and _heal_stuck_timer never can — a timer
+        # hosts no sessions — so they stay direct.
+        #
+        # on_ceiling='force': content drift means the installed unit file no
+        # longer matches the repo, which must eventually be reconciled. This
+        # healer runs twice daily, so a deferred restart would leave the drift
+        # standing for ~12h.
+        guarded = restart_guard.guarded_restart(
+            unit, 'systemd-install-drift', lambda: _restart_now(unit),
+            ceiling_sec=restart_guard.RESTART_DEFER_CEILING_SEC,
+            on_ceiling='force',
+            log=log,
+        )
+        if not guarded.performed:
+            # Peer-active skip. Report success-with-no-action: `_cp_and_reload`
+            # already ran, so the installed unit file IS reconciled and the
+            # drift this healer detects is gone; only the restart is deferred.
+            #
+            # Narrow window, deliberately accepted: if the peer's restart had
+            # already begun before our cp, it loads the OLD file and nothing
+            # restarts the unit on this run. That does not persist — the unit is
+            # then running code older than its file, which is precisely what
+            # heal_stale_daemon_code detects and restarts, every 10 minutes.
+            # Returning non-zero instead would DM Larry a failure for work that
+            # actually landed.
+            log(f'{unit}: content-drift restart skipped — a peer restarter '
+                f'holds the cordon lock; its restart loads the same '
+                f'newly-installed unit file (heal_stale_daemon_code is the '
+                f'backstop if it raced our cp)')
+            return 0, ''
+        rc, stderr = guarded.result
+        if rc != 0:
+            return rc, stderr
 
+    return 0, ''
+
+
+def _restart_now(unit: str) -> tuple[int, str]:
+    """The unguarded restart used by the content-drift path. Split out so
+    cordon-and-drain can wrap it without duplicating the error contract."""
+    try:
+        restart_result = subprocess.run(
+            ['sudo', '-n', 'systemctl', 'restart', unit],
+            capture_output=True, text=True, timeout=RESTART_TIMEOUT_S,
+        )
+    except subprocess.TimeoutExpired:
+        return -1, f'restart {unit} timed out'
+    except FileNotFoundError:
+        return -1, 'sudo or systemctl not found in PATH'
+    if restart_result.returncode != 0:
+        return restart_result.returncode, (
+            f'restart failed: {(restart_result.stderr or "").strip()}'
+        )
     return 0, ''
 
 

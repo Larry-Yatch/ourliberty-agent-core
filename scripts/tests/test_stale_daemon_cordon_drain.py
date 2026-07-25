@@ -1,9 +1,15 @@
-"""Cordon-and-drain in heal_stale_daemon_code (PR 2 of the restart-inflight
-guard; spec docs/restart-inflight-guard-spec.md, #981/#989/#995).
+"""Cordon-and-drain (PR 2 of the restart-inflight guard; spec
+docs/restart-inflight-guard-spec.md, #981/#989/#995).
 
 This is the PRODUCER: the first code that writes a cordon against the live
 system. Its failure mode is a silent full-queue stall, so the stall cases are
 tested before the happy path.
+
+PR 3 moved the machinery out of ``heal_stale_daemon_code`` into the shared
+``restart_guard`` so the other restarters use one implementation rather than a
+copy. The assertions below are unchanged — only the module they point at moved.
+``heal_stale_daemon_code`` is still exercised end-to-end through
+``auto_restart_unit``, which is what actually has to keep working.
 
 Coverage:
 - RENEWAL (the flaw the adversarial pass caught): a drain longer than
@@ -40,6 +46,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
 import agent_work_in_flight as awif  # noqa: E402
 import heal_stale_daemon_code as h  # noqa: E402
 import inbox_watcher as iw  # noqa: E402
+import restart_guard as rg  # noqa: E402
 
 AGENT_UNIT = 'ourliberty-inbox-watcher.service'
 OTHER_UNIT = 'ourliberty-dashboard-api.service'
@@ -68,7 +75,7 @@ class CordonDrainFixture(unittest.TestCase):
             os.environ['OURLIBERTY_AGENTS_ROOT'] = self._saved
 
     def _cordon(self):
-        p = h._cordon_file(AGENT_UNIT)
+        p = rg.cordon_file(AGENT_UNIT)
         return json.loads(p.read_text()) if p.exists() else None
 
     def _logged(self, needle):
@@ -99,17 +106,17 @@ class RenewalTests(CordonDrainFixture):
         def work_in_flight(*a, **k):
             calls['n'] += 1
             # Busy for ~1200s of simulated time (2x the 600s TTL), then quiet.
-            return calls['n'] * h.DRAIN_POLL_SEC < 1200
+            return calls['n'] * rg.DRAIN_POLL_SEC < 1200
 
-        with mock.patch.object(h.time, 'time', side_effect=fake_time), \
-                mock.patch.object(h.time, 'sleep', side_effect=fake_sleep), \
-                mock.patch.object(h.agent_work_in_flight, 'agent_work_in_flight',
+        with mock.patch.object(rg.time, 'time', side_effect=fake_time), \
+                mock.patch.object(rg.time, 'sleep', side_effect=fake_sleep), \
+                mock.patch.object(rg.agent_work_in_flight, 'agent_work_in_flight',
                                   side_effect=work_in_flight):
-            h.write_cordon(AGENT_UNIT, 'test')
-            drained, waited = h.drain_agent_work(AGENT_UNIT, 'test')
+            rg.write_cordon(AGENT_UNIT, 'test')
+            drained, waited = rg.drain_agent_work(AGENT_UNIT, 'test')
 
         self.assertTrue(drained)
-        self.assertGreater(waited, h.CORDON_TTL_SEC,
+        self.assertGreater(waited, rg.CORDON_TTL_SEC,
                            'drain must have outlasted the TTL for this to test anything')
         self.assertTrue(observed_expiry_gaps, 'no drain polls observed')
         # NEVER expired from the watcher's point of view.
@@ -120,8 +127,8 @@ class RenewalTests(CordonDrainFixture):
     def test_renew_interval_is_below_ttl(self):
         # Structural guard: renewal must be comfortably inside the TTL, or a
         # slow poll could let it lapse between renewals.
-        self.assertLess(h.CORDON_RENEW_EVERY_SEC, h.CORDON_TTL_SEC)
-        self.assertLessEqual(h.CORDON_RENEW_EVERY_SEC, h.CORDON_TTL_SEC / 2)
+        self.assertLess(rg.CORDON_RENEW_EVERY_SEC, rg.CORDON_TTL_SEC)
+        self.assertLessEqual(rg.CORDON_RENEW_EVERY_SEC, rg.CORDON_TTL_SEC / 2)
 
     def test_ceiling_exceeds_review_session_ceiling(self):
         # The backstop must never fire on a single legitimate review.
@@ -134,14 +141,14 @@ class ReleaseTests(CordonDrainFixture):
     """An un-cleared cordon stalls dispatch until its TTL."""
 
     def test_cordon_cleared_after_successful_drain(self):
-        with mock.patch.object(h.agent_work_in_flight, 'agent_work_in_flight',
+        with mock.patch.object(rg.agent_work_in_flight, 'agent_work_in_flight',
                                return_value=False):
             h.auto_restart_unit(AGENT_UNIT)
         self.assertIsNone(self._cordon())
         self.restart.assert_called_once()
 
     def test_cordon_cleared_when_ceiling_hit(self):
-        with mock.patch.object(h.agent_work_in_flight, 'agent_work_in_flight',
+        with mock.patch.object(rg.agent_work_in_flight, 'agent_work_in_flight',
                                return_value=True), \
                 mock.patch.object(h, 'RESTART_DEFER_CEILING_SEC', 0):
             h.auto_restart_unit(AGENT_UNIT)
@@ -151,7 +158,7 @@ class ReleaseTests(CordonDrainFixture):
 
     def test_cordon_cleared_when_restart_raises(self):
         self.restart.side_effect = RuntimeError('systemctl exploded')
-        with mock.patch.object(h.agent_work_in_flight, 'agent_work_in_flight',
+        with mock.patch.object(rg.agent_work_in_flight, 'agent_work_in_flight',
                                return_value=False):
             with self.assertRaises(RuntimeError):
                 h.auto_restart_unit(AGENT_UNIT)
@@ -159,7 +166,7 @@ class ReleaseTests(CordonDrainFixture):
                           'a cordon left behind by a crashing healer stalls dispatch')
 
     def test_cordon_cleared_when_drain_raises(self):
-        with mock.patch.object(h, 'drain_agent_work',
+        with mock.patch.object(rg, 'drain_agent_work',
                                side_effect=RuntimeError('boom')):
             with self.assertRaises(RuntimeError):
                 h.auto_restart_unit(AGENT_UNIT)
@@ -169,8 +176,8 @@ class ReleaseTests(CordonDrainFixture):
 class ScopeTests(CordonDrainFixture):
     def test_non_agent_unit_restarts_immediately(self):
         # A dashboard-api restart must not wait on a Mirror review.
-        with mock.patch.object(h, 'drain_agent_work') as drain, \
-                mock.patch.object(h.agent_work_in_flight, 'agent_work_in_flight',
+        with mock.patch.object(rg, 'drain_agent_work') as drain, \
+                mock.patch.object(rg.agent_work_in_flight, 'agent_work_in_flight',
                                   return_value=True):
             rc, _ = h.auto_restart_unit(OTHER_UNIT)
         self.assertEqual(rc, 0)
@@ -178,7 +185,7 @@ class ScopeTests(CordonDrainFixture):
         self.assertIsNone(self._cordon())
 
     def test_agent_unit_waits_for_work(self):
-        with mock.patch.object(h, 'drain_agent_work',
+        with mock.patch.object(rg, 'drain_agent_work',
                                return_value=(True, 42.0)) as drain:
             h.auto_restart_unit(AGENT_UNIT)
         drain.assert_called_once()
@@ -189,8 +196,8 @@ class FailOpenTests(CordonDrainFixture):
     def test_cordon_write_failure_degrades_to_restart_now(self):
         # An IO fault must not leave a stale daemon running forever; falling
         # back to today's behavior is no worse than today. But never silently.
-        with mock.patch.object(h, 'write_cordon', return_value=False), \
-                mock.patch.object(h, 'drain_agent_work') as drain:
+        with mock.patch.object(rg, 'write_cordon', return_value=False), \
+                mock.patch.object(rg, 'drain_agent_work') as drain:
             rc, _ = h.auto_restart_unit(AGENT_UNIT)
         self.assertEqual(rc, 0)
         drain.assert_not_called()
@@ -239,8 +246,8 @@ class SigtermGuardTests(CordonDrainFixture):
     def test_sigterm_during_drain_clears_the_cordon(self):
         # Defense in depth: `finally` does NOT run on the default SIGTERM
         # disposition, so without this the cordon file outlives the healer.
-        h.write_cordon(AGENT_UNIT, 'test')
-        guard = h._CordonSigtermGuard(AGENT_UNIT)
+        rg.write_cordon(AGENT_UNIT, 'test')
+        guard = rg._CordonSigtermGuard(AGENT_UNIT, self.log)
         guard._prev = lambda *a: None  # swallow the re-raise inside the test
         guard._on_term(15, None)
         self.assertIsNone(self._cordon())
@@ -249,7 +256,7 @@ class SigtermGuardTests(CordonDrainFixture):
     def test_guard_restores_previous_handler(self):
         import signal as _sig
         before = _sig.getsignal(_sig.SIGTERM)
-        with h._CordonSigtermGuard(AGENT_UNIT):
+        with rg._CordonSigtermGuard(AGENT_UNIT):
             pass
         self.assertEqual(_sig.getsignal(_sig.SIGTERM), before)
 
@@ -259,13 +266,13 @@ class SeamTests(CordonDrainFixture):
     does nothing."""
 
     def test_cordon_path_matches_watcher(self):
-        self.assertEqual(h._cordon_file(AGENT_UNIT), iw._restart_cordon_file())
+        self.assertEqual(rg.cordon_file(AGENT_UNIT), iw._restart_cordon_file())
 
     def test_cordon_path_is_anchored_to_the_agents_root(self):
         # NOT tautological. Comparing the two callers to each other passes even
         # when the shared helper is broken — they agree on the WRONG path. This
         # pins the path to the configured root independently of either caller.
-        path = h._cordon_file(AGENT_UNIT)
+        path = rg.cordon_file(AGENT_UNIT)
         self.assertEqual(path.parent, self.root / 'state' / 'restart-cordon')
         self.assertEqual(path.name, f'{AGENT_UNIT}.json')
         self.assertTrue(str(path).startswith(str(self.root)),
@@ -280,17 +287,17 @@ class SeamTests(CordonDrainFixture):
         # than skipping on non-Linux — a skipped seam test is a seam test that
         # never runs on the machine where the code is written.
         fake_boot = '11111111-2222-3333-4444-555555555555'
-        with mock.patch.object(h, '_boot_id', return_value=fake_boot), \
+        with mock.patch.object(rg, '_boot_id', return_value=fake_boot), \
                 mock.patch.object(iw, '_current_boot_id', return_value=fake_boot):
-            h.write_cordon(AGENT_UNIT, 'stale-lib-restart')
+            rg.write_cordon(AGENT_UNIT, 'stale-lib-restart')
             self.assertEqual(iw._restart_cordon_active(), 'stale-lib-restart')
 
     def test_cleared_cordon_is_not_honored(self):
         fake_boot = '11111111-2222-3333-4444-555555555555'
-        with mock.patch.object(h, '_boot_id', return_value=fake_boot), \
+        with mock.patch.object(rg, '_boot_id', return_value=fake_boot), \
                 mock.patch.object(iw, '_current_boot_id', return_value=fake_boot):
-            h.write_cordon(AGENT_UNIT, 'stale-lib-restart')
-            h.clear_cordon(AGENT_UNIT)
+            rg.write_cordon(AGENT_UNIT, 'stale-lib-restart')
+            rg.clear_cordon(AGENT_UNIT)
             self.assertIsNone(iw._restart_cordon_active())
 
 

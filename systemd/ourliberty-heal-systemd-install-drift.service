@@ -20,7 +20,15 @@ Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 # then `sudo systemctl restart ourliberty-heal-systemd-install-drift.timer`.
 Environment="OURLIBERTY_INSTALL_DRIFT_HEALER_ENABLED=true"
 ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/heal_systemd_install_drift.py
-TimeoutStartSec=60
+# 3900s = restart_guard.RESTART_DEFER_CEILING_SEC (3600) + headroom for the
+# daemon-reload, restart and verify. Content-drift remediation of a long-running
+# .service now cordons the unit and waits out any live Claude session before
+# restarting it (PR 3), and that drain can legitimately run to the ceiling.
+# Raised from 60s, which is the #1000 bug: systemd SIGTERMs the healer mid-drain,
+# Python's `finally` does not run on SIGTERM, so the restart silently never
+# happens. It fails safe and does nothing — the worst kind of working.
+# test_restart_guard.CallerCeilingBudgetTests pins this against the ceiling.
+TimeoutStartSec=3900
 Nice=10
 StandardOutput=journal
 StandardError=journal
