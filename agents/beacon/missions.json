@@ -11561,7 +11561,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-25T02:43:19.864038+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-25T02:40:16.150844+00:00"
+      "orphan_last_activity_ts": "2026-07-25T02:40:16.150844+00:00",
+      "briefing": {
+        "what": "A piece of work your team built and quality-checked on its own, but it isn't attached to any active initiative yet.",
+        "why": "Unclaimed work that ships without a clear business owner can drift from your priorities and quietly add upkeep you didn't plan for.",
+        "suggest": "Before letting it go live, take a moment to confirm it belongs to a goal you care about \u2014 or set it aside until it does."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-25T02:51:06.463186+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
