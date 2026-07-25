@@ -11666,7 +11666,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-25T05:59:10.401299+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-25T05:57:42.17415+00:00"
+      "orphan_last_activity_ts": "2026-07-25T05:57:42.17415+00:00",
+      "briefing": {
+        "what": "A finished piece of work from your team that passed its quality check but hasn't been tied to any active initiative.",
+        "why": "Completed work sitting unclaimed means effort you've already paid for isn't delivering value, and it's unclear what customer or goal it serves.",
+        "suggest": "Have someone confirm what this work was for and either fold it into a current priority or shelve it before it moves forward."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-25T06:02:17.820148+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
