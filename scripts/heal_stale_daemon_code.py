@@ -53,7 +53,6 @@ import json
 import os
 import re
 import shlex
-import signal
 import subprocess
 import sys
 import time
@@ -63,7 +62,7 @@ from typing import Optional
 
 if str(Path(__file__).resolve().parent) not in sys.path:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-import agent_work_in_flight  # noqa: E402  (shared live-session predicate, #994)
+import restart_guard  # noqa: E402  (shared cordon-and-drain, PR 3)
 from atomic_io import atomic_write_json  # noqa: E402
 
 AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', '/home/larry/agents'))
@@ -655,150 +654,25 @@ def is_stale(
 
 
 # -------------------- restart cordon + drain (spec: restart-inflight-guard) ---
+#
+# The machinery now lives in `restart_guard`, shared with the other restarters
+# (PR 3). It was built and proven here first — 2026-07-22 logged the real thing:
+# `RESTART_DRAINED unit=ourliberty-inbox-watcher.service waited=135s`, a busy
+# watcher held 135s and restarted without killing the live review. Moving it out
+# rather than copying it is the whole point: `agent_work_in_flight` was factored
+# out because "a guard inlined into one healer would have fixed a fifth of the
+# problem", and the guard around it has exactly the same property.
+#
+# These names stay as aliases because this module's ceiling/units are part of its
+# published behavior and its tests read them.
 
-# Units that HOST Claude agent loops, i.e. where a restart SIGTERMs paid work
-# mid-session. Only these get cordon-and-drain. The *-bot units (telegram
-# front-ends) and dashboard-api host no sessions and must keep restarting
-# immediately — a needless drain wait on them would just delay a fix.
-# Must match inbox_watcher.CORDON_UNIT, which is what the watcher looks for.
-AGENT_HOSTING_UNITS = frozenset({'ourliberty-inbox-watcher.service'})
+AGENT_HOSTING_UNITS = restart_guard.AGENT_HOSTING_UNITS
+RESTART_DEFER_CEILING_SEC = restart_guard.RESTART_DEFER_CEILING_SEC
 
-# Short by design. A cordon is dangerous exactly in proportion to how long a
-# DEAD healer's copy survives: while it stands, the watcher accepts no work, so
-# an abandoned cordon is a silent full-queue stall. We keep the TTL short and
-# RENEW while draining instead of buying headroom with a long TTL — the same
-# trade dispatch_lease makes (180s TTL / 60s heartbeat).
-CORDON_TTL_SEC = int(os.environ.get('OL_CORDON_TTL_SEC', '600'))
-CORDON_RENEW_EVERY_SEC = max(1, CORDON_TTL_SEC // 3)
-DRAIN_POLL_SEC = int(os.environ.get('OL_DRAIN_POLL_SEC', '15'))
-
-# Backstop only. Normally the drain ends when the running session ends. This
-# bounds the pathological case — work that never stops — after which we restart
-# anyway and say so loudly. Above REVIEW_SESSION_CEILING_SECONDS (2100s) so a
-# single review can never exhaust it; only a continuous queue can.
-RESTART_DEFER_CEILING_SEC = int(
-    os.environ.get('OL_RESTART_DEFER_CEILING_SEC', '3600')
-)
-
-
-def _cordon_file(unit: str) -> Path:
-    """Canonical helper — see agent_work_in_flight.cordon_file for why this must
-    NOT be derived locally."""
-    return agent_work_in_flight.cordon_file(unit)
-
-
-def _boot_id() -> str:
-    try:
-        with open('/proc/sys/kernel/random/boot_id') as f:
-            return f.read().strip()
-    except OSError:
-        return ''
-
-
-def write_cordon(unit: str, reason: str) -> bool:
-    """Write/refresh the cordon for <unit>. True iff it landed.
-
-    Called once to raise the cordon and again on every drain poll to push
-    ``expires_at`` forward. Renewal is what makes a SHORT ttl safe: a review may
-    run to REVIEW_SESSION_CEILING_SECONDS (2100s), 3.5x the 600s TTL, so a
-    non-renewed cordon would EXPIRE MID-DRAIN — the watcher would resume taking
-    work and we would restart into a live session, reintroducing the exact bug
-    this exists to prevent."""
-    path = _cordon_file(unit)
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        atomic_write_json(path, {
-            'unit': unit,
-            'reason': reason,
-            'created_at': time.time(),
-            'expires_at': time.time() + CORDON_TTL_SEC,
-            'pid': os.getpid(),
-            'boot_id': _boot_id(),
-        })
-        return True
-    except (OSError, ValueError) as e:
-        log(f'cordon write failed for {unit}: {e}', 'WARN')
-        return False
-
-
-def clear_cordon(unit: str) -> None:
-    """Remove the cordon. Called from a `finally` on every non-fatal path — a
-    cordon we forget to clear stalls dispatch until its TTL."""
-    try:
-        _cordon_file(unit).unlink()
-    except OSError:
-        pass
-
-
-class _CordonSigtermGuard:
-    """Clear the cordon if we are SIGTERMed mid-drain.
-
-    Belt-and-braces for the systemd kill path. A `finally` does NOT run when the
-    default SIGTERM disposition terminates the process, so a healer killed while
-    draining leaves its cordon file behind. Holder-liveness already makes that
-    cordon inert within one watcher poll (the pid is dead), so this is not what
-    prevents a stall — it removes the corpse promptly instead of leaving a
-    confusing file on disk for up to CORDON_TTL_SEC, and it re-raises via the
-    previous handler so systemd still sees a normal termination.
-
-    Restores the prior handler on exit; a non-main-thread install is a no-op
-    (signal.signal raises there) rather than an error."""
-
-    def __init__(self, unit: str):
-        self.unit = unit
-        self._prev = None
-        self._installed = False
-
-    def __enter__(self):
-        try:
-            self._prev = signal.getsignal(signal.SIGTERM)
-            signal.signal(signal.SIGTERM, self._on_term)
-            self._installed = True
-        except (ValueError, OSError):
-            pass  # not the main thread — holder-liveness still covers us
-        return self
-
-    def _on_term(self, signum, frame):
-        clear_cordon(self.unit)
-        log(f'SIGTERM during drain of {self.unit} — cordon cleared; the restart '
-            f'did NOT happen (raise TimeoutStartSec if this repeats)', 'WARN')
-        if callable(self._prev):
-            self._prev(signum, frame)
-        else:
-            signal.signal(signal.SIGTERM, signal.SIG_DFL)
-            os.kill(os.getpid(), signal.SIGTERM)
-
-    def __exit__(self, *exc):
-        if self._installed:
-            try:
-                signal.signal(signal.SIGTERM, self._prev)
-            except (ValueError, OSError):
-                pass
-        return False
-
-
-def drain_agent_work(unit: str, reason: str) -> tuple[bool, float]:
-    """Hold the cordon until no agent session is live. Return (drained, waited).
-
-    ``drained`` False means we hit RESTART_DEFER_CEILING_SEC with work still
-    running — the caller restarts anyway and logs it loudly.
-
-    The cordon is raised BEFORE the first liveness probe, which is what makes
-    this terminate: with new dispatch blocked, in-flight can only fall to zero.
-    Probing first and cordoning after would race the watcher's 5s poll forever
-    on a busy queue."""
-    started = time.time()
-    last_renew = started
-    while True:
-        if not agent_work_in_flight.agent_work_in_flight():
-            return True, time.time() - started
-        waited = time.time() - started
-        if waited >= RESTART_DEFER_CEILING_SEC:
-            return False, waited
-        time.sleep(DRAIN_POLL_SEC)
-        if time.time() - last_renew >= CORDON_RENEW_EVERY_SEC:
-            write_cordon(unit, reason)  # push expires_at forward
-            last_renew = time.time()
+# Restart requested, but a peer restarter already holds this unit's cordon lock
+# and is draining it. Its restart satisfies ours, so this is NOT a failure and
+# must never DM Larry — we simply take no action and re-evaluate next tick.
+RC_SKIPPED_PEER_ACTIVE = -2
 
 
 # -------------------- auto-restart + PR-inference helpers --------------------
@@ -838,34 +712,19 @@ def auto_restart_unit(unit: str, reason: str = 'stale-shared-lib') -> tuple[int,
     Sudoers contract on the droplet is `(ALL) NOPASSWD: ALL`; -n errors
     immediately if that ever changes rather than blocking on a prompt.
     """
-    if unit not in AGENT_HOSTING_UNITS:
-        return _restart_unit_now(unit)
-
-    # Cordon → drain → restart → uncordon.
-    if not write_cordon(unit, reason):
-        # Could not raise the cordon (disk full, perms). Restarting anyway is
-        # exactly today's behavior — no worse — and refusing would let a stale
-        # daemon run indefinitely on an unrelated IO fault. Never silent.
-        log(f'watchlist: cordon unavailable for {unit}; restarting WITHOUT '
-            f'drain (pre-#994 behavior — a live session may be killed)', 'WARN')
-        return _restart_unit_now(unit)
-    try:
-        with _CordonSigtermGuard(unit):
-            drained, waited = drain_agent_work(unit, reason)
-        if drained:
-            log(f'RESTART_DRAINED unit={unit} waited={waited:.0f}s '
-                f'reason={reason} — restarting into a quiet window', 'INFO')
-        else:
-            # Backstop: work never stopped. Restart anyway (staleness must
-            # eventually win) but make it loud — this is the one path that can
-            # still kill a live session.
-            log(f'RESTART_FORCED_OVER_CEILING unit={unit} '
-                f'drained_for={waited:.0f}s ceiling={RESTART_DEFER_CEILING_SEC}s '
-                f'reason={reason} — restarting with work STILL in flight', 'WARN')
-        return _restart_unit_now(unit)
-    finally:
-        # Unconditional: an un-cleared cordon stalls dispatch until its TTL.
-        clear_cordon(unit)
+    outcome = restart_guard.guarded_restart(
+        unit, reason, lambda: _restart_unit_now(unit),
+        # Unchanged from #999: this unit's TimeoutStartSec is 3900s (#1000),
+        # which is what makes a full 3600s drain survivable here.
+        ceiling_sec=RESTART_DEFER_CEILING_SEC,
+        on_ceiling='force',
+        log=log,
+    )
+    if not outcome.performed:
+        # Only reachable via the peer-active skip: this caller uses
+        # on_ceiling='force', so a drain that times out still restarts.
+        return RC_SKIPPED_PEER_ACTIVE, 'peer restarter holds the cordon lock'
+    return outcome.result
 
 
 def _restart_unit_now(unit: str) -> tuple[int, str]:
@@ -1310,6 +1169,13 @@ def check_unit(
         service_start, tz=timezone.utc,
     ).isoformat()
     rc, stderr = auto_restart_unit(unit)
+    if rc == RC_SKIPPED_PEER_ACTIVE:
+        # A peer restarter is mid-drain on this unit; its restart clears our
+        # staleness too. Take NO cooldown — we did not act, so the next tick
+        # must be free to re-evaluate if the peer's restart fell through.
+        log(f'{unit}: restart skipped — {stderr}; re-evaluating next tick')
+        return 'restart-skipped-peer-active'
+
     # Record the attempt under the cooldown clock regardless of outcome.
     # A failed restart STILL gets the 30-min cooldown — we don't hammer
     # broken units between healer ticks.
@@ -1425,6 +1291,13 @@ def _check_watchlist_pair(
         )
 
     rc, stderr = auto_restart_unit(unit)
+    if rc == RC_SKIPPED_PEER_ACTIVE:
+        # See the same branch in the entrypoint path: a peer is already draining
+        # this unit, so we neither act nor burn the cooldown.
+        log(f'watchlist: restart of {unit} skipped — {stderr}; '
+            f're-evaluating next tick')
+        return 'restart-skipped-peer-active'
+
     mark_restarted(state, unit, now=now)
     save_state(state)
 
