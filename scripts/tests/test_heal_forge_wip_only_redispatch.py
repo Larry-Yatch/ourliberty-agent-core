@@ -857,5 +857,92 @@ class HelperUnitTest(unittest.TestCase):
             self.assertIsNone(h._target_pr_coordinate('rebase-pr-860', None))
 
 
+
+class DagPreflightSuppressionTest(_Base):
+    """A `review-sequence-dag-<seq_id>` task validates a build sequence's DAG and
+    hands off — it opens NO PR of its own, so it always trips the WIP-only / no-PR
+    signature. When the sequence's audit_log already records a preflight outcome
+    for the task, the preflight concluded and the sequence moved on: suppress (no
+    retry, no escalation). Regression for the false `forge-wip-redispatch`
+    EXHAUSTED alert on review-sequence-dag-rsdpm-m11-001-retry1 (2026-07-25)."""
+
+    _SEQ_ID = 'rsdpm-m11-001'
+    _STEM = 'review-sequence-dag-rsdpm-m11-001'
+    _BRANCH = 'mirror/review-sequence-dag-rsdpm-m11-001-retry1'
+
+    def _write_sequence(self, audit_log):
+        d = h.AGENTS_ROOT / 'blackboard' / 'build-sequences'
+        d.mkdir(parents=True, exist_ok=True)
+        (d / f'{self._SEQ_ID}.json').write_text(json.dumps({
+            'seq_id': self._SEQ_ID,
+            'status': 'active',
+            'audit_log': audit_log,
+        }))
+
+    def test_pass_kickoff_suppresses(self):
+        self._write_sequence([
+            {'event': 'dag-preflight-pass-kickoff',
+             'mirror_task_id': 'review-sequence-dag-rsdpm-m11-001-retry1'},
+        ])
+        with self._git_world([(self._BRANCH, time.time() - 3600)]):
+            self._run()
+        # No retry envelope, no alert at all (neither digest nor escalate).
+        self.assertEqual(self._inbox_files(), [])
+        self.assertEqual(self._alerts.call_count, 0)
+        ledger = self._ledger()
+        self.assertIn(self._STEM, ledger)
+        self.assertTrue(ledger[self._STEM]['suppressed'])
+        self.assertEqual(ledger[self._STEM]['suppress_reason'],
+                         'suppressed-dag-preflight-concluded')
+        self.assertNotIn('attempts', ledger[self._STEM])
+
+    def test_revision_routed_suppresses(self):
+        # A REVISION outcome (routed for autonomous amend) also concluded the
+        # preflight — the base task_id (retry-stripped) still matches the family.
+        self._write_sequence([
+            {'event': 'dag-preflight-revision-routed',
+             'mirror_task_id': 'review-sequence-dag-rsdpm-m11-001'},
+        ])
+        with self._git_world([(self._BRANCH, time.time() - 3600)]):
+            self._run()
+        self.assertEqual(self._inbox_files(), [])
+        self.assertEqual(self._alerts.call_count, 0)
+        self.assertTrue(self._ledger()[self._STEM]['suppressed'])
+
+    def test_no_preflight_outcome_still_escalates(self):
+        # Sequence exists but recorded NO preflight outcome for this task (a
+        # genuinely dead preflight): the healer must NOT suppress — at MAX it
+        # escalates exactly once, as before. Only the audit_log distinguishes a
+        # concluded preflight from a dead one.
+        self._write_sequence([{'event': 'sequence-created', 'actor': 'go-live-chat'}])
+        self._seed_ledger({self._STEM: {
+            'attempts': h.MAX_AUTO_RETRIES,
+            'last_retry_task_id': 'review-sequence-dag-rsdpm-m11-001-retry1',
+            'escalated': False}})
+        with self._git_world([(self._BRANCH, time.time() - 3600)]):
+            self._run()
+        routes = [c.args[0] for c in self._alerts.call_args_list]
+        self.assertEqual(routes, ['escalate'])
+        self.assertFalse(self._ledger()[self._STEM].get('suppressed'))
+
+    def test_concluded_dag_never_escalates_even_at_max(self):
+        # A concluded-preflight family sitting at MAX must not fire the 'exhausted'
+        # escalation — the DAG-preflight gate precedes the exhaustion path.
+        self._write_sequence([
+            {'event': 'dag-preflight-pass-kickoff',
+             'mirror_task_id': 'review-sequence-dag-rsdpm-m11-001-retry1'},
+        ])
+        self._seed_ledger({self._STEM: {
+            'attempts': h.MAX_AUTO_RETRIES,
+            'last_retry_task_id': 'review-sequence-dag-rsdpm-m11-001-retry1',
+            'escalated': False}})
+        with self._git_world([(self._BRANCH, time.time() - 3600)]):
+            self._run()
+        escalate_calls = [c for c in self._alerts.call_args_list
+                          if c.args[0] == 'escalate']
+        self.assertEqual(escalate_calls, [])
+        self.assertTrue(self._ledger()[self._STEM]['suppressed'])
+
+
 if __name__ == '__main__':
     unittest.main()

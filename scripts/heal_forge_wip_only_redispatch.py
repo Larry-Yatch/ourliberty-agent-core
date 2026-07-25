@@ -667,6 +667,55 @@ def _open_and_merged_heads(repo: Path) -> Optional[tuple[set[str], set[str]]]:
     return open_heads, merged_heads
 
 
+# ---------- DAG-preflight terminal-by-design lookup ----------
+
+_DAG_PREFLIGHT_PREFIX = 'review-sequence-dag-'
+
+
+def _dag_preflight_concluded(branch_stem: str) -> bool:
+    """True if this candidate is a Mirror DAG-preflight task whose sequence has
+    already recorded a preflight OUTCOME — so its no-PR result is terminal-by-
+    design, never an abandoned build.
+
+    A ``review-sequence-dag-<seq_id>`` task validates a build sequence's DAG and
+    hands off; it opens NO PR of its own, so it always trips the WIP-only / no-PR
+    signature below. When the outbox-notifier processed its verdict it appended a
+    ``dag-preflight-pass-kickoff`` (PASS) or ``dag-preflight-revision-*``
+    (REVISION) entry to the sequence's blackboard audit_log, keyed on
+    ``mirror_task_id``. Presence of any such entry for THIS task family proves the
+    preflight concluded and the sequence moved on — the case behind the
+    2026-07-25 false ``forge-wip-redispatch`` EXHAUSTED escalation on
+    ``review-sequence-dag-rsdpm-m11-001-retry1`` (M11 PASS at 03:42 kicked off
+    PR-A/B/C while the retry branch still carried only its WIP checkpoint).
+
+    Ambiguity — not a DAG task, missing/unreadable sequence file, no matching
+    audit entry — returns False so a genuinely dead preflight still surfaces."""
+    base = _ledger_base(branch_stem)
+    if not base.startswith(_DAG_PREFLIGHT_PREFIX):
+        return False
+    seq_id = base[len(_DAG_PREFLIGHT_PREFIX):]
+    if not seq_id:
+        return False
+    seq_path = AGENTS_ROOT / 'blackboard' / 'build-sequences' / f'{seq_id}.json'
+    try:
+        seq = json.loads(seq_path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return False
+    audit = seq.get('audit_log') if isinstance(seq, dict) else None
+    if not isinstance(audit, list):
+        return False
+    for entry in audit:
+        if not isinstance(entry, dict):
+            continue
+        event = entry.get('event', '')
+        if not (isinstance(event, str) and event.startswith('dag-preflight-')):
+            continue
+        mtid = entry.get('mirror_task_id')
+        if isinstance(mtid, str) and _ledger_base(mtid) == base:
+            return True
+    return False
+
+
 def evaluate(cand: Candidate, now: float, open_heads: set[str],
              merged_heads: set[str], ledger: dict) -> tuple[str, str]:
     """Pure-ish decision for one candidate. Returns (action, reason) where action
@@ -708,6 +757,19 @@ def evaluate(cand: Candidate, now: float, open_heads: set[str],
     if (ledger.get(base) or {}).get('suppressed'):
         reason = (ledger.get(base) or {}).get('suppress_reason', 'suppressed')
         return 'skip', f'already suppressed ({reason})'
+
+    # Gate 1 (DAG-preflight concluded): a `review-sequence-dag-<seq_id>` task
+    # validates a build sequence and hands off — it opens NO PR of its own, so it
+    # always trips the WIP-only / no-PR signature. When its sequence's audit_log
+    # already records a `dag-preflight-pass-kickoff` / `dag-preflight-revision-*`
+    # outcome for this task family, the preflight concluded and the sequence moved
+    # on: suppress (never redispatch, never escalate). Regression for the
+    # 2026-07-25 false `forge-wip-redispatch` EXHAUSTED alert on
+    # review-sequence-dag-rsdpm-m11-001-retry1 (M11 PASS kicked off PR-A/B/C).
+    if _dag_preflight_concluded(cand.branch_stem):
+        return ('suppress-dag-preflight',
+                'DAG-preflight concluded (sequence recorded a preflight outcome) '
+                '— no PR by design, terminal')
 
     # Gate 3: an open or merged PR for this branch means the work is not abandoned.
     if cand.branch in open_heads:
@@ -945,6 +1007,10 @@ def sweep_repo(repo: Path, ledger: dict, now: float) -> SweepCounts:
             acted_bases.add(base)
         elif action == 'suppress-already-merged':
             _do_suppress(cand, ledger, reason, 'suppressed-build-already-merged')
+            counts.suppressed += 1
+            acted_bases.add(base)
+        elif action == 'suppress-dag-preflight':
+            _do_suppress(cand, ledger, reason, 'suppressed-dag-preflight-concluded')
             counts.suppressed += 1
             acted_bases.add(base)
         else:
