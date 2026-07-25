@@ -8736,7 +8736,10 @@
         "at": "2026-07-11T09:30:17.686978+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-07-25T00:11:59.863725+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-reconcile-675-contract-c-promote-alerts-001",
@@ -8846,7 +8849,10 @@
         "at": "2026-07-11T18:57:02.030282+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-07-25T00:11:59.863725+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-auto-route-externally-authored-pr-reviews-001-retry1",
@@ -8877,7 +8883,10 @@
         "at": "2026-07-11T19:47:15.920072+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-07-25T00:11:59.863725+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-mirror-review-pr-ourliberty-agent-core-931",
@@ -8908,7 +8917,10 @@
         "at": "2026-07-11T19:47:15.920072+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-07-25T00:11:59.863725+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-pr-ourliberty-agent-core-937",
@@ -8974,7 +8986,10 @@
         "at": "2026-07-11T20:17:47.706827+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-07-25T00:11:59.863725+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-auto-route-externally-authored-pr-reviews-001-retr",
@@ -9005,7 +9020,10 @@
         "at": "2026-07-11T20:17:47.706827+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-07-25T00:11:59.863725+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "xiv-b-tier-4-alert-write-back-loop",
@@ -11058,6 +11076,244 @@
       "retired_at": "2026-07-24T23:41:37.116913+00:00",
       "retired_reason": "orphan-terminal",
       "retired_signal": "pr_merged:#840"
+    },
+    {
+      "id": "proposed-delegate-retrospective-pulse-check-i-2026-07-20",
+      "name": "Delegate Retrospective Pulse Check I 2026 07 20",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `delegate-retrospective-pulse-check-i-2026-07-20`. Last activity 2026-07-24T01:11:46.331844+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "delegate-retrospective-pulse-check-i-2026-07-20"
+      ],
+      "repo": null,
+      "created": "2026-07-25",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-25T00:11:59.863725+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-24T01:11:46.331844+00:00"
+    },
+    {
+      "id": "proposed-delegate-retrospective-heal-claude-json-bind-drift-probe-blind-2026-07-20",
+      "name": "Delegate Retrospective Heal Claude JSON Bind Drift Probe Blind 2026 07 20",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `delegate-retrospective-heal-claude-json-bind-drift-probe-blind-2026-07-20`. Last activity 2026-07-24T01:04:55.746494+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "delegate-retrospective-heal-claude-json-bind-drift-probe-blind-2026-07-20"
+      ],
+      "repo": null,
+      "created": "2026-07-25",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-25T00:11:59.863725+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-24T01:04:55.746494+00:00"
+    },
+    {
+      "id": "proposed-larry-reject-fafcc89832b5845a5c13178d3e42c673f3c82e91",
+      "name": "Larry Reject Fafcc89832b5845a5c13178d3e42c673f3c82e91",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `larry-reject-fafcc89832b5845a5c13178d3e42c673f3c82e91`. Last activity 2026-07-24T00:59:25.128543+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "larry-reject-fafcc89832b5845a5c13178d3e42c673f3c82e91"
+      ],
+      "repo": null,
+      "created": "2026-07-25",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-25T00:11:59.863725+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-24T00:59:25.128543+00:00"
+    },
+    {
+      "id": "proposed-larry-reject-6810d59984cc7605743570ee34f7d1c2a68dd4f9",
+      "name": "Larry Reject 6810d59984cc7605743570ee34f7d1c2a68dd4f9",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `larry-reject-6810d59984cc7605743570ee34f7d1c2a68dd4f9`. Last activity 2026-07-24T00:55:13.90627+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "larry-reject-6810d59984cc7605743570ee34f7d1c2a68dd4f9"
+      ],
+      "repo": null,
+      "created": "2026-07-25",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-25T00:11:59.863725+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-24T00:55:13.90627+00:00"
+    },
+    {
+      "id": "proposed-stale-pending-approval-unreg-approval-ce90b1a4c981",
+      "name": "Stale Pending Approval Unreg Approval Ce90b1a4c981",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `stale-pending-approval-unreg-approval-ce90b1a4c981`. Last activity 2026-07-24T00:51:43.7865+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "stale-pending-approval-unreg-approval-ce90b1a4c981"
+      ],
+      "repo": null,
+      "created": "2026-07-25",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-25T00:11:59.863725+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-24T00:51:43.7865+00:00"
+    },
+    {
+      "id": "proposed-deep-review-hold-pr1015-ae9d9d07",
+      "name": "Deep Review Hold Pr1015 Ae9d9d07",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `deep-review-hold-pr1015-ae9d9d07`. Last activity 2026-07-23T07:22:32.738697+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "deep-review-hold-pr1015-ae9d9d07"
+      ],
+      "repo": null,
+      "created": "2026-07-25",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-25T00:11:59.863725+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-23T07:22:32.738697+00:00"
+    },
+    {
+      "id": "proposed-m3-pr2-re-dispatch-routing-gap",
+      "name": "M3 Pr2 Re Dispatch Routing Gap",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `m3-pr2-re-dispatch-routing-gap`. Last activity 2026-07-23T05:47:40.511329+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "m3-pr2-re-dispatch-routing-gap"
+      ],
+      "repo": null,
+      "created": "2026-07-25",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-25T00:11:59.863725+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-23T05:47:40.511329+00:00"
+    },
+    {
+      "id": "proposed-deep-review-hold-pr1014-d2896a90",
+      "name": "Deep Review Hold Pr1014 D2896a90",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `deep-review-hold-pr1014-d2896a90`. Last activity 2026-07-23T05:39:19.958271+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "deep-review-hold-pr1014-d2896a90"
+      ],
+      "repo": null,
+      "created": "2026-07-25",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-25T00:11:59.863725+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-23T05:39:19.958271+00:00"
+    },
+    {
+      "id": "proposed-dispatch-m1-amend-quote-redact",
+      "name": "Dispatch M1 Amend Quote Redact",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `dispatch-m1-amend-quote-redact`. Last activity 2026-07-23T03:52:01.214993+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "dispatch-m1-amend-quote-redact"
+      ],
+      "repo": null,
+      "created": "2026-07-25",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-25T00:11:59.863725+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-23T03:52:01.214993+00:00"
+    },
+    {
+      "id": "proposed-dispatch-m5-pr2-revision",
+      "name": "Dispatch M5 Pr2 Revision",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `dispatch-m5-pr2-revision`. Last activity 2026-07-23T03:51:25.659778+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "dispatch-m5-pr2-revision"
+      ],
+      "repo": null,
+      "created": "2026-07-25",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-25T00:11:59.863725+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-23T03:51:25.659778+00:00"
+    },
+    {
+      "id": "proposed-m5-pr2-mirror-escalate-stalled-66min",
+      "name": "M5 Pr2 Mirror Escalate Stalled 66min",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `m5-pr2-mirror-escalate-stalled-66min`. Last activity 2026-07-22T22:27:25.284524+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "m5-pr2-mirror-escalate-stalled-66min"
+      ],
+      "repo": null,
+      "created": "2026-07-25",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-25T00:11:59.863725+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-22T22:27:25.284524+00:00"
+    },
+    {
+      "id": "proposed-cycle-fix-forge-marker-task-id-prefix-mismatch-001",
+      "name": "Cycle Fix Forge Marker Task ID Prefix Mismatch 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `cycle-fix-forge-marker-task-id-prefix-mismatch-001`. Last activity 2026-07-22T20:25:27.367394+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "cycle-fix-forge-marker-task-id-prefix-mismatch-001"
+      ],
+      "repo": null,
+      "created": "2026-07-25",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-25T00:11:59.863725+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-22T20:25:27.367394+00:00"
+    },
+    {
+      "id": "proposed-seq-rsdpm-v0-001",
+      "name": "Seq Rsdpm V0 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `seq-rsdpm-v0-001`. Last activity 2026-07-22T20:15:56.821033+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "seq-rsdpm-v0-001"
+      ],
+      "repo": null,
+      "created": "2026-07-25",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-25T00:11:59.863725+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-22T20:15:56.821033+00:00"
+    },
+    {
+      "id": "proposed-delegate-retrospective-ledger-weekly-2026-07-20",
+      "name": "Delegate Retrospective Ledger Weekly 2026 07 20",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `delegate-retrospective-ledger-weekly-2026-07-20`. Last activity 2026-07-22T18:08:55.925872+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "delegate-retrospective-ledger-weekly-2026-07-20"
+      ],
+      "repo": null,
+      "created": "2026-07-25",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-25T00:11:59.863725+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-22T18:08:55.925872+00:00"
     }
   ]
 }
