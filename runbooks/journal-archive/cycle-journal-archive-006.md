@@ -32895,3 +32895,63 @@ Watermark advanced 742→743. NOMINAL ✅
 
 ---
 
+## Iteration ~6193 — 2026-07-24T13:22Z UTC (Larry /cycle chat, Tier 3)
+
+**Health:** ✅ NOMINAL. Tier 3 (consecutive_clean=15→16; stays Tier 3). All 9 daemons alive. 0 open PRs. 0 new alerts. Pipeline drained. All inboxes empty.
+
+**VERIFY-BEFORE-REASSERT (from iter ~6192 at ~12:52Z UTC):**
+- **"daemons healthy (9 PIDs)"**: CONFIRMED — all 9 PIDs alive (1590654/SNs, 1590875+1591041+1591194/Ss×3, 1591274/Ss, 1971090/Ssl, 2437535/Ssl, 2438915/Ss, 2439513/Ss). NOMINAL ✅
+- **"sync NOMINAL, last_sync=2026-07-24T12:18:19Z UTC"**: UPDATED — new sync at 2026-07-24T13:18:20Z UTC (~3 min from check); status=no-change; consecutive_push_failures=0. Within 2h. NOMINAL ✅
+- **"beacon-pending-approvals pending=0"**: CONFIRMED — pending=0, history=534. NOMINAL ✅
+- **"HEAD=a546bf3f=origin/main"**: UPDATED — HEAD=fa0c0dcf=origin/main (wrapper auto-commit from iter ~6192 "Pulse cycle 20260724T125340Z"). On main; clean tree; 0 ahead/behind. NOMINAL ✅
+- **"larry-alerts.jsonl watermark=653"**: CONFIRMED — repair-watermark: repaired=false (old=653, file_length=653). 0 new alerts. Watermark stays 653. NOMINAL ✅
+- **"check-vi-posture-proposals-2026-07-07 — 2 proposals"**: CARRY — timer-managed; no new run. [carry — no new DM]
+
+**NEW findings this iter:** None. All checks nominal.
+
+**Check 0 — Alert triage (~13:21Z UTC):** repair-watermark: repaired=false (old=653, file_length=653). 0 new alerts above watermark=653. Watermark stays 653. NOMINAL ✅ [No tier-reset]
+
+**Check 1 — Log noise (~13:21Z UTC):** outbox-notifier.log: last entry 21:35:19 MDT Jul 23 (03:35:19Z UTC; ~9.8h from check; PR #1021 AUTO_MERGE completion). inbox_watcher.log: last entry 03:35:51Z UTC (~9.8h; beacon done). watchdog.log: last entry 07:18:59 MDT Jul 24 (13:18:59Z UTC; ~3 min from check; overall=healthy). 0 unresolved WARNs. No patterns above threshold. NOMINAL ✅
+
+**Check 2 — Telegram sweep (~13:21Z UTC):** Beacon bot PID 2439513 alive (Ss). Last Larry message: 'go' at 19:14:20 MDT Jul 23 (01:14:20Z UTC; ~12.1h ago; outside 4h window). All Jul 23 directives tracked and resolved in prior iters. No orphan directives in 4h. No agent distress. NOMINAL ✅
+
+**Check 3 — Pipeline stall (~13:21Z UTC):** heal_pipeline_stall dry-run at 13:21:34Z UTC: FORGE_NO_PR_SKIP for 5 tasks (heal-unrouted-owner-pr-nudge-001/#1016[MERGED], actionable-alerts-reach-approvals-tab-001/#1018, heal-unreg-approval-guards-001/#1019, heal-bind-drift-probe-blind-fp-001/#1020, check-i-digest-weekly-dedup-001/#1021 — all pr_exists). "no stalls detected." NOMINAL ✅
+
+**Check 4 — Pending directives (~13:21Z UTC):** beacon-pending-approvals: pending=0 (history=534). All inboxes EMPTY (forge=0, beacon=0, mirror=0). NOMINAL ✅
+
+**Check 5 — Stale daemon code (~13:21Z UTC):** heartbeat=2026-07-24T13:13:09Z UTC (~9 min from check; fresh <60 min). All 9 daemon PIDs alive. NOMINAL ✅
+
+**Check A — Source repo:** HEAD=fa0c0dcf=origin/main; on main; clean tree; 0 ahead/behind. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-24T13:18:20Z UTC (~3 min from check); status=no-change; consecutive_push_failures=0. Within 2h. NOMINAL ✅
+**Check C — Agent liveness:** All 9 daemons alive (1590654/SNs, 1590875+1591041+1591194/Ss×3, 1591274/Ss, 1971090/Ssl, 2437535/Ssl, 2438915/Ss, 2439513/Ss). NOMINAL ✅
+**Check E — PR/merge state:** 0 open PRs in ourliberty-agent-core. NOMINAL ✅
+**Check H — Forge activity digest:** All inboxes empty. Pipeline fully drained. 5 tasks with pr_exists (PRs #1016[MERGED]+#1018+#1019+#1020+#1021). 0 open Forge PRs. NOMINAL ✅
+
+**§5.0:** audit_due_nudge: no committed baseline; no-op. distill_detector: no un-distilled audits; no-op. audit_cadence_signal: no post-seed distill artifacts; no-op. NOMINAL ✅
+
+**Rotations:** [carry] SUPABASE_SERVICE_ROLE_KEY due=2026-08-22 (~29d). Last DM 2026-07-20T20:00Z UTC. 14-day dedup active; no new DM.
+
+**Conditional checks:**
+- **Check I:** Fri 2026-07-24 UTC is a firing day. Timer fires ~14:13Z UTC (~51 min from this iter). No new artifact yet (latest: check-i-2026-07-22.json). [pending timer — do NOT invoke from cycle]
+- **Check III:** OFF-WEEK — last artifact 2026-07-12; next fire 2026-07-27 (Sun).
+- **Check VI:** check-vi-2026-07.json present; timer-managed; heartbeat=2026-07-07T19:41:44Z UTC. [carry]
+- **Check VIII:** timer-managed; last artifact check-viii-2026-07-20.json.
+
+**G-rule assessment:** No new G-rules this iter. Active carries unchanged: forge-revision-preamble-missing (vp); forge-wip-redispatch-digest (vp); forge-wip-redispatch-exhausted-no-pr (vp); outbox-notifier-intent-reject (Forge vp); check-i-force-bypass-dm-route (2/3); auto-dispatch-APPROVAL_REQUEST-mismatch (vp). Sub-threshold: pr-merged-without-deep-review-shortcut-001 (1/3); mirror-ghost-retry-m5-pr2 (1/3); heal-stall-retry-exhausted-after-pr-merge (1/3); forge-marker-taskid-suffix-increment-001 (1/3); MalformedForgeMarker WARN (1/3).
+
+**Actions taken:**
+1. Check 0: repair-watermark no-op (repaired=false, old=653, file_length=653). 0 alerts triaged. Watermark stays 653.
+2. §5.0 one-shots: all no-ops.
+3. PRIME ledger: iter_clean appended (nominal-tier3; all checks nominal; 0 new alerts; pipeline drained; inboxes empty; 9 daemons alive; tier=3; consecutive_clean=15→16; 13:22Z UTC). Trailing 30d: ratio=26.62 (systemic_fixes=66, verification_pending=29, trend=improving).
+4. Tier state: record --checks-clean true → consecutive_clean=15→16; Tier 3 (floor, no further de-escalation; last_signal_at=2026-07-24T03:41:05Z UTC unchanged).
+5. Watermark: stays 653 (no new alerts).
+
+**Escalations:** None.
+- [carry — no new DM] check-vi-posture-proposals-2026-07-07 (2 proposals)
+- [carry — no new DM] ourliberty-health-subject-key-mismatch translation gap (vp, dispatched iter ~4488)
+
+**PRIME DIRECTIVE:** iter_clean (all checks nominal; 0 new alerts; pipeline fully drained; inboxes empty; tier=3; consecutive_clean=16). Trailing 30d: ratio=26.62 (systemic_fixes=66, verification_pending=29, trend=improving).
+**Tier end-of-iter:** **Tier 3** (consecutive_clean=16; last_signal_at=2026-07-24T03:41:05Z UTC; floor cadence).
+
+---
+
