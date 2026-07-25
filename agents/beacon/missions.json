@@ -11580,6 +11580,23 @@
       "retired_by": "heal_orphan_autoregister",
       "retired_at": "2026-07-25T02:58:20.588568+00:00",
       "retired_reason": "orphan-terminal"
+    },
+    {
+      "id": "proposed-pr-RSDPM-44",
+      "name": "PR RSDPM 44",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pr-RSDPM-44`. Last activity 2026-07-25T04:55:41.128561+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pr-RSDPM-44"
+      ],
+      "repo": null,
+      "created": "2026-07-25",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-25T04:58:56.687421+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-25T04:55:41.128561+00:00"
     }
   ]
 }
