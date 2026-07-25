@@ -4,6 +4,69 @@
 
 ---
 
+## Iteration ~6243 — 2026-07-25T13:56Z UTC (Larry /cycle chat, Tier 3)
+
+**Health:** ✅ NOMINAL. Tier 3 (consecutive_clean=15→16). All 9 daemons alive. 0 new alerts. 0 open PRs on agent-core or RSDPM. Pipeline fully idle.
+
+**VERIFY-BEFORE-REASSERT (from iter ~6242 at ~13:21Z UTC):**
+- **"daemons healthy (9 PIDs)"**: CONFIRMED — heal-stale-daemon-code.heartbeat=2026-07-25T13:47:30Z UTC (~9 min from check); all 9 PIDs alive (ps confirmed). NOMINAL ✅
+- **"sync NOMINAL, last_sync=2026-07-25T13:20:33Z UTC"**: CONFIRMED — same value (~36 min from check); status=no-change; consecutive_push_failures=0. Within 2h. NOMINAL ✅
+- **"beacon-pending-approvals pending=0"**: CONFIRMED — pending=0, history=534. NOMINAL ✅
+- **"HEAD=0920cb43=origin/main"**: UPDATED — HEAD=8272a64e=origin/main (wrapper auto-committed "Pulse cycle 20260725T132312Z"). On main; clean tree; 0 ahead/behind. NOMINAL ✅
+- **"larry-alerts.jsonl watermark=526"**: CONFIRMED — file_length=526, watermark=526; 0 new alerts. NOMINAL ✅
+- **"forge-marker-taskid-suffix-increment-001 at 2/3"**: CARRY — no new occurrences. [carry, 2/3]
+- **"MalformedForgeMarker WARN at 2/3"**: CARRY — last WARN remains m11-pr-b at 04:17:32Z UTC Jul 25. [carry, 2/3]
+- **"check-vi-posture-proposals-2026-07-07 — 2 proposals"**: CARRY — timer-managed; no new run. [carry — no new DM]
+- **"Check I: check-i-2026-07-24.json (1 proposal)"**: CARRY — timer fires ~14:13Z UTC Fri Jul 25; check at 13:56Z UTC (not yet fired; ~17 min remaining). [carry — pending timer]
+- **"PR #1022 MERGED — verification_pending heal-wip-redispatch DAG-preflight suppression"**: CARRY — pipeline idle; no new healer runs. [carry, vp]
+
+**NEW findings this iter:** None. Pipeline fully idle. Check I timer fires in ~17 min; artifact will appear in pulse-check-i/ for next cycle to read.
+
+**Check 0 — Alert triage (~13:56Z UTC):** repair-watermark: repaired=false (old=526, file_length=526). 0 new alerts above watermark=526. Watermark stays 526. NOMINAL ✅ [No tier-reset]
+
+**Check 1 — Log noise (~13:56Z UTC):** outbox-notifier.log last entry 2026-07-25T00:14:14 MDT (06:14:14Z UTC; ~7.8h from check; PR #49 AUTO_MERGE, all INFO). watchdog.log last entry 2026-07-25T07:52:25 MDT (13:52:25Z UTC; ~4 min from check; overall=healthy). 0 new WARNs since last iter. Most recent WARN remains m11-pr-b MalformedForgeMarker at 04:17:32Z UTC (G-rule 2/3). 0 signatures above 5/h threshold. NOMINAL ✅
+
+**Check 2 — Telegram sweep (~13:56Z UTC):** beacon_telegram_bot.log last entry 2026-07-24T23:13:27-0600 (05:13:27Z UTC; ~8.7h from check; idx=663 sequence-complete:rsdpm-m11-001 delivered). 0 new Larry directives. No agent distress. NOMINAL ✅
+
+**Check 3 — Pipeline stall (~13:56Z UTC):** heal_pipeline_stall dry-run at 13:56:32Z UTC: "no stalls detected." (FORGE_NO_PR_SKIP: m11-pr-a/#41, m11-pr-b/#43, m11-pr-c/#45, pr-RSDPM-32/-35/-38/-44 — all MERGED, correct.) 0 open RSDPM PRs (verified via gh). NOMINAL ✅
+
+**Check 4 — Pending directives (~13:56Z UTC):** beacon-pending-approvals: pending=0 (history=534). All agent inboxes empty (forge=0, beacon=0, mirror=0). 0 orphan Larry directives. NOMINAL ✅
+
+**Check 5 — Stale daemon code (~13:56Z UTC):** heal-stale-daemon-code.heartbeat=2026-07-25T13:47:30Z UTC (~9 min from check; fresh <60 min). All 9 PIDs alive (ps confirmed). NOMINAL ✅
+
+**Check A — Source repo:** HEAD=8272a64e=origin/main; on main; clean tree; 0 ahead/behind. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-25T13:20:33Z UTC (~36 min from check); status=no-change; consecutive_push_failures=0. Within 2h. NOMINAL ✅
+**Check C — Agent liveness:** All 9 PIDs alive (ps confirmed): 1590654/chain-event-shipper, 1590875/forge-bot, 1591041/mirror-bot, 1591194/pulse-bot, 1591274/spec-review-runner, 1971090/inbox-watcher, 2437535/dashboard-api, 2438915/outbox-notifier, 2439513/beacon-bot. Watchdog=healthy at 13:52:25Z UTC. NOMINAL ✅
+**Check E — PR/merge state:** 0 open PRs on ourliberty-agent-core. 0 open PRs on RSDPM (verified via gh pr list). NOMINAL ✅
+**Check H — Forge activity digest:** All inboxes empty. Pipeline idle since RSDPM PR #49 AUTO_MERGE at 06:14Z UTC. NOMINAL ✅
+
+**§5.0:** audit_due_nudge: no committed baseline; no-op. distill_detector: no un-distilled audits; no-op. audit_cadence_signal: no post-seed distill artifacts; no-op. NOMINAL ✅
+
+**Rotations:** [carry] SUPABASE_SERVICE_ROLE_KEY due=2026-08-22 (~28d). Last DM 2026-07-20T20:00Z UTC. 14-day dedup active (expires ~2026-08-03); no new DM.
+
+**Conditional checks:**
+- **Check I:** Fri Jul 25 — timer fires ~14:13Z UTC; check at 13:56Z UTC (not yet fired; ~17 min remaining). Latest artifact: check-i-2026-07-24.json. Next cycle (~14:26Z UTC) will read new artifact. [carry — pending timer]
+- **Check III:** OFF-WEEK — next fire 2026-07-27 (Sun). [carry]
+- **Check VI:** timer-managed. [carry]
+- **Check VIII:** timer-managed; last artifact check-viii-2026-07-20.json. [carry]
+
+**G-rule assessment:** No new occurrences this iter. forge-marker-taskid-suffix-increment-001: **2/3** [carry]; MalformedForgeMarker WARN: **2/3** [carry]. Active carries unchanged: forge-revision-preamble-missing (vp); forge-wip-redispatch-digest (vp); forge-wip-redispatch-exhausted-no-pr (vp); outbox-notifier-intent-reject (Forge vp); check-i-force-bypass-dm-route (2/3); auto-dispatch-APPROVAL_REQUEST-mismatch (vp); PR #1022 merged heal-wip-redispatch DAG-preflight suppression (vp). Sub-threshold: pr-merged-without-deep-review-shortcut-001 (1/3); mirror-ghost-retry-m5-pr2 (1/3); heal-stall-retry-exhausted-after-pr-merge (1/3).
+
+**Actions taken:**
+1. Check 0: repair-watermark no-op (repaired=false, old=526, file_length=526). 0 alerts triaged. Watermark stays 526.
+2. §5.0 one-shots: all no-ops.
+3. Tier state: record --checks-clean true → consecutive_clean=15→16; Tier 3 unchanged (top tier; counter advances).
+4. PRIME ledger: iter_clean appended (tier=3, template=iter-clean; ts=2026-07-25T13:56:00Z UTC).
+
+**Escalations:** None.
+- [carry — no new DM] check-vi-posture-proposals-2026-07-07 (2 proposals)
+- [carry — no new DM] ourliberty-health-subject-key-mismatch translation gap (vp, dispatched iter ~4488)
+
+**PRIME DIRECTIVE:** iter_clean (all checks nominal; pipeline idle; 0 open PRs agent-core/RSDPM; 9 daemons alive; 0 new alerts watermark=526; Tier 3 consecutive_clean=15→16). Trailing 30d: ratio=29.125 (interventions=~1648+, systemic_fixes=56, verification_pending=25, trend=improving).
+**Tier end-of-iter:** **Tier 3** (consecutive_clean=16; last_signal_at=2026-07-25T04:18:26Z UTC; 30-min cadence).
+
+---
+
 ## Iteration ~6242 — 2026-07-25T13:21Z UTC (Larry /cycle chat, Tier 3)
 
 **Health:** ✅ NOMINAL. Tier 3 (consecutive_clean=14→15). All 9 daemons alive. 0 new alerts. 0 open PRs on agent-core or RSDPM. Pipeline fully idle.
@@ -2468,67 +2531,6 @@
 
 **PRIME DIRECTIVE:** iter_clean (all checks nominal; 0 new alerts; pipeline fully drained; inboxes empty; 9 daemons alive; tier=3; consecutive_clean=27). Trailing 30d: ratio=26.62 (systemic_fixes=66, verification_pending=29, trend=improving).
 **Tier end-of-iter:** **Tier 3** (consecutive_clean=27; last_signal_at=2026-07-24T03:41:05Z UTC; floor cadence).
-
----
-
-## Iteration ~6203 — 2026-07-24T18:46Z UTC (Larry /cycle chat, Tier 3)
-
-**Health:** ✅ NOMINAL. Tier 3 (consecutive_clean=25→26; stays Tier 3). All 9 daemons alive. 0 open PRs. 0 new alerts. Pipeline drained. All inboxes empty.
-
-**VERIFY-BEFORE-REASSERT (from iter ~6202 at ~18:12Z UTC):**
-- **"daemons healthy (9 PIDs)"**: CONFIRMED — all 9 PIDs alive via ps: 1590654/chain-event-shipper, 1590875/forge-bot, 1591041/mirror-bot, 1591194/pulse-bot, 1591274/spec-review-runner, 1971090/inbox-watcher, 2437535/dashboard-api, 2438915/outbox-notifier, 2439513/beacon-bot. NOMINAL ✅
-- **"sync NOMINAL, last_sync=2026-07-24T17:19:03Z UTC"**: UPDATED — new sync at 2026-07-24T18:19:11Z UTC (~27 min from check); status=no-change; consecutive_push_failures=0. Within 2h. NOMINAL ✅
-- **"beacon-pending-approvals pending=0"**: CONFIRMED — pending=0, history=534. NOMINAL ✅
-- **"HEAD=e28e1651=origin/main"**: UPDATED — HEAD=d4d5ba02=origin/main (wrapper auto-commit "Pulse cycle 20260724T181344Z"). On main; clean tree; 0 ahead/behind. NOMINAL ✅
-- **"larry-alerts.jsonl watermark=656"**: CONFIRMED — repair-watermark: repaired=false (old=656, file_length=656). 0 new alerts. Watermark stays 656. NOMINAL ✅
-- **"check-vi-posture-proposals-2026-07-07 — 2 proposals"**: CARRY — timer-managed; no new run. [carry — no new DM]
-- **"Check I: check-i-2026-07-24.json (1 proposal, read iter ~6195)"**: CARRY — same artifact; no new firing. [carry — no action required]
-
-**NEW findings this iter:** None. All checks nominal.
-
-**Check 0 — Alert triage (~18:46Z UTC):** repair-watermark: repaired=false (old=656, file_length=656). 0 new alerts above watermark=656. Watermark stays 656. NOMINAL ✅ [No tier-reset]
-
-**Check 1 — Log noise (~18:46Z UTC):** watchdog.log: last entry 2026-07-24 12:41:30 MDT (18:41:30Z UTC; ~5 min from check; overall=healthy). outbox-notifier.log: last entry 2026-07-23 21:35:19 MDT (03:35:19Z UTC Jul 24; ~15.2h from check; PR #1021 AUTO_MERGE completion, all INFO). beacon_telegram_bot.log: last entry 09:56:33 MDT Jul 24 (15:56:33Z UTC; alert idx=655 route=digest; skipping DM). 0 unresolved WARNs. No patterns above threshold. NOMINAL ✅
-
-**Check 2 — Telegram sweep (~18:46Z UTC):** All 9 bot PIDs alive. Last Larry action: 'go' at 19:14:20 MDT Jul 23 (01:14:20Z UTC; ~17.5h ago; outside 4h window). Alerts 653/654 delivered at 14:15:40Z UTC (routine digest). Alert 655 route=digest skipped at 15:56:33Z UTC. No orphan directives in 4h. No agent distress. NOMINAL ✅
-
-**Check 3 — Pipeline stall (~18:46Z UTC):** heal_pipeline_stall dry-run at 18:46:02Z UTC: FORGE_NO_PR_SKIP for 4 tasks (actionable-alerts-reach-approvals-tab-001/#1018, heal-unreg-approval-guards-001/#1019, heal-bind-drift-probe-blind-fp-001/#1020, check-i-digest-weekly-dedup-001/#1021 — all pr_exists). "no stalls detected." NOMINAL ✅
-
-**Check 4 — Pending directives (~18:46Z UTC):** beacon-pending-approvals: pending=0 (history=534). All inboxes EMPTY (forge=0, beacon=0, mirror=0). NOMINAL ✅
-
-**Check 5 — Stale daemon code (~18:46Z UTC):** heartbeat=2026-07-24T18:36:18Z UTC (~10 min from check; fresh <60 min). All 9 PIDs alive. NOMINAL ✅
-
-**Check A — Source repo:** HEAD=d4d5ba02=origin/main; on main; clean tree; 0 ahead/behind. NOMINAL ✅
-**Check B — Sync health:** last_sync=2026-07-24T18:19:11Z UTC (~27 min from check); status=no-change; consecutive_push_failures=0. Within 2h. NOMINAL ✅
-**Check C — Agent liveness:** All 9 PIDs alive (ps confirmed): 1590654/chain-event-shipper, 1590875/forge-bot, 1591041/mirror-bot, 1591194/pulse-bot, 1591274/spec-review-runner, 1971090/inbox-watcher, 2437535/dashboard-api, 2438915/outbox-notifier, 2439513/beacon-bot. NOMINAL ✅
-**Check E — PR/merge state:** 0 open PRs in ourliberty-agent-core. NOMINAL ✅
-**Check H — Forge activity digest:** All inboxes empty. Pipeline fully drained. 4 tasks with pr_exists (PRs #1018+#1019+#1020+#1021). 0 open Forge PRs. NOMINAL ✅
-
-**§5.0:** audit_due_nudge: no committed baseline; no-op. distill_detector: no un-distilled audits; no-op. audit_cadence_signal: no post-seed distill artifacts; no-op. NOMINAL ✅
-
-**Rotations:** [carry] SUPABASE_SERVICE_ROLE_KEY due=2026-08-22 (~29d). Last DM 2026-07-20T20:00Z UTC. 14-day dedup active; no new DM.
-
-**Conditional checks:**
-- **Check I:** check-i-2026-07-24.json already read in iter ~6195 (fired_at=2026-07-24T14:11:49Z UTC; 1 proposal small-effort; DM delivered). [carry — no action required]
-- **Check III:** OFF-WEEK — last artifact 2026-07-12; next fire 2026-07-27 (Sun).
-- **Check VI:** check-vi-2026-07.json present; timer-managed; heartbeat=2026-07-07T19:41:44Z UTC. [carry]
-- **Check VIII:** timer-managed; last artifact check-viii-2026-07-20.json. [carry]
-
-**G-rule assessment:** No new G-rules this iter. Active carries unchanged: forge-revision-preamble-missing (vp); forge-wip-redispatch-digest (vp); forge-wip-redispatch-exhausted-no-pr (vp); outbox-notifier-intent-reject (Forge vp); check-i-force-bypass-dm-route (2/3); auto-dispatch-APPROVAL_REQUEST-mismatch (vp). Sub-threshold: pr-merged-without-deep-review-shortcut-001 (1/3); mirror-ghost-retry-m5-pr2 (1/3); heal-stall-retry-exhausted-after-pr-merge (1/3); forge-marker-taskid-suffix-increment-001 (1/3); MalformedForgeMarker WARN (1/3).
-
-**Actions taken:**
-1. Check 0: repair-watermark no-op (repaired=false, old=656, file_length=656). 0 alerts triaged. Watermark stays 656.
-2. §5.0 one-shots: all no-ops.
-3. Tier state: record --checks-clean true → consecutive_clean=25→26; Tier 3 (floor; no further de-escalation; last_signal_at=2026-07-24T03:41:05Z UTC unchanged).
-4. PRIME ledger: iter_clean appended (tier=3, kind=iter_clean; ts=2026-07-24T18:46:28Z UTC). Trailing 30d: ratio=26.62 (systemic_fixes=66, verification_pending=29, trend=improving).
-5. Watermark: stays 656 (no new alerts).
-
-**Escalations:** None.
-- [carry — no new DM] check-vi-posture-proposals-2026-07-07 (2 proposals)
-- [carry — no new DM] ourliberty-health-subject-key-mismatch translation gap (vp, dispatched iter ~4488)
-
-**PRIME DIRECTIVE:** iter_clean (all checks nominal; 0 new alerts; pipeline fully drained; inboxes empty; 9 daemons alive; tier=3; consecutive_clean=26). Trailing 30d: ratio=26.62 (systemic_fixes=66, verification_pending=29, trend=improving).
-**Tier end-of-iter:** **Tier 3** (consecutive_clean=26; last_signal_at=2026-07-24T03:41:05Z UTC; floor cadence).
 
 ---
 
