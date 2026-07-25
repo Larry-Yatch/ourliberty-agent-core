@@ -11092,7 +11092,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-25T00:11:59.863725+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-24T01:11:46.331844+00:00"
+      "orphan_last_activity_ts": "2026-07-24T01:11:46.331844+00:00",
+      "briefing": {
+        "what": "A review of how well the team's recent work is running, started on its own without being tied to any specific initiative yet.",
+        "why": "Catching what's working and what's slipping early keeps the team's output reliable before small problems grow into costly ones.",
+        "suggest": "Let it wrap up and bring you a short summary of findings, then decide whether it's worth attaching to a formal project."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-25T00:19:36.515409+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-delegate-retrospective-heal-claude-json-bind-drift-probe-blind-2026-07-20",
@@ -11109,7 +11123,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-25T00:11:59.863725+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-24T01:04:55.746494+00:00"
+      "orphan_last_activity_ts": "2026-07-24T01:04:55.746494+00:00",
+      "briefing": {
+        "what": "The team ran a self-check to make sure our automated helpers are still reading and reacting to information correctly, rather than quietly drifting off course.",
+        "why": "If those helpers start misreading things unnoticed, small errors can pile up and undermine work across the operation before anyone catches it.",
+        "suggest": "Ask the team to close this out with a short plain-English finding \u2014 what they checked and whether anything's actually broken \u2014 before you invest more attention in it."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-25T00:19:36.515409+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-larry-reject-fafcc89832b5845a5c13178d3e42c673f3c82e91",
@@ -11126,7 +11154,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-25T00:11:59.863725+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-24T00:59:25.128543+00:00"
+      "orphan_last_activity_ts": "2026-07-24T00:59:25.128543+00:00",
+      "briefing": {
+        "what": "Some work got started by the team but isn't connected to any active project or goal yet.",
+        "why": "Unassigned work can quietly eat time and money without moving anything on your roadmap forward.",
+        "suggest": "Before it goes further, take a moment to confirm whether this is worth pursuing or should be set aside."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-25T00:19:36.515409+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-larry-reject-6810d59984cc7605743570ee34f7d1c2a68dd4f9",
@@ -11143,7 +11185,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-25T00:11:59.863725+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-24T00:55:13.90627+00:00"
+      "orphan_last_activity_ts": "2026-07-24T00:55:13.90627+00:00",
+      "briefing": {
+        "what": "Some early work the team kicked off on their own that isn't connected to any active initiative yet.",
+        "why": "Loose, unassigned work can quietly eat time and drift away from your priorities if it's left unchecked.",
+        "suggest": "Hold off on greenlighting it until someone confirms what it's for and which goal it should serve."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-25T00:19:36.515409+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-stale-pending-approval-unreg-approval-ce90b1a4c981",
@@ -11160,7 +11216,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-25T00:11:59.863725+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-24T00:51:43.7865+00:00"
+      "orphan_last_activity_ts": "2026-07-24T00:51:43.7865+00:00",
+      "briefing": {
+        "what": "A request has been sitting in your approval queue for a while without a decision, and it isn't linked to any active project yet.",
+        "why": "Loose ends like this can quietly stall real work or signal something slipped through the cracks, so it's worth a quick look before it ages further.",
+        "suggest": "Take a moment to review it and either clear it or confirm it's safe to set aside, rather than letting it linger unresolved."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-25T00:19:36.515409+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-deep-review-hold-pr1015-ae9d9d07",
@@ -11177,7 +11247,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-25T00:11:59.863725+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-23T07:22:32.738697+00:00"
+      "orphan_last_activity_ts": "2026-07-23T07:22:32.738697+00:00",
+      "briefing": {
+        "what": "A piece of work the team kicked off that isn't yet connected to any active project, and it's waiting on your go-ahead.",
+        "why": "Unassigned work can quietly consume time and attention without moving a real priority forward, so it's worth a quick look before it grows.",
+        "suggest": "Take a moment to confirm this fits a current goal before greenlighting it \u2014 if it doesn't clearly serve one, hold off until it's tied to a real priority."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-25T00:19:36.515409+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-m3-pr2-re-dispatch-routing-gap",
@@ -11194,7 +11278,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-25T00:11:59.863725+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-23T05:47:40.511329+00:00"
+      "orphan_last_activity_ts": "2026-07-23T05:47:40.511329+00:00",
+      "briefing": {
+        "what": "Some early work has begun on fixing a delivery hiccup where certain follow-up messages don't reach the right place, but it isn't yet part of any planned project.",
+        "why": "If messages quietly fail to route, the team can miss things that need attention, which erodes trust that the system is handling work reliably.",
+        "suggest": "Let's fold this into a proper project with a clear owner before pushing further, so a fix is done deliberately rather than in a loose, ad-hoc way."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-25T00:19:36.515409+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-deep-review-hold-pr1014-d2896a90",
@@ -11211,7 +11309,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-25T00:11:59.863725+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-23T05:39:19.958271+00:00"
+      "orphan_last_activity_ts": "2026-07-23T05:39:19.958271+00:00",
+      "briefing": {
+        "what": "A piece of work the team kicked off that hasn't yet been connected to any active project and is now waiting on your sign-off.",
+        "why": "Unassigned work sitting in limbo ties up the team's time and can quietly drift without a clear goal or owner behind it.",
+        "suggest": "Take a quick look and confirm where this fits before giving the green light, so effort stays pointed at something that matters."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-25T00:19:36.515409+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-dispatch-m1-amend-quote-redact",
