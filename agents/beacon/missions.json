@@ -12380,7 +12380,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-26T20:31:19.793587+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-26T20:30:25.465965+00:00"
+      "orphan_last_activity_ts": "2026-07-26T20:30:25.465965+00:00",
+      "briefing": {
+        "what": "A piece of work your team built and finished that hasn't been tied to a specific business goal yet.",
+        "why": "It has already passed a quality check and is ready to go, so it's finished value sitting on the shelf instead of helping the business.",
+        "suggest": "Take a quick look to confirm where it fits before greenlighting it, so you don't ship something that isn't clearly earning its place."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-26T20:36:28.184485+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
