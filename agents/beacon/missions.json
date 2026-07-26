@@ -12042,7 +12042,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-26T04:09:16.023316+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-26T04:05:10.852849+00:00"
+      "orphan_last_activity_ts": "2026-07-26T04:05:10.852849+00:00",
+      "briefing": {
+        "what": "A piece of work your team started on its own that hasn't been tied to any of your current projects yet.",
+        "why": "Unassigned work that's been sitting in the review line can quietly stall or drift off-course, tying up your team's time without moving a real goal forward.",
+        "suggest": "Take a quick look to confirm it's worth finishing and connect it to a real priority before greenlighting it \u2014 if it doesn't map to something you care about, set it aside."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-26T04:15:45.146257+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
