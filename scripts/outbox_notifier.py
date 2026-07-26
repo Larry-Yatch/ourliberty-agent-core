@@ -5998,22 +5998,110 @@ def _classify_no_session_review(
     return NO_SESSION_SELF_HEALING
 
 
+def _resolve_escalation_head_sha(
+    data: dict[str, Any], pr_url: Optional[str],
+) -> Optional[str]:
+    """Head SHA for a session-less escalation approval: envelope first, then a
+    live `gh` lookup.
+
+    The envelope is preferred when present (free, and it is the head the review
+    actually covered). It is normally absent on this path — see
+    `_emit_no_session_decision_approval`'s docstring — so the `gh` leg is the
+    one that usually runs. This is an escalation path (rare by construction: 37
+    such approvals in ~2 months), so one `gh pr view` here is not a rate
+    concern, and `_gh_pr_head_sha` already backs off via `_gh_backoff_skip`.
+
+    Returns None if the head cannot be resolved by either route; callers must
+    treat that as "keep the un-suffixed id" rather than raising — an escalation
+    that reaches Larry with a coarse id is strictly better than one that never
+    reaches him at all.
+    """
+    env_head = data.get('head_sha')
+    if isinstance(env_head, str) and env_head:
+        return env_head
+    if not pr_url:
+        return None
+    parsed = _parse_pr_url(pr_url)
+    if parsed is None:
+        return None
+    return _gh_pr_head_sha(*parsed)
+
+
+def _build_recheck_target(
+    *,
+    task_id: str,
+    pr_url: Optional[str],
+    target_repo: Optional[str],
+    head_sha: Optional[str],
+    data: dict[str, Any],
+) -> Optional[dict[str, Any]]:
+    """Structured PR coordinate for the Approvals tab's third action, or None.
+
+    None when any of `pr_url` / `target_repo` / `head_sha` is missing: the
+    action needs all three to dispatch, and a card that renders the button but
+    cannot honor it would resolve the approval and THEN fail — unrecoverable,
+    because the card is gone by then. Absent field ⇒ no button ⇒ the operator
+    still has Approve/Reject. Fails closed, in the safe direction.
+
+    `round` is the revision round the NEXT review would be, so the re-dispatch
+    can name its own filename (`review-<task_id>-rev<N>.json`) without
+    re-deriving it from the inbox.
+    """
+    if not (pr_url and target_repo and head_sha):
+        return None
+    prior_round = data.get('revision_count')
+    if not isinstance(prior_round, int) or prior_round < 0:
+        prior_round = 0
+    return {
+        'task_id': task_id,
+        'pr_url': pr_url,
+        'target_repo': target_repo,
+        'head_sha': head_sha,
+        'round': prior_round + 1,
+    }
+
+
 def _emit_no_session_decision_approval(
     data: dict[str, Any], marker_decision: dict[str, Any],
 ) -> None:
     """Decision bucket (spec §6): a BINARY approval_request on the Approvals tab
     (never a plain larry_alert — that strands the decision, the 2026-06-03
     deploy-notifier incident). add_pending is the durable store; the chain_event
-    is the tab feed (best-effort). Idempotent on PR + head SHA."""
+    is the tab feed (best-effort). Idempotent on PR + head SHA.
+
+    Head resolution (approvals-third-action-recheck slice 1, 2026-07-25): the
+    head is resolved LIVE from `pr_url` and only falls back to the envelope's
+    `head_sha`. The mirror-result envelope does NOT carry a head — `head_sha` is
+    not in `CHAIN_CONTEXT_FIELDS`, so `build_chain_envelope` drops it on the
+    marker-notify hop (verified on RSDPM #59's `notify-pr-RSDPM-59.json`, which
+    carries `pr_url` + `target_repo` and no head). The consequence was NOT
+    cosmetic: with no head8 suffix the approval id collapses to the bare
+    `mirror-review-<task_id>`, and Contract D below matches it in `history` as
+    well as `pending` — so once ANY bare-id card for a task is decided, every
+    later escalation on that task is SILENTLY suppressed (red commit status, no
+    card, no DM). Resolving live restores the per-head scoping the contract
+    always assumed it had. Fail-safe: an unresolvable head keeps the bare id
+    (exact prior behavior) rather than crashing the escalation path.
+
+    `recheck_target` is the structured PR coordinate for the Approvals tab's
+    third action ("Fixed — re-review"). Before this, `pr_url` reached the card
+    ONLY inside the prose summary, so a consumer had to regex it back out of
+    English — the same parse-the-id trap that forced word-boundary matching in
+    `_reconcile_no_session_decision_on_merge`. Its presence is also the
+    capability gate: no `recheck_target` on the card ⇒ the dashboard does not
+    render the third button and the backend rejects the action.
+    """
     task_id = data.get('task_id') or 'unknown'
-    head = (data.get('head_sha') or '')[:8]
+    payload_in = marker_decision.get('payload') or {}
+    pr_url = data.get('pr_url') or payload_in.get('pr_url')
+    target_repo = data.get('target_repo') or backfill_target_repo(task_id)
+    head_sha = _resolve_escalation_head_sha(data, pr_url)
+    head = (head_sha or '')[:8]
     approval_task_id = f'mirror-review-{task_id}' + (f'-{head}' if head else '')
     # Contract D: one approval per PR+head SHA. A re-review of the same head
     # finds the existing row (pending or history) and skips.
     if approval.find_by_id_any_state(approval_task_id) is not None:
         return
-    payload_in = marker_decision.get('payload') or {}
-    pr_url = data.get('pr_url') or payload_in.get('pr_url')
     reason = (marker_decision.get('intent_kwargs') or {}).get('reason', '') or (
         'Mirror flagged this session-less PR for a human decision.'
     )
@@ -6029,6 +6117,15 @@ def _emit_no_session_decision_approval(
         'target_agent': 'forge',
         'prompt': summary,
     }
+    # Only stamp a target we could fully address. A partial coordinate is worse
+    # than none: it would render the button and then fail at dispatch time,
+    # after the card has already been resolved and is no longer recoverable.
+    recheck_target = _build_recheck_target(
+        task_id=task_id, pr_url=pr_url, target_repo=target_repo,
+        head_sha=head_sha, data=data,
+    )
+    if recheck_target is not None:
+        payload['recheck_target'] = recheck_target
     # Null-chat fallback (2026-07-02 PR #805 incident): a session-less
     # escalation whose envelope carries no valid reply_chat_id was stored with
     # chat_id=None, so the DM never reached Larry — only the tab fired. Fall
