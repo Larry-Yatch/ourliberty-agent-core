@@ -12174,7 +12174,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-26T17:15:16.860164+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-26T17:13:17.135458+00:00"
+      "orphan_last_activity_ts": "2026-07-26T17:13:17.135458+00:00",
+      "briefing": {
+        "what": "A piece of finished work from your team that passed quality checks but isn't yet attached to any active initiative.",
+        "why": "Unassigned work that ships without a clear owner or goal can quietly add to what you have to maintain later, and right now nobody's accountable for it.",
+        "suggest": "Before it moves further, have someone confirm which goal it serves \u2014 if it fits, keep it; if not, pause it until you know why it exists."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-26T17:25:20.117380+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
