@@ -12477,7 +12477,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-26T21:16:46.709838+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-26T21:02:05.378998+00:00"
+      "orphan_last_activity_ts": "2026-07-26T21:02:05.378998+00:00",
+      "briefing": {
+        "what": "A small reliability fix that lets the team's messaging system automatically clean up mislabeled internal messages instead of rejecting them and trying again.",
+        "why": "It's the single most common cause of wasted retries right now, so fixing it makes daily operations faster and cheaper with fewer stalls.",
+        "suggest": "Worth doing, but since it touches how messages get delivered, give it a quick sanity check before it goes live rather than rushing it through."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-26T21:27:04.554404+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
