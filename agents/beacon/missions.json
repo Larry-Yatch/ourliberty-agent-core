@@ -11774,7 +11774,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-26T00:22:23.942581+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-26T00:20:29.427499+00:00"
+      "orphan_last_activity_ts": "2026-07-26T00:20:29.427499+00:00",
+      "briefing": {
+        "what": "A piece of work your team built and finished that isn't yet attached to any active initiative.",
+        "why": "Finished-but-unassigned work can quietly ship changes or sit idle, so it's worth a quick look before it moves further.",
+        "suggest": "Take a moment to confirm this belongs somewhere before letting it go live, rather than approving it blind."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-26T00:24:20.421747+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
