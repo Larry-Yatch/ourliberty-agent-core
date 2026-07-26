@@ -1040,6 +1040,17 @@ def build_approval_request_chain_event(
     # untouched.
     if origin_task_id and origin_task_id != task_id:
         chain_payload['origin_task_id'] = origin_task_id
+    # approvals-third-action-recheck slice 1: forward the structured PR
+    # coordinate to the tab feed when the emitting path stamped one (today only
+    # `outbox_notifier._emit_no_session_decision_approval`). Deliberately NOT a
+    # third `suggested_envelope_*`: `recheck` writes a Mirror review request
+    # directly via safe_write_inbox rather than an LLM envelope to Beacon, so
+    # there is no envelope to suggest. Presence here is the dashboard's
+    # capability gate for rendering the third button; absence is the norm and
+    # leaves every existing payload byte-identical.
+    recheck_target = payload.get('recheck_target')
+    if isinstance(recheck_target, dict) and recheck_target:
+        chain_payload['recheck_target'] = recheck_target
     # Null-chat leg (fix-pulse-auto-dispatch-null-chat-chain-event-001): when the
     # notifier resolved a chat destination (a valid inbound int, or the Larry
     # fallback for a null reply_chat_id), thread it into the chain event AND both
