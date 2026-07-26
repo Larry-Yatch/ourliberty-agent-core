@@ -2464,18 +2464,49 @@ def _classify_forge_marker(data: dict[str, Any]) -> Optional[dict[str, Any]]:
         and marker_task_id is not None
         and marker_task_id != envelope_task_id
     ):
-        # Record the cross-identity claim BEFORE raising so a later board Launch
-        # of `marker_task_id` can de-duplicate against this in-flight work.
-        _record_deliverable_claim(
-            claimed_task_id=marker_task_id,
-            envelope_task_id=envelope_task_id,
-            agent=data.get('agent', 'forge'),
-            target_repo=data.get('target_repo'),
+        # marker-taskid-normalize-001: routing already keys off the outbox
+        # FILENAME STEM (= envelope task_id), so an affix-only or whitespace-only
+        # difference is unambiguously the SAME task, not a competing claim.
+        # Auto-normalize those instead of dead-lettering (each reject cost one
+        # extra Forge invocation; ~9 occurrences/week). A MATCH is: (a)
+        # whitespace-only difference, or (b) stripping a single recognized
+        # leading agent affix (`forge-` / `forge/`) yields the bare envelope id.
+        # Anything else (semantic rename, suffix bump) stays a genuine
+        # DIVERGENCE and keeps the strict record-claim + raise — Forge recovers
+        # from those at retry 1, the correct teaching signal.
+        stripped = marker_task_id.strip() if isinstance(marker_task_id, str) else marker_task_id
+        normalized_match = isinstance(marker_task_id, str) and (
+            stripped == envelope_task_id
+            or any(
+                stripped[len(affix):] == envelope_task_id
+                for affix in ('forge-', 'forge/')
+                if stripped.startswith(affix)
+            )
         )
-        raise fph.MalformedForgeMarker(
-            f'marker task_id ({marker_task_id!r}) does not match envelope '
-            f'task_id ({envelope_task_id!r})'
-        )
+        if normalized_match:
+            # Auto-recovered: no deliverable claim (same task), no raise. Use the
+            # canonical envelope id downstream. INFO-only — not actionable for
+            # Larry (actionable-only alert discipline).
+            log(
+                f'normalized affixed forge marker task_id: {marker_task_id!r} '
+                f'-> {envelope_task_id!r}'
+            )
+            if isinstance(payload, dict):
+                payload['task_id'] = envelope_task_id
+        else:
+            # Record the cross-identity claim BEFORE raising so a later board
+            # Launch of `marker_task_id` can de-duplicate against this in-flight
+            # work.
+            _record_deliverable_claim(
+                claimed_task_id=marker_task_id,
+                envelope_task_id=envelope_task_id,
+                agent=data.get('agent', 'forge'),
+                target_repo=data.get('target_repo'),
+            )
+            raise fph.MalformedForgeMarker(
+                f'marker task_id ({marker_task_id!r}) does not match envelope '
+                f'task_id ({envelope_task_id!r})'
+            )
 
     agent = data.get('agent', 'forge')
     if marker_type == 'clarify_request':
