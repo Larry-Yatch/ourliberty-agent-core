@@ -4,6 +4,78 @@
 
 ---
 
+## Iteration ~6349 — 2026-07-26T23:43Z UTC (Larry /cycle chat, Tier 1)
+
+**Health:** ✅ NOMINAL with carries. **Tier 1** (consecutive_clean=0; carries: Forge PID 561609 in-flight post-PR#1028 open (in-flight-stall Tier-3 silence); Mirror review for PR#1028 dispatched 23:40Z UTC; PR#74 RSDPM isDraft=true queue depth 3; PR#90 revision-1 in Forge inbox 53+ min queued; pending=0). 9 daemons alive. Watermark=513 (1 new alert triaged Tier-3).
+
+**VERIFY-BEFORE-REASSERT (from iter ~6348 at ~23:35Z UTC):**
+- **"PR #1028 OPENED 23:28:19Z UTC (forge/marker-taskid-normalize-001)"**: CONFIRMED — PR #1028 OPEN/NOT-DRAFT/MERGEABLE. **CORRECTED:** prev iter concluded "Forge build COMPLETED" but forge.log has NO completion entry since 22:33Z UTC start; PID 561609 ALIVE per ps (cpu=2:21); PR was opened mid-session (not post-exit). Mirror review dispatched by outbox-notifier at 23:40:20Z UTC. [carry → UPDATED: Mirror review in-flight ✅]
+- **"revision-transcript-jump-1 queued in Forge inbox"**: CONFIRMED — file still in Forge inbox (22:50Z UTC, now ~53 min queued; Forge PID 561609 still occupying the slot). [carry ✅]
+- **"pending=1 unreg-approval-7d4c2c8ff4ff"**: UPDATED → **pending=0** (history=539). Approval resolved/dismissed since last iter. [resolved ✅]
+- **"PR #74 isDraft=true queue depth 3"**: CONFIRMED — isDraft=true MERGEABLE; PRs #88+#91+#93 NOT-DRAFT/MERGEABLE/amr=null. Queue depth 3. [carry ✅]
+- **"9 daemons alive"**: CONFIRMED — 9 PIDs alive (19656+19683+19716+19724+19868+19943+65525+65530+65548); watchdog healthy 23:42:26Z UTC. [carry ✅]
+- **"watermark=512"**: UPDATED → 513 (1 new alert at line 513, triaged Tier-3). [updated]
+- **"Check 3 red_mirror_status:RSDPM:90 in cooldown"**: CONFIRMED — still in cooldown; 0 alerts fire. [carry ✅]
+
+**New findings this iter:**
+1. **pending=0** (was pending=1 last iter): unreg-approval-7d4c2c8ff4ff for pr-RSDPM-90 is gone from beacon-pending-approvals (state). Resolved or dismissed since last iter. NOMINAL ✅
+2. **Mirror review dispatched for PR #1028** (23:40:20Z UTC): outbox-notifier dispatched `review-marker-taskid-normalize-001.json` to Mirror inbox. Normal pipeline progression.
+3. **Alert line 513 (23:38:00Z UTC):** sentinel in-flight-stall for marker-taskid-normalize-001 (PID 561609, 1.08h). Triaged **Tier-3 silence** (known pattern — `alert_triage_state.py triage-alert` returned tier=3, route=digest). Forge PID 561609 confirmed alive (ps). Wedged-session reaper will clean up the slot automatically within its progress grace. No action taken.
+4. **Check 3 NO_SESSION_REVISION:** stall checker suppresses page for transcript-jump (human-authored branch `claude/transcript-jump`; cold-start revision in Forge inbox is expected, not a stall). Separate from red_mirror_status:RSDPM:90 cooldown.
+
+**Check 0 — Alert triage (~23:41Z UTC):** repair-watermark no-op (repaired=false, old=512, file_length=513). 1 new alert (line 513): in-flight-stall for marker-taskid-normalize-001 (PID 561609) → `triage-alert` returned **Tier-3 silence** (known pattern; route=digest). Watermark advanced 512→513. NOMINAL ✅
+
+**Check 1 — Log noise (~23:41Z UTC):** outbox-notifier.log last entry [2026-07-26 17:40:20] MDT (23:40:20Z UTC; ~1 min from check; Mirror review dispatch for PR#1028 — INFO). watchdog.log last entry [2026-07-26 17:42:26] MDT (23:42:26Z UTC; ~1 min from check; overall=healthy). 0 new WARNs. NOMINAL ✅
+
+**Check 2 — Telegram sweep (~23:43Z UTC):** beacon_telegram_bot.log last entry [2026-07-26T17:42:14-0600] (23:42:14Z UTC; alert idx=512 delivered re: in-flight-stall sentinel). Bot PID 65525 alive. 0 new Larry directives since last iter. NOMINAL ✅
+
+**Check 3 — Pipeline stall (~23:39Z UTC):** heal_pipeline_stall dry-run: FORGE_NO_PR_SKIP threshold-update-2026-07-26-001 (pr_exists PR #1027 MERGED); FORGE_NO_PR_SKIP pr-RSDPM-75+81+85+89 (MERGED); NO_SESSION_REVISION task=transcript-jump (human-authored branch, suppressed); suppressed(cooldown): mirror_pass_unmerged:m12-queue-zones; suppressed(cooldown): red_mirror_status:Larry-Yatch/RSDPM:90. **0 alerts would fire; 0 recoveries.** NOMINAL ✅
+
+**Check 4 — Pending directives (~23:43Z UTC):** beacon-pending-approvals (state): **pending=0** (history=539). NOMINAL ✅ [CHANGED from pending=1 last iter]
+
+**Check 5 — Stale daemon code (~23:43Z UTC):** heal-stale-daemon-code heartbeat=2026-07-26T23:39:21Z UTC (~4 min from check; fresh <60 min). --dry-run: fresh=439, unparseable=102 (inactive systemd service units — expected). Watchdog=healthy 23:42:26Z UTC. NOMINAL ✅
+
+**Check A — Source repo:** HEAD=d3d98302=origin/main; on main; clean tree; 0 ahead/behind. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-26T22:52:22Z UTC (~51 min from check); status=no-change; consecutive_push_failures=0. Within 2h. NOMINAL ✅
+**Check C — Agent liveness:** 9 PIDs alive (19656/chain-event-shipper, 19683+19724+19868/agent_telegram_bots, 19716/inbox-watcher, 19943/spec-review-runner, 65525/beacon-bot, 65530/dashboard-api, 65548/outbox-notifier). Watchdog=healthy 23:42:26Z UTC. NOMINAL ✅
+**Check E — PR/merge state:** ourliberty-agent-core: **PR #1028 OPEN/NOT-DRAFT/MERGEABLE** [Mirror review dispatched 23:40Z UTC; amr=null]. RSDPM: PR #74 OPEN/DRAFT/MERGEABLE [carry ⚠️ M12 active dev]; PR #88 OPEN/NOT-DRAFT/MERGEABLE (REVIEW_PASS/HELD(#74)); PR #90 OPEN/DRAFT/MERGEABLE [M13 spec, revision-1 in Forge inbox ~53 min queued]; PR #91 OPEN/NOT-DRAFT/MERGEABLE (REVIEW_PASS/HELD(#74)); PR #93 OPEN/NOT-DRAFT/MERGEABLE (REVIEW_PASS/HELD(#74)). Queue depth behind #74: **3** (#88+#91+#93 REVIEW_PASS/HELD).
+**Check H — Forge inbox:** build-marker-taskid-normalize-001.json (PR#1028 opened but PID 561609 alive, in-flight slot held; inbox_watcher will archive after process exits) + revision-transcript-jump-1.json (queued 22:50Z UTC, ~53 min; awaiting Forge slot). Beacon=0, Mirror=0. NOMINAL ✅
+
+**§5.0:** audit_due_nudge: no committed baseline; no-op. distill_detector: no un-distilled audits; no-op. audit_cadence_signal: no post-seed distill artifacts; no-op. NOMINAL ✅
+
+**Rotations:** [carry] SUPABASE_SERVICE_ROLE_KEY due=2026-08-22 (~27d). 14-day dedup active (expires ~2026-08-03); no new DM.
+
+**Conditional checks:**
+- **Check I:** DONE ✅ (2026-07-26T14:13Z UTC). [done]
+- **Check III:** DONE ✅ (PR #1027 MERGED). [done ✅]
+- **Check VI:** timer-managed. [carry]
+- **Check VIII:** timer-managed; last artifact check-viii-2026-07-20.json. [carry]
+
+**G-rule assessment:**
+- **marker-taskid-normalize-001: verification_pending** [UPDATED: PR#1028 OPEN/MERGEABLE; Mirror review dispatched 23:40Z UTC; G-rule advances from "PR open" to "Mirror review in-flight"; Forge PID 561609 still alive (in-flight slot; wedged-session reaper will handle cleanup)].
+- **pipeline-stall-red-mirror-revision-in-forge-001: 1/3** [carry; stall checker suppressed this iter: NO_SESSION_REVISION for transcript-jump + red_mirror_status:RSDPM:90 cooldown; Forge PID still alive occupying slot; G-rule may self-resolve when Forge exits and inbox_watcher picks up revision-transcript-jump-1].
+- forge-marker-taskid-suffix-increment-001: **2/3** [carry, 0 new].
+- medic-draft-status-false-positive: **2/3** [carry, 0 new].
+- check-i-force-bypass-dm-route: **2/3** [carry, 0 new].
+- Active carries (verification_pending): forge-revision-preamble-missing; forge-wip-redispatch-digest; forge-wip-redispatch-exhausted-no-pr; outbox-notifier-intent-reject; auto-dispatch-APPROVAL_REQUEST-mismatch; PR #1022 heal-wip-redispatch DAG-preflight suppression; marker-taskid-normalize-001 (Mirror review in-flight). Sub-threshold: pr-merged-without-deep-review-shortcut-001 (1/3); mirror-ghost-retry-m5-pr2 (1/3); heal-stall-retry-exhausted-after-pr-merge (1/3); pipeline-stall-red-mirror-revision-in-forge-001 (1/3).
+
+**Actions taken:**
+1. Check 0: repair-watermark no-op. Alert line 513 triaged Tier-3 silence (in-flight-stall, known pattern). Watermark advanced 512→513.
+2. §5.0 one-shots: all no-ops.
+3. Tier state: `record --checks-clean false` → consecutive_clean=0; **Tier 1** stays (last_signal_at=2026-07-26T23:43:34Z UTC).
+4. PRIME ledger: intervention appended (tier=1, kind=intervention, detail=pending0-cleared-from-1;Mirror-review-dispatched-PR1028-23:40Z;in-flight-stall-Tier3-silence-PID561609-alive;revision-transcript-jump-53min-queued;PR74-draft-carry-queue3;9-daemons-alive).
+
+**Escalations:** None new.
+- [cleared ✅] unreg-approval-7d4c2c8ff4ff for pr-RSDPM-90: pending=0 (resolved/dismissed). No DM needed.
+- [carry — no new DM] RSDPM PR #74 isDraft=true queue depth 3 (#88+#91+#93 REVIEW_PASS/HELD). Larry-aware from idx=507.
+- [carry — no new DM] check-vi-posture-proposals-2026-07-07 (2 proposals)
+- [carry — no new DM] ourliberty-health-subject-key-mismatch translation gap (vp, dispatched iter ~4488) — current health check clean ✅; auto-remediated.
+
+**PRIME DIRECTIVE:** intervention (pending=0 cleared; Mirror review dispatched PR#1028 23:40Z UTC; in-flight-stall PID561609 Tier-3 silence; revision-transcript-jump-1 53min queued; PR#74 isDraft=true queue depth 3; 9 daemons alive; watermark 512→513). Trailing 30d: ratio=improving.
+**Tier end-of-iter:** **Tier 1** (consecutive_clean=0; last_signal_at=2026-07-26T23:43:34Z UTC; 5-min cadence).
+
+---
+
 ## Iteration ~6348 — 2026-07-26T23:35Z UTC (Larry /cycle chat, Tier 1)
 
 **Health:** ⚠️ NON-NOMINAL — Check 4 new pending approval + PR #1028 opened. **Tier 1** (consecutive_clean=0; Forge build marker-taskid-normalize-001 COMPLETE → PR #1028 opened 23:28:19Z UTC; revision-transcript-jump-1 queued in Forge inbox; pending=1 (unreg-approval-7d4c2c8ff4ff, pr-RSDPM-90); PR #74 RSDPM isDraft=true queue depth 3: #88+#91+#93 REVIEW_PASS/HELD). 9 daemons alive. Watermark=512 (1 new alert triaged Tier-3). 
@@ -2677,71 +2749,6 @@ Watermark advanced 507→509. NOMINAL ✅ [No tier-reset from Check 0: Tier-4 DM
 
 **PRIME DIRECTIVE:** intervention carry (Check 3: RSDPM PR #74 still isDraft=true; healer in cooldown; DM delivered idx=507+508; action required: `gh pr ready 74 --repo Larry-Yatch/RSDPM`). Trailing 30d: ratio=29.46 (systemic_fixes=52, verification_pending=23, trend=improving).
 **Tier end-of-iter:** **Tier 1** (consecutive_clean=0; last_signal_at=2026-07-26T19:07:05Z UTC; 5-min cadence).
-
----
-
-## Iteration ~6309 — 2026-07-26T19:03Z UTC (Larry /cycle chat, Tier 1 carry)
-
-**Health:** ⚠️ SIGNAL (carry). **Tier 1** (consecutive_clean stays 0; last_signal_at=2026-07-26T19:01:05Z UTC; 5-min cadence). RSDPM PR #74 (feat(M12)) remains isDraft=true after Mirror PASS at 18:20Z UTC — no change since iter ~6308. No new external alerts (larry-alerts.jsonl file_length=508; line 508 = Pulse's own iter ~6308 escalation). 9 live daemons. Zombie PID 397443 (Zs, PPID=65548 alive; self-reaping from PR #83 BASELINE_WARM). Watchdog=healthy 18:54Z UTC. 0 open PRs agent-core. Check I + Check III DONE ✅.
-
-**VERIFY-BEFORE-REASSERT (from iter ~6308 at 18:55Z UTC):**
-- **"daemons healthy (9 PIDs)"**: CONFIRMED — heartbeat=2026-07-26T18:56:20Z UTC (~5 min fresh); 9 PIDs alive (19656/chain-event-shipper, 19683+19724+19868/agent_telegram_bots, 19716/inbox-watcher, 19943/spec-review-runner, 65525/beacon-bot, 65530/dashboard-api, 65548/outbox-notifier). Zombie PID 397443 (Zs, PPID=65548 alive; BASELINE_WARM from PR #83 at 18:43Z UTC; self-reaping). Watchdog=healthy 12:54 MDT (18:54Z UTC). NOMINAL ✅
-- **"sync NOMINAL, last_sync=2026-07-26T17:52:15Z UTC"**: UPDATED — last_sync=2026-07-26T18:52:16Z UTC (~8 min from check ~19:01Z UTC); status=no-change; push_failures=0. Within 2h. NOMINAL ✅
-- **"beacon-pending-approvals pending=0"**: CONFIRMED — pending=0 (history=0). NOMINAL ✅
-- **"HEAD=7e4041e4=origin/main"**: UPDATED — HEAD=bb833964=origin/main (wrapper auto-committed "Pulse cycle 20260726T185647Z" for iter ~6308). On main; clean tree; 0 ahead/behind. NOMINAL ✅
-- **"larry-alerts.jsonl watermark=507"**: file_length=508; line 508 = Pulse's own iter ~6308 escalation (RSDPM PR #74 draft-block). 0 new external alerts. Watermark stays 507. NOMINAL ✅
-- **"forge-marker-taskid-suffix-increment-001 at 2/3"**: CARRY — 0 new occurrences. [carry, 2/3]
-- **"MalformedForgeMarker WARN at 2/3"**: CARRY — 0 new occurrences. [carry, 2/3]
-- **"Check I: DONE ✅"**: CONFIRMED — check-i-2026-07-26.json; fired 14:13Z UTC. [done ✅]
-- **"Check III: DONE ✅, PR #1027 auto-merged ~15:54Z UTC"**: CONFIRMED. [done ✅]
-- **"RSDPM PR #74 draft-blocked after Mirror PASS"**: CONFIRMED PERSISTS — PR #74 still isDraft=true, MERGEABLE, state=OPEN. Pipeline stall dry-run still shows mirror_pass_unmerged:m12-queue-zones. Escalation already sent to Larry (larry-alerts.jsonl line 508, iter ~6308). No new action — awaiting Larry/Forge to `gh pr ready 74 --repo Larry-Yatch/RSDPM`. [carry, ask-then-do, no new DM]
-- **"PR #1022 MERGED — verification_pending heal-wip-redispatch DAG-preflight suppression"**: CARRY. [carry, vp]
-
-**NEW findings this iter:** None. All carries confirmed; PR #74 signal unchanged.
-
-**Check 0 — Alert triage (~19:01Z UTC):** file_length=508; watermark=507. Line 508 = Pulse's iter ~6308 escalation (already tracked). 0 new incoming external alerts. Watermark stays 507. NOMINAL ✅ [No new tier-reset from Check 0]
-
-**Check 1 — Log noise (~19:01Z UTC):** outbox-notifier.log last entry [2026-07-26 12:43:24] MDT = 18:43:24Z UTC (~17 min from check; AUTO_MERGE PR #83 merged — pipeline quiescent since). watchdog.log last entry [2026-07-26 12:54:12] MDT = 18:54:12Z UTC (~7 min from check; overall=healthy). 0 new WARNs since iter ~6308. MalformedForgeMarker G-rule at 2/3 carries unchanged. NOMINAL ✅
-
-**Check 2 — Telegram sweep (~19:01Z UTC):** beacon_telegram_bot.log last entry [2026-07-26T09:58:11-0600] = 15:58:11Z UTC (~3h from check; idx=506 review-pass notification). Bot PID 65525 alive (ps, Ss). 0 new Larry directives unhandled. No agent distress. NOMINAL ✅
-
-**Check 3 — Pipeline stall (~19:01Z UTC):** heal_pipeline_stall dry-run: `DRY-RUN would recover-then-alert: mirror_pass_unmerged:m12-queue-zones (subject='pipeline-stall:mirror-pass-unmerged:PR#74')`. PR #74 still isDraft=true — same signal as iter ~6308. FORGE_NO_PR_SKIP for threshold-update-2026-07-26-001 (PR #1027 exists — expected). Escalation already dispatched (larry-alerts.jsonl line 508, iter ~6308). No new DM. **[carry, tier-reset; consecutive_clean stays 0]** ⚠️ SIGNAL
-
-**Check 4 — Pending directives (~19:01Z UTC):** beacon-pending-approvals: **pending=0** (history=0). All agent-core inboxes empty (forge=0, beacon=0, mirror=0). 0 orphan Larry directives. NOMINAL ✅
-
-**Check 5 — Stale daemon code (~19:01Z UTC):** heal-stale-daemon-code.heartbeat=2026-07-26T18:56:20Z UTC (~5 min from check; fresh <60 min). 9 Python processes alive (ps). Zombie PID 397443 (Zs, PPID=65548 alive; BASELINE_WARM remnant from PR #83 18:43Z UTC; self-reaping). Watchdog=healthy 18:54Z UTC. NOMINAL ✅
-
-**Check A — Source repo:** HEAD=bb833964=origin/main; on main; clean tree; 0 ahead/behind. NOMINAL ✅
-**Check B — Sync health:** last_sync=2026-07-26T18:52:16Z UTC (~8 min from check); status=no-change; push_failures=0. Within 2h. NOMINAL ✅
-**Check C — Agent liveness:** All 9 daemons alive (PIDs confirmed via ps). Zombie PID 397443 self-reaping (PPID=65548 alive). Watchdog=healthy 18:54Z UTC. NOMINAL ✅
-**Check E — PR/merge state:** 0 open PRs on ourliberty-agent-core. NOMINAL ✅. RSDPM: only PR #74 OPEN/DRAFT — signal owned by Check 3.
-**Check H — Forge activity digest:** All agent-core inboxes empty. RSDPM pipeline quiet: PR #74 draft-blocked, 0 new PRs since iter ~6308. ✅
-
-**§5.0:** audit_due_nudge: no committed baseline; no-op. distill_detector: no un-distilled audits; no-op. audit_cadence_signal: no post-seed distill artifacts; no-op. NOMINAL ✅
-
-**Rotations:** [carry] SUPABASE_SERVICE_ROLE_KEY due=2026-08-22 (~27d). Last DM 2026-07-20T20:00Z UTC. 14-day dedup active (expires ~2026-08-03); no new DM.
-
-**Conditional checks:**
-- **Check I:** DONE ✅ (2026-07-26T14:13Z UTC). [done]
-- **Check III:** DONE ✅ (2026-07-26T10:41Z UTC). PR #1027 auto-merged ~15:54Z UTC. [done ✅]
-- **Check VI:** timer-managed. [carry]
-- **Check VIII:** timer-managed; last artifact check-viii-2026-07-20.json. [carry]
-
-**G-rule assessment:** No new occurrences this iter. forge-marker-taskid-suffix-increment-001: **2/3** [carry]; MalformedForgeMarker WARN: **2/3** [carry]. Active carries: forge-revision-preamble-missing (vp); forge-wip-redispatch-digest (vp); forge-wip-redispatch-exhausted-no-pr (vp); outbox-notifier-intent-reject (Forge vp); check-i-force-bypass-dm-route (2/3); auto-dispatch-APPROVAL_REQUEST-mismatch (vp); PR #1022 heal-wip-redispatch DAG-preflight suppression (vp). Sub-threshold: pr-merged-without-deep-review-shortcut-001 (1/3); mirror-ghost-retry-m5-pr2 (1/3); heal-stall-retry-exhausted-after-pr-merge (1/3); ourliberty-health-transient-precommit-DM (1/3).
-
-**Actions taken:**
-1. Check 0: 0 alerts triaged. Watermark stays 507.
-2. §5.0 one-shots: all no-ops.
-3. Tier state: record --checks-clean false → consecutive_clean stays 0; **Tier 1** (last_signal_at=2026-07-26T19:01:05Z UTC).
-4. PRIME ledger: intervention appended (tier=1, template=mirror-pass-unmerged-draft-pr, detail=RSDPM PR #74 still isDraft=true; already escalated iter ~6308; carry — awaiting Larry/Forge to gh pr ready 74 --repo Larry-Yatch/RSDPM).
-
-**Escalations:** None new.
-- [carry, no new DM — already escalated iter ~6308] RSDPM PR #74 draft-blocked after Mirror PASS. Fix: `gh pr ready 74 --repo Larry-Yatch/RSDPM`.
-- [carry — no new DM] check-vi-posture-proposals-2026-07-07 (2 proposals)
-- [carry — no new DM] ourliberty-health-subject-key-mismatch translation gap (vp, dispatched iter ~4488)
-
-**PRIME DIRECTIVE:** intervention carry (Check 3: RSDPM PR #74 (feat(M12)) remains draft-blocked after Mirror PASS at 18:20Z UTC; already escalated iter ~6308 larry-alerts line 508; no new action this iter; action required: gh pr ready 74 --repo Larry-Yatch/RSDPM). Trailing 30d: ratio=29.46 (systemic_fixes=52, verification_pending=23, trend=improving).
-**Tier end-of-iter:** **Tier 1** (consecutive_clean=0; last_signal_at=2026-07-26T19:01:05Z UTC; 5-min cadence).
 
 ---
 
