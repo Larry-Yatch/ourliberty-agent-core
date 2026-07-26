@@ -12123,6 +12123,23 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-threshold-update-2026-07-26-001",
+      "name": "Threshold Update 2026 07 26 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `threshold-update-2026-07-26-001`. Last activity 2026-07-26T14:59:51.028062+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "threshold-update-2026-07-26-001"
+      ],
+      "repo": null,
+      "created": "2026-07-26",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-26T15:14:16.149744+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-26T14:59:51.028062+00:00"
     }
   ]
 }
