@@ -11920,7 +11920,11 @@
         "at": "2026-07-26T03:25:37.621529+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-26T03:39:07.088100+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-pr-RSDPM-62",
@@ -11951,7 +11955,11 @@
         "at": "2026-07-26T03:25:37.621529+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-26T03:39:07.088100+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-pr-ourliberty-agent-core-1024",
@@ -11983,6 +11991,23 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-deep-review-hold-pr1024-1d76561c",
+      "name": "Deep Review Hold Pr1024 1d76561c",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `deep-review-hold-pr1024-1d76561c`. Last activity 2026-07-26T03:32:47.40883+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "deep-review-hold-pr1024-1d76561c"
+      ],
+      "repo": null,
+      "created": "2026-07-26",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-26T03:39:07.088100+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-26T03:32:47.40883+00:00"
     }
   ]
 }
