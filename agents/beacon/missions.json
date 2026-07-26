@@ -11855,6 +11855,23 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-larry-reject-deef5175138e5e45a83ab0c13e1916ee52da46da",
+      "name": "Larry Reject Deef5175138e5e45a83ab0c13e1916ee52da46da",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `larry-reject-deef5175138e5e45a83ab0c13e1916ee52da46da`. Last activity 2026-07-26T02:05:55.399003+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "larry-reject-deef5175138e5e45a83ab0c13e1916ee52da46da"
+      ],
+      "repo": null,
+      "created": "2026-07-26",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-26T02:08:29.773892+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-26T02:05:55.399003+00:00"
     }
   ]
 }
