@@ -12456,7 +12456,28 @@
         "at": "2026-07-26T21:06:53.283011+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-26T21:16:46.709838+00:00",
+      "retired_reason": "orphan-terminal"
+    },
+    {
+      "id": "proposed-marker-taskid-normalize-001",
+      "name": "Marker Taskid Normalize 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `marker-taskid-normalize-001`. Last activity 2026-07-26T21:02:05.378998+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "marker-taskid-normalize-001"
+      ],
+      "repo": null,
+      "created": "2026-07-26",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-26T21:16:46.709838+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-26T21:02:05.378998+00:00"
     }
   ]
 }
