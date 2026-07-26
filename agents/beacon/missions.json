@@ -12223,7 +12223,11 @@
         "at": "2026-07-26T17:55:23.075300+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-26T18:00:15.989148+00:00",
+      "retired_reason": "orphan-terminal"
     }
   ]
 }
