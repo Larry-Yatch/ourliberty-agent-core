@@ -39070,3 +39070,70 @@ Watermark advanced 534→535. NOMINAL ✅ [No tier-reset — Tier 3]
 
 ---
 
+## Iteration ~6290 — 2026-07-26T11:00Z UTC (Larry /cycle chat, Tier 3→1)
+
+**Health:** ⚠️ NON-NOMINAL. **Tier 3 → 1** (tier-reset: Tier-4 Check III threshold-proposal; consecutive_clean 13→0). 9 live daemons + 1 zombie (PID 85658, BASELINE_WARM RSDPM PR #66, Zs; PPID=65548; self-reaping). Check III fired 10:41Z UTC — 2 proposals (beacon 320→232s, mirror 1531→1311s), DM delivered 10:43:48Z UTC. 1 alert triaged Tier 4. 0 open PRs. Pipeline idle. Sync NOMINAL.
+
+**VERIFY-BEFORE-REASSERT (from iter ~6289 at ~10:24Z UTC):**
+- **"daemons healthy (9+1 PIDs)"**: CONFIRMED — heal-stale-daemon-code.heartbeat=2026-07-26T10:52:16Z UTC (~8 min from check); 9 PIDs alive (same PIDs as ~6289); PID 85658 persists (Zs, PPID=65548/outbox-notifier alive, self-reaping). NOMINAL ✅
+- **"sync NOMINAL, last_sync=2026-07-26T09:51:10Z UTC"**: UPDATED — new sync at 2026-07-26T10:51:16Z UTC (~9 min from check); status=no-change; push_failures=0. Within 2h. NOMINAL ✅
+- **"beacon-pending-approvals pending=0"**: CONFIRMED — pending=0, history=537. NOMINAL ✅
+- **"HEAD=f680b549=origin/main"**: UPDATED — HEAD=1e726fff=origin/main ("chore(missions): GC healer — commit missions.json delta"). On main; clean tree; 0 ahead/behind. NOMINAL ✅
+- **"larry-alerts.jsonl watermark=501"**: UPDATED — file_length=502; 1 new alert (threshold-proposal-2026-07-26, tier-4, tier-reset); watermark advanced to 502. NON-NOMINAL [tier-reset]
+- **"forge-marker-taskid-suffix-increment-001 at 2/3"**: CARRY — 0 new occurrences in outbox-notifier.log (last entry 05:23:35Z UTC Jul 26, all INFO). [carry, 2/3]
+- **"MalformedForgeMarker WARN at 2/3"**: CARRY — last WARN remains m11-pr-b at 04:17:32Z UTC Jul 25; 0 new occurrences. [carry, 2/3]
+- **"Check I: UPCOMING TODAY (Sun Jul 26 UTC)"**: UPDATED — timer fires ~14:13Z UTC; currently ~11:00Z UTC (~3.2h remaining). Latest artifact: check-i-2026-07-24.json (Fri). Not yet fired — timer-managed. [upcoming today]
+- **"Check III: UPCOMING TODAY (Sun Jul 26 UTC, imminent)"**: RESOLVED — Check III FIRED at 10:41:20Z UTC; artifact check-iii-2026-07-26.json written; DM delivered 10:43:48Z UTC (beacon-bot alert idx=501). [FIRED ✅]
+- **"PR #1022 MERGED — verification_pending heal-wip-redispatch DAG-preflight suppression"**: CARRY — pipeline idle; no new healer runs. [carry, vp]
+
+**NEW findings this iter:**
+- **Check III FIRED (10:41:20Z UTC):** Artifact check-iii-2026-07-26.json. 2 threshold proposals (30d lookback, n≥10, bounded_delta≤50%):
+  - `(beacon, _default)`: 320s → 232s; n=234; median=36s; p90=232s; p99=496s; Δ=28%; high_attention=false; rollback=false.
+  - `(mirror, _default)`: 1531s → 1311s; n=155; median=256s; p90=1311s; p99=1670s; Δ=14%; high_attention=false; rollback=false.
+  DM delivered via beacon-bot at 10:43:48Z UTC (route=escalate, alert idx=501). Larry can approve: `approve threshold-update-2026-07-26` on Telegram. Triage helper returned Tier 4 (source=pulse/subject=threshold-proposal-2026-07-26 has no translation entry → novel). → **tier-reset to 1.**
+
+**Check 0 — Alert triage (~10:57Z UTC):** repair-watermark: repaired=false (old=501, file_length=502). 1 new alert above watermark=501: threshold-proposal-2026-07-26 (ts=2026-07-26T10:41:20Z UTC, source=pulse, route=escalate). Triage helper: **Tier 4** (novel; no registry template, no translation match). DM already delivered via beacon-bot 10:43:48Z UTC; no duplicate DM sent. Watermark advanced to 502. NON-NOMINAL [tier-reset] ⚠️
+
+**Check 1 — Log noise (~10:58Z UTC):** outbox-notifier.log last entry [2026-07-25 23:23:35] MDT (2026-07-26T05:23:35Z UTC; ~5.4h from check; AUTO_MERGE RSDPM PR #66 + BASELINE_WARM — all INFO). watchdog.log last entry [2026-07-26 04:56:20] MDT (2026-07-26T10:56:20Z UTC; ~4 min from check; overall=healthy). 0 new WARNs. MalformedForgeMarker carry 2/3 unchanged. NOMINAL ✅
+
+**Check 2 — Telegram sweep (~10:58Z UTC):** beacon_telegram_bot.log last entry [2026-07-26T04:43:48-0600] (2026-07-26T10:43:48Z UTC; ~17 min from check; alert idx=501 threshold-proposal delivered). 0 new Larry directives (← 7998341473 count=0 in recent window). No agent distress. NOMINAL ✅
+
+**Check 3 — Pipeline stall (~10:57Z UTC):** heal_pipeline_stall dry-run at 10:57:08Z UTC: "no stalls detected." NOMINAL ✅
+
+**Check 4 — Pending directives (~10:57Z UTC):** beacon-pending-approvals: **pending=0** (history=537). All agent inboxes empty (forge=0, beacon=0, mirror=0). 0 orphan Larry directives. NOMINAL ✅
+
+**Check 5 — Stale daemon code (~10:57Z UTC):** heal-stale-daemon-code.heartbeat=2026-07-26T10:52:16Z UTC (~8 min from check; fresh <60 min). 9 Python processes alive: 19656/chain-event-shipper, 19683+19724+19868/agent_telegram_bots (forge/mirror/pulse), 19716/inbox-watcher, 19943/spec-review-runner, 65525/beacon-bot, 65530/dashboard-api, 65548/outbox-notifier. PID 85658=zombie (Zs, PPID=65548; BASELINE_WARM pr-RSDPM-66 completed). Watchdog=healthy 10:56:20Z UTC. NOMINAL ✅
+
+**Check A — Source repo:** HEAD=1e726fff=origin/main; on main; clean tree; 0 ahead/behind. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-26T10:51:16Z UTC (~9 min from check); status=no-change; push_failures=0. Within 2h. NOMINAL ✅
+**Check C — Agent liveness:** 9 live PIDs confirmed (ps). Watchdog=healthy 10:56:20Z UTC. NOMINAL ✅
+**Check E — PR/merge state:** 0 open PRs on ourliberty-agent-core. 0 open PRs on RSDPM. NOMINAL ✅
+**Check H — Forge activity digest:** All inboxes empty (forge=0, beacon=0, mirror=0). Pipeline idle. NOMINAL ✅
+
+**§5.0:** audit_due_nudge: no committed baseline; no-op. distill_detector: no un-distilled audits; no-op. audit_cadence_signal: no post-seed distill artifacts; no-op. NOMINAL ✅
+
+**Rotations:** [carry] SUPABASE_SERVICE_ROLE_KEY due=2026-08-22 (~27d). Last DM 2026-07-20T20:00Z UTC. 14-day dedup active (expires ~2026-08-03); no new DM.
+
+**Conditional checks:**
+- **Check I:** UPCOMING TODAY (Sun Jul 26 UTC). Timer fires ~14:13Z UTC; currently ~11:00Z UTC (~3.2h remaining). Latest artifact: check-i-2026-07-24.json (Fri). Not yet fired — timer-managed. [upcoming today]
+- **Check III:** FIRED ✅ (2026-07-26T10:41Z UTC). Artifact check-iii-2026-07-26.json. 2 proposals (see NEW findings above). DM delivered 10:43:48Z UTC. [done]
+- **Check VI:** timer-managed. [carry]
+- **Check VIII:** timer-managed; last artifact check-viii-2026-07-20.json. [carry]
+
+**G-rule assessment:** No new occurrences this iter. forge-marker-taskid-suffix-increment-001: **2/3** [carry]; MalformedForgeMarker WARN: **2/3** [carry]. Active carries unchanged: forge-revision-preamble-missing (vp); forge-wip-redispatch-digest (vp); forge-wip-redispatch-exhausted-no-pr (vp); outbox-notifier-intent-reject (Forge vp); check-i-force-bypass-dm-route (2/3); auto-dispatch-APPROVAL_REQUEST-mismatch (vp); PR #1022 merged heal-wip-redispatch DAG-preflight suppression (vp). Sub-threshold: pr-merged-without-deep-review-shortcut-001 (1/3); mirror-ghost-retry-m5-pr2 (1/3); heal-stall-retry-exhausted-after-pr-merge (1/3).
+
+**Actions taken:**
+1. Check 0: repair-watermark no-op (repaired=false, old=501, file_length=502). 1 alert triaged (threshold-proposal-2026-07-26, Tier 4, tier-reset). Watermark advanced to 502.
+2. §5.0 one-shots: all no-ops.
+3. Tier state: record --checks-clean false → tier-reset 3→1; consecutive_clean=0; last_signal_at=2026-07-26T11:00:24Z UTC.
+4. PRIME ledger: intervention appended (tier=1, template=check-iii-threshold-proposal, Check III 2 proposals, Tier-4 triage).
+
+**Escalations:** None (Check III DM already delivered via beacon-bot route=escalate at 10:43:48Z UTC; no duplicate).
+- [carry — no new DM] check-vi-posture-proposals-2026-07-07 (2 proposals)
+- [carry — no new DM] ourliberty-health-subject-key-mismatch translation gap (vp, dispatched iter ~4488)
+
+**PRIME DIRECTIVE:** intervention (Check III FIRED: 2 threshold proposals surfaced; Tier-4 triage triggered tier-reset 3→1; DM delivered; no auto-apply per Check III discipline). Trailing 30d: ratio=29.34 (systemic_fixes=53, verification_pending=24, trend=improving). Note: 1 systemic_fix aged out of 30d window vs. iter ~6289 (53 vs 54); trend remains improving.
+**Tier end-of-iter:** **Tier 1** (consecutive_clean=0; last_signal_at=2026-07-26T11:00:24Z UTC; 5-min cadence).
+
+---
+
