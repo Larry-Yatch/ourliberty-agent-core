@@ -12056,7 +12056,11 @@
         "at": "2026-07-26T04:15:45.146257+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-26T04:54:20.993671+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-deep-review-hold-pr1026-b7e27e1c",
