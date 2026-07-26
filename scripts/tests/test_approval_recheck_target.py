@@ -100,7 +100,27 @@ class BuildRecheckTargetTest(unittest.TestCase):
             'target_repo': 'RSDPM',
             'head_sha': LIVE_HEAD,
             'round': 1,
+            'replan_count': 0,
         })
+
+    def test_replan_count_rides_along_from_the_envelope(self):
+        # `revision_count` resets to 0 on each replan's first review dispatch,
+        # so `round` alone cannot name a round on a replanned task. Without the
+        # count, replan 2 round 1 and replan 1 round 1 both spell `rev1`.
+        got = self._build(data={'replan_count': 2, 'revision_count': 0})
+        self.assertEqual(got['replan_count'], 2)
+        self.assertEqual(got['round'], 1)
+
+    def test_absent_replan_count_is_zero_not_missing(self):
+        # Consumers branch on `> 0`; a MISSING key would make an old card and a
+        # replan-0 card indistinguishable from a malformed one.
+        self.assertEqual(self._build()['replan_count'], 0)
+
+    def test_bogus_replan_count_falls_back_to_zero(self):
+        for bogus in ('2', -1, None, [], 1.5):
+            with self.subTest(bogus=bogus):
+                got = self._build(data={'replan_count': bogus})
+                self.assertEqual(got['replan_count'], 0)
 
     def test_round_advances_past_prior_revision_count(self):
         self.assertEqual(self._build(data={'revision_count': 2})['round'], 3)

@@ -6044,20 +6044,36 @@ def _build_recheck_target(
     still has Approve/Reject. Fails closed, in the safe direction.
 
     `round` is the revision round the NEXT review would be, so the re-dispatch
-    can name its own filename (`review-<task_id>-rev<N>.json`) without
-    re-deriving it from the inbox.
+    can name its own filename without re-deriving it from the inbox.
+
+    `replan_count` rides along for the SAME reason, and it is not optional
+    bookkeeping: `revision_count` RESETS to 0 on each replan's first review
+    dispatch (`_dispatch_mirror_review` hardcodes `revision_count: 0`), so
+    `round` alone does not identify a review round on a replanned task. That is
+    exactly why `_dispatch_mirror_review_rerun` keys its filename on BOTH
+    (`review-<task>-replan<N>-rev<R>.json` when replanning, else
+    `review-<task>-rev<R>.json`) — the D3.5 5c-followup-2 HIGH-1 fix. Without
+    the count here, the recheck dispatch can only ever spell the bare form, so
+    replan 2 round 1 and replan 1 round 1 collide on one name. Consumers must
+    treat an ABSENT `replan_count` as 0: cards stamped before this field
+    existed carry no count, and 0 reproduces the bare filename they already
+    assumed.
     """
     if not (pr_url and target_repo and head_sha):
         return None
     prior_round = data.get('revision_count')
     if not isinstance(prior_round, int) or prior_round < 0:
         prior_round = 0
+    replan_count = data.get('replan_count')
+    if not isinstance(replan_count, int) or replan_count < 0:
+        replan_count = 0
     return {
         'task_id': task_id,
         'pr_url': pr_url,
         'target_repo': target_repo,
         'head_sha': head_sha,
         'round': prior_round + 1,
+        'replan_count': replan_count,
     }
 
 
@@ -6070,9 +6086,11 @@ def _emit_no_session_decision_approval(
     is the tab feed (best-effort). Idempotent on PR + head SHA.
 
     Head resolution (approvals-third-action-recheck slice 1, 2026-07-25): the
-    head is resolved LIVE from `pr_url` and only falls back to the envelope's
-    `head_sha`. The mirror-result envelope does NOT carry a head — `head_sha` is
-    not in `CHAIN_CONTEXT_FIELDS`, so `build_chain_envelope` drops it on the
+    envelope's `head_sha` wins when present, and the head is otherwise resolved
+    LIVE from `pr_url` — see `_resolve_escalation_head_sha`, which is the order
+    that actually runs. In practice the live leg is the one that fires on THIS
+    path, because the mirror-result envelope does NOT carry a head: `head_sha`
+    is not in `CHAIN_CONTEXT_FIELDS`, so `build_chain_envelope` drops it on the
     marker-notify hop (verified on RSDPM #59's `notify-pr-RSDPM-59.json`, which
     carries `pr_url` + `target_repo` and no head). The consequence was NOT
     cosmetic: with no head8 suffix the approval id collapses to the bare

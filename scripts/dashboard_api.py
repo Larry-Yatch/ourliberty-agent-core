@@ -9907,6 +9907,16 @@ def _build_recheck_envelope(
     round_num = target.get('round')
     if not isinstance(round_num, int) or round_num < 1:
         round_num = 1
+    # `revision_count` RESETS to 0 on each replan's first review dispatch, so
+    # `round` alone does not identify a round on a replanned task — replan 2
+    # round 1 and replan 1 round 1 both spell `rev1`. Mirror the filename
+    # grammar `outbox_notifier._dispatch_mirror_review_rerun` already uses
+    # (D3.5 5c-followup-2 HIGH-1) so the two dispatch paths cannot collide on
+    # one name. Absent/bogus ⇒ 0 ⇒ the bare form: cards stamped before
+    # `replan_count` existed keep exactly the name they already resolved to.
+    replan_count = target.get('replan_count')
+    if not isinstance(replan_count, int) or replan_count < 0:
+        replan_count = 0
 
     prior = str(payload.get('prompt') or '').strip()
     lines = [
@@ -9953,11 +9963,22 @@ def _build_recheck_envelope(
         'target_repo': target_repo,
         'revision_count': round_num,
     }
+    # Carry the replan count forward so the round accounting downstream of this
+    # dispatch stays on the same iteration the task is actually in. It is a
+    # CHAIN_CONTEXT_FIELDS carry field; dropping it here would restart the
+    # replan budget at the next hop.
+    if replan_count > 0:
+        envelope['replan_count'] = replan_count
     if prior:
         envelope['previous_findings'] = [prior]
     if comment:
         envelope['comment'] = comment
-    filename = f'review-{review_task_id}-rev{round_num}.json'
+    if replan_count > 0:
+        filename = (
+            f'review-{review_task_id}-replan{replan_count}-rev{round_num}.json'
+        )
+    else:
+        filename = f'review-{review_task_id}-rev{round_num}.json'
     return 'mirror', filename, envelope
 
 
