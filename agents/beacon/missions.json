@@ -12613,7 +12613,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-26T22:47:44.600586+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-26T22:46:51.265436+00:00"
+      "orphan_last_activity_ts": "2026-07-26T22:46:51.265436+00:00",
+      "briefing": {
+        "what": "Your team started building a feature called Transcript Jump, but it isn't attached to any active project or goal yet.",
+        "why": "Unassigned work like this can quietly eat time and effort without a clear payoff, and it's already moved through several rounds of review.",
+        "suggest": "Before it goes further, take a quick look and either tie it to a real priority or pause it \u2014 worth a moment's confirmation rather than letting it run on its own."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-26T22:57:44.760435+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-pr-RSDPM-94",
@@ -12630,7 +12644,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-26T22:47:44.600586+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-26T22:45:09.923155+00:00"
+      "orphan_last_activity_ts": "2026-07-26T22:45:09.923155+00:00",
+      "briefing": {
+        "what": "A piece of work your team picked up and finished on its own, but it isn't attached to any of your active projects yet.",
+        "why": "Unplanned work that lands without a clear purpose can quietly add upkeep and pull the team off your real priorities.",
+        "suggest": "Before it goes further, have someone confirm which goal it serves \u2014 and if it doesn't map to one, set it aside."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-26T22:57:44.760435+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
