@@ -12007,7 +12007,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-26T03:39:07.088100+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-26T03:32:47.40883+00:00"
+      "orphan_last_activity_ts": "2026-07-26T03:32:47.40883+00:00",
+      "briefing": {
+        "what": "A piece of work your team kicked off that's waiting on your go-ahead before it moves forward.",
+        "why": "It's stuck in limbo and tying up effort that could either pay off or be wasted until you weigh in.",
+        "suggest": "Take a quick look and give it a clear yes or park it \u2014 but ask for a one-line plain summary first, since it hasn't been tied to a specific goal yet."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-26T03:45:40.931198+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
