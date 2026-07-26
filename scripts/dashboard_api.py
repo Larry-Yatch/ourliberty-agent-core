@@ -361,6 +361,14 @@ LARRY_ACTION_VALID_ACTIONS: frozenset[str] = frozenset({
     # ("this alert should not have been sent"). Valid ONLY on alert event
     # types — enforced in _build_envelope_for_action.
     'acted', 'not_useful',
+    # approvals-third-action-recheck slice 2: "Fixed — re-review". The third
+    # exit from a review escalation, for when the operator fixed the PR
+    # themselves. Approve dispatches a Forge revision against already-fixed
+    # code; Reject dispatches NOTHING and — because review dispatch is
+    # head-blind once a task concludes — strands the PR permanently (RSDPM #59,
+    # 2026-07-25). `recheck` re-dispatches the Mirror review at the CURRENT
+    # head. Valid only on an approval_request carrying a `recheck_target`.
+    'recheck',
 })
 
 # The rating verbs above, and the event types they may be applied to. An alert
@@ -9796,6 +9804,176 @@ def _atomic_write_envelope(path: Path, payload: dict[str, Any]) -> None:
     os.replace(tmp, path)
 
 
+RECHECK_GH_TIMEOUT_S = 15
+
+
+def _gh_pr_head_sha_for_recheck(target_repo: str, pr_number: int) -> Optional[str]:
+    """Live PR head SHA via `gh pr view --json headRefOid`, or None.
+
+    A deliberate second implementation rather than an import of
+    `outbox_notifier._gh_pr_head_sha`: importing the notifier into the API
+    process pulls its module-level daemon state and its own gh backoff ledger
+    into a request path, and the notifier is a long-lived daemon whose import
+    side effects are not request-safe. This is ~15 lines with no shared state.
+    """
+    owner_repo = (
+        target_repo if '/' in target_repo else f'Larry-Yatch/{target_repo}'
+    )
+    try:
+        proc = subprocess.run(
+            ['gh', 'pr', 'view', str(pr_number), '--repo', owner_repo,
+             '--json', 'headRefOid'],
+            capture_output=True, text=True, timeout=RECHECK_GH_TIMEOUT_S,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
+        return None
+    if proc.returncode != 0:
+        return None
+    try:
+        sha = json.loads(proc.stdout).get('headRefOid')
+    except (ValueError, AttributeError):
+        return None
+    return sha if isinstance(sha, str) and sha else None
+
+
+def _build_recheck_envelope(
+    *,
+    payload: dict[str, Any],
+    comment: Optional[str],
+    task_id: Optional[str],
+) -> tuple[str, str, dict[str, Any]]:
+    """Build the Mirror re-review envelope for action=recheck.
+
+    Unlike approve/reject — which write an LLM envelope to Beacon and let her
+    work out the routing — this writes the review request to Mirror DIRECTLY.
+    That is load-bearing, not a shortcut: on RSDPM #59 the `larry-reject` Beacon
+    session ran SUCCESSFULLY, cost $0.78, and still stranded the PR, because
+    "reject" correctly means dispatch-nothing. Re-dispatch is mechanical
+    (resolve a head, write a JSON envelope), so it is done mechanically — no
+    paid hop that can fail or reinterpret.
+
+    The head is resolved LIVE and an unresolvable head is a 400, NOT a fallback
+    to the head stamped on the card. The card's head is stale by definition —
+    staleness is the entire premise of the click — so re-reviewing it would
+    re-review the code the operator just replaced: confidently wrong, and it
+    would burn a paid Mirror run to re-report findings that are already fixed.
+    Every raise here fires BEFORE the atomic read_at claim in the caller, so a
+    400 leaves the card fully intact and the operator can simply click again.
+
+    NOT guarded here: "a review of this exact head already has a verdict."
+    `outbox_notifier._review_request_already_dispatched` owns that predicate,
+    with archive/`.invalid`/`.claimed`/lost-result legs and a round-name grammar
+    this module has no business restating — a second copy would drift, and drift
+    in review dedup is what produced the #865 triple-dispatch. The response
+    reports `head_moved` so the UI can warn when the head is unchanged; a
+    deliberate re-run on an unmoved head is allowed (spec §8 Q2).
+    """
+    target = payload.get('recheck_target')
+    if not isinstance(target, dict):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                'source approval_request carries no recheck_target; this card '
+                'predates the coordinate stamp or its PR could not be resolved'
+            ),
+        )
+    pr_url = target.get('pr_url')
+    target_repo = target.get('target_repo')
+    stamped_head = target.get('head_sha')
+    review_task_id = target.get('task_id') or task_id
+    if not (isinstance(pr_url, str) and pr_url
+            and isinstance(target_repo, str) and target_repo
+            and isinstance(review_task_id, str) and review_task_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail='recheck_target is incomplete (need pr_url, target_repo, task_id)',
+        )
+    parsed = _parse_recheck_pr_url(pr_url)
+    if parsed is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f'recheck_target.pr_url is not a PR URL: {pr_url!r}',
+        )
+    live_head = _gh_pr_head_sha_for_recheck(target_repo, parsed[1])
+    if not live_head:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=(
+                'could not resolve the PR head from GitHub; not dispatching a '
+                'review against a possibly-stale commit. Retry — the card is '
+                'untouched.'
+            ),
+        )
+    round_num = target.get('round')
+    if not isinstance(round_num, int) or round_num < 1:
+        round_num = 1
+
+    prior = str(payload.get('prompt') or '').strip()
+    lines = [
+        f'Re-review phase. Revision {round_num} has been applied on task '
+        f'`{review_task_id}` per your earlier review findings.',
+        '',
+        'Dispatched by the operator via the Approvals tab ("Fixed — '
+        're-review"): they addressed your findings themselves rather than '
+        'routing a Forge revision.',
+    ]
+    if comment:
+        # Operator context, explicitly framed as context. Mirror's review
+        # protocol (her CLAUDE.md) governs what she does; this text never
+        # licenses acting outside it.
+        lines += ['', f"Operator's note on what changed: {comment}"]
+    lines += [
+        '',
+        f'Task: `{review_task_id}`',
+        f'PR: {pr_url}',
+    ]
+    if prior:
+        lines += ['', 'Your findings from the previous round:', f'  1. {prior}']
+    lines += [
+        '',
+        f'Read the updated PR diff (`gh pr diff {parsed[1]}` — same PR, now at '
+        f'head {live_head[:8]}). Verify each finding above is resolved in the '
+        'new diff AND no new issues were introduced. Emit one marker: '
+        'REVIEW_PASS (if findings resolved cleanly), REVIEW_REVISION (if more '
+        f'changes needed; next would be round {round_num + 1}), '
+        'REVIEW_ESCALATE (if the revision approach is wrong), or '
+        'REVIEW_EMERGENCY_HALT (safety issue).',
+    ]
+
+    envelope = {
+        'task_id': review_task_id,
+        'prompt': '\n'.join(lines),
+        'source': 'dashboard',
+        'phase': 'review',
+        'max_revisions': 3,
+        'dispatched_by': 'dashboard-recheck',
+        'head_sha': live_head,
+        'head_moved': live_head != stamped_head,
+        'pr_url': pr_url,
+        'target_repo': target_repo,
+        'revision_count': round_num,
+    }
+    if prior:
+        envelope['previous_findings'] = [prior]
+    if comment:
+        envelope['comment'] = comment
+    filename = f'review-{review_task_id}-rev{round_num}.json'
+    return 'mirror', filename, envelope
+
+
+def _parse_recheck_pr_url(pr_url: str) -> Optional[tuple[str, int]]:
+    """('<owner>/<repo>', number) from a GitHub PR URL, else None."""
+    m = re.match(
+        r'^https://github\.com/([\w.-]+/[\w.-]+)/pull/(\d+)/?$', pr_url.strip(),
+    )
+    if not m:
+        return None
+    try:
+        return m.group(1), int(m.group(2))
+    except ValueError:
+        return None
+
+
 def _build_envelope_for_action(
     *,
     source: dict[str, Any],
@@ -9864,6 +10042,10 @@ def _build_envelope_for_action(
             if comment:
                 envelope['comment'] = comment
             return target_agent, filename, envelope
+        if action == 'recheck':
+            return _build_recheck_envelope(
+                payload=payload, comment=comment, task_id=task_id,
+            )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f'action={action!r} not valid for approval_request',
@@ -10288,6 +10470,18 @@ def _handle_larry_action(
     # NOT fan out (it is not a resolution).
     _LARRY_ACTION_TO_OUTCOME = {
         'approve': 'approved', 'reject': 'rejected', 'mark_done': 'approved',
+        # approvals-third-action-recheck slice 2. `modified` is a pre-existing
+        # member of beacon_approval_handler.resolve()'s status set and of
+        # decision_resolve.VALID_OUTCOMES — no new terminal state, no
+        # migration. It is also the honest label: the operator neither accepted
+        # nor refused the verdict, they changed the artifact under it.
+        #
+        # This fan-out is what CLOSES the card. approve/reject are resolved
+        # downstream by the Beacon session their envelope spawns; `recheck`
+        # writes no Beacon envelope, so without this entry the review would
+        # re-dispatch correctly and the card would sit pending forever until
+        # heal_stale_approvals reconciled it.
+        'recheck': 'modified',
     }
     fan_outcome = _LARRY_ACTION_TO_OUTCOME.get(action)
     if fan_outcome is not None and _decision_resolve is not None \
@@ -10314,6 +10508,13 @@ def _handle_larry_action(
         'target_agent': target_agent,
         'audit_persisted': audit_persisted,
     }
+    # Surface what `recheck` actually dispatched so the UI toast can name the
+    # head, and warn when the head did NOT move (a re-review of identical bits
+    # will very likely return the identical verdict — allowed, but the operator
+    # should know they are paying for it). See spec §8 Q2.
+    if action == 'recheck' and isinstance(envelope_payload, dict):
+        result['recheck_head_sha'] = envelope_payload.get('head_sha')
+        result['head_moved'] = envelope_payload.get('head_moved')
     if audit_error is not None:
         result['audit_error'] = audit_error
     if reconcile_detail:
