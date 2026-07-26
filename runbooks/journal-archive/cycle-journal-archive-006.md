@@ -40298,3 +40298,69 @@ Watermark advanced 534→535. NOMINAL ✅ [No tier-reset — Tier 3]
 
 ---
 
+## Iteration ~6308 — 2026-07-26T18:55Z UTC (Larry /cycle chat, Tier 3→1)
+
+**Health:** ⚠️ SIGNAL. **Tier 3→1** (consecutive_clean reset 11→0; last_signal_at=2026-07-26T18:54Z UTC). RSDPM PR #74 (feat(M12)) Mirror PASSED 18:20Z UTC but auto-merge failed — PR is still a draft (isDraft=true). RSDPM PR #83 merged since last iter at 18:43Z UTC. 0 new alerts above watermark (watermark=507, file_length→508 after this iter's escalation). 0 open PRs agent-core. 9 live daemons. Zombies PIDs 373086+373412 reaped. Watchdog=healthy 18:49Z UTC. Check I + Check III DONE ✅.
+
+**VERIFY-BEFORE-REASSERT (from iter ~6307 at 18:18Z UTC):**
+- **"daemons healthy (9 PIDs)"**: CONFIRMED — heal-stale-daemon-code.heartbeat=2026-07-26T18:46:19Z UTC (~9 min from check ~18:55Z); all 9 PIDs alive (ps: 19656/chain-event-shipper, 19683+19724+19868/agent_telegram_bots, 19716/inbox-watcher, 19943/spec-review-runner, 65525/beacon-bot, 65530/dashboard-api, 65548/outbox-notifier). Watchdog=healthy 12:49 MDT (18:49Z UTC). **Zombies PIDs 373086+373412 reaped** (not seen in ps output; PPID=65548 self-cleaned as expected). NOMINAL ✅
+- **"sync NOMINAL, last_sync=2026-07-26T17:52:15Z UTC"**: CONFIRMED — same value (~63 min from check); within 2h. NOMINAL ✅
+- **"beacon-pending-approvals pending=0"**: CONFIRMED — pending=0 (history=538). NOMINAL ✅
+- **"HEAD=4d926724=origin/main"**: UPDATED — HEAD=7e4041e4=origin/main (wrapper auto-committed "Pulse cycle 20260726T182002Z" for iter ~6307). On main; clean tree; 0 ahead/behind. NOMINAL ✅
+- **"larry-alerts.jsonl watermark=507"**: CONFIRMED — repair-watermark repaired=false (old=507, file_length=507 at start of iter; escalation alert appended this iter → file_length=508). 0 new incoming alerts; watermark stays 507. NOMINAL ✅
+- **"forge-marker-taskid-suffix-increment-001 at 2/3"**: CARRY — 0 new occurrences. [carry, 2/3]
+- **"MalformedForgeMarker WARN at 2/3"**: CARRY — 0 new occurrences. [carry, 2/3]
+- **"Check I: DONE ✅"**: CONFIRMED — check-i-2026-07-26.json; fired 14:13Z UTC. [done ✅]
+- **"Check III: DONE ✅, PR #1027 auto-merged ~15:54Z UTC"**: CONFIRMED — commit 8c95d3fd on main. [done ✅]
+- **"RSDPM pipeline: PR #74 (feat(M12)) dispatched to Mirror 18:15:56Z UTC; currently in review"**: UPDATED → **⚠️ ESCALATE**: PR #74 Mirror REVIEW_PASS at 18:20:15Z UTC; AUTO_MERGE FAILED 18:20:19Z UTC (`GraphQL: Pull Request is still a draft (mergePullRequest)`); PR confirmed isDraft=true, MERGEABLE, state=OPEN. Additionally: PR #83 merged 18:43Z UTC (10→11 total RSDPM merges today). [new finding — ask-then-do]
+- **"PR #1022 MERGED — verification_pending heal-wip-redispatch DAG-preflight suppression"**: CARRY — pipeline idle re this vp. [carry, vp]
+
+**NEW findings this iter:**
+1. **[⚠️ ask-then-do + tier-reset] RSDPM PR #74 draft-blocked after Mirror PASS.** outbox-notifier.log [2026-07-26 12:20:19] MDT: `WARN AUTO_MERGE task=m12-queue-zones outcome=failed (state=OPEN, stderr='GraphQL: Pull Request is still a draft')`. PR confirmed isDraft=true, MERGEABLE. Mirror REVIEW_PASS fired at 18:20:15Z UTC. heal_pipeline_stall dry-run confirms `mirror_pass_unmerged:m12-queue-zones` — stall healer would recover-then-alert. Root cause: PR #74 was pushed as a draft; the "mark ready" step never fired before Mirror reviewed it. Fix: `gh pr ready 74 --repo Larry-Yatch/RSDPM` to un-draft, then auto-merge will complete normally. **Escalated to Larry (larry-alerts.jsonl line 508). Tier-reset.**
+2. **[nominal] RSDPM PR #83 merged.** outbox-notifier.log [2026-07-26 12:43:24] MDT (18:43Z UTC): AUTO_MERGE PR #83 (fix(?) — newly dispatched + reviewed today) merged, BASELINE_WARM spawned, worktree torn down. New since iter ~6307. NOMINAL ✅
+
+**Check 0 — Alert triage (~18:51Z UTC):** repair-watermark: repaired=false (old=507, file_length=507). 0 new alerts above watermark=507. Watermark stays 507. NOMINAL ✅ [No tier-reset from Check 0]
+
+**Check 1 — Log noise (~18:51Z UTC):** outbox-notifier.log last entry [2026-07-26 12:43:24] MDT = 18:43:24Z UTC (~12 min from check; AUTO_MERGE PR #83 merged — normal pipeline). Lone WARN: [2026-07-26 12:20:19] MDT AUTO_MERGE failed m12-queue-zones draft — real signal, handled by Check 3. watchdog.log last entry [2026-07-26 12:49:04] MDT = 18:49:04Z UTC (~2 min from check; overall=healthy). 0 new unaccounted WARNs. MalformedForgeMarker G-rule at 2/3 carries unchanged. NOMINAL (Check 3 owns the signal) ✅
+
+**Check 2 — Telegram sweep (~18:51Z UTC):** beacon_telegram_bot.log last entry [2026-07-26T09:58:11-0600] = 15:58:11Z UTC (~3h from check; idx=506 review-pass notification). Bot PID 65525 alive (ps, Ss). 0 new Larry directives unhandled. No agent distress. NOMINAL ✅
+
+**Check 3 — Pipeline stall (~18:51Z UTC):** heal_pipeline_stall dry-run: `DRY-RUN would recover-then-alert: mirror_pass_unmerged:m12-queue-zones (subject='pipeline-stall:mirror-pass-unmerged:PR#74')`. Root cause: RSDPM PR #74 isDraft=true, Mirror PASSED 18:20Z UTC, auto-merge failed draft state. **ask-then-do + tier-reset.** Escalated to Larry via larry-alerts.jsonl (line 508). FORGE_NO_PR_SKIP for threshold-update-2026-07-26-001 (PR #1027 exists — expected). ⚠️ SIGNAL
+
+**Check 4 — Pending directives (~18:51Z UTC):** beacon-pending-approvals: **pending=0** (history=538). All agent-core inboxes empty (forge=0, beacon=0, mirror=0). 0 orphan Larry directives. NOMINAL ✅
+
+**Check 5 — Stale daemon code (~18:51Z UTC):** heal-stale-daemon-code.heartbeat=2026-07-26T18:46:19Z UTC (~5 min from check; fresh <60 min). 9 Python processes alive (ps). Zombies PIDs 373086+373412 reaped. Watchdog=healthy 18:49Z UTC. NOMINAL ✅
+
+**Check A — Source repo:** HEAD=7e4041e4=origin/main; on main; clean tree; 0 ahead/behind. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-26T17:52:15Z UTC (~63 min from check); status=no-change; push_failures=0. Within 2h. NOMINAL ✅
+**Check C — Agent liveness:** All 9 daemons alive (PIDs confirmed via ps). Zombies PIDs 373086+373412 reaped. Watchdog=healthy 18:49Z UTC. NOMINAL ✅
+**Check E — PR/merge state:** 0 open PRs on ourliberty-agent-core. NOMINAL ✅. RSDPM: PR #74 OPEN/DRAFT — signal captured in Check 3. PR #83 merged 18:43Z UTC.
+**Check H — Forge activity digest:** All agent-core inboxes empty. RSDPM: PR #83 merged (11 total today). PR #74 (feat(M12)) blocked in draft state. ✅
+
+**§5.0:** audit_due_nudge: no committed baseline; no-op. distill_detector: no un-distilled audits; no-op. audit_cadence_signal: no post-seed distill artifacts; no-op. NOMINAL ✅
+
+**Rotations:** [carry] SUPABASE_SERVICE_ROLE_KEY due=2026-08-22 (~27d). Last DM 2026-07-20T20:00Z UTC. 14-day dedup active (expires ~2026-08-03); no new DM.
+
+**Conditional checks:**
+- **Check I:** DONE ✅ (2026-07-26T14:13Z UTC). check-i-2026-07-26.json. [done]
+- **Check III:** DONE ✅ (2026-07-26T10:41Z UTC). PR #1027 auto-merged ~15:54Z UTC. [done ✅]
+- **Check VI:** timer-managed. [carry]
+- **Check VIII:** timer-managed; last artifact check-viii-2026-07-20.json. [carry]
+
+**G-rule assessment:** No new occurrences this iter. forge-marker-taskid-suffix-increment-001: **2/3** [carry]; MalformedForgeMarker WARN: **2/3** [carry]. Active carries: forge-revision-preamble-missing (vp); forge-wip-redispatch-digest (vp); forge-wip-redispatch-exhausted-no-pr (vp); outbox-notifier-intent-reject (Forge vp); check-i-force-bypass-dm-route (2/3); auto-dispatch-APPROVAL_REQUEST-mismatch (vp); PR #1022 heal-wip-redispatch DAG-preflight suppression (vp). Sub-threshold: pr-merged-without-deep-review-shortcut-001 (1/3); mirror-ghost-retry-m5-pr2 (1/3); heal-stall-retry-exhausted-after-pr-merge (1/3); ourliberty-health-transient-precommit-DM (1/3).
+
+**Actions taken:**
+1. Check 0: repair-watermark no-op (repaired=false, old=507, file_length=507). 0 alerts triaged. Watermark stays 507.
+2. §5.0 one-shots: all no-ops.
+3. Tier state: record --checks-clean false → consecutive_clean=11→0; **Tier 3→1 reset** (last_signal_at=2026-07-26T18:54Z UTC).
+4. PRIME ledger: intervention appended (tier=1, template=mirror-pass-unmerged-draft-pr, detail=RSDPM PR #74 Mirror PASS 18:20Z UTC; auto-merge failed draft; escalated to Larry).
+5. larry_alerts.py append_alert (source=pulse, severity=warning, route=escalate, subject="RSDPM PR #74 draft-blocked after Mirror PASS") → appended to larry-alerts.jsonl line 508.
+
+**Escalations:**
+- [yellow] RSDPM PR #74 (feat(M12)) — Mirror PASSED 18:20Z UTC but auto-merge blocked (PR is draft). Fix: `gh pr ready 74 --repo Larry-Yatch/RSDPM`. DMed via larry-alerts.jsonl line 508.
+
+**PRIME DIRECTIVE:** intervention (Check 3: mirror_pass_unmerged:m12-queue-zones; RSDPM PR #74 Mirror PASSED 18:20Z UTC; auto-merge failed — PR is still a draft (isDraft=true); escalated to Larry; action required: gh pr ready 74 --repo Larry-Yatch/RSDPM). Trailing 30d: ratio=29.44 (systemic_fixes=52, verification_pending=23).
+**Tier end-of-iter:** **Tier 1** (consecutive_clean=0; last_signal_at=2026-07-26T18:54Z UTC; 5-min cadence).
+
+---
+
