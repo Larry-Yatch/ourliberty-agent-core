@@ -12516,7 +12516,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-26T22:17:20.170567+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-26T22:16:09.40776+00:00"
+      "orphan_last_activity_ts": "2026-07-26T22:16:09.40776+00:00",
+      "briefing": {
+        "what": "A piece of work the team picked up and finished that isn't yet attached to any active project on your roadmap.",
+        "why": "Finished work sitting outside a named project can quietly ship changes with no clear owner or business goal behind it.",
+        "suggest": "Before it goes further, have someone confirm which initiative this belongs to and whether it's still wanted."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-26T22:27:20.250516+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-pr-RSDPM-91",
@@ -12533,7 +12547,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-26T22:17:20.170567+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-26T22:13:33.422409+00:00"
+      "orphan_last_activity_ts": "2026-07-26T22:13:33.422409+00:00",
+      "briefing": {
+        "what": "A piece of finished work the team built that isn't attached to any current initiative yet.",
+        "why": "It's already passed quality checks and is sitting ready, so it's completed effort that isn't delivering value while it waits.",
+        "suggest": "Take a quick look to confirm it still fits our priorities before giving it the green light, since it isn't tied to an active goal."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-26T22:27:20.250516+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
