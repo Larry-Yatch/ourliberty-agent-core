@@ -12139,7 +12139,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-26T15:14:16.149744+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-26T14:59:51.028062+00:00"
+      "orphan_last_activity_ts": "2026-07-26T14:59:51.028062+00:00",
+      "briefing": {
+        "what": "A tune-up to the system's alert timing, adjusting two response-time limits to better match how fast things actually run.",
+        "why": "Getting these limits right means you're warned about real slowdowns without being bothered by false alarms, keeping your attention on what truly needs it.",
+        "suggest": "This is a sensible, low-stakes adjustment you already signed off on \u2014 approve it, and keep an eye on alerts over the next few days to confirm the new timing feels right."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-26T15:24:17.585202+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
