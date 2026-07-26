@@ -155,6 +155,38 @@ class BuildRecheckEnvelopeTest(unittest.TestCase):
         self.assertEqual(ctx.exception.status_code, 502)
         self.assertIn('card is untouched', ctx.exception.detail)
 
+    def test_replan_iteration_uses_the_replan_filename_grammar(self):
+        # Must match `outbox_notifier._dispatch_mirror_review_rerun` exactly
+        # (D3.5 5c-followup-2 HIGH-1) or the two dispatch paths collide.
+        target = dict(FULL_TARGET, replan_count=2, round=1)
+        _, filename, env = self._build(target)
+        self.assertEqual(filename, 'review-pr-RSDPM-59-replan2-rev1.json')
+        self.assertEqual(env['replan_count'], 2)
+
+    def test_same_round_in_different_replans_gets_distinct_names(self):
+        # The collision this fixes: `revision_count` resets per replan, so both
+        # of these were `rev1` and the second overwrote the first's name.
+        names = {
+            self._build(dict(FULL_TARGET, replan_count=n, round=1))[1]
+            for n in (1, 2)
+        }
+        self.assertEqual(len(names), 2)
+
+    def test_no_replan_keeps_the_bare_name_and_omits_the_field(self):
+        # Back-compat: cards stamped before `replan_count` existed carry none,
+        # and must resolve to exactly the filename they already did.
+        _, filename, env = self._build(FULL_TARGET)
+        self.assertEqual(filename, 'review-pr-RSDPM-59-rev1.json')
+        self.assertNotIn('replan_count', env)
+
+    def test_bogus_replan_count_degrades_to_the_bare_name(self):
+        for bogus in ('2', -1, None, [], 1.5, 0):
+            with self.subTest(bogus=bogus):
+                _, filename, env = self._build(
+                    dict(FULL_TARGET, replan_count=bogus))
+                self.assertEqual(filename, 'review-pr-RSDPM-59-rev1.json')
+                self.assertNotIn('replan_count', env)
+
     def test_bogus_round_falls_back_to_one(self):
         for bogus in (0, -1, '2', None, 1.5):
             with self.subTest(bogus=bogus):
