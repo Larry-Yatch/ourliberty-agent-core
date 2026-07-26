@@ -12108,7 +12108,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-26T10:42:21.836604+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-26T10:41:20.775263+00:00"
+      "orphan_last_activity_ts": "2026-07-26T10:41:20.775263+00:00",
+      "briefing": {
+        "what": "The team drafted a new proposal to adjust one of your operating limits, but it isn't attached to any active project yet.",
+        "why": "Changing an operating limit can quietly shift how the business runs, so it deserves a deliberate yes or no rather than drifting along unowned.",
+        "suggest": "Take a quick look and either tie it to a project with a clear owner or set it aside, but don't greenlight the change until you know what limit is moving and by how much."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-26T10:52:16.004676+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
