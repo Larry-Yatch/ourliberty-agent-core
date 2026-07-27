@@ -13571,7 +13571,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-27T15:39:20.076319+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-27T15:37:50.347191+00:00"
+      "orphan_last_activity_ts": "2026-07-27T15:37:50.347191+00:00",
+      "briefing": {
+        "what": "A piece of work your team started on their own that's waiting on your go-ahead before it moves forward.",
+        "why": "It's sitting idle without a clear home or purpose, so it's tying up effort that could be pointed at something that matters to the business.",
+        "suggest": "Take a quick look and either give it a clear goal to serve or set it aside \u2014 but confirm what it touches before greenlighting, since it isn't fully vetted yet."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-27T15:45:36.516458+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-deep-review-hold-pr1035-599f82a3",
@@ -13588,7 +13602,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-27T15:39:20.076319+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-27T15:28:29.242745+00:00"
+      "orphan_last_activity_ts": "2026-07-27T15:28:29.242745+00:00",
+      "briefing": {
+        "what": "A piece of work your team kicked off on its own that isn't yet attached to any active project.",
+        "why": "Unassigned work can quietly consume time and drift from your priorities if it isn't tied to a clear goal.",
+        "suggest": "Take a quick look and confirm it fits your current priorities before giving it the green light to continue."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-27T15:45:36.516458+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
