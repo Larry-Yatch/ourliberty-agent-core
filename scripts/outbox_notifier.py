@@ -435,11 +435,36 @@ _GH_RATE_LIMIT_SIGNATURE_RE = re.compile(
     r'rate limit already exceeded', re.IGNORECASE,
 )
 
+# ── Transient GitHub 5xx retry (merge-state recheck only) ────────────────────
+# notifier-gh-502-transient-retry-001. A transient GitHub server error (HTTP
+# 502/503/504) surfaces as a non-zero `gh` exit with the 5xx code in stderr.
+# It is NOT the rate-limit signature, so the backoff gate above never arms on
+# it — and before this change the `gh pr view` merge-state recheck in
+# `_gh_pr_state` got no retry at all: one transient 502 immediately logged WARN
+# and returned None, losing the merged/failed disambiguation. This narrow retry
+# closes that gap for that one call site only. Scope is strictly the recheck
+# path; the rate-limit backoff logic and every other `gh` wrapper are unchanged.
+_GH_TRANSIENT_RETRY_MAX_ATTEMPTS = 3      # 1 initial + 2 retries
+_GH_TRANSIENT_RETRY_DELAYS_S = (5.0, 15.0)  # before retry #2 and #3
+
+# The transient-server-error signature. GitHub returns these as an HTTP 5xx in
+# `gh` stderr; the "We had issues producing the response" wording is the CLI's
+# GraphQL-side phrasing for the same class of self-resolving server fault.
+# Case-insensitive for robustness.
+_GH_TRANSIENT_SERVER_ERROR_RE = re.compile(
+    r'HTTP 50[234]|We had issues producing the response', re.IGNORECASE,
+)
+
 # Injectable seams for tests. Production leaves these at the stdlib defaults;
 # tests swap in a fake monotonic clock + fixed jitter so the backoff math is
 # deterministic and no real time passes / no real gh is hit.
 _gh_backoff_clock = time.monotonic       # () -> float seconds (monotonic)
 _gh_backoff_jitter = random.uniform      # (low, high) -> float
+
+# Injectable sleep seam for the transient-5xx retry above (mirrors the backoff
+# clock/jitter injection). Production sleeps for real between attempts; tests
+# swap in a no-op so no real time passes.
+_gh_transient_retry_sleep = time.sleep   # (seconds) -> None
 
 # Module state. `_gh_backoff_until` is the monotonic timestamp before which no
 # `gh` call should shell out (0.0 == no active backoff). The consecutive count
@@ -470,6 +495,23 @@ def _gh_is_rate_limit_error(returncode: int, stderr: Optional[str]) -> bool:
     if not stderr:
         return False
     return bool(_GH_RATE_LIMIT_SIGNATURE_RE.search(stderr))
+
+
+def _gh_is_transient_server_error(returncode: int, stderr: Optional[str]) -> bool:
+    """True iff a *completed* `gh` call is a transient GitHub 5xx signature.
+
+    Requires a non-zero exit AND stderr matching a transient server-error
+    wording (HTTP 502/503/504 or the CLI's "We had issues producing the
+    response"). A plain 404 / auth failure / conflict / merge-not-possible
+    (non-zero exit, different stderr) does NOT count — those must not retry
+    (success criterion 3). Distinct from the rate-limit signature: a 5xx never
+    arms the backoff window (notifier-gh-502-transient-retry-001).
+    """
+    if returncode == 0:
+        return False
+    if not stderr:
+        return False
+    return bool(_GH_TRANSIENT_SERVER_ERROR_RE.search(stderr))
 
 
 def _gh_backoff_remaining() -> float:
@@ -6753,40 +6795,57 @@ def _gh_pr_state(repo_coords: str, pr_number: int) -> Optional[str]:
     treats that as "couldn't disambiguate; report the original failure."
 
     State values per GitHub API: 'OPEN', 'CLOSED', 'MERGED'.
+
+    A transient GitHub server error (HTTP 502/503/504) is self-resolving and
+    does NOT arm the rate-limit backoff, so a bare recheck would lose the
+    merged/failed disambiguation on a momentary API blip. This path retries a
+    *completed* transient-5xx result up to 2 more times (3 attempts total) with
+    fixed 5s/15s delays via the injectable sleep seam before falling through to
+    the existing WARN + None (notifier-gh-502-transient-retry-001). The retry
+    is for the completed-call transient signature only; the exception path
+    (timeout / gh missing) keeps today's no-retry behavior.
     """
     if _gh_backoff_skip('pr-state-recheck'):
         return None
-    try:
-        proc = subprocess.run(
-            ['gh', 'pr', 'view', str(pr_number),
-             '--repo', repo_coords,
-             '--json', 'state'],
-            capture_output=True,
-            text=True,
-            timeout=_AUTO_MERGE_TIMEOUT_S,
-        )
-    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
-        log(
-            f'gh pr view {pr_number} ({repo_coords}) FAILED during merge-state '
-            f'recheck: {type(e).__name__}: {e}',
-            'WARN',
-        )
-        return None
-    _gh_note_result(proc.returncode, proc.stderr)
-    if proc.returncode != 0:
-        log(
-            f'gh pr view {pr_number} ({repo_coords}) returned {proc.returncode} '
-            f'during merge-state recheck: {(proc.stderr or "").strip()[:200]}',
-            'WARN',
-        )
-        return None
-    try:
-        data = json.loads(proc.stdout or '{}')
-    except (ValueError, json.JSONDecodeError):
-        return None
-    state = data.get('state')
-    if isinstance(state, str):
-        return state
+    last_proc = None
+    for attempt in range(_GH_TRANSIENT_RETRY_MAX_ATTEMPTS):
+        try:
+            proc = subprocess.run(
+                ['gh', 'pr', 'view', str(pr_number),
+                 '--repo', repo_coords,
+                 '--json', 'state'],
+                capture_output=True,
+                text=True,
+                timeout=_AUTO_MERGE_TIMEOUT_S,
+            )
+        except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
+            log(
+                f'gh pr view {pr_number} ({repo_coords}) FAILED during merge-state '
+                f'recheck: {type(e).__name__}: {e}',
+                'WARN',
+            )
+            return None
+        _gh_note_result(proc.returncode, proc.stderr)
+        if proc.returncode == 0:
+            try:
+                data = json.loads(proc.stdout or '{}')
+            except (ValueError, json.JSONDecodeError):
+                return None
+            state = data.get('state')
+            if isinstance(state, str):
+                return state
+            return None
+        last_proc = proc
+        if (_gh_is_transient_server_error(proc.returncode, proc.stderr)
+                and attempt < _GH_TRANSIENT_RETRY_MAX_ATTEMPTS - 1):
+            _gh_transient_retry_sleep(_GH_TRANSIENT_RETRY_DELAYS_S[attempt])
+            continue
+        break
+    log(
+        f'gh pr view {pr_number} ({repo_coords}) returned {last_proc.returncode} '
+        f'during merge-state recheck: {(last_proc.stderr or "").strip()[:200]}',
+        'WARN',
+    )
     return None
 
 
