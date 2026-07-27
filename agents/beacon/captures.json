@@ -1888,6 +1888,36 @@
         "at": "2026-07-27T15:05:25.377983+00:00",
         "from_state": "parked"
       }
+    },
+    {
+      "id": "cap-nothing-watches-usr-local-lib-rsdpm-for-install-ff9a",
+      "title": "Nothing watches /usr/local/lib/rsdpm for install drift",
+      "note": "The RSDPM driftcheck unit runs ExecStart=/usr/local/lib/rsdpm/drift-check.sh, installed by hand via deploy/systemd/install-driftcheck.sh. No healer in agent-core references /usr/local/lib/rsdpm, so nothing verifies the installed copy matches deploy/drift-check.sh in the repo.\n\nFound 2026-07-27 investigating a false drift alert: on 07-26 the checker ran from 23:26 until 08:38 next morning on a hand-installed draft whose text existed in NO commit (verified - not in any branch, not in any dangling object, nowhere on the droplet filesystem). Two alerts fired from two different draft versions two minutes apart, which is why they read slightly differently and looked like two separate incidents.\n\nRepo and installed copy are byte-identical right now, so no live problem - but that is luck, not a mechanism.\n\nSuggested: a healer, or a check inside drift-check.sh itself, comparing the installed copy against REPO/deploy/drift-check.sh and reporting install drift. Same class as heal_systemd_install_drift.py, which covers units but not this staged script.\n\nRelated: RSDPM PR #117 fixes the two alert-correctness defects from the same investigation and explicitly leaves this one out of scope.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "main",
+        "captured_at": "2026-07-27T15:05:48.018168+00:00"
+      },
+      "last_touched": "2026-07-27T15:05:48.018168+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "The safety monitor that's supposed to catch when our software gets changed without permission is itself installed by hand, and nothing checks that the installed copy actually matches our official version.",
+        "why": "Last night it ran for nine hours off an unofficial edited copy that exists in none of our records, firing false alarms \u2014 today the copies happen to match, but only by luck, so the watchdog could quietly go rogue again.",
+        "suggest": "Worth fixing, but carefully \u2014 add a simple self-check so the monitor confirms it matches our official version, and let the team scope it properly rather than rushing a patch."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-27T15:15:25.128619+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     }
   ]
 }
