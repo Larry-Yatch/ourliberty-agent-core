@@ -12679,7 +12679,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-27T00:03:10.621172+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-27T00:02:19.479376+00:00"
+      "orphan_last_activity_ts": "2026-07-27T00:02:19.479376+00:00",
+      "briefing": {
+        "what": "A piece of work your team kicked off on its own that isn't attached to any active project yet, now paused and waiting on your go-ahead.",
+        "why": "Unassigned work that sits in limbo ties up your team's time and can drift away from what the business actually needs right now.",
+        "suggest": "Take a quick look before greenlighting it \u2014 confirm it fits a current priority, and if it doesn't, park it so the team stays focused."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-27T00:08:10.618014+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
