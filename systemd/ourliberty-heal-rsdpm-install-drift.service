@@ -1,0 +1,54 @@
+[Unit]
+Description=Self-healing healer — RSDPM install file-content drift (watches /usr/local/lib/rsdpm for silent change/corruption of the installed tooling)
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/heal_rsdpm_install_drift.py
+After=network.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+WorkingDirectory=/home/larry/agent-core
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+# Activation gate. Default OFF until verified live. When unset (or != "true"),
+# the healer runs in DRY-RUN mode — it logs install drift and DMs Larry one-time
+# activation instructions, but does NOT send the per-drift alert. First run
+# always adopts the current install as baseline with no alert regardless of this
+# flag. To activate after verification:
+#   sudo systemctl edit ourliberty-heal-rsdpm-install-drift.service
+# then add under [Service]:
+#   Environment="OURLIBERTY_RSDPM_INSTALL_DRIFT_HEALER_ENABLED=true"
+# then `sudo systemctl restart ourliberty-heal-rsdpm-install-drift.timer`.
+Environment="OURLIBERTY_RSDPM_INSTALL_DRIFT_HEALER_ENABLED=true"
+
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/heal_rsdpm_install_drift.py
+
+TimeoutStartSec=300
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-heal-rsdpm-install-drift
+
+# Fingerprints 3 small scripts + a stat-only walk of node22 (~4700 files, no
+# content read beyond the node sentinel). Tiny.
+MemoryMax=256M
+MemoryHigh=128M
+
+# Hardening — matches the heal-stale-pr-escalations pattern. Read-only
+# observation: /usr/local/lib/rsdpm is under /usr, which ProtectSystem=strict
+# renders read-only (still readable — exactly what we need). The ONLY writes are
+# this healer's own state/heartbeat/log + the larry-alerts queue, all under
+# ~/agents. agent-core is read-only (no repo write).
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/home/larry/agents
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
+[Install]
+WantedBy=multi-user.target
