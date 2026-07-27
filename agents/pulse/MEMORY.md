@@ -747,3 +747,9 @@ Occurrences: iter ~6155 (1/3); iter ~6156 (2/3); iter ~6157 (3/3 + meta-loop new
 
 **Correct path:** `~/agents/blackboard/heal-stale-daemon-code.heartbeat` (NOT `~/agents/state/` as iters ~6361–6363 incorrectly cited). All healer heartbeats live in `~/agents/blackboard/*.heartbeat`, not in `~/agents/state/`. Verified at iter ~6364: file present, value=2026-07-27T01:29:04Z UTC.
 
+---
+
+## Check III "RESOLVED" carry is NOT a skip — verify blackboard each iter (learned iter ~6423, 2026-07-27)
+
+**Rule:** When the prior journal carries "Check III: RESOLVED ✅; Next 14-day cycle ~2026-08-09", that means the PREVIOUS Check III cycle completed — it is NOT permission to skip checking `~/agents/blackboard/pulse-check-iii/` for a new artifact this iter. Iters ~6420–6422 (2026-07-27 08:07–08:22Z UTC) all carried "RESOLVED ✅" without checking the directory, and missed `check-iii-2026-07-26.json` (as_of=2026-07-26T10:41:20Z UTC) — a real artifact with 2 threshold proposals. **Always `ls ~/agents/blackboard/pulse-check-iii/` each iter and read the newest file if its timestamp is after your last Check III report.** The "RESOLVED" label applies to the completed cycle, not to a permission to skip future artifact checks.
+
