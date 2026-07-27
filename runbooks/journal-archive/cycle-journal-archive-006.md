@@ -45851,3 +45851,78 @@ None. All carries from iter ~6381.
 
 ---
 
+## Iteration ~6387 — 2026-07-27T04:12Z UTC (Larry /cycle chat, Tier 1 stays)
+
+**Health:** ⚠️ NON-NOMINAL. **Tier 1 stays** (consecutive_clean=0; PR #98 RSDPM CONFLICTING carry — DMs delivered awaiting Larry rebase; 1 new Vercel FAILED alert already DM'd by outbox-notifier; Check A RESOLVED — repo now clean + up-to-date after wrapper commit; PR #104 MERGED ✅; system-health=healthy 04:06Z UTC).
+
+**VERIFY-BEFORE-REASSERT (from iter ~6386 at ~04:04Z UTC):**
+- **"PR #98 RSDPM CONFLICTING (needs rebase)"**: CONFIRMED — PR #98 mergeable=CONFLICTING, isDraft=false. [carry ⚠️]
+- **"watermark=528 1 new alert Tier-3 silence"**: REFUTED/UPDATED — file_length=529; new alert = deploy-notifier Vercel FAILED rsdpm/test/e2e-disposable-guard (ts=04:00:11Z UTC). Already DM'd by outbox-notifier (beacon log: idx=528 delivered 04:01:39Z UTC). Watermark advanced 528→529. [updated ✅]
+- **"system-health=healthy 03:56Z UTC"**: CONFIRMED + MORE RECENT — system-health.json overall=healthy ts=2026-07-27T04:06:19Z UTC. [carry ✅]
+- **"heal-stale-daemon-code.heartbeat=04:00:15Z UTC"**: CONFIRMED (heartbeat=04:00:15Z UTC; fresh <60 min). [carry ✅]
+- **"Check I pending today Mon 2026-07-27"**: CONFIRMED — last artifact=check-i-2026-07-26.json; no new artifact at 04:12Z UTC; timer next elapse ~14:13Z UTC. [carry pending]
+- **"PR #104 RSDPM NEW e2e auth fix entering pipeline"**: REFUTED/UPDATED — PR #104 state=MERGED (branch=claude/e2e-capture-real-chrome). [updated: MERGED ✅]
+- **"PR #103 RSDPM M1-amendment in Mirror review"**: CONFIRMED — PR #103 OPEN/NOT-DRAFT/MERGEABLE, auto-review label, reviewDecision="". [carry ✅]
+- **"Check A dirty tree + behind origin/main by 1 commit"**: REFUTED — RESOLVED: tree clean, HEAD=9fa5e835 "Pulse cycle 20260727T040705Z" = origin/main. Wrapper commit resolved dirty tree. [resolved ✅]
+
+**New findings this iter:**
+- **Check 0**: 1 new alert — deploy-notifier Vercel FAILED, Project=rsdpm, Branch=test/e2e-disposable-guard (ts=04:00:11Z UTC, severity=critical). No open PR for this branch. Already DM'd by outbox-notifier at 04:01:39Z UTC. No Pulse re-DM. Watermark advanced 528→529.
+- **PR #104 RSDPM MERGED** ✅ — was "entering pipeline" in iter ~6386; confirmed merged.
+
+**Check 0 — Alert triage (~04:10Z UTC):** repair-watermark: repaired=false, old=528, file_length=529 → 1 new alert. Alert=deploy-notifier Vercel FAILED rsdpm/test/e2e-disposable-guard (ts=04:00:11Z UTC, severity=critical). Already DM'd by outbox-notifier (beacon log: idx=528 delivered [2026-07-26T22:01:39-0600]=04:01:39Z UTC). Triaged: journal-note only (delivery already confirmed). Watermark advanced 528→529. NOMINAL (delivery confirmed) ✅
+
+**Check 1 — Log noise (~04:10Z UTC):** outbox-notifier.log last WARN=[2026-07-26 21:23:38 MDT] (03:23:38Z UTC): `gh pr view 74 returned 1 during merge-state recheck: HTTP 502` — carry from iter ~6380, sub-threshold (GH-502-merge-state-recheck 1/3 floor). No new WARN entries. inbox-watcher.log: MISSING (carry — system-health shows inbox_watcher=ok). NOMINAL ✅
+
+**Check 2 — Telegram sweep (~04:10Z UTC):** beacon_telegram_bot.log: last entries [2026-07-26T22:01:39-0600]=04:01:39Z UTC (idx=528 deploy-notifier delivered). 0 new Larry directives. No response to PR #98 rebase DMs (idx=520/521/522 delivered 01:31–01:51Z UTC). NOMINAL ✅
+
+**Check 3 — Pipeline stall (~04:10Z UTC):** heal_pipeline_stall dry-run: FORGE_NO_PR_SKIP threshold-update-2026-07-26-001 (#1027 MERGED); pr-RSDPM-75+81+85+89 (MERGED); marker-taskid-normalize-001 (#1028 MERGED); transcript-jump (#90 RSDPM); suppressed(cooldown): mirror_pass_unmerged:m12-queue-zones. 0 alerts would fire; 0 recoveries. NOMINAL ✅
+
+**Check 4 — Pending directives (~04:10Z UTC):** beacon-pending-approvals.json (at /agents/state/): pending=0, history=542. NOMINAL ✅
+
+**Check 5 — Stale daemon code (~04:10Z UTC):** heal-stale-daemon-code.heartbeat=2026-07-27T04:00:15Z UTC (~12 min from check; fresh <60 min). system-health.json overall=healthy ts=04:06:19Z UTC. NOMINAL ✅
+
+**Check A — Source repo (~04:07Z UTC):** on main; **clean tree** ✅ (dirty-tree from iter ~6386 resolved — wrapper committed 9fa5e835 "Pulse cycle 20260727T040705Z"); HEAD=9fa5e835=origin/main; fetch dry-run: up to date. NOMINAL ✅ [RESOLVED]
+**Check B — Sync health (~04:10Z UTC):** last_sync=2026-07-27T03:40:55Z UTC (~31 min from check); status=no-change; consecutive_push_failures=0. Within 2h. NOMINAL ✅
+**Check C — Agent liveness (~04:10Z UTC):** system-health.json overall=healthy ts=2026-07-27T04:06:19Z UTC (~6 min from check); all bots alive (beacon/forge/mirror/pulse); inbox_watcher=ok, outbox_notifier=ok. NOMINAL ✅
+**Check E — PR/merge state (~04:10Z UTC):** ourliberty-agent-core: **0 open PRs** ✅. RSDPM: PR #74 OPEN/DRAFT/UNKNOWN (M12 active dev); PR #88 OPEN/NOT-DRAFT/MERGEABLE (HELD(#74)); PR #91 OPEN/NOT-DRAFT/MERGEABLE (HELD(#74)); PR #93 OPEN/NOT-DRAFT/UNKNOWN/no-auto-review (M11-amendment, HELD); PR #98 OPEN/NOT-DRAFT/**CONFLICTING** ⚠️ (rebase needed; DMs delivered — awaiting Larry); PR #101 OPEN/NOT-DRAFT/MERGEABLE (HELD(#74)); PR #103 OPEN/NOT-DRAFT/MERGEABLE (M1-amendment; auto-review; in Mirror pipeline); **PR #104 MERGED** ✅ (fix(e2e): Google-blocks-Chromium; claude/e2e-capture-real-chrome). NON-NOMINAL ⚠️ (PR #98 actionable — DMs delivered)
+**Check H — Forge inbox:** 0 JSON. Mirror: 0 JSON. Beacon: 0 JSON. NOMINAL ✅
+
+**§5.0:** audit-due-nudge: no-op. distill-detector: no-op. audit-cadence-signal: no-op. NOMINAL ✅
+
+**Rotations:** [carry] SUPABASE_SERVICE_ROLE_KEY due=2026-08-22 (~26d). 14-day dedup active (last DM 2026-07-20; expires ~2026-08-03); no new DM. NOMINAL ✅
+
+**Conditional checks:**
+- **Check I:** timer-managed (firing day today Mon 2026-07-27; last artifact=check-i-2026-07-26.json; no new artifact at 04:12Z UTC; timer next elapse ~14:13Z UTC). [pending today]
+- **Check III:** last artifact=check-iii-2026-07-26.json (proposals: beacon 320s→232s Δ28%; mirror 1531s→1311s Δ14%; both pending Larry approval). 14-day cycle next ~2026-08-09. [carry ✅]
+- **Check VI:** timer-managed. [carry]
+- **Check VIII:** timer-managed; last artifact=check-viii-2026-07-20.json. [carry]
+
+**G-rule assessment:**
+- **marker-taskid-normalize-001: VERIFIED ✅ COMPLETE** — closed (PR #1028 + PR #1029 both merged). [carry closed]
+- forge-marker-taskid-suffix-increment-001: **2/3** [carry, 0 new].
+- medic-draft-status-false-positive: **2/3** [carry, 0 new].
+- check-i-force-bypass-dm-route: **2/3** [carry, 0 new].
+- auto-merge-conflict-route-hold-no-dm-001: **1/3** [carry, 0 new].
+- mirror-queue-wait-readiness: **1/3** [carry, 0 new].
+- GH-502-merge-state-recheck: **1/3** [carry, 0 new; sub-threshold, watch].
+- Active carries (verification_pending): forge-revision-preamble-missing; forge-wip-redispatch-digest; forge-wip-redispatch-exhausted-no-pr; outbox-notifier-intent-reject; auto-dispatch-APPROVAL_REQUEST-mismatch; PR #1022 heal-wip-redispatch DAG-preflight suppression.
+
+**Actions taken:**
+1. Check 0: watermark advanced 528→529 (deploy-notifier Vercel FAILED rsdpm/test/e2e-disposable-guard; already DM'd by outbox-notifier; journal-note only).
+2. §5.0 one-shots: all no-ops.
+3. Tier state: `record --checks-clean false` → consecutive_clean=0 (unchanged); **Tier 1** stays; last_signal_at=2026-07-27T04:12:27Z UTC.
+4. PRIME ledger: intervention appended (tier=1, kind=intervention, template=uncategorized, detail=PR-98-RSDPM-CONFLICTING-carry;PR-104-RSDPM-MERGED;Vercel-FAILED-test-e2e-disposable-guard-DM-delivered-outbox-notifier;watermark-528-to-529;Check-A-RESOLVED;PR-103-M1-amendment-Mirror-pipeline;system-health-healthy-04:06Z).
+
+**Escalations:**
+- [carry — no new DM] PR #98 RSDPM CONFLICTING — DMs delivered: idx=520 (01:31Z), idx=521 (01:46Z), idx=522 (01:51Z). Awaiting Larry response. Rebase: `gh pr checkout 98 --repo Larry-Yatch/RSDPM && git fetch origin && git rebase origin/main && git push --force-with-lease`
+- [carry — no new DM] RSDPM PR #74 isDraft=true; queue: #88+#91+#93+#101 HELD + #98 CONFLICTING + #103 in Mirror pipeline.
+- [carry — no new DM] check-vi-posture-proposals-2026-07-07 (2 proposals).
+- [carry — no new DM] ourliberty-health-subject-key-mismatch translation gap (vp, dispatched iter ~4488) — health check clean ✅.
+- [carry — no new DM] Mirror queue-wait p95=92.3m (threshold 90m) over 54 reviews/24h (alert idx=523 delivered 02:01Z UTC; gauge self-suppresses 3d).
+- [journal only — DM already delivered] Vercel build FAILED rsdpm/test/e2e-disposable-guard — outbox-notifier DM delivered 04:01:39Z UTC; no open PR for this branch; Larry already aware.
+
+**PRIME DIRECTIVE:** intervention (PR #98 CONFLICTING carry — DMs delivered awaiting rebase; Vercel FAILED rsdpm/test/e2e-disposable-guard — DM delivered by outbox-notifier; PR #104 MERGED ✅; PR #103 M1-amendment in Mirror pipeline; watermark 528→529; Check A RESOLVED; system-health=healthy 04:06Z). Trailing 30d: ratio=32.7% (systemic_fixes=48, verification_pending=23, trend=worsening).
+**Tier end-of-iter:** **Tier 1** (consecutive_clean=0; last_signal_at=2026-07-27T04:12:27Z UTC; 5-min cadence).
+
+---
+
