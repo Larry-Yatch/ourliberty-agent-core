@@ -13031,6 +13031,40 @@
       "retired_at": "2026-07-27T05:35:02.081244+00:00",
       "retired_reason": "orphan-terminal",
       "retired_signal": "pr_merged:#1018"
+    },
+    {
+      "id": "proposed-mirror-review-pr-RSDPM-111-f2b287ea",
+      "name": "Mirror Review PR RSDPM 111 F2b287ea",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `mirror-review-pr-RSDPM-111-f2b287ea`. Last activity 2026-07-27T05:41:03.01204+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "mirror-review-pr-RSDPM-111-f2b287ea"
+      ],
+      "repo": null,
+      "created": "2026-07-27",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-27T05:50:10.262429+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-27T05:41:03.01204+00:00"
+    },
+    {
+      "id": "proposed-pr-RSDPM-111",
+      "name": "PR RSDPM 111",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pr-RSDPM-111`. Last activity 2026-07-27T05:40:59.922673+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pr-RSDPM-111"
+      ],
+      "repo": null,
+      "created": "2026-07-27",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-27T05:50:10.262429+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-27T05:40:59.922673+00:00"
     }
   ]
 }
