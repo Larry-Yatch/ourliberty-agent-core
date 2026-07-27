@@ -104,7 +104,12 @@ class _GhRouter:
         self.pr_mergeable: dict[tuple[str, int], str] = {}
         # (repo, pr_number) -> 'OPEN' | 'MERGED' | 'CLOSED'
         self.pr_state: dict[tuple[str, int], str] = {}
-        # repo -> list[dict] of open PRs (number, createdAt, headRefName)
+        # (repo, pr_number) -> bool, consumed by the sweep's
+        # `gh pr view --json state,isDraft` blocker probe. Default False
+        # (not a draft), so every pre-existing test keeps its old behavior.
+        self.pr_draft: dict[tuple[str, int], bool] = {}
+        # repo -> list[dict] of open PRs
+        # (number, createdAt, headRefName, isDraft)
         self.open_prs: dict[str, list[dict]] = {}
         # fix-auto-merge-freshness-revalidation — baseRefOid (base-branch tip)
         # + headRefOid per PR, consumed by the release-path freshness gate.
@@ -123,6 +128,8 @@ class _GhRouter:
         self.pr_labels: dict[tuple[str, int], list[str]] = {}
         self.label_creates: list[tuple[str, str]] = []
         self.label_edits: list[tuple[str, int, tuple[str, ...], tuple[str, ...]]] = []
+        # Every `gh` argv seen, for call-count assertions.
+        self.calls: list[list[str]] = []
 
     def __call__(self, cmd, capture_output=True, text=True, timeout=None,
                  **kwargs):
@@ -133,6 +140,7 @@ class _GhRouter:
         # All callers pass a list[str] cmd starting with 'gh'.
         if not cmd or cmd[0] != 'gh':
             return _CompletedProc(stdout='', stderr='not gh', returncode=1)
+        self.calls.append(list(cmd))
         if cmd[1] == 'pr' and cmd[2] == 'view':
             pr_n = int(cmd[3])
             # --repo <coords>
@@ -155,6 +163,8 @@ class _GhRouter:
                 payload['labels'] = [
                     {'name': n} for n in self.pr_labels.get((repo, pr_n), [])
                 ]
+            if 'isDraft' in json_fields.split(','):
+                payload['isDraft'] = self.pr_draft.get((repo, pr_n), False)
             if 'baseRefOid' in json_fields.split(','):
                 payload['baseRefOid'] = self.pr_base.get(
                     (repo, pr_n), 'base000000000000',
@@ -693,6 +703,100 @@ class BlockerRejectedReleaseTest(SerializerTestBase):
         self.assertEqual(self.on._load_auto_merge_queue(), [])
 
 
+class BlockerBecameDraftReleaseTest(SerializerTestBase):
+    """auto-merge-serializer-skip-draft-blocker-001, sweep half.
+
+    `_find_overlap_blocker`'s draft skip only fires at HOLD time, and
+    `blocker_pr_number` is pinned thereafter. Pass 2 previously released only
+    on the blocker leaving OPEN — and a draft stays OPEN indefinitely, so an
+    entry already pinned behind one could never drain. That is the 9h RSDPM
+    wedge; these pin the sweep-side self-heal.
+    """
+
+    FILE = 'docs/operating-manual.md'
+
+    def _hold_behind_ready_blocker(self):
+        self.gh.open_prs[REPO] = [
+            {'number': 109, 'createdAt': '2026-05-26T10:00:00Z',
+             'headRefName': 'a', 'isDraft': False},
+        ]
+        self.gh.pr_files[(REPO, 109)] = [self.FILE]
+        self.gh.pr_mergeable[(REPO, 109)] = 'MERGEABLE'
+        self.gh.pr_mergeable[(REPO, 112)] = 'MERGEABLE'
+        r = self._attempt(112, changed_files=[self.FILE])
+        self.assertEqual(r['merge_outcome'], 'held_for_blocker')
+        self.assertEqual(r['blocker_pr_number'], 109)
+
+    def test_blocker_converted_to_draft_releases_via_sweep(self):
+        self._hold_behind_ready_blocker()
+        # Blocker is converted to a draft AFTER the hold. It stays OPEN, so
+        # the old `is_open is False` test never fires.
+        self.gh.pr_draft[(REPO, 109)] = True
+        self.gh.open_prs[REPO] = [
+            {'number': 109, 'createdAt': '2026-05-26T10:00:00Z',
+             'headRefName': 'a', 'isDraft': True},
+        ]
+        self.on._auto_merge_queue_sweep()
+        # Released and merged — the hold-time skip declines to re-pin the
+        # same draft, so it does not simply bounce back into the queue.
+        self.assertIn((REPO, 112), self.gh.merge_calls)
+        self.assertEqual(self.on._load_auto_merge_queue(), [])
+
+    def test_ready_open_blocker_still_holds_through_sweep(self):
+        # Serialization unchanged: an OPEN, non-draft blocker keeps gating.
+        self._hold_behind_ready_blocker()
+        self.on._auto_merge_queue_sweep()
+        self.assertNotIn((REPO, 112), self.gh.merge_calls)
+        queue = self.on._load_auto_merge_queue()
+        self.assertEqual(len(queue), 1)
+        self.assertEqual(queue[0]['blocker_pr_number'], 109)
+
+    def test_unknown_blocker_state_keeps_holding(self):
+        # Conservative: a gh failure leaves (None, None) — leave the entry
+        # queued and retry next tick rather than releasing on a guess.
+        self._hold_behind_ready_blocker()
+        with mock.patch.object(
+            self.on, '_gh_pr_open_and_draft', return_value=(None, None),
+        ):
+            self.on._auto_merge_queue_sweep()
+        self.assertNotIn((REPO, 112), self.gh.merge_calls)
+        self.assertEqual(len(self.on._load_auto_merge_queue()), 1)
+
+    def test_draft_release_clears_the_held_behind_label(self):
+        # Cross-feature: held-behind-label landed independently and stamps
+        # `held-behind-#N` at hold time. The draft-release branch must not
+        # leave that stamp behind reading as authoritative — it clears
+        # because it routes through `_queue_release`. Pinned so a later
+        # refactor that releases WITHOUT `_queue_release` fails loudly
+        # instead of silently stranding a stale label on a merged PR.
+        self._hold_behind_ready_blocker()
+        self.assertIn('held-behind-#109', self.gh.pr_labels.get((REPO, 112), []))
+        self.gh.pr_draft[(REPO, 109)] = True
+        self.gh.open_prs[REPO] = [
+            {'number': 109, 'createdAt': '2026-05-26T10:00:00Z',
+             'headRefName': 'a', 'isDraft': True},
+        ]
+        self.on._auto_merge_queue_sweep()
+        self.assertIn((REPO, 112), self.gh.merge_calls)
+        self.assertNotIn(
+            'held-behind-#109', self.gh.pr_labels.get((REPO, 112), []),
+        )
+
+    def test_open_and_draft_probe_is_one_gh_call(self):
+        # `isDraft` is folded into Pass 2's existing state probe, so the
+        # sweep's gh-call count is unchanged by this fix.
+        self.gh.pr_draft[(REPO, 109)] = True
+        is_open, is_draft = self.on._gh_pr_open_and_draft(REPO, 109)
+        self.assertTrue(is_open)
+        self.assertTrue(is_draft)
+        view_calls = [
+            c for c in self.gh.calls
+            if len(c) > 2 and c[1] == 'pr' and c[2] == 'view'
+        ]
+        self.assertEqual(len(view_calls), 1)
+        self.assertIn('state,isDraft', view_calls[0])
+
+
 class ConflictingMergeableTest(SerializerTestBase):
     """Gate 2: mergeable=CONFLICTING → DM Larry, no merge, queue clear."""
 
@@ -958,6 +1062,100 @@ class FindOverlapBlockerTest(SerializerTestBase):
         self.gh.pr_mergeable[(REPO, 900)] = 'MERGEABLE'
         blocker = self.on._find_overlap_blocker(913, REPO, [FILE])
         self.assertEqual(blocker, 900)
+
+
+class FindOverlapBlockerSkipDraftTest(SerializerTestBase):
+    """auto-merge-serializer-skip-draft-blocker-001 — a DRAFT candidate
+    blocker is skipped exactly like a CONFLICTING one. Mirrors the
+    skip-dirty block above.
+
+    THE incident (2026-07-26, Larry-Yatch/RSDPM): draft PR #74 held four
+    green, Mirror-PASSed PRs (#88/#91/#93/#101) for 9+ hours; the chain
+    drained 18s after a human closed #74.
+    """
+
+    FILE = 'app/(dashboard)/queue/page.tsx'
+
+    def test_draft_blocker_skipped(self):
+        # A lone DRAFT overlapping blocker can never merge (GitHub refuses
+        # mergePullRequest on a draft) — skip it, return None.
+        self.gh.open_prs[REPO] = [
+            {'number': 74, 'createdAt': '2026-07-26T09:00:00Z',
+             'headRefName': 'm12-queue', 'isDraft': True},
+        ]
+        self.gh.pr_files[(REPO, 74)] = [self.FILE]
+        self.gh.pr_mergeable[(REPO, 74)] = 'MERGEABLE'
+        blocker = self.on._find_overlap_blocker(88, REPO, [self.FILE])
+        self.assertIsNone(blocker)
+
+    def test_ready_blocker_still_held(self):
+        # Serialization unchanged: a non-draft MERGEABLE blocker still gates.
+        self.gh.open_prs[REPO] = [
+            {'number': 74, 'createdAt': '2026-07-26T09:00:00Z',
+             'headRefName': 'm12-queue', 'isDraft': False},
+        ]
+        self.gh.pr_files[(REPO, 74)] = [self.FILE]
+        self.gh.pr_mergeable[(REPO, 74)] = 'MERGEABLE'
+        blocker = self.on._find_overlap_blocker(88, REPO, [self.FILE])
+        self.assertEqual(blocker, 74)
+
+    def test_missing_isdraft_field_still_held(self):
+        # Conservative: an absent `isDraft` (older gh / partial payload) is
+        # NOT treated as a draft — keep holding, matching the UNKNOWN rule.
+        self.gh.open_prs[REPO] = [
+            {'number': 74, 'createdAt': '2026-07-26T09:00:00Z',
+             'headRefName': 'm12-queue'},
+        ]
+        self.gh.pr_files[(REPO, 74)] = [self.FILE]
+        self.gh.pr_mergeable[(REPO, 74)] = 'MERGEABLE'
+        blocker = self.on._find_overlap_blocker(88, REPO, [self.FILE])
+        self.assertEqual(blocker, 74)
+
+    def test_mixed_blockers_holds_behind_ready_only(self):
+        # Older blocker is a DRAFT (skipped), newer is ready+MERGEABLE —
+        # hold behind the ready one only.
+        self.gh.open_prs[REPO] = [
+            {'number': 74, 'createdAt': '2026-07-26T09:00:00Z',
+             'headRefName': 'draft', 'isDraft': True},
+            {'number': 91, 'createdAt': '2026-07-26T11:00:00Z',
+             'headRefName': 'ready', 'isDraft': False},
+        ]
+        self.gh.pr_files[(REPO, 74)] = [self.FILE]
+        self.gh.pr_files[(REPO, 91)] = [self.FILE]
+        self.gh.pr_mergeable[(REPO, 74)] = 'MERGEABLE'
+        self.gh.pr_mergeable[(REPO, 91)] = 'MERGEABLE'
+        blocker = self.on._find_overlap_blocker(93, REPO, [self.FILE])
+        self.assertEqual(blocker, 91)
+
+    def test_draft_skip_costs_no_mergeable_call(self):
+        # The draft test is checked BEFORE the CONFLICTING test precisely so
+        # it costs no `gh pr view`. Assert we never probed the draft's
+        # mergeable state.
+        self.gh.open_prs[REPO] = [
+            {'number': 74, 'createdAt': '2026-07-26T09:00:00Z',
+             'headRefName': 'draft', 'isDraft': True},
+        ]
+        self.gh.pr_files[(REPO, 74)] = [self.FILE]
+        with mock.patch.object(
+            self.on, '_gh_pr_mergeable_status',
+            side_effect=AssertionError('must not probe mergeable for a draft'),
+        ):
+            blocker = self.on._find_overlap_blocker(88, REPO, [self.FILE])
+        self.assertIsNone(blocker)
+
+    def test_all_four_held_prs_release_when_blocker_is_draft(self):
+        # The incident shape end-to-end: four ready PRs overlapping one draft
+        # blocker each evaluate to "no blocker" instead of queueing behind it.
+        self.gh.open_prs[REPO] = [
+            {'number': 74, 'createdAt': '2026-07-26T09:00:00Z',
+             'headRefName': 'm12-queue', 'isDraft': True},
+        ]
+        self.gh.pr_files[(REPO, 74)] = [self.FILE]
+        for pr in (88, 91, 93, 101):
+            self.assertIsNone(
+                self.on._find_overlap_blocker(pr, REPO, [self.FILE]),
+                f'PR #{pr} must not be held behind draft #74',
+            )
 
 
 class ReleaseRegressionGateRunnerTest(unittest.TestCase):
