@@ -1859,6 +1859,35 @@
         "from_state": "parked"
       },
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+    },
+    {
+      "id": "cap-title-3c29",
+      "title": "--title",
+      "note": "Nothing watches /usr/local/lib/rsdpm for install drift",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "main",
+        "captured_at": "2026-07-27T15:05:16.415139+00:00"
+      },
+      "last_touched": "2026-07-27T15:05:16.415139+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "Right now no one is keeping an eye on a key piece of installed software to make sure it hasn't quietly changed or broken over time.",
+        "why": "If that software drifts out of shape without anyone noticing, it could fail unexpectedly and disrupt operations before we even know something's wrong.",
+        "suggest": "This is low-stakes and can wait, so I'd greenlight it for whenever there's a spare moment rather than pulling anyone off priority work."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-27T15:05:25.377983+00:00",
+        "from_state": "parked"
+      }
     }
   ]
 }
