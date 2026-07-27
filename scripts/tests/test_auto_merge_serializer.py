@@ -117,6 +117,12 @@ class _GhRouter:
         self.pr_head: dict[tuple[str, int], str] = {}
         # Recorded `gh pr merge` shell-outs
         self.merge_calls: list[tuple[str, int]] = []
+        # held-behind-label — (repo, pr) -> live label names, plus recorded
+        # label writes so a test can assert the ORDER of stamp/clear rather
+        # than only the end state.
+        self.pr_labels: dict[tuple[str, int], list[str]] = {}
+        self.label_creates: list[tuple[str, str]] = []
+        self.label_edits: list[tuple[str, int, tuple[str, ...], tuple[str, ...]]] = []
 
     def __call__(self, cmd, capture_output=True, text=True, timeout=None,
                  **kwargs):
@@ -145,6 +151,10 @@ class _GhRouter:
                 )
             if 'state' in json_fields.split(','):
                 payload['state'] = self.pr_state.get((repo, pr_n), 'OPEN')
+            if 'labels' in json_fields.split(','):
+                payload['labels'] = [
+                    {'name': n} for n in self.pr_labels.get((repo, pr_n), [])
+                ]
             if 'baseRefOid' in json_fields.split(','):
                 payload['baseRefOid'] = self.pr_base.get(
                     (repo, pr_n), 'base000000000000',
@@ -162,6 +172,20 @@ class _GhRouter:
                 stdout=json.dumps(self.open_prs.get(repo, [])),
                 stderr='', returncode=0,
             )
+        if cmd[1] == 'label' and cmd[2] == 'create':
+            repo = cmd[cmd.index('--repo') + 1]
+            self.label_creates.append((repo, cmd[3]))
+            return _CompletedProc(stdout='', stderr='', returncode=0)
+        if cmd[1] == 'pr' and cmd[2] == 'edit':
+            pr_n = int(cmd[3])
+            repo = cmd[cmd.index('--repo') + 1]
+            add = [cmd[i + 1] for i, a in enumerate(cmd) if a == '--add-label']
+            rm = [cmd[i + 1] for i, a in enumerate(cmd) if a == '--remove-label']
+            cur = list(self.pr_labels.get((repo, pr_n), []))
+            cur = [n for n in cur if n not in rm] + [n for n in add if n not in cur]
+            self.pr_labels[(repo, pr_n)] = cur
+            self.label_edits.append((repo, pr_n, tuple(add), tuple(rm)))
+            return _CompletedProc(stdout='', stderr='', returncode=0)
         if cmd[1] == 'pr' and cmd[2] == 'merge':
             pr_n = int(cmd[3])
             repo = cmd[cmd.index('--repo') + 1]
@@ -1069,3 +1093,134 @@ class MergeReconcilesNoSessionDecisionTest(SerializerTestBase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class HeldBehindLabelTest(SerializerTestBase):
+    """held-behind-label — a held PR must SAY it is held, on the PR.
+
+    The gap this closes: a held PR showed nothing on GitHub. Every check
+    green, mergeStateStatus CLEAN, mirror-review success, no merge — visually
+    identical to a wedged PR. The hold lived only in outbox-notifier.log and
+    the queue file, so on 2026-07-27 RSDPM #101 was watched for an hour before
+    the log revealed it was simply queued behind #74.
+    """
+
+    def _labels(self, pr: int, repo: str = REPO) -> list[str]:
+        return self.gh.pr_labels.get((repo, pr), [])
+
+    def test_hold_stamps_the_blocker_number_on_the_pr(self):
+        self.gh.open_prs[REPO] = [
+            {'number': 109, 'createdAt': '2026-05-26T10:00:00Z', 'headRefName': 'a'},
+        ]
+        self.gh.pr_files[(REPO, 109)] = ['docs/operating-manual.md']
+        self.gh.pr_mergeable[(REPO, 109)] = 'MERGEABLE'
+        self.gh.pr_mergeable[(REPO, 112)] = 'MERGEABLE'
+
+        r = self._attempt(112, changed_files=['docs/operating-manual.md'])
+        self.assertEqual(r['merge_outcome'], 'held_for_blocker')
+        # The blocker number is IN the label — "held" alone would not answer
+        # the question that made this worth building.
+        self.assertIn('held-behind-#109', self._labels(112))
+        # And the label was created first: `gh pr edit --add-label` fails on a
+        # label the repo has never seen, and these run across four repos with
+        # unshared label sets.
+        self.assertIn((REPO, 'held-behind-#109'), self.gh.label_creates)
+
+    def test_release_clears_the_stamp(self):
+        self.gh.open_prs[REPO] = [
+            {'number': 109, 'createdAt': '2026-05-26T10:00:00Z', 'headRefName': 'a'},
+        ]
+        self.gh.pr_files[(REPO, 109)] = ['docs/operating-manual.md']
+        self.gh.pr_mergeable[(REPO, 109)] = 'MERGEABLE'
+        self.gh.pr_mergeable[(REPO, 112)] = 'MERGEABLE'
+        self._attempt(112, changed_files=['docs/operating-manual.md'])
+        self.assertIn('held-behind-#109', self._labels(112))
+
+        # Blocker merges → release pass re-attempts 112 and it merges.
+        self.gh.open_prs[REPO] = []
+        self._attempt(109, changed_files=['docs/operating-manual.md'])
+        self.assertIn((REPO, 112), self.gh.merge_calls)
+        # A stale "held-behind" on a merged PR is worse than none — it reads
+        # as authoritative.
+        self.assertNotIn('held-behind-#109', self._labels(112))
+
+    def test_release_into_conflict_clears_the_stamp(self):
+        # The gap the merged-path test misses: overlapping serialized PRs
+        # frequently CONFLICT once the blocker lands (that's *why* they were
+        # serialized). When the blocker merges and moves main under the held
+        # PR, the release freshness gate legitimately returns held_conflict —
+        # which does NOT re-stamp. If the clear were gated on the whole
+        # `held_*` family the label would survive, pointing at a blocker that
+        # has already merged: "authoritative" and wrong, the exact failure
+        # this feature exists to prevent.
+        self.gh.open_prs[REPO] = [
+            {'number': 109, 'createdAt': '2026-05-26T10:00:00Z', 'headRefName': 'a'},
+        ]
+        self.gh.pr_files[(REPO, 109)] = ['docs/operating-manual.md']
+        self.gh.pr_mergeable[(REPO, 109)] = 'MERGEABLE'
+        self.gh.pr_mergeable[(REPO, 112)] = 'MERGEABLE'
+        self._attempt(112, changed_files=['docs/operating-manual.md'])
+        self.assertIn('held-behind-#109', self._labels(112))
+
+        # Blocker merges → release re-attempt of 112, but the merged blocker
+        # moved main under it and it now conflicts → held_conflict (no merge,
+        # no re-stamp), PR left open awaiting a manual rebase.
+        self.gh.open_prs[REPO] = []
+        self.gh.pr_mergeable[(REPO, 112)] = 'CONFLICTING'
+        self._attempt(109, changed_files=['docs/operating-manual.md'])
+        self.assertNotIn((REPO, 112), self.gh.merge_calls)
+        # The stamp must be GONE even though the outcome starts with `held_`.
+        self.assertEqual(
+            [n for n in self._labels(112) if n.startswith('held-behind-#')],
+            [], 'held-behind label survived a release that ended in conflict',
+        )
+
+    def test_every_held_pr_names_its_OWN_blocker(self):
+        # A < B < C all overlap. The label has to track each PR's actual
+        # blocker — a shared "held" label would say nothing, and stamping
+        # every held PR with the head-of-queue would be actively misleading.
+        FILE = 'docs/operating-manual.md'
+        self.gh.open_prs[REPO] = [
+            {'number': 109, 'createdAt': '2026-05-26T10:00:00Z', 'headRefName': 'a'},
+        ]
+        self.gh.pr_files[(REPO, 109)] = [FILE]
+        self.gh.pr_mergeable.update({
+            (REPO, 109): 'MERGEABLE', (REPO, 112): 'MERGEABLE',
+            (REPO, 113): 'MERGEABLE',
+        })
+
+        r_b = self._attempt(112, changed_files=[FILE])
+        self.assertEqual(r_b['blocker_pr_number'], 109)
+        self.assertIn('held-behind-#109', self._labels(112))
+
+        r_c = self._attempt(113, changed_files=[FILE])
+        # C's blocker is whichever the serializer picked; the label must agree
+        # with the queue rather than be assumed.
+        self.assertIn(f'held-behind-#{r_c["blocker_pr_number"]}', self._labels(113))
+
+        # A merges → the whole chain drains, and no stale stamp survives on
+        # any of them.
+        self.gh.open_prs[REPO] = []
+        self._attempt(109, changed_files=[FILE])
+        self.assertEqual(self.on._load_auto_merge_queue(), [])
+        for pr in (112, 113):
+            self.assertEqual(
+                [n for n in self._labels(pr) if n.startswith('held-behind-#')],
+                [], f'PR {pr} kept a held-behind label after merging',
+            )
+
+    def test_label_failure_never_blocks_the_merge(self):
+        # The whole feature is decoration for human eyes. If gh label calls
+        # fail, the merge must behave exactly as it did before this existed.
+        real = self.gh.__call__
+
+        def fail_label_calls(cmd, *a, **kw):
+            if cmd[:3] in (['gh', 'pr', 'edit'], ['gh', 'label', 'create']):
+                return _CompletedProc(stdout='', stderr='boom', returncode=1)
+            return real(cmd, *a, **kw)
+
+        with mock.patch.object(self.on.subprocess, 'run', side_effect=fail_label_calls):
+            self.gh.pr_mergeable[(REPO, 112)] = 'MERGEABLE'
+            r = self._attempt(112, changed_files=['docs/only-mine.md'])
+        self.assertEqual(r['merge_outcome'], 'merged')
+        self.assertIn((REPO, 112), self.gh.merge_calls)
