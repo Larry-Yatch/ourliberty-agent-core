@@ -13205,7 +13205,11 @@
         "at": "2026-07-27T06:10:56.563102+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-27T18:10:17.401902+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-deep-review-hold-pr1031-e423cbbd",
@@ -13333,7 +13337,11 @@
         "at": "2026-07-27T14:55:25.074969+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-27T18:10:17.401902+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-pr-ourliberty-agent-core-1035",
