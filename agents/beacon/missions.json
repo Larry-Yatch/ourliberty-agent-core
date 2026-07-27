@@ -12815,7 +12815,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-27T02:04:07.494330+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-27T01:59:11.213153+00:00"
+      "orphan_last_activity_ts": "2026-07-27T01:59:11.213153+00:00",
+      "briefing": {
+        "what": "Your team has been preparing to add a third reviewer slot so more work can be checked at once.",
+        "why": "More review capacity means work moves faster and doesn't pile up waiting on a single bottleneck.",
+        "suggest": "Worth a quick look before you greenlight it \u2014 confirm it's actually needed right now rather than approving on autopilot."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-27T02:09:20.709888+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-pr-ourliberty-agent-core-1029",
@@ -12832,7 +12846,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-27T02:04:07.494330+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-27T01:50:25.049859+00:00"
+      "orphan_last_activity_ts": "2026-07-27T01:50:25.049859+00:00",
+      "briefing": {
+        "what": "A piece of work your team kicked off on its own that isn't attached to any active initiative yet.",
+        "why": "Unassigned work that's waiting for a sign-off can quietly stall or drift away from your priorities the longer it sits.",
+        "suggest": "Take a quick look to confirm it's worth continuing before it clears review \u2014 if it doesn't map to something you care about right now, set it aside."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-27T02:09:20.709888+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
