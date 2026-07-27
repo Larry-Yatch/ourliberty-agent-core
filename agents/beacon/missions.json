@@ -13268,7 +13268,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-27T12:07:35.269950+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-27T11:52:33.758813+00:00"
+      "orphan_last_activity_ts": "2026-07-27T11:52:33.758813+00:00",
+      "briefing": {
+        "what": "A routine health check on your automated systems flagged a few items worth a look.",
+        "why": "These early warnings can point to small problems before they grow into ones that slow the team down or cost money.",
+        "suggest": "Take a quick look this week to confirm nothing needs action, rather than letting it sit unreviewed."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-27T12:14:15.657255+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
