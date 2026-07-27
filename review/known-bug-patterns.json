@@ -157,6 +157,36 @@
       "severity_default": "LOW",
       "example_finding_ids": [],
       "blocking": false
+    },
+    {
+      "class_id": "migration-irreversible-data-loss",
+      "name": "Migration destroys existing data with no mechanical undo",
+      "description": "A migration drops, truncates, deletes, or narrows something that holds rows, so applying it loses data git cannot restore. It reads as routine schema tidying in a diff because the rows are not in the pull request. MIGRATION-SAFETY class from the RSDPM merged-but-not-applied incidents of 2026-07-26/27, NOT one of the 64 escaped bugs from the source audit. Sharpened by apply-on-merge: once merging a migration executes it, review is the last point a human is asked anything.",
+      "detection_signature": "DROP TABLE / DROP COLUMN / TRUNCATE / DELETE FROM in a migration file, targeting an object not created earlier in the SAME file; ALTER COLUMN ... TYPE that narrows (text -> varchar(n), numeric -> int); ALTER ... SET NOT NULL, or a new CHECK / FOREIGN KEY, on a populated table (rewrites or rejects existing rows, and passes against the empty database ops/verify-fresh-db.sh uses); any review that states or implies a row count it did not measure — an unmeasured blast radius is UNKNOWN, and UNKNOWN counts as FAIL.",
+      "review_lens": "migration-safety",
+      "severity_default": "HIGH",
+      "example_finding_ids": [],
+      "blocking": true
+    },
+    {
+      "class_id": "migration-out-of-order-clobber",
+      "name": "Migration redefines an object a higher-numbered migration also redefines",
+      "description": "Two migrations CREATE OR REPLACE the same function/view/policy. Applied in order this is harmless; applied late or out of order, the earlier one silently reverts the later one and the database runs old code that nothing in the repo describes. MIGRATION-SAFETY class, not from the source audit. RSDPM checked exactly this by hand for 0022 against 0027 — a hand check is not a check.",
+      "detection_signature": "The set of objects targeted by CREATE OR REPLACE / ALTER / DROP ... IF EXISTS in this migration intersects the same set in any HIGHER-numbered file in the migrations directory; or intersects a LOWER-numbered file known to be unapplied. Also: a migration added with a number below an already-merged migration (out-of-band numbering).",
+      "review_lens": "migration-safety",
+      "severity_default": "HIGH",
+      "example_finding_ids": [],
+      "blocking": true
+    },
+    {
+      "class_id": "migration-unhardened-object",
+      "name": "New table/view/function ships without its RLS class or definer hardening",
+      "description": "A migration creates a table with no RLS policy, a view without security_invoker, or a SECURITY DEFINER function with no pinned search_path and no revoked PUBLIC execute. The object works and tests pass; the hole is visible only to someone reading the target repo's standing rules alongside the diff. MIGRATION-SAFETY class, sourced from RSDPM CLAUDE.md standing rules 2 and 3 rather than the audit.",
+      "detection_signature": "CREATE TABLE with no matching ENABLE ROW LEVEL SECURITY + CREATE POLICY in the same migration; CREATE VIEW lacking WITH (security_invoker = true); CREATE FUNCTION ... SECURITY DEFINER lacking SET search_path = '' or lacking REVOKE EXECUTE ... FROM PUBLIC, anon before an explicit GRANT; a GRANT of INSERT/UPDATE/DELETE directly to the authenticated role; a new table or function named by no module spec's owned-DDL list (an amendment, not a drive-by).",
+      "review_lens": "migration-safety",
+      "severity_default": "HIGH",
+      "example_finding_ids": [],
+      "blocking": true
     }
   ],
   "coverage": {
@@ -168,6 +198,7 @@
     "A single upstream root — dispatch_validator only type-checking task_id (non-empty str, no charset/length) — propagates into at least three distinct downstream bug classes: path traversal (10/11/39), substring/truncation identifier collisions (12/26/53), and worktree contamination. Fixing the boundary validator (reject separators, enforce a length floor, canonicalize) would retire many instances at once.",
     "Crash-atomicity and concurrency are systematically under-handled on a memory-constrained VM whose documented failure mode is OOM/SIGKILL: non-atomic writes to sentinel/state files, lock-free read-modify-write across daemons, cursors advanced before durable commit, multi-step mutations with no transaction. Atomic tmp+rename is used inconsistently and does not serialize read->mutate->write, so its presence is not evidence of safety.",
     "Many findings are environment- or timing-gated (PID reuse, DST window, >200-row batch, microsecond collisions, multi-tenant /tmp) and correctly latent rather than refuted; the code shape is always present and unguarded. A notable fraction explicitly contradict their own docstring/comment, making 'review the code against its own stated contract' a high-yield, low-false-positive lens.",
+    "MIGRATION-SAFETY classes (2026-07-27): the three migration-* classes are the second group that is NOT from AUDIT_main_20260605 (coverage.all_64_covered still describes only the audit corpus, and they carry empty example_finding_ids for that reason). They come from the RSDPM merged-but-not-applied incidents of 2026-07-26/27 — 0022, 0029 and 0030 each merged, sat unapplied, and broke something live while every surface reported green — plus that repo's standing rules 2 and 3. They power Lens J (migration safety), which is scope-gated to diffs shipping SQL a live database will run, and unlike Lens I it DOES block: with apply-on-merge, merging a migration executes it, so the review is the last point a human is asked anything. Lens J's distinctive rule is that an unquantified blast radius counts as a FAIL, not a pass.",
     "SAFETY-FIRST posture (2026-06-08): unsynchronized-shared-state-rmw flipped to blocking=true (was advisory) per Larry's gate posture. Advisory remain: insufficient-uniqueness-key-collision (LOW), implementation-diverges-from-stated-contract (MEDIUM, cosmetic-leaning).",
     "REUSE class (2026-06-10): reinvents-cataloged-shelf-component is the first FORWARD-LOOKING class — it is not one of the 64 escaped bugs (coverage.all_64_covered still describes the audit corpus). It powers Lens I (reuse/reinvention), which queries the ourliberty-graph shelf librarian and is ADVISORY ONLY (blocking=false, narrative note, never a REVISION/ESCALATE/HALT). It is the Mission-A 'connect-before-build' nudge wired into the gate Mirror already runs; graduate toward a real gate only once the accuracy meter (Pulse Check XI) earns it (PLAN §5-#3 / §9-Q4)."
   ]

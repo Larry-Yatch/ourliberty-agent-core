@@ -35,6 +35,10 @@ whose `review_lens` matches its lens.
 Each returns a list of candidate findings: `{file, line_range, lens, severity,
 description, why_real, suggested_fix}`.
 
+Two are scope-gated rather than universal: **Lens I** runs only on diffs that add a
+new part, and **Lens J** runs only on diffs that ship SQL a live database will run.
+On a diff that does neither, both are skipped and say so in one line.
+
 ### Lens A — concurrency & atomicity
 TOCTOU, lock scope, lost updates, non-atomic read-modify-write, crash-recovery
 gaps, `os.open` without `O_EXCL` on predictable paths, check-then-act on shared
@@ -128,6 +132,138 @@ It surfaces a reuse opportunity; Forge/Larry decide.
 PLAN §5-#3 / §9-Q4. Graduate it toward a real gate only once Pulse Check XI's accuracy meter earns
 the trust.)
 
+### Lens J — migration safety  *(scope: diffs that ship SQL a live database will run)*
+
+**Fires when** the diff adds or edits a file under a migrations directory
+(`supabase/migrations/*.sql` in RSDPM) — or otherwise ships DDL/DML destined for a
+real database. Skip entirely otherwise; this lens has nothing to say about ordinary
+code.
+
+**Why it exists.** A migration is reviewed and merged like code, but merging it does
+not change the database — historically a human pasted it into a SQL console
+afterwards. In RSDPM, three times in two days (`0022`, `0029`, `0030`), the first
+happened and the second did not, and each broke something live while every surface
+reported green. The fix is to apply on merge. **That fix changes what a review
+means: once it lands, merging a migration EXECUTES it.** The judgement that used to
+sit (uselessly) in front of a paste step has to sit here instead, because here is
+the last point where a human is asked anything.
+
+It is worth saying plainly why "here" and not "at the paste step". From the repo
+owner, verbatim: *"I don't have the technical expertise to know if I'm going to do
+something that's going to break it anyway."* A gate whose operator cannot evaluate
+what they approve is a delay with ceremony. So this lens does not ask him to
+approve SQL. It hands him a decision he **can** make — about blast radius and
+reversibility, in plain words.
+
+#### The five questions. Grade every one PASS / FAIL / **UNKNOWN**.
+
+**J1 — Reversible?** Is there a mechanical undo that restores structure *and* data?
+`ADD COLUMN`, `CREATE INDEX`, a new table, `CREATE OR REPLACE FUNCTION` where the
+prior body is in git → yes. `DROP COLUMN`, `DROP TABLE`, `TRUNCATE`, `DELETE`, and
+`ALTER COLUMN ... TYPE` that narrows → **no**; the rows are gone and git does not
+hold them.
+
+**J2 — Structure or data?** Classify *every statement*, not the file. DATA-TOUCHING
+includes the obvious (`INSERT`/`UPDATE`/`DELETE`/`TRUNCATE`) and the easily missed:
+`DROP COLUMN`/`DROP TABLE` on a populated object, `ALTER COLUMN ... TYPE` (rewrites
+existing rows), `SET NOT NULL` and new `CHECK`/`FOREIGN KEY` constraints (reject
+existing rows, so the migration can simply fail mid-way on real data after passing
+against an empty one). STRUCTURE-ONLY is a narrower category than it looks.
+
+**J3 — How many rows?** For every data-touching statement, state a **number or a
+bound**, and say how you got it. If you cannot count — and at review time you
+usually cannot, because you are reading a diff and not connected to the database —
+**say so, and treat the blast radius as unknown**. Unknown is a block. `"0 rows"`
+is a claim that needs evidence; it is never the default.
+
+**J4 — The rulebook.** Read the *target repo's* CLAUDE.md (Lens H's habit, applied
+to schema). For RSDPM that is standing rules 2 and 3, and they are concrete:
+every new table ships its RLS class in the same migration, deny-by-default;
+`authenticated` gets no direct DML anywhere; every view is
+`WITH (security_invoker = true)`; every function is `SECURITY DEFINER SET
+search_path = ''`, owned by a dedicated non-superuser definer role, with `REVOKE
+EXECUTE FROM PUBLIC, anon` and explicit `GRANT`s; module-owned DDL is a closed
+list, so an object nobody's spec names is an amendment, not a drive-by.
+
+**J5 — Order.** Does this migration redefine an object (function, view, policy,
+trigger) that a **higher-numbered** migration in the same tree also redefines? If
+so, applying it out of order silently reverts the later one. Check every `CREATE OR
+REPLACE` / `ALTER` target against all higher-numbered files in the directory. This
+exact check was done **by hand** for `0022` against `0027`; it must stop being a
+hand check. Flag the mirror case too — a migration whose object a *lower*-numbered
+**unapplied** migration also touches.
+
+#### The verdict — written for a non-DBA, blast radius first
+
+Emit this block in the review narrative for every migration file. It is the
+deliverable of this lens; the graded J1–J5 are its working.
+
+```
+## Migration verdict — <filename>
+
+**What it does to the database:** <one sentence, plain words, no SQL>
+**Reversible:** yes / no — <why>
+**Data at risk:** <N rows / N people / affects everyone who …>, or "none — structure only"
+**Rulebook:** pass / fails <which rule>, at <file:line>
+**Order:** safe / conflicts with <later migration>
+**Recommendation:** apply / do not apply — <one clause>
+**What I could not check:** <list, or "nothing">
+**Independence:** <the standing caveat below>
+```
+
+How to write it, because the wording *is* the feature:
+
+- **No SQL identifier is the subject of a sentence.** "the column that records
+  whether a host wants the morning briefing", not `profiles.briefing_enabled`.
+- **Name people and rows, not tables**, whenever data is at risk: *"this deletes a
+  column holding data for 6 people and cannot be undone. I recommend no."*
+- **Never write "approve this SQL?"** He has said he cannot evaluate it. A verdict
+  that asks him to is a rubber stamp with extra steps.
+- **State the limit of your own recommendation.** Standing caveat, include it every
+  time: *"Written and reviewed by the same model — a careful second pass with
+  adversarial framing, not an independent one."*
+
+#### Designing against the reviewer that always says yes
+
+This lens's whole value is that it sometimes says no. Three guards:
+
+1. **Grade against the written rules, item by item.** A Lens-J output without
+   explicit PASS/FAIL/UNKNOWN on each of J1–J5 is not a run of this lens.
+2. **UNKNOWN counts as FAIL.** Bias to block when unsure. The asymmetry is real —
+   a wrongly-blocked migration costs a round trip; a wrongly-applied destructive one
+   costs data.
+3. **Track the approval rate.** Every verdict is one ledger line. **A migration lens
+   that has never recommended "do not apply" is not reviewing** — it is the paste
+   step again, wearing a report. (Meter and ledger land in the follow-up PR; until
+   then, state the running count in the narrative.)
+
+And the conflict, said out loud rather than papered over: **the same model writes
+the migration and reviews it.** The partial mitigation is that this is a separate
+pass with adversarial framing, run by a different agent with a different prompt —
+genuinely how several real bugs were caught. It is a mitigation, not independence,
+and the verdict says so in Larry's copy so he can price the recommendation.
+
+#### Routing
+
+- **J4 failure** (missing RLS, non-hardened function, view without
+  `security_invoker`) → Forge can fix it inline → **`REVIEW_REVISION`**.
+- **J5 overlap** → **`REVIEW_REVISION`** (reorder or fold the migrations), unless
+  resolving it needs a spec decision → `REVIEW_ESCALATE`.
+- **J1/J2/J3 — irreversible loss of existing data, or an UNKNOWN blast radius** →
+  **`REVIEW_ESCALATE`**, carrying the verdict block verbatim. Not a revision:
+  a deliberately destructive migration is not a bug Forge can fix, it is a question
+  only a human can answer. Escalation is the path that asks him.
+- **`REVIEW_EMERGENCY_HALT`** stays narrow: the migration targets a **production**
+  database, or it deletes **client content** (transcripts, meeting notes, anything
+  carrying real conversation) rather than factory-generated rows.
+
+**A note on the halt rule above (step 4b, "a destructive/irreversible operation the
+diff performs").** Once apply-on-merge exists, that rule starts reaching migrations,
+because merging one performs it. Do not let it swallow this lens: halt stops the
+pipeline and tells nobody anything, and the destructive-migration case specifically
+needs a human to *decide*. Escalate by default; halt only on the two conditions
+named above.
+
 ## Confidence + severity gating
 
 For each candidate, a separate verifier scores confidence 0–100 (try to construct a
@@ -139,8 +275,15 @@ class:
 | security, concurrency-atomicity, data-loss, input-path-safety | 50 | 70 |
 | automation-honesty, integration-seam, control-flow | 60 | 80 |
 | identifier-matching, state-persistence | 60 | 75 |
+| migration-safety | 40 | 60 |
 | CLAUDE.md adherence, style | 80 | (never blocks alone) |
 | reuse-reinvention (advisory) | 70 | (never blocks) |
+
+`migration-safety` sits lowest on purpose: with apply-on-merge, merging the diff
+executes it, so a false negative is not a latent bug — it is a database change that
+already happened. Its UNKNOWN-counts-as-FAIL rule is a floor under the table, not a
+score: an unquantified blast radius blocks regardless of confidence, because the
+thing you are uncertain about is exactly the thing being measured.
 
 A finding marked `blocking: true` in the corpus inherits the lower (blocking)
 threshold for its class. Lens I (reuse-reinvention) is `blocking: false` and keyed
@@ -169,6 +312,12 @@ no score threshold.
   catalog-on-build restock) always go in the narrative above the marker, regardless of
   confidence, and never enter `findings[]`. It is an advisory connect-on-build nudge, not a
   correctness gate; a reuse or restock note must not, on its own, turn a `REVIEW_PASS` into a revision.
+- **Lens J (migration safety)** routes per its own section above — `REVIEW_REVISION`
+  for rulebook and ordering faults, `REVIEW_ESCALATE` for irreversible data loss or
+  an unknown blast radius, `REVIEW_EMERGENCY_HALT` only for prod or client content.
+  Its **verdict block always goes in the narrative**, on a `REVIEW_PASS` as much as
+  on a block — a clean migration Larry can read is the point, not just a blocked
+  one.
 - This runs **in addition to** the `test_regression_check.py` gate and the spec/AC
   checklist. Order: spec/AC → bug-hunt → test-regression gate. All three must pass
   for `REVIEW_PASS`.
