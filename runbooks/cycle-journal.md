@@ -4,6 +4,82 @@
 
 ---
 
+## Iteration ~6442 — 2026-07-27T10:42Z UTC (Larry /cycle chat, Tier 1 → consecutive_clean=0)
+
+**Health:** ⚠️ NON-NOMINAL with carry (all same as iter ~6441). **Tier 1 stays** (consecutive_clean=0; PR #111 RSDPM approval→REJECT carry; PR #103 RSDPM CONFLICTING carry; PR #113 RSDPM HELD behind #103; PR #1031 ourliberty AUTO_MERGE_HELD_DEEP_REVIEW carry; PR #1030 ourliberty HELD behind #1031; notifier-gh-502-approval-pending[3] carry; Check I + VIII + IX + X pending today Mon 2026-07-27 fires ~14:13Z UTC).
+
+**VERIFY-BEFORE-REASSERT (from iter ~6441 at ~10:37Z UTC):**
+- **"PR #111 RSDPM approval→REJECT"**: CONFIRMED ⚠️ — OPEN/MERGEABLE; autoMergeRequest=null; pending[1] (05:41:02Z) still active. [carry ⚠️]
+- **"PR #103 RSDPM CONFLICTING"**: CONFIRMED ⚠️ — OPEN/CONFLICTING. [carry ⚠️]
+- **"PR #113 RSDPM HELD behind #103"**: CONFIRMED — OPEN/MERGEABLE; autoMergeRequest=null. [carry ✅]
+- **"PR #1031 ourliberty AUTO_MERGE_HELD_DEEP_REVIEW"**: CONFIRMED ⚠️ — OPEN/MERGEABLE; autoMergeRequest=null; pending[2] (06:24:14Z) still active. [carry ⚠️]
+- **"PR #1030 ourliberty HELD behind #1031"**: CONFIRMED — OPEN/MERGEABLE; autoMergeRequest=null. [carry ✅]
+- **"notifier-gh-502-transient-retry-001 pending[3]"**: CONFIRMED — created=07:48:08Z UTC. Larry reply awaited. [carry ⚠️]
+- **"alerts watermark=500"**: CONFIRMED — repair-watermark: repaired=false (old=500, file_length=500). 0 new alerts. [carry ✅]
+- **"system-health=healthy"**: UPDATED — overall=healthy ts=2026-07-27T10:38:24Z UTC; all bots ok. [carry ✅]
+- **"heal-stale-daemon-code.heartbeat"**: CONFIRMED — heartbeat=2026-07-27T10:33:23Z UTC (~9 min from 10:42Z check; fresh). [carry ✅]
+- **"Check I pending today Mon 2026-07-27"**: CONFIRMED — last artifact=check-i-2026-07-26.json (Sun 1 proposal); no new artifact at 10:42Z UTC; timer fires ~14:13Z UTC. [carry pending]
+- **"Check III RESOLVED"**: CONFIRMED ✅ — check-iii-2026-07-26.json present; PR #1027 MERGED 2026-07-26T15:54:34Z UTC. Next cycle ~2026-08-09. [carry resolved ✅]
+- **"Check VIII/IX/X pending today"**: CONFIRMED — no new artifacts at 10:42Z UTC; fires ~14:13Z UTC. [carry pending]
+
+**New findings this iter:**
+- No new findings. All carries persist unchanged. Pipeline clean (0 stalls per dry-run 10:41Z UTC). ℹ️ [INFO]
+
+**Check 0 — Alert triage (~10:41Z UTC):** repair-watermark: repaired=false (old=500, file_length=500). 0 new alerts above watermark. Watermark stays 500. NOMINAL ✅
+
+**Check 1 — Log noise (~10:41Z UTC):** outbox-notifier.log last entry [2026-07-27 02:33:54 MDT] = 08:33:54Z UTC (~128 min from check). No new entries since iter ~6441. Carry WARNs: AUTO_MERGE_HELD pr-RSDPM-113 (blocker=#103; by-design). NOMINAL ✅
+
+**Check 2 — Telegram sweep (~10:41Z UTC):** beacon_telegram_bot.log last entry [2026-07-27T01:58:46-0600] = 07:58:46Z UTC (~163 min from check). No new Larry directives. idx=541 doorbell (01:58:46-0600) — Tier-3 silenced; no action. NOMINAL ✅
+
+**Check 3 — Pipeline stall (~10:41Z UTC):** heal_pipeline_stall dry-run (10:41Z UTC): FORGE_NO_PR_SKIP threshold-update-2026-07-26-001 (pr_exists #1027); FORGE_NO_PR_SKIP pr-RSDPM-75+81+85+89 (MERGED); FORGE_NO_PR_SKIP marker-taskid-normalize-001 (pr_exists #1028); FORGE_NO_PR_SKIP transcript-jump (pr_exists #90 RSDPM); FORGE_NO_PR_SKIP pr-ourliberty-agent-core-1031 (sibling_pr_title_shipped #1031). **0 stalls detected.** NOMINAL ✅
+
+**Check 4 — Pending directives (~10:41Z UTC):** beacon-pending-approvals.json: **pending=3** ⚠️. [1] mirror-review-pr-RSDPM-111-f2b287ea (05:41:02Z); [2] deep-review-hold-pr1031-e423cbbd (06:24:14Z); [3] notifier-gh-502-transient-retry-001 (07:48:08Z). All DMs delivered prior iters. No new DM this iter. NON-NOMINAL ⚠️ (carry — awaiting Larry)
+
+**Check 5 — Stale daemon code (~10:41Z UTC):** heal-stale-daemon-code.heartbeat=2026-07-27T10:33:23Z UTC (~9 min from check; fresh <60 min). system-health.json overall=healthy ts=2026-07-27T10:38:24Z UTC; all bots ok. NOMINAL ✅
+
+**Check A — Source repo (~10:41Z UTC):** HEAD=9480d6b3=origin/main (Pulse cycle 20260727T103946Z — iter ~6441 auto-commit); on main; clean tree; 0 ahead/behind. NOMINAL ✅
+**Check B — Sync health (~10:41Z UTC):** last_sync=2026-07-27T09:41:52Z UTC (~60 min from check); status=no-change; consecutive_push_failures=0. Within 2h. NOMINAL ✅
+**Check C — Agent liveness (~10:41Z UTC):** system-health.json overall=healthy 10:38:24Z UTC; all bots ok (beacon, forge, mirror, pulse all alive). NOMINAL ✅
+**Check E — PR/merge state (~10:41Z UTC):** ourliberty-agent-core: **PR #1031 OPEN/MERGEABLE** (AUTO_MERGE_HELD_DEEP_REVIEW carry; pending[2]); **PR #1030 OPEN/MERGEABLE** (HELD behind #1031 carry). RSDPM: PR #111 OPEN/MERGEABLE (approval→REJECT carry; pending[1]); PR #103 OPEN/**CONFLICTING** ⚠️ (carry); PR #113 OPEN/MERGEABLE (HELD behind #103 carry). NON-NOMINAL ⚠️ (all carries; no changes from iter ~6441)
+**Check H — Inbox (~10:41Z UTC):** Forge: 0. Mirror: 0. Beacon: 0. NOMINAL ✅
+
+**§5.0:** audit-due-nudge: no-op. distill-detector: no-op. NOMINAL ✅
+
+**Rotations:** [carry] SUPABASE_SERVICE_ROLE_KEY due=2026-08-22 (~26d). 14-day dedup active (last DM 2026-07-20; expires ~2026-08-03); no new DM. NOMINAL ✅
+
+**Conditional checks:**
+- **Check I:** timer-managed (firing day today Mon 2026-07-27; last artifact=check-i-2026-07-26.json Sun 1 proposal; no new artifact at 10:42Z UTC; timer fires ~14:13Z UTC). [pending today]
+- **Check III:** RESOLVED ✅ — check-iii-2026-07-26.json present (Sun run); PR #1027 MERGED 2026-07-26T15:54:34Z. Next cycle ~2026-08-09.
+- **Check VIII / IX / X:** timer-managed (Monday; no artifacts yet; fires ~14:13Z UTC). [pending today]
+
+**G-rule assessment:** No changes from iter ~6441.
+- forge-marker-taskid-suffix-increment-001: **2/3** [carry, 0 new].
+- medic-draft-status-false-positive: **2/3** [carry, 0 new].
+- check-i-force-bypass-dm-route: **2/3** [carry, 0 new].
+- auto-merge-conflict-route-hold-no-dm-001: **1/3** [carry, 0 new].
+- mirror-queue-wait-readiness: **1/3** [carry, 0 new].
+- GH-502-merge-state-recheck: **3/3 DISPATCHED iter ~6416** — notifier-gh-502-transient-retry-001 pending Larry [3]. verification_pending.
+- Active carries (verification_pending): forge-revision-preamble-missing; forge-wip-redispatch-digest; forge-wip-redispatch-exhausted-no-pr; outbox-notifier-intent-reject; auto-dispatch-APPROVAL_REQUEST-mismatch; PR #1022 heal-wip-redispatch DAG-preflight suppression.
+
+**Actions taken:**
+1. Check 0: repair-watermark no-op (repaired=false, old=500, file_length=500). 0 new alerts. Watermark stays 500.
+2. §5.0 one-shots: all no-ops.
+3. Tier state: `cycle_tier_state.py record --checks-clean false` → consecutive_clean=0; **Tier 1** stays (last_signal_at=2026-07-27T10:41:41Z UTC).
+4. PRIME ledger: intervention appended (tier=1, kind=intervention, template=carry-pr-holds, ts=2026-07-27T10:41:45Z UTC).
+
+**Escalations:**
+- [carry — no new DM] PR #111 RSDPM Mirror approval→REJECT pending[1]. DM delivered idx=535 (05:52Z UTC). Approve to dispatch Forge revision fixing pre-existing CI failure; Reject to abandon PR.
+- [carry — no new DM] PR #103 RSDPM CONFLICTING. DM delivered idx=534. Rebase: `gh pr checkout 103 --repo Larry-Yatch/RSDPM && git fetch origin && git rebase origin/main && git push --force-with-lease`
+- [carry — no new DM] PR #1031 ourliberty AUTO_MERGE_HELD_DEEP_REVIEW. DM delivered idx=537 (06:27:58Z UTC). Approve to authorize merge; Reject to keep holding.
+- [carry — no new DM] notifier-gh-502-transient-retry-001: Forge build plan pending Larry approval [3]. Reply `approve / go / ok / ship it` to proceed. DM delivered idx=540 (07:48:40Z UTC).
+- [carry — no new DM] check-vi-posture-proposals-2026-07-07 (2 proposals).
+- [carry — no new DM] Mirror queue-wait p95=92.3m (self-suppresses 3d → ~2026-07-30T02Z UTC).
+
+**PRIME DIRECTIVE:** intervention (all-carries iter; no new findings; 0 new alerts; system-health=healthy 10:38Z UTC; pipeline clean; inbox empty). Trailing 30d: ratio≈32.91% (interventions=1615, systemic_fixes=49, vp=23). Trend: worsening.
+**Tier end-of-iter:** **Tier 1** (consecutive_clean=0; last_signal_at=2026-07-27T10:41:41Z UTC; 5-min cadence).
+
+---
+
 ## Iteration ~6441 — 2026-07-27T10:37Z UTC (Larry /cycle chat via /loop, Tier 1 → consecutive_clean=0)
 
 **Health:** ⚠️ NON-NOMINAL with carry (all same as iter ~6440). **Tier 1 stays** (consecutive_clean=0; PR #111 RSDPM approval→REJECT carry; PR #103 RSDPM CONFLICTING carry; PR #113 RSDPM HELD behind #103; PR #1031 ourliberty AUTO_MERGE_HELD_DEEP_REVIEW carry; PR #1030 ourliberty HELD behind #1031; notifier-gh-502-approval-pending[3] carry; Check I + VIII + IX + X pending today Mon 2026-07-27 fires ~14:13Z UTC).
@@ -2948,82 +3024,6 @@ Watermark advanced 538→540. NOMINAL ✅
 
 **PRIME DIRECTIVE:** intervention (PR #109+#111 pending approvals carry; PR #103 CONFLICTING carry; PR #1030 ourliberty Mirror in-progress; PR #1031 ourliberty NEW companion; PR #115 RSDPM MERGED ✅; PRs #113+#114 Mirror in-progress; watermark=536; system-health=healthy 05:52Z UTC). Trailing 30d: ratio=32.9% (interventions=1577, systemic_fixes=48, vp=23, trend=worsening).
 **Tier end-of-iter:** **Tier 1** (consecutive_clean=0; last_signal_at=2026-07-27T05:59:36Z UTC; 5-min cadence).
-
----
-
-## Iteration ~6402 — 2026-07-27T05:54Z UTC (Larry /cycle chat, Tier 1 → consecutive_clean=0)
-
-**Health:** ⚠️ NON-NOMINAL with carry. **Tier 1 stays** (consecutive_clean=0; PRs #109+#111 pending approvals — REJECT BOTH carry (CI fixed by #110+#112; no new Pulse DM); PR #103 RSDPM CONFLICTING carry; PR #1030 ourliberty-agent-core NEW auto-merge skip-draft; PRs #113+#114 in Mirror inbox; PRs #114+#115 RSDPM NEW; system-health=healthy 05:47Z UTC).
-
-**VERIFY-BEFORE-REASSERT (from iter ~6401 at ~05:47Z UTC):**
-- **"PRs #109+#111 approvals REJECT BOTH recommended"**: CONFIRMED ⚠️ — beacon-pending-approvals.json pending=2 (created 05:34:01Z + 05:41:02Z UTC). CI is fixed (#110+#112 MERGED). Still awaiting Larry rejection. [carry ⚠️]
-- **"PR #103 RSDPM CONFLICTING"**: CONFIRMED ⚠️ — `gh pr list` shows PR #103 mergeable=CONFLICTING. No Larry rebase yet. outbox-notifier promoted escalation: idx=534 delivered to Larry 05:47:36Z UTC. [carry ⚠️]
-- **"PR #113 RSDPM NEW (Mirror review pending)"**: CONFIRMED — review-pr-RSDPM-113.json present in Mirror inbox. In progress. [carry ✅]
-- **"ourliberty-agent-core: 0 open PRs"**: OUTDATED — PR #1030 NEW (created 05:46:05Z UTC). [carry updated]
-- **"Check A NOMINAL — clean + up to date (HEAD=6e4a08aa)"**: CONFIRMED + UPDATED — HEAD=39fd60c7 (Pulse cycle 20260727T054928Z, auto-commit from iter ~6401); matches origin/main. On main, clean tree. [carry ✅]
-- **"Check I pending today Mon 2026-07-27"**: CONFIRMED — no new artifact at 05:54Z UTC; timer fires ~14:13Z UTC. [carry pending]
-- **"system-health=healthy 05:42Z UTC"**: UPDATED — overall=healthy ts=2026-07-27T05:47:48Z UTC. [carry ✅]
-- **"heal-stale-daemon-code.heartbeat=05:40:52Z UTC"**: CONFIRMED — heartbeat=2026-07-27T05:40:52Z UTC (~14 min from check; fresh <60 min). [carry ✅]
-
-**New findings this iter:**
-- **PR #1030 ourliberty-agent-core NEW** (created 05:46:05Z UTC, MERGEABLE, no reviewDecision): "Skip DRAFT blockers in the auto-merge overlap serializer" — branch=fix/auto-merge-skip-draft-blocker. Forge opened this fix for `_find_overlap_blocker` serializing PASSed PRs behind DRAFT blockers (DRAFT state already skipped for `mergeable` check, but not for overlap-serializer blockers). Normal pipeline — Mirror review pending dispatch (created after outbox-notifier last scan at 05:43Z UTC; outbox-notifier will pick up on next sweep).
-- **PR #114 RSDPM NEW** (created 05:45:32Z UTC, MERGEABLE, no reviewDecision): "[M5-amendment] queue grouping is by ZONE, not tier; the trim editor moves behind Fix" — review-pr-RSDPM-114.json dispatched to Mirror inbox at ~05:50Z UTC. In progress.
-- **PR #115 RSDPM NEW** (created 05:46:23Z UTC, MERGEABLE, no reviewDecision): "feat(M12): slice 1 — the queue's substrate and the facts it was throwing away" — not yet in Mirror inbox (created after outbox-notifier last scan). Will be dispatched on next outbox-notifier sweep.
-- **Alert line 535 (outbox-notifier::promoted PR #103 conflict)** (ts=05:47:09Z UTC): Tier-4 per helper (`alert_triage_state.py`). PR #103 conflict promotion after 3 outbox-notifier hold cycles — DM already delivered to Larry by outbox-notifier at idx=534 (05:47:36Z UTC confirmed). Pulse DM suppressed (redundant delivery). Journal-note only.
-- **Alert line 536 (Pulse own-DM delivery confirm iter ~6401)** (ts=05:47:47Z UTC, source=pulse): Tier-4 per helper. Journal-note only (established practice for Pulse own-DM delivery confirms).
-
-**Check 0 — Alert triage (~05:51Z UTC):** repair-watermark: repaired=false (old=534, file_length=536). 2 new alerts: line 535 = outbox-notifier PR #103 conflict promoted (Tier-4; outbox-notifier already DM'd Larry idx=534; Pulse DM suppressed); line 536 = Pulse own-DM delivery confirm (Tier-4; journal-note only). Watermark advanced 534→536. NON-NOMINAL ⚠️
-
-**Check 1 — Log noise (~05:51Z UTC):** outbox-notifier.log last entry [23:43:34 MDT] (05:43:34Z UTC): AUTO_MERGE_QUEUE_RELEASED pr-RSDPM-110 outcome=merged. No new entries since last iter. No new WARNs. Last WARN=[23:20:03 MDT] AUTO_MERGE_HELD_STALE_CONFLICT pr-RSDPM-103 (carry, Check E). NOMINAL ✅
-
-**Check 2 — Telegram sweep (~05:51Z UTC):** beacon_telegram_bot.log last entry [23:47:36 MDT] (05:47:36Z UTC): idx=534 outbox-notifier PR #103 conflict::promoted delivered. No new Larry directives or responses. NOMINAL ✅
-
-**Check 3 — Pipeline stall (~05:51Z UTC):** heal_pipeline_stall dry-run: FORGE_NO_PR_SKIP threshold-update-2026-07-26-001 (#1027 MERGED); FORGE_NO_PR_SKIP pr-RSDPM-75+81+85+89 (MERGED); FORGE_NO_PR_SKIP marker-taskid-normalize-001 (#1028 MERGED); FORGE_NO_PR_SKIP transcript-jump (#90 RSDPM). 0 stalls detected. NOMINAL ✅
-
-**Check 4 — Pending directives (~05:51Z UTC):** beacon-pending-approvals.json: **pending=2, history=542** ⚠️. Pending: (1) mirror-review-pr-RSDPM-109-468e5884 (PR #109, created 05:34:01Z UTC); (2) mirror-review-pr-RSDPM-111-f2b287ea (PR #111, created 05:41:02Z UTC). Both: CI blocker fixed by #110+#112 MERGED. REJECT BOTH recommended (iter ~6401 DM delivered; no new Pulse DM this iter). NON-NOMINAL ⚠️
-
-**Check 5 — Stale daemon code (~05:51Z UTC):** heal-stale-daemon-code.heartbeat=2026-07-27T05:40:52Z UTC (~14 min from check; fresh <60 min). system-health.json overall=healthy ts=2026-07-27T05:47:48Z UTC. NOMINAL ✅
-
-**Check A — Source repo (~05:51Z UTC):** on main; clean tree ✅; HEAD=39fd60c7 (Pulse cycle 20260727T054928Z; matches origin/main). NOMINAL ✅
-**Check B — Sync health (~05:51Z UTC):** last_sync=2026-07-27T05:41:00Z UTC (~13 min from check); status=no-change; consecutive_push_failures=0. Within 2h. NOMINAL ✅
-**Check C — Agent liveness (~05:51Z UTC):** system-health.json overall=healthy ts=2026-07-27T05:47:48Z UTC; all bots alive (beacon/forge/mirror/pulse); inbox_watcher=ok, outbox_notifier=ok; disk=13%, memory=20%. NOMINAL ✅
-**Check E — PR/merge state (~05:51Z UTC):** ourliberty-agent-core: **PR #1030 OPEN/MERGEABLE** (NEW auto-merge skip-draft fix — Mirror review pending dispatch; normal pipeline). RSDPM: PR #103 OPEN/NOT-DRAFT/**CONFLICTING** ⚠️ (rebase needed — carry; outbox-notifier promoted escalation at idx=534); PR #109 OPEN/NOT-DRAFT/MERGEABLE (Mirror ESCALATE, approval pending → REJECT); PR #111 OPEN/NOT-DRAFT/MERGEABLE (Mirror ESCALATE, approval pending → REJECT); PR #113 OPEN/NOT-DRAFT/MERGEABLE (Mirror review in progress — review-pr-RSDPM-113 in inbox); PR #114 OPEN/NOT-DRAFT/MERGEABLE (NEW M5-amendment — Mirror review in progress — review-pr-RSDPM-114 in inbox); PR #115 OPEN/NOT-DRAFT/MERGEABLE (NEW feat M12 slice 1 — Mirror review pending dispatch). NON-NOMINAL ⚠️
-**Check H — Inbox (~05:51Z UTC):** Forge: 0. Mirror: 2 (review-pr-RSDPM-113, review-pr-RSDPM-114 — expected pipeline work). Beacon: 0. NOMINAL ✅
-
-**§5.0:** audit-due-nudge: no-op. distill-detector: no-op. audit-cadence-signal: no-op. NOMINAL ✅
-
-**Rotations:** [carry] SUPABASE_SERVICE_ROLE_KEY due=2026-08-22 (~26d). 14-day dedup active (last DM 2026-07-20; expires ~2026-08-03); no new DM. NOMINAL ✅
-
-**Conditional checks:**
-- **Check I:** timer-managed (firing day today Mon 2026-07-27; no new artifact at 05:54Z UTC; timer fires ~14:13Z UTC). [pending today]
-- **Check III:** Next 14-day cycle ~2026-08-09. [RESOLVED ✅]
-- **Check VI:** timer-managed. [carry]
-- **Check VIII:** timer-managed; last artifact=check-viii-2026-07-20.json. [carry]
-
-**G-rule assessment:**
-- forge-marker-taskid-suffix-increment-001: **2/3** [carry, 0 new].
-- medic-draft-status-false-positive: **2/3** [carry, 0 new].
-- check-i-force-bypass-dm-route: **2/3** [carry, 0 new].
-- auto-merge-conflict-route-hold-no-dm-001: **1/3** [carry, 0 new].
-- mirror-queue-wait-readiness: **1/3** [carry, 0 new].
-- GH-502-merge-state-recheck: **1/3** [carry, 0 new; sub-threshold, watch].
-- Active carries (verification_pending): forge-revision-preamble-missing; forge-wip-redispatch-digest; forge-wip-redispatch-exhausted-no-pr; outbox-notifier-intent-reject; auto-dispatch-APPROVAL_REQUEST-mismatch; PR #1022 heal-wip-redispatch DAG-preflight suppression.
-
-**Actions taken:**
-1. Check 0: repair-watermark no-op (repaired=false, old=534, file_length=536). 2 new alerts triaged (line 535 Tier-4 DM-suppressed; line 536 Tier-4 journal-note). Watermark advanced 534→536.
-2. §5.0 one-shots: all no-ops.
-3. Tier state: `record --checks-clean false` → consecutive_clean=0; **Tier 1** stays (last_signal_at=2026-07-27T05:54:25Z UTC).
-4. PRIME ledger: intervention appended (tier=1, kind=intervention, template=uncategorized, detail=PR-109+111-pending-approvals-REJECT-BOTH-carry;PR-103-CONFLICTING-carry;PR-1030-ourliberty-NEW;PR-113+114-Mirror-inbox;PRs-114+115-NEW-RSDPM;alerts-535-536-triaged;watermark-536;system-health-healthy-05:47Z).
-
-**Escalations:**
-- [carry — no new Pulse DM] PRs #109+#111 Mirror ESCALATE approvals: REJECT BOTH. CI fixed by #110+#112. Iter ~6401 DM delivered (idx=533). Reject both approval_requests and trigger fresh Mirror reviews.
-- [carry — no new Pulse DM] PR #103 RSDPM CONFLICTING. outbox-notifier promoted escalation (idx=534, 05:47:36Z UTC). Rebase: `gh pr checkout 103 --repo Larry-Yatch/RSDPM && git fetch origin && git rebase origin/main && git push --force-with-lease`
-- [carry — no new DM] rsdpm-driftcheck: PR #113 Forge fix in Mirror pipeline (rsdpm_materialize_quote probe). Monitor.
-- [carry — no new DM] check-vi-posture-proposals-2026-07-07 (2 proposals).
-- [carry — no new DM] Mirror queue-wait p95=92.3m (self-suppresses 3d → ~2026-07-30T02Z).
-
-**PRIME DIRECTIVE:** intervention (PR #109+#111 pending approvals carry; PR #103 CONFLICTING carry; PR #1030 ourliberty NEW auto-merge fix; PRs #114+#115 RSDPM NEW in pipeline; Mirror inbox 2 items; alerts 535-536 triaged; watermark=536; system-health=healthy 05:47Z UTC). Trailing 30d: ratio=32.8% (interventions=~1575, systemic_fixes=48, vp=23, trend=worsening).
-**Tier end-of-iter:** **Tier 1** (consecutive_clean=0; last_signal_at=2026-07-27T05:54:25Z UTC; 5-min cadence).
 
 ---
 
