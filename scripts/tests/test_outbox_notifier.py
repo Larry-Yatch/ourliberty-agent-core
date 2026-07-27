@@ -3198,6 +3198,89 @@ class ClassifyMirrorMarkerTest(unittest.TestCase):
             on._classify_mirror_marker(data)
         self.assertIn('task_id', str(ctx.exception))
 
+    # ---- marker-taskid-normalize-001 (Mirror half): whitespace-only ----
+    #
+    # Routing keys off the outbox FILENAME STEM (= envelope task_id), so a
+    # whitespace-only difference is unambiguously the SAME task. Auto-normalize
+    # (no raise, no deliverable claim) — a reject here costs a full review
+    # retry (~$1 / ~7 min). Deliberately NARROWER than the Forge half: no
+    # `forge-`/`forge/` affix stripping, because on Mirror any non-whitespace
+    # difference means "reviewed the wrong PR."
+
+    def _classify_mirror_with_claim_spy(self, marker_task_id, envelope_task_id):
+        """Run mirror classify with record_claim mocked; return (decision, rec)."""
+        import launch_dedup_guard
+        marker = _mirror_pass_marker(task_id=marker_task_id)
+        data = _mirror_outbox_body(
+            marker, task_id=envelope_task_id,
+            target_repo='ourliberty-agent-core',
+        )
+        with mock.patch.object(launch_dedup_guard, 'record_claim') as rec:
+            decision = on._classify_mirror_marker(data)
+        return decision, rec
+
+    def test_whitespace_padded_task_id_normalizes(self):
+        decision, rec = self._classify_mirror_with_claim_spy(
+            '  real-rev\n', 'real-rev',
+        )
+        self.assertEqual(decision['marker_type'], 'review_pass')
+        self.assertEqual(decision['intent'], 'review-pass')
+        # Same task — no competing claim recorded.
+        rec.assert_not_called()
+        # Canonical id downstream is the bare envelope id.
+        self.assertEqual(decision['payload']['task_id'], 'real-rev')
+
+    def test_trailing_newline_task_id_normalizes(self):
+        # The observed shape: a stray trailing newline from a heredoc/echo.
+        decision, rec = self._classify_mirror_with_claim_spy(
+            'real-rev\n', 'real-rev',
+        )
+        self.assertEqual(decision['marker_type'], 'review_pass')
+        rec.assert_not_called()
+        self.assertEqual(decision['payload']['task_id'], 'real-rev')
+
+    def test_mirror_affix_task_id_still_raises_and_records_claim(self):
+        # The Forge-specific `mirror-`/`forge-` affix normalization is
+        # DELIBERATELY NOT applied here. On Mirror an affixed id is not a
+        # formatting slip — it is a different id, and accepting it would risk
+        # attaching a verdict to the wrong PR. Strict reject stands.
+        import launch_dedup_guard
+        marker = _mirror_pass_marker(task_id='mirror-real-rev')
+        data = _mirror_outbox_body(
+            marker, task_id='real-rev', target_repo='ourliberty-agent-core',
+        )
+        with mock.patch.object(launch_dedup_guard, 'record_claim') as rec:
+            with self.assertRaises(on.mrh.MalformedMirrorMarker) as ctx:
+                on._classify_mirror_marker(data)
+        self.assertIn('mirror-real-rev', str(ctx.exception))
+        rec.assert_called_once()
+        self.assertEqual(rec.call_args.kwargs['claimed_task_id'], 'mirror-real-rev')
+        self.assertEqual(rec.call_args.kwargs['envelope_task_id'], 'real-rev')
+
+    def test_divergent_task_id_still_raises_and_records_claim(self):
+        # A semantic rename is GENUINELY ambiguous — on Mirror it means the
+        # review may have been run against the wrong PR. Keep the strict reject
+        # + deliverable-claim so a later board Launch can de-dupe.
+        import launch_dedup_guard
+        marker = _mirror_pass_marker(task_id='review-pr-89-e4-2-spec-doc')
+        data = _mirror_outbox_body(
+            marker, task_id='review-pr-89-e4-2-spec-doc-retry',
+            target_repo='ourliberty-agent-core',
+        )
+        with mock.patch.object(launch_dedup_guard, 'record_claim') as rec:
+            with self.assertRaises(on.mrh.MalformedMirrorMarker) as ctx:
+                on._classify_mirror_marker(data)
+        self.assertIn('review-pr-89-e4-2-spec-doc', str(ctx.exception))
+        self.assertIn('review-pr-89-e4-2-spec-doc-retry', str(ctx.exception))
+        rec.assert_called_once()
+        self.assertEqual(
+            rec.call_args.kwargs['claimed_task_id'], 'review-pr-89-e4-2-spec-doc',
+        )
+        self.assertEqual(
+            rec.call_args.kwargs['envelope_task_id'],
+            'review-pr-89-e4-2-spec-doc-retry',
+        )
+
     def test_malformed_marker_propagates(self):
         # Missing required field (no summary on PASS).
         bad_payload = json.dumps({'task_id': 'real-rev', 'pr_url': PR_URL_FIXTURE})

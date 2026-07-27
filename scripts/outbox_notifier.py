@@ -3818,19 +3818,45 @@ def _classify_mirror_marker(data: dict[str, Any]) -> Optional[dict[str, Any]]:
         and marker_task_id is not None
         and marker_task_id != envelope_task_id
     ):
-        # Record the cross-identity claim BEFORE raising (same bridge as Forge):
-        # Mirror reviewed/approved a PR whose marker task_id drifted from the
-        # envelope, so a later Launch of that task_id can de-duplicate.
-        _record_deliverable_claim(
-            claimed_task_id=marker_task_id,
-            envelope_task_id=envelope_task_id,
-            agent=data.get('agent', 'mirror'),
-            target_repo=data.get('target_repo'),
-        )
-        raise mrh.MalformedMirrorMarker(
-            f'marker task_id ({marker_task_id!r}) does not match envelope '
-            f'task_id ({envelope_task_id!r})'
-        )
+        # marker-taskid-normalize-001 (Mirror half). Routing keys off the outbox
+        # FILENAME STEM (= envelope task_id), so a WHITESPACE-ONLY difference —
+        # a stray trailing newline or padding on an otherwise identical id — is
+        # unambiguously the SAME task, not a review of some other PR. Normalize
+        # it (no deliverable claim, no raise, INFO log) instead of dead-lettering;
+        # each reject here costs a full review retry (~$1 / ~7 min).
+        #
+        # DELIBERATELY NARROWER than the Forge half: Forge also strips a leading
+        # `forge-`/`forge/` affix, which is agent-specific and would be wrong to
+        # apply here. Any non-whitespace difference on Mirror means "reviewed the
+        # wrong PR" — a correctness hazard, not a formatting slip — so it keeps
+        # the strict record-claim + raise below.
+        if (
+            isinstance(marker_task_id, str)
+            and marker_task_id.strip() == envelope_task_id
+        ):
+            # Auto-recovered: same task. Use the canonical envelope id
+            # downstream. INFO-only — not actionable for Larry.
+            log(
+                f'normalized whitespace-padded mirror marker task_id: '
+                f'{marker_task_id!r} -> {envelope_task_id!r}'
+            )
+            if isinstance(payload, dict):
+                payload['task_id'] = envelope_task_id
+        else:
+            # Record the cross-identity claim BEFORE raising (same bridge as
+            # Forge): Mirror reviewed/approved a PR whose marker task_id drifted
+            # from the envelope, so a later Launch of that task_id can
+            # de-duplicate.
+            _record_deliverable_claim(
+                claimed_task_id=marker_task_id,
+                envelope_task_id=envelope_task_id,
+                agent=data.get('agent', 'mirror'),
+                target_repo=data.get('target_repo'),
+            )
+            raise mrh.MalformedMirrorMarker(
+                f'marker task_id ({marker_task_id!r}) does not match envelope '
+                f'task_id ({envelope_task_id!r})'
+            )
 
     agent = data.get('agent', 'mirror')
     auto_promoted = mrh.should_auto_promote(marker_type, payload)
