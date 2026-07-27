@@ -313,6 +313,28 @@ _DEEP_REVIEW_PATHS_CONFIG_PATH = (
 # the stamp is applied immediately before hand-off with no third-party push.
 _DEEP_REVIEW_REQUIRED_LABEL = 'deep-review-required'
 _DEEP_REVIEW_PASSED_LABEL = 'deep-review-passed'
+
+# held-behind-label — make AUTO_MERGE_HELD visible ON the PR.
+#
+# A PR held behind an overlapping PR shows NOTHING on GitHub: every check green,
+# mergeStateStatus CLEAN, mirror-review success, and no merge. That is visually
+# identical to a wedged PR, and the hold exists only in outbox-notifier.log and
+# the queue state file. On 2026-07-27 that cost an hour of watching RSDPM #101
+# before the log revealed it was simply queued behind #74 — working exactly as
+# designed, invisibly.
+#
+# The blocker number is IN the label rather than a static "held" label plus a
+# comment, because "is it held?" was never the hard question — "behind WHAT?"
+# was. One artifact answers both and needs no comment machinery to stay
+# idempotent. Cost: the repo's label list accumulates a `held-behind-#N` entry
+# per distinct blocker. They are harmless, greppable, and only created when a
+# hold actually happens.
+_HELD_BEHIND_LABEL_PREFIX = 'held-behind-#'
+_HELD_BEHIND_LABEL_COLOUR = 'fbca04'
+
+
+def _held_behind_label(blocker_pr_number: Any) -> str:
+    return f'{_HELD_BEHIND_LABEL_PREFIX}{blocker_pr_number}'
 # deep-review-sha-bound-approval slice 1 — the SHA-scoped twin of the
 # `deep-review-passed` label. A commit status is bound to a specific head, so
 # (unlike the label) it cannot outlive a push: a new head simply has no status,
@@ -9107,6 +9129,95 @@ def _gh_pr_labels(repo_coords: str, pr_number: int) -> Optional[list[str]]:
     return out
 
 
+def _gh_label_edit(
+    repo_coords: str, pr_number: int, pr_url: str, *,
+    add: Optional[list[str]] = None, remove: Optional[list[str]] = None,
+) -> bool:
+    """Add/remove labels on a PR. True iff gh succeeded.
+
+    BEST-EFFORT BY CONSTRUCTION. Every caller is decorating a PR for human
+    eyes; none of them may influence whether the merge happens. A gh failure
+    here must never propagate — the worst outcome of a failed label call is the
+    hold going un-labelled, i.e. exactly the status quo this replaces.
+    """
+    args = ['gh', 'pr', 'edit', str(pr_number), '--repo', repo_coords]
+    for name in (add or []):
+        args += ['--add-label', name]
+    for name in (remove or []):
+        args += ['--remove-label', name]
+    if len(args) == 6:  # nothing to do
+        return True
+    try:
+        proc = subprocess.run(
+            args, capture_output=True, text=True, timeout=_AUTO_MERGE_TIMEOUT_S,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
+        log(f'label edit FAILED for pr={pr_url}: {type(e).__name__}: {e}', 'WARN')
+        return False
+    if proc.returncode != 0:
+        log(
+            f'label edit returned {proc.returncode} for pr={pr_url}: '
+            f'{(proc.stderr or "").strip()[:200]}',
+            'WARN',
+        )
+        return False
+    return True
+
+
+def _gh_ensure_label(repo_coords: str, name: str) -> None:
+    """Create the label if the repo lacks it. Silent on 'already exists'.
+
+    `gh pr edit --add-label` FAILS on a label the repo has never seen, and this
+    runs across four repos that do not share a label set — so a first hold in a
+    repo would silently no-op without this. Non-zero exit is swallowed: the
+    overwhelmingly common case is the benign 'already exists', and a genuinely
+    failed create surfaces as the add failing right after.
+    """
+    try:
+        subprocess.run(
+            ['gh', 'label', 'create', name, '--repo', repo_coords,
+             '--color', _HELD_BEHIND_LABEL_COLOUR,
+             '--description', 'Auto-merge is queued behind an overlapping PR',
+             '--force'],
+            capture_output=True, text=True, timeout=_AUTO_MERGE_TIMEOUT_S,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
+        log(f'label create {name} ({repo_coords}) failed: {type(e).__name__}: {e}', 'WARN')
+
+
+def _sync_held_behind_label(
+    repo_coords: str, pr_number: int, pr_url: str, blocker_pr_number: Any,
+) -> None:
+    """Stamp `held-behind-#<blocker>`, clearing any stale one.
+
+    A chained blocker (A < B < C) re-queues the entry under a NEW blocker, so
+    the previous label would otherwise persist and point at a PR that already
+    merged — worse than no label, because it reads as authoritative.
+    """
+    want = _held_behind_label(blocker_pr_number)
+    current = _gh_pr_labels(repo_coords, pr_number) or []
+    stale = [
+        n for n in current
+        if n.startswith(_HELD_BEHIND_LABEL_PREFIX) and n != want
+    ]
+    if want in current and not stale:
+        return  # already correct — don't spend a gh call re-stamping
+    _gh_ensure_label(repo_coords, want)
+    _gh_label_edit(repo_coords, pr_number, pr_url, add=[want], remove=stale)
+
+
+def _clear_held_behind_labels(
+    repo_coords: str, pr_number: int, pr_url: str,
+) -> None:
+    """Drop every held-behind-* label — the PR is no longer held."""
+    current = _gh_pr_labels(repo_coords, pr_number)
+    if not current:
+        return
+    held = [n for n in current if n.startswith(_HELD_BEHIND_LABEL_PREFIX)]
+    if held:
+        _gh_label_edit(repo_coords, pr_number, pr_url, remove=held)
+
+
 def _deep_review_required(
     repo_coords: str,
     pr_number: int,
@@ -11078,6 +11189,10 @@ def _attempt_auto_merge_with_gates(
             f'blocker=#{blocker} (overlap on {sorted(set(changed_files))[:5]}'
             f'{"..." if len(changed_files) > 5 else ""})',
         )
+        # held-behind-label: make the hold visible on the PR itself. Everything
+        # above this line is already recorded — but only in this log and the
+        # queue file, neither of which anyone looking at the PR can see.
+        _sync_held_behind_label(repo_coords, pr_number, pr_url, blocker)
         return {
             'merge_outcome': 'held_for_blocker',
             'merge_reason': f'queued behind PR #{blocker}',
@@ -11342,6 +11457,15 @@ def _queue_release(merged_pr_number: int, repo_coords: str) -> None:
             f'AUTO_MERGE_QUEUE_RELEASED pr={entry.get("pr_url")} '
             f'task={entry.get("task_id")} outcome={outcome}',
         )
+        # held-behind-label: the entry left the queue. Clear the stamp unless
+        # it went straight back into a hold — in which case the hold path has
+        # ALREADY re-stamped it with the new blocker, and clearing here would
+        # undo that. Checked by outcome rather than by re-reading labels so a
+        # chained blocker never flickers un-labelled.
+        if not str(outcome or '').startswith('held_'):
+            _clear_held_behind_labels(
+                repo, pr_number, entry.get('pr_url') or '',
+            )
         # fix-review-pass-dm-await-merge-outcome (2026-05-26):
         # `process_outbox` is long gone for this entry — it produced the
         # first DM ("queued behind PR #Y") and archived its outbox. The
