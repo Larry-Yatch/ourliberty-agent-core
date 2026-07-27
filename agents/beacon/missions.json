@@ -12877,7 +12877,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-27T02:19:10.246196+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-27T02:12:02.934147+00:00"
+      "orphan_last_activity_ts": "2026-07-27T02:12:02.934147+00:00",
+      "briefing": {
+        "what": "A piece of work the team began that hasn't been tied to a specific project yet, and it's now waiting for your sign-off before it can move forward.",
+        "why": "Unattached work that stalls can quietly waste the team's effort or drift out of line with your priorities, so a quick decision keeps things on track.",
+        "suggest": "Take a moment to confirm where this fits before green-lighting it \u2014 a short check now avoids committing to something that isn't clearly aligned yet."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-27T02:29:21.253807+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
