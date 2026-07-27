@@ -1829,6 +1829,36 @@
         "from_state": "parked"
       },
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+    },
+    {
+      "id": "cap-rsdpm-nothing-checks-that-a-merged-migration-is-2de0",
+      "title": "RSDPM: nothing checks that a merged migration is actually LIVE on staging",
+      "note": "Left standing in RSDPM issue #96 when it was closed 2026-07-26, and #96 is now closed so nobody will re-read it.\n\nTHE GAP: ops/verify-fresh-db.sh proves migrations apply cleanly to an EMPTY database. It cannot see staging drift. So a migration can merge, pass CI, pass the fresh-DB proof, and still not exist in the live database \u2014 with no signal anywhere.\n\nThat is not hypothetical. Migration 0022 sat merged-but-unapplied for a full day while 'Mark complete' and 'Record decision' were broken for every user in the live app (42702 ambiguous column). It was found by a human clicking, not by any check. Meanwhile 0027 merged the same day and WAS applied \u2014 so the drift is selective, which makes it harder to reason about than a blanket lag.\n\nWHAT WOULD CLOSE IT: a post-merge check that asserts each expected function/column actually EXISTS on staging \u2014 the same end-state assertions ops/verify-fresh-db.sh already runs, pointed at the live database instead of a scratch cluster. supabase/verify/99_assertions.sql is already written as a standalone psql script, so the work is mostly plumbing: staging credentials + a runner + somewhere for the result to surface.\n\nRELATED, now shipped: RSDPM PR #103 added a briefing_enabled assertion to that same file, with a negative control. Every new assertion added there is wasted on staging until this runner exists.\n\nRepo: Larry-Yatch/RSDPM. See memory [[rsdpm-merge-not-applied-sql-drift]].",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "main",
+        "captured_at": "2026-07-27T03:55:32.748035+00:00"
+      },
+      "last_touched": "2026-07-27T03:55:32.748035+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "A safety check that confirms a database change didn't just get approved on paper but actually went live for real users.",
+        "why": "Last time this slipped, a core feature was silently broken for every user for a full day and only got caught because a person happened to click it \u2014 not by any system.",
+        "suggest": "Worth funding a small, careful fix to add this check, since we already have most of the pieces \u2014 but scope it deliberately so we're confident it catches the problem without creating false alarms."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-27T04:00:15.766948+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     }
   ]
 }
