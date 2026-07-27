@@ -1,0 +1,10 @@
+[Unit]
+Description=Run heal_rsdpm_install_drift every 12 hours
+
+[Timer]
+OnCalendar=00,12:00:00
+Persistent=true
+Unit=ourliberty-heal-rsdpm-install-drift.service
+
+[Install]
+WantedBy=timers.target
