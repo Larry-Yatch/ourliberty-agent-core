@@ -12947,6 +12947,62 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-mirror-review-pr-RSDPM-109-468e5884",
+      "name": "Mirror Review PR RSDPM 109 468e5884",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `mirror-review-pr-RSDPM-109-468e5884`. Last activity 2026-07-27T05:34:01.681297+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "mirror-review-pr-RSDPM-109-468e5884"
+      ],
+      "repo": null,
+      "created": "2026-07-27",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-27T05:35:02.081244+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-27T05:34:01.681297+00:00"
+    },
+    {
+      "id": "proposed-pr-RSDPM-109",
+      "name": "PR RSDPM 109",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pr-RSDPM-109`. Last activity 2026-07-27T05:33:58.945531+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pr-RSDPM-109"
+      ],
+      "repo": null,
+      "created": "2026-07-27",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-27T05:35:02.081244+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-27T05:33:58.945531+00:00"
+    },
+    {
+      "id": "proposed-actionable-alerts-reach-approvals-tab-001",
+      "name": "Actionable Alerts Reach Approvals Tab 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `actionable-alerts-reach-approvals-tab-001`. Last activity 2026-07-24T02:34:23.216598+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "actionable-alerts-reach-approvals-tab-001"
+      ],
+      "repo": null,
+      "created": "2026-07-27",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-27T05:35:02.081244+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-24T02:34:23.216598+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-27T05:35:02.081244+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#1018"
     }
   ]
 }
