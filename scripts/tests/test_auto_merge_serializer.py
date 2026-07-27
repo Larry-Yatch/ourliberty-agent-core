@@ -1144,6 +1144,37 @@ class HeldBehindLabelTest(SerializerTestBase):
         # as authoritative.
         self.assertNotIn('held-behind-#109', self._labels(112))
 
+    def test_release_into_conflict_clears_the_stamp(self):
+        # The gap the merged-path test misses: overlapping serialized PRs
+        # frequently CONFLICT once the blocker lands (that's *why* they were
+        # serialized). When the blocker merges and moves main under the held
+        # PR, the release freshness gate legitimately returns held_conflict —
+        # which does NOT re-stamp. If the clear were gated on the whole
+        # `held_*` family the label would survive, pointing at a blocker that
+        # has already merged: "authoritative" and wrong, the exact failure
+        # this feature exists to prevent.
+        self.gh.open_prs[REPO] = [
+            {'number': 109, 'createdAt': '2026-05-26T10:00:00Z', 'headRefName': 'a'},
+        ]
+        self.gh.pr_files[(REPO, 109)] = ['docs/operating-manual.md']
+        self.gh.pr_mergeable[(REPO, 109)] = 'MERGEABLE'
+        self.gh.pr_mergeable[(REPO, 112)] = 'MERGEABLE'
+        self._attempt(112, changed_files=['docs/operating-manual.md'])
+        self.assertIn('held-behind-#109', self._labels(112))
+
+        # Blocker merges → release re-attempt of 112, but the merged blocker
+        # moved main under it and it now conflicts → held_conflict (no merge,
+        # no re-stamp), PR left open awaiting a manual rebase.
+        self.gh.open_prs[REPO] = []
+        self.gh.pr_mergeable[(REPO, 112)] = 'CONFLICTING'
+        self._attempt(109, changed_files=['docs/operating-manual.md'])
+        self.assertNotIn((REPO, 112), self.gh.merge_calls)
+        # The stamp must be GONE even though the outcome starts with `held_`.
+        self.assertEqual(
+            [n for n in self._labels(112) if n.startswith('held-behind-#')],
+            [], 'held-behind label survived a release that ended in conflict',
+        )
+
     def test_every_held_pr_names_its_OWN_blocker(self):
         # A < B < C all overlap. The label has to track each PR's actual
         # blocker — a shared "held" label would say nothing, and stamping

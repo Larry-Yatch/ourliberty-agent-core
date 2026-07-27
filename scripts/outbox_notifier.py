@@ -11458,11 +11458,18 @@ def _queue_release(merged_pr_number: int, repo_coords: str) -> None:
             f'task={entry.get("task_id")} outcome={outcome}',
         )
         # held-behind-label: the entry left the queue. Clear the stamp unless
-        # it went straight back into a hold — in which case the hold path has
-        # ALREADY re-stamped it with the new blocker, and clearing here would
-        # undo that. Checked by outcome rather than by re-reading labels so a
-        # chained blocker never flickers un-labelled.
-        if not str(outcome or '').startswith('held_'):
+        # it went straight back into a hold-for-blocker — the ONE outcome whose
+        # path (`_sync_held_behind_label` at :11195) has ALREADY re-stamped it
+        # with the new blocker, so clearing here would undo that. Every other
+        # `held_*` outcome (held_conflict / held_stale_regression on the release
+        # freshness gate, held_deep_review, the fail-closed variants) does NOT
+        # re-stamp: the blocker has merged and moved main, the PR now sits open
+        # awaiting a rebase, and a surviving `held-behind-#<merged-blocker>`
+        # reads as authoritative — exactly the stale-label failure this exists
+        # to prevent. So gate on the single re-stamping outcome, not the whole
+        # `held_` family. Checked by outcome rather than by re-reading labels so
+        # a chained blocker never flickers un-labelled.
+        if str(outcome or '') != 'held_for_blocker':
             _clear_held_behind_labels(
                 repo, pr_number, entry.get('pr_url') or '',
             )
