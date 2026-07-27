@@ -13186,6 +13186,23 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-deep-review-hold-pr1031-e423cbbd",
+      "name": "Deep Review Hold Pr1031 E423cbbd",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `deep-review-hold-pr1031-e423cbbd`. Last activity 2026-07-27T06:24:14.931301+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "deep-review-hold-pr1031-e423cbbd"
+      ],
+      "repo": null,
+      "created": "2026-07-27",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-27T06:35:15.879886+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-27T06:24:14.931301+00:00"
     }
   ]
 }
