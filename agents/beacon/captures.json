@@ -1799,6 +1799,36 @@
       "closed_by": "heal_missions_card_gc:terminal-backstop",
       "shipped_note": "shipped (linked work merged)",
       "closed_at": "2026-07-21T08:20:50.959055+00:00"
+    },
+    {
+      "id": "cap-rsdpm-profiles-briefing-enabled-replace-the-brie-5e0a",
+      "title": "RSDPM: profiles.briefing_enabled \u2014 replace the BRIEFING_RECIPIENTS env allowlist",
+      "note": "[M1-amendment] Follow-up to RSDPM PR #99, which shipped the server-side half of the briefing recipient opt-out (an env allowlist, BRIEFING_RECIPIENTS, set as a systemd drop-in on the droplet).\n\nLarry's decision 2026-07-26 was 'server list now, database switch later'. This is the later.\n\nWHY the env list is not the end state: it lives on a machine Rob has no access to, so he cannot turn his own briefing off; adding/removing a recipient is a droplet edit rather than a click; and nothing in Supabase records who is actually receiving, so the two sources of truth can silently disagree.\n\nSHAPE: profiles.briefing_enabled boolean not null default true, read by workers/briefing/db.py::list_profiles and honoured by the engine \u2014 REPLACING, not stacking on, the env allowlist. Remove the env path in the same PR so there are never two live mechanisms for the same thing.\n\nRoutes as an [M1-amendment] under RSDPM Standing Rule 2 (module-owned DDL is a closed list and profiles is M1's): spec + contract tests + migration + code move together.\n\nTRAP: merging is not applying. Migration 0022 sat unapplied for a full day and the queue verbs were broken live the whole time. Apply to staging via the Management API, probe with a real user token, and re-run ops/verify-fresh-db.sh.\n\nFull DoD checklist is in GitHub issue https://github.com/Larry-Yatch/RSDPM/issues/100 \u2014 kept as the detailed writeup, but nothing in the factory watches GitHub issues, which is why this capture exists.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "main",
+        "captured_at": "2026-07-27T01:54:54.100273+00:00"
+      },
+      "last_touched": "2026-07-27T01:54:54.100273+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "A self-serve on/off switch for who receives the daily briefing, moved out of a hand-edited server file and into our customer database where it belongs.",
+        "why": "Today a recipient like Rob can't turn his own briefing off, and we have no reliable record of who's actually getting them \u2014 so what we think is happening and what's really happening can quietly drift apart.",
+        "suggest": "Worth doing, but treat the finish line with care: a similar change once looked done yet sat switched-off for a full day, so insist it's proven live with a real user before anyone calls it complete."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-27T01:59:21.227588+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     }
   ]
 }
