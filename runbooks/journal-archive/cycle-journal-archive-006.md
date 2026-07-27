@@ -43385,3 +43385,74 @@ Watermark advanced 509→510. NOMINAL ✅
 
 ---
 
+## Iteration ~6353 — 2026-07-27T00:11Z UTC (Larry /cycle chat, Tier 1)
+
+**Health:** ⚠️ NON-NOMINAL with carries. **Tier 1** (consecutive_clean=0; PR #1028 AUTO_MERGE_HELD pending Larry approval deep-review-hold-pr1028-f032e2dc; PR #74 RSDPM isDraft=true queue depth 3; Forge/Mirror/Beacon inboxes empty; 9 daemons healthy). Watermark=515 (0 new alerts).
+
+**VERIFY-BEFORE-REASSERT (from iter ~6352 at ~00:05Z UTC):**
+- **"PR #1028 OPEN/NOT-DRAFT/MERGEABLE/CLEAN; AUTO_MERGE_HELD deep-review-hold"**: UPDATED — OPEN/NOT-DRAFT/MERGEABLE=UNKNOWN (GitHub returning UNKNOWN; transient — PR still OPEN, still held, deep-review-hold-pr1028-f032e2dc still pending). [carry ⚠️]
+- **"revision-transcript-jump Mirror PID 682641 in-flight since 00:02:27Z UTC"**: RESOLVED — Mirror PASSED transcript-jump round=1 at 2026-07-27T00:03:24Z UTC (outbox-notifier log 18:03:24 MDT). Auto-merge failed (PR #90 is DRAFT — expected for M13 spec PR; spec PRs stay draft until M13 build dispatch). G-rule pipeline-stall-red-mirror-revision-in-forge-001 SELF-RESOLVED. [resolved ✅]
+- **"pending=1 deep-review-hold-pr1028-f032e2dc doorbell delivered idx=514"**: CONFIRMED — pending=1, history=540. Still awaiting Larry approval. [carry ⚠️]
+- **"PR #74 isDraft=true queue depth 3 (#88+#91+#93 REVIEW_PASS/HELD)"**: CONFIRMED + UPDATED — PR #74 DRAFT/UNSTABLE; #88+#91+#93 NOT-DRAFT/CLEAN/MERGEABLE/HELD; **PR #95 MERGED at 22:54Z UTC** (M11-amendment "Houston may read the ONE draft..." auto-merged after Mirror PASS); PR #90 now DRAFT/CLEAN/MERGEABLE (Mirror PASS round=1); queue depth behind #74 still 3. [carry ✅ + PR#95 merged ✅]
+- **"9 daemons alive"**: CONFIRMED — watchdog last 18:08:10 MDT (00:08:10Z UTC); overall=healthy. [carry ✅]
+- **"watermark=515 (2 new alerts, both Tier-3)"**: CONFIRMED — watermark=515, file_length=515. 0 new alerts above watermark. [carry ✅]
+- **"Check 3 red_mirror_status:RSDPM:90 in cooldown"**: RESOLVED — no longer in stall dry-run output; PR #90 Mirror PASS ended the red_mirror_status condition. [resolved ✅]
+
+**New findings this iter:**
+1. **PR #95 (RSDPM) MERGED** at 22:54Z UTC (16:54 MDT) — M11-amendment auto-merged after Mirror PASS. Pipeline executed cleanly.
+2. **transcript-jump PR #90 Mirror PASS (round=1)** at 00:03:24Z UTC — revision re-review completed. Auto-merge correctly failed (draft). G-rule pipeline-stall-red-mirror-revision-in-forge-001 SELF-RESOLVED.
+3. **Forge/Mirror/Beacon inboxes all empty** — all in-flight processing complete; pipeline fully drained.
+
+**Check 0 — Alert triage (~00:08Z UTC):** repair-watermark: repaired=false (old=515, file_length=515). 0 new alerts above watermark=515. NOMINAL ✅
+
+**Check 1 — Log noise (~00:09Z UTC):** outbox-notifier.log last entry [2026-07-26 18:03:27 MDT] (00:03:27Z UTC; ~8 min from check; AUTO_MERGE failed for transcript-jump draft — expected). watchdog.log last entry [2026-07-26 18:08:10 MDT] (00:08:10Z UTC; overall=healthy). WARN `AUTO_MERGE_HELD_DEEP_REVIEW` (1 occ, by-design); WARN `AUTO_MERGE failed - draft` (1 occ, expected for M13 spec PR). No systemic-fix targets. NOMINAL ✅
+
+**Check 2 — Telegram sweep (~00:09Z UTC):** beacon_telegram_bot.log last entry [2026-07-26T18:02:25-0600] (00:02:25Z UTC; same as prior iter — no new deliveries). Bot PID alive. 0 new Larry directives. NOMINAL ✅
+
+**Check 3 — Pipeline stall (~00:08Z UTC):** heal_pipeline_stall dry-run: FORGE_NO_PR_SKIP threshold-update-2026-07-26-001 (pr_exists PR #1027 MERGED); FORGE_NO_PR_SKIP pr-RSDPM-75+81+85+89 (MERGED); MIRROR_PASS_UNMERGED_SKIP marker-taskid-normalize-001 (held_deep_review — intentional); suppressed(cooldown): mirror_pass_unmerged:m12-queue-zones. **0 alerts would fire; 0 recoveries.** NOMINAL ✅
+
+**Check 4 — Pending directives (~00:09Z UTC):** beacon-pending-approvals (state): **pending=1** (history=540). deep-review-hold-pr1028-f032e2dc still awaiting Larry approval. NON-NOMINAL ⚠️
+
+**Check 5 — Stale daemon code (~00:10Z UTC):** heal-stale-daemon-code.heartbeat=2026-07-27T00:08:10Z UTC (~2 min from check; fresh <60 min). dry-run: fresh=439, unparseable=102 (inactive systemd units — expected). Watchdog healthy 00:08:10Z UTC. NOMINAL ✅
+
+**Check A — Source repo:** HEAD=d4f9ead5=origin/main; on main; clean tree; 0 ahead/behind. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-26T23:52:29Z UTC (~19 min from check); status=no-change; consecutive_push_failures=0. Within 2h. NOMINAL ✅
+**Check C — Agent liveness:** Watchdog healthy 00:08:10Z UTC; overall=healthy. 9 PIDs (carried from watchdog health). NOMINAL ✅
+**Check E — PR/merge state:** ourliberty-agent-core: **PR #1028 OPEN/NOT-DRAFT/MERGEABLE=UNKNOWN** [Mirror PASS 00:01:28Z UTC; AUTO_MERGE_HELD deep-review-hold; amr=null; pending Larry approval deep-review-hold-pr1028-f032e2dc]. RSDPM: PR #74 OPEN/DRAFT/UNSTABLE [carry ⚠️ M12 active dev]; PR #88 OPEN/NOT-DRAFT/CLEAN/MERGEABLE (REVIEW_PASS/HELD(#74)); PR #90 OPEN/DRAFT/CLEAN/MERGEABLE [M13 spec — Mirror PASS round=1 00:03:24Z UTC; auto-merge failed draft; stays draft until M13 build dispatch]; PR #91 OPEN/NOT-DRAFT/CLEAN/MERGEABLE (REVIEW_PASS/HELD(#74)); PR #93 OPEN/NOT-DRAFT/CLEAN/MERGEABLE (REVIEW_PASS/HELD(#74)); **PR #95 MERGED 22:54Z UTC** (M11-amendment). Queue depth behind #74: **3** (#88+#91+#93 REVIEW_PASS/HELD).
+**Check H — Forge inbox:** 0 JSON files. Mirror: 0 JSON files. Beacon: 0 JSON files. NOMINAL ✅
+
+**§5.0:** audit_due_nudge: no-op. distill_detector: no-op. audit_cadence_signal: no-op. NOMINAL ✅
+
+**Rotations:** [carry] SUPABASE_SERVICE_ROLE_KEY due=2026-08-22 (~26d). 14-day dedup active (expires ~2026-08-03); no new DM.
+
+**Conditional checks:**
+- **Check I:** DONE ✅ (2026-07-26T14:13Z UTC). [done]
+- **Check III:** DONE ✅ (PR #1027 MERGED). [done ✅]
+- **Check VI:** timer-managed. [carry]
+- **Check VIII:** timer-managed; last artifact check-viii-2026-07-20.json. [carry]
+
+**G-rule assessment:**
+- **marker-taskid-normalize-001: verification_pending** [carry; PR #1028 OPEN/MERGEABLE=UNKNOWN/AUTO_MERGE_HELD; deep-review-hold-pr1028-f032e2dc pending Larry approval; no change from iter ~6352].
+- **pipeline-stall-red-mirror-revision-in-forge-001: SELF-RESOLVED** [transcript-jump Mirror PASS round=1 at 00:03:24Z UTC; auto-merge failed draft (expected); G-rule closed — the "revision queued with no session" condition resolved via Mirror pass path; cooldown suppression still active]. 
+- forge-marker-taskid-suffix-increment-001: **2/3** [carry, 0 new].
+- medic-draft-status-false-positive: **2/3** [carry, 0 new].
+- check-i-force-bypass-dm-route: **2/3** [carry, 0 new].
+- Active carries (verification_pending): forge-revision-preamble-missing; forge-wip-redispatch-digest; forge-wip-redispatch-exhausted-no-pr; outbox-notifier-intent-reject; auto-dispatch-APPROVAL_REQUEST-mismatch; PR #1022 heal-wip-redispatch DAG-preflight suppression; marker-taskid-normalize-001 (Mirror PASS/deep-review-hold). Sub-threshold: pr-merged-without-deep-review-shortcut-001 (1/3); mirror-ghost-retry-m5-pr2 (1/3); heal-stall-retry-exhausted-after-pr-merge (1/3).
+
+**Actions taken:**
+1. Check 0: repair-watermark no-op. 0 new alerts. Watermark stays 515.
+2. §5.0 one-shots: all no-ops.
+3. Tier state: `record --checks-clean false` → consecutive_clean=0; **Tier 1** stays (last_signal_at=2026-07-27T00:10:49Z UTC).
+4. PRIME ledger: intervention appended (tier=1, kind=intervention, template=forge-mirror-pass-deep-review-hold).
+
+**Escalations:** None new.
+- **[carry — doorbell idx=514 delivered 00:02:25Z UTC]** deep-review-hold-pr1028-f032e2dc: PR #1028 Mirror PASS, AUTO_MERGE_HELD for critical-path deep review. Larry: dashboard.ourliberty.dev/approvals — APPROVE to authorize merge; REJECT to run /code-review high.
+- [carry — no new DM] RSDPM PR #74 isDraft=true queue depth 3 (#88+#91+#93 REVIEW_PASS/HELD). Larry-aware from idx=507.
+- [carry — no new DM] check-vi-posture-proposals-2026-07-07 (2 proposals).
+- [carry — no new DM] ourliberty-health-subject-key-mismatch translation gap (vp, dispatched iter ~4488) — health check clean ✅.
+
+**PRIME DIRECTIVE:** intervention (PR #1028 OPEN AUTO_MERGE_HELD deep-review-hold; PR #95 RSDPM MERGED 22:54Z UTC; transcript-jump PR #90 Mirror PASS round=1 00:03:24Z UTC auto-merge-failed-draft; Forge/Mirror/Beacon inboxes empty; watermark=515 no new alerts; watchdog healthy; PR #74 isDraft=true queue depth 3). Trailing 30d: ratio=improving.
+**Tier end-of-iter:** **Tier 1** (consecutive_clean=0; last_signal_at=2026-07-27T00:10:49Z UTC; 5-min cadence).
+
+---
+
