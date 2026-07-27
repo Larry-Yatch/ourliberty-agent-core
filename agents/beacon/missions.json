@@ -13109,7 +13109,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-27T06:05:15.950595+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-27T06:03:11.208691+00:00"
+      "orphan_last_activity_ts": "2026-07-27T06:03:11.208691+00:00",
+      "briefing": {
+        "what": "A piece of work your team kicked off on its own that hasn't been tied to any active project yet.",
+        "why": "Loose work that isn't linked to a goal can quietly eat time and effort without moving anything you care about forward.",
+        "suggest": "Before it goes further, have someone confirm what it's for and whether it's worth finishing \u2014 hold off greenlighting until that's clear."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-27T06:10:56.563102+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-pr-RSDPM-113",
@@ -13126,7 +13140,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-27T06:05:15.950595+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-27T06:03:04.430074+00:00"
+      "orphan_last_activity_ts": "2026-07-27T06:03:04.430074+00:00",
+      "briefing": {
+        "what": "A piece of work your team started and has already checked over once, but it isn't yet tied to any active initiative.",
+        "why": "Loose work that isn't connected to a goal can quietly pile up, tie up your people, and ship changes nobody asked for.",
+        "suggest": "Before it goes any further, have someone confirm which priority it serves \u2014 and if it doesn't map to one, pause it until it does."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-27T06:10:56.563102+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-pr-ourliberty-agent-core-1030",
@@ -13143,7 +13171,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-27T06:05:15.950595+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-27T05:50:32.995755+00:00"
+      "orphan_last_activity_ts": "2026-07-27T05:50:32.995755+00:00",
+      "briefing": {
+        "what": "A piece of work the team started on its own that's waiting for your sign-off and isn't attached to any current project.",
+        "why": "It's been sitting in line for review, so it's tying up effort without moving any goal forward until someone decides where it fits.",
+        "suggest": "Take a quick look and either tie it to a real priority or set it aside, but don't rush it through until you know why it was started."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-27T06:10:56.563102+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
