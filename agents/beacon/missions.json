@@ -12398,7 +12398,11 @@
         "at": "2026-07-26T20:36:28.184485+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-27T05:20:01.426412+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-pr-RSDPM-89",
@@ -12569,7 +12573,11 @@
         "at": "2026-07-26T22:27:20.250516+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-27T05:20:01.426412+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-pr-RSDPM-93",
@@ -12600,7 +12608,11 @@
         "at": "2026-07-26T22:37:27.809426+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-27T05:20:01.426412+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-transcript-jump",
@@ -12732,7 +12744,11 @@
         "at": "2026-07-27T01:19:02.729635+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-27T05:20:01.426412+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-pr-RSDPM-90",
@@ -12798,7 +12814,11 @@
         "at": "2026-07-27T01:49:17.097197+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-27T05:20:01.426412+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-third-review-slot-readiness",
