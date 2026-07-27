@@ -735,3 +735,9 @@ PR #950 (`fix(pulse): resolve reply_chat_id at direction-ask envelope creation (
 
 Occurrences: iter ~6155 (1/3); iter ~6156 (2/3); iter ~6157 (3/3 + meta-loop new pattern, DISPATCHED).
 
+---
+
+## Check 5 heartbeat path correction (iter ~6364, 2026-07-27)
+
+**Correct path:** `~/agents/blackboard/heal-stale-daemon-code.heartbeat` (NOT `~/agents/state/` as iters ~6361–6363 incorrectly cited). All healer heartbeats live in `~/agents/blackboard/*.heartbeat`, not in `~/agents/state/`. Verified at iter ~6364: file present, value=2026-07-27T01:29:04Z UTC.
+
