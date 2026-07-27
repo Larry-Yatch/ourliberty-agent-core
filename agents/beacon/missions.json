@@ -12663,6 +12663,23 @@
       "retired_by": "heal_orphan_autoregister",
       "retired_at": "2026-07-26T23:02:56.546584+00:00",
       "retired_reason": "orphan-terminal"
+    },
+    {
+      "id": "proposed-deep-review-hold-pr1028-f032e2dc",
+      "name": "Deep Review Hold Pr1028 F032e2dc",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `deep-review-hold-pr1028-f032e2dc`. Last activity 2026-07-27T00:02:19.479376+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "deep-review-hold-pr1028-f032e2dc"
+      ],
+      "repo": null,
+      "created": "2026-07-27",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-27T00:03:10.621172+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-27T00:02:19.479376+00:00"
     }
   ]
 }
