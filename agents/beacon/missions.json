@@ -13361,6 +13361,108 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-rsdpm-install-drift-healer-001",
+      "name": "Rsdpm Install Drift Healer 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `rsdpm-install-drift-healer-001`. Last activity 2026-07-27T15:23:07.502662+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "rsdpm-install-drift-healer-001"
+      ],
+      "repo": null,
+      "created": "2026-07-27",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-27T15:23:59.430025+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-27T15:23:07.502662+00:00"
+    },
+    {
+      "id": "proposed-delegate-cap-title-3c29",
+      "name": "Delegate Cap Title 3c29",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `delegate-cap-title-3c29`. Last activity 2026-07-27T15:23:02.389369+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "delegate-cap-title-3c29"
+      ],
+      "repo": null,
+      "created": "2026-07-27",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-27T15:23:59.430025+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-27T15:23:02.389369+00:00"
+    },
+    {
+      "id": "proposed-pr-RSDPM-117",
+      "name": "PR RSDPM 117",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pr-RSDPM-117`. Last activity 2026-07-27T15:21:07.897487+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pr-RSDPM-117"
+      ],
+      "repo": null,
+      "created": "2026-07-27",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-27T15:23:59.430025+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-27T15:21:07.897487+00:00"
+    },
+    {
+      "id": "proposed-pr-RSDPM-119",
+      "name": "PR RSDPM 119",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pr-RSDPM-119`. Last activity 2026-07-27T15:20:15.323295+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pr-RSDPM-119"
+      ],
+      "repo": null,
+      "created": "2026-07-27",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-27T15:23:59.430025+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-27T15:20:15.323295+00:00"
+    },
+    {
+      "id": "proposed-pr-RSDPM-120",
+      "name": "PR RSDPM 120",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pr-RSDPM-120`. Last activity 2026-07-27T15:20:11.837574+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pr-RSDPM-120"
+      ],
+      "repo": null,
+      "created": "2026-07-27",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-27T15:23:59.430025+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-27T15:20:11.837574+00:00"
+    },
+    {
+      "id": "proposed-pr-RSDPM-118",
+      "name": "PR RSDPM 118",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pr-RSDPM-118`. Last activity 2026-07-27T15:15:32.818504+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pr-RSDPM-118"
+      ],
+      "repo": null,
+      "created": "2026-07-27",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-27T15:23:59.430025+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-27T15:15:32.818504+00:00"
     }
   ]
 }
