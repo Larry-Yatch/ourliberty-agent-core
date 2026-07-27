@@ -13377,7 +13377,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-27T15:23:59.430025+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-27T15:23:07.502662+00:00"
+      "orphan_last_activity_ts": "2026-07-27T15:23:07.502662+00:00",
+      "briefing": {
+        "what": "A new automated watchdog that notices if the installed software on our server gets quietly altered or corrupted and raises a single clear alert.",
+        "why": "It closes a blind spot our current safety checks don't cover, so a silent change to critical files won't go unnoticed until something breaks.",
+        "suggest": "Approve it, but have someone confirm it only alerts on real problems before relying on it fully."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-27T15:25:27.777902+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-delegate-cap-title-3c29",
@@ -13394,7 +13408,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-27T15:23:59.430025+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-27T15:23:02.389369+00:00"
+      "orphan_last_activity_ts": "2026-07-27T15:23:02.389369+00:00",
+      "briefing": {
+        "what": "Some of the team started a piece of work on their own, and it isn't attached to any project we're currently tracking.",
+        "why": "Unplanned work that isn't tied to a goal can quietly eat time and money without moving anything that matters to the business.",
+        "suggest": "Let's pause and confirm what this work is meant to accomplish before it goes further \u2014 if it maps to a real priority, we fold it in; if not, we shelve it."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-27T15:25:27.777902+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-pr-RSDPM-117",
@@ -13411,7 +13439,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-27T15:23:59.430025+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-27T15:21:07.897487+00:00"
+      "orphan_last_activity_ts": "2026-07-27T15:21:07.897487+00:00",
+      "briefing": {
+        "what": "A piece of finished work from the team that hasn't been tied to any active project yet, and it's now waiting on a final sign-off.",
+        "why": "It's been through several rounds of back-and-forth and is sitting idle in the review line, so unclaimed effort is at risk of stalling out or being forgotten.",
+        "suggest": "Have someone confirm which initiative this belongs to and give it a careful look before waving it through, rather than approving it blind."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-27T15:25:27.777902+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-pr-RSDPM-119",
@@ -13428,7 +13470,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-27T15:23:59.430025+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-27T15:20:15.323295+00:00"
+      "orphan_last_activity_ts": "2026-07-27T15:20:15.323295+00:00",
+      "briefing": {
+        "what": "A piece of work your team started that isn't yet attached to any active project.",
+        "why": "Unassigned work can quietly consume time and attention without moving your real priorities forward.",
+        "suggest": "Take a quick look to confirm it's worth continuing before anyone invests more into it."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-27T15:25:27.777902+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-pr-RSDPM-120",
@@ -13445,7 +13501,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-27T15:23:59.430025+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-27T15:20:11.837574+00:00"
+      "orphan_last_activity_ts": "2026-07-27T15:20:11.837574+00:00",
+      "briefing": {
+        "what": "A piece of work your team started that hasn't been connected to any active project yet, and it's now waiting for a sign-off.",
+        "why": "Unassigned work that sits in limbo ties up your team's effort without moving a real goal forward, and stalled sign-offs quietly pile up.",
+        "suggest": "Take a quick look to confirm it belongs to something you actually want, then either fold it into a real project or set it aside before it drifts further."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-27T15:25:27.777902+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-pr-RSDPM-118",
@@ -13462,7 +13532,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-27T15:23:59.430025+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-27T15:15:32.818504+00:00"
+      "orphan_last_activity_ts": "2026-07-27T15:15:32.818504+00:00",
+      "briefing": {
+        "what": "A new piece of work the team built and finished, but it isn't attached to any active project yet.",
+        "why": "Completed work sitting unassigned is effort you've paid for that isn't yet delivering value, and it can quietly rot or cause confusion if left in limbo.",
+        "suggest": "Before greenlighting it, have someone confirm which goal it serves and that it's still wanted \u2014 then either fold it into a project or set it aside."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-27T15:25:27.777902+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
