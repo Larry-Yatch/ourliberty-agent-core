@@ -13093,6 +13093,57 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-pr-ourliberty-agent-core-1031",
+      "name": "PR Ourliberty Agent Core 1031",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pr-ourliberty-agent-core-1031`. Last activity 2026-07-27T06:03:11.208691+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pr-ourliberty-agent-core-1031"
+      ],
+      "repo": null,
+      "created": "2026-07-27",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-27T06:05:15.950595+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-27T06:03:11.208691+00:00"
+    },
+    {
+      "id": "proposed-pr-RSDPM-113",
+      "name": "PR RSDPM 113",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pr-RSDPM-113`. Last activity 2026-07-27T06:03:04.430074+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pr-RSDPM-113"
+      ],
+      "repo": null,
+      "created": "2026-07-27",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-27T06:05:15.950595+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-27T06:03:04.430074+00:00"
+    },
+    {
+      "id": "proposed-pr-ourliberty-agent-core-1030",
+      "name": "PR Ourliberty Agent Core 1030",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pr-ourliberty-agent-core-1030`. Last activity 2026-07-27T05:50:32.995755+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pr-ourliberty-agent-core-1030"
+      ],
+      "repo": null,
+      "created": "2026-07-27",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-27T06:05:15.950595+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-27T05:50:32.995755+00:00"
     }
   ]
 }
