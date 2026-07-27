@@ -168,5 +168,63 @@ class CLISmoke(unittest.TestCase):
         self.assertIn('missing required fields', err)
 
 
+class AffixedForgeTaskIdWarning(unittest.TestCase):
+    """marker-taskid-normalize-001: warn at author time when a Forge marker
+    task_id carries a `forge-`/`forge/` affix. The envelope task_id is BARE;
+    the affix is the recurring drift that dead-letters at the notifier. Warn to
+    stderr but still render/exit-0 — a same-turn nudge, not a hard failure."""
+
+    def test_render_warns_for_forge_dash_affixed_task_id(self):
+        payload = {'task_id': 'forge-m4-pr2', 'preflight_summary': 'ok'}
+        rc, out, err = _run_cli(
+            json.dumps(payload), ['render', 'forge', 'proceed'],
+        )
+        self.assertEqual(rc, 0, err)
+        self.assertIn('WARNING', err)
+        self.assertIn('forge-m4-pr2', err)
+        # Still renders the block.
+        self.assertIn('=== PROCEED ===', out)
+
+    def test_render_warns_for_forge_slash_affixed_task_id(self):
+        payload = {'task_id': 'forge/m5-pr1', 'preflight_summary': 'ok'}
+        rc, out, err = _run_cli(
+            json.dumps(payload), ['render', 'forge', 'proceed'],
+        )
+        self.assertEqual(rc, 0, err)
+        self.assertIn('WARNING', err)
+        self.assertIn('forge/m5-pr1', err)
+
+    def test_render_no_warning_for_bare_task_id(self):
+        payload = {'task_id': 'm4-pr2', 'preflight_summary': 'ok'}
+        rc, out, err = _run_cli(
+            json.dumps(payload), ['render', 'forge', 'proceed'],
+        )
+        self.assertEqual(rc, 0, err)
+        self.assertNotIn('WARNING', err)
+
+    def test_validate_warns_for_affixed_task_id(self):
+        payload = {'task_id': 'forge-m6-pr1', 'preflight_summary': 'ok'}
+        rc, out, err = _run_cli(
+            json.dumps(payload), ['validate', 'forge', 'proceed'],
+        )
+        self.assertEqual(rc, 0, err)
+        self.assertIn('WARNING', err)
+
+    def test_no_warning_for_non_forge_agent(self):
+        # The affix pattern is Forge-specific; a Beacon task_id that happens to
+        # start with `forge-` should not trip the warning.
+        payload = {
+            'task_id': 'forge-something',
+            'summary': 'x',
+            'target_agent': 'forge',
+            'prompt': 'y',
+        }
+        rc, out, err = _run_cli(
+            json.dumps(payload), ['render', 'beacon', 'approval_request'],
+        )
+        self.assertEqual(rc, 0, err)
+        self.assertNotIn('WARNING', err)
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -1766,6 +1766,73 @@ class ClassifyForgeMarkerTest(unittest.TestCase):
         })
         self.assertIsNotNone(decision)
 
+    # ---- marker-taskid-normalize-001: affix / whitespace auto-normalization ----
+    #
+    # Routing already keys off the outbox FILENAME STEM (= envelope task_id), so
+    # a `forge-`/`forge/` affix or whitespace-only difference is unambiguously
+    # the SAME task. Auto-normalize (no raise, no deliverable claim) instead of
+    # dead-lettering — each reject previously cost one extra Forge invocation.
+
+    def _classify_with_claim_spy(self, marker_task_id, envelope_task_id):
+        """Run classify with record_claim mocked; return (decision, rec_mock)."""
+        import launch_dedup_guard
+        result = (
+            '=== PROCEED ===\n'
+            f'{{"task_id": {json.dumps(marker_task_id)}, '
+            '"preflight_summary": "ok"}\n'
+            '=== END_PROCEED ==='
+        )
+        with mock.patch.object(launch_dedup_guard, 'record_claim') as rec:
+            decision = on._classify_forge_marker({
+                'agent': 'forge', 'result': result,
+                'task_id': envelope_task_id,
+                'target_repo': 'ourliberty-agent-core',
+            })
+        return decision, rec
+
+    def test_forge_dash_affixed_task_id_normalizes(self):
+        decision, rec = self._classify_with_claim_spy('forge-real-1', 'real-1')
+        self.assertEqual(decision['marker_type'], 'proceed')
+        # Same task — no competing claim recorded.
+        rec.assert_not_called()
+        # Canonical id downstream is the bare envelope id.
+        self.assertEqual(decision['payload']['task_id'], 'real-1')
+
+    def test_forge_slash_affixed_task_id_normalizes(self):
+        decision, rec = self._classify_with_claim_spy('forge/real-1', 'real-1')
+        self.assertEqual(decision['marker_type'], 'proceed')
+        rec.assert_not_called()
+        self.assertEqual(decision['payload']['task_id'], 'real-1')
+
+    def test_whitespace_padded_task_id_normalizes(self):
+        decision, rec = self._classify_with_claim_spy('  real-1\n', 'real-1')
+        self.assertEqual(decision['marker_type'], 'proceed')
+        rec.assert_not_called()
+        self.assertEqual(decision['payload']['task_id'], 'real-1')
+
+    def test_divergent_task_id_still_raises_and_records_claim(self):
+        # A semantic rename (not an affix relationship) is GENUINELY ambiguous:
+        # keep the strict reject + deliverable-claim so a later board Launch can
+        # de-dupe, and so Forge gets the correct teaching signal at retry 1.
+        import launch_dedup_guard
+        result = (
+            '=== PROCEED ===\n'
+            '{"task_id": "rsdpm-m11-001-pr-b", "preflight_summary": "ok"}\n'
+            '=== END_PROCEED ==='
+        )
+        with mock.patch.object(launch_dedup_guard, 'record_claim') as rec:
+            with self.assertRaises(on.fph.MalformedForgeMarker) as cm:
+                on._classify_forge_marker({
+                    'agent': 'forge', 'result': result,
+                    'task_id': 'm11-pr-b',
+                    'target_repo': 'ourliberty-agent-core',
+                })
+        self.assertIn('rsdpm-m11-001-pr-b', str(cm.exception))
+        self.assertIn('m11-pr-b', str(cm.exception))
+        rec.assert_called_once()
+        self.assertEqual(rec.call_args.kwargs['claimed_task_id'], 'rsdpm-m11-001-pr-b')
+        self.assertEqual(rec.call_args.kwargs['envelope_task_id'], 'm11-pr-b')
+
 
 class EmitClarifyRequestChainEventTest(unittest.TestCase):
     """E4.4e PR-A: clarify_request chain_event emission at classification.

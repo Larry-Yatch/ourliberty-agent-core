@@ -39,8 +39,16 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from typing import Any
+
+
+# marker-taskid-normalize-001: a Forge marker task_id must be the BARE envelope
+# id; a leading `forge-` / `forge/` affix (leaked from the worktree dir or
+# branch name) is the recurring drift that dead-letters at the notifier. Match
+# it here so we can nudge at author time.
+_AFFIXED_FORGE_TASK_ID_RE = re.compile(r'^forge[-/].+')
 
 import forge_preflight_handler as fph
 import mirror_review_handler as mrh
@@ -90,10 +98,32 @@ def _read_stdin_json() -> dict[str, Any]:
     return payload
 
 
+def _warn_if_affixed_forge_task_id(agent: str, payload: dict[str, Any]) -> None:
+    """Non-fatal stderr nudge when a Forge marker task_id looks affixed.
+
+    marker-taskid-normalize-001 defense-in-depth: routing keys off the BARE
+    envelope task_id, so a `forge-`/`forge/`-prefixed id is drift. The notifier
+    now auto-normalizes it, but warning here at render/validate time catches ALL
+    affixed cases (including future ones) at author time. Warn-only; never fails
+    the command.
+    """
+    if agent != 'forge':
+        return
+    task_id = payload.get('task_id')
+    if isinstance(task_id, str) and _AFFIXED_FORGE_TASK_ID_RE.match(task_id):
+        sys.stderr.write(
+            f'marker.py: WARNING: task_id {task_id!r} looks affixed '
+            f'(forge-/forge/ prefix). The envelope task_id is BARE — copy it '
+            f'verbatim (no forge- prefix, not derived from the worktree dir or '
+            f'branch name).\n'
+        )
+
+
 def cmd_render(args: argparse.Namespace) -> int:
     """render <agent> <type>: print canonical marker block to stdout."""
     handler = _resolve_handler(args.agent)
     payload = _read_stdin_json()
+    _warn_if_affixed_forge_task_id(args.agent, payload)
     # V3 (orchestrator-rectification-v2): --phase merges into the payload so
     # Beacon can mint approval_request markers with `"phase": "routing-signal"`
     # for DAG-preflight emissions without hand-editing JSON. The flag is
@@ -121,6 +151,7 @@ def cmd_validate(args: argparse.Namespace) -> int:
     """validate <agent> <type>: exit 0 if payload is valid, 1 otherwise."""
     handler = _resolve_handler(args.agent)
     payload = _read_stdin_json()
+    _warn_if_affixed_forge_task_id(args.agent, payload)
     try:
         # render_marker's validation IS the validation. Discard the output.
         handler.render_marker(args.type, **payload)
