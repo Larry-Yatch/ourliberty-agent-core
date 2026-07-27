@@ -13047,7 +13047,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-27T05:50:10.262429+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-27T05:41:03.01204+00:00"
+      "orphan_last_activity_ts": "2026-07-27T05:41:03.01204+00:00",
+      "briefing": {
+        "what": "A finished piece of work is waiting for your sign-off before it can go live.",
+        "why": "It's ready now, but it's grown out of a clear plan, so approving blindly could let something slip through unchecked.",
+        "suggest": "Give it a quick look to confirm it's what you expected, then approve it so the team isn't left waiting."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-27T05:50:54.190338+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-pr-RSDPM-111",
@@ -13064,7 +13078,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-27T05:50:10.262429+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-27T05:40:59.922673+00:00"
+      "orphan_last_activity_ts": "2026-07-27T05:40:59.922673+00:00",
+      "briefing": {
+        "what": "A piece of work your team kicked off on its own that hasn't been attached to any active project or goal yet.",
+        "why": "Unassigned work ties up your team's time and, until it's connected to a real priority, you can't be sure it's moving the business forward.",
+        "suggest": "Before it goes any further, have someone confirm what this is for and whether it's worth finishing \u2014 it needs a second look, not an automatic green light."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-27T05:50:54.190338+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
