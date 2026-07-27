@@ -12702,6 +12702,40 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-pr-RSDPM-98",
+      "name": "PR RSDPM 98",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pr-RSDPM-98`. Last activity 2026-07-27T01:18:08.551084+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pr-RSDPM-98"
+      ],
+      "repo": null,
+      "created": "2026-07-27",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-27T01:18:35.795294+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-27T01:18:08.551084+00:00"
+    },
+    {
+      "id": "proposed-pr-RSDPM-90",
+      "name": "PR RSDPM 90",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pr-RSDPM-90`. Last activity 2026-07-27T01:15:52.562602+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pr-RSDPM-90"
+      ],
+      "repo": null,
+      "created": "2026-07-27",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-27T01:18:35.795294+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-27T01:15:52.562602+00:00"
     }
   ]
 }
