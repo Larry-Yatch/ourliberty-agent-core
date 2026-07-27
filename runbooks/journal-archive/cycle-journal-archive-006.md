@@ -43988,3 +43988,69 @@ Watermark advanced 509→510. NOMINAL ✅
 
 ---
 
+## Iteration ~6362 — 2026-07-27T01:12Z UTC (Larry /cycle chat, Tier 1 → Tier 2)
+
+**Health:** ✅ NOMINAL. **Tier 1 → Tier 2** (consecutive_clean=3 → de-escalated; 0 new alerts watermark=519; PR #98 RSDPM new M8 deliverability checklist queue depth 4; pending=0; watchdog healthy 01:08Z UTC).
+
+**VERIFY-BEFORE-REASSERT (from iter ~6361 at ~01:06Z UTC):**
+- **"PR #97 RSDPM M8 MERGED 01:02Z UTC"**: CONFIRMED — not in RSDPM PR list; outbox-notifier.log shows AUTO_MERGE merged at 19:02:33 MDT. [carry RESOLVED ✅]
+- **"RSDPM queue depth 3 (#88+#91+#93)"**: NOT CONFIRMED → **PR #98 NEW** created 01:07:53Z UTC; queue depth now **4** (#88+#91+#93+#98). [update: 3→4]
+- **"watermark=519 0 new alerts"**: CONFIRMED — repair-watermark: repaired=false (old=519, file_length=519). [carry ✅]
+- **"Check I pending today (Sun 2026-07-27)"**: CONFIRMED — last artifact check-i-2026-07-26.json; timer fires ~14:13Z UTC today. [carry pending]
+- **"watchdog healthy 01:03Z UTC"**: CONFIRMED + MORE RECENT: last [2026-07-26 19:08:54 MDT] = 01:08:54Z UTC; overall=healthy. [carry ✅]
+
+**New findings this iter:**
+1. **PR #98 NEW (RSDPM)** — "ops(M8): briefing deliverability PASSES; content does not — file the two accuracy defects." Created 2026-07-27T01:07:53Z UTC (after iter ~6361). NOT-DRAFT/MERGEABLE, reviewDecision="" (Mirror review dispatch not yet in outbox-notifier.log; PR is 4 min old — normal pipeline lag; Forge may not have written the notify marker yet). Checklist doc only. Queue depth behind #74: **4** (#88+#91+#93+#98). [blue] FYI.
+2. **Tier de-escalation: Tier 1 → Tier 2** — consecutive_clean=3; cadence drops from 5-min to 15-min. Last signal 2026-07-27T00:50Z UTC.
+
+**Check 0 — Alert triage (~01:12Z UTC):** repair-watermark: repaired=false (old=519, file_length=519). 0 new alerts above watermark=519. NOMINAL ✅
+
+**Check 1 — Log noise (~01:12Z UTC):** outbox-notifier.log last entry [2026-07-26 19:02:33 MDT] (01:02:33Z UTC; PR #97 auto-merge + worktree teardown). WARN AUTO_MERGE transcript-jump failed (draft PR #90 — expected, 1 occ). No systemic-fix targets. NOMINAL ✅
+
+**Check 2 — Telegram sweep (~01:12Z UTC):** beacon_telegram_bot.log last entry [2026-07-26T19:00:58-0600] (01:00:58Z UTC; idx=518 heal-stale-daemon-code route=digest skipping DM). Bot alive (restart at 18:55:56 MDT normal). 0 new Larry directives. NOMINAL ✅
+
+**Check 3 — Pipeline stall (~01:12Z UTC):** heal_pipeline_stall dry-run: FORGE_NO_PR_SKIP threshold-update-2026-07-26-001 (pr_exists #1027 MERGED); FORGE_NO_PR_SKIP pr-RSDPM-75+81+85+89 (MERGED); FORGE_NO_PR_SKIP marker-taskid-normalize-001 (pr_exists #1028 MERGED); suppressed(cooldown): mirror_pass_unmerged:transcript-jump; suppressed(cooldown): mirror_pass_unmerged:m12-queue-zones. **0 alerts would fire; 0 recoveries.** NOMINAL ✅
+
+**Check 4 — Pending directives (~01:12Z UTC):** beacon-pending-approvals (state): **pending=0** (history=541). NOMINAL ✅
+
+**Check 5 — Stale daemon code (~01:12Z UTC):** heal-stale-daemon-code.heartbeat=2026-07-27T01:08:54Z UTC (~3 min from check; fresh <60 min). Watchdog healthy 01:08:54Z UTC. NOMINAL ✅
+
+**Check A — Source repo:** HEAD=0a8322f3=origin/main (Pulse cycle 20260727T010815Z); on main; clean tree; 0 ahead/behind. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-27T00:55:56Z UTC (sync shows 51c9c8e7; 2 direct-push Pulse cycle commits since then; local==origin confirmed via fetch --dry-run). ~16 min from check; within 2h. NOMINAL ✅
+**Check C — Agent liveness:** Watchdog healthy 01:08:54Z UTC; overall=healthy. NOMINAL ✅
+**Check E — PR/merge state:** ourliberty-agent-core: **0 open PRs** ✅. RSDPM: PR #74 OPEN/DRAFT/MERGEABLE (M12 active dev); PR #88 OPEN/NOT-DRAFT/MERGEABLE (HELD(#74)); PR #90 OPEN/DRAFT/MERGEABLE [M13 spec, "Draft on purpose"]; PR #91 OPEN/NOT-DRAFT/MERGEABLE (HELD(#74)); PR #93 OPEN/NOT-DRAFT/MERGEABLE (HELD(#74)); **PR #98 OPEN/NOT-DRAFT/MERGEABLE** [M8 deliverability checklist, just created, Mirror review dispatch pending]. Queue depth behind #74: **4** (#88+#91+#93+#98). NOMINAL ✅
+**Check H — Forge inbox:** 0 JSON files. Mirror: 0 JSON files. Beacon: 0 JSON files. NOMINAL ✅
+
+**§5.0:** audit-due-nudge: no-op. distill-detector: no-op. audit-cadence-signal: no-op. NOMINAL ✅
+
+**Rotations:** [carry] SUPABASE_SERVICE_ROLE_KEY due=2026-08-22 (~26d). 14-day dedup active (expires ~2026-08-03); no new DM.
+
+**Conditional checks:**
+- **Check I:** timer-managed (firing day today Sun 2026-07-27; pending ~14:13Z UTC; last artifact check-i-2026-07-26.json). [pending today]
+- **Check III:** DONE ✅ (PR #1027 MERGED). [done ✅]
+- **Check VI:** timer-managed. [carry]
+- **Check VIII:** timer-managed; last artifact check-viii-2026-07-20.json. [carry]
+
+**G-rule assessment:**
+- **marker-taskid-normalize-001: VERIFIED ✅** [carry from iter ~6360; PR #1028 MERGED. In Completed G-rules.]
+- forge-marker-taskid-suffix-increment-001: **2/3** [carry, 0 new].
+- medic-draft-status-false-positive: **2/3** [carry, 0 new].
+- check-i-force-bypass-dm-route: **2/3** [carry, 0 new].
+- Active carries (verification_pending): forge-revision-preamble-missing; forge-wip-redispatch-digest; forge-wip-redispatch-exhausted-no-pr; outbox-notifier-intent-reject; auto-dispatch-APPROVAL_REQUEST-mismatch; PR #1022 heal-wip-redispatch DAG-preflight suppression. Sub-threshold: pr-merged-without-deep-review-shortcut-001 (1/3); mirror-ghost-retry-m5-pr2 (1/3); heal-stall-retry-exhausted-after-pr-merge (1/3).
+
+**Actions taken:**
+1. Check 0: repair-watermark no-op. 0 new alerts. Watermark stays 519.
+2. §5.0 one-shots: all no-ops.
+3. Tier state: `record --checks-clean true` → consecutive_clean=3 → **de-escalate Tier 1 → Tier 2** (consecutive_clean reset to 0; 15-min cadence).
+4. PRIME ledger: iter_clean appended (tier=1, template=nominal, PR #98 RSDPM new + pending=0 + watchdog healthy + tier de-escalate Tier 2).
+
+**Escalations:** None.
+- [carry — no new DM] RSDPM PR #74 isDraft=true queue depth 4 (#88+#91+#93+#98 HELD). PR #90 (M13 spec) "Draft on purpose." PR #98 (M8 deliverability) just created, Mirror review pending.
+- [carry — no new DM] check-vi-posture-proposals-2026-07-07 (2 proposals).
+- [carry — no new DM] ourliberty-health-subject-key-mismatch translation gap (vp, dispatched iter ~4488) — health check clean ✅.
+
+**PRIME DIRECTIVE:** iter_clean (0 new alerts watermark=519; PR #98 RSDPM new M8 deliverability queue depth 4; pending=0; 0 open agent-core PRs; watchdog healthy). Trailing 30d: ratio=32.7% (systemic_fixes=48, verification_pending=23).
+**Tier end-of-iter:** **Tier 2** (consecutive_clean=0; last_signal_at=2026-07-27T00:50Z UTC; 15-min cadence).
+
+---
+
