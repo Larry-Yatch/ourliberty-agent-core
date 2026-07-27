@@ -1887,6 +1887,11 @@
         "model": "claude-opus-4-8",
         "at": "2026-07-27T15:05:25.377983+00:00",
         "from_state": "parked"
+      },
+      "spawned": {
+        "kind": "delegate",
+        "task_id": "delegate-cap-title-3c29",
+        "stamped_at": "2026-07-27T15:18:59.034690+00:00"
       }
     },
     {
