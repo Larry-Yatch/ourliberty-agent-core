@@ -44054,3 +44054,74 @@ Watermark advanced 509→510. NOMINAL ✅
 
 ---
 
+## Iteration ~6363 — 2026-07-27T01:28Z UTC (Larry /cycle chat, Tier 2 → Tier 1)
+
+**Health:** ⚠️ NON-NOMINAL. **Tier 2 → Tier 1** (Tier-4 alert found; consecutive_clean reset to 0; 1 new alert watermark=519→520; PR #98 RSDPM CONFLICTING; PR #90 MERGED; PR #99 MERGED; pending=0; watchdog healthy 01:24Z UTC).
+
+**VERIFY-BEFORE-REASSERT (from iter ~6362 at ~01:12Z UTC):**
+- **"PR #98 RSDPM OPEN/NOT-DRAFT/MERGEABLE (Mirror review pending)"**: NOT CONFIRMED → **PR #98 CONFLICTING** — Mirror REVIEW_PASS at 19:18:09 MDT; AUTO_MERGE_HELD blocker=#99 (overlap GO_LIVE_CHECKLIST.md); PR #99 merged at 19:22:53 MDT releasing the hold; PR #98 then CONFLICTING. [update: MERGEABLE→CONFLICTING ⚠️]
+- **"PR #90 OPEN/DRAFT/MERGEABLE [M13 spec, Draft on purpose]"**: NOT CONFIRMED → **PR #90 MERGED 01:19:54Z UTC** — outbox-notifier dispatched Mirror review after restart; Mirror REVIEW_PASS at 19:19:47 MDT; auto-merged --squash. [update: MERGED ✅]
+- **"queue depth 4 (#88+#91+#93+#98)"**: PARTIALLY CONFIRMED — #88/#91/#93 still HELD; #98 CONFLICTING; PR #99 MERGED (was not listed prior). [update: queue depth 4 with #98 CONFLICTING not MERGEABLE]
+- **"pending=0 history=541"**: CONFIRMED — pending=0 (history=541). [carry ✅]
+- **"watermark=519 0 new alerts"**: NOT CONFIRMED — file_length=520 (1 new alert). [update — see Check 0]
+- **"watchdog healthy 01:08Z UTC"**: CONFIRMED + MORE RECENT: last [2026-07-26 19:24:07 MDT] = 01:24:07Z UTC; overall=healthy. [carry ✅]
+
+**New findings this iter:**
+1. **Alert line 520 (Tier-4)** — `auto-merge-conflict:Larry-Yatch/RSDPM:98` (01:22:57Z UTC; source=outbox-notifier; route=hold). Bot suppressed DM (idx=519 route=hold; skipping DM per bot log). Triage helper: Tier-4 (novel; no registry template, no translation match). PR #98 CONFLICTING after PR #99 merged on GO_LIVE_CHECKLIST.md. Larry NOT DM'd by bot → Pulse forwarded via larry_alerts route=escalate.
+2. **PR #90 MERGED 01:19:54Z UTC** — M13 transcript-jump spec (specs/M13-transcript-jump.md). Was "Draft on purpose" in prior iter; outbox-notifier post-restart rescan dispatched Mirror review (pr-RSDPM-90); Mirror REVIEW_PASS; auto-merged. [blue] FYI — M13 now specced.
+3. **PR #99 MERGED 01:22:53Z UTC** — ourliberty-agent-core previously unknown open PR; Mirror REVIEW_PASS; auto-merged. Released blocker on PR #98 → PR #98 became CONFLICTING.
+4. **Tier 2 → Tier 1** — non-clean iter (Tier-4 alert); consecutive_clean=0; 5-min cadence.
+
+**Check 0 — Alert triage (~01:27Z UTC):** repair-watermark: repaired=false (old=519, file_length=520). 1 new alert above watermark=519: line 520 `auto-merge-conflict:Larry-Yatch/RSDPM:98` (route=hold, tier=FYI from notifier; bot idx=519 skipped DM) → **Tier-4** (novel; triage helper: no translation match). Pulse forwarded DM via larry_alerts (route=escalate). Watermark advanced 519→520. NON-NOMINAL ⚠️
+
+**Check 1 — Log noise (~01:27Z UTC):** outbox-notifier.log last entry [2026-07-26 19:22:57 MDT] (01:22:57Z UTC; AUTO_MERGE_HELD_STALE_CONFLICT PR #98 conflict). WARN AUTO_MERGE_HELD_STALE_CONFLICT (1 occ, by-design — PR #98 conflict after PR #99 merge); WARN AUTO_MERGE failed=draft (1 occ for transcript-jump — was PR #90, which subsequently auto-merged post-restart rescan; resolved). watchdog.log last [2026-07-26 19:24:07 MDT] (01:24:07Z UTC; overall=healthy). No systemic-fix targets. NOMINAL ✅
+
+**Check 2 — Telegram sweep (~01:27Z UTC):** beacon_telegram_bot.log last entry [2026-07-26T19:26:11-0600] (01:26:11Z UTC; idx=519 auto-merge-conflict:RSDPM:98 route=hold skipping DM). 0 new Larry directives. NOMINAL ✅
+
+**Check 3 — Pipeline stall (~01:27Z UTC):** heal_pipeline_stall dry-run: FORGE_NO_PR_SKIP threshold-update-2026-07-26-001 (pr_exists #1027 MERGED); FORGE_NO_PR_SKIP pr-RSDPM-75+81+85+89 (MERGED); FORGE_NO_PR_SKIP marker-taskid-normalize-001 (pr_exists #1028 MERGED); suppressed(cooldown): mirror_pass_unmerged:m12-queue-zones. **0 alerts would fire; 0 recoveries.** NOMINAL ✅
+
+**Check 4 — Pending directives (~01:27Z UTC):** beacon-pending-approvals (state): **pending=0** (history=541). NOMINAL ✅
+
+**Check 5 — Stale daemon code (~01:27Z UTC):** heal-stale-daemon-code.heartbeat=2026-07-27T01:19:02Z UTC (~8 min from check; fresh <60 min). Watchdog healthy 01:24:07Z UTC. NOMINAL ✅
+
+**Check A — Source repo:** HEAD=be3d5d74=origin/main; on main; clean tree; 0 ahead/behind. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-27T00:55:56Z UTC (~32 min from check); status=success (consecutive_push_failures=0). Within 2h. NOMINAL ✅
+**Check C — Agent liveness:** Watchdog healthy 01:24:07Z UTC; overall=healthy. NOMINAL ✅
+**Check E — PR/merge state:** ourliberty-agent-core: **0 open PRs** ✅. RSDPM: PR #74 OPEN/DRAFT/MERGEABLE (M12 active dev); PR #88 OPEN/NOT-DRAFT/MERGEABLE (HELD(#74)); PR #90 **MERGED** ✅ (M13 transcript-jump spec, 01:19:54Z UTC); PR #91 OPEN/NOT-DRAFT/MERGEABLE (HELD(#74)); PR #93 OPEN/NOT-DRAFT/MERGEABLE (HELD(#74)); PR #98 OPEN/NOT-DRAFT/**CONFLICTING** ⚠️ (needs rebase after PR #99 merged on GO_LIVE_CHECKLIST.md); PR #99 **MERGED** ✅ (01:22:53Z UTC). Queue depth behind #74: **3 HELD** (#88+#91+#93) + **1 CONFLICTING** (#98). NON-NOMINAL ⚠️ (PR #98 actionable — rebase required)
+**Check H — Forge inbox:** 0 JSON files. Mirror: 0 JSON files. Beacon: 0 JSON files. NOMINAL ✅
+
+**§5.0:** audit-due-nudge: no-op. distill-detector: no-op. audit-cadence-signal: no-op. NOMINAL ✅
+
+**Rotations:** [carry] SUPABASE_SERVICE_ROLE_KEY due=2026-08-22 (~26d). 14-day dedup active (expires ~2026-08-03); no new DM.
+
+**Conditional checks:**
+- **Check I:** timer-managed (firing day today Sun 2026-07-27; pending ~14:13Z UTC; last artifact check-i-2026-07-26.json). [pending today]
+- **Check III:** DONE ✅ (PR #1027 MERGED). [done ✅]
+- **Check VI:** timer-managed. [carry]
+- **Check VIII:** timer-managed; last artifact check-viii-2026-07-20.json. [carry]
+
+**G-rule assessment:**
+- **marker-taskid-normalize-001: VERIFIED ✅** [carry from iter ~6360; PR #1028 MERGED. In Completed G-rules.]
+- forge-marker-taskid-suffix-increment-001: **2/3** [carry, 0 new].
+- medic-draft-status-false-positive: **2/3** [carry, 0 new].
+- check-i-force-bypass-dm-route: **2/3** [carry, 0 new].
+- **NEW sub-threshold 1/3**: `auto-merge-conflict-route-hold-no-dm-001` — outbox-notifier fires `auto-merge-conflict:` alerts with route=hold (bot suppresses DM); no direct DM path fires for conflicts; Pulse must forward. If 3 occurrences, dispatch to Beacon: either change route to escalate in AUTO_MERGE_HELD_STALE_CONFLICT path, OR add Tier-3 translation (silence) if bot DM is separately confirmed working.
+- Active carries (verification_pending): forge-revision-preamble-missing; forge-wip-redispatch-digest; forge-wip-redispatch-exhausted-no-pr; outbox-notifier-intent-reject; auto-dispatch-APPROVAL_REQUEST-mismatch; PR #1022 heal-wip-redispatch DAG-preflight suppression. Sub-threshold: pr-merged-without-deep-review-shortcut-001 (1/3); mirror-ghost-retry-m5-pr2 (1/3); heal-stall-retry-exhausted-after-pr-merge (1/3).
+
+**Actions taken:**
+1. Check 0: repair-watermark no-op. 1 new alert (line 520, auto-merge-conflict:RSDPM:98) → Tier-4 (novel). DM forwarded via larry_alerts route=escalate. Watermark advanced 519→520.
+2. §5.0 one-shots: all no-ops.
+3. Tier state: `record --checks-clean false` → **tier reset Tier 2 → Tier 1** (consecutive_clean=0; last_signal_at=2026-07-27T01:28:37Z UTC).
+4. PRIME ledger: intervention appended (tier=2, kind=intervention, template=auto-merge-conflict-no-translation, PR #98 CONFLICTING forwarded to Larry).
+
+**Escalations:**
+- **[new — larry_alerts route=escalate delivered this iter]** RSDPM PR #98 CONFLICTING: needs rebase after PR #99 merged on GO_LIVE_CHECKLIST.md. Rebase: `gh pr checkout 98 --repo Larry-Yatch/RSDPM && git fetch origin && git rebase origin/main && git push --force-with-lease`
+- [carry — no new DM] RSDPM PR #74 isDraft=true queue depth 3 HELD (#88+#91+#93) + 1 CONFLICTING (#98). PR #90 MERGED ✅ (M13 transcript-jump spec). PR #99 MERGED ✅.
+- [carry — no new DM] check-vi-posture-proposals-2026-07-07 (2 proposals).
+- [carry — no new DM] ourliberty-health-subject-key-mismatch translation gap (vp, dispatched iter ~4488) — health check clean ✅.
+
+**PRIME DIRECTIVE:** intervention (1 new alert Tier-4: auto-merge-conflict:RSDPM:98 route=hold bot-suppressed → Pulse forwarded; PR #90+#99 MERGED; RSDPM queue depth 3 HELD + 1 CONFLICTING behind #74 draft; ourliberty-agent-core 0 open PRs; watchdog healthy). Trailing 30d: ratio=32.7% (systemic_fixes=48, verification_pending=23).
+**Tier end-of-iter:** **Tier 1** (consecutive_clean=0; last_signal_at=2026-07-27T01:28:37Z UTC; 5-min cadence).
+
+---
+
