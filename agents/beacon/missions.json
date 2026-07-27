@@ -13267,7 +13267,11 @@
         "at": "2026-07-27T07:51:47.723080+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-27T15:54:39.798310+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-pulse-check-xiv-digest",
@@ -13488,7 +13492,11 @@
         "at": "2026-07-27T15:25:27.777902+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-27T15:54:39.798310+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-pr-RSDPM-120",
@@ -13554,7 +13562,11 @@
         "at": "2026-07-27T15:25:27.777902+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-27T15:54:39.798310+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-deep-review-hold-pr1030-c2d21ca9",
