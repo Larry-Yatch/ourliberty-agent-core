@@ -53026,3 +53026,87 @@ Watermark advanced 513→515. NOMINAL ✅
 
 ---
 
+## Iteration ~6481 — 2026-07-27T15:42Z UTC (Larry /cycle chat, Tier 1 → consecutive_clean=0)
+
+**Health:** ⚠️ NON-NOMINAL — active pipeline iter. Major resolution since iter ~6480 (~15:36Z UTC): ALL 4 RSDPM PRs MERGED (#117 at 15:37:27Z, #120 at 15:37:37Z, #119 at 15:40:12Z, #118 at 15:40:20Z). RSDPM staging drift FULLY RESOLVED ✅ including critical security migrations 0023+0026. New finding: PR #1030 (Skip DRAFT blockers in auto-merge overlap serializer) Mirror REVIEW_PASS → deep-review hold (deep-review-hold-pr1030-c2d21ca9) at 15:37:48Z UTC. pending=3 (rsdpm-install-drift-healer-001 + deep-review-hold-pr1035 + deep-review-hold-pr1030). ourliberty: 4 open PRs (#1030/#1032/#1034/#1035) — #1030 and #1035 on deep-review gates; #1032 and #1034 HELD behind #1030. **Tier 1 stays** (consecutive_clean=0; active deep-review gates; 4 ourliberty PRs open).
+
+**VERIFY-BEFORE-REASSERT (from iter ~6480 at ~15:36Z UTC):**
+- **"RSDPM staging drift NEW DIMENSION (0023+0026 unapplied)"**: **RESOLVED ✅** — PR #119 (`ops(P2): provision the leak-gate users`) merged 15:40:12Z UTC; PR #117 merged 15:37:27Z; PR #120 merged 15:37:37Z; PR #118 merged 15:40:20Z. All 4 RSDPM PRs merged. Security migrations 0023+0026 now applied to staging. [resolved ✅]
+- **"PR #1030 Mirror review in progress"**: **RESOLVED → NEW STATE ✅** — Mirror REVIEW_PASS at ~15:37Z UTC. AUTO_MERGE_HELD_DEEP_REVIEW (critical-path: scripts/outbox_notifier.py). deep-review-hold-pr1030-c2d21ca9 created 15:37:50Z UTC. [resolved ✅ → new deep-review gate]
+- **"PR #1034 REVIEW_PASS, held behind #1030"**: **CONFIRMED ✅** — labels=['held-behind-#1030']; MERGEABLE. Still blocked until #1030 merges. [carry ✅]
+- **"PR #1035 REVIEW_PASS/deep-review-hold"**: **CONFIRMED ✅** — labels=['auto-review', 'deep-review-required']; MERGEABLE. Awaiting Larry deep-review sign-off. [carry ✅]
+- **"PR #1032 Mirror review in progress"**: **CONFIRMED** — still open MERGEABLE; labels=['auto-review', 'held-behind-#1030']. Held behind #1030. [carry — held, not stuck]
+- **"pending=2 (rsdpm-install-drift-healer-001 + deep-review-hold-pr1035)"**: **UPDATED — pending=3**. deep-review-hold-pr1030-c2d21ca9 added 15:37:50Z UTC. [carry UPDATED]
+- **"system-health=healthy"**: **CONFIRMED ✅** — ts=2026-07-27T15:38:46Z UTC; all bots ok (beacon/forge/mirror/pulse). [carry ✅]
+- **"heal-stale-daemon-code.heartbeat"**: **CONFIRMED ✅** — 2026-07-27T15:35:36Z UTC (~7 min; <60 min). [carry ✅]
+- **"alerts watermark=515"**: **UPDATED** — repair-watermark repaired=false (old=515, file_length=516). L516 = auto-merge-deep-review-hold:PR#1030 (Tier-3 silence per translation). Watermark advanced 515→516. [carry UPDATED ✅]
+- **"Check I RESOLVED"**: **CONFIRMED ✅** — next ~2026-07-29 Wed. [carry ✅]
+- **"Check VIII/IX/X next 2026-08-03"**: **CONFIRMED ✅**. [carry ✅]
+- **"Check XIV Tier-4 × 2"**: **CARRY** — idx=500+501 bot-delivered; awaiting Larry triage. [carry ⚠️]
+- **"RSDPM 4 open PRs (#117, #118, #119, #120)"**: **RESOLVED ✅** — all 4 MERGED. RSDPM 0 open PRs. [resolved ✅]
+- **"GH-502-merge-state-recheck DISPATCHED 3/3 VP"**: **CARRY VP** — PR #1034 (fix) REVIEW_PASS/HELD behind #1030; PR #1035 REVIEW_PASS/deep-review-hold. Both need to merge for verification to complete. [carry VP]
+- **"auto-merge-conflict-route-hold-no-dm-001 VP"**: **CARRY VP** — no new auto-merge-conflict:* non-promoted alerts. Awaiting #1030 merge to confirm suppression end-to-end. [carry VP]
+
+**New findings this iter:**
+1. **RSDPM ALL 4 PRs MERGED ✅** — #117 (15:37:27Z), #120 (15:37:37Z), #119 (15:40:12Z), #118 (15:40:20Z). RSDPM staging drift fully resolved. Security migrations 0023+0026 applied. RSDPM 0 open PRs. [RESOLVED ✅ — major resolution]
+2. **PR #1030 Mirror REVIEW_PASS → deep-review hold** — outbox-notifier [09:37:48 MDT]=15:37:48Z UTC: `AUTO_MERGE_HELD_DEEP_REVIEW task=pr-ourliberty-agent-core-1030` (critical-path: scripts/outbox_notifier.py; no deep-review stamp). deep-review-hold-pr1030-c2d21ca9 surfaced 15:37:50Z UTC. Larry action required: approve via dashboard (`deep-review-passed`) or `/code-review high` then merge manually (`scripts/merge_reviewed_pr.sh 1030`). [NEW ✅ — pipeline progressing; Larry gate]
+
+**Check 0 — Alert triage (~15:41Z UTC):** repair-watermark: repaired=false (old=515, file_length=516). 1 new alert:
+- L516 (ts=15:37:48Z): `auto-merge-deep-review-hold:Larry-Yatch/ourliberty-agent-core:1030` — **Tier-3** (helper: known-pattern match, tier_source=translation). NOMINAL ✅
+Watermark advanced 515→516. NOMINAL ✅
+
+**Check 1 — Log noise (~15:41Z UTC):** outbox-notifier.log last entry [09:40:22 MDT]=15:40:22Z UTC (~1 min ago). Recent activity: PR #1030 deep-review hold surfaced; RSDPM #119 Mirror REVIEW_PASS → merged; #118 AUTO_MERGE_RELEASE_FRESH → merged. No unexpected WARNs or ERRORs. NOMINAL ✅
+
+**Check 2 — Telegram sweep (~15:41Z UTC):** beacon_telegram_bot.log last entry [09:31:02-0600]=15:31:02Z UTC (~10 min ago). No new Larry directives in last 4h. NOMINAL ✅
+
+**Check 3 — Pipeline stall (~15:39Z UTC):** heal_pipeline_stall dry-run: FORGE_NO_PR_SKIP × 7 (threshold-update/#1027 MERGED, pr-RSDPM-75/81/85/89 MERGED, marker-taskid-normalize-001/#1028 MERGED, transcript-jump/#90 RSDPM MERGED, pr-ourliberty-1031 MERGED). **0 stalls detected.** NOMINAL ✅
+
+**Check 4 — Pending directives (~15:41Z UTC):** beacon-pending-approvals.json: **pending=3** — (1) rsdpm-install-drift-healer-001 (Forge preflight, low-priority); (2) deep-review-hold-pr1035-599f82a3 (PR #1035 critical-path, heal_stale_escalation_recheck.py severity fix); (3) deep-review-hold-pr1030-c2d21ca9 (PR #1030 critical-path, scripts/outbox_notifier.py draft-skip fix). All expected approval-chain activity. No orphan directives. NOMINAL ✅
+
+**Check 5 — Stale daemon code (~15:41Z UTC):** heal-stale-daemon-code.heartbeat=2026-07-27T15:35:36Z UTC (~7 min; <60 min). system-health.json overall=healthy ts=2026-07-27T15:38:46Z UTC; all bots ok. NOMINAL ✅
+
+**Check A — Source repo (~15:41Z UTC):** HEAD=49b219cc=origin/main. On main. Clean tree. NOMINAL ✅
+**Check B — Sync health (~15:41Z UTC):** last_sync=2026-07-27T14:42:16Z UTC (~59 min; <2h); status=no-change; consecutive_push_failures=0. NOMINAL ✅ (approaching 2h threshold; auto-trigger will fire next iter if not synced by wrapper)
+**Check C — Agent liveness (~15:41Z UTC):** system-health.json overall=healthy; all bots ok. NOMINAL ✅
+**Check E — PR/merge state (~15:41Z UTC):** ourliberty-agent-core: #1030 MERGEABLE (deep-review-required; scripts/outbox_notifier.py); #1032 MERGEABLE (held-behind-#1030, Mirror complete); #1034 MERGEABLE (held-behind-#1030); #1035 MERGEABLE (deep-review-required). All <72h. RSDPM: 0 open PRs ✅. NON-NOMINAL ⚠️ (active — 2 deep-review gates + 2 HELD; expected state)
+**Check H — Inbox + Forge activity (~15:41Z UTC):** Mirror inbox: empty ✅. Forge inbox: empty ✅. Worktrees: none active (all prior worktrees torn down by auto-merge). NOMINAL ✅
+
+**§5.0 one-shots (~15:41Z UTC):** audit_due_nudge: no-op; distill_detector: no-op; audit_cadence_signal: no-op. NOMINAL ✅
+
+**Credential rotation (~15:41Z UTC):** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (26 days). 14-day dedup active (last DM 2026-07-20; expires ~2026-08-03). No DM sent. NOMINAL ✅
+
+**PRIME DIRECTIVE:** No new corrective actions this iter — monitoring + 1 Tier-3 alert triage. RSDPM staging drift resolved (4 PRs merged). PR #1030 deep-review gate surfaced. Trailing 30d: ratio≈33.65% (systemic_fixes=49, vp=24, trend=worsening).
+
+**Patterns:**
+- **RSDPM pipeline drained cleanly**: 4 PRs merged in ~3 min via serial auto-merge (#119 first → released #118; #117 and #120 merged independently via Mirror review completion). The pipeline serialization worked exactly as designed.
+- **Deep-review pile-up on outbox_notifier**: PR #1030 and #1034 both touch `scripts/outbox_notifier.py`. PR #1030 is the blocker for #1032 (test coverage) and #1034 (GH-502 fix). Larry's dashboard-approve of PR #1030 is the highest-leverage single action right now: it would unblock #1032 → auto-merge, #1034 → auto-merge, and clear the merge queue. Then PR #1035 (heal_stale_escalation_recheck.py) is a separate approve.
+- **Sync approaching 2h**: last_sync=14:42Z. If the wrapper doesn't auto-sync before next iter, Check B will trigger the always-fix.
+
+**G-rule assessment:**
+- forge-marker-taskid-suffix-increment-001: **2/3** [carry, 0 new].
+- medic-draft-status-false-positive: **2/3** [carry, 0 new].
+- check-i-force-bypass-dm-route: **2/3** [carry, 0 new].
+- auto-merge-conflict-route-hold-no-dm-001: **VERIFICATION_PENDING** [carry VP — 0 new occurrences; PR #1030 merge needed to complete].
+- mirror-queue-wait-readiness: **1/3** [carry, 0 new].
+- beacon-pending-approvals-path-bug: **1/3** [carry, 0 new].
+- GH-502-merge-state-recheck: **VP** — PR #1034 REVIEW_PASS/HELD; PR #1035 REVIEW_PASS/deep-review-hold. Both need to merge. [carry VP]
+- RSDPM staging drift: **FULLY RESOLVED ✅** — all 4 PRs merged. G-rule monitoring complete.
+- Active carries (verification_pending): forge-revision-preamble-missing; forge-wip-redispatch-digest; forge-wip-redispatch-exhausted-no-pr; outbox-notifier-intent-reject; auto-dispatch-APPROVAL_REQUEST-mismatch; PR #1022 heal-wip-redispatch DAG-preflight suppression; auto-merge-conflict-route-hold-no-dm-001; GH-502-merge-state-recheck.
+
+**Actions taken:**
+1. Check 0: triage L516 (Tier-3 silence, deep-review-hold PR#1030 delivery confirm). Watermark advanced 515→516.
+2. §5.0 one-shots: all no-ops.
+3. PRIME ledger: intervention appended (tier=1, kind=intervention, template=active-pipeline-rsdpm-resolved, detail=RSDPM-117-118-119-120-all-merged-ourliberty-pr1030-deep-review-hold, ts=2026-07-27T15:42:30Z UTC).
+4. Tier state: `cycle_tier_state.py record --checks-clean false` → consecutive_clean=0; **Tier 1** stays (last_signal_at=2026-07-27T15:42:31Z UTC).
+
+**Escalations:**
+- [carry — no new DM; pipeline fully drained] RSDPM staging drift FULLY RESOLVED ✅. All 4 PRs merged including security migrations 0023+0026.
+- **[yellow] pending=3: dashboard-approve action needed.** (1) deep-review-hold-pr1030-c2d21ca9 — PR #1030 (draft-skip fix in outbox_notifier.py) is the highest-leverage approve: clears the auto-merge queue for #1032 + #1034. (2) deep-review-hold-pr1035-599f82a3 — PR #1035 (heal_stale_escalation_recheck.py severity fix). (3) rsdpm-install-drift-healer-001 — Forge preflight (low-priority). Dashboard at https://dashboard.ourliberty.dev/approvals.
+- [carry — no new DM] check-vi-posture-proposals-2026-07-07 (2 proposals).
+- [carry — no new DM] Mirror queue-wait p95=92.3m (self-suppresses ~2026-07-30T02Z UTC).
+- [carry — no new DM] Check XIV Tier-4 × 2: oversilence + fleet digest. Awaiting Larry triage.
+
+**Tier end-of-iter:** **Tier 1** (consecutive_clean=0; last_signal_at=2026-07-27T15:42:31Z UTC; 5-min cadence).
+
+---
+
