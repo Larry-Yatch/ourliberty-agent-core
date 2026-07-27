@@ -10027,18 +10027,22 @@ def _gh_pr_merge_freshness(
 
 
 def _gh_open_prs_for_repo(repo_coords: str) -> list[dict[str, Any]]:
-    """Return open PRs for `repo_coords` with number/createdAt/headRefName.
+    """Return open PRs for `repo_coords` with
+    number/createdAt/headRefName/isDraft.
 
     Empty list on error. Used by `_find_overlap_blocker` to catch PRs
     that have already opened but haven't reached Mirror PASS yet — those
     can still merge before this one and create overlap conflicts.
+
+    `isDraft` rides along on this ONE listing call so the skip-draft-blocker
+    rule costs no extra `gh pr view` per candidate.
     """
     if _gh_backoff_skip('open-prs-for-repo'):
         return []
     try:
         proc = subprocess.run(
             ['gh', 'pr', 'list', '--repo', repo_coords, '--state', 'open',
-             '--json', 'number,createdAt,headRefName'],
+             '--json', 'number,createdAt,headRefName,isDraft'],
             capture_output=True, text=True, timeout=_AUTO_MERGE_TIMEOUT_S,
         )
     except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
@@ -10078,6 +10082,62 @@ def _gh_pr_is_open(repo_coords: str, pr_number: int) -> Optional[bool]:
     if state in ('MERGED', 'CLOSED'):
         return False
     return None
+
+
+def _gh_pr_open_and_draft(
+    repo_coords: str, pr_number: int,
+) -> tuple[Optional[bool], Optional[bool]]:
+    """Return `(is_open, is_draft)` from ONE `gh pr view --json state,isDraft`.
+
+    The queue sweep's Pass 2 already spends a `gh pr view` per held entry to
+    test its blocker's OPEN-ness; folding `isDraft` into that same call lets
+    Pass 2 also release entries wedged behind a draft blocker at zero extra
+    API cost (see `_auto_merge_queue_sweep`).
+
+    Both halves are independently tri-state, and every failure path yields
+    `(None, None)` — the caller leaves the entry queued and retries next
+    tick, matching `_gh_pr_is_open`'s conservative convention. `is_draft` is
+    None whenever the field is absent or non-bool, which is treated as "not
+    known to be a draft" and therefore keeps holding.
+    """
+    if _gh_backoff_skip('pr-state-draft'):
+        return (None, None)
+    try:
+        proc = subprocess.run(
+            ['gh', 'pr', 'view', str(pr_number),
+             '--repo', repo_coords,
+             '--json', 'state,isDraft'],
+            capture_output=True, text=True, timeout=_AUTO_MERGE_TIMEOUT_S,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
+        log(
+            f'gh pr view {pr_number} ({repo_coords}) --json state,isDraft '
+            f'failed: {type(e).__name__}: {e}',
+            'WARN',
+        )
+        return (None, None)
+    _gh_note_result(proc.returncode, proc.stderr)
+    if proc.returncode != 0:
+        log(
+            f'gh pr view {pr_number} ({repo_coords}) --json state,isDraft '
+            f'exit={proc.returncode}: {(proc.stderr or "").strip()[:200]}',
+            'WARN',
+        )
+        return (None, None)
+    try:
+        data = json.loads(proc.stdout or '{}')
+    except (ValueError, json.JSONDecodeError):
+        return (None, None)
+    state = data.get('state')
+    if state == 'OPEN':
+        is_open: Optional[bool] = True
+    elif state in ('MERGED', 'CLOSED'):
+        is_open = False
+    else:
+        is_open = None
+    raw_draft = data.get('isDraft')
+    is_draft = raw_draft if isinstance(raw_draft, bool) else None
+    return (is_open, is_draft)
 
 
 def _mirror_review_target_is_terminal(pr_url: Optional[str]) -> bool:
@@ -10168,6 +10228,22 @@ def _find_overlap_blocker(
     Gate 2's conservative UNKNOWN-defers treatment, so we never race a
     merge while mergeability is still being computed.
 
+    Skip-draft-blocker (auto-merge-serializer-skip-draft-blocker-001): the
+    skip-dirty rationale applies VERBATIM to a DRAFT blocker, and more
+    strongly — GitHub refuses `mergePullRequest` on a draft outright
+    ("Pull Request is still a draft"), and unlike a conflict (which a
+    rebase clears mechanically) only a human marking it ready can ever
+    resolve it. Observed 2026-07-26 in Larry-Yatch/RSDPM: draft PR #74
+    held four green, Mirror-PASSed PRs for 9+ hours; the chain drained 18
+    seconds after a human closed #74. Draft candidates are SKIPPED
+    (logged as AUTO_MERGE_BLOCKER_SKIP_DRAFT). The draft test is checked
+    FIRST because `isDraft` already rides along on the `gh pr list`
+    payload — skipping there costs no API call, while the CONFLICTING
+    test needs a per-candidate `gh pr view`. Only a positive `isDraft is
+    True` skips; a missing/non-bool field (older `gh`, partial payload)
+    is treated as "not a draft" and keeps holding, matching the
+    conservative UNKNOWN treatment.
+
     Cross-repo isolation: a PR in repo A never blocks a PR in repo B —
     `repo` field comparison is strict.
 
@@ -10193,7 +10269,8 @@ def _find_overlap_blocker(
         if e.get('repo') == repo_coords and isinstance(e.get('pr_number'), int)
     }
 
-    candidates: list[tuple[str, int]] = []  # (createdAt, pr_number)
+    # (createdAt, pr_number, is_draft)
+    candidates: list[tuple[str, int, bool]] = []
     for pr_info in _gh_open_prs_for_repo(repo_coords):
         pr = pr_info.get('number')
         if not isinstance(pr, int) or pr == self_pr_number:
@@ -10208,12 +10285,29 @@ def _find_overlap_blocker(
         if not files:
             continue
         if self_files & set(files):
-            candidates.append((str(pr_info.get('createdAt') or ''), pr))
+            candidates.append((
+                str(pr_info.get('createdAt') or ''),
+                pr,
+                pr_info.get('isDraft') is True,
+            ))
 
     if not candidates:
         return None
     candidates.sort(key=lambda x: (x[0], x[1]))
-    for _created_at, pr in candidates:
+    for _created_at, pr, is_draft in candidates:
+        # Skip-draft-blocker: GitHub refuses to merge a draft at all, and
+        # only a human can clear that — holding a ready PR behind one
+        # wedges the chain indefinitely. Checked before the CONFLICTING
+        # test because it's free (isDraft came from the `gh pr list`
+        # payload) whereas the mergeable check costs a `gh pr view`.
+        if is_draft:
+            log(
+                f'AUTO_MERGE_BLOCKER_SKIP_DRAFT pr=#{self_pr_number} '
+                f'skipped_blocker=#{pr} (blocker is a DRAFT; GitHub cannot '
+                f'merge it and only a human can mark it ready, so it would '
+                f'wedge the chain indefinitely)',
+            )
+            continue
         # Skip-dirty-blocker: a CONFIRMED-CONFLICTING blocker can't merge
         # as-is, so gating a mergeable PR behind it just wedges the chain.
         # UNKNOWN keeps holding (conservative — don't race a still-computing
@@ -11496,7 +11590,11 @@ def _auto_merge_queue_sweep() -> None:
          retry merge with second_attempt_on_unknown=True (one defer,
          then proceed per spec).
       2. entry.blocker_pr_number is set → check `gh pr view` state for
-         that PR; if MERGED/CLOSED, re-attempt via _queue_release.
+         that PR; if MERGED/CLOSED, re-attempt via _queue_release. Also
+         releases when the blocker is still OPEN but is a DRAFT — GitHub
+         cannot merge a draft, so that entry would otherwise wait forever
+         (see AUTO_MERGE_BLOCKER_RELEASE_DRAFT below). Both come from one
+         `gh pr view --json state,isDraft`, so the call count is unchanged.
       3. entry.queued_at older than watchdog_dm_hours AND not yet
          DMed → DM Larry once, set watchdog_dm_sent=True.
 
@@ -11552,11 +11650,28 @@ def _auto_merge_queue_sweep() -> None:
         repo = entry.get('repo')
         if not isinstance(blocker, int) or not isinstance(repo, str):
             continue
-        is_open = _gh_pr_is_open(repo, blocker)
+        is_open, is_draft = _gh_pr_open_and_draft(repo, blocker)
         if is_open is False:
             # Blocker resolved (merged or closed) — release this entry.
             _queue_release(blocker, repo)
             # Don't break; other entries may share this blocker.
+        elif is_open is True and is_draft is True:
+            # auto-merge-serializer-skip-draft-blocker-001, sweep half.
+            # `_find_overlap_blocker`'s draft skip only fires at HOLD time;
+            # `blocker_pr_number` is pinned thereafter and this pass only ever
+            # released on the blocker leaving OPEN. A draft stays OPEN
+            # indefinitely, so an entry pinned behind one (held before this
+            # fix shipped, or behind a PR converted to draft AFTER the hold)
+            # could never drain — exactly the 9h RSDPM wedge. Release it:
+            # `_queue_release` re-runs both gates from scratch, and the
+            # hold-time skip above now declines to re-pin the same draft.
+            log(
+                f'AUTO_MERGE_BLOCKER_RELEASE_DRAFT blocker=#{blocker} '
+                f'repo={repo} (blocker still OPEN but is a DRAFT; releasing '
+                f'held entries rather than waiting on a blocker GitHub '
+                f'cannot merge)',
+            )
+            _queue_release(blocker, repo)
 
     # Pass 3: watchdog DMs (re-read again — releases above may have
     # cleared entries).
