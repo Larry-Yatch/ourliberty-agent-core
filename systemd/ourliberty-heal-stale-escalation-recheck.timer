@@ -1,0 +1,19 @@
+[Unit]
+Description=Retire session-less escalation cards whose cited blocker has since cleared
+
+[Timer]
+# OnCalendar (not OnUnitActiveSec) per the OnUnitActiveSec-dies lesson: an
+# absolute wall-clock schedule keeps firing even if a run is missed/slow.
+#
+# Every 20 minutes. The window this closes is measured in HOURS (RSDPM #111 sat
+# wrong for nine of them), so a tighter cadence buys nothing and each tick costs
+# a handful of gh reads per pending card — and pending cards are normally zero.
+# The ledger makes re-scans idempotent, and MAX_ACTIONS_PER_RUN caps how many
+# CI runs a single tick can trigger.
+OnCalendar=*-*-* *:00/20:00
+Persistent=true
+RandomizedDelaySec=90
+Unit=ourliberty-heal-stale-escalation-recheck.service
+
+[Install]
+WantedBy=timers.target
