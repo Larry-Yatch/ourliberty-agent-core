@@ -52146,3 +52146,85 @@ Watermark advanced 538→540. NOMINAL ✅
 
 ---
 
+## Iteration ~6470 — 2026-07-27T14:27Z UTC (Larry /cycle chat, Tier 1 → consecutive_clean=0)
+
+**Health:** ⚠️ NON-NOMINAL — state-change iter. Check I fired at 14:10:38Z UTC (delivered idx=503; $1201.30 total week, +206%/+$809 vs prior; auto-dispatch Beacon). PR #113 RSDPM confirmed HELD behind #103 (outbox notifier ran 08:33:54Z UTC, re-established #103 as explicit blocker). beacon-pending-approvals.json absent (file not found; previously pending=3; underlying items still unresolved per PR state). Check VIII/IX/X stale carry resolved (timers fire 2026-08-03, not today). **Tier 1 stays** (consecutive_clean=0; carries; pending-approvals absent; RSDPM #103 CONFLICTING; #111 approval pending).
+
+**VERIFY-BEFORE-REASSERT (from iter ~6469 at ~14:10Z UTC):**
+- **"PR #111 RSDPM approval→REJECT"**: CONFIRMED ⚠️ — OPEN/MERGEABLE per GH API; pending-approvals file absent; DM delivered idx=535 (05:52Z UTC); carry based on PR state. [carry ⚠️]
+- **"PR #103 RSDPM CONFLICTING"**: CONFIRMED ⚠️ — OPEN/CONFLICTING. [carry ⚠️]
+- **"PR #113 RSDPM HELD behind #103"**: CONFIRMED ✅ — outbox notifier ran 08:33:54Z UTC (02:33:54 MDT): released #109 as blocker, re-established #103 as blocker (overlap on deploy/GO_LIVE_CHECKLIST.md, ops/staging-contract-baseline.json, ops/verify-staging-contract.mts, tests/contracts/__tests__/staging-drift-gate.contract.test.ts). OPEN/MERGEABLE. [carry confirmed — notifier state explicit]
+- **"PR #1031 ourliberty AUTO_MERGE_HELD_DEEP_REVIEW"**: UPDATED ⚠️ — OPEN/UNKNOWN mergeable (GH ghost state; was MERGEABLE prior iters); pending-approvals file absent; DM delivered idx=537 (06:27:58Z UTC). [carry ⚠️ — ghost state]
+- **"PR #1030 ourliberty HELD behind #1031"**: UPDATED — OPEN/UNKNOWN (GH ghost state; was MERGEABLE). [carry ✅]
+- **"notifier-gh-502-transient-retry-001 pending[3]"**: UPDATED — pending-approvals file absent; 6h reminder sent 13:51:51Z UTC; Beacon inbox received pulse-auto Check I task at 14:12:02Z UTC; no Larry reply visible in bot log. [carry ⚠️ — file gone; DMs sent]
+- **"alerts watermark=503"**: UPDATED ✅ — larry-alerts.jsonl = 504 lines; new alert idx=503 = check-i-2026-07-27 delivered 14:10:38Z UTC. repair_alerts_watermark.py not found at /home/larry/agent-core/scripts/. Delivery confirmed via beacon_telegram_bot.log. [INFO — watermark script absent; delivery working]
+- **"system-health=healthy"**: CONFIRMED ✅ — overall=healthy ts=2026-07-27T14:12:19Z UTC; all bots ok. [carry ✅]
+- **"heal-stale-daemon-code.heartbeat"**: CONFIRMED — 2026-07-27T14:05:03Z UTC (~22 min from 14:27Z check; fresh <60 min). [carry ✅]
+- **"Check I pending today Mon 2026-07-27"**: RESOLVED ✅ — fired 14:10:38Z UTC; idx=503 delivered; auto-dispatch Beacon inbox (pulse-auto-eecf5e695b-20260727). [resolved]
+- **"Check VIII/IX/X pending today"**: RESOLVED ✅ — **STALE CARRY**: timers fire Mon 2026-08-03 (08:10, 08:21, 08:32 MDT = 05:10, 05:21, 05:32 MDT per systemctl). Prior carry "fires ~14:13Z UTC today" was incorrect. No artifacts due or expected today. [resolved — carry was stale]
+- **"Check XIV Tier-4 × 2"**: CONFIRMED — check-xiv-2026-07-27.json present; idx=500+501 bot-delivered; awaiting Larry triage. [carry ⚠️]
+
+**New findings this iter:**
+1. Check I fired at 14:10:38Z UTC: total week $1201.30 (+$809.08/+206.3% vs prior week); 419 σ-anomalies; retry overhead=0.1%; top anomaly: cycle-202607230601240000 (pulse, $2.16 vs $0.87 baseline, 45.2σ). Auto-dispatch sent: pulse-auto-eecf5e695b-20260727 in Beacon inbox — review high-σ anomaly and propose fast-path/prompt-discipline/model fix. [NEW ✅ — expected timer firing]
+2. beacon-pending-approvals.json ABSENT: file not found; previously pending=3 ([1] mirror-review-pr-RSDPM-111, [2] deep-review-hold-pr1031, [3] notifier-gh-502-transient-retry-001). File disappeared between 13:51:51Z UTC (6h reminder sent) and 14:12:02Z UTC (Check I delivered). Underlying PRs still open → items not resolved. Possible Beacon state reset. DMs already sent; carries remain valid. [NEW FINDING ⚠️ — Approvals tracking file gone]
+3. repair_alerts_watermark.py not at /home/larry/agent-core/scripts/ — script not found. Delivery still working (bot log confirms). [INFO]
+4. Check VIII/IX/X stale carry resolved (timers 2026-08-03). [resolved]
+
+**Check 0 — Alert triage (~14:19Z UTC):** larry-alerts.jsonl = 504 lines; idx=503 = check-i-2026-07-27 delivered 14:10:38Z UTC. repair_alerts_watermark.py not found. Delivery confirmed via bot log. [INFO — script path stale; delivery working] NON-NOMINAL ⚠️ (script absent)
+
+**Check 1 — Log noise (~14:19Z UTC):** outbox-notifier.log last entry [2026-07-27 02:33:54 MDT] = 08:33:54Z UTC (~5.9h from check; quiet — inbox empty since). journalctl ourliberty-*.service last 30 min: no WARN/ERROR from agent services (sudo nsenter entries are routine Claude Code sandboxing; ourliberty-sync-dispatch-repos INFO at 08:12:38Z UTC expected). NOMINAL ✅
+
+**Check 2 — Telegram sweep (~14:19Z UTC):** beacon_telegram_bot.log last entry [2026-07-27T08:12:02-0600] = 14:12:02Z UTC (Check I alert idx=503 delivery). No new Larry directives. NOMINAL ✅
+
+**Check 3 — Pipeline stall (~14:19Z UTC):** heal_pipeline_stall last run at 14:13:36Z UTC: 0 stalls (same FORGE_NO_PR_SKIP set as prior iters). NOMINAL ✅
+
+**Check 4 — Pending directives (~14:19Z UTC):** beacon-pending-approvals.json ABSENT (file not found; was pending=3). Underlying items unresolved per PR state. [NEW FINDING ⚠️] NON-NOMINAL ⚠️
+
+**Check 5 — Stale daemon code (~14:19Z UTC):** heal-stale-daemon-code.heartbeat=2026-07-27T14:05:03Z UTC (~22 min from check; fresh <60 min). system-health.json overall=healthy ts=2026-07-27T14:12:19Z UTC; all bots alive (beacon, forge, mirror, pulse noop). NOMINAL ✅
+
+**Check A — Source repo (~14:19Z UTC):** HEAD=21a5f737=origin/main (Pulse cycle 20260727T141241Z — iter ~6469 auto-commit); on main; clean tree; 0 ahead/behind. NOMINAL ✅
+**Check B — Sync health (~14:19Z UTC):** last_sync=2026-07-27T13:42:16Z UTC (~45 min from check); status=no-change; consecutive_push_failures=0. Within 2h. NOMINAL ✅
+**Check C — Agent liveness (~14:19Z UTC):** system-health.json overall=healthy 14:12:19Z UTC; all bots ok. NOMINAL ✅
+**Check E — PR/merge state (~14:19Z UTC):** ourliberty-agent-core: **#1031 OPEN/UNKNOWN** (GH ghost state; AUTO_MERGE_HELD_DEEP_REVIEW carry; pending-approvals absent); **#1030 OPEN/UNKNOWN** (GH ghost state; HELD behind #1031). RSDPM: **#113 OPEN/MERGEABLE** (HELD behind #103 — confirmed via notifier log 08:33:54Z UTC); **#111 OPEN/MERGEABLE** (approval→REJECT carry); **#103 OPEN/CONFLICTING** (carry). NON-NOMINAL ⚠️ (carries; #1031/#1030 ghost state)
+**Check H — Inbox + Forge activity (~14:19Z UTC):** Forge: 0. Mirror: 0. Beacon: 1 (pulse-auto-eecf5e695b-20260727 — Check I auto-dispatch, placed 14:10:38Z UTC; expected). NOMINAL ✅
+
+**§5.0:** audit-due-nudge: no-op. distill-detector: no-op. audit-cadence-signal: no-op. NOMINAL ✅
+
+**Rotations:** [carry] SUPABASE_SERVICE_ROLE_KEY due=2026-08-22 (~26d). 14-day dedup active (last DM 2026-07-20; expires ~2026-08-03); no new DM. NOMINAL ✅
+
+**Conditional checks:**
+- **Check I:** RESOLVED ✅ — fired 14:10:38Z UTC; check-i-2026-07-27.json; idx=503 delivered; Beacon auto-dispatch placed.
+- **Check III:** RESOLVED ✅ — PR #1027 MERGED 2026-07-26T15:54:34Z. Next cycle ~2026-08-09.
+- **Check VIII / IX / X:** Next Monday 2026-08-03 (stale carry resolved ✅).
+- **Check XIV:** carry ⚠️ — idx=500+501 bot-delivered; awaiting Larry triage.
+
+**G-rule assessment:** No changes from iter ~6469.
+- forge-marker-taskid-suffix-increment-001: **2/3** [carry, 0 new].
+- medic-draft-status-false-positive: **2/3** [carry, 0 new].
+- check-i-force-bypass-dm-route: **2/3** [carry, 0 new].
+- auto-merge-conflict-route-hold-no-dm-001: **1/3** [carry, 0 new].
+- mirror-queue-wait-readiness: **1/3** [carry, 0 new].
+- GH-502-merge-state-recheck: **3/3 DISPATCHED iter ~6416** — notifier-gh-502-transient-retry-001 pending Larry [3]. verification_pending.
+- Active carries (verification_pending): forge-revision-preamble-missing; forge-wip-redispatch-digest; forge-wip-redispatch-exhausted-no-pr; outbox-notifier-intent-reject; auto-dispatch-APPROVAL_REQUEST-mismatch; PR #1022 heal-wip-redispatch DAG-preflight suppression.
+
+**Actions taken:**
+1. §5.0 one-shots: all no-ops.
+2. Tier state: `cycle_tier_state.py record --checks-clean false` → consecutive_clean=0; **Tier 1** stays (last_signal_at=2026-07-27T14:19:58Z UTC).
+3. PRIME ledger: intervention appended (tier=1, kind=intervention, template=carry-plus-check-i-fired, ts=2026-07-27T14:20:15Z UTC).
+
+**Escalations:**
+- [carry — no new DM] PR #111 RSDPM Mirror approval→REJECT. DM delivered idx=535 (05:52Z UTC). Approve to dispatch Forge revision; Reject to abandon.
+- [carry — no new DM] PR #103 RSDPM CONFLICTING. DM delivered idx=534. Rebase: `gh pr checkout 103 --repo Larry-Yatch/RSDPM && git fetch origin && git rebase origin/main && git push --force-with-lease`
+- [carry — no new DM] PR #1031 ourliberty AUTO_MERGE_HELD_DEEP_REVIEW. DM delivered idx=537 (06:27:58Z UTC). Approve to authorize merge; Reject to hold.
+- [carry — no new DM] notifier-gh-502-transient-retry-001. DM delivered idx=540 (07:48:40Z UTC). Reply `approve / go / ok / ship it` to proceed.
+- [NEW — INFO, no DM] beacon-pending-approvals.json absent. DMs for all 3 items already sent; carries valid per PR state. File disappeared 13:51–14:12Z UTC. No Pulse action. ℹ️
+- [NEW — INFO, no DM] Check I result: $1201.30 this week (+206%/+$809). High-σ Pulse cycle anomalies (RSDPM V0 active work week). Auto-dispatch sent to Beacon. ℹ️
+- [carry — no new DM] check-vi-posture-proposals-2026-07-07 (2 proposals).
+- [carry — no new DM] Mirror queue-wait p95=92.3m (self-suppresses 3d → ~2026-07-30T02Z UTC).
+- [carry — no new DM] Check XIV Tier-4 × 2: oversilence + fleet digest. Awaiting Larry triage.
+
+**PRIME DIRECTIVE:** intervention (state-change iter; Check I fired; pending-approvals absent; check-viii-ix-x stale carry resolved; system-health=healthy 14:12Z UTC; pipeline clean 14:13Z UTC). Trailing 30d: ratio≈33.49% (interventions=1641, systemic_fixes=49, vp=23). Trend: worsening.
+**Tier end-of-iter:** **Tier 1** (consecutive_clean=0; last_signal_at=2026-07-27T14:19:58Z UTC; 5-min cadence).
+
+---
+
