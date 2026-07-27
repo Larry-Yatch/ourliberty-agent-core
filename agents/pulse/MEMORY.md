@@ -94,6 +94,12 @@
 
 ---
 
+## system-health.json correct path (confirmed iter ~6383)
+
+**Rule:** `system-health.json` lives at `/home/larry/agents/blackboard/system-health.json` (NOT `~/agents/state/`). Contains JSON with `overall` and `timestamp` fields. Read with `cat /home/larry/agents/blackboard/system-health.json`. Prior iters that used `/agents/state/system-health.json` got "No such file or directory."
+
+---
+
 ## heal-stale-daemon-code heartbeat correct path and format (corrected iter ~1768, confirmed ~1829)
 
 **Rule:** Heartbeat lives at `/home/larry/agents/blackboard/heal-stale-daemon-code.heartbeat` (NOT `state/`). Contains a **plain-text ISO 8601 UTC timestamp**, NOT JSON — read with `cat`, not `json.load`.
