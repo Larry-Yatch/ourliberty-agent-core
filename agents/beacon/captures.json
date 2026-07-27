@@ -1864,7 +1864,7 @@
       "id": "cap-title-3c29",
       "title": "--title",
       "note": "Nothing watches /usr/local/lib/rsdpm for install drift",
-      "state": "parked",
+      "state": "done",
       "label": null,
       "origin": {
         "source": "desktop-chat",
@@ -1891,8 +1891,12 @@
       "spawned": {
         "kind": "delegate",
         "task_id": "delegate-cap-title-3c29",
-        "stamped_at": "2026-07-27T15:18:59.034690+00:00"
-      }
+        "stamped_at": "2026-07-27T15:18:59.034690+00:00",
+        "outcome": "merged"
+      },
+      "closed_by": "heal_missions_card_gc:terminal-backstop",
+      "shipped_note": "shipped (linked work merged)",
+      "closed_at": "2026-07-27T19:08:16.919435+00:00"
     },
     {
       "id": "cap-nothing-watches-usr-local-lib-rsdpm-for-install-ff9a",
