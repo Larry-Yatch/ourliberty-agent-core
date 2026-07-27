@@ -1407,6 +1407,54 @@ class HeldBehindLabelTest(SerializerTestBase):
                 [], f'PR {pr} kept a held-behind label after merging',
             )
 
+    def test_rehold_under_a_new_blocker_drops_the_stale_stamp(self):
+        # The re-stamp path, which the chain-drain test above cannot reach:
+        # there the release drains through `_queue_release`, which clears ALL
+        # held-behind labels regardless. Here the release goes straight back
+        # into gate 1 under a DIFFERENT blocker (outcome `held_for_blocker`),
+        # so `_queue_release` deliberately does NOT clear — `_sync_held_behind
+        # _label`'s own `remove=stale` is the only thing standing between the
+        # PR and two labels, one of which points at an already-merged blocker.
+        A_FILE = 'docs/operating-manual.md'   # 109 ∩ 112
+        B_FILE = 'scripts/foo.py'             # 110 ∩ 112 (109 does NOT touch it)
+        self.gh.open_prs[REPO] = [
+            {'number': 109, 'createdAt': '2026-05-26T10:00:00Z', 'headRefName': 'a'},
+            {'number': 110, 'createdAt': '2026-05-26T11:00:00Z', 'headRefName': 'b'},
+        ]
+        self.gh.pr_files[(REPO, 109)] = [A_FILE]
+        self.gh.pr_files[(REPO, 110)] = [B_FILE]
+        self.gh.pr_mergeable.update({
+            (REPO, 109): 'MERGEABLE', (REPO, 110): 'MERGEABLE',
+            (REPO, 112): 'MERGEABLE',
+        })
+
+        # 112 overlaps both; the oldest wins, so it is held behind 109.
+        r = self._attempt(112, changed_files=[A_FILE, B_FILE])
+        self.assertEqual(r['blocker_pr_number'], 109)
+        self.assertIn('held-behind-#109', self._labels(112))
+
+        # 109 merges (it doesn't touch B_FILE, so nothing blocks it) and the
+        # release re-attempt of 112 hits gate 1 again — new blocker, 110.
+        self.gh.open_prs[REPO] = [
+            {'number': 110, 'createdAt': '2026-05-26T11:00:00Z', 'headRefName': 'b'},
+        ]
+        self.assertEqual(
+            self._attempt(109, changed_files=[A_FILE])['merge_outcome'], 'merged',
+        )
+        self.assertEqual(
+            [e['blocker_pr_number'] for e in self.on._load_auto_merge_queue()
+             if e['pr_number'] == 112],
+            [110], 'expected 112 to be re-queued behind the new blocker',
+        )
+        # Exactly one stamp, naming the LIVE blocker. `held-behind-#109` on a
+        # merged PR reads as authoritative and is the precise failure this
+        # feature exists to prevent.
+        self.assertEqual(
+            [n for n in self._labels(112) if n.startswith('held-behind-#')],
+            ['held-behind-#110'],
+            'stale held-behind label survived a re-hold under a new blocker',
+        )
+
     def test_label_failure_never_blocks_the_merge(self):
         # The whole feature is decoration for human eyes. If gh label calls
         # fail, the merge must behave exactly as it did before this existed.
