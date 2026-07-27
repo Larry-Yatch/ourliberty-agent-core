@@ -42562,3 +42562,65 @@ Watermark advanced 509→510. NOMINAL ✅
 
 
 
+## Iteration ~6341 — 2026-07-26T22:39Z UTC (Larry /loop /cycle chat, Tier 1)
+
+**Health:** ✅ NOMINAL with carries. **Tier 1** (consecutive_clean=0; last_signal_at=2026-07-26T22:39:00Z UTC; 5-min cadence). 9 live daemons, zombie PID 292743 reaped. Check 0 watermark compaction auto-repaired (512→511). marker-taskid-normalize-001 build-phase dispatched to Forge 22:33Z UTC. RSDPM PR #74 CONFIRMED ACTIVELY DEVELOPED by Forge (new commit d1b5731 on branch); draft intentional; queue PRs #88+#91+#93 HELD by design. 0 agent-core open PRs. Sync NOMINAL.
+
+**VERIFY-BEFORE-REASSERT (from iter ~6340 at ~22:26Z UTC):**
+- **"PR #74 isDraft=true+MERGEABLE carry"**: CONFIRMED — isDraft=true, MERGEABLE. NEW context: branch `claude/m12-queue-zones` has commit d1b5731 (feat(M12): discrete item tiles + per-item ask line; desktop-first; Houston in place) not present in earlier iters — Forge ACTIVELY DEVELOPING M12. Draft intentional. Prior `gh pr ready 74` calls were counterproductive (Forge re-drafts on push). Do NOT call `gh pr ready` again. [carry — intentional draft ✅]
+- **"PRs #88+#91+#93 REVIEW_PASS/HELD(#74)"**: CONFIRMED — #88 (fix/M5 confirm), #91 (M12-amendment desktop-first), #93 (M11-amendment Houston draft context) all isDraft=false, MERGEABLE, HELD by outbox-notifier due to overlap with #74. Queue by design. [carry — expected ✅]
+- **"PR #90 isDraft=true M13 spec"**: CONFIRMED — isDraft=true, MERGEABLE. Intentional Forge draft. [carry ✅]
+- **"marker-taskid-normalize-001 pending Larry approval"**: UPDATED → RESOLVED — pending=0, history=539 (+1). Forge ack-proceeded at 22:33Z UTC; outbox-notifier dispatched build-marker-taskid-normalize-001.json to Forge inbox at 22:33:04Z UTC (cost=$0.29). [build in-flight ✅]
+- **"9 daemons alive"**: CONFIRMED — heartbeat=2026-07-26T22:27:20Z UTC (~12 min from check); 9 PIDs alive (19656+19683+19716+19724+19868+19943+65525+65530+65548). Zombie PID 292743 REAPED. Watchdog=healthy 22:37:11Z UTC. NOMINAL ✅
+- **"watermark=512"**: UPDATED — compaction repair: repaired=true (old=512, file_length=511, new=511). 0 new alerts above new watermark=511. NOMINAL ✅
+
+**NEW findings this iter:**
+1. **Check 0 watermark-rotation-gap auto-repaired**: repair-watermark returned repaired=true (old=512, file_length=511, new=511). File was compacted. Watermark corrected 512→511. G-rule-suppression noted per spec. 0 new alerts. NOMINAL ✅
+2. **RSDPM PR #74 — root cause clarified**: Branch `claude/m12-queue-zones` has new commit d1b5731 absent in earlier iters. Forge is ACTIVELY DEVELOPING M12 on this branch. Draft state is intentional — Forge marks PR draft while iterating. Prior Pulse iterations' `gh pr ready 74` calls were overriding Forge's intentional draft gate, and Forge was re-drafting on each push. The queue PRs #88, #91, #93 HELD by file-overlap are waiting normally. No Pulse remediation appropriate. NOMINAL ✅
+3. **marker-taskid-normalize-001 build dispatched**: Forge acknowledged `proceed` at ~22:33Z UTC; outbox-notifier dispatched `build-marker-taskid-normalize-001.json` to Forge inbox (cost=$0.29, cap=$50). MalformedForgeMarker 3/3 G-rule now has a Forge build in-flight — moving to verification_pending. ✅
+
+**Check 0 — Alert triage (~22:36Z UTC):** repair-watermark: repaired=true (old=512, file_length=511, new=511). G-rule-suppression noted. 0 new alerts above watermark=511. Watermark stays 511. NOMINAL ✅
+
+**Check 1 — Log noise (~22:36Z UTC):** outbox-notifier.log last entry [2026-07-26 16:33:04] MDT (22:33:04Z UTC; ~3 min from check; build-marker-taskid-normalize-001 dispatch — INFO). watchdog.log last entry [2026-07-26 16:37:11] MDT (22:37:11Z UTC; ~2 min from check; overall=healthy). 0 new WARNs. NOMINAL ✅
+
+**Check 2 — Telegram sweep (~22:36Z UTC):** beacon_telegram_bot.log last entry [2026-07-26T15:26:03-0600] (21:26:03Z UTC; ~73 min from check; idx=511 doorbell delivered). Last Larry message at 09:30:43-0600 (15:30:43Z UTC; Beacon answered "No — self-resolved" at 09:32:57-0600). No new unhandled Larry directives. Bot alive (ps confirmed, watchdog=healthy). NOMINAL ✅
+
+**Check 3 — Pipeline stall (~22:36Z UTC):** heal_pipeline_stall dry-run: "0 alert(s) would fire." mirror_pass_unmerged:m12-queue-zones suppressed (cooldown). NOMINAL ✅
+
+**Check 4 — Pending directives (~22:36Z UTC):** beacon-pending-approvals: **pending=0** (history=539). Forge inbox: build-marker-taskid-normalize-001.json (in-flight, expected). Beacon=0, Mirror=0. 0 orphan Larry directives. NOMINAL ✅
+
+**Check 5 — Stale daemon code (~22:36Z UTC):** heal-stale-daemon-code.heartbeat=2026-07-26T22:27:20Z UTC (~12 min; fresh <60 min). 9 Python processes alive: 19656/chain-event-shipper, 19683+19724+19868/agent_telegram_bots, 19716/inbox-watcher, 19943/spec-review-runner, 65525/beacon-bot, 65530/dashboard-api, 65548/outbox-notifier. Zombie PID 292743 (outbox-notifier subprocess) REAPED. Watchdog=healthy 22:37:11Z UTC. NOMINAL ✅
+
+**Check A — Source repo:** HEAD=b7fcc56d=origin/main; on main; clean tree; 0 ahead/behind. NOMINAL ✅
+**Check B — Sync health:** last_sync=2026-07-26T21:52:22Z UTC (~47 min from check); status=no-change; push_failures=0. Within 2h. NOMINAL ✅
+**Check C — Agent liveness:** 9 live PIDs confirmed. Watchdog=healthy 22:37:11Z UTC. NOMINAL ✅
+**Check E — PR/merge state:** 0 open PRs on ourliberty-agent-core. RSDPM: #74+#90 intentional drafts (Forge active dev); #88+#91+#93 REVIEW_PASS/HELD(#74) by design. NOMINAL ✅
+**Check H — Forge activity digest:** Forge inbox: build-marker-taskid-normalize-001.json (in-flight). Beacon=0, Mirror=0. NOMINAL ✅
+
+**§5.0:** audit_due_nudge: no committed baseline; no-op. distill_detector: no un-distilled audits; no-op. audit_cadence_signal: no post-seed distill artifacts; no-op. NOMINAL ✅
+
+**Rotations:** [carry] SUPABASE_SERVICE_ROLE_KEY due=2026-08-22 (~27d). 14-day dedup active (expires ~2026-08-03); no new DM.
+
+**Conditional checks:**
+- **Check I:** DONE ✅ (2026-07-26T14:13Z UTC). [done]
+- **Check III:** DONE ✅ (PR #1027 merged). [done ✅]
+- **Check VI:** timer-managed. [carry]
+- **Check VIII:** timer-managed; last artifact check-viii-2026-07-20.json. [carry]
+
+**G-rule assessment:** MalformedForgeMarker WARN + forge-marker-taskid-suffix-increment-001: **3/3 → RESOLVED → verification_pending** (direction-ask-malformed-forge-marker-3of3-001 dispatched; Beacon processed; marker-taskid-normalize-001 approved by Larry; Forge ack-proceed; build-phase in Forge inbox). Active carries: forge-revision-preamble-missing (vp); forge-wip-redispatch-digest (vp); forge-wip-redispatch-exhausted-no-pr (vp); outbox-notifier-intent-reject (Forge vp); check-i-force-bypass-dm-route (2/3); auto-dispatch-APPROVAL_REQUEST-mismatch (vp); PR #1022 merged heal-wip-redispatch DAG-preflight suppression (vp); marker-taskid-normalize-001 NEW verification_pending. Sub-threshold: pr-merged-without-deep-review-shortcut-001 (1/3); mirror-ghost-retry-m5-pr2 (1/3); heal-stall-retry-exhausted-after-pr-merge (1/3); ourliberty-health-transient-precommit-DM (1/3).
+
+**Actions taken:**
+1. Check 0: repair-watermark repaired (old=512→new=511). G-rule-suppression journal-noted. 0 alerts triaged. Watermark stays 511.
+2. §5.0 one-shots: all no-ops.
+3. Tier state: record --checks-clean false → consecutive_clean=0; Tier 1 stays; last_signal_at=2026-07-26T22:39:00Z UTC.
+4. PRIME ledger: intervention appended (template=mirror-pass-unmerged-draft-pr; PR #74 active Forge dev carry; queue HELD by design; marker-taskid-normalize-001 build dispatched).
+
+**Escalations:** None new.
+- [carry — no new DM] check-vi-posture-proposals-2026-07-07 (2 proposals)
+- [carry] ourliberty-health-subject-key-mismatch translation gap (vp, dispatched iter ~4488)
+
+**PRIME DIRECTIVE:** intervention (RSDPM PR #74 isDraft=true; Forge actively developing M12 branch, draft intentional, queue PRs #88+#91+#93 HELD by design; marker-taskid-normalize-001 build-phase dispatched Forge inbox 22:33Z UTC; watermark compaction auto-repaired 512→511; 9 daemons alive; Tier 1 consecutive_clean=0). Trailing 30d: ratio=~29.6 (trend=improving).
+**Tier end-of-iter:** **Tier 1** (consecutive_clean=0; last_signal_at=2026-07-26T22:39:00Z UTC; 5-min cadence).
+
+---
+
