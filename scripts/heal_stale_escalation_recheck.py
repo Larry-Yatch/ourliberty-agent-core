@@ -483,7 +483,7 @@ def main() -> int:
         try:
             la.append_alert(
                 source=HEALER_SOURCE,
-                severity='warn',
+                severity='warning',
                 message=f'heal_stale_escalation_recheck failed: '
                         f'{type(e).__name__}: {e}',
                 subject='Stale-escalation recheck healer failed',
