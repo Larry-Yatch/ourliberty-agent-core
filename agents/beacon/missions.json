@@ -12963,7 +12963,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-27T05:35:02.081244+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-27T05:34:01.681297+00:00"
+      "orphan_last_activity_ts": "2026-07-27T05:34:01.681297+00:00",
+      "briefing": {
+        "what": "A piece of work your team kicked off that's ready for a quick sign-off but isn't yet attached to any active project.",
+        "why": "Unassigned work sitting in limbo ties up your team's effort without clearly advancing a goal you've prioritized.",
+        "suggest": "Take a quick look before approving \u2014 confirm it fits a current priority, and if not, either fold it into one or set it aside."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-27T05:40:53.035773+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-pr-RSDPM-109",
@@ -12980,7 +12994,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-27T05:35:02.081244+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-27T05:33:58.945531+00:00"
+      "orphan_last_activity_ts": "2026-07-27T05:33:58.945531+00:00",
+      "briefing": {
+        "what": "A piece of work the team kicked off on its own that hasn't been tied to any active initiative yet.",
+        "why": "Unassigned work that's already waiting on review can quietly eat time and drift from your priorities if no one claims it.",
+        "suggest": "Take a quick look to decide whether it fits your current goals \u2014 if it does, fold it into a project; if not, hold it before more effort goes in."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-27T05:40:53.035773+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-actionable-alerts-reach-approvals-tab-001",
