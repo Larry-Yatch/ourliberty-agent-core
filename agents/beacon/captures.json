@@ -1923,6 +1923,36 @@
         "from_state": "parked"
       },
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+    },
+    {
+      "id": "cap-post-merge-sync-hook-can-never-auto-install-a-sy-1076",
+      "title": "Post-merge sync hook can never auto-install a systemd unit (EROFS)",
+      "note": "heal_systemd_install_drift auto-install works normally (82 successes via its own timer) but fails 27/27 when invoked via the POST-MERGE SYNC HOOK, always with: cp: cannot create regular file '/etc/systemd/system/<unit>': Read-only file system. Neither ourliberty-sync-agent-core.service nor the healer unit sets ProtectSystem/ReadWritePaths, so the RO view comes from the hook's execution context (suspect a bwrap/sandbox wrapper on the sync path - same family as [[projects-p3p4-writeback-erofs]] and [[active-tier-write-choke-and-failopen-classes]]). Consequence: a unit shipped in a PR is NEVER installed by the deploy that merges it; it waits for the healer's own next scheduled tick, and the 30-min grace manual-dance DM can page Larry first. Found 2026-07-27 while merging agent-core #1035, whose timer I then installed by hand. Repro: tail /home/larry/agents/logs/heal-systemd-install-drift.log around a merge; grep 'auto-install of .* failed'.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "main",
+        "captured_at": "2026-07-27T18:15:47.150702+00:00"
+      },
+      "last_touched": "2026-07-27T18:15:47.150702+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "When we ship a new piece of automation, the system that's supposed to switch it on right after release can't, so the new feature sits dark until a background cleanup process happens to catch it \u2014 and that lag can ping you in the middle of the night.",
+        "why": "It means every new capability we release quietly starts late and can create an unnecessary after-hours interruption for you, turning a smooth launch into a manual chore.",
+        "suggest": "Worth fixing, but let's have someone confirm the exact cause before touching it, since this lives in the release plumbing and a careless change could disrupt deployments."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-27T18:16:50.334023+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     }
   ]
 }
