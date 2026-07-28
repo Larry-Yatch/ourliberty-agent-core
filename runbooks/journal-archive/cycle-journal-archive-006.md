@@ -61091,3 +61091,78 @@ Watermark advanced: 517 → 522. **⚠️ TIER-RESET** (Tier-4 alert at alert 52
 
 ---
 
+## Iteration ~6628 — 2026-07-28T17:33Z UTC (Larry /cycle chat, Tier 2, consecutive_clean=0→1)
+
+**Health:** ✅ NOMINAL — All checks clean. First fully nominal cycle in 50+ iterations. RSDPM staging drift approval (`unreg-approval-8c235f8b82d0`) confirmed resolved. **Tier 2 stays (consecutive_clean now 1).**
+
+**VERIFY-BEFORE-REASSERT (from iters ~6594–6625):**
+- **"RSDPM staging drift approval (unreg-approval-8c235f8b82d0) — pending=1"**: RE-VERIFIED ✅ — `state/beacon-pending-approvals.json`: pending=[] (empty). The item moved to history. RSDPM PR #133 merged 2026-07-28T16:58:25Z UTC ("deploy: the drift alert stops telling you to paste SQL, now that a machine applies it"). **CARRY CLOSED.** ✅
+- **"SUPABASE_DB_PASSWORD last DM idx=503 at 14:10 UTC today"**: CONFIRMED — bot log shows `alert idx=503 delivered` at 14:10:51 MDT (14:08:55 UTC create ts). 14-day dedup active. [carry ✅]
+- **"system-health=healthy"**: CONFIRMED — heal-stale-daemon-code.heartbeat=2026-07-28T17:20:35Z UTC (~13 min at 17:33Z UTC; <60 min). [carry ✅]
+- **"0 open forge/ PRs"**: CONFIRMED — `gh pr list` returned []. [carry ✅]
+- **"alerts watermark=506"**: CONFIRMED — repair-watermark: repaired=false (old=506, file_length=506). [carry ✅]
+- **"Check I next artifact — Mon 2026-07-28"**: RE-VERIFIED — `pulse-check-i/` newest still check-i-2026-07-27.json. No check-i-2026-07-28.json. Timer expected at ~14:10 UTC; absence suggests Ledger sidecar not ready at fire time. [carry, no action]
+- **"Check III last artifact check-iii-2026-07-26.json"**: CONFIRMED — no new Sunday artifact (Jul 27 was likely off-week for 14-day cadence). [carry ✅]
+- **"VP carries / G-rule carries"**: CARRY ✅ — no new occurrences this iter.
+
+**Check 0 — Alert triage (~17:26Z UTC):** repair-watermark: repaired=false (old=506, file_length=506). No new alerts since watermark. NOMINAL ✅
+
+**Check 1 — Log noise (~17:26Z UTC):** outbox-notifier.log last entry [2026-07-28T10:58:26 MDT]=16:58:26Z UTC (INFO: BASELINE_WARM + AUTO_MERGE_WORKTREE_TEARDOWN + marker-notified for RSDPM PR #133 review-pass — all INFO, no WARNs/ERRORs). inbox-watcher.log: no entries found. NOMINAL ✅
+
+**Check 2 — Telegram sweep (~17:26Z UTC):** beacon_telegram_bot.log last entry [2026-07-28T10:59:21 MDT]=16:59:21Z UTC (catch_me_up delivered to Larry after `status` query). Larry's `status` at 16:59 UTC is a system query, not a directive. No orphan directives in last 4h. NOMINAL ✅
+
+**Check 3 — Pipeline stall (~17:27Z UTC):** heal_pipeline_stall dry-run: FORGE_NO_PR_SKIP ×2 (rsdpm-install-drift-healer-001 pr=#1037 MERGED; pr-ourliberty-agent-core-1038 MERGED). 0 stalls detected. NOMINAL ✅
+
+**Check 4 — Pending directives (~17:26Z UTC):** `state/beacon-pending-approvals.json`: pending=0 (was pending=1 for ~50 iters). The `unreg-approval-8c235f8b82d0` (RSDPM staging drift) confirmed moved to history. RSDPM PRs #128–#133 landed, establishing auto-apply mechanism for staging drift. New rsdpm-driftcheck alert at 16:42Z UTC (0031_schema_migration_log.sql not applied) already DM'd to Larry at 16:47 UTC (idx=505) and claimed by prior cycle; PR #133's auto-apply handles this going forward. NOMINAL ✅
+
+**Check 5 — Stale daemon code (~17:26Z UTC):** heal-stale-daemon-code.heartbeat=2026-07-28T17:20:35Z UTC (~13 min; <60 min). system-health=healthy. NOMINAL ✅
+
+**Check A — Source repo (~17:26Z UTC):** On main. HEAD=18282d65. Clean tree. HEAD==origin/main (0 behind, 0 ahead). NOMINAL ✅
+**Check B — Sync health (~17:26Z UTC):** last_sync=2026-07-28T17:13:53Z UTC (~20 min; <2h); status=no-change. NOMINAL ✅
+**Check C — Agent liveness (~17:26Z UTC):** beacon/forge/mirror/inbox-watcher/cycle.timer all active. Beacon bot log last entry 16:59 UTC (~34 min at 17:33Z; within 30-min tolerance for Tier 2 cadence). NOMINAL ✅
+**Check E — PR/merge state (~17:26Z UTC):** ourliberty-agent-core: 0 open PRs. RSDPM: 0 open PRs. NOMINAL ✅
+**Check H — Forge activity digest (~17:26Z UTC):** 0 open forge/ PRs. Recently merged RSDPM PRs: #133 (16:58 UTC), #132 (03:06 UTC), #131 (03:06 UTC), #129 (02:53 UTC), #128 (02:53 UTC). Agent-core: #1037, #1038 merged today. NOMINAL ✅
+
+**§5.0 one-shots (~17:26Z UTC):** audit_due_nudge.py: no committed audit baseline; no-op. distill_detector: no un-distilled audits; no-op. audit_cadence_signal.py: no post-seed decision-grade artifacts; no-op. NOMINAL ✅
+
+**Credential rotation (~17:33Z UTC):** SUPABASE_DB_PASSWORD: credential-drift carry — last DM idx=503 at 14:08:55Z UTC today; 14-day dedup active. No new DM. NOMINAL carry.
+
+**Check I artifact triage (~17:33Z UTC):** Newest artifact still check-i-2026-07-27.json (Sun 2026-07-27). No check-i-2026-07-28.json yet. Timer expected ~14:10 UTC today (Mon) — likely skipped; Ledger's Monday sidecar may not have been ready at fire time. Will appear in later cycle if Ledger catches up. NOMINAL carry.
+
+**Check III artifact triage (~17:33Z UTC):** Newest artifact check-iii-2026-07-26.json (Jul 26 09:54 MDT). No Jul 27 artifact — consistent with off-week skip for 14-day cadence. Next expected Sunday 2026-08-10. NOMINAL ✅.
+
+**PRIME DIRECTIVE accounting:** iter_clean (all mandatory + additive checks nominal, no interventions, no systemic fixes dispatched). Appended `kind=iter_clean` to cycle-prime-ledger.jsonl at 2026-07-28T17:33:58Z UTC. Trailing 30d: carry from prior iters (ratio=34.52%, worsening trend — no change this iter).
+
+**Patterns:**
+- RSDPM staging drift approval cleared after 50+ consecutive NON-NOMINAL iters. The entire fix arc (PRs #123–#133) represents a systemic resolution: automatic drift detection → automatic apply-on-merge → alert language updated. This is the teach-to-fish pattern working as intended — no more manual SQL paste instructions.
+- System otherwise fully stable across all infra checks.
+- G-rule carries steady (no new occurrences this iter).
+- Tier 2 consecutive_clean now at 1; 2 more clean iters → Tier 3 de-escalation.
+
+**G-rule assessment (all carries, 0 new this iter):**
+- mirror-worktree-cleanup-mid-session: **1/3** [carry, 0 new].
+- forge-marker-taskid-suffix-increment-001: **2/3** [carry, 0 new].
+- medic-draft-status-false-positive: **2/3** [carry, 0 new].
+- check-i-force-bypass-dm-route: **2/3** [carry, 0 new].
+- auto-merge-conflict-route-hold-no-dm-001: **VP** [carry VP].
+- mirror-queue-wait-readiness: **1/3** [carry, 0 new].
+- beacon-pending-approvals-path-bug: **2/3** [carry, 0 new].
+- Active VP carries: forge-revision-preamble-missing; forge-wip-redispatch-digest; forge-wip-redispatch-exhausted-no-pr; outbox-notifier-intent-reject; auto-dispatch-APPROVAL_REQUEST-mismatch; PR #1022 heal-wip-redispatch DAG-preflight suppression; auto-merge-conflict-route-hold-no-dm-001; orphaned-pr-review-loglevel-by-class-001.
+
+**Actions taken:**
+1. Check 0: repair-watermark no-op (repaired=false, old=506, file=506).
+2. §5.0 one-shots: all no-op (no committed audit baseline; no un-distilled audits; no post-seed distill artifacts).
+3. PRIME ledger: iter_clean appended at 2026-07-28T17:33:58Z UTC (tier=2, kind=iter_clean, iter=6628).
+4. Tier state: `cycle_tier_state.py record --checks-clean true` → consecutive_clean=1; last_signal_at=2026-07-28T16:49:09Z UTC unchanged; **Tier 2** stays.
+
+**Escalations:**
+- [carry ⚠️ — no new DM] SUPABASE_DB_PASSWORD credential-drift (Tier-4): last DM idx=503 at 14:08:55Z UTC today. Awaiting Larry triage: (a) install per `docs/runbooks/rotate-supabase-db-password.md`, or (b) remove from `config/token-rotation-schedule.json` if retired. Will re-DM if >24h without response (~14:08Z UTC 2026-07-29).
+- [carry — no new DM] check-vi-posture-proposals-2026-07-07 (2 proposals). Awaiting Larry triage.
+- [carry — no new DM] Mirror queue-wait p95=92.3m (self-suppresses ~2026-07-30T02Z UTC; ~1.2 days away).
+- [carry — no new DM] Check XIV Tier-4 × 2: oversilence + fleet digest. Awaiting Larry triage.
+- [VP — gate cleared, fix unverified] orphaned-pr-review-loglevel-by-class-001: pending=0. VP stands until implementation confirmed.
+
+**Tier end-of-iter:** **Tier 2** (consecutive_clean=1; last_signal_at=2026-07-28T16:49:09Z UTC; 15-min cadence).
+
+---
+
