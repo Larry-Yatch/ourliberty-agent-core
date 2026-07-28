@@ -13820,6 +13820,57 @@
       "retired_by": "heal_orphan_autoregister",
       "retired_at": "2026-07-28T18:18:51.863950+00:00",
       "retired_reason": "orphan-terminal"
+    },
+    {
+      "id": "proposed-larry-reject-302b30b0ff3c645f0e7c82243a597dc39a21d966",
+      "name": "Larry Reject 302b30b0ff3c645f0e7c82243a597dc39a21d966",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `larry-reject-302b30b0ff3c645f0e7c82243a597dc39a21d966`. Last activity 2026-07-28T18:43:13.11168+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "larry-reject-302b30b0ff3c645f0e7c82243a597dc39a21d966"
+      ],
+      "repo": null,
+      "created": "2026-07-28",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-28T18:49:07.884880+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-28T18:43:13.11168+00:00"
+    },
+    {
+      "id": "proposed-pr-RSDPM-136",
+      "name": "PR RSDPM 136",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pr-RSDPM-136`. Last activity 2026-07-28T18:40:35.918995+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pr-RSDPM-136"
+      ],
+      "repo": null,
+      "created": "2026-07-28",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-28T18:49:07.884880+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-28T18:40:35.918995+00:00"
+    },
+    {
+      "id": "proposed-larry-reject-f98a4ac0043d2e7b22d2ac2517040745ca90d833",
+      "name": "Larry Reject F98a4ac0043d2e7b22d2ac2517040745ca90d833",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `larry-reject-f98a4ac0043d2e7b22d2ac2517040745ca90d833`. Last activity 2026-07-28T18:39:22.401516+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "larry-reject-f98a4ac0043d2e7b22d2ac2517040745ca90d833"
+      ],
+      "repo": null,
+      "created": "2026-07-28",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-28T18:49:07.884880+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-28T18:39:22.401516+00:00"
     }
   ]
 }
