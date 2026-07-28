@@ -14228,7 +14228,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-28T23:51:16.580548+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-28T23:37:55.783287+00:00"
+      "orphan_last_activity_ts": "2026-07-28T23:37:55.783287+00:00",
+      "briefing": {
+        "what": "A safety check on the tool that bulk-approves records: right now it can quietly wave through less-certain 'parent' records that were meant to get a second look.",
+        "why": "Those parent records are exactly the ones the review step exists to catch, so letting them slide through unchecked risks bad data slipping in without anyone noticing.",
+        "suggest": "Approve adding a rule that pauses on any lower-confidence parent record and asks a person to confirm it before it goes through \u2014 a sensible safeguard, and worth a quick look at how it's built so it doesn't slow the team down more than needed."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-28T23:54:10.214797+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
