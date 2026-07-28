@@ -14197,7 +14197,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-28T23:36:16.327757+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-28T23:33:09.776732+00:00"
+      "orphan_last_activity_ts": "2026-07-28T23:33:09.776732+00:00",
+      "briefing": {
+        "what": "The team has begun a piece of work that hasn't been attached to any project or clear goal yet.",
+        "why": "Effort spent on unassigned work can quietly drain time from the priorities that actually move the business.",
+        "suggest": "Before it goes further, have someone confirm what this is meant to accomplish and either tie it to a real goal or pause it."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-28T23:43:50.259133+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
