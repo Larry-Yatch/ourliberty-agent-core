@@ -13933,7 +13933,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-28T21:50:45.926871+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-28T21:49:11.376269+00:00"
+      "orphan_last_activity_ts": "2026-07-28T21:49:11.376269+00:00",
+      "briefing": {
+        "what": "A piece of work your team started and has been refining, but it hasn't been tied to any active initiative yet.",
+        "why": "Loose work that isn't connected to a goal can quietly consume time and attention without moving the business forward.",
+        "suggest": "Before it goes further, let's confirm where this fits or set it aside so effort stays on what matters."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-28T21:52:42.389799+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-pr-RSDPM-146",
@@ -13950,7 +13964,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-28T21:50:45.926871+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-28T21:48:44.891696+00:00"
+      "orphan_last_activity_ts": "2026-07-28T21:48:44.891696+00:00",
+      "briefing": {
+        "what": "A piece of work the team started on its own that hasn't been tied to any active project yet.",
+        "why": "Unplanned work that sits in review limbo ties up the team's time without a clear payoff to the business.",
+        "suggest": "Before it goes further, take a moment to confirm it's worth doing and connect it to a real goal \u2014 or set it aside."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-28T21:52:42.389799+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
