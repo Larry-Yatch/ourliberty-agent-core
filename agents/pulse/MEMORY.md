@@ -12,6 +12,12 @@
 
 ---
 
+## credential-rotation-dedup.json is a phantom file — real state is pulse-rotation-window-dms.json (learned 2026-07-28, iter ~6528)
+
+**Rule:** `credential-rotation-dedup.json` does NOT exist and has no writer in any script. Prior cycle journal entries referenced it ("prior iters read it normally") but that was itself phantom narration. The real credential rotation DM dedup state lives at `/home/larry/agents/state/pulse-rotation-window-dms.json` — a JSON dict keyed by credential name (e.g., `"SUPABASE_SERVICE_ROLE_KEY": "<ISO 8601 ts of last DM>"`). The dedup window is 14 days. For the credential rotation check: read `pulse-rotation-window-dms.json`, NOT any phantom path. The SUPABASE_SERVICE_ROLE_KEY was last DM'd 2026-07-20T20:00:15Z UTC (expires ~2026-08-03). Do NOT report `credential-rotation-dedup.json` as missing — it never existed.
+
+---
+
 ## pulse-heartbeat.json is a phantom file — Check 5 real substrate is heal-stale-daemon-code.heartbeat (learned 2026-07-22, Beacon investigation)
 
 **Rule:** `pulse-heartbeat.json` does NOT exist and never has a writer. It never appeared in tracked code (`git log -S` empty). Only Pulse's own journal/ledger/G-rule ever referenced it — the name was invented. **Check 5's correct substrate** is `/home/larry/agents/blackboard/heal-stale-daemon-code.heartbeat` (plain-text ISO 8601 UTC timestamp, NOT JSON). If `heal-stale-daemon-code.heartbeat` is fresh and the healer daemon is alive, Check 5 is NOMINAL — do not report missing `pulse-heartbeat.json`.
