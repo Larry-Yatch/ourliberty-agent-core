@@ -4,6 +4,84 @@
 
 ---
 
+## Iteration ~6623 — 2026-07-28T16:53Z UTC (Larry /cycle chat, Tier 1, consecutive_clean=1)
+
+**Health:** ✅ NOMINAL — All checks clean. No new alerts (watermark 506 = file_length 506). Check 4: pending=0 (confirmed carry from iter ~6622 clear). All 4 bots healthy. 0 open PRs. **Tier 1 stays (consecutive_clean=1).**
+
+**VERIFY-BEFORE-REASSERT (from iter ~6622 at ~16:49Z UTC):**
+- **"rsdpm-driftcheck Tier-4 (DM idx=505 at 16:47:13Z UTC)"**: RE-VERIFIED — watermark=506, file_length=506. No new rsdpm-driftcheck alerts. [carry ⚠️ — awaiting Larry action on 0031_schema_migration_log.sql]
+- **"system-health=healthy"**: CONFIRMED ✅ — ts=2026-07-28T16:47:20Z UTC (~6 min at 16:53Z UTC). overall=healthy. [carry ✅]
+- **"heal-stale-daemon-code.heartbeat fresh"**: CONFIRMED ✅ — 2026-07-28T16:50:20Z UTC (~3 min at 16:53Z UTC; <60 min). [carry ✅]
+- **"alerts watermark=506"**: CONFIRMED ✅ — repair-watermark: repaired=false (old=506, file_length=506). No new alerts. [carry ✅]
+- **"0 open PRs"**: CONFIRMED ✅ — gh pr list returned []. [carry ✅]
+- **"SUPABASE_DB_PASSWORD credential-drift"**: CONFIRMED ✅ — no new alerts (watermark=506). 24h escalation threshold: ~14:10Z UTC 2026-07-29 (~21h away). [carry ⚠️]
+- **"Check I next Wed Jul 29 ~14:13Z UTC"**: CONFIRMED ✅ — today Tuesday Jul 28. [carry ✅]
+- **"Check III/VIII/IX/X carries"**: CARRY ✅. [carry ✅]
+- **"Check XIV Tier-4 × 2"**: CARRY ⚠️ — no new data; awaiting Larry triage. [carry ⚠️]
+- **"auto-merge-conflict-route-hold-no-dm-001 VP"**: CARRY VP. [carry VP]
+- **"check-vi-posture-proposals-2026-07-07 carry"**: CARRY. [carry]
+- **"Mirror queue-wait p95 carry"**: CARRY — self-suppresses ~2026-07-30T02Z UTC (~1.04 days away). [carry]
+
+**Check 0 — Alert triage (~16:53Z UTC):** repair-watermark: repaired=false (old=506, file_length=506). No new alerts since watermark 506. NOMINAL ✅
+
+**Check 1 — Log noise (~16:53Z UTC):** outbox-notifier.log: last entry [2026-07-28 06:04:45] outbox-notifier starting (12:04:45Z UTC). 0 WARNs/ERRORs since restart. NOMINAL ✅
+
+**Check 2 — Telegram sweep (~16:53Z UTC):** beacon_telegram_bot.log last entry [2026-07-28T10:47:13-0600]=16:47:13Z UTC (idx=505 rsdpm-driftcheck delivered). No new Larry directive since idx=505. NOMINAL ✅
+
+**Check 3 — Pipeline stall (~16:53Z UTC):** heal_pipeline_stall dry-run: FORGE_NO_PR_SKIP ×2 (rsdpm-install-drift-healer-001→#1037 pr_exists; pr-ourliberty-agent-core-1038 MERGED). 0 stalls detected. NOMINAL ✅
+
+**Check 4 — Pending directives (~16:53Z UTC):** state/beacon-pending-approvals.json: **pending=0**. NOMINAL ✅
+
+**Check 5 — Stale daemon code (~16:53Z UTC):** heal-stale-daemon-code.heartbeat=2026-07-28T16:50:20Z UTC (~3 min at 16:53Z UTC; <60 min). system-health overall=healthy ts=2026-07-28T16:47:20Z UTC. NOMINAL ✅
+
+**Check A — Source repo (~16:53Z UTC):** On main. Clean tree. HEAD=6899fe0a matches origin/main. NOMINAL ✅
+**Check B — Sync health (~16:53Z UTC):** last_sync=2026-07-28T16:13:55Z UTC (~39 min; <2h); status=no-change; consecutive_push_failures=0. NOMINAL ✅
+**Check C — Agent liveness (~16:53Z UTC):** system-health overall=healthy ts=2026-07-28T16:47:20Z UTC. All 4 bots alive (beacon ✅ forge ✅ mirror ✅ pulse ✅). disk=13% memory=21%. NOMINAL ✅
+**Check E — PR/merge state (~16:53Z UTC):** 0 open PRs. NOMINAL ✅
+**Check H — Inbox state (~16:53Z UTC):** inbox_watcher=ok (per system-health). NOMINAL ✅
+
+**§5.0 one-shots (~16:53Z UTC):** audit_due_nudge.py: no committed audit baseline; no-op. distill_detector: no un-distilled audits; no-op. NOMINAL ✅
+
+**Credential rotation (~16:53Z UTC):** SUPABASE_SERVICE_ROLE_KEY: last_dm=2026-07-20T20:00:15Z UTC (age~196.9h; 14d dedup active through ~2026-08-03). No DM. SUPABASE_DB_PASSWORD: credential-drift carry — 3 DMs today (idx=519 02:09Z UTC + idx=523 08:12Z UTC + idx=503 14:10Z UTC); no new DM this iter; 24h escalation threshold ~14:10Z UTC 2026-07-29. NOMINAL ✅
+
+**Check I artifact triage (~16:53Z UTC):** Today Tuesday Jul 28 UTC. Next Check I: Wed 2026-07-29 ~14:13Z UTC. No new artifact by design. NOMINAL ✅
+
+**PRIME DIRECTIVE accounting:** iter_clean appended (tier=1, ts=2026-07-28T16:53:23Z UTC). Trailing 30d: ratio=35.32% (interventions=1766, systemic_fixes=50, vp=24; trend=worsening). **Tier 1 stays** (consecutive_clean=1; last_signal_at=2026-07-28T16:49:09Z UTC).
+
+**Patterns:**
+- First clean iter after iter ~6622 non-nominal. Check 4 remains clear (pending=0). No new alerts.
+- rsdpm-driftcheck 0031_schema_migration_log.sql still pending Larry action (DM already delivered idx=505 at 16:47:13Z UTC).
+- SUPABASE_DB_PASSWORD: 3 DMs today; 24h escalation threshold ~14:10Z UTC 2026-07-29.
+- PRIME ratio 35.32% (flat; no new fixes or VP closures this iter).
+
+**G-rule assessment (all carries, 0 new):**
+- mirror-worktree-cleanup-mid-session: **1/3** [carry].
+- forge-marker-taskid-suffix-increment-001: **2/3** [carry].
+- medic-draft-status-false-positive: **2/3** [carry].
+- check-i-force-bypass-dm-route: **2/3** [carry].
+- auto-merge-conflict-route-hold-no-dm-001: **VP** [carry VP].
+- mirror-queue-wait-readiness: **1/3** [carry].
+- beacon-pending-approvals-path-bug: **2/3** [carry].
+- Active VP carries: forge-revision-preamble-missing; forge-wip-redispatch-digest; forge-wip-redispatch-exhausted-no-pr; outbox-notifier-intent-reject; auto-dispatch-APPROVAL_REQUEST-mismatch; PR #1022 heal-wip-redispatch DAG-preflight suppression; auto-merge-conflict-route-hold-no-dm-001; orphaned-pr-review-loglevel-by-class-001.
+
+**Actions taken:**
+1. Check 0: repair-watermark no-op (repaired=false, old=506, file_length=506). No new alerts.
+2. §5.0 one-shots: audit_due_nudge no-op; distill_detector no-op.
+3. PRIME ledger: iter_clean appended at 2026-07-28T16:53:23Z UTC (tier=1, kind=iter_clean, template=nominal-cycle, detail=all-5-mandatory-plus-additive-clean,iter-6623).
+4. Tier state: `cycle_tier_state.py record --checks-clean true` → consecutive_clean=1; **Tier 1** stays.
+
+**Escalations:**
+- [carry ⚠️ — DM delivered idx=505 at 16:47:13Z UTC] RSDPM staging drift (0031_schema_migration_log.sql not applied): Apply 0031_schema_migration_log.sql in Supabase rsdpm-staging SQL editor (all CREATE OR REPLACE, safe to re-run). 40 migrations verified OK, 0 drifted — only 0031 remains.
+- [carry ⚠️ — 3 DMs today] SUPABASE_DB_PASSWORD credential-drift (Tier-4): awaiting Larry triage: (a) install per `docs/runbooks/rotate-supabase-db-password.md`, or (b) remove from `config/token-rotation-schedule.json` if retired. 24h escalation threshold: ~14:10Z UTC 2026-07-29.
+- [VP — gate cleared, fix unverified] orphaned-pr-review-loglevel-by-class-001.
+- [carry — no new DM] check-vi-posture-proposals-2026-07-07 (2 proposals).
+- [carry — self-suppresses ~2026-07-30T02Z UTC] Mirror queue-wait p95=92.3m.
+- [carry — no new DM] Check XIV Tier-4 × 2: oversilence + fleet digest. Awaiting Larry triage.
+
+**Tier end-of-iter:** **Tier 1** (consecutive_clean=1; last_signal_at=2026-07-28T16:49:09Z UTC; 5-min cadence).
+
+---
+
 ## Iteration ~6622 — 2026-07-28T16:49Z UTC (Larry /cycle chat, Tier 1, consecutive_clean=0)
 
 **Health:** ⚠️ NON-NOMINAL — Check 0: new rsdpm-driftcheck alert (0031_schema_migration_log.sql not applied; Tier-4; DM delivered idx=505 at 16:47:13Z UTC). **Check 4 CLEARED** ✅ — RSDPM staging drift approval (unreg-approval-8c235f8b82d0) resolved after ~85 iters. All other checks nominal. All bots healthy. 0 open PRs. **Tier 1 stays.**
@@ -3123,85 +3201,6 @@
 - [carry — no new DM] Check XIV Tier-4 × 2: oversilence + fleet digest. Awaiting Larry triage.
 
 **Tier end-of-iter:** **Tier 1** (consecutive_clean=0; last_signal_at=2026-07-28T11:42:48Z UTC; 5-min cadence).
-
----
-
-## Iteration ~6582 — 2026-07-28T11:38Z UTC (Larry /cycle chat, Tier 1, consecutive_clean=0)
-
-**Health:** ⚠️ NON-NOMINAL — Check 4: RSDPM staging drift approval carry (unreg-approval-8c235f8b82d0, pending=1, ~6h07m open, same as iters ~6536–6581). All other checks nominal. All 4 bots alive. 0 open PRs. **Tier 1 stays.**
-
-**VERIFY-BEFORE-REASSERT (from iter ~6581 at ~11:27Z UTC):**
-- **"SUPABASE_DB_PASSWORD last DM 08:12:30Z UTC (idx=523)"**: CONFIRMED ✅ — bot log last entry [2026-07-28T05:34:16-0600]=11:34:16Z UTC (6h reminder for unreg-approval; no new SUPABASE_DB_PASSWORD entry). idx=523 at 08:12:30Z UTC unchanged; ~3h26m since DM. [carry ✅]
-- **"system-health=healthy"**: CONFIRMED ✅ — ts=2026-07-28T11:31:19Z UTC; overall=healthy; all checks ok. [carry ✅]
-- **"heal-stale-daemon-code.heartbeat fresh"**: CONFIRMED ✅ — 2026-07-28T11:27:19Z UTC (~11 min at 11:38Z UTC; <60 min). [carry ✅]
-- **"alerts watermark=501"**: CONFIRMED ✅ — repair-watermark: repaired=false (old=501, file_length=501). [carry ✅]
-- **"RSDPM staging drift approval (unreg-approval-8c235f8b82d0)"**: RE-VERIFIED ⚠️ — pending=1 in state/beacon-pending-approvals.json; created_at=2026-07-28T05:31:16Z UTC (~6h07m at 11:38Z UTC). No change. [carry ⚠️]
-- **"0 open PRs"**: CONFIRMED ✅ — gh pr list returned []. [carry ✅]
-- **"Check I next ~14:13Z UTC today (Mon 2026-07-28)"**: CARRY — newest still check-i-2026-07-27.json (~2h35m from now). [carry]
-- **"Check III/VIII/IX/X carries"**: CARRY ✅. [carry ✅]
-- **"Check XIV Tier-4 × 2"**: CARRY ⚠️ — no new data; awaiting Larry triage. [carry ⚠️]
-- **"auto-merge-conflict-route-hold-no-dm-001 VP"**: CARRY VP. [carry VP]
-- **"check-vi-posture-proposals-2026-07-07 carry"**: CARRY. [carry]
-- **"Mirror queue-wait p95 carry"**: CARRY — self-suppresses ~2026-07-30T02Z UTC (~1.7 days away). [carry]
-
-**Check 0 — Alert triage (~11:38Z UTC):** repair-watermark: repaired=false (old=501, file_length=501). No new alerts. NOMINAL ✅
-
-**Check 1 — Log noise (~11:38Z UTC):** outbox-notifier.log last entry [2026-07-27 21:06:12 MDT]=2026-07-28T03:06:12Z UTC (AUTO_MERGE_QUEUE_RELEASED pr-RSDPM-132, outcome=merged — unchanged from iter ~6581). 0 new WARNs/ERRORs. NOMINAL ✅
-
-**Check 2 — Telegram sweep (~11:38Z UTC):** beacon_telegram_bot.log last entry [2026-07-28T05:34:16-0600]=11:34:16Z UTC (reminder sent (6h) for unreg-approval-8c235f8b82d0 — new since iter ~6581's 10:08:30Z UTC entry). No new Larry directives. NOMINAL ✅
-
-**Check 3 — Pipeline stall (~11:38Z UTC):** heal_pipeline_stall dry-run (ran 11:35:53Z UTC): FORGE_NO_PR_SKIP ×6 (notifier-gh-502→#1034 MERGED; pr-1035 MERGED; RSDPM-117 MERGED; RSDPM-119 MERGED; rsdpm-install-drift-healer→#1037 MERGED; pr-1038 MERGED). 0 stalls detected. NOMINAL ✅
-
-**Check 4 — Pending directives (~11:38Z UTC):** state/beacon-pending-approvals.json: **pending=1** — unreg-approval-8c235f8b82d0 (RSDPM staging drift; created 2026-07-28T05:31:16Z UTC; ~6h07m open). Carry from iters ~6536–6581. No change. NON-NOMINAL ⚠️
-
-**Check 5 — Stale daemon code (~11:38Z UTC):** heal-stale-daemon-code.heartbeat=2026-07-28T11:27:19Z UTC (~11 min; <60 min). system-health ts=2026-07-28T11:31:19Z UTC; overall=healthy; all checks ok (inbox_watcher, outbox_notifier, disk 13%, memory 14%). NOMINAL ✅
-
-**Check A — Source repo (~11:38Z UTC):** On main. HEAD=2d73250b (Pulse cycle 20260728T112843Z). Clean tree. HEAD==origin/main (in sync). NOMINAL ✅
-**Check B — Sync health (~11:38Z UTC):** last_sync=2026-07-28T11:13:40Z UTC (~24 min; <2h); status=no-change; consecutive_push_failures=0. NOMINAL ✅
-**Check C — Agent liveness (~11:38Z UTC):** system-health ts=2026-07-28T11:31:19Z UTC; overall=healthy; all 4 bots alive (beacon/forge/mirror/pulse). NOMINAL ✅
-**Check E — PR/merge state (~11:38Z UTC):** ourliberty-agent-core: 0 open PRs. NOMINAL ✅
-**Check H — Inbox state (~11:38Z UTC):** All inboxes empty (beacon=0, forge=0, mirror=0, pulse=0). NOMINAL ✅
-
-**§5.0 one-shots (~11:38Z UTC):** audit_due_nudge.py: no committed audit baseline; no-op. distill_detector: no un-distilled audits; no-op. NOMINAL ✅
-
-**Credential rotation (~11:38Z UTC):** SUPABASE_SERVICE_ROLE_KEY: carry (last DM 2026-07-20T20:00:15Z UTC; 14d dedup active through ~2026-08-03). No DM. SUPABASE_DB_PASSWORD: credential-drift carry (Tier-4 alert, DM delivered idx=523 at 2026-07-28T08:12:30Z UTC; ~3h26m since DM; awaiting Larry triage). NOMINAL ✅
-
-**Check I artifact triage (~11:38Z UTC):** Newest artifact check-i-2026-07-27.json (Sun 2026-07-27 at 14:10Z UTC). Timer fires ~14:13Z UTC today (Mon 2026-07-28) — ~2h35m from now. NOMINAL ✅
-
-**PRIME DIRECTIVE accounting:** intervention appended (tier=1, kind=intervention, template=rsdpm-staging-drift-carry, intervention_id=rsdpm-staging-drift-carry:pending=1,unreg-approval-8c235f8b82d0,~6h05m-open,iter-6582, ts=2026-07-28T11:38:07Z UTC). Trailing 30d: ratio=34.48% (interventions=1724, systemic_fixes=50, vp=24; trend=worsening). **Tier 1 stays** (consecutive_clean=0).
-
-**Patterns:**
-- RSDPM staging drift approval has been the sole non-nominal finding for ~46 iters (~6h07m) since iter ~6536. System otherwise fully stable.
-- Approval system auto-sent 6h reminder for unreg-approval-8c235f8b82d0 at 11:34:16Z UTC. Still awaiting Larry action.
-- SUPABASE_DB_PASSWORD carry: last DM 08:12:30Z UTC (~3h26m ago). Will escalate [yellow] if >24h without response (~08:12Z UTC 2026-07-29).
-- Check I fires today ~14:13Z UTC (~2h35m from now). No new artifact yet; expect ~14:30Z UTC.
-- PRIME ratio ticked to 34.48% (from 34.44% at iter ~6581). Worsening trend continues.
-
-**G-rule assessment (all carries, 0 new):**
-- mirror-worktree-cleanup-mid-session: **1/3** [carry, 0 new].
-- forge-marker-taskid-suffix-increment-001: **2/3** [carry, 0 new].
-- medic-draft-status-false-positive: **2/3** [carry, 0 new].
-- check-i-force-bypass-dm-route: **2/3** [carry, 0 new].
-- auto-merge-conflict-route-hold-no-dm-001: **VP** [carry VP].
-- mirror-queue-wait-readiness: **1/3** [carry, 0 new].
-- beacon-pending-approvals-path-bug: **2/3** [carry, 0 new].
-- Active VP carries: forge-revision-preamble-missing; forge-wip-redispatch-digest; forge-wip-redispatch-exhausted-no-pr; outbox-notifier-intent-reject; auto-dispatch-APPROVAL_REQUEST-mismatch; PR #1022 heal-wip-redispatch DAG-preflight suppression; auto-merge-conflict-route-hold-no-dm-001; orphaned-pr-review-loglevel-by-class-001.
-
-**Actions taken:**
-1. Check 0: repair-watermark no-op (repaired=false, old=501, file=501).
-2. §5.0 one-shots: audit_due_nudge.py no-op (no committed audit baseline); distill_detector no-op (no un-distilled audits).
-3. PRIME ledger: intervention appended at 2026-07-28T11:38:07Z UTC (tier=1, kind=intervention, template=rsdpm-staging-drift-carry, intervention_id=rsdpm-staging-drift-carry:pending=1,unreg-approval-8c235f8b82d0,~6h05m-open,iter-6582).
-4. Tier state: `cycle_tier_state.py record --checks-clean false` → consecutive_clean=0; last_signal_at=2026-07-28T11:38:08Z UTC; **Tier 1** stays.
-
-**Escalations:**
-- [carry ⚠️ — no new DM] SUPABASE_DB_PASSWORD credential-drift (Tier-4): last DM 08:12:30Z UTC (idx=523). Awaiting Larry triage: (a) install per `docs/runbooks/rotate-supabase-db-password.md`, or (b) remove from `config/token-rotation-schedule.json` if retired.
-- [carry — DM + 6h auto-reminder sent 11:34Z UTC] RSDPM staging drift (unreg-approval-8c235f8b82d0): ~6h07m open. Action: apply 0002_core_tables.sql + 0027_org_owner_business_areas.sql + 0030_profiles_briefing_enabled.sql to Supabase rsdpm-staging SQL editor → re-run `sudo systemctl start ourliberty-rsdpm-driftcheck`.
-- [VP — gate cleared, fix unverified] orphaned-pr-review-loglevel-by-class-001: pending=0. VP stands until implementation confirmed.
-- [carry — no new DM] check-vi-posture-proposals-2026-07-07 (2 proposals).
-- [carry — no new DM] Mirror queue-wait p95=92.3m (self-suppresses ~2026-07-30T02Z UTC).
-- [carry — no new DM] Check XIV Tier-4 × 2: oversilence + fleet digest. Awaiting Larry triage.
-
-**Tier end-of-iter:** **Tier 1** (consecutive_clean=0; last_signal_at=2026-07-28T11:38:08Z UTC; 5-min cadence).
 
 ---
 
