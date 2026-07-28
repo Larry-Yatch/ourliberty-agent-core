@@ -2016,6 +2016,11 @@
         "model": "claude-opus-4-8",
         "at": "2026-07-28T23:03:23.015976+00:00",
         "from_state": "parked"
+      },
+      "spawned": {
+        "kind": "delegate",
+        "task_id": "delegate-cap-title-f47b",
+        "stamped_at": "2026-07-28T23:12:29.896549+00:00"
       }
     }
   ]
