@@ -54852,3 +54852,83 @@ Watermark advanced 515→516. NOMINAL ✅
 
 ---
 
+## Iteration ~6505 — 2026-07-27T18:32Z UTC (Larry /cycle chat, Tier 1 → consecutive_clean=0)
+
+**Health:** ⚠️ NON-NOMINAL — active pipeline. Two new PRs opened and dispatched for Mirror review since iter ~6504. ourliberty-agent-core PR #1036 (Lens J — migration safety) dispatched for Mirror review at 18:25:27Z UTC; RSDPM PR #122 (staging-write-script) dispatched at 18:30:24Z UTC. Forge inbox: `build-rsdpm-install-drift-healer-001.json` (~26 min; stall window closes ~20:06Z UTC). **Tier 1 stays** (consecutive_clean=0; active pipeline).
+
+**VERIFY-BEFORE-REASSERT (from iter ~6504 at 18:27Z UTC):**
+- **"ourliberty-agent-core: 0 open PRs"**: **UPDATED** — PR #1036 OPEN (created 18:21:01Z UTC; was open during iter ~6504 but not caught — timing gap on gh pr list query). Mirror review dispatched 18:25:27Z UTC. [change ✅]
+- **"RSDPM: 0 open PRs"**: **UPDATED** — PR #122 OPEN (created 18:25:32Z UTC). Mirror review dispatched 18:30:24Z UTC. [change ✅]
+- **"Forge inbox: build-rsdpm-install-drift-healer-001.json dispatched 18:06:42Z"**: **CONFIRMED ✅** — file still in Forge inbox; ~26 min old; stall checker FORGE_NO_PR_SKIP on all existing tasks; 0 stalls detected; within 2h window (closes ~20:06Z). [carry ✅]
+- **"ORPHANED_PR_REVIEW/notifier-race: 1/3"**: **CARRY** — no new occurrences this iter. [carry 1/3]
+- **"system-health=healthy"**: **CONFIRMED ✅** — ts=2026-07-27T18:27:26Z UTC; overall=healthy; disk=13%, mem=25%; all 4 bots alive. [carry ✅]
+- **"heal-stale-daemon-code.heartbeat"**: **CONFIRMED ✅** — 2026-07-27T18:26:51Z UTC (~5 min at check time; <60 min). [carry ✅]
+- **"alerts watermark=517"**: **CONFIRMED ✅** — repair-watermark: repaired=false (old=517, file_length=517). No new alerts. [carry ✅]
+- **"Check I RESOLVED"**: **CARRY ✅** — next ~2026-07-29 Wed. [carry ✅]
+- **"Check III RESOLVED"**: **CARRY ✅** — next ~2026-08-09. [carry ✅]
+- **"Check VIII/IX/X next 2026-08-03"**: **CARRY ✅**. [carry ✅]
+- **"Check XIV Tier-4 × 2"**: **CARRY** — awaiting Larry triage. [carry ⚠️]
+- **"auto-merge-conflict-route-hold-no-dm-001 VP"**: **CARRY VP** — no new data this iter. [carry VP]
+- **"check-vi-posture-proposals-2026-07-07 carry"**: **CARRY** — no new DM. [carry]
+- **"Mirror queue-wait p95 carry"**: **CARRY** — self-suppresses ~2026-07-30T02Z UTC. [carry]
+
+**New findings this iter:**
+- **PR #1036** (ourliberty-agent-core): "feat(mirror): Lens J — migration safety, with a verdict written for Larry". Branch: `claude/migration-review-lens`. Step 3 of the merged-but-not-applied plan (per docs/migration-apply-brief from PR #121). Mirror review dispatched 12:25:27 MDT = 18:25:27Z UTC. Normal pipeline. Not in stall window.
+- **RSDPM PR #122**: "ops: one narrow script for staging data writes, so curl need not be allowlisted". Branch: `claude/staging-write-script`. The "also, separately" item from `ops/build-sequences/migration-apply-automation.md` — independent of steps 2-4. Mirror review dispatched 12:30:24 MDT = 18:30:24Z UTC. Normal pipeline.
+- **iter ~6504 PR-catch gap (noted)**: PR #1036 was created at 18:21:01Z UTC (6 min before iter ~6504 at 18:27Z) but wasn't caught in ~6504's Check E. Not a systemic issue — the gap is sub-cadence and Mirror review was dispatched by the notifier normally. At 5-min iter cadence, a PR created mid-iter will sometimes land just after a check runs.
+- **Mirror inbox spec items (noted)**: Mirror inbox contains `wire-pulse-optimize-001.json`, `xii-v1.json`, `xiv-b-alert-write-back-spec-001.json`, `xiv-v1.forfeit.json`, `xiv-v1.json`. Stall checker shows 0 stalls. The PR review tasks for #1036 and #122 are not in Mirror's inbox (Mirror picked them up for active processing). Spec items are background queue — no escalation this iter.
+
+**Check 0 — Alert triage (~18:32Z UTC):** repair-watermark: repaired=false (old=517, file_length=517). watermark=517; file=517. No new alerts. NOMINAL ✅
+
+**Check 1 — Log noise (~18:32Z UTC):** outbox-notifier.log: two review dispatches since last iter — PR #1036 at 12:25:27 MDT (18:25:27Z UTC) and PR #122 at 12:30:24 MDT (18:30:24Z UTC). All INFO. No WARNs since 12:10:08 MDT (the single SIGTERM WARN from restart; sub-threshold). NOMINAL ✅
+
+**Check 2 — Telegram sweep (~18:32Z UTC):** beacon_telegram_bot.log last entry 12:10:08-0600=18:10:08Z UTC (Beacon bot starting). No new Larry directives since iter ~6504. NOMINAL ✅
+
+**Check 3 — Pipeline stall (~18:32Z UTC):** heal_pipeline_stall dry-run: FORGE_NO_PR_SKIP × 9 (all MERGED or existing PRs). 0 stalls detected. `build-rsdpm-install-drift-healer-001` not yet in stall window. NOMINAL ✅
+
+**Check 4 — Pending directives (~18:32Z UTC):** beacon-pending-approvals.json: **pending=0** ✅. NOMINAL ✅
+
+**Check 5 — Stale daemon code (~18:32Z UTC):** heal-stale-daemon-code.heartbeat=2026-07-27T18:26:51Z UTC (~5 min; <60 min). system-health.json overall=healthy ts=2026-07-27T18:27:26Z UTC; disk=13%, mem=25%; all 4 bots alive. NOMINAL ✅
+
+**Check A — Source repo (~18:32Z UTC):** On main. HEAD=b6571945=origin/main. Clean tree. NOMINAL ✅
+**Check B — Sync health (~18:32Z UTC):** last_sync=2026-07-27T18:12:54Z UTC (~19 min; <2h); status=success; consecutive_push_failures=0. NOMINAL ✅
+**Check C — Agent liveness (~18:32Z UTC):** system-health.json overall=healthy; all 4 bots alive (beacon/forge/mirror/pulse). NOMINAL ✅
+**Check E — PR/merge state (~18:32Z UTC):** ourliberty-agent-core: **1 open PR** — PR #1036 MERGEABLE, Mirror review in progress (dispatched 18:25:27Z UTC; ~7 min). RSDPM: **1 open PR** — PR #122 MERGEABLE, Mirror review in progress (dispatched 18:30:24Z UTC; ~2 min). Both normal pipeline. NON-NOMINAL ⚠️ (active, not stalled)
+**Check H — Inbox + Forge activity (~18:32Z UTC):** Forge inbox: `build-rsdpm-install-drift-healer-001.json` (~26 min; within 2h window). Beacon inbox: empty. Mirror inbox: 5 spec items (background queue, 0 stalls). NOMINAL ✅
+
+**§5.0 one-shots (~18:32Z UTC):** audit_due_nudge: no-op. distill_detector: no-op. audit_cadence_signal: no-op. NOMINAL ✅
+
+**Credential rotation (~18:32Z UTC):** SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (26 days). 14-day dedup active (last DM 2026-07-20; expires ~2026-08-03). No DM sent. NOMINAL ✅
+
+**PRIME DIRECTIVE:** 1 monitoring intervention (active-pipeline-pr1036-pr122-mirror-review). Trailing 30d: ratio≈34.08% (interventions=1671, systemic_fixes=49, vp=24; trend=worsening). consecutive_clean=0.
+
+**Patterns:**
+- Pipeline re-populated immediately after the quiescent state in iter ~6504: Forge opened PR #1036 (Lens J) and PR #122 within 4 min of each other. Both flow from the migration-apply-automation.md ops doc that PR #121 closed. The pipeline is working as intended.
+- `build-rsdpm-install-drift-healer-001` still in Forge inbox at 26 min. If no PR by ~20:06Z UTC, escalate as FORGE_BUILD_NO_PR stall.
+
+**G-rule assessment:**
+- forge-marker-taskid-suffix-increment-001: **2/3** [carry, 0 new].
+- medic-draft-status-false-positive: **2/3** [carry, 0 new].
+- check-i-force-bypass-dm-route: **2/3** [carry, 0 new].
+- auto-merge-conflict-route-hold-no-dm-001: **VERIFICATION_PENDING** [carry VP; no new data].
+- mirror-queue-wait-readiness: **1/3** [carry, 0 new].
+- beacon-pending-approvals-path-bug: **1/3** [carry, 0 new].
+- ORPHANED_PR_REVIEW/notifier-race: **1/3** [carry, 0 new].
+- Active carries (verification_pending): forge-revision-preamble-missing; forge-wip-redispatch-digest; forge-wip-redispatch-exhausted-no-pr; outbox-notifier-intent-reject; auto-dispatch-APPROVAL_REQUEST-mismatch; PR #1022 heal-wip-redispatch DAG-preflight suppression; auto-merge-conflict-route-hold-no-dm-001.
+
+**Actions taken:**
+1. Check 0: repair-watermark no-op (repaired=false, old=517, file=517). No new alerts.
+2. §5.0 one-shots: audit_due_nudge + distill_detector + audit_cadence_signal — all no-ops.
+3. PRIME ledger: intervention appended (tier=1, kind=intervention, template=active-pipeline-pr1036-pr122-mirror-review, ts=2026-07-27T18:32:20Z UTC).
+4. Tier state: `cycle_tier_state.py record --checks-clean false` → consecutive_clean=0; **Tier 1** stays (last_signal_at=2026-07-27T18:32:21Z UTC).
+
+**Escalations:**
+- [watch — no DM yet] build-rsdpm-install-drift-healer-001: stall window closes ~20:06Z UTC. If no Forge PR by then, escalate.
+- [carry — no new DM] check-vi-posture-proposals-2026-07-07 (2 proposals).
+- [carry — no new DM] Mirror queue-wait p95=92.3m (self-suppresses ~2026-07-30T02Z UTC).
+- [carry — no new DM] Check XIV Tier-4 × 2: oversilence + fleet digest. Awaiting Larry triage.
+
+**Tier end-of-iter:** **Tier 1** (consecutive_clean=0; last_signal_at=2026-07-27T18:32:21Z UTC; 5-min cadence).
+
+---
+
