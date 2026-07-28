@@ -663,8 +663,52 @@ elif [ "$OLD_HEAD" != "$NEW_HEAD" ] && [ -f "$INSTALL_DRIFT_HEALER" ]; then
     UNIT_CHANGED_PATHS="$(cd "$REPO_DIR" && git diff --name-only "$OLD_HEAD" "$NEW_HEAD" 2>/dev/null || true)"
     if printf '%s\n' "$UNIT_CHANGED_PATHS" | grep -Eq '^systemd/.*\.(service|timer)$'; then
         log "Install-drift trigger: a systemd unit file changed this sync; running healer (--triggered)."
-        if OURLIBERTY_INSTALL_DRIFT_HEALER_ENABLED=true \
-            python3 "$INSTALL_DRIFT_HEALER" --triggered; then
+        # ── The healer MUST run outside this script's mount namespace ────────
+        # sync_agent_core.sh runs under ourliberty-sync.service, which sets
+        # ProtectSystem=strict. That makes the whole filesystem READ-ONLY for
+        # every descendant process except its ReadWritePaths (which do NOT
+        # include /etc), and `sudo` does not escape a mount namespace — it
+        # raises privilege, not visibility. So the healer's own
+        # `sudo -n cp <unit> /etc/systemd/system/` failed here 27 times out of
+        # 27 with EROFS, while the SAME healer succeeded 82 times on its own
+        # (unsandboxed) timer. Net effect: a systemd unit shipped in a PR was
+        # never installed by the deploy that merged it — it waited up to 12h
+        # for the timer, and the 30m grace DM could page Larry first. Found
+        # 2026-07-27 merging #1035, whose timer needed the manual dance.
+        #
+        # `systemd-run` fixes it by asking PID 1 to spawn the healer as a fresh
+        # transient unit, which gets its own un-sandboxed namespace and can
+        # therefore write /etc/systemd/system. `--wait --collect` keeps the call
+        # synchronous and propagates the HEALER's exit code, so the non-fatal
+        # WARN branch below behaves exactly as it did before.
+        #
+        # Availability is probed UP FRONT rather than by falling back on
+        # failure: a fallback keyed on a non-zero exit cannot tell "systemd-run
+        # could not launch" from "the healer ran and reported drift", and would
+        # run the healer twice. Either/or, never both.
+        INSTALL_DRIFT_RC=0
+        INSTALL_DRIFT_PY="$(command -v python3 || true)"
+        if [ -n "$INSTALL_DRIFT_PY" ] \
+            && command -v systemd-run >/dev/null 2>&1 \
+            && sudo -n true >/dev/null 2>&1; then
+            sudo -n systemd-run \
+                --unit="ourliberty-install-drift-triggered-$$" \
+                --wait --collect --quiet \
+                --property=User="$(id -un)" \
+                --setenv=HOME="$HOME" \
+                --setenv=OURLIBERTY_AGENTS_ROOT="${OURLIBERTY_AGENTS_ROOT:-$LIVE_ROOT}" \
+                --setenv=OURLIBERTY_INSTALL_DRIFT_HEALER_ENABLED=true \
+                "$INSTALL_DRIFT_PY" "$INSTALL_DRIFT_HEALER" --triggered \
+                || INSTALL_DRIFT_RC=$?
+        else
+            # No systemd-run / no passwordless sudo (e.g. a laptop checkout or a
+            # test harness). Run in-process: every non-/etc remediation still
+            # works, and unit installs stay the 12h timer's job.
+            log "  NOTE: systemd-run or passwordless sudo unavailable; running healer in-process (unit installs to /etc/systemd/system may be blocked by ProtectSystem=strict)."
+            OURLIBERTY_INSTALL_DRIFT_HEALER_ENABLED=true \
+                python3 "$INSTALL_DRIFT_HEALER" --triggered || INSTALL_DRIFT_RC=$?
+        fi
+        if [ "$INSTALL_DRIFT_RC" -eq 0 ]; then
             log "Install-drift trigger: healer tick complete."
         else
             log "  WARN: install-drift healer (--triggered) exited non-zero; the 12h timer remains the backstop."
