@@ -761,9 +761,11 @@ Occurrences: iter ~6155 (1/3); iter ~6156 (2/3); iter ~6157 (3/3 + meta-loop new
 
 ---
 
-## Check 5 heartbeat path correction (iter ~6364, 2026-07-27)
+## Check 5 heartbeat path correction (iter ~6364, 2026-07-27; REPEAT VIOLATION iter ~6646, 2026-07-28)
 
-**Correct path:** `~/agents/blackboard/heal-stale-daemon-code.heartbeat` (NOT `~/agents/state/` as iters ~6361–6363 incorrectly cited). All healer heartbeats live in `~/agents/blackboard/*.heartbeat`, not in `~/agents/state/`. Verified at iter ~6364: file present, value=2026-07-27T01:29:04Z UTC.
+**Correct path:** `~/agents/blackboard/heal-stale-daemon-code.heartbeat` (NOT `~/agents/state/` as iters ~6361–6363 and iter ~6646 incorrectly cited). All healer heartbeats live in `~/agents/blackboard/*.heartbeat`, not in `~/agents/state/`. Verified at iter ~6364 and iter ~6646.
+
+**This error has been made twice.** ALWAYS read `~/agents/blackboard/heal-stale-daemon-code.heartbeat`. NEVER read `~/agents/state/heal-stale-daemon-code.heartbeat` (it does not exist).
 
 ---
 
