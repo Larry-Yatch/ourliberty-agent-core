@@ -2772,12 +2772,24 @@ def _larry_artifact_exists(task_id: str, head_sha: Optional[str]) -> bool:
     the Approvals tab (decision bucket). Uses the SAME id derivations the step-2
     routing site uses (`mirror-review:<task>` and `mirror-review-<task>[-<sha8>]`)
     so the backstop never double-notifies a case step 2 already surfaced
-    (Contract D). Fail-safe: read errors return False."""
+    (Contract D). Fail-safe: read errors return False.
+
+    Head-aware (fix-escalated-pr-headchange-backoff-001): an OPEN record only
+    covers the PR at the head SHA it was written for. When a human manually fixes
+    an escalated PR the head advances, and that stale record must NOT keep
+    suppressing re-evaluation — otherwise the fixed PR sits idle for up to ~3h
+    until merge/close. So an OPEN record whose stored head differs from the PR
+    current head does NOT count as covering. Degrade safely: a record with no
+    stored head (legacy row), or a PR whose current head is unknown, still counts
+    as covering — comparing an absent value would only produce an un-dedupable
+    repeat nudge."""
     record_id = f'mirror-review:{task_id}'
     try:
         rec = for_larry_escalations.get(record_id)
         if isinstance(rec, dict) and rec.get('resolved') is not True:
-            return True
+            stored_head = rec.get('head_sha')
+            if not stored_head or not head_sha or stored_head == head_sha:
+                return True
     except Exception as e:  # noqa: BLE001
         log(f'_larry_artifact_exists feed read failed for {task_id}: '
             f'{type(e).__name__}: {e}', 'WARN')
@@ -2853,8 +2865,14 @@ def check_red_mirror_status_no_artifact(open_prs: list[dict],
             continue
         pr_url = f'https://github.com/{repo}/pull/{number}'
         record_id = f'mirror-review:{task_id}'
+        title = pr.get('title') or ''
         alerts.append({
-            'key': f'red_mirror_status:{repo}:{number}',
+            # Head SHA in the key (mirroring the proven unrouted-PR-stranded
+            # pattern ~L3073) so a manual fix that leaves the PR red on a NEW
+            # head earns a fresh once-per-head nudge, while a persistent red on
+            # the SAME head dedups and never spams. Empty when gh didn't surface
+            # a head — still a stable per-episode key.
+            'key': f'red_mirror_status:{repo}:{number}:{head_sha or ""}',
             'message': (
                 f'PR #{number} ({repo}) on branch `{branch}` has carried a RED '
                 f'`mirror-review` status for {elapsed_min} min with no self-heal '
@@ -2873,6 +2891,7 @@ def check_red_mirror_status_no_artifact(open_prs: list[dict],
             # Waiting-on-You surface before alerting.
             'recovery': functools.partial(
                 _recover_red_mirror_status, task_id, pr_url, head_sha, record_id,
+                branch, repo, title,
             ),
         })
     return alerts
@@ -3584,7 +3603,8 @@ def _recover_stalled_sequence(seq_id: str, seq_path: str) -> bool:
 
 def _recover_red_mirror_status(task_id: str, pr_url: str,
                                head_sha: Optional[str],
-                               record_id: str) -> bool:
+                               record_id: str, branch: str = '',
+                               repo: str = '', title: str = '') -> bool:
     """Check 10 'recovery' for the #653 silent-red backstop (Contract E).
 
     The recovery IS the promotion: surface the silent-red PR on its Contract C
@@ -3601,9 +3621,22 @@ def _recover_red_mirror_status(task_id: str, pr_url: str,
         iff an OPEN record exists afterward; a write failure (no open record)
         returns False so exactly one fallback alert fires.
 
+    Head-change re-dispatch (fix-escalated-pr-headchange-backoff-001): if an
+    OPEN record already existed for a DIFFERENT head, a human manually fixed the
+    escalated PR (new head SHA). That push does NOT re-trigger Mirror on its own
+    (Mirror dispatches off Forge PR-open, not arbitrary human pushes), so the
+    upsert-refresh alone would leave the fixed PR idle. On that head change we
+    ALSO re-dispatch a fresh Mirror review via the existing
+    `_recover_via_mirror_review` seam so the fix re-enters the pipeline within
+    one tick. The first-ever escalation (no prior record) only surfaces to
+    Larry — it must not re-review a PR nobody has touched.
+
     Idempotent (Contract D): `dedup_identity` is the SAME `{pr_url}@{head_sha}`
     step-2 routing uses, so a re-run on the same head is a no-op upsert and a
-    fresh push refreshes the record in place — never a duplicate."""
+    fresh push refreshes the record in place — never a duplicate. The head-change
+    re-dispatch is likewise gated on a genuine stored-head difference, and
+    `_recover_via_mirror_review`'s own presence-check skips a duplicate review
+    write, so the SAME head yields at most one re-dispatch."""
     pr_state = _gh_pr_state(pr_url) if pr_url else None
     if pr_state in ('MERGED', 'CLOSED'):
         try:
@@ -3619,6 +3652,19 @@ def _recover_red_mirror_status(task_id: str, pr_url: str,
         log(f'RED_MIRROR task={task_id} pr_state unverifiable (gh '
             f'unreachable); deferring to next tick', 'INFO')
         return True
+    # Detect a manual fix: an OPEN record whose stored head differs from the
+    # PR current head means the human pushed a new commit to the escalated PR.
+    # Read this BEFORE the upsert refreshes the row's head in place.
+    head_changed = False
+    try:
+        prior = for_larry_escalations.get(record_id)
+        if (isinstance(prior, dict) and prior.get('resolved') is not True
+                and head_sha and prior.get('head_sha')
+                and prior.get('head_sha') != head_sha):
+            head_changed = True
+    except Exception as e:  # noqa: BLE001
+        log(f'red-mirror prior-head read failed for {record_id}: '
+            f'{type(e).__name__}: {e}', 'WARN')
     dedup_identity = f'{pr_url or task_id}@{head_sha or ""}'
     try:
         for_larry_escalations.upsert(
@@ -3651,6 +3697,19 @@ def _recover_red_mirror_status(task_id: str, pr_url: str,
     if recovered:
         log(f'RED_MIRROR_ROUTED task={task_id} → for-Larry record '
             f'{record_id} (Contract C action surface)', 'INFO')
+    if head_changed:
+        # The manual fix advanced the head; re-enter the review pipeline so the
+        # PR moves forward instead of sitting idle until merge/close.
+        try:
+            landed = _recover_via_mirror_review(
+                task_id, branch, repo, title, pr_url)
+        except Exception as e:  # noqa: BLE001
+            landed = False
+            log(f'red-mirror head-change re-dispatch raised for {task_id}: '
+                f'{type(e).__name__}: {e}', 'WARN')
+        log(f'RED_MIRROR_HEADCHANGE task={task_id} '
+            f'new_head={(head_sha or "")[:8]} re-dispatched Mirror review '
+            f'landed={landed}', 'INFO')
     return recovered
 
 

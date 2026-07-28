@@ -3977,7 +3977,9 @@ class TestCheckRedMirrorStatusNoArtifact(_TempAgentsRootMixin, unittest.TestCase
             alerts = self.hps.check_red_mirror_status_no_artifact([self._pr()], {})
         self.assertEqual(len(alerts), 1)
         a = alerts[0]
-        self.assertEqual(a['key'], 'red_mirror_status:owner/repo:7')
+        # Head SHA is in the key so a new commit earns a fresh once-per-head
+        # nudge (fix-escalated-pr-headchange-backoff-001).
+        self.assertEqual(a['key'], 'red_mirror_status:owner/repo:7:deadbeefcafe')
         self.assertEqual(a['subject'], 'pipeline-stall:red-mirror-status:PR#7')
         self.assertIn('silent-red', a['message'])
         self.assertIn('recovery', a)
@@ -4154,6 +4156,79 @@ class TestCheckRedMirrorStatusNoArtifact(_TempAgentsRootMixin, unittest.TestCase
         rec = self._fle.get('mirror-review:silent-red')
         self.assertIsInstance(rec, dict)
         self.assertIs(rec['resolved'], False)
+
+    # ---- head-change re-dispatch (fix-escalated-pr-headchange-backoff-001) ----
+
+    def test_stale_head_open_record_does_not_cover(self) -> None:
+        # A human manually fixed the escalated PR: the OPEN record is on the OLD
+        # head, the PR status now reports a NEW head. The stale record must NOT
+        # suppress re-evaluation — the check fires again (with a recovery).
+        self._fle.upsert(
+            'mirror-review:silent-red', headline='h', context='c',
+            pr_url='https://github.com/owner/repo/pull/7',
+            head_sha='oldhead0000',
+            dedup_identity='https://github.com/owner/repo/pull/7@oldhead0000')
+        with patch.object(self.hps, '_mirror_review_status',
+                          return_value=self._status(sha='newhead1111')):
+            alerts = self.hps.check_red_mirror_status_no_artifact([self._pr()], {})
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(alerts[0]['key'],
+                         'red_mirror_status:owner/repo:7:newhead1111')
+        self.assertIn('recovery', alerts[0])
+
+    def test_legacy_record_without_head_still_covers(self) -> None:
+        # Degrade safely: an OPEN record with NO stored head (legacy row) still
+        # counts as covering — comparing an absent value would only spam.
+        self._fle.upsert('mirror-review:silent-red', headline='h', context='c',
+                         pr_url='https://github.com/owner/repo/pull/7',
+                         head_sha=None, dedup_identity='x@')
+        self.assertTrue(
+            self.hps._larry_artifact_exists('silent-red', 'anyhead'))
+
+    def test_new_head_recovery_redispatches_mirror_review(self) -> None:
+        # The recovery on a detected head change refreshes the record AND
+        # re-dispatches a fresh Mirror review via the existing seam.
+        self._fle.upsert(
+            'mirror-review:silent-red', headline='h', context='c',
+            pr_url='https://github.com/owner/repo/pull/7',
+            head_sha='oldhead0000',
+            dedup_identity='https://github.com/owner/repo/pull/7@oldhead0000')
+        with patch.object(self.hps, '_mirror_review_status',
+                          return_value=self._status(sha='newhead1111')):
+            alerts = self.hps.check_red_mirror_status_no_artifact([self._pr()], {})
+        recovery = self._recovery_for(alerts)
+        with patch.object(self.hps, '_gh_pr_state', return_value='OPEN'), \
+                patch.object(self.hps, '_recover_via_mirror_review',
+                             return_value=True) as redispatch:
+            recovered = recovery()
+        self.assertTrue(recovered)
+        redispatch.assert_called_once()
+        args = redispatch.call_args.args
+        self.assertEqual(args[0], 'silent-red')          # task_id
+        self.assertEqual(args[1], 'forge/silent-red')    # branch
+        self.assertEqual(args[2], 'owner/repo')          # repo
+        self.assertEqual(args[4], 'https://github.com/owner/repo/pull/7')  # pr_url
+        # Record refreshed in place onto the new head.
+        rec = self._fle.get('mirror-review:silent-red')
+        self.assertEqual(rec['head_sha'], 'newhead1111')
+
+    def test_same_head_recovery_no_redispatch(self) -> None:
+        # First-ever escalation (no prior record) and any same-head re-run must
+        # NOT re-dispatch a review — only a genuine head change does. Guards the
+        # idempotency criterion: same head → at most one dispatch (here zero,
+        # because nothing was manually fixed).
+        with patch.object(self.hps, '_mirror_review_status',
+                          return_value=self._status()):
+            alerts = self.hps.check_red_mirror_status_no_artifact([self._pr()], {})
+        recovery = self._recovery_for(alerts)
+        with patch.object(self.hps, '_gh_pr_state', return_value='OPEN'), \
+                patch.object(self.hps, '_recover_via_mirror_review',
+                             return_value=True) as redispatch:
+            self.assertTrue(recovery())   # first escalation: surface only
+            self.assertTrue(recovery())   # same head: idempotent no-op
+        redispatch.assert_not_called()
+        rows = self._fle.list_open()
+        self.assertEqual([r['id'] for r in rows], ['mirror-review:silent-red'])
 
 
 # ===================================================================
