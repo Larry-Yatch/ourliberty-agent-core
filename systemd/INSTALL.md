@@ -145,6 +145,7 @@ sudo systemctl enable --now ourliberty-heal-orphaned-mirror-claims.timer  # arch
 sudo systemctl enable --now ourliberty-heal-pr-auto-merge.timer  # E1.3 — DRY-RUN by default; see service file for activation
 sudo systemctl enable --now ourliberty-heal-credential-registry-drift.timer  # E1.5.2 — DRY-RUN by default
 sudo systemctl enable --now ourliberty-heal-systemd-install-drift.timer  # E1.5.2 — DRY-RUN by default
+sudo systemctl enable --now ourliberty-heal-rsdpm-install-drift.timer  # file-content integrity of the /usr/local/lib/rsdpm install (twice daily, 00:00+12:00) — read-only observation, NEVER writes the install; DRY-RUN by default
 sudo systemctl enable --now ourliberty-sync-deploy-targets.timer  # E2.1 — DRY-RUN by default
 sudo systemctl enable --now ourliberty-deploy-notifier.timer  # E2.2 — DRY-RUN by default
 sudo systemctl enable --now ourliberty-heal-dashboard-api-sha-drift.timer  # dashboard-api-deploy-race-001 (every 3 min) — restarts ourliberty-dashboard-api when its reported git SHA drifts from on-disk HEAD (stale-process backstop); needs EnvironmentFile=.env.larry for DASHBOARD_API_TOKEN
@@ -197,6 +198,7 @@ What each one does:
 | `pr-auto-merge` (E1.3) | 5 min | Mirror-PASSed PRs whose auto-merge primary path missed |
 | `credential-registry-drift` (E1.5.2) | 6 h | Credentials in store without registry entries; registry entries without credentials in store |
 | `systemd-install-drift` (E1.5.2) | 12 h | systemd units shipped in repo but never installed under `/etc/systemd/system/` |
+| `rsdpm-install-drift` (#1037) | 12 h | File-content integrity of the RSDPM tooling installed at `/usr/local/lib/rsdpm` — the three root-owned scripts (`alert-emit.py` / `drift-check.sh` / `refresh.sh`) fingerprinted by sha256 + octal mode + owner:group, plus a CHEAP integrity signal for the vendored `node22/` runtime (sha256 of `node22/bin/node` + file count + aggregate size, NOT a 12h per-file hash of ~4700 files). Read-only observation — it NEVER writes or re-installs; recovery is a human call. First run adopts the current state as baseline with no alert; later runs alert ONCE naming which file drifted and how (content/mode/owner), then adopt, so a legitimate change does not re-alarm every cycle. Baseline at `state/heal-rsdpm-install-drift.json`. **Easily confused with two siblings:** `ourliberty-rsdpm-driftcheck` watches the RSDPM staging *database schema* vs repo migrations, and `systemd-install-drift` (above) watches unit *presence* — this one is the only check on file content under `/usr/local/lib`. |
 | `sync-deploy-targets` (E2.1) | 12 h | `config/deploy_targets.json` ↔ Vercel API drift (project missing on either side, name mismatch) |
 | `deploy-notifier` (E2.2) | 2 min | Vercel preview-URL READY + build-ERROR events for configured deploy targets |
 | `chain-event-shipper-heartbeat` (E4.4d PR-B) | 5 min | `chain_event_shipper.heartbeat` file mtime > 10 min stale (daemon hung or crashed) |
