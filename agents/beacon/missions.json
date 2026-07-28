@@ -13692,7 +13692,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-28T01:43:37.814830+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-28T01:40:28.546329+00:00"
+      "orphan_last_activity_ts": "2026-07-28T01:40:28.546329+00:00",
+      "briefing": {
+        "what": "A piece of work the team picked up and finished on its own, but it isn't attached to any active priority yet.",
+        "why": "Finished work that isn't tied to a goal can quietly ship changes nobody asked for, or waste effort that should have gone elsewhere.",
+        "suggest": "Take a quick look to confirm it belongs before it goes further, and either fold it into a real priority or set it aside."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-28T01:51:58.913152+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-pr-RSDPM-126",
@@ -13709,7 +13723,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-28T01:43:37.814830+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-28T01:40:28.313721+00:00"
+      "orphan_last_activity_ts": "2026-07-28T01:40:28.313721+00:00",
+      "briefing": {
+        "what": "A piece of work the team started and already checked over, but it isn't attached to any active initiative yet.",
+        "why": "Loose work that lands without a clear purpose can drift or create cleanup later, so it's worth a quick look before it goes further.",
+        "suggest": "Have someone confirm what this is meant to accomplish and tie it to a goal before letting it move ahead."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-28T01:51:58.913152+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
