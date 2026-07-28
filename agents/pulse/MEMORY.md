@@ -12,6 +12,12 @@
 
 ---
 
+## DM delivery time must be verified from bot log, NOT larry-alerts.jsonl ts field (learned 2026-07-28, iter ~6556)
+
+**Rule:** When narrating "DM delivered at time X", verify against `beacon_telegram_bot.log` (the `idx=N delivered` entries). The `ts` field in `larry-alerts.jsonl` is when the alert was WRITTEN by the healer — NOT when it was delivered to Larry's Telegram. These can differ by minutes. Prior iters ~6536–6555 phantom-narrated "SUPABASE_DB_PASSWORD DM delivered 2026-07-28T02:09Z UTC" — no bot log entry at that time exists. Actual delivery was idx=523 at `[2026-07-28T02:12:30-0600]` = 08:12:30Z UTC, discovered at iter ~6556. **Always tail beacon_telegram_bot.log to confirm delivery; never infer delivery from alert ts.**
+
+---
+
 ## credential-rotation-dedup.json is a phantom file — real state is pulse-rotation-window-dms.json (learned 2026-07-28, iter ~6528)
 
 **Rule:** `credential-rotation-dedup.json` does NOT exist and has no writer in any script. Prior cycle journal entries referenced it ("prior iters read it normally") but that was itself phantom narration. The real credential rotation DM dedup state lives at `/home/larry/agents/state/pulse-rotation-window-dms.json` — a JSON dict keyed by credential name (e.g., `"SUPABASE_SERVICE_ROLE_KEY": "<ISO 8601 ts of last DM>"`). The dedup window is 14 days. For the credential rotation check: read `pulse-rotation-window-dms.json`, NOT any phantom path. The SUPABASE_SERVICE_ROLE_KEY was last DM'd 2026-07-20T20:00:15Z UTC (expires ~2026-08-03). Do NOT report `credential-rotation-dedup.json` as missing — it never existed.
