@@ -54932,3 +54932,59 @@ Watermark advanced 515→516. NOMINAL ✅
 
 ---
 
+## Iteration ~6506 — 2026-07-27T18:38Z UTC (Larry /cycle chat, Tier 1 → consecutive_clean=0)
+
+**Health:** ⚠️ NON-NOMINAL — active pipeline + new findings. RSDPM PR #122 merged. Forge built PR #1037 (rsdpm-install-drift-healer-001). New WARN: `ourliberty-heal-stale-escalation-recheck.service` auto-install blocked by read-only `/etc/systemd/system/`. ORPHANED_PR_REVIEW/notifier-race at 3/3 → G-rule dispatched to Beacon. Tier 1 stays (consecutive_clean=0).
+
+**VERIFY-BEFORE-REASSERT (from iter ~6505 at 18:32Z UTC):**
+- **"ourliberty-agent-core: 1 open PR #1036"**: UPDATED — now 2 open PRs: #1036 (Lens J, active Mirror review since 18:25:27Z UTC) + #1037 (rsdpm-install-drift-healer-001, opened 18:34:10Z UTC, Mirror review dispatch pending notifier poll). [change ✅]
+- **"RSDPM: 1 open PR #122"**: UPDATED — PR #122 MERGED 18:33:51Z UTC (Mirror PASS → auto-merged). RSDPM has 0 open PRs. [change ✅]
+- **"Forge inbox: build-rsdpm-install-drift-healer-001.json (~26 min)"**: UPDATED — Forge built PR #1037 at 18:34:10Z UTC. Task file still in inbox (normal pre-archival). [change ✅]
+- **"ORPHANED_PR_REVIEW/notifier-race: 1/3"**: UPDATED — 3 more occurrences this iter (PR #121 at 18:15:34Z, #1036 at 18:25:26Z, #122 at 18:30:23Z UTC). Counter: 3+/3. G-rule direction-ask dispatched to Beacon. [change ⚠️]
+- **"system-health=healthy"**: CONFIRMED ✅ — ts=2026-07-27T18:32:29Z UTC; overall=healthy; disk=13%, mem=25%; all 4 bots alive. [carry ✅]
+- **"heal-stale-daemon-code.heartbeat"**: CONFIRMED ✅ — 2026-07-27T18:26:51Z UTC (~11 min at check time; <60 min). [carry ✅]
+- **"alerts watermark=517"**: CONFIRMED ✅ — repair-watermark: repaired=false (old=517, file_length=517). No new alerts. [carry ✅]
+- **"Check I RESOLVED"**: CARRY ✅ — next ~2026-07-29 Wed.
+- **"Check III RESOLVED"**: CARRY ✅ — next ~2026-08-09.
+- **"Check VIII/IX/X next 2026-08-03"**: CARRY ✅
+- **"Check XIV Tier-4 × 2"**: CARRY ⚠️ — today's artifact (11:52Z UTC): 1 over_silence_finding (heal-dashboard-api-sha-drift, 163 alerts, 100% silenced — already escalated 05:55Z UTC, awaiting Larry triage). 1 recurring_novel_candidate (beacon source, 3 RSDPM V0 kickoff messages — stale, V0 COMPLETE). [carry ⚠️]
+- **"auto-merge-conflict-route-hold-no-dm-001 VP"**: CARRY VP — no new data. [carry VP]
+- **"check-vi-posture-proposals-2026-07-07 carry"**: CARRY. [carry]
+- **"Mirror queue-wait p95 carry"**: CARRY — self-suppresses ~2026-07-30T02Z UTC. [carry]
+
+**Check 0 — Alert triage (~18:38Z UTC):** repair-watermark: repaired=false (old=517, file_length=517). No new alerts. NOMINAL ✅
+
+**Check 1 — Log noise (~18:38Z UTC):** ORPHANED_PR_REVIEW: 52/24h (~2.2/h, sub-threshold). Notifier-race pattern: healer fires 1s before notifier dispatch on PRs #121, #1036, #122 — G-rule dispatch filed. New WARN: `ourliberty-heal-stale-escalation-recheck.service` + `.timer` auto-install failed rc=1 (read-only /etc/systemd/system/) — 2 occurrences today, fires every sync run since PR #1035 merge. GitHub 502/503/504 transients overnight (01:17–02:32Z UTC) — single occurrences, self-recovered. APPROVAL_REQUEST task_id mismatch (pulse-auto-eecf5e695b-20260727 vs cycle-prompt-context-budget-001) — known pattern (3/3 dispatched, VP). NON-NOMINAL ⚠️
+
+**Check 2 — Telegram sweep (~18:38Z UTC):** beacon_telegram_bot.log last entry 12:10:08 MDT = 18:10:08Z UTC (bot starting). No new Larry directives since iter ~6505. NOMINAL ✅
+
+**Check 3 — Pipeline stall (~18:38Z UTC):** heal_pipeline_stall dry-run: FORGE_NO_PR_SKIP × 9 (all MERGED or existing PRs). 0 stalls detected. build-rsdpm-install-drift-healer-001 produced PR #1037 (18:34:10Z UTC); within 2h stall window. NOMINAL ✅
+
+**Check 4 — Pending directives (~18:38Z UTC):** beacon-pending-approvals.json: pending=0 ✅. NOMINAL ✅
+
+**Check 5 — Stale daemon code (~18:38Z UTC):** heal-stale-daemon-code.heartbeat=2026-07-27T18:26:51Z UTC (~11 min; <60 min). system-health.json overall=healthy; disk=13%, mem=25%; all 4 bots alive. NOMINAL ✅
+
+**Check A — Source repo (~18:38Z UTC):** On main, HEAD=f45b2d37=origin/main, clean tree. NOMINAL ✅
+**Check B — Sync health (~18:38Z UTC):** last_sync=2026-07-27T18:12:54Z UTC (~25 min; <2h); status=success; consecutive_push_failures=0. NOMINAL ✅
+**Check C — Agent liveness (~18:38Z UTC):** all 4 bots alive (system-health=healthy). NOMINAL ✅
+**Check E — PR/merge state (~18:38Z UTC):** ourliberty-agent-core: 2 open PRs — #1036 (Lens J, active Mirror review ~13 min); #1037 (rsdpm-install-drift-healer-001, new, Mirror review dispatch pending next notifier poll). RSDPM: 0 open PRs. No stall window breaches. NON-NOMINAL ⚠️ (active, not stalled)
+**Check H — Inbox (~18:38Z UTC):** Forge: `build-rsdpm-install-drift-healer-001.json` (PR #1037 built; pre-archival). Beacon: empty. Mirror: empty (PR #1036 in active review). NOMINAL ✅
+
+**§5.0 one-shots:** audit-due=no-op, distill=no-op, audit-cadence=no-op. NOMINAL ✅
+
+**Check I (periodic, fired 14:10Z UTC today):** 1 proposal — "Review high-σ anomaly task `cycle-202607230601240000`" (effort=small). DM delivered 08:12 MDT (alert idx=503). No Pulse action this iter.
+
+**Check XIV (periodic, fired 11:52Z UTC today):** Fleet: 433 alerts, 86 signatures, noise_candidate_share=89.8%. over_silence: `heal-dashboard-api-sha-drift` (163 alerts silenced — escalated 05:55Z UTC, Larry triage pending). recurring_novel: beacon source 3 RSDPM V0 kickoff messages (stale, V0 COMPLETE). No new action.
+
+**Actions this iter:**
+- Dispatched G-rule direction-ask to Beacon: `direction-ask-orphaned-pr-review-notifier-race-001` (heal-undispatched-pr-review fires 1s before notifier dispatch; fix: increase grace window or add notifier-in-progress guard). → `always-fix` per allow-list (route-to-beacon)
+- Wrote `[yellow]` escalation to pulse-escalations.json: `ourliberty-heal-stale-escalation-recheck.service` manual install needed. → `never-auto` (requires sudo/systemd)
+
+**PRIME DIRECTIVE accounting:**
+- `intervention`: ourliberty-heal-stale-escalation-recheck.service read-only auto-install failure (Tier 1; new finding; escalated to Larry)
+- `systemic_fix`: ORPHANED_PR_REVIEW/notifier-race direction-ask dispatched to Beacon (template=orphaned-pr-review-notifier-race-001; verification_pending)
+
+**Tier state:** Tier 1, consecutive_clean=0 (active pipeline + findings).
+
+---
+
