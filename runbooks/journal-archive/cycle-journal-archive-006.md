@@ -59861,3 +59861,60 @@ Watermark advanced: 517 → 522. **⚠️ TIER-RESET** (Tier-4 alert at alert 52
 
 ---
 
+## Iteration ~6611 — 2026-07-28T15:15Z UTC (Tier 1, /loop chat invocation)
+
+**Health:** ⚠️ Drift — 3 open carries; all mandatory checks nominal; awaiting Larry action on 2 credential issues + 1 direction-ask.
+
+**Tier state:** Tier 1, consecutive_clean=0, last_signal=15:15Z. Recorded checks-clean=false (open carries).
+
+---
+
+**Check 0 — Alert triage (15:12Z UTC):**
+- repair-watermark: repaired=false (old=504, file_length=504). No new alerts this iter.
+- Triage calls executed for lines 502–504 (courtesy idempotent re-triage; all were already DM'd by prior iters/outbox-notifier):
+  - Line 502 rsdpm-driftcheck: Tier 4 (no template match). DM already delivered idx=501 at 07:20 MDT = 13:20Z UTC; verified: service ran at 07:16 MDT, exit=2 (INCOMPLETE), still failing.
+  - Line 503 doorbell: Tier 3 (known-pattern silence). Resolved.
+  - Line 504 heal-credential-registry-drift: Tier 4 (no template match). DM already delivered 3× by bot (idx=519 at 2026-07-27T20:09 MDT; idx=523 at 02:12 MDT; idx=503 at 08:10 MDT = 14:10Z UTC).
+- Watermark at 504; no advance needed this iter. NOMINAL ✅
+
+**Check 1 — Log noise (15:12Z UTC):**
+- outbox-notifier.log: last entry `[2026-07-28 06:04:45] outbox-notifier starting` (12:04Z UTC). Idle since restart — system-health confirms: `log_growth.status=ok, seconds_since_write=11134, reason=idle (empty inboxes, watcher healthy)`.
+- systemd last 30 min: 0 new WARN/ERROR. NOMINAL ✅
+
+**Check 2 — Telegram sweep (15:12Z UTC):**
+- beacon_telegram_bot.log last entry: `[2026-07-28T08:10:51-0600]` = 14:10Z UTC (idx=503, heal-credential-registry-drift SUPABASE_DB_PASSWORD DM delivered). No new Larry directives. NOMINAL ✅
+
+**Check 3 — Pipeline stall (15:13Z UTC):**
+- heal_pipeline_stall dry-run: FORGE_NO_PR_SKIP ×4 (pr-1035 MERGED, pr-RSDPM-117 MERGED, pr-RSDPM-119 MERGED, pr-1038 MERGED); rsdpm-install-drift-healer-001 matched by branch to PR #1037 (verified MERGED via `gh pr view`). 0 stalls detected. NOMINAL ✅
+
+**Check 5 — heal-stale-daemon-code (15:12Z UTC):**
+- Heartbeat: `2026-07-28T15:10:10Z` (~5 min old). NOMINAL ✅
+
+**Check A — Repo discipline (15:13Z UTC):**
+- Branch: main ✅, tree: clean ✅, sync: last_sync=15:13Z no-change at f2e442d ✅. NOMINAL ✅
+
+**Check C — Process liveness (from system-health.json 15:10Z UTC):**
+- overall=healthy: beacon alive ✅, forge alive ✅, mirror alive ✅, pulse alive ✅. Disk 13%, memory 19%. NOMINAL ✅
+
+**§5.0 one-shots:** audit_due_nudge=no-op, distill_detector=no-op, audit_cadence_signal=no-op. NOMINAL ✅
+
+---
+
+**Carry items — verified against live state this iter:**
+
+1. **unreg-approval-8c235f8b82d0 (RSDPM staging drift direction-ask)** — VERIFIED: still in beacon-pending-approvals.json, status=pending, created 2026-07-28T05:31:16Z UTC, 6 reminders sent (last at 05:34 MDT = 11:34Z UTC). Now ~9h44m open. No new DM this iter. Larry: respond via Telegram or apply migrations 0002/0027/0030 directly in Supabase SQL editor for rsdpm-staging. [carry ⚠️]
+
+2. **SUPABASE_DB_PASSWORD missing from credentials store** — VERIFIED: `grep -c SUPABASE_DB_PASSWORD /home/larry/credentials/.env.larry` = 0. Registered in token-rotation-schedule.json but absent from env_file. 3 DMs sent. Larry: install per `docs/runbooks/rotate-supabase-db-password.md` or remove the registry entry. No new DM this iter. [carry ⚠️]
+
+3. **rsdpm-driftcheck running blind (E2E auth failure)** — VERIFIED: last run 07:16 MDT = 13:16Z UTC, exit=2 INCOMPLETE. Behaviour probes skipped — E2E test account auth failure. Alert delivered via telegram+dashboard+email at 13:16Z. Larry: check `/etc/rsdpm/E2E_EMAIL` and `/etc/rsdpm/E2E_PASSWORD`; confirm lyatch@gmail.com password grant still works; re-run `sudo systemctl start ourliberty-rsdpm-driftcheck`. No new DM this iter (already escalated). [carry ⚠️]
+
+---
+
+**Actions taken this iter:** None. All carries already DM'd; no new auto-fix-eligible findings.
+
+**PRIME DIRECTIVE ledger:** 1 intervention row appended (rsdpm-staging-drift-carry, tier=1, iter-6611, 15:15Z).
+
+**Tier end-of-iter:** **Tier 1** (consecutive_clean=0; last_signal_at=2026-07-28T15:15:00Z UTC; 5-min cadence).
+
+---
+
