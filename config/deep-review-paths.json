@@ -1,5 +1,6 @@
 {
   "_comment": "PRs touching these paths pass Mirror review but are HELD for a human /code-review high + manual merge (deep-review hold) instead of auto-merging. Optional + graceful: a missing/malformed file, a non-list `paths`, or `enabled`:false all fall back to the code default in outbox_notifier._DEFAULT_DEEP_REVIEW_PATHS. Tuned by Pulse-Check. Globs are fnmatch'd against `gh pr view --json files` paths. A PR carrying the `deep-review-required` label also holds even if it touches none of these. A critical-path PR that Claude already /code-review high'd carries the `deep-review-passed` label and flows through Mirror to auto-merge normally.",
+  "_comment_cross_repo": "This list is REPO-AGNOSTIC — globs match a PR's file paths in whichever repo it was opened against. The `scripts/` and `config/` entries below therefore only ever match agent-core, and the RSDPM entries only ever match RSDPM. When onboarding another repo, add ITS critical paths here; nothing scopes this file to one repo, and an unlisted repo has NO durable hold at all (only the manual `deep-review-required` label).",
   "enabled": true,
   "paths": [
     "scripts/beacon_approval_handler.py",
@@ -11,6 +12,12 @@
     "scripts/trust_policy.py",
     "scripts/outbox_notifier.py",
     "config/trust-policy.json",
-    "config/suite-guardian.json"
+    "config/suite-guardian.json",
+
+    "supabase/migrations/*",
+    "supabase/verify/*",
+    "middleware.ts",
+    "lib/route-access.ts",
+    "lib/houston/whitelist.ts"
   ]
 }

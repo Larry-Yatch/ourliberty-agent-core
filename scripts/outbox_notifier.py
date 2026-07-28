@@ -286,6 +286,7 @@ _LOOP_BOUNDS_CACHE: dict[str, Any] = {}
 # it. Globs are fnmatch'd against `gh pr view --json files` paths. Kept in sync
 # with config/deep-review-paths.json — the config file IS this list.
 _DEFAULT_DEEP_REVIEW_PATHS: tuple[str, ...] = (
+    # agent-core — the factory's own decision/merge/alert machinery.
     'scripts/beacon_approval_handler.py',
     'scripts/decision_*.py',
     'scripts/resolve*.py',
@@ -296,6 +297,17 @@ _DEFAULT_DEEP_REVIEW_PATHS: tuple[str, ...] = (
     'scripts/outbox_notifier.py',
     'config/trust-policy.json',
     'config/suite-guardian.json',
+    # RSDPM — customer data boundary + auth gate. This list is REPO-AGNOSTIC
+    # (globs match a PR's file paths in whichever repo it was opened against),
+    # so these only ever match RSDPM and the entries above only ever match here.
+    # Until they were added, EVERY RSDPM migration and RLS change auto-merged on
+    # a Mirror pass with no durable hold — including the ones that carry the
+    # cross-customer boundary.
+    'supabase/migrations/*',
+    'supabase/verify/*',
+    'middleware.ts',
+    'lib/route-access.ts',
+    'lib/houston/whitelist.ts',
 )
 _DEEP_REVIEW_PATHS_CONFIG_PATH = (
     Path(__file__).resolve().parent.parent / 'config' / 'deep-review-paths.json'
