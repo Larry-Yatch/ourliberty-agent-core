@@ -14003,7 +14003,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-28T22:20:58.860480+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-28T22:19:23.704776+00:00"
+      "orphan_last_activity_ts": "2026-07-28T22:19:23.704776+00:00",
+      "briefing": {
+        "what": "Your team has a finished piece of work waiting for your sign-off before it can go live.",
+        "why": "It's ready now, but it isn't tied to any active initiative, so it's unclear what it delivers or why it was started.",
+        "suggest": "Hold off on approving until someone confirms what this delivers and that it's still wanted \u2014 a quick check before you greenlight it."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-28T22:22:55.105934+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-pr-RSDPM-142",
@@ -14020,7 +14034,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-28T22:20:58.860480+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-28T22:19:20.856749+00:00"
+      "orphan_last_activity_ts": "2026-07-28T22:19:20.856749+00:00",
+      "briefing": {
+        "what": "A piece of work the team picked up on its own that hasn't been tied to any active project yet, and it's now waiting on a final sign-off.",
+        "why": "Unplanned work that stalls in review ties up the team's time without moving a business goal forward, and the sign-off already got kicked upstairs for a second look.",
+        "suggest": "Before green-lighting it, take a minute to confirm which goal this actually serves \u2014 if it doesn't map to a current priority, hold it rather than let it consume more time."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-28T22:22:55.105934+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-pr-ourliberty-agent-core-1041",
@@ -14037,7 +14065,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-28T22:20:58.860480+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-28T22:15:25.886806+00:00"
+      "orphan_last_activity_ts": "2026-07-28T22:15:25.886806+00:00",
+      "briefing": {
+        "what": "A piece of work your team began on their own that hasn't been connected to any of your current priorities yet.",
+        "why": "Unclaimed work can quietly eat time and attention that belongs to the goals you actually care about, and it's been sitting waiting for a decision.",
+        "suggest": "Take a quick look to confirm it's worth continuing before anyone invests more into it \u2014 if it doesn't tie back to a real priority, set it aside."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-28T22:22:55.105934+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
