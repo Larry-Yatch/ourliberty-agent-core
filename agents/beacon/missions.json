@@ -14181,6 +14181,23 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-delegate-cap-title-f1a1",
+      "name": "Delegate Cap Title F1a1",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `delegate-cap-title-f1a1`. Last activity 2026-07-28T23:33:09.776732+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "delegate-cap-title-f1a1"
+      ],
+      "repo": null,
+      "created": "2026-07-28",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-28T23:36:16.327757+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-28T23:33:09.776732+00:00"
     }
   ]
 }
