@@ -469,6 +469,80 @@ class PredicateUnitTest(_GateTestBase):
                          self.on._DEFAULT_DEEP_REVIEW_PATHS)
 
 
+class ShippedFilesetTest(_GateTestBase):
+    """The SHIPPED config, not a tmp fixture.
+
+    Every other test in this file points the config at a tmp path so it owns
+    the fileset — which is right for testing the gate's logic, and is also why
+    nothing here ever noticed that the real `config/deep-review-paths.json`
+    listed ONLY agent-core paths. RSDPM matched no glob, so every migration and
+    every RLS-policy change in that repo auto-merged on a Mirror pass with no
+    durable hold: the sole brake was somebody remembering to apply
+    `deep-review-required` by hand.
+
+    These assert the real file's *coverage*, so an entry cannot be dropped
+    silently. Coverage is asserted through `_deep_review_required` rather than
+    by string-matching the list, so a glob that is present but does not actually
+    match still fails — an entry that cannot tell right from wrong is the thing
+    being guarded against.
+    """
+
+    def setUp(self):
+        super().setUp()
+        # Point the loader back at the repo's real config for this class only.
+        self.on._DEEP_REVIEW_PATHS_CONFIG_PATH = (
+            Path(__file__).resolve().parents[2]
+            / 'config' / 'deep-review-paths.json'
+        )
+        self.on._invalidate_deep_review_paths_cache()
+
+    def test_shipped_config_holds_rsdpm_critical_paths(self):
+        for path in (
+            'supabase/migrations/0031_workspace_boundary.sql',
+            'supabase/verify/99_assertions.sql',
+            'middleware.ts',
+            'lib/route-access.ts',
+            'lib/houston/whitelist.ts',
+        ):
+            with self.subTest(path=path):
+                self.assertTrue(
+                    self.on._deep_review_required(
+                        REPO, 1, [path], labels=['auto-review']),
+                    f'{path} must be deep-review-held, not auto-merged',
+                )
+
+    def test_shipped_config_still_holds_agent_core_critical_paths(self):
+        # The RSDPM entries are additive — nothing above them regressed.
+        for path in ('scripts/outbox_notifier.py', 'config/trust-policy.json'):
+            with self.subTest(path=path):
+                self.assertTrue(self.on._deep_review_required(
+                    REPO, 1, [path], labels=['auto-review']))
+
+    def test_shipped_config_does_not_hold_ordinary_files(self):
+        # The fileset must still discriminate — a gate that holds everything is
+        # as useless as one that holds nothing, and would train around itself.
+        for path in ('docs/CLICK_MAP.md', 'app/board/components/BoardView.tsx',
+                     'README.md'):
+            with self.subTest(path=path):
+                self.assertFalse(self.on._deep_review_required(
+                    REPO, 1, [path], labels=['auto-review']))
+
+    def test_shipped_config_and_code_default_agree(self):
+        """The config's own docstring promises it is `Kept in sync with
+        config/deep-review-paths.json — the config file IS this list`, and
+        nothing enforced that. A malformed or deleted config silently falls back
+        to the code default, so drift between them is a FAIL-OPEN: protection
+        that looks present in the file it is read from and is absent in the one
+        actually used.
+        """
+        self.assertEqual(
+            tuple(json.loads(
+                self.on._DEEP_REVIEW_PATHS_CONFIG_PATH.read_text()
+            )['paths']),
+            self.on._DEFAULT_DEEP_REVIEW_PATHS,
+        )
+
+
 class ShaBoundTokenSlice1Test(_GateTestBase):
     """deep-review-sha-bound-approval slice 1 — the gate accepts a SHA-bound
     `deep-review` success commit status as a stamp equivalent to the legacy
