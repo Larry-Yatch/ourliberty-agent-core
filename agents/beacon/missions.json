@@ -13987,6 +13987,57 @@
       "retired_by": "heal_orphan_autoregister",
       "retired_at": "2026-07-28T22:05:46.187605+00:00",
       "retired_reason": "orphan-terminal"
+    },
+    {
+      "id": "proposed-mirror-review-pr-RSDPM-142-ca78b2da",
+      "name": "Mirror Review PR RSDPM 142 Ca78b2da",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `mirror-review-pr-RSDPM-142-ca78b2da`. Last activity 2026-07-28T22:19:23.704776+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "mirror-review-pr-RSDPM-142-ca78b2da"
+      ],
+      "repo": null,
+      "created": "2026-07-28",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-28T22:20:58.860480+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-28T22:19:23.704776+00:00"
+    },
+    {
+      "id": "proposed-pr-RSDPM-142",
+      "name": "PR RSDPM 142",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pr-RSDPM-142`. Last activity 2026-07-28T22:19:20.856749+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pr-RSDPM-142"
+      ],
+      "repo": null,
+      "created": "2026-07-28",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-28T22:20:58.860480+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-28T22:19:20.856749+00:00"
+    },
+    {
+      "id": "proposed-pr-ourliberty-agent-core-1041",
+      "name": "PR Ourliberty Agent Core 1041",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pr-ourliberty-agent-core-1041`. Last activity 2026-07-28T22:15:25.886806+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pr-ourliberty-agent-core-1041"
+      ],
+      "repo": null,
+      "created": "2026-07-28",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-28T22:20:58.860480+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-28T22:15:25.886806+00:00"
     }
   ]
 }
