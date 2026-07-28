@@ -6,6 +6,12 @@
 
 ---
 
+## system-health.json correct path is ~/agents/blackboard/system-health.json (learned 2026-07-28, iter ~6618)
+
+**Rule:** The system health file is `~/agents/blackboard/system-health.json` (NOT `agent-core-system-health.json`). Schema: `{"timestamp": "<ISO 8601>", "overall": "healthy|degraded", "checks": {...}, "bots": {...}}` — key is `"timestamp"` not `"ts"`. The file has full bot liveness (beacon/forge/mirror/pulse: desired, alive, unit, action). `agent-core-system-health.json` does NOT exist. The correct path for Check C bot liveness is `system-health.json`.
+
+---
+
 ## beacon-pending-approvals.json is at ~/agents/state/ NOT ~/agents/blackboard/ (learned 2026-07-23, iter ~6020)
 
 **Rule:** `beacon-pending-approvals.json` lives at `/home/larry/agents/state/beacon-pending-approvals.json` (state dir), NOT `~/agents/blackboard/`. Schema: `{"version": 1, "pending": [...], "history": [...]}` — pending items use key `"pending"` (not `"approvals"`). Prior iters that checked the wrong path got `No such file or directory` → treated as pending=0 → false-clear. Always read from `state/` path and iterate `d["pending"]`.
