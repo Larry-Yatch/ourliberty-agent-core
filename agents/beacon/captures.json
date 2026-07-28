@@ -1958,6 +1958,36 @@
         "from_state": "parked"
       },
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+    },
+    {
+      "id": "cap-install-md-documents-only-56-of-99-systemd-timer-0b82",
+      "title": "INSTALL.md documents only 56 of 99 systemd timers",
+      "note": "Audit 2026-07-27 while adding the #1037 line (PR #1039): systemd/INSTALL.md contains an enable-line/table-row for only 56 of the 99 .timer units in systemd/. 43 are undocumented, including load-bearing ones (heal-pipeline-stall, heal-undispatched-pr-review, heal-stale-approvals, heal-stale-daemon-code, main-suite-guardian, rotate-active-tier, sync-dispatch-repos). This matters more now that we know the post-merge sync hook could never auto-install (see #1038): when auto-install is unavailable or a unit must be hand-installed, INSTALL.md is the reference a human uses, and it silently omits ~44% of the fleet. Not a one-off omission by #1037 \u2014 a systemic doc gap. Suggested fix: generate the enable-line block from systemd/*.timer so it cannot drift, or add a test asserting every repo timer appears in INSTALL.md (the same existence-gate discipline as [[existence-gates-are-false-clean-generators]]). Repro: compare basenames of systemd/*.timer against the text of systemd/INSTALL.md.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "main",
+        "captured_at": "2026-07-28T01:38:45.902755+00:00"
+      },
+      "last_touched": "2026-07-28T01:38:45.902755+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "Our setup guide for the automated background jobs that keep the operation running only lists about half of them \u2014 43 are missing, including several that handle critical self-healing and recovery.",
+        "why": "If any of these jobs ever has to be set up or restored by hand, whoever does it is working from a guide that silently leaves out nearly half the fleet, so critical pieces could quietly never get turned back on.",
+        "suggest": "Worth fixing, but do it carefully: have the guide build itself automatically from the real list of jobs so it can never fall out of sync again, rather than patching the missing entries by hand."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-28T01:41:40.557894+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     }
   ]
 }
