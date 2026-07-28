@@ -57,6 +57,33 @@ head they cover, and the shared `review_record_name_re` grammar (reused here)
 teaches the dedup predicate — archive, live-inbox, AND lost-result legs — the
 revision-round filenames.
 
+BACK-OFF, NARROWED (the manually-fixed escalation strand, RSDPM #142, 2026-07-28):
+
+The recency leg above answers "did the pipeline touch this task lately", which
+is a proxy for "the pipeline OWNS this PR" — and a FALSE one in one reachable
+state: Mirror emits a TERMINAL `REVIEW_ESCALATE` (so no Forge revision is
+dispatched and the revision-in-flight ledger stays empty), nobody approves the
+escalation card (so nothing re-dispatches), and a human then pushes a manual fix.
+Nothing owns the PR — but the archived round-0 record kept the backstop off for
+the rest of the 180-minute window, and the head-aware dedup that WOULD have
+caught it (PR #539: the archived record's head_sha is the PRE-fix head) never
+ran, because this guard returns first. Observed live on RSDPM #142: four
+consecutive ticks logged PIPELINE_BACKOFF against a record covering a superseded
+head; the PR only moved when the record was moved aside by hand.
+
+The recency leg is now HEAD-AWARE the same way the dedup is: an ARCHIVED record
+that provably covers a DIFFERENT head than the PR's current one is not evidence
+of ownership. The #865 protection is unaffected because head drift was never
+what identified that shape — a live cascade moves the head under itself
+repeatedly (Forge's `[WIP][session-start]` checkpoint + work commits), and the
+signal for that is `revision_in_flight_ledger`, which is durable, TTL-bounded
+and deliberately NOT head-keyed. While it is set the recency leg stays fully
+head-blind; the one window it cannot cover (it clears at re-review DISPATCH,
+before that re-review runs) is held by the live-inbox and `.claimed/` legs,
+which are head-agnostic by construction and were widened here to include
+`.claimed/` for exactly that reason. Every uncertainty — no recorded head, no
+current head, an unreadable ledger — keeps the old back-off.
+
 Why a LABEL and not a branch rule: neither branch prefix nor PR author can
 separate Larry's hand-opened PRs from the agent team's. The team commits as
 Larry's own GitHub identity and uses the very same prefixes (`fix/`, `feat/`,
@@ -517,11 +544,35 @@ def head_has_passing_review_status(repo: str, head_sha: str) -> bool:
     return isinstance(states, list) and 'success' in states
 
 
+def _revision_in_flight(task_id: str) -> bool:
+    """Is a Forge revision round in flight for `task_id`?
+
+    Thin, fail-SAFE wrapper over `revision_in_flight_ledger.is_in_flight` — the
+    durable flag set when a REVIEW_REVISION is written to Forge and cleared at
+    the re-review dispatch / a terminal verdict. This is the signal that a
+    cascade is live and moving the PR head under itself (the #865 shape), which
+    is what the recency guard's head-awareness must yield to.
+
+    An import or read failure returns True — "assume a revision is in flight" —
+    so a broken ledger degrades the recency guard to its pre-head-aware,
+    strictly MORE conservative behavior (back off) rather than opening the
+    duplicate-dispatch window. `is_in_flight` itself never raises; the guard is
+    for the import and for any future signature drift."""
+    try:
+        import revision_in_flight_ledger
+        return bool(revision_in_flight_ledger.is_in_flight(task_id))
+    except Exception as e:  # noqa: BLE001 — never crash a timer tick
+        log(f'revision-in-flight ledger unavailable ({type(e).__name__}); '
+            f'treating as in-flight (head-blind recency)', 'WARN')
+        return True
+
+
 def recent_review_record(
     review_stem: str,
     mirror_inbox: Path,
     now: datetime,
     window_minutes: int = RECENT_REVIEW_ACTIVITY_MINUTES,
+    current_head_sha: Optional[str] = None,
 ) -> Optional[str]:
     """Reason string when the review pipeline holds a recent record for this
     task that should keep the backstop off; None when the task looks genuinely
@@ -530,19 +581,53 @@ def recent_review_record(
     a task_id that `sanitize_component` rewrites (e.g. a `/` in the id) is
     matched under its real on-disk name, not the raw form.
 
-    Scans Mirror's inbox + `.archive/` + `.invalid/` for ALL of the task's
-    review-record shapes via `outbox_notifier.review_record_name_re` — the
-    SAME name grammar the head-aware dedup uses, so the two can't disagree
-    about which records exist (the drift that caused #865, where the `-rev<N>`
-    round names were invisible to one scanner). `.archive/.lost-result/` is NOT
-    descended into (glob is non-recursive): died-verdictless re-dispatch pacing
-    is owned by the dedup predicate's debounce+cap, not this time window.
+    Scans Mirror's inbox + `.claimed/<slot>/` + `.archive/` + `.invalid/` for
+    ALL of the task's review-record shapes via
+    `outbox_notifier.review_record_name_re` — the SAME name grammar the
+    head-aware dedup uses, so the two can't disagree about which records exist
+    (the drift that caused #865, where the `-rev<N>` round names were invisible
+    to one scanner). `.archive/.lost-result/` is NOT descended into (glob is
+    non-recursive): died-verdictless re-dispatch pacing is owned by the dedup
+    predicate's debounce+cap, not this time window.
 
-    - a matching file LIVE in the inbox blocks regardless of age (a queued
-      review is pending no matter how long it has queued);
+    - a matching file LIVE in the inbox, or relocated into `.claimed/<slot>/`,
+      blocks regardless of age (a queued or claimed review is pending no matter
+      how long it has queued — `.claimed/` is the window where Mirror is
+      literally executing the review, so it is the LAST record shape that may
+      be read as orphaned; the sibling dedup predicate
+      `outbox_notifier._review_request_already_dispatched` blocks on it for the
+      same reason, and `heal_orphaned_mirror_claims` archives a claim whose
+      session died, which restores the age bound below);
     - a matching `.archive/` / `.invalid/` record blocks only while its mtime
       (= dispatch time; archive is a plain rename) is younger than
       `window_minutes`. A future mtime (clock skew) also blocks: conservative.
+
+    HEAD-AWARENESS on the archived legs (`current_head_sha`, default OFF — the
+    manually-fixed-escalation strand, RSDPM #142, 2026-07-28):
+
+      Recency answers "did the pipeline touch this task lately", which is only
+      a proxy for "the pipeline OWNS this PR right now". It is a FALSE proxy in
+      one live state: Mirror emits a terminal REVIEW_ESCALATE (so no Forge
+      revision is dispatched and no revision-in-flight flag is set), nobody
+      approves the escalation card, and a human then pushes a manual fix.
+      Nothing owns the PR — yet the archived record keeps the backstop off for
+      the rest of the window, and the head-aware dedup that WOULD catch it
+      (PR #539; the archived record's head_sha is the PRE-fix head) never runs,
+      because this guard returns first. Observed: four consecutive ticks logged
+      PIPELINE_BACKOFF while the PR sat un-re-reviewed.
+
+      So when the caller supplies the PR's current head, an archived/.invalid
+      record that provably covers a DIFFERENT head is not evidence of ownership
+      and is skipped. Deliberately narrow — every uncertainty keeps today's
+      back-off:
+        - record recorded no head (`None`) → blocks (can't prove drift);
+        - record's head == current head → blocks (that record covers this head);
+        - caller passes None → blocks (the caller is the one that knows whether
+          a Forge revision is in flight; see `pipeline_backoff_reason`);
+        - live/claimed records are head-agnostic, as above.
+      Records are evaluated individually, so a task holding BOTH a drifted
+      round-0 record and a current-head `-rev<N>` record still backs off on the
+      latter.
 
     Fail-open per directory: an unreadable dir/entry is skipped, so an fs
     hiccup can only make the backstop MORE willing to dispatch (its default
@@ -550,8 +635,28 @@ def recent_review_record(
     import outbox_notifier  # grammar owner; already imported by main() by now
     name_re = outbox_notifier.review_record_name_re(review_stem)
     glob_pat = f'{glob.escape(review_stem)}*.json'
-    for sub in ('', '.archive', '.invalid'):
-        d = mirror_inbox / sub if sub else mirror_inbox
+    head_aware = isinstance(current_head_sha, str) and bool(current_head_sha)
+    # Live legs first (age-independent): the inbox root, then every claim slot.
+    # Globbing the slot dirs (not the record name) keeps a metacharacter-bearing
+    # task_id from widening the scan.
+    live_dirs = [(mirror_inbox, 'still queued in Mirror inbox')]
+    try:
+        live_dirs.extend(
+            (s, 'claimed by a live Mirror slot')
+            for s in (mirror_inbox / '.claimed').glob('*') if s.is_dir()
+        )
+    except OSError:
+        pass
+    for d, why in live_dirs:
+        try:
+            entries = d.glob(glob_pat)
+        except OSError:
+            continue
+        for p in entries:
+            if name_re.fullmatch(p.name):
+                return f'{p.name} {why}'
+    for sub in ('.archive', '.invalid'):
+        d = mirror_inbox / sub
         try:
             entries = d.glob(glob_pat)
         except OSError:
@@ -559,8 +664,11 @@ def recent_review_record(
         for p in entries:
             if not name_re.fullmatch(p.name):
                 continue
-            if not sub:
-                return f'{p.name} still queued in Mirror inbox'
+            if head_aware:
+                recorded = outbox_notifier._recorded_review_head_sha(p)
+                if isinstance(recorded, str) and recorded and \
+                        recorded != current_head_sha:
+                    continue  # covers a superseded head — proves nothing
             try:
                 mtime = datetime.fromtimestamp(
                     p.stat().st_mtime, tz=timezone.utc,
@@ -588,25 +696,70 @@ def pipeline_backoff_reason(
       2. a recent review record for the task (any round shape, dispatch-time
          window) — catches a healthy cascade whose head has moved since its
          review was dispatched (the exact #865 head-drift the head-keyed dedup
-         misses);
+         misses). HEAD-AWARE unless a Forge revision is in flight, see below;
       3. a SUCCESS `mirror-review` status on the CURRENT head — a PASS merely
          held/unmerged, which must never be re-reviewed. Failure / absent / gh
-         error fall through to a real dispatch, gated by (2)."""
+         error fall through to a real dispatch, gated by (2).
+
+    (2) IS HEAD-AWARE; (1) AND (3) NEED NOT BE (RSDPM #142, 2026-07-28):
+
+      (2) was the only leg keyed on "the pipeline touched this task lately"
+      rather than on the head in front of it, and that is the leg that stranded
+      a manually-fixed, terminally-ESCALATED PR for the full 180-minute window
+      (nothing owned the PR: no revision dispatched, no human approval, and the
+      head-aware dedup that would have caught the drift never ran because this
+      guard returned first). So an archived record covering a superseded head no
+      longer justifies backing off — see `recent_review_record`.
+
+      The guard's REASON for existing survives that intact, because head drift
+      alone was never the #865 signal. #865 is a live cascade whose head moves
+      under it (Forge's `[WIP][session-start]` checkpoint + work commits during
+      a revision round), and the ledger `revision_in_flight_ledger` is the
+      DURABLE, TTL-bounded flag for exactly that state — set when a revision is
+      written to Forge, cleared only at the re-review dispatch or a terminal
+      verdict, and explicitly documented as NOT head-keyed because a revision
+      moves the head repeatedly while still in flight. While it is set, this
+      passes no head and (2) keeps its original, head-blind behavior. The window
+      the ledger cannot cover (cleared at re-review DISPATCH, before that
+      re-review completes) is covered by the live/`.claimed/` legs of (2), which
+      are head-agnostic by construction.
+
+      (1) is a liveness probe, not a record scan: it reads a running claude
+      process / a queued inbox task, both of which describe the pipeline RIGHT
+      NOW and vanish when the round ends. It cannot go stale against a moved
+      head, and piling a second review onto a live one is the very harm this
+      whole guard exists to prevent — left alone.
+
+      (3) is ALREADY head-aware in the strongest sense: it probes the status of
+      `headRefOid` itself, so a manual fix that moves the head makes it return
+      False on its own. It fires only when THIS head genuinely carries a PASS —
+      left alone."""
     repo_short = _repo_segment(pr.get('_repo') or '')
     live, live_reason = pipeline_live_state.pr_review_in_progress(
         repo_short, pr['number'],
     )
     if live:
         return f'active review ({live_reason})'
-    recent = recent_review_record(review_stem, mirror_inbox, now)
+    repo = pr.get('_repo')
+    head_sha = pr.get('headRefOid')
+    # Head to hold archived records against — None (= keep the pre-#142
+    # head-blind behavior) whenever we cannot prove nothing owns the PR: no
+    # usable head, or a Forge revision genuinely in flight for this task.
+    recency_head: Optional[str] = None
+    if isinstance(head_sha, str) and head_sha:
+        task_id = pr.get('task_id')
+        if isinstance(task_id, str) and task_id and \
+                not _revision_in_flight(task_id):
+            recency_head = head_sha
+    recent = recent_review_record(
+        review_stem, mirror_inbox, now, current_head_sha=recency_head,
+    )
     if recent:
         return f'recent review record — {recent}'
     # gh, last. Only probe with the PR's OWN repo (never guess a fallback: a
     # wrong-repo status query 404s → False anyway, but the guess could also
     # false-match a same-SHA commit in the other repo). Missing repo/head →
     # skip the probe and fall through (recency already had its say).
-    repo = pr.get('_repo')
-    head_sha = pr.get('headRefOid')
     if repo and isinstance(head_sha, str) and head_sha:
         if head_has_passing_review_status(repo, head_sha):
             return f'passing mirror-review status on {head_sha[:12]}'

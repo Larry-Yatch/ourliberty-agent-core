@@ -1077,6 +1077,243 @@ class TestPipelineBackoffReason(unittest.TestCase):
         self.assertIsNone(r)
 
 
+class TestRecentReviewRecordHeadAware(unittest.TestCase):
+    """`current_head_sha`: an ARCHIVED record covering a superseded head is not
+    evidence the pipeline owns the PR (the manually-fixed-escalation strand,
+    RSDPM #142). Every uncertainty must keep the old, head-blind back-off."""
+
+    TASK = 'pr-RSDPM-142'
+    # The live shapes from the incident: the archived record recorded the head
+    # that Mirror ESCALATEd, the PR now carries the human's manual-fix head.
+    OLD_HEAD = 'ca78b2dacf69b0599024139036ff93213d60db6b'
+    NEW_HEAD = '99f370378b8fc07da194c392ec2de315dab54d98'
+
+    def setUp(self):
+        import tempfile
+        self._tmp = tempfile.TemporaryDirectory()
+        self.inbox = Path(self._tmp.name)
+        (self.inbox / '.archive').mkdir()
+        (self.inbox / '.invalid').mkdir()
+        self.now = datetime.now(timezone.utc)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _write(self, relpath, *, head=None, age_minutes=24.0, nest=False):
+        """Write a review record. `nest` puts head_sha under `context`, the
+        chain-envelope shape `_recorded_review_head_sha` also reads."""
+        import os
+        p = self.inbox / relpath
+        p.parent.mkdir(parents=True, exist_ok=True)
+        body = {'task_id': self.TASK}
+        if head is not None:
+            if nest:
+                body['context'] = {'head_sha': head}
+            else:
+                body['head_sha'] = head
+        p.write_text(json.dumps(body))
+        ts = (self.now - timedelta(minutes=age_minutes)).timestamp()
+        os.utime(p, (ts, ts))
+        return p
+
+    def _probe(self, head):
+        return h.recent_review_record(
+            f'review-{self.TASK}', self.inbox, self.now, current_head_sha=head)
+
+    # ---- the defect: drifted archived record must NOT hold the backstop off ----
+
+    def test_drifted_archived_record_does_not_block(self):
+        self._write(f'.archive/review-{self.TASK}.json', head=self.OLD_HEAD)
+        self.assertIsNone(self._probe(self.NEW_HEAD))
+
+    def test_drifted_archived_record_still_blocks_when_head_blind(self):
+        # The SAME record, probed the old way (no head) — proves the relaxation
+        # is opt-in and that this record is what stranded the PR for 180min.
+        self._write(f'.archive/review-{self.TASK}.json', head=self.OLD_HEAD)
+        self.assertIsNotNone(h.recent_review_record(
+            f'review-{self.TASK}', self.inbox, self.now))
+
+    def test_drifted_rev_round_record_does_not_block(self):
+        self._write(f'.archive/review-{self.TASK}-rev1.json', head=self.OLD_HEAD)
+        self.assertIsNone(self._probe(self.NEW_HEAD))
+
+    def test_drifted_invalid_leg_record_does_not_block(self):
+        self._write(f'.invalid/review-{self.TASK}.json', head=self.OLD_HEAD)
+        self.assertIsNone(self._probe(self.NEW_HEAD))
+
+    def test_nested_context_head_is_read(self):
+        # A chain-envelope record nests head_sha under `context`; drift there
+        # must be seen too, or the guard is head-aware in name only.
+        self._write(f'.archive/review-{self.TASK}.json',
+                    head=self.OLD_HEAD, nest=True)
+        self.assertIsNone(self._probe(self.NEW_HEAD))
+
+    # ---- every uncertainty keeps the back-off ----
+
+    def test_matching_head_still_blocks(self):
+        self._write(f'.archive/review-{self.TASK}.json', head=self.NEW_HEAD)
+        self.assertIsNotNone(self._probe(self.NEW_HEAD))
+
+    def test_record_without_recorded_head_still_blocks(self):
+        # Can't prove drift → conservative. (The pre-#539 round records.)
+        self._write(f'.archive/review-{self.TASK}-rev1.json', head=None)
+        self.assertIsNotNone(self._probe(self.NEW_HEAD))
+
+    def test_unparseable_record_still_blocks(self):
+        import os
+        p = self.inbox / '.archive' / f'review-{self.TASK}.json'
+        p.write_text('{not json')
+        ts = (self.now - timedelta(minutes=24)).timestamp()
+        os.utime(p, (ts, ts))
+        self.assertIsNotNone(self._probe(self.NEW_HEAD))
+
+    def test_current_head_record_wins_over_drifted_sibling(self):
+        # Records are judged INDIVIDUALLY: a task holding a superseded round-0
+        # record AND a current-head rev round must still back off on the latter,
+        # whichever order the directory scan happens to yield.
+        self._write(f'.archive/review-{self.TASK}.json', head=self.OLD_HEAD)
+        self._write(f'.archive/review-{self.TASK}-rev1.json', head=self.NEW_HEAD)
+        r = self._probe(self.NEW_HEAD)
+        self.assertIsNotNone(r)
+        self.assertIn('-rev1.json', r)
+
+    def test_stale_matching_head_record_still_does_not_block(self):
+        # Head-awareness must not RESURRECT the window: a same-head record
+        # older than the window is still not a back-off reason.
+        self._write(f'.archive/review-{self.TASK}.json', head=self.NEW_HEAD,
+                    age_minutes=h.RECENT_REVIEW_ACTIVITY_MINUTES + 30)
+        self.assertIsNone(self._probe(self.NEW_HEAD))
+
+    # ---- live legs are head-agnostic by construction ----
+
+    def test_live_inbox_record_blocks_despite_drift(self):
+        # A queued review picks up the PR's CURRENT head when Mirror runs it,
+        # so its recorded head is irrelevant — never pile on.
+        self._write(f'review-{self.TASK}.json', head=self.OLD_HEAD)
+        self.assertIsNotNone(self._probe(self.NEW_HEAD))
+
+    def test_claimed_record_blocks_despite_drift(self):
+        # THE #865 GUARD after the ledger clears: between a re-review's dispatch
+        # and its verdict the record lives in `.claimed/<slot>/` and the
+        # in-flight flag is already cleared. If this leg missed it, a drifted
+        # round-0 record would let a duplicate review through onto a LIVE one.
+        self._write(f'.claimed/slot-1/review-{self.TASK}-rev1.json',
+                    head=self.OLD_HEAD)
+        self.assertIsNotNone(self._probe(self.NEW_HEAD))
+
+    def test_claimed_record_blocks_head_blind_too(self):
+        self._write(f'.claimed/slot-1/review-{self.TASK}.json', head=None)
+        self.assertIsNotNone(h.recent_review_record(
+            f'review-{self.TASK}', self.inbox, self.now))
+
+    def test_claimed_sibling_task_does_not_block(self):
+        # The name grammar still gates the `.claimed/` leg.
+        self._write(f'.claimed/slot-1/review-{self.TASK}-extra-leg.json',
+                    head=self.OLD_HEAD)
+        self.assertIsNone(self._probe(self.NEW_HEAD))
+
+    def test_missing_claimed_dir_is_not_an_error(self):
+        # No `.claimed/` at all (the temp tree above) must scan cleanly.
+        self.assertIsNone(self._probe(self.NEW_HEAD))
+
+
+class TestPipelineBackoffHeadAwareWiring(unittest.TestCase):
+    """End-to-end through `pipeline_backoff_reason` with a REAL inbox tree —
+    the recency leg is head-aware only when no Forge revision is in flight."""
+
+    TASK = 'pr-RSDPM-142'
+    OLD_HEAD = 'ca78b2dacf69b0599024139036ff93213d60db6b'
+    NEW_HEAD = '99f370378b8fc07da194c392ec2de315dab54d98'
+
+    def setUp(self):
+        import tempfile
+        self._tmp = tempfile.TemporaryDirectory()
+        self.inbox = Path(self._tmp.name)
+        (self.inbox / '.archive').mkdir()
+        self.now = datetime.now(timezone.utc)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _archive(self, name, head):
+        import os
+        p = self.inbox / '.archive' / name
+        p.write_text(json.dumps({'task_id': self.TASK, 'head_sha': head}))
+        ts = (self.now - timedelta(minutes=24)).timestamp()
+        os.utime(p, (ts, ts))
+
+    def _run(self, *, head, task_id=None, in_flight=False, live=(False, ''),
+             passing=False):
+        from unittest import mock
+        pr = {'number': 142, 'task_id': task_id if task_id is not None else self.TASK,
+              '_repo': 'Larry-Yatch/RSDPM', 'headRefOid': head}
+        with mock.patch.object(h.pipeline_live_state, 'pr_review_in_progress',
+                               return_value=live), \
+                mock.patch.object(h, '_revision_in_flight',
+                                  return_value=in_flight), \
+                mock.patch.object(h, 'head_has_passing_review_status',
+                                  return_value=passing):
+            return h.pipeline_backoff_reason(
+                pr, self.inbox, f'review-{self.TASK}', self.now)
+
+    def test_manually_fixed_escalated_pr_is_dispatchable(self):
+        # THE DEFECT, end to end: terminal ESCALATE (nothing in flight), human
+        # pushed a fix, archived record covers the pre-fix head → no back-off.
+        self._archive(f'review-{self.TASK}.json', self.OLD_HEAD)
+        self.assertIsNone(self._run(head=self.NEW_HEAD))
+
+    def test_same_record_backs_off_while_a_revision_is_in_flight(self):
+        # THE #865 SHAPE: the identical drifted record, but a Forge revision is
+        # genuinely in flight — the head is moving under a LIVE cascade, so the
+        # guard stays head-blind and holds.
+        self._archive(f'review-{self.TASK}.json', self.OLD_HEAD)
+        r = self._run(head=self.NEW_HEAD, in_flight=True)
+        self.assertIsNotNone(r)
+        self.assertIn('recent review record', r)
+
+    def test_backs_off_when_pr_head_unknown(self):
+        self._archive(f'review-{self.TASK}.json', self.OLD_HEAD)
+        self.assertIsNotNone(self._run(head=None))
+
+    def test_backs_off_when_task_id_missing(self):
+        # No task_id → can't ask the ledger → can't prove nothing owns the PR.
+        self._archive(f'review-{self.TASK}.json', self.OLD_HEAD)
+        self.assertIsNotNone(self._run(head=self.NEW_HEAD, task_id=''))
+
+    def test_active_review_still_short_circuits(self):
+        r = self._run(head=self.NEW_HEAD, live=(True, 'live_pid'))
+        self.assertIn('active review', r)
+
+    def test_passing_status_on_current_head_still_backs_off(self):
+        # Leg 3 is untouched and already head-keyed: it probes headRefOid.
+        r = self._run(head=self.NEW_HEAD, passing=True)
+        self.assertIn('passing mirror-review status', r)
+
+
+class TestRevisionInFlightWrapper(unittest.TestCase):
+    """`_revision_in_flight` fails toward "in flight" so a broken ledger can only
+    make the recency guard MORE conservative (back off), never open the
+    duplicate-dispatch window."""
+
+    def test_delegates_to_the_ledger(self):
+        from unittest import mock
+        import revision_in_flight_ledger
+        with mock.patch.object(revision_in_flight_ledger, 'is_in_flight',
+                               return_value=True) as p:
+            self.assertTrue(h._revision_in_flight('t-1'))
+        p.assert_called_once_with('t-1')
+        with mock.patch.object(revision_in_flight_ledger, 'is_in_flight',
+                               return_value=False):
+            self.assertFalse(h._revision_in_flight('t-1'))
+
+    def test_ledger_failure_reads_as_in_flight(self):
+        from unittest import mock
+        import revision_in_flight_ledger
+        with mock.patch.object(revision_in_flight_ledger, 'is_in_flight',
+                               side_effect=RuntimeError('boom')):
+            self.assertTrue(h._revision_in_flight('t-1'))
+
+
 class TestCanonicalTaskIdForPr(unittest.TestCase):
     """canonical_task_id_for_pr: recover the build-outbox task_id by PR-URL match,
     regardless of how the head branch mangled the id (G-rule
