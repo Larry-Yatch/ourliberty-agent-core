@@ -14048,7 +14048,11 @@
         "at": "2026-07-28T22:22:55.105934+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-28T23:21:16.285161+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-pr-ourliberty-agent-core-1041",
@@ -14115,6 +14119,40 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-fix-escalated-pr-headchange-backoff-001",
+      "name": "Fix Escalated PR Headchange Backoff 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `fix-escalated-pr-headchange-backoff-001`. Last activity 2026-07-28T23:19:36.496517+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "fix-escalated-pr-headchange-backoff-001"
+      ],
+      "repo": null,
+      "created": "2026-07-28",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-28T23:21:16.285161+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-28T23:19:36.496517+00:00"
+    },
+    {
+      "id": "proposed-delegate-cap-title-f47b",
+      "name": "Delegate Cap Title F47b",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `delegate-cap-title-f47b`. Last activity 2026-07-28T23:19:28.022192+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "delegate-cap-title-f47b"
+      ],
+      "repo": null,
+      "created": "2026-07-28",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-28T23:21:16.285161+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-28T23:19:28.022192+00:00"
     }
   ]
 }
