@@ -1988,6 +1988,35 @@
         "from_state": "parked"
       },
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+    },
+    {
+      "id": "cap-title-f47b",
+      "title": "--title",
+      "note": "PIPELINE_BACKOFF strands a manually-fixed escalated PR for up to 3 hours",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "main",
+        "captured_at": "2026-07-28T23:01:21.920992+00:00"
+      },
+      "last_touched": "2026-07-28T23:01:21.920992+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "When our team manually fixes an urgent, flagged piece of work, the system can sit on it and leave it waiting for up to three hours before anything moves forward.",
+        "why": "That delay stalls work someone already rushed to fix by hand, wasting the effort and slowing down the very items we've flagged as most urgent.",
+        "suggest": "Worth fixing so hand-fixed urgent items move ahead right away; it's a low-stakes change, so we can slot it in without disrupting anything."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-28T23:03:23.015976+00:00",
+        "from_state": "parked"
+      }
     }
   ]
 }
