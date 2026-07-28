@@ -72,6 +72,46 @@ _HEALER_SHIM = (
     'sys.exit(int(os.environ.get("TRIGGER_SHIM_RC", "0")))\n'
 )
 
+# ── Namespace-escape shims ──────────────────────────────────────────────────
+# sync runs under ourliberty-sync.service (ProtectSystem=strict), whose mount
+# namespace makes /etc/systemd/system read-only for every descendant — `sudo`
+# raises privilege but does NOT escape a namespace, so the healer's own
+# `sudo -n cp <unit> /etc/systemd/system/` failed 27/27 on this path. Step 7b
+# now re-launches the healer via `systemd-run`, which asks PID 1 to spawn it as
+# a fresh un-sandboxed transient unit. These shims stand in for `systemd-run`
+# and `sudo` so the escape path is exercised without real systemd or root.
+#
+# The systemd-run shim mirrors the real contract closely enough to be a
+# meaningful test: it consumes its own flags, APPLIES each --setenv to the child
+# environment (so the test proves the enable flag survives the hand-off rather
+# than leaking in from the parent), records that it was used, and then execs the
+# remaining argv, propagating the child's exit code the way --wait does.
+_SYSTEMD_RUN_SHIM = (
+    '#!/usr/bin/env bash\n'
+    'envs=()\n'
+    'while [ $# -gt 0 ]; do\n'
+    '  case "$1" in\n'
+    '    --setenv=*) envs+=("${1#--setenv=}"); shift;;\n'
+    '    --unit=*|--property=*|--wait|--collect|--quiet) shift;;\n'
+    '    *) break;;\n'
+    '  esac\n'
+    'done\n'
+    'if [ -n "${SYSTEMD_RUN_SENTINEL:-}" ]; then\n'
+    '  echo "systemd-run $*" >> "$SYSTEMD_RUN_SENTINEL"\n'
+    'fi\n'
+    'exec env ${envs[@]+"${envs[@]}"} "$@"\n'
+)
+
+# `sudo -n <cmd>` → run <cmd> unprivileged. Also makes the `sudo -n true`
+# availability probe succeed.
+_SUDO_SHIM = (
+    '#!/usr/bin/env bash\n'
+    'while [ $# -gt 0 ]; do\n'
+    '  case "$1" in -n) shift;; *) break;; esac\n'
+    'done\n'
+    'exec "$@"\n'
+)
+
 
 class _SyncInstallDriftBase(unittest.TestCase):
     def setUp(self):
@@ -137,6 +177,14 @@ class _SyncInstallDriftBase(unittest.TestCase):
         self.shim_bin.mkdir()
         install_timeout_shim(self.shim_bin)
 
+        self.systemd_run_shim = self.shim_bin / 'systemd-run'
+        self.systemd_run_shim.write_text(_SYSTEMD_RUN_SHIM)
+        os.chmod(self.systemd_run_shim, 0o755)
+        self.sudo_shim = self.shim_bin / 'sudo'
+        self.sudo_shim.write_text(_SUDO_SHIM)
+        os.chmod(self.sudo_shim, 0o755)
+        self.escape_sentinel = self.tmp_path / 'systemd-run-sentinel.txt'
+
     def tearDown(self):
         self._tmp.cleanup()
 
@@ -168,6 +216,7 @@ class _SyncInstallDriftBase(unittest.TestCase):
         env['BACKUP_ROOT'] = str(self.backup_root)
         env['TRIGGER_SENTINEL'] = str(self.sentinel)
         env['TRIGGER_SHIM_RC'] = str(shim_rc)
+        env['SYSTEMD_RUN_SENTINEL'] = str(self.escape_sentinel)
         env['PATH'] = f"{self.shim_bin}{os.pathsep}{env.get('PATH', '')}"
         return subprocess.run(
             ['bash', str(self.scripts_dir / 'sync_agent_core.sh')],
@@ -180,6 +229,12 @@ class _SyncInstallDriftBase(unittest.TestCase):
         if not self.sentinel.exists():
             return []
         return [ln for ln in self.sentinel.read_text().splitlines() if ln]
+
+    def _escape_lines(self) -> list[str]:
+        """One line per `systemd-run` invocation — i.e. per namespace escape."""
+        if not self.escape_sentinel.exists():
+            return []
+        return [ln for ln in self.escape_sentinel.read_text().splitlines() if ln]
 
 
 class UnitChangeTriggersHealerTest(_SyncInstallDriftBase):
@@ -255,6 +310,116 @@ class HealerErrorIsNonFatalTest(_SyncInstallDriftBase):
         self.assertIn('the 12h timer remains the backstop', out)
         # Sync ran to completion past Step 7b.
         self.assertIn('Sync complete', out)
+
+
+class NamespaceEscapeTest(_SyncInstallDriftBase):
+    """Step 7b must launch the healer OUTSIDE sync's mount namespace.
+
+    Regression cover for the 2026-07-27 finding: sync runs under
+    ourliberty-sync.service (ProtectSystem=strict), so /etc/systemd/system is
+    read-only for everything it spawns and `sudo` cannot escape that — the
+    healer's auto-install failed 27/27 here while succeeding 82 times on its own
+    timer. A unit shipped in a PR was therefore never installed by the deploy
+    that merged it.
+    """
+
+    def test_healer_is_launched_via_systemd_run(self):
+        self._advance_origin(
+            'systemd/ourliberty-existing.service',
+            '[Service]\nExecStart=/bin/true\nNice=3\n',
+        )
+        result = self._run_sync()
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+        escapes = self._escape_lines()
+        self.assertEqual(
+            len(escapes), 1,
+            'the healer must be re-launched through systemd-run exactly once — '
+            f'without it the install silently EROFSes; got {escapes!r}',
+        )
+        # It is the HEALER that was handed to systemd-run, with --triggered.
+        self.assertIn('heal_systemd_install_drift.py', escapes[0])
+        self.assertIn('--triggered', escapes[0])
+
+    def test_enable_flag_survives_the_handoff(self):
+        """The env must cross into the transient unit via --setenv.
+
+        The healer dry-runs unless OURLIBERTY_INSTALL_DRIFT_HEALER_ENABLED=true,
+        so an escape that dropped the flag would 'succeed' while remediating
+        nothing — a false green of exactly the kind this whole area keeps
+        producing. The systemd-run shim applies only --setenv values, so the
+        flag reaching the healer proves it was passed explicitly.
+        """
+        self._advance_origin(
+            'systemd/ourliberty-brand-new.timer', '[Timer]\nOnCalendar=hourly\n',
+        )
+        result = self._run_sync()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        lines = self._sentinel_lines()
+        self.assertEqual(len(lines), 1, lines)
+        self.assertIn('enabled=true', lines[0])
+        self.assertIn("'--triggered'", lines[0])
+
+    def test_healer_runs_exactly_once_not_twice(self):
+        """Escape and in-process are either/or — never both.
+
+        The availability probe is deliberately up front rather than a
+        fallback-on-failure, because a non-zero exit cannot distinguish 'could
+        not launch' from 'the healer ran and found drift'. A fallback keyed on
+        exit code would run the healer twice, doubling its writes.
+        """
+        self._advance_origin(
+            'systemd/ourliberty-existing.service',
+            '[Service]\nExecStart=/bin/true\nNice=4\n',
+        )
+        result = self._run_sync(shim_rc=1)  # healer reports failure
+        self.assertEqual(result.returncode, 0, 'healer error stays non-fatal')
+        self.assertEqual(
+            len(self._sentinel_lines()), 1,
+            'a failing healer must NOT be retried in-process',
+        )
+        self.assertEqual(len(self._escape_lines()), 1)
+        out = result.stdout.decode()
+        self.assertIn('healer (--triggered) exited non-zero', out)
+        self.assertIn('the 12h timer remains the backstop', out)
+
+    def test_falls_back_in_process_when_systemd_run_is_absent(self):
+        """No systemd-run (laptop checkout, container) ⇒ still run the healer.
+
+        Non-/etc remediations keep working; unit installs stay the 12h timer's
+        job. The NOTE says so out loud rather than silently degrading.
+        """
+        self.systemd_run_shim.unlink()
+        self._advance_origin(
+            'systemd/ourliberty-existing.service',
+            '[Service]\nExecStart=/bin/true\nNice=6\n',
+        )
+        result = self._run_sync()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(
+            self._escape_lines(), [], 'no systemd-run ⇒ no escape attempt',
+        )
+        lines = self._sentinel_lines()
+        self.assertEqual(len(lines), 1, 'the healer still runs in-process')
+        self.assertIn('enabled=true', lines[0])
+        self.assertIn('systemd-run or passwordless sudo unavailable',
+                      result.stdout.decode())
+
+    def test_falls_back_in_process_when_sudo_is_unavailable(self):
+        """Passwordless sudo is required to spawn a transient unit; without it
+        the probe must fail CLOSED to the in-process path, not error out."""
+        self.sudo_shim.write_text('#!/usr/bin/env bash\nexit 1\n')
+        os.chmod(self.sudo_shim, 0o755)
+        self._advance_origin(
+            'systemd/ourliberty-existing.service',
+            '[Service]\nExecStart=/bin/true\nNice=7\n',
+        )
+        result = self._run_sync()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self._escape_lines(), [])
+        self.assertEqual(len(self._sentinel_lines()), 1)
+        self.assertIn('systemd-run or passwordless sudo unavailable',
+                      result.stdout.decode())
 
 
 if __name__ == '__main__':
