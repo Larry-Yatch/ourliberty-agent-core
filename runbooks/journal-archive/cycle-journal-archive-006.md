@@ -56879,3 +56879,80 @@ Watermark advanced: 517 → 522. **⚠️ TIER-RESET** (Tier-4 alert at alert 52
 
 ---
 
+## Iteration ~6532 — 2026-07-28T03:42Z UTC (Larry /cycle chat, Tier 2→3 PROMOTED, consecutive_clean=0)
+
+**Health:** ✅ NOMINAL — all mandatory + additive checks clean. 0 open PRs both repos. All 4 bots alive. **Tier 2→3 PROMOTED** (consecutive_clean=3 achieved).
+
+**VERIFY-BEFORE-REASSERT (from iter ~6531 at 03:27Z UTC):**
+- **"SUPABASE_DB_PASSWORD credential-drift Tier-4"**: CARRY ⚠️ — no new alerts (watermark=522, file=522 confirmed). 7th iter since DM at 02:09:20Z UTC. No Larry response in bot log (last entry 02:29:32Z UTC). Normal overnight latency. [carry ⚠️]
+- **"system-health=healthy"**: CONFIRMED ✅ — ts=2026-07-28T03:37:17Z UTC; all 4 bots alive. [carry ✅]
+- **"heal-stale-daemon-code.heartbeat"**: CONFIRMED ✅ — 2026-07-28T03:32:57Z UTC (~9 min; <60 min). [carry ✅]
+- **"alerts watermark=522"**: CONFIRMED ✅ — repaired=false (old=522, file_length=522). No new alerts. [carry ✅]
+- **"APPROVAL_REQUEST orphaned-pr-review-loglevel-by-class-001 VP"**: CONFIRMED VP — pending=0. [carry VP]
+- **"Check I expected ~14:13Z UTC today (Mon 2026-07-28)"**: CARRY — current time 03:42Z UTC; timer fires ~14:13Z UTC; check-i-2026-07-27.json remains latest artifact. [carry]
+- **"Check III RESOLVED"**: CARRY ✅ — next ~2026-08-09. [carry ✅]
+- **"Check VIII/IX/X next 2026-08-03"**: CARRY ✅. [carry ✅]
+- **"Check XIV Tier-4 × 2"**: CARRY ⚠️ — no new alerts; awaiting Larry triage. [carry ⚠️]
+- **"auto-merge-conflict-route-hold-no-dm-001 VP"**: CARRY VP — no new data. [carry VP]
+- **"check-vi-posture-proposals-2026-07-07 carry"**: CARRY. [carry]
+- **"Mirror queue-wait p95 carry"**: CARRY — self-suppresses ~2026-07-30T02Z UTC. [carry]
+
+**Check 0 — Alert triage (~03:42Z UTC):** repair-watermark: repaired=false (old=522, file_length=522). No new alerts. NOMINAL ✅
+
+**Check 1 — Log noise (~03:42Z UTC):** outbox-notifier.log last entry [2026-07-27 21:06:12 MDT] = 2026-07-28T03:06:12Z UTC (BASELINE_WARM + AUTO_MERGE_WORKTREE_TEARDOWN + AUTO_MERGE_QUEUE_RELEASED for pr-RSDPM-132 — clean resolution; unchanged from iter ~6531). No new WARNs. Prior moot WARN [20:08:32 MDT] MalformedMirrorMarker for pr-ourliberty-agent-core-1039 (PR #1039 MERGED; residual known from iter ~6526). NOMINAL ✅
+
+**Check 2 — Telegram sweep (~03:42Z UTC):** beacon_telegram_bot.log last entry [2026-07-27T20:29:32-0600] = 02:29:32Z UTC (notification idx=521, medic-diagnosis). No new Larry directives. NOMINAL ✅
+
+**Check 3 — Pipeline stall (~03:41Z UTC):** heal_pipeline_stall dry-run: FORGE_NO_PR_SKIP ×7 (all MERGED or existing PRs); 0 stalls detected. NOMINAL ✅
+
+**Check 4 — Pending directives (~03:42Z UTC):** beacon-pending-approvals.json: pending=0 ✅. NOMINAL ✅
+
+**Check 5 — Stale daemon code (~03:32Z UTC):** heal-stale-daemon-code.heartbeat=2026-07-28T03:32:57Z UTC (~9 min; <60 min). system-health ts=2026-07-28T03:37:17Z UTC; overall=healthy; all 4 bots alive (beacon/forge/mirror/pulse). Disk 13%, memory 17%, cgroup 2.45/8.59 GB (ratio=0.285). NOMINAL ✅
+
+**Check A — Source repo (~03:41Z UTC):** On main. HEAD=d453fbda=origin/main. Clean tree. NOMINAL ✅
+**Check B — Sync health (~03:41Z UTC):** last_sync=2026-07-28T03:13:24Z UTC (~29 min; <2h); status=no-change; consecutive_push_failures=0. NOMINAL ✅
+**Check C — Agent liveness (~03:41Z UTC):** system-health ts=2026-07-28T03:37:17Z UTC; overall=healthy; all 4 bots alive (beacon/forge/mirror/pulse). NOMINAL ✅
+**Check E — PR/merge state (~03:41Z UTC):** ourliberty-agent-core: 0 open PRs ✅. RSDPM: 0 open PRs ✅. NOMINAL ✅
+**Check H — Inbox + Forge activity (~03:41Z UTC):** all inboxes empty (beacon/forge/mirror/pulse). NOMINAL ✅
+
+**§5.0 one-shots (~03:42Z UTC):** audit_due_nudge: "no committed audit baseline; no-op." distill_detector: "no un-distilled audits; no-op." NOMINAL ✅
+
+**Credential rotation (~03:42Z UTC):** pulse-rotation-window-dms.json: SUPABASE_SERVICE_ROLE_KEY last DM 2026-07-20T20:00:15Z UTC (~8d; within 14d dedup window; expires ~2026-08-03). No DM sent. NOMINAL ✅
+
+**Check I artifact triage (~03:42Z UTC):** No new artifact. check-i-2026-07-27.json (Sunday 2026-07-27) remains latest. Timer fires ~14:13Z UTC today (Mon 2026-07-28). NOMINAL ✅
+
+**PRIME DIRECTIVE accounting:** iter_clean appended (tier=2, kind=iter_clean, ts=2026-07-28T03:42:12Z UTC). Trailing 30d: ratio=33.5% (interventions=1675, systemic_fixes=50, vp=24; trend=worsening, unchanged). **Tier 2→3 PROMOTED** (consecutive_clean reset to 0 in Tier 3).
+
+**Patterns:**
+- **Tier 2→3 promotion**: consecutive_clean=3 achieved across iters ~6530→~6531→~6532 (all clean after RSDPM sprint wrapped). Monitoring for Tier 3 stability.
+- System fully nominal. All bots alive, 0 open PRs, no stalls, no new alerts.
+- SUPABASE_DB_PASSWORD carry: 7th iter since DM at 02:09Z UTC. No Larry response — overnight latency, carry without re-DM.
+- PRIME ratio stable at 33.5%; no new interventions or fixes this iter.
+
+**G-rule assessment:**
+- mirror-worktree-cleanup-mid-session: **1/3** [carry, 0 new].
+- forge-marker-taskid-suffix-increment-001: **2/3** [carry, 0 new].
+- medic-draft-status-false-positive: **2/3** [carry, 0 new].
+- check-i-force-bypass-dm-route: **2/3** [carry, 0 new].
+- auto-merge-conflict-route-hold-no-dm-001: **VP** [carry VP].
+- mirror-queue-wait-readiness: **1/3** [carry, 0 new].
+- beacon-pending-approvals-path-bug: **1/3** [carry, 0 new].
+- Active VP carries: forge-revision-preamble-missing; forge-wip-redispatch-digest; forge-wip-redispatch-exhausted-no-pr; outbox-notifier-intent-reject; auto-dispatch-APPROVAL_REQUEST-mismatch; PR #1022 heal-wip-redispatch DAG-preflight suppression; auto-merge-conflict-route-hold-no-dm-001; orphaned-pr-review-loglevel-by-class-001.
+
+**Actions taken:**
+1. Check 0: repair-watermark no-op (repaired=false, old=522, file=522).
+2. §5.0 one-shots: audit_due_nudge no-op; distill_detector no-op.
+3. PRIME ledger: iter_clean appended (tier=2, kind=iter_clean, ts=2026-07-28T03:42:12Z UTC).
+4. Tier state: `cycle_tier_state.py record --checks-clean true` → **Tier 2→3 PROMOTED** (consecutive_clean reset to 0 in Tier 3).
+
+**Escalations:**
+- [carry ⚠️ — no new DM] SUPABASE_DB_PASSWORD credential-drift (Tier 4): DM delivered 2026-07-28T02:09:20Z UTC. 7th iter. Awaiting Larry triage: (a) install per runbook, or (b) remove from token-rotation-schedule.json if retired.
+- [VP — gate cleared, fix unverified] orphaned-pr-review-loglevel-by-class-001: pending=0 (approval gate resolved). VP stands until implementation confirmed.
+- [carry — no new DM] check-vi-posture-proposals-2026-07-07 (2 proposals).
+- [carry — no new DM] Mirror queue-wait p95=92.3m (self-suppresses ~2026-07-30T02Z UTC).
+- [carry — no new DM] Check XIV Tier-4 × 2: oversilence + fleet digest. Awaiting Larry triage.
+
+**Tier end-of-iter:** **Tier 3** (consecutive_clean=0; promoted from Tier 2 this iter).
+
+---
+
