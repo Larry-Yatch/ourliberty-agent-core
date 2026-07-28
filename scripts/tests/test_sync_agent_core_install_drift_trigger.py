@@ -207,7 +207,36 @@ class _SyncInstallDriftBase(unittest.TestCase):
         self._git('push', '-q', 'origin', 'main')
         self._git('reset', '--hard', 'HEAD~1', '--quiet')
 
-    def _run_sync(self, shim_rc: int = 0):
+    def _curated_path_without_systemd_run(self) -> str:
+        """A PATH that resolves every real binary EXCEPT systemd-run.
+
+        The Step 7b probe is existence-keyed (`command -v systemd-run`), and
+        `_run_sync` prepends shim_bin to the inherited system PATH — so merely
+        unlinking the shim leaves the host's /usr/bin/systemd-run resolvable and
+        the escape branch still fires. To simulate 'systemd-run absent'
+        deterministically on any host (droplet, regression gate), we symlink
+        every executable found on the inherited PATH into a curated dir, skipping
+        systemd-run, and hand back shim_bin + that dir with NO real PATH entry.
+        bash/git/python3/etc. still resolve; systemd-run genuinely does not.
+        """
+        curated = self.tmp_path / 'curated-bin'
+        curated.mkdir(exist_ok=True)
+        for d in os.environ.get('PATH', '').split(os.pathsep):
+            if not d or not os.path.isdir(d):
+                continue
+            for name in os.listdir(d):
+                if name == 'systemd-run':
+                    continue
+                link = curated / name
+                if link.exists() or link.is_symlink():
+                    continue  # first PATH entry wins, mirroring real resolution
+                try:
+                    link.symlink_to(os.path.join(d, name))
+                except OSError:
+                    pass
+        return f"{self.shim_bin}{os.pathsep}{curated}"
+
+    def _run_sync(self, shim_rc: int = 0, path: str | None = None):
         env = os.environ.copy()
         env['HOME'] = str(self.home)
         env['REPO_DIR'] = str(self.repo_dir)
@@ -217,7 +246,9 @@ class _SyncInstallDriftBase(unittest.TestCase):
         env['TRIGGER_SENTINEL'] = str(self.sentinel)
         env['TRIGGER_SHIM_RC'] = str(shim_rc)
         env['SYSTEMD_RUN_SENTINEL'] = str(self.escape_sentinel)
-        env['PATH'] = f"{self.shim_bin}{os.pathsep}{env.get('PATH', '')}"
+        if path is None:
+            path = f"{self.shim_bin}{os.pathsep}{env.get('PATH', '')}"
+        env['PATH'] = path
         return subprocess.run(
             ['bash', str(self.scripts_dir / 'sync_agent_core.sh')],
             env=env, cwd=self.repo_dir,
@@ -394,7 +425,9 @@ class NamespaceEscapeTest(_SyncInstallDriftBase):
             'systemd/ourliberty-existing.service',
             '[Service]\nExecStart=/bin/true\nNice=6\n',
         )
-        result = self._run_sync()
+        # Curate PATH so `command -v systemd-run` fails on ANY host — the shim
+        # unlink alone leaves the system's /usr/bin/systemd-run resolvable.
+        result = self._run_sync(path=self._curated_path_without_systemd_run())
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(
             self._escape_lines(), [], 'no systemd-run ⇒ no escape attempt',
