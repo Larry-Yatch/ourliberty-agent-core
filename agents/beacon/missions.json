@@ -15310,7 +15310,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-29T19:27:24.842360+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-29T19:25:06.347416+00:00"
+      "orphan_last_activity_ts": "2026-07-29T19:25:06.347416+00:00",
+      "briefing": {
+        "what": "A piece of work your team started on their own that isn't attached to any current initiative, now waiting for a sign-off before it can move forward.",
+        "why": "Loose work with no clear home can quietly pile up, waste effort, or ship changes nobody asked for \u2014 so it's worth a quick look before it goes further.",
+        "suggest": "Take a moment to confirm this is something you actually want before greenlighting it, rather than waving it through automatically."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T19:32:50.692255+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-check0-tier4-guard-001",
@@ -15327,7 +15341,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-29T19:27:24.842360+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-29T19:23:27.716251+00:00"
+      "orphan_last_activity_ts": "2026-07-29T19:23:27.716251+00:00",
+      "briefing": {
+        "what": "A safety check the team started building that stops the system's highest-priority alerts from being logged unless an independent automated check agrees they're truly that urgent.",
+        "why": "It cuts down on false alarms at the top severity level, so your team's attention stays on problems that are actually critical.",
+        "suggest": "Worth doing, but since it isn't tied to a current priority yet, give it a quick green light to finish and verify before it goes live rather than fast-tracking it."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T19:32:50.692255+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-delegate-cap-check-0-reject-a-tier-4-classification-not-prece-fd54",
@@ -15344,7 +15372,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-29T19:27:24.842360+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-29T19:23:25.29312+00:00"
+      "orphan_last_activity_ts": "2026-07-29T19:23:25.29312+00:00",
+      "briefing": {
+        "what": "The team started some exploratory work on its own that isn't yet attached to any active project or goal.",
+        "why": "Untethered work can quietly consume time and effort without a clear payoff for the business, and right now there's no visible reason it's being done.",
+        "suggest": "Hold off on investing more here until someone confirms what this is for and whether it's worth pursuing \u2014 a quick check before it grows."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T19:32:50.692255+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
