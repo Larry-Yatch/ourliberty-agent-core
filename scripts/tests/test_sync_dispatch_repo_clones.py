@@ -227,23 +227,46 @@ class LiveConfigTest(unittest.TestCase):
         for repo, path in paths.items():
             self.assertTrue(path.startswith('/'), f'{repo} path not absolute')
 
-    def test_unit_grants_write_to_every_syncable_repo(self):
-        """A repo in repo_paths that the unit can't write to fails every tick.
-
-        This is the trap the unit comments warn about: adding a dispatch repo
-        without extending ReadWritePaths yields a silent per-tick error."""
+    def _granted_paths(self, unit_name: str) -> list[str]:
         unit = (Path(sdrc.__file__).resolve().parent.parent
-                / 'systemd' / 'ourliberty-sync-dispatch-repos.service')
-        text = unit.read_text()
-        rw_line = next(l for l in text.splitlines()
-                       if l.startswith('ReadWritePaths='))
-        granted = rw_line.split('=', 1)[1].split()
-        for repo, path in sdrc.load_repo_paths().items():
-            if repo in sdrc.SELF_SYNCED_REPOS:
-                continue
-            self.assertIn(
-                path, granted,
-                f'{repo} ({path}) is in repo_paths but the unit cannot write it')
+                / 'systemd' / unit_name)
+        self.assertTrue(
+            unit.is_file(),
+            f'{unit_name} is listed in FF_CAPABLE_UNITS but has no unit file '
+            f'at {unit} — the allowlist below cannot be checked for it')
+        rw_line = next(
+            (l for l in unit.read_text().splitlines()
+             if l.startswith('ReadWritePaths=')), None)
+        self.assertIsNotNone(
+            rw_line,
+            f'{unit_name} has no ReadWritePaths= line; if its sandbox changed '
+            f'shape, this invariant needs rechecking, not skipping')
+        return rw_line.split('=', 1)[1].split()
+
+    def test_unit_grants_write_to_every_syncable_repo(self):
+        """A repo in repo_paths that a unit can't write to fails there alone.
+
+        This is the trap the unit comments warn about, and the on-demand
+        self-heal widened it: `sync_one` is now also called inline from the
+        DAG-preflight (under ourliberty-inbox-watcher) and the kickoff (under
+        ourliberty-outbox-notifier), each with its own ProtectHome=read-only
+        sandbox. Checking only the timer's unit would leave the newer callers
+        free to EROFS on the next repo onboarded — and because the timer would
+        still be succeeding, the checkout would look maintained while the
+        on-demand path was silently dead. Assert across ALL of them."""
+        syncable = {repo: path
+                    for repo, path in sdrc.load_repo_paths().items()
+                    if repo not in sdrc.SELF_SYNCED_REPOS}
+        self.assertTrue(syncable, 'expected at least one syncable repo')
+        self.assertTrue(sdrc.FF_CAPABLE_UNITS, 'the unit list must not be empty')
+        for unit_name in sdrc.FF_CAPABLE_UNITS:
+            granted = self._granted_paths(unit_name)
+            for repo, path in syncable.items():
+                self.assertIn(
+                    path, granted,
+                    f'{repo} ({path}) is in repo_paths but {unit_name} cannot '
+                    f'write it — its fast-forward will EROFS there while the '
+                    f'other units keep succeeding')
 
 
 class MainTest(unittest.TestCase):

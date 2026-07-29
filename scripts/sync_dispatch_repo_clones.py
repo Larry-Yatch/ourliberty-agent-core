@@ -79,6 +79,27 @@ SELF_SYNCED_REPOS = frozenset({'ourliberty-agent-core'})
 # and the next tick should get it instead.
 GIT_TIMEOUT_SEC = 120
 
+# Every systemd unit that can reach `sync_one` and therefore fast-forward a
+# registered checkout. This was ONE unit until the on-demand sync-lag self-heal
+# (`build_sequence_validator.refresh_checkout`) started calling `sync_one`
+# inline from the DAG-preflight and kickoff paths, which run under different
+# units with their own sandboxes.
+#
+# ⚠ ADDING A DISPATCH REPO: its checkout path must be added to the
+# `ReadWritePaths=` of EVERY unit listed here, not just the timer's. All of
+# them run `ProtectHome=read-only`, so a repo in `repo_paths` that is missing
+# from one unit's allowlist is a READ-ONLY FILESYSTEM to that caller alone.
+# That is the worst-shaped failure available here: the 30-minute sweep keeps
+# succeeding, so the checkout looks maintained, while the on-demand path dies
+# silently and the preflight stalls exactly as it did before the self-heal.
+# `test_unit_grants_write_to_every_syncable_repo` asserts this across the whole
+# tuple so the omission fails a test run instead of a production tick.
+FF_CAPABLE_UNITS = (
+    'ourliberty-sync-dispatch-repos.service',  # the 30-min sweep — run()
+    'ourliberty-inbox-watcher.service',        # hosts Mirror's check-spec-doc preflight
+    'ourliberty-outbox-notifier.service',      # hosts the build-sequence kickoff
+)
+
 
 @dataclass
 class RepoOutcome:

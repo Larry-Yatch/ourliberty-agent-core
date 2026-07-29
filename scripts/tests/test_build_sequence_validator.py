@@ -1120,9 +1120,11 @@ class SpecDocSyncLagSelfHealTest(unittest.TestCase):
         path.write_text(json.dumps(seq))
         return path
 
-    def _run_cli(self, seq_path: Path) -> subprocess.CompletedProcess:
+    def _run_cli(self, seq_path: Path,
+                 *extra: str) -> subprocess.CompletedProcess:
         return subprocess.run(
-            [sys.executable, str(self.script), 'check-spec-doc', str(seq_path)],
+            [sys.executable, str(self.script), 'check-spec-doc',
+             str(seq_path), *extra],
             capture_output=True, text=True, timeout=90,
             env={**self._git_env,
                  bsv.SPEC_DOC_REPO_ROOT_ENV: str(self.checkout)},
@@ -1177,6 +1179,47 @@ class SpecDocSyncLagSelfHealTest(unittest.TestCase):
         # Now PRESENT locally, so no refresh is needed — and the run says OK
         # rather than going quiet about a check it silently skipped.
         self.assertIn('OK:', second.stdout)
+
+    def test_no_refresh_classifies_without_moving_the_tree(self):
+        """`check-spec-doc` reads as a query, and by default it is not one —
+        it fast-forwards. `--no-refresh` restores the pure classifier for an
+        operator inspecting a checkout they parked on an older commit on
+        purpose (clean + on `main`, so the ff-only guards would NOT save it)."""
+        head_before = self._git(self.checkout, 'rev-parse', 'HEAD')
+        proc = self._run_cli(self._seq_file('RSDPM'), '--no-refresh')
+        self.assertEqual(proc.returncode, 3)
+        # The classification still happens, and still names the right syncer.
+        self.assertIn('BEHIND_ORIGIN:', proc.stderr)
+        self.assertIn(bsv.DISPATCH_REPO_SYNC_UNIT, proc.stderr)
+        # But nothing moved.
+        self.assertEqual(
+            self._git(self.checkout, 'rev-parse', 'HEAD'), head_before)
+        self.assertFalse((self.checkout / self.SPEC).exists())
+
+    def test_no_refresh_says_it_declined_rather_than_going_quiet(self):
+        """Suppressed and 'ran but declined' must not read alike."""
+        proc = self._run_cli(self._seq_file('RSDPM'), '--no-refresh')
+        self.assertIn('REFRESH: skipped — --no-refresh', proc.stderr)
+        self.assertNotIn('advanced', proc.stderr)
+
+    def test_no_refresh_is_rejected_on_the_other_cli_forms(self):
+        """A flag that silently does nothing reads as 'the tree is safe'."""
+        seq = self._seq_file('RSDPM')
+        for argv in (['validate', 'some-seq'], [str(seq)]):
+            with self.subTest(argv=argv):
+                proc = subprocess.run(
+                    [sys.executable, str(self.script), *argv, '--no-refresh'],
+                    capture_output=True, text=True, timeout=90,
+                    env=self._git_env,
+                )
+                self.assertEqual(proc.returncode, 2)
+                self.assertIn('--no-refresh only applies', proc.stderr)
+
+    def test_default_still_refreshes(self):
+        """The opt-out must not become the default by accident."""
+        proc = self._run_cli(self._seq_file('RSDPM'))
+        self.assertEqual(proc.returncode, 0)
+        self.assertIn('REFRESH: RSDPM: advanced (+1)', proc.stderr)
 
     def test_agent_core_target_is_not_pulled_and_names_its_own_syncer(self):
         """agent-core keeps its own syncer; this path must not touch it."""

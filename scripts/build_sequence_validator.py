@@ -940,8 +940,8 @@ def _read_seq_json(path: Path) -> Tuple[Optional[Any], int]:
         return None, 1
 
 
-def _cli_check_spec_doc(seq_id_or_path: str) -> int:
-    """CLI for `check-spec-doc <seq-id|path>`.
+def _cli_check_spec_doc(seq_id_or_path: str, *, refresh: bool = True) -> int:
+    """CLI for `check-spec-doc <seq-id|path> [--no-refresh]`.
 
     Resolves the sequence file (a bare token expands to the canonical
     blackboard path; anything containing a path separator or `.json` is
@@ -953,7 +953,15 @@ def _cli_check_spec_doc(seq_id_or_path: str) -> int:
       1  not_authored — genuinely missing; author + merge first
       3  behind_origin — spec exists on main; run sync, don't re-author
 
-    Repo-root resolution (resolve_spec_doc_repo_root): SPEC_DOC_REPO_ROOT_ENV,
+    NOT a pure query by default: on BEHIND_ORIGIN this fast-forwards the target
+    repo's checkout (see the self-heal below). `refresh=False` (`--no-refresh`)
+    restores the pure-classifier behavior for anyone who needs to inspect a
+    checkout WITHOUT moving it — e.g. an operator who has reset `~/RSDPM` back
+    to an older commit on `main` to reproduce something and wants the
+    classification without losing the pinned state. Mirror's preflight leaves
+    it on: the whole point there is not to park a build on a stale tree.
+
+    Repo-root resolution (resolve_spec_doc_repo): SPEC_DOC_REPO_ROOT_ENV,
     when set, wins and anchors local-file resolution + the `git -C <root>`
     probes at that path (the SpecDocCliTest /tmp-fixture seam). Otherwise the
     sequence's effective target_repo picks the checkout: agent-core / unset /
@@ -981,7 +989,7 @@ def _cli_check_spec_doc(seq_id_or_path: str) -> int:
     # of parking the build until it does. The refresh is ff-only and declines
     # a tree in use (see refresh_checkout), so the worst case is the same
     # BEHIND_ORIGIN we already had, now printed with the reason it stayed.
-    if presence.status == SPEC_DOC_BEHIND_ORIGIN:
+    if refresh and presence.status == SPEC_DOC_BEHIND_ORIGIN:
         line = refresh_checkout(repo_name, repo_root)
         if line is not None:
             # Always emitted, advanced or not: a silent no-op and a working
@@ -989,6 +997,10 @@ def _cli_check_spec_doc(seq_id_or_path: str) -> int:
             sys.stderr.write(f'REFRESH: {line}\n')
             presence = check_spec_doc_presence(
                 spec_doc, repo_root=repo_root, repo_name=repo_name)
+    elif not refresh and presence.status == SPEC_DOC_BEHIND_ORIGIN:
+        # Say so. Otherwise --no-refresh looks identical to a refresh that ran
+        # and silently declined, and the operator can't tell which they got.
+        sys.stderr.write('REFRESH: skipped — --no-refresh\n')
 
     if presence.status == SPEC_DOC_PRESENT:
         sys.stdout.write(f'OK: {presence.message}\n')
@@ -1026,14 +1038,33 @@ def _cli(argv: list[str]) -> int:
             'to a sequence file (JSON). Exits 0 if valid, 1 otherwise.'
         ),
     )
+    parser.add_argument(
+        '--no-refresh',
+        action='store_true',
+        help=(
+            'check-spec-doc only: do NOT fast-forward the target repo\'s '
+            'checkout on behind-origin. Use when inspecting a checkout you '
+            'have deliberately parked on an older commit; the classification '
+            'is reported without moving the tree.'
+        ),
+    )
     parsed = parser.parse_args(argv)
     raw_args = parsed.args
+
+    if parsed.no_refresh and not (
+            len(raw_args) == 2 and raw_args[0] == 'check-spec-doc'):
+        # Fail loudly rather than accepting a flag that would do nothing —
+        # a silently-ignored --no-refresh reads as "the tree is safe".
+        sys.stderr.write(
+            'ERROR: --no-refresh only applies to `check-spec-doc`\n')
+        return 2
 
     if len(raw_args) == 2 and raw_args[0] == 'validate':
         seq_id = raw_args[1]
         path = DEFAULT_BLACKBOARD_DIR / f'{seq_id}.json'
     elif len(raw_args) == 2 and raw_args[0] == 'check-spec-doc':
-        return _cli_check_spec_doc(raw_args[1])
+        return _cli_check_spec_doc(
+            raw_args[1], refresh=not parsed.no_refresh)
     elif len(raw_args) == 1:
         path = Path(raw_args[0])
     else:
