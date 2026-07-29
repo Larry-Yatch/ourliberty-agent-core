@@ -228,16 +228,42 @@ def is_previously_green(
     """True iff ``test_id`` was absent from the red set of >=1 prior COMPLETED
     run (L5 definition of previously-green).
 
-    Derivable from the registry: an existing entry that has ever been green
-    (``ever_green``) qualifies. A test with NO entry that is red for the first
-    time qualifies iff the guardian has completed >=1 prior run — a full-suite
-    run means absence-from-registry == passed-in-every-prior-run. On the
-    guardian's first-ever completed run (completed_runs_before == 0) a brand-new
-    red is backlog debt, never a break.
+    A test with NO entry that is red for the first time qualifies iff the
+    guardian has completed >=1 prior run — a full-suite run means
+    absence-from-registry == passed-in-every-prior-run. On the guardian's
+    first-ever completed run (completed_runs_before == 0) a brand-new red is
+    backlog debt, never a break.
+
+    THE DECISION IS MADE ONCE, AT FIRST SIGHTING, AND NEVER RE-DERIVED. Reading
+    it back off ``ever_green`` (as this did until 2026-07-28) asks a DIFFERENT
+    question — "have we watched it pass?" — and the answer for a genuine break is
+    permanently False, because a broken test never goes green on its own. So
+    night 1 correctly said `genuine-break`, wrote the entry with
+    ``ever_green: False``, and night 2 read that back and demoted the test to
+    ``backlog`` — which is not in `_ACTIONABLE_CLASSIFICATIONS` and never cards.
+    Escalation needs `genuine-break` on TWO consecutive reds, so the demotion
+    landed exactly one night before the guardian was allowed to speak: **every
+    genuine break it could ever find was silenced by construction.** Observed on
+    17 consecutive runs; 4 of the 5 tracked tests carry the fingerprint.
+
+    ``origin_run`` is that first-sighting decision, already persisted since the
+    entry schema was written (`record_red` stamps `completed_runs_before` at
+    creation) — so this reads the original verdict rather than re-deriving a
+    wrong one, and the live registry self-heals with no migration.
+
+    ``ever_green`` still qualifies on its own: a test we HAVE watched pass and
+    which then broke is a break under any reading. A legacy entry predating
+    ``origin_run`` falls back to False — conservative, matching prior behaviour.
     """
     entry = registry.get('tests', {}).get(test_id)
     if entry is not None:
-        return bool(entry.get('ever_green'))
+        if entry.get('ever_green'):
+            return True
+        origin = entry.get('origin_run')
+        # bool is an int subclass — exclude it so a stray True can't read as 1.
+        if isinstance(origin, int) and not isinstance(origin, bool):
+            return origin >= 1
+        return False
     return completed_runs_before >= 1
 
 
@@ -301,8 +327,22 @@ def record_red(
         return entry
 
     prev_cls = entry.get('classification')
+    # `flip_count` measures INSTABILITY — a test whose behaviour keeps changing
+    # category. Leaving a HOLDING LANE is not that. `backlog` (like `recovered`
+    # and `unstable`) is a lane we put a test in, not a verdict about how the
+    # test behaves, so exiting it must not count as a flip.
+    #
+    # This is load-bearing for the demotion fix above, not a tidy-up. Every test
+    # that fix rescues already carries `flip_count: 1` from the demotion it is
+    # undoing (backlog was reached BY the bug). Counting the correction as a
+    # second flip trips `flip_count >= 2` below, so all four live tests would
+    # have gone straight to `unstable` + `parked` instead of escalating —
+    # permanently, since `record_green` only sets `recovered` when NOT parked.
+    # It would also have re-broken lock 2: `_unstable_count` feeds
+    # `flip_flop_count`, and the 0->1 graduation gate requires that to be zero.
+    # The fix would have shipped, passed every test, and changed nothing.
     if prev_cls != classification and prev_cls not in (
-        None, CLS_RECOVERED, CLS_UNSTABLE,
+        None, CLS_RECOVERED, CLS_UNSTABLE, CLS_BACKLOG,
     ):
         entry['flip_count'] = entry.get('flip_count', 0) + 1
     entry['classification'] = classification
@@ -1191,23 +1231,32 @@ def main(argv: Optional[list] = None) -> int:
         eff_stage = 0
     result['effective_stage'] = eff_stage
 
-    # Propose->approve->dispatch loop (D2) runs at Stage 1+ on a conclusive run.
-    # Stage 0 (shadow) detects + records only; a skipped/inconclusive run carries
-    # no per-test verdict, so there is nothing to propose or drain this cycle.
-    if eff_stage >= 1 and result.get('status') in (RUN_GREEN, RUN_RED):
-        registry = load_registry(
-            Path(args.registry) if args.registry else default_registry_path())
-        current_run = int(registry.get('_meta', {}).get('completed_runs', 0))
-        try:
-            proposal = run_proposal_cycle(
-                repo_root, result, registry_path=args.registry,
-                effective_stage=eff_stage, current_run=current_run,
-            )
-            result['proposal'] = proposal
-        except Exception as exc:  # noqa: BLE001 — the loop must never wedge the timer
-            print(f'main_suite_guardian: proposal cycle failed: {exc}',
-                  file=sys.stderr)
-        # Post-cycle stage bookkeeping (window closing, graduation, L8 card).
+    # A skipped/inconclusive run carries no per-test verdict, so there is nothing
+    # to propose, drain, or count toward evidence this cycle.
+    if result.get('status') in (RUN_GREEN, RUN_RED):
+        # Propose->approve->dispatch loop (D2) runs at Stage 1+ only. Stage 0
+        # (shadow) detects + records only.
+        if eff_stage >= 1:
+            registry = load_registry(
+                Path(args.registry) if args.registry else default_registry_path())
+            current_run = int(registry.get('_meta', {}).get('completed_runs', 0))
+            try:
+                proposal = run_proposal_cycle(
+                    repo_root, result, registry_path=args.registry,
+                    effective_stage=eff_stage, current_run=current_run,
+                )
+                result['proposal'] = proposal
+            except Exception as exc:  # noqa: BLE001 — must never wedge the timer
+                print(f'main_suite_guardian: proposal cycle failed: {exc}',
+                      file=sys.stderr)
+        # Stage bookkeeping (window closing, GRADUATION, L8 card) runs at EVERY
+        # stage, including 0. Gating it on `eff_stage >= 1` made Stage 0 a dead
+        # end: the only exit from shadow is a graduation evidence card, and the
+        # code that files it could only run once already out of shadow. The
+        # guardian met the Stage-1 bar around run 7 and sat in shadow through run
+        # 17 with no way to say so. Nothing in here grants authority — it files
+        # evidence for a human decision — so running it in shadow is exactly the
+        # shadow contract, not a widening of it.
         _run_stage_maintenance(repo_root, registry_path=args.registry)
 
     print(json.dumps(result, indent=2, sort_keys=True))
