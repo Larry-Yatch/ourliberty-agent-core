@@ -144,9 +144,9 @@
 
 ---
 
-## §5.0 script paths — ground-truth (confirmed iter ~2183)
+## §5.0 script paths — ground-truth (confirmed iter ~2183, corrected iter ~6767)
 
-**Rule:** `audit_due_nudge.py` and `distill_detector.py` live in `scripts/`, NOT `review/distill/`. Only `audit_cadence_signal.py` is in `review/distill/`. Always invoke: `python3 scripts/audit_due_nudge.py`, `python3 scripts/distill_detector.py`, `python3 review/distill/audit_cadence_signal.py`.
+**Rule:** All three §5.0 one-shots live in `scripts/`. Always invoke: `python3 scripts/audit_due_nudge.py`, `python3 scripts/distill_detector.py`, `python3 scripts/silence_file_auditor.py`. The third one-shot is `silence_file_auditor.py` (NOT `audit_cadence_signal.py`, NOT `review/distill/silence_file_auditor.py` — both wrong). `review/distill/` does not contain the third one-shot. Prior iters using `review/distill/silence_file_auditor.py` got "No such file or directory" (iter ~6767 caught this).
 
 ---
 
