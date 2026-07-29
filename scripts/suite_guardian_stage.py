@@ -441,15 +441,39 @@ def _graduation_decision(approval_id: Optional[str]) -> Optional[str]:
     `expired` into `'rejected'`. That is right for a fix proposal but wrong here:
     `expired` is written when an approval AGES OUT or is reconciled away — Larry
     never answered — and treating "never answered" as "said no" would silence the
-    graduation ask forever on a card he never even saw."""
+    graduation ask forever on a card he never even saw.
+
+    NEWEST WINS, which is why this does not use `find_by_id_any_state`. That
+    helper returns the FIRST history match, and `_graduation_task_id` is
+    deterministic across re-asks — so once a re-ask has happened, history holds
+    more than one entry under the same id and an older `approved` SHADOWS the
+    `rejected` that came after it. The decline would never stick and the card
+    would resume re-filing on the cooldown forever: the round-2 nag, back again,
+    on the one path where declining matters most (the second ask, after Larry
+    already said yes once and it did not take). The helper's first-match
+    semantics are right for its own callers — a dedup that only asks "is this id
+    known" — so it is left alone.
+
+    A still-PENDING card outranks any history: that is the live ask, undecided.
+    """
     if not approval_id:
         return None
     try:
         import beacon_approval_handler as ah
-        entry = ah.find_by_id_any_state(approval_id)
+        s = ah.load_state()
     except Exception:  # noqa: BLE001 — decision read is best-effort
         return None
-    if not isinstance(entry, dict):
+    if not isinstance(s, dict):
+        return None
+    for row in (s.get('pending') or []):
+        if isinstance(row, dict) and row.get('id') == approval_id:
+            return None  # live ask still open
+    entry = None
+    for row in reversed(s.get('history') or []):
+        if isinstance(row, dict) and row.get('id') == approval_id:
+            entry = row
+            break
+    if entry is None:
         return None
     status = entry.get('status')
     if status == 'rejected':

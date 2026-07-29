@@ -444,25 +444,77 @@ class GraduationAskOnceTest(unittest.TestCase):
     def test_decision_lookup_maps_statuses(self):
         # `expired` must read as UNDECIDED, not declined — the distinction the
         # proposal loop's own lookup collapses.
-        import types as _t
-        fake = _t.SimpleNamespace(find_by_id_any_state=None)
-        with mock.patch.dict('sys.modules',
-                             {'beacon_approval_handler': fake}):
-            for status, want in (('expired', None), ('rejected', 'declined'),
-                                 ('approved', 'approved'), ('modified', 'approved'),
-                                 ('pending', None)):
-                fake.find_by_id_any_state = (
-                    lambda _id, _s=status: {'status': _s})
+        import beacon_approval_handler as ah
+        for status, want in (('expired', None), ('rejected', 'declined'),
+                             ('approved', 'approved'), ('modified', 'approved'),
+                             ('pending', None)):
+            state = {'pending': [], 'history': [{'id': 'x', 'status': status}]}
+            with mock.patch.object(ah, 'load_state', lambda _s=state: _s):
                 self.assertEqual(stage._graduation_decision('x'), want, status)
 
+    def test_unknown_id_is_undecided(self):
+        import beacon_approval_handler as ah
+        with mock.patch.object(ah, 'load_state',
+                               lambda: {'pending': [], 'history': []}):
+            self.assertIsNone(stage._graduation_decision('never-asked'))
+
+    def test_newest_decision_wins_over_a_reused_id(self):
+        # THE SHADOWING BUG. `_graduation_task_id` is deterministic and the
+        # re-ask reuses it, so history can hold TWO entries under one id.
+        # `find_by_id_any_state` returns the FIRST (oldest) match, so a decline
+        # that FOLLOWS an approval was invisible and the nag came back.
+        # Exercises the REAL lookup — the other tests fake `_graduation_decision`
+        # wholesale, which is exactly why this slipped through.
+        import beacon_approval_handler as ah
+        dup = stage._graduation_task_id(1)
+        state = {'pending': [], 'history': [
+            {'id': dup, 'status': 'approved'},   # ask #1: yes, never applied
+            {'id': dup, 'status': 'rejected'},   # ask #2: no
+        ]}
+        with mock.patch.object(ah, 'load_state', lambda: state):
+            self.assertEqual(stage._graduation_decision(dup), 'declined')
+
+    def test_a_live_pending_ask_outranks_history(self):
+        import beacon_approval_handler as ah
+        dup = stage._graduation_task_id(1)
+        state = {'pending': [{'id': dup, 'status': 'pending'}],
+                 'history': [{'id': dup, 'status': 'rejected'}]}
+        with mock.patch.object(ah, 'load_state', lambda: state):
+            self.assertIsNone(stage._graduation_decision(dup))
+
+    def test_decline_after_a_re_ask_is_durable_end_to_end(self):
+        # Full sequence through the REAL lookup: ask -> approve -> PR never
+        # lands -> re-ask -> DECLINE -> silent from then on.
+        import beacon_approval_handler as ah
+        dup = stage._graduation_task_id(1)
+        hist: list = []
+        state = {'pending': [], 'history': hist}
+        with mock.patch.object(ah, 'load_state', lambda: state):
+            self.assertIsNotNone(stage.emit_graduation(
+                self._candidate(), state_path=self.state, completed_runs=18))
+            hist.append({'id': dup, 'status': 'approved'})     # yes, unapplied
+            self.assertIsNotNone(stage.emit_graduation(        # re-ask past cooldown
+                self._candidate(), state_path=self.state, completed_runs=22))
+            hist.append({'id': dup, 'status': 'rejected'})     # no
+            for run in (26, 40, 200):
+                self.assertIsNone(stage.emit_graduation(
+                    self._candidate(), state_path=self.state, completed_runs=run))
+        self.assertEqual(len(self.emits), 2)
+
     def test_decision_lookup_is_fail_safe(self):
+        import beacon_approval_handler as ah
         self.assertIsNone(stage._graduation_decision(None))
-        import types as _t
-        def _boom(_id):
-            raise RuntimeError('store unreadable')
-        fake = _t.SimpleNamespace(find_by_id_any_state=_boom)
-        with mock.patch.dict('sys.modules',
-                             {'beacon_approval_handler': fake}):
+
+        def _boom():
+            raise RuntimeError('approval store unreadable')
+
+        with mock.patch.object(ah, 'load_state', _boom):
+            self.assertIsNone(stage._graduation_decision('x'))
+        # A malformed store must read as undecided, not raise.
+        with mock.patch.object(ah, 'load_state', lambda: ['not', 'a', 'dict']):
+            self.assertIsNone(stage._graduation_decision('x'))
+        with mock.patch.object(ah, 'load_state',
+                               lambda: {'pending': None, 'history': None}):
             self.assertIsNone(stage._graduation_decision('x'))
 
     def test_failed_emit_does_not_consume_the_ask(self):
