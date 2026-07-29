@@ -15019,7 +15019,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-29T14:56:15.942679+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-29T14:54:51.11987+00:00"
+      "orphan_last_activity_ts": "2026-07-29T14:54:51.11987+00:00",
+      "briefing": {
+        "what": "A housekeeping fix to stop a routine health system from repeatedly flagging leftover scratch files it shouldn't be watching.",
+        "why": "It quiets a recurring false alarm so real problems don't get lost in the noise, keeping your team's attention on what actually matters.",
+        "suggest": "Approve it \u2014 it's low-stakes cleanup, though worth a quick confirmation that nothing important gets swept away before it runs."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T15:00:20.257913+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
