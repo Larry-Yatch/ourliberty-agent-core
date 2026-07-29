@@ -177,6 +177,24 @@
       "tier": "FYI",
       "plain_language_summary": "A PR earned a Mirror REVIEW_PASS but has not merged yet, so heal-pipeline-stall flagged it. The healer already routes this as escalate and DMs you directly, so by the time Pulse triages it the message is in your Telegram thread. A second Pulse-side escalation would just duplicate it. Surfaced here only for the digest record.",
       "recommended_action": "None at the Pulse layer -- the heal-pipeline-stall escalate DM is the primary delivery and is already in your thread. If the PR stays unmerged the healer re-escalates via its own route=escalate path. Runbook: runbooks/heal-pipeline-stall.md."
+    },
+    "dag-preflight-sync-lag": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "plain_language_summary": "A build-sequence is parked because the spec it names is merged on origin/main but still isn't in the checkout Mirror reads, and the sync that should have pulled it hasn't advanced in 30+ min. This is NOT a missing spec — do not re-author it. (The same alert also fires when the healer cannot confirm the spec is readable at all, e.g. a git timeout; it deliberately will not auto-re-dispatch on an unconfirmed reading.)",
+      "recommended_action": "Check the sync units on the droplet: `systemctl status ourliberty-sync.service ourliberty-sync-dispatch-repos.service` (dispatch repos — RSDPM, dashboard, graph — sync via the LATTER). Confirm the target checkout advanced with `git -C <checkout> rev-list --count HEAD..origin/main`. Once it reaches 0 the healer re-dispatches the DAG preflight itself on the next tick; no manual re-dispatch needed. Runbook: runbooks/heal-pipeline-stall.md."
+    },
+    "dag-preflight-sync-lag-redispatch": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "plain_language_summary": "A build-sequence's sync-lag cleared — the spec is now readable — but the healer's automatic re-dispatch of the Mirror DAG preflight did not land, so the sequence is still sitting `pending` instead of kicking off.",
+      "recommended_action": "Re-dispatch the preflight by hand via Beacon (`review-sequence-dag <seq-id>`, --phase routing-signal), or inspect the sequence at ~/agents/blackboard/build-sequences/<seq-id>.json. Check ~/agents/logs/heal-pipeline-stall.log for a `recover(sync-lag)` line naming the dispatch failure. Runbook: runbooks/heal-pipeline-stall.md."
+    },
+    "dag-preflight-sync-lag-unrecorded": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "plain_language_summary": "Bookkeeping-only failure: the Mirror DAG preflight WAS successfully re-dispatched for this sequence, but the healer could not write the `dag-preflight-sync-lag-cleared` entry into the sequence file. Mirror's verdict will arrive normally. The only risk is that, because the file doesn't record the re-dispatch, the healer may send a duplicate on a later tick.",
+      "recommended_action": "Check the sequence file is writable: `ls -l ~/agents/blackboard/build-sequences/<seq-id>.json`, plus disk space (`df -h`) and whether a concurrent writer (the advancer, or a Beacon session) is holding it. No action is needed on the dispatch itself. Runbook: runbooks/heal-pipeline-stall.md."
     }
   },
   "heal-systemd-install-drift": {
@@ -371,6 +389,12 @@
       "never_silence": true,
       "plain_language_summary": "A Forge-built PR earned Mirror's REVIEW_PASS but auto-merge is BLOCKED because the PR has merge conflicts with main -- it needs a manual rebase before it can land. This is the SIBLING of the intent=merge_conflict_manual_rebase DM, NOT a duplicate of it: _dm_larry_rebase_needed is either/or -- with a reply chat_id it sends the DM and returns; with NO chat_id (the queued-retry/sweep path that has no envelope context) it falls through to this append_alert broadcast instead. So when THIS subject fires, no companion DM went out -- the broadcast IS the delivery. never_silence is set because Tier-3-silencing a sole-delivery actionable alert would bury a blocked chain. The raw subject carries the coords + PR after colons (auto-merge-conflict:<repo>:<PR>, plus a ::promoted variant when the same hold is re-flagged); this bare prefix key matches both via the ':'-prefix-strip lookup rule.",
       "recommended_action": "Rebase the PR onto main and force-push: `gh pr checkout <PR> --repo <repo> && git fetch origin && git rebase origin/main && git push --force-with-lease` (the raw alert body carries the exact command plus Mirror's review summary for conflict-resolution context). For the shared RSDPM / agent-core checkouts, do the rebase in a dedicated `git worktree` so you don't clobber a concurrent session's HEAD, and pin `--force-with-lease` to the old head. Auto-merge re-fires on its own once the PR reports MERGEABLE and CI is green. Producer: scripts/outbox_notifier.py (_dm_larry_rebase_needed append_alert fallback, ~L10341); audit trail in ~/agents/logs/outbox-notifier.log."
+    },
+    "mirror-dag-audit-unrecorded": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "plain_language_summary": "Mirror returned a DAG-preflight REVISION for a build-sequence, but the audit entry that records it could not be written to the sequence file. That entry is what arms the stalled-sequence backstops, so nothing is now watching this sequence — it will sit `pending` silently. This DM is the replacement for that lost safety net.",
+      "recommended_action": "Check the sequence file is readable/writable: `ls -l ~/agents/blackboard/build-sequences/<seq-id>.json`, disk space (`df -h`), and whether a concurrent writer is holding it. Then read Mirror's verdict in the DM body, perform the remediation she asked for (it may be operational — a sync — rather than a DAG edit), and re-dispatch the preflight via Beacon. Runbook: runbooks/heal-pipeline-stall.md."
     }
   },
   "heal-wedged-review-sessions": {
@@ -498,12 +522,12 @@
     }
   },
   "heal-tier2-weekly-probe": {
-      "tier2_provisioning_drift": {
-        "severity": "WARNING",
-        "tier": "SOON",
-        "plain_language_summary": "Tier 2 (the fallback Claude account) is not at capability parity with Tier 1, so if work rotates to Tier 2 the agent runs degraded. Authentication is fine -- this is about the surrounding provisioning: a missing MCP server (the agent silently loses those tools), or a session-running systemd unit that no longer carves the Tier-2 home into ReadWritePaths (Tier-2 transcripts hit EROFS and --resume fails, silently losing the session). The weekly Tier-2 probe now checks this; the raw alert lists exactly which facet drifted.",
-        "recommended_action": "Read the drift list in the raw message and bring Tier 2 to parity per docs/runbooks/tier1-tier2-switch-capability-audit.md. MCP gap: define the server in a project .mcp.json (tier-proof) or authenticate it under TIER2_HOME. ReadWritePaths gap: add TIER2_HOME to the unit ReadWritePaths and reinstall via the install-drift healer. This is SOON not NOW -- Tier 1 is healthy; the risk only materializes on a rotation to Tier 2."
-      },
+    "tier2_provisioning_drift": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "plain_language_summary": "Tier 2 (the fallback Claude account) is not at capability parity with Tier 1, so if work rotates to Tier 2 the agent runs degraded. Authentication is fine -- this is about the surrounding provisioning: a missing MCP server (the agent silently loses those tools), or a session-running systemd unit that no longer carves the Tier-2 home into ReadWritePaths (Tier-2 transcripts hit EROFS and --resume fails, silently losing the session). The weekly Tier-2 probe now checks this; the raw alert lists exactly which facet drifted.",
+      "recommended_action": "Read the drift list in the raw message and bring Tier 2 to parity per docs/runbooks/tier1-tier2-switch-capability-audit.md. MCP gap: define the server in a project .mcp.json (tier-proof) or authenticate it under TIER2_HOME. ReadWritePaths gap: add TIER2_HOME to the unit ReadWritePaths and reinstall via the install-drift healer. This is SOON not NOW -- Tier 1 is healthy; the risk only materializes on a rotation to Tier 2."
+    },
     "tier2_weekly_probe_failed": {
       "severity": "WARNING",
       "tier": "SOON",

@@ -4090,15 +4090,21 @@ def _parse_dag_preflight_verdict(result_text: str) -> Optional[str]:
 def _append_dag_audit_entry(
     seq_path: Path, seq_id: str, event: str, mirror_task_id: str,
     extra: Optional[dict[str, Any]] = None,
-) -> None:
+) -> bool:
     """Append a DAG-preflight audit entry to the sequence's audit_log
-    (best-effort, atomic write).
+    (atomic write). Returns True iff the entry is durably on disk (an
+    already-present entry counts — the round is recorded either way).
 
     Gives the heal_pipeline_stall backstops a durable signal that does not
     depend on log retention. Parallels the PASS path's
     `dag-preflight-pass-kickoff` entry. Does NOT change `status`.
     Idempotent on `(event, mirror_task_id)` so a re-processed Mirror outbox
     doesn't double-record the same round.
+
+    The return value matters: this entry is the ONLY thing that arms Check 9
+    / Check 12. A caller that has no other durable artifact (the sync-lag
+    branch writes no Beacon notify) MUST escalate when this returns False,
+    or the REVISION is dropped in total silence.
     """
     try:
         seq = json.loads(seq_path.read_text())
@@ -4109,7 +4115,7 @@ def _append_dag_audit_entry(
             f'{e})',
             'WARN',
         )
-        return
+        return False
     if not isinstance(seq.get('audit_log'), list):
         seq['audit_log'] = []
     already = any(
@@ -4119,7 +4125,7 @@ def _append_dag_audit_entry(
         for e in seq['audit_log']
     )
     if already:
-        return
+        return True   # this round IS recorded — the write already happened
     entry: dict[str, Any] = {
         'ts': datetime.now(timezone.utc).isoformat(),
         'event': event,
@@ -4145,11 +4151,13 @@ def _append_dag_audit_entry(
             f'write audit entry to sequence file ({e})',
             'WARN',
         )
+        return False
+    return True
 
 
 def _append_dag_revision_audit(
     seq_path: Path, seq_id: str, mirror_task_id: str,
-) -> None:
+) -> bool:
     """Record an UNRESOLVED REVISION routed to Beacon's amend path.
 
     The sequence stays `pending` until Beacon amends + re-dispatches and
@@ -4157,8 +4165,42 @@ def _append_dag_revision_audit(
     the stall signal). Only written when the amend path was ACTUALLY
     engaged — see `_dag_revision_is_sync_lag` for the class that is not.
     """
-    _append_dag_audit_entry(
+    return _append_dag_audit_entry(
         seq_path, seq_id, 'dag-preflight-revision-routed', mirror_task_id,
+    )
+
+
+def _alert_dag_audit_unrecorded(
+    seq_id: str, seq_path: Path, task_id: str, klass: str, backstop: str,
+    body_snippet: str = '',
+) -> None:
+    """DM Larry when a DAG-preflight audit entry could not be written.
+
+    That entry is the only thing that arms the heal_pipeline_stall backstops,
+    so losing it converts a REVISION into a silent stall — the exact failure
+    this whole arc exists to end. The write fails on EROFS/ENOSPC or a torn
+    read while the advancer rewrites the sequence concurrently; rare, but its
+    failure mode is total silence, so it gets a DM rather than a log line.
+    """
+    extra = f'\n\n--- Mirror\'s verdict ---\n{body_snippet}' if body_snippet else ''
+    larry_alerts.append_alert(
+        source='outbox-notifier',
+        severity='warning',
+        message=(
+            f'Mirror returned a DAG-preflight REVISION ({klass}) for sequence '
+            f'`{seq_id}`, but the audit entry recording it could not be '
+            f'written to `{seq_path}`. That entry is what arms the '
+            f'{backstop} backstop, so NOTHING is now watching this sequence — '
+            f'it will sit `pending` silently. Mirror task_id: `{task_id}`.'
+            f'{extra}'
+        ),
+        subject=f'mirror-dag-audit-unrecorded:{seq_id}',
+        suggested_action=(
+            f'Check the sequence file is readable/writable (`ls -l '
+            f'{seq_path}`, disk space, a concurrent writer). Then perform '
+            f'the remediation Mirror asked for and re-dispatch the preflight '
+            f'via Beacon.'
+        ),
     )
 
 
@@ -4295,7 +4337,7 @@ def _handle_mirror_dag_preflight_result(data: dict[str, Any]) -> Optional[str]:
         # if the sync never advances.
         lag = _dag_revision_is_sync_lag(seq_path, seq_id)
         if lag is not None:
-            _append_dag_audit_entry(
+            recorded = _append_dag_audit_entry(
                 seq_path, seq_id, 'dag-preflight-sync-lag-detected', task_id,
                 extra={
                     'spec_doc': lag.spec_doc,
@@ -4303,6 +4345,24 @@ def _handle_mirror_dag_preflight_result(data: dict[str, Any]) -> Optional[str]:
                     'message': lag.message,
                 },
             )
+            if not recorded:
+                # This branch writes NO Beacon notify by design, so the audit
+                # entry is the sole artifact. Unlike the amend route below —
+                # which still leaves a live notify in Beacon's inbox when its
+                # audit write fails — a lost entry here means no artifact at
+                # all: no Check 12, no Check 9, no DM. Escalate instead.
+                _alert_dag_audit_unrecorded(
+                    seq_id, seq_path, task_id, 'sync-lag',
+                    'heal-pipeline-stall Check 12 sync-lag',
+                    body_snippet,
+                )
+                log(
+                    f'MIRROR_DAG_PREFLIGHT seq={seq_id} verdict=REVISION '
+                    f'class=sync-lag task={task_id}; audit entry UNRECORDED '
+                    f'(sole artifact lost) — DMed Larry',
+                    'WARN',
+                )
+                return f'mirror-dag-preflight:revision-sync-lag-unrecorded:{seq_id}'
             log(
                 f'MIRROR_DAG_PREFLIGHT seq={seq_id} verdict=REVISION '
                 f'class=sync-lag task={task_id} spec_doc={lag.spec_doc!r} '
@@ -4406,7 +4466,22 @@ def _handle_mirror_dag_preflight_result(data: dict[str, Any]) -> Optional[str]:
         # pending-sequence healer has a durable, log-retention-independent
         # signal of an UNRESOLVED REVISION (parallels the PASS path's
         # `dag-preflight-pass-kickoff` entry). Does NOT change `status`.
-        _append_dag_revision_audit(seq_path, seq_id, task_id)
+        if not _append_dag_revision_audit(seq_path, seq_id, task_id):
+            # The Beacon notify above IS live, so this is not the total-silence
+            # case the sync-lag branch guards. But without the audit entry
+            # Check 9 cannot arm, so if Beacon no-ops on the notify nothing
+            # catches it — same silent-stall class, one step removed. Escalate.
+            _alert_dag_audit_unrecorded(
+                seq_id, seq_path, task_id, 'routed to Beacon for auto-amend',
+                'heal-pipeline-stall Check 9 stalled-pending-sequence',
+                body_snippet,
+            )
+            log(
+                f'MIRROR_DAG_PREFLIGHT seq={seq_id} verdict=REVISION '
+                f'task={task_id}; Beacon notify routed but audit entry '
+                f'UNRECORDED (Check 9 cannot arm) — DMed Larry',
+                'WARN',
+            )
 
         # Actionable-only: the raw Mirror verdict is now an inter-agent
         # message, not a Larry DM. Log-only — no append_alert.

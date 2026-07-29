@@ -2548,6 +2548,13 @@ def check_rebase_obligation_stuck(state: dict) -> list[dict]:
 
 
 # ---------- Check 9: Sequence stuck pending after unresolved DAG REVISION ----------
+def _latest_ts(timeline: list, *events: str) -> Optional[datetime]:
+    """Newest timestamp in `timeline` whose event is one of `events`, else
+    None. `timeline` is a list of `(datetime, event_name)` pairs."""
+    matches = [ts for ts, ev in timeline if ev in events]
+    return max(matches) if matches else None
+
+
 def check_stalled_pending_sequence(state: dict) -> list[dict]:
     """Scan build-sequences for any sequence stuck in `status: pending`
     with an UNRESOLVED Mirror DAG-preflight REVISION older than the
@@ -2596,10 +2603,11 @@ def check_stalled_pending_sequence(state: dict) -> list[dict]:
         audit = seq.get('audit_log')
         if not isinstance(audit, list):
             continue
-        latest_rev_ts: Optional[datetime] = None
-        latest_pass_ts: Optional[datetime] = None
-        latest_amend_ts: Optional[datetime] = None
-        latest_resolved_ts: Optional[datetime] = None
+        # Collect (ts, event) once, then reason over it. The no-op-resolution
+        # test below needs to know what ELSE happened after the routed entry,
+        # which a single-pass scan can't answer (the pivot it compares
+        # against is still being computed).
+        timeline: list[tuple[datetime, str]] = []
         for entry in audit:
             if not isinstance(entry, dict):
                 continue
@@ -2608,18 +2616,12 @@ def check_stalled_pending_sequence(state: dict) -> list[dict]:
             if ts is None:
                 continue
             event = entry.get('event')
-            if event == 'dag-preflight-revision-routed':
-                if latest_rev_ts is None or ts > latest_rev_ts:
-                    latest_rev_ts = ts
-            elif event == 'dag-preflight-pass-kickoff':
-                if latest_pass_ts is None or ts > latest_pass_ts:
-                    latest_pass_ts = ts
-            elif event == 'dag-preflight-revision-amend':
-                if latest_amend_ts is None or ts > latest_amend_ts:
-                    latest_amend_ts = ts
-            elif event == 'dag-preflight-revision-resolved':
-                if latest_resolved_ts is None or ts > latest_resolved_ts:
-                    latest_resolved_ts = ts
+            timeline.append((ts, event if isinstance(event, str) else ''))
+        latest_rev_ts = _latest_ts(timeline, 'dag-preflight-revision-routed')
+        latest_pass_ts = _latest_ts(timeline, 'dag-preflight-pass-kickoff')
+        latest_resolved_ts = _latest_ts(
+            timeline, 'dag-preflight-revision-resolved',
+        )
         if latest_rev_ts is None:
             continue  # no REVISION routed → not this stall shape
         # Resolved: a PASS-kickoff at/after the REVISION means Mirror
@@ -2641,18 +2643,32 @@ def check_stalled_pending_sequence(state: dict) -> list[dict]:
         key = f'stalled_pending_sequence:{seq_id}:{latest_rev_ts.isoformat()}'
 
         # A NO-OP RESOLUTION (incident rsdpm-m14-001, 2026-07-28): Beacon
-        # recorded `dag-preflight-revision-resolved` for this round without a
-        # `dag-preflight-revision-amend` — she claimed the outcome and changed
-        # nothing. Re-routing the same revision back to her is provably
-        # useless: she has already read it and concluded there was nothing to
-        # amend (the sync-lag class, whose remediation is operational). The
-        # notifier suppressed the Larry DM on the assumption the autonomous
-        # path owned this; it did not, so the backstop must escalate NOW
-        # rather than spend its recovery budget re-asking.
+        # recorded `dag-preflight-revision-resolved` for this round and
+        # NOTHING ELSE — she claimed the outcome and changed nothing. Re-routing
+        # the same revision back to her is provably useless: she has already
+        # read it and concluded there was nothing to amend (the sync-lag class,
+        # whose remediation is operational). The notifier suppressed the Larry
+        # DM on the assumption the autonomous path owned this; it did not, so
+        # the backstop must escalate NOW rather than spend its recovery budget
+        # re-asking.
+        #
+        # Deliberately defined as "no OTHER event after the routed entry"
+        # rather than "no `dag-preflight-revision-amend` entry". Beacon writes
+        # this vocabulary freehand — the live blackboard carries 19 distinct
+        # `dag-preflight-*` event names, including BOTH `-amend` (6) and
+        # `-amended` (1), plus one-offs like `-escalated-syncblock` and
+        # `-redispatch`. Keying an escalation decision on one exact spelling
+        # would read a genuine amend as a no-op and DM Larry on the happy path.
+        # Any entry she writes counts as evidence she acted; only the bare
+        # `resolved` marker counts as evidence she did not.
+        acted_after_revision = any(
+            ts > latest_rev_ts and ev != 'dag-preflight-revision-resolved'
+            for ts, ev in timeline
+        )
         noop_resolution = (
             latest_resolved_ts is not None
             and latest_resolved_ts >= latest_rev_ts
-            and (latest_amend_ts is None or latest_amend_ts < latest_rev_ts)
+            and not acted_after_revision
         )
         # Recovery budget (per revision round). A successful recovery stamps
         # the alert cooldown, so an unbounded budget silences this backstop
@@ -2668,9 +2684,9 @@ def check_stalled_pending_sequence(state: dict) -> list[dict]:
             message = (
                 f'Build sequence `{seq_id}` is stuck in `status: pending` '
                 f'{elapsed_min} min after a Mirror DAG-preflight REVISION. '
-                f'Beacon recorded `dag-preflight-revision-resolved` but made '
-                f'NO amendment to the sequence and Mirror never re-PASSed — '
-                f'the revision was marked resolved without anything being '
+                f'Beacon recorded `dag-preflight-revision-resolved` and made '
+                f'NO other entry in the sequence, and Mirror never re-PASSed '
+                f'— the revision was marked resolved without anything being '
                 f'done ({seq_path}). This is the class whose remediation is '
                 f'OPERATIONAL (run a sync, restart a unit, wait for a deploy) '
                 f'rather than an edit to the sequence file, so the autonomous '
@@ -2827,21 +2843,28 @@ def check_dag_preflight_sync_lag(state: dict) -> list[dict]:
                 f'{seq_id}: {type(e).__name__}: {e}', 'WARN')
             continue
         elapsed_min = int((now - latest_lag_ts).total_seconds() / 60)
-        key = f'dag_preflight_sync_lag:{seq_id}:{latest_lag_ts.isoformat()}'
+        stamp = latest_lag_ts.isoformat()
 
-        if presence.status != bsv.SPEC_DOC_BEHIND_ORIGIN:
-            # The blocking condition is gone (or is no longer classifiable as
-            # a sync-lag). Finish the handoff Mirror asked for.
+        if presence.status == bsv.SPEC_DOC_PRESENT:
+            # The blocking condition is PROVEN gone. Finish the handoff Mirror
+            # asked for.
+            #
+            # Its own dedup key, distinct from the escalation below. `run()`
+            # tests should_alert() BEFORE it runs a recovery, so sharing one
+            # key would let the "sync is stuck" alert's cooldown gag the
+            # mechanical re-dispatch for a full ALERT_DEDUP_HOURS — i.e. the
+            # heal would be blocked for an hour precisely because we had
+            # already paged Larry about the thing that just fixed itself.
             alerts.append({
-                'key': key,
+                'key': f'dag_preflight_sync_lag_redispatch:{seq_id}:{stamp}',
                 'message': (
                     f'Build sequence `{seq_id}` was parked {elapsed_min} min '
-                    f'ago on a Mirror DAG-preflight sync-lag '
-                    f'(`spec_doc` behind origin/main). The checkout has since '
-                    f'caught up, but re-dispatching the preflight failed — '
-                    f'the sequence is still `pending` ({seq_path}).'
+                    f'ago on a Mirror DAG-preflight sync-lag (`spec_doc` '
+                    f'behind origin/main). The checkout has since caught up, '
+                    f'but the automatic re-dispatch of the preflight did not '
+                    f'land — the sequence is still `pending` ({seq_path}).'
                 ),
-                'subject': f'dag-preflight-sync-lag:{seq_id}',
+                'subject': f'dag-preflight-sync-lag-redispatch:{seq_id}',
                 'suggested_action': (
                     f'Re-dispatch the DAG preflight manually via Beacon '
                     f'(`review-sequence-dag {seq_id}`, --phase '
@@ -2856,16 +2879,35 @@ def check_dag_preflight_sync_lag(state: dict) -> list[dict]:
         if elapsed_min < SYNC_LAG_STALL_MIN:
             continue  # the sync timers get first refusal
 
-        # Still behind after the threshold — the sync itself is stuck.
-        alerts.append({
-            'key': key,
-            'message': (
-                f'Build sequence `{seq_id}` has been parked `pending` for '
-                f'{elapsed_min} min on a Mirror DAG-preflight sync-lag and '
+        # Past the threshold and the spec is STILL not readable. Two shapes,
+        # both human-actionable, neither auto-clearable:
+        #   * BEHIND_ORIGIN — the sync is not advancing.
+        #   * anything else (INDETERMINATE from a git timeout / unresolvable
+        #     origin/main, or NOT_AUTHORED) — we cannot even confirm the
+        #     class. Critically this branch must NOT re-dispatch-and-clear:
+        #     doing so on a transient `git` failure would stamp
+        #     `dag-preflight-sync-lag-cleared` over a lag that never lifted
+        #     and retire the check while the sequence is still parked.
+        if presence.status == bsv.SPEC_DOC_BEHIND_ORIGIN:
+            detail = (
                 f'the checkout STILL has not caught up: {presence.message} '
                 f'The spec is merged — this is not a missing spec and must '
                 f'NOT be re-authored. The sync that should have cleared it '
-                f'is not advancing ({seq_path}).'
+                f'is not advancing'
+            )
+        else:
+            detail = (
+                f'the spec_doc could not be confirmed readable '
+                f'(classifier status `{presence.status}`: {presence.message}) '
+                f'— the healer will not auto-re-dispatch on an unconfirmed '
+                f'classification, so this needs eyes'
+            )
+        alerts.append({
+            'key': f'dag_preflight_sync_lag:{seq_id}:{stamp}',
+            'message': (
+                f'Build sequence `{seq_id}` has been parked `pending` for '
+                f'{elapsed_min} min on a Mirror DAG-preflight sync-lag and '
+                f'{detail} ({seq_path}).'
             ),
             'subject': f'dag-preflight-sync-lag:{seq_id}',
             'suggested_action': (
@@ -3895,12 +3937,34 @@ def _recover_dag_preflight_sync_lag(seq_id: str, seq_path: str) -> bool:
     re-dispatched 56 min later).
 
     The dispatch shape is the orchestrator's own (see
-    `~/agents/inboxes/mirror/.archive/review-sequence-dag-*.json`). Success
-    is outcome-shaped: the audit entry is only written once the dispatch
-    landed, so a failed write leaves the check armed rather than silently
-    marking it done."""
+    `~/agents/inboxes/mirror/.archive/review-sequence-dag-*.json`), with ONE
+    difference: the task_id carries a per-round `-synclagN` suffix.
+
+    That suffix is load-bearing, not cosmetic. The notifier's audit writer is
+    idempotent on `(event, mirror_task_id)`, so re-dispatching under the bare
+    `review-sequence-dag-<seq>` means a SECOND `BEHIND_ORIGIN` verdict writes
+    no new `dag-preflight-sync-lag-detected` entry — leaving the `cleared`
+    entry we wrote here permanently newer than the newest `detected`, and
+    Check 12 disarmed while the sequence is still parked. Beacon's own
+    re-dispatches always carried a fresh id (`…-rsdpm-m11-001-retry1` in the
+    live archive), which is why this never bit before. N is derived from the
+    durable audit_log, so it is stable across healer restarts."""
+    round_n = 1
+    try:
+        seq = json.loads(Path(seq_path).read_text())
+        audit = seq.get('audit_log') if isinstance(seq, dict) else None
+        if isinstance(audit, list):
+            round_n = 1 + sum(
+                1 for e in audit
+                if isinstance(e, dict)
+                and e.get('event') == 'dag-preflight-sync-lag-cleared'
+            )
+    except Exception as e:  # noqa: BLE001 — a bad read just means round 1
+        log(f'recover(sync-lag) seq={seq_id} could not count prior rounds '
+            f'({type(e).__name__}: {e}); using round 1', 'WARN')
+    task_id = f'review-sequence-dag-{seq_id}-synclag{round_n}'
     task_base = {
-        'task_id': f'review-sequence-dag-{seq_id}',
+        'task_id': task_id,
         'source': 'orchestrator',
         'prompt': f'review-sequence-dag {seq_id}',
         'task_type': 'code-review',
@@ -3935,13 +3999,13 @@ def _recover_dag_preflight_sync_lag(seq_id: str, seq_path: str) -> bool:
             target_agent='mirror',
             task_dict=task,
             source_agent='heal-pipeline-stall',
-            filename=f'review-sequence-dag-{seq_id}.json',
+            filename=f'{task_id}.json',
         )
     except (safe_write_inbox.DispatchRejected,
             safe_write_inbox.RoutingDenied) as e:
         log(f'recover(sync-lag) seq={seq_id} dispatch denied: '
             f'{type(e).__name__}: {e}', 'WARN')
-        return False
+        return False   # accurate: the re-dispatch did NOT land → alert
     except Exception as e:  # noqa: BLE001
         log(f'recover(sync-lag) seq={seq_id} dispatch failed: '
             f'{type(e).__name__}: {e}', 'WARN')
@@ -3950,17 +4014,40 @@ def _recover_dag_preflight_sync_lag(seq_id: str, seq_path: str) -> bool:
         'ts': datetime.now(timezone.utc).isoformat(),
         'event': 'dag-preflight-sync-lag-cleared',
         'actor': 'heal-pipeline-stall',
-        'mirror_task_id': f'review-sequence-dag-{seq_id}',
+        'mirror_task_id': task_id,
         'note': (
             'spec_doc readable again; DAG preflight re-dispatched to Mirror'
         ),
     })
     log(f'recover(sync-lag) seq={seq_id} re-dispatched preflight to mirror '
-        f'(file={getattr(dest, "name", dest)}) audit_recorded={recorded}',
-        'INFO')
-    # The audit entry is what disarms the check. Without it the next tick
-    # would re-dispatch again, so a failed write is a failed recovery.
-    return recorded
+        f'as task={task_id} (file={getattr(dest, "name", dest)}) '
+        f'audit_recorded={recorded}', 'INFO')
+    if not recorded:
+        # The dispatch DID land — Mirror has the request. Only the bookkeeping
+        # failed. Returning False here would fire the caller's alert, whose
+        # text says the re-dispatch did not land: the exact opposite of what
+        # happened, handed to an operator already chasing a stalled build. Say
+        # the true thing instead, and report success so that alert stays shut.
+        larry_alerts.append_alert(
+            source='heal-pipeline-stall',
+            severity='warning',
+            message=(
+                f'Build sequence `{seq_id}`: the DAG preflight WAS '
+                f're-dispatched to Mirror as `{task_id}` (its sync-lag '
+                f'cleared), but the `dag-preflight-sync-lag-cleared` audit '
+                f'entry could not be written to `{seq_path}`. The dispatch is '
+                f'live; only the bookkeeping failed. Because the sequence '
+                f'file does not record it, the healer may re-dispatch a '
+                f'duplicate on a later tick.'
+            ),
+            subject=f'dag-preflight-sync-lag-unrecorded:{seq_id}',
+            suggested_action=(
+                f'Check the sequence file is writable (`ls -l {seq_path}`; '
+                f'disk space; a concurrent writer holding it). Mirror\'s '
+                f'verdict for `{task_id}` will arrive normally either way.'
+            ),
+        )
+    return True
 
 
 def _recover_red_mirror_status(task_id: str, pr_url: str,
