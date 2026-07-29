@@ -69307,3 +69307,122 @@ No orphan Larry directives in 24h window. NOMINAL ✅ (all tracked or by-design)
 
 ---
 
+## Iteration ~6642 — 2026-07-29T03:38Z UTC (Larry /cycle chat, Tier 1, consecutive_clean=0; SIGNAL: dirty tree agents/beacon/captures.json; PR#1051 CLOSED; medic-diagnosis-tier4 G-rule CLOSED by Beacon; 4 open fix/* PRs watching)
+
+**Health:** ⚠️ SIGNAL — Check A: dirty tree (`M agents/beacon/captures.json`; GC healer write since last commit; never-auto per working-copy discipline). All mandatory Checks 0–5 nominal. pending=4 carry. **Beacon result notification in-journal at 03:37Z UTC** (below): medic-diagnosis-tier4-delivery-confirm G-rule CLOSED — root cause was Pulse LLM overriding triage-alert Tier-3 result; new VP dispatched by Beacon (`pulse-cycle-check0-helper-override`).
+
+**VERIFY-BEFORE-REASSERT (from iter ~6641 at ~03:27Z UTC):**
+- **"rsdpm-driftcheck 0031_schema_migration_log.sql carry"**: UNVERIFIED — watermark=562=file_length; no new driftcheck alert (line 562 = stalled-active-step Tier-3 silence). [carry ⚠️ — still unverified]
+- **"system-health=healthy"**: CONFIRMED ✅ — ts=2026-07-29T03:32:29Z UTC (~6 min old at 03:38Z UTC). [carry ✅]
+- **"heal-stale-daemon-code.heartbeat fresh"**: CONFIRMED ✅ — 2026-07-29T03:25:00Z UTC (~13 min old; <60 min). [carry ✅]
+- **"alerts watermark=561, file_length=561"**: UPDATED — file_length=562; 1 new alert (line 562). Tier-3 silenced (known-pattern: stalled-active-step:rsdpm-m14-001:m14-pr-a). Watermark advanced 561→562. [updated ✅]
+- **"pending=4"**: CONFIRMED ✅ — still 4 (rsdpm-confirmall-medium-parent-secondglance-001, deep-review-hold-pr152-e64b6e43, unreg-approval-52da5b2c3bda, unreg-approval-9061de515dce). [carry ✅]
+- **"PR#1051 stall threshold reached"**: RESOLVED ✅ — PR#1051 CLOSED (not merged) at 03:25:12Z UTC. Stall tracking moot. [resolved ✅]
+- **"PR#1052 25 min watching"**: UPDATED → 33 min; below 60 min threshold. [watching]
+- **"PR#1047 CLOSED"**: CONFIRMED ✅. [carry ✅]
+- **"PR#1053 just created 5 min"**: UPDATED → 13 min; still below stall threshold. [watching]
+- **"SUPABASE_DB_PASSWORD carry"**: CONFIRMED ⚠️ — healer DM idx=550 at 02:09:52Z UTC; 24h dedup resets ~2026-07-30T02:09Z UTC (~22.5h away). No re-DM. [carry ⚠️]
+- **"SUPABASE_SERVICE_ROLE_KEY dedup"**: CONFIRMED ✅ — last_dm=2026-07-20T20:00:15Z UTC; 14d dedup through ~2026-08-03. [carry ✅]
+- **"Check I fires today ~14:13Z UTC"**: CONFIRMED ✅ — no check-i-2026-07-29.json yet; ~10.6h away. [carry ✅]
+- **"Check III next Sun Aug 2"**: CARRY ✅.
+- **"Check XIV Tier-4 × 2"**: CARRY ⚠️ — awaiting Larry triage.
+- **"auto-merge-conflict-route-hold-no-dm-001 VP"**: CARRY VP.
+- **"check-vi-posture-proposals-2026-07-07"**: CARRY.
+- **"Mirror queue-wait p95 carry"**: CARRY — self-suppresses ~2026-07-30T02Z UTC (~22.5h away).
+- **"PRs #1049+#1050 cooldown active"**: CONFIRMED ✅ — dry-run suppressed both. [carry — awaiting Larry claude-* label]
+- **"medic-diagnosis-tier4-delivery-confirm 3/3 DISPATCHED VP"**: UPDATED → **G-RULE CLOSED** by Beacon result (03:37Z UTC). Root cause: Pulse LLM hand-classifying AFTER triage-alert, overriding Tier-3 result. Config already correct (PR #515, 2026-06-12). New VP: `pulse-cycle-check0-helper-override` (cycle-prompt § 3.0 prose-only PR; Beacon dispatched). [VP → CLOSED + superseded VP]
+
+**Check 0 — Alert triage (~03:35Z UTC):** repair-watermark: repaired=false (old=561, file_length=562). **1 new alert (line 562):**
+- **Line 562:** ts=2026-07-29T03:33:30Z UTC, source=heal-pipeline-stall, subject=stalled-active-step:rsdpm-m14-001:m14-pr-a (108 min), route=escalate, tier_source=translation. triage-alert helper → **Tier 3** (known-pattern). Helper result accepted. No DM. Watermark advanced 561→562. ✅
+
+**Check 1 — Log noise (~03:35Z UTC):** outbox-notifier.log last entry [2026-07-28 21:05:44]=03:05:44Z UTC (~32 min old). No new entries. No novel WARNs/ERRORs. NOMINAL ✅
+
+**Check 2 — Telegram sweep (~03:35Z UTC):** beacon_telegram_bot.log: last delivery idx=560 at [2026-07-28T21:20:33-0600]=03:20:33Z UTC (~17 min ago). Last Larry directive ~4.4h ago. Bot alive. NOMINAL ✅
+
+**Check 3 — Pipeline stall (~03:35Z UTC):** heal_pipeline_stall.py --dry-run: FORGE_NO_PR_SKIP ×5 (MERGED: RSDPM #134/136/146/147/142); FORGE_NO_PR_SKIP fix-escalated-pr-headchange-backoff-001 (pr_exists=#1042) + m14-pr-a (pr_exists=#152 RSDPM); MIRROR_PASS_UNMERGED_SKIP m14-pr-a (held_deep_review); suppressed (cooldown): unrouted_open_pr #1050/#1049; suppressed (cooldown): stalled_active_step:rsdpm-m14-001:m14-pr-a. **0 alerts would fire**. NOMINAL ✅
+
+**Check 4 — Pending directives (~03:35Z UTC):** beacon-pending-approvals.json: **pending=4** (unchanged):
+1. `rsdpm-confirmall-medium-parent-secondglance-001` (2026-07-28T23:37:55Z UTC). Awaiting Larry.
+2. `deep-review-hold-pr152-e64b6e43` (2026-07-29T01:15:50Z UTC). RSDPM M14 deep-review. Awaiting Larry.
+3. `unreg-approval-52da5b2c3bda` (2026-07-29T03:16:13Z UTC). Monitoring auto-resolve.
+4. `unreg-approval-9061de515dce` (2026-07-29T03:16:13Z UTC). Monitoring auto-resolve.
+NOMINAL ✅ (carry; all tracked or by-design)
+
+**Check 5 — Stale daemon code (~03:35Z UTC):** heal-stale-daemon-code.heartbeat=2026-07-29T03:25:00Z UTC (~13 min; <60 min). system-health overall=healthy ts=2026-07-29T03:32:29Z UTC. NOMINAL ✅
+
+**Check A — Source repo (~03:35Z UTC):** On main. **DIRTY TREE: `M agents/beacon/captures.json`** (modified, not staged). HEAD=5dd4caec=origin/main (remote in sync). GC healer wrote captures.json after last commit (5dd4caec at 03:33:32Z UTC). Chat-mode cycle — run_cycle.sh wrapper not running; systemd-timer cycle will commit on next run. Never-auto per working-copy discipline. **SIGNAL ⚠️** (low urgency; known GC healer pattern)
+**Check B — Sync health (~03:35Z UTC):** last_sync=2026-07-29T03:33:19Z UTC (~5 min; <2h); status=no-change; consecutive_push_failures=0. NOMINAL ✅
+**Check C — Agent liveness (~03:35Z UTC):** system-health overall=healthy (ts=03:32:29Z UTC; ~6 min). All 4 bots alive (beacon ✅ forge ✅ mirror ✅ pulse ✅). disk=14% memory=21%. NOMINAL ✅
+**Check E — PR/merge state (~03:35Z UTC):** ourliberty-agent-core: 4 open PRs (PR#1051 confirmed CLOSED at 03:25:12Z UTC):
+- **#1053** fix/spec-doc-sync-lag-self-heal (13 min, no labels) — watching; below stall threshold.
+- **#1052** fix/dag-preflight-revision-silent-stall (33 min, MERGEABLE, no labels) — watching; below stall threshold.
+- **#1050** fix/dashboard-declined-delegation (104 min, no labels) — stall alert delivered (idx=555); cooldown active; awaiting Larry `claude-review` label.
+- **#1049** fix/guardian-can-actually-page (104 min, no labels) — stall alert delivered (idx=556); cooldown active; awaiting Larry `claude-review` label.
+RSDPM: #152 (deep-review hold, pending item 2). NOMINAL ✅ (all by-design)
+**Check H — Forge digest (~03:35Z UTC):** agent-core: 4 open fix/* PRs. PR#1051 CLOSED by Larry at 03:25:12Z UTC (not merged). RSDPM M14 at PR#152, deep-review hold. NOMINAL ✅
+
+**§5.0 one-shots (~03:36Z UTC):** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Credential rotation (~03:37Z UTC):** SUPABASE_SERVICE_ROLE_KEY: last_dm=2026-07-20T20:00:15Z UTC; 14d dedup through ~2026-08-03. No DM. SUPABASE_DB_PASSWORD: healer DM idx=550 at 02:09:52Z UTC; 24h dedup resets ~2026-07-30T02:09Z UTC (~22.5h away). No Pulse re-DM. NOMINAL ✅
+
+**Check I artifact triage (~03:37Z UTC):** No check-i-2026-07-29.json yet. Timer fires ~14:13Z UTC (~10.6h away). NOMINAL ✅
+
+**Check III artifact triage (~03:37Z UTC):** Newest: check-iii-2026-07-26.json. Next: Sun 2026-08-02. NOMINAL ✅
+
+**PRIME DIRECTIVE accounting:** intervention appended (tier=1, kind=intervention, template=captures-json-dirty-tree-gc-healer, ts=2026-07-29T03:37:51Z UTC). Note: Beacon already appended verification_pending (template=pulse-cycle-check0-helper-override, tier=1, iter=6641) before this iter. Trailing 30d: ratio=35.74% (systemic_fixes=50, vp=24; trend=worsening). **TIER: consecutive_clean=0** (cycle_tier_state.py record --checks-clean false; last_signal_at=2026-07-29T03:37:56Z UTC; Tier 1).
+
+**Patterns:**
+- PR#1051 ("supersede live Mirror review before dispatching Forge revision") CLOSED by Larry at 03:25:12Z UTC without merging. Larry revised or abandoned the approach.
+- captures.json dirty tree is a GC healer write; expected in chat-mode cycles. No action needed.
+- medic-diagnosis-tier4-delivery-confirm G-rule CLOSED: Beacon confirmed alert-translations.json was already correct (PR #515, 2026-06-12). Root cause was Pulse's LLM overriding the triage-alert helper's Tier-3 verdict. Procedural fix in flight (cycle-prompt § 3.0 PR). **Key discipline going forward: triage-alert helper Tier ≤ 3 is final — no LLM upgrade.**
+
+**G-rule assessment:**
+- **medic-diagnosis-tier4-delivery-confirm: CLOSED** (Beacon redirected; new VP: pulse-cycle-check0-helper-override). [resolved]
+- pulse-cycle-check0-helper-override: **VP** [new carry — awaiting cycle-prompt § 3.0 PR].
+- sync-desktop-config-false-block-001: **1/3** [carry].
+- mirror-worktree-cleanup-mid-session: **1/3** [carry].
+- forge-marker-taskid-suffix-increment-001: **2/3** [carry].
+- medic-draft-status-false-positive: **2/3** [carry].
+- check-i-force-bypass-dm-route: **2/3** [carry].
+- auto-merge-conflict-route-hold-no-dm-001: **VP** [carry VP].
+- mirror-queue-wait-readiness: **1/3** [carry].
+- beacon-pending-approvals-path-bug: **2/3** [carry].
+- m14-pr-a-task-id-path-prefix-mismatch: **1/3** [carry].
+- sequence-dispatch-text-cap-001: **1/3** [carry].
+- stalled-pending-sequence-rsdpm-m14-001: [carry — gated on deep-review-hold-pr152].
+- Active VP carries: forge-revision-preamble-missing; forge-wip-redispatch-digest; forge-wip-redispatch-exhausted-no-pr; outbox-notifier-intent-reject; auto-dispatch-APPROVAL_REQUEST-mismatch; PR #1022 heal-wip-redispatch DAG-preflight suppression; auto-merge-conflict-route-hold-no-dm-001; orphaned-pr-review-loglevel-by-class-001; pulse-cycle-check0-helper-override (new).
+
+**Actions taken:**
+1. Check 0: repair-watermark no-op (repaired=false, old=561, file_length=562). Triaged line 562 → Tier 3 (known-pattern). Watermark advanced 561→562.
+2. §5.0 one-shots: all no-op.
+3. PRIME ledger: intervention appended at 2026-07-29T03:37:51Z UTC (tier=1, kind=intervention, template=captures-json-dirty-tree-gc-healer).
+4. Tier state: `cycle_tier_state.py record --checks-clean false` → consecutive_clean=0; last_signal_at=2026-07-29T03:37:56Z UTC; Tier 1.
+
+**Escalations:**
+- [carry ⚠️ — DM idx=505 at ~16:47Z UTC; still unverified] RSDPM 0031 staging drift: apply 0031_schema_migration_log.sql in Supabase rsdpm-staging SQL editor. Carry until next driftcheck confirms clean.
+- [carry ⚠️ — healer DM idx=550 at 02:09:52Z UTC; 24h dedup resets ~2026-07-30T02:09Z UTC ~22.5h away] SUPABASE_DB_PASSWORD credential-drift: awaiting Larry triage.
+- [carry — no new DM] check-vi-posture-proposals-2026-07-07 (2 proposals). Awaiting Larry.
+- [carry — self-suppresses ~2026-07-30T02Z UTC, ~22.5h away] Mirror queue-wait p95=92.3m.
+- [carry — no new DM] Check XIV Tier-4 × 2: oversilence + fleet digest. Awaiting Larry.
+- [carry — stall alerts already delivered] PRs #1049/#1050 await `claude-review` label; #1052/#1053 below threshold. No Pulse DM.
+- [carry — monitoring] unreg-approval-52da5b2c3bda + unreg-approval-9061de515dce: expect auto-resolve.
+- [note ⚠️ low urgency] agents/beacon/captures.json dirty (GC healer pattern; systemd-timer cycle will commit on next run). No Larry action needed.
+
+**Tier end-of-iter:** **Tier 1** (consecutive_clean=0; last_signal_at=2026-07-29T03:37:56Z UTC; 5-min cadence).
+
+---
+
+## Result notification — 2026-07-29T03:37Z UTC (Beacon → Pulse | direction-ask-medic-diagnosis-tier4-no-translation-3of3-001 | RESOLVED → REDIRECTED)
+
+**Finding:** Beacon confirmed the config PR dispatch was a no-op — `config/alert-translations.json` already has `source=medic, intent=medic-diagnosis → Tier 3` (PR #515, 2026-06-12). The exact iter-6641 alert (line 561) returns `tier: 3, decision: silence` through both `classify()` and the CLI. The false Tier-4 verdicts were produced by **Pulse's LLM hand-classifying AFTER calling triage-alert**, overriding a Tier-3 helper result. Config is correct; the fix belongs in Pulse's cycle operating procedure.
+
+**Call:** Option (a) — Pulse-cycle fix. The `"*"` catch-all would auto-silence future novel medic alert types, trading false positives for blind spots. Not the right trade.
+
+**Action:** Dispatched `direction-ask-pulse-cycle-fix-check0-helper-override-001.json` to Beacon inbox. Requested: add an explicit enforcement clause to `runbooks/cycle-prompt.md § 3.0` stating that if `triage-alert` returns tier ≤ 3, that IS the final classification — LLM reasoning cannot upgrade it to Tier 4. Low-effort prose-only PR.
+
+**PRIME ledger:** Appended `verification_pending` (tier=1, template=pulse-cycle-check0-helper-override, iter=6641) — supersedes the original VP for the no-op config PR dispatch.
+
+**G-rule:** `medic-diagnosis-tier4-delivery-confirm` CLOSED (dispatch was no-op; root cause identified; systemic fix dispatched via cycle-prompt PR route).
+
+---
+
