@@ -15294,6 +15294,57 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-pr-ourliberty-agent-core-1049",
+      "name": "PR Ourliberty Agent Core 1049",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pr-ourliberty-agent-core-1049`. Last activity 2026-07-29T19:25:06.347416+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pr-ourliberty-agent-core-1049"
+      ],
+      "repo": null,
+      "created": "2026-07-29",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-29T19:27:24.842360+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-29T19:25:06.347416+00:00"
+    },
+    {
+      "id": "proposed-check0-tier4-guard-001",
+      "name": "Check0 Tier4 Guard 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `check0-tier4-guard-001`. Last activity 2026-07-29T19:23:27.716251+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "check0-tier4-guard-001"
+      ],
+      "repo": null,
+      "created": "2026-07-29",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-29T19:27:24.842360+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-29T19:23:27.716251+00:00"
+    },
+    {
+      "id": "proposed-delegate-cap-check-0-reject-a-tier-4-classification-not-prece-fd54",
+      "name": "Delegate Cap Check 0 Reject A Tier 4 Classification Not Prece Fd54",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `delegate-cap-check-0-reject-a-tier-4-classification-not-prece-fd54`. Last activity 2026-07-29T19:23:25.29312+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "delegate-cap-check-0-reject-a-tier-4-classification-not-prece-fd54"
+      ],
+      "repo": null,
+      "created": "2026-07-29",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-29T19:27:24.842360+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-29T19:23:25.29312+00:00"
     }
   ]
 }
