@@ -395,7 +395,9 @@ Beacon dispatches you a preflight DAG review BEFORE she emits the kickoff APPROV
 
 For each `review-sequence-dag <seq-id>` dispatch, you MUST run these four checks against the sequence file. They are mechanical — no judgment, no vibe. If your verdict diverges from the checks, you're doing it wrong.
 
-**Check 0 — spec_doc reachability (sync-lag guard).** Before checks 1–4, you MUST confirm the sequence's `spec_doc` is actually readable from this checkout. A spec that was just merged to `origin/main` is invisible here until `ourliberty-sync.timer` advances HEAD (incident 2026-06-10: a kickoff failed preflight with "spec never authored" when the spec was in fact merged as PR #415 — the droplet checkout simply lagged origin/main by one commit). NEVER report a missing `spec_doc` as "never authored" without first ruling out sync-lag. Run the script-backed classifier and branch on its exit code:
+**Check 0 — spec_doc reachability (sync-lag guard).** Before checks 1–4, you MUST confirm the sequence's `spec_doc` is actually readable from this checkout. A spec that was just merged to `origin/main` is invisible here until that repo's syncer advances HEAD (incident 2026-06-10: a kickoff failed preflight with "spec never authored" when the spec was in fact merged as PR #415 — the droplet checkout simply lagged origin/main by one commit). NEVER report a missing `spec_doc` as "never authored" without first ruling out sync-lag.
+
+**Which checkout, and which syncer, depends on the sequence's `target_repo`** — the classifier resolves a cross-repo `spec_doc` against that repo's own checkout, so an RSDPM sequence is read from `/home/larry/RSDPM`, not agent-core. The two trees have different keepers, and they are not interchangeable: `ourliberty-sync.service` advances agent-core ONLY, while every other registered checkout is fast-forwarded by `ourliberty-sync-dispatch-repos.service`. Take the remediation from the classifier's own message rather than assuming agent-core's. Run the script-backed classifier and branch on its exit code:
 
     ```bash
     python3 /home/larry/agent-core/scripts/build_sequence_validator.py check-spec-doc <seq-id>
@@ -404,7 +406,7 @@ For each `review-sequence-dag <seq-id>` dispatch, you MUST run these four checks
     # exit 1 = NOT_AUTHORED → the spec is genuinely absent on origin/main
     ```
 
-    - **exit 3 (behind origin):** do NOT run checks 1–4 and do NOT tell anyone to author the spec. Flag REVISION with the classifier's stdout/stderr message verbatim — it says to run `systemctl start ourliberty-sync.service` and re-dispatch once HEAD advances. The spec already exists; re-authoring would create a duplicate/conflict.
+    - **exit 3 (behind origin):** do NOT run checks 1–4 and do NOT tell anyone to author the spec. Flag REVISION with the classifier's stdout/stderr message verbatim — it names the syncer that can actually advance THIS repo's checkout, and re-dispatch once HEAD advances. The spec already exists; re-authoring would create a duplicate/conflict. Note that before returning exit 3 for a cross-repo sequence the classifier has ALREADY attempted an on-demand fast-forward and printed the result as a `REFRESH:` line — so exit 3 now means the pull was tried and did not resolve it (the `REFRESH:` line says why: a dirty tree, a non-`main` branch, or a genuine fetch failure). Quote that line too; it is the difference between "wait for the timer" and "someone is mid-edit in that checkout".
     - **exit 1 (not authored):** flag REVISION with: *"Sequence `<seq-id>` spec_doc `<spec_doc>` is absent from the working copy AND origin/main; author + merge it before re-dispatching the DAG preflight."*
     - **exit 0:** the spec is present (or origin/main doesn't resolve, e.g. an ad-hoc local run) — proceed to checks 1–4 normally.
 

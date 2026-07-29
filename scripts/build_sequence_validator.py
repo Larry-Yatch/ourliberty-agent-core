@@ -68,6 +68,99 @@ SPEC_DOC_REPO_ROOT_ENV = 'OURLIBERTY_SPEC_DOC_REPO_ROOT'
 # byte-for-byte identical to before the target_repo resolution was added.
 AGENT_CORE_REPO_NAME = 'ourliberty-agent-core'
 
+# -------------------- who actually advances which checkout --------------------
+#
+# Incident 2026-07-24 (rsdpm-m11-001) + 2026-07-28 (rsdpm-m14-001): both
+# DAG-preflights hit BEHIND_ORIGIN on `/home/larry/RSDPM` and told the operator
+# to run `ourliberty-sync.service`. That unit runs `sync_agent_core.sh`, which
+# is agent-core-ONLY by design (atomic swap into ~/agents) and can never
+# advance an RSDPM checkout — so the remediation was unfollowable for the exact
+# repo it was printed about.
+#
+# The two trees have different keepers, and naming the wrong one sends the
+# operator to a unit that will report success while changing nothing:
+#   agent-core           → ourliberty-sync.service (sync_agent_core.sh)
+#   every other repo_paths
+#   checkout (RSDPM, …)  → ourliberty-sync-dispatch-repos.service
+#                          (sync_dispatch_repo_clones.py, ff-only, every 30min)
+AGENT_CORE_SYNC_UNIT = 'ourliberty-sync.service'
+DISPATCH_REPO_SYNC_UNIT = 'ourliberty-sync-dispatch-repos.service'
+
+
+def sync_remediation(repo_name: Optional[str]) -> str:
+    """The remediation clause naming the mechanism that can actually advance
+    `repo_name`'s droplet checkout.
+
+    `None` / agent-core → the agent-core syncer. Any other repo → the
+    dispatch-repo syncer, stated together with the fact that the agent-core
+    unit cannot help, because that is precisely the wrong turn the old
+    message caused twice."""
+    if not repo_name or repo_name == AGENT_CORE_REPO_NAME:
+        return f'Run sync (`systemctl start {AGENT_CORE_SYNC_UNIT}`)'
+    return (
+        f'Fast-forward the `{repo_name}` checkout (`systemctl start '
+        f'{DISPATCH_REPO_SYNC_UNIT}` — note `{AGENT_CORE_SYNC_UNIT}` syncs '
+        f'agent-core ONLY and cannot advance this repo)'
+    )
+
+
+def _checkout_label(repo_name: Optional[str]) -> str:
+    """How to refer to the lagging checkout in operator-facing text."""
+    return 'working copy' if not repo_name else f'the `{repo_name}` checkout'
+
+
+def refresh_checkout(
+    repo_name: Optional[str],
+    repo_root: Optional[Path],
+    *,
+    syncer: Optional[Callable[..., Any]] = None,
+) -> Optional[str]:
+    """Best-effort fast-forward of a lagging dispatch-repo checkout.
+
+    Returns a one-line state string (`RSDPM: advanced (+1)`, `RSDPM: skipped —
+    2 uncommitted change(s) …`) or None when no refresh was attempted.
+
+    WHY this exists at all: `/home/larry/RSDPM` is NOT unkept — since #1008
+    `ourliberty-sync-dispatch-repos.timer` fast-forwards every registered
+    repo_paths checkout every 30 minutes, ff-only, logging a state line per
+    repo per tick. What it cannot do is beat its own poll interval, and that
+    interval is the whole failure: a spec merges, a kickoff dispatches minutes
+    later, and the preflight reads a checkout that is up to 30 minutes stale.
+    Both observed incidents were behind by exactly ONE commit — a spec that had
+    merged inside the current window. rsdpm-m11-001 (2026-07-24 21:10) and
+    rsdpm-m14-001 (2026-07-28 17:08, 4 minutes before the 17:12 tick that
+    would have cleared it) each parked a build until a human noticed.
+
+    Shortening the timer only shrinks the window; pulling on demand CLOSES it.
+    So on BEHIND_ORIGIN we run the same sweep's per-repo function inline and
+    re-check, turning a 90-minute park into a few seconds.
+
+    Deliberately delegates to `sync_dispatch_repo_clones.sync_one` rather than
+    reimplementing a pull: that function is the reviewed one that is ff-only,
+    refuses a tree that is dirty / not on main / ahead of origin, and never
+    resets. A second, subtly-different pull path on a SHARED checkout is
+    exactly the machine-owned-file single-committer trap. Inheriting it means
+    the on-demand path cannot be less safe than the timer.
+
+    agent-core is never refreshed here — `sync_agent_core.sh` owns that tree
+    (sync_one skips it by name for the same reason). Any failure degrades to
+    None so a refresh problem can never be worse than the stall it treats."""
+    if not repo_name or repo_name == AGENT_CORE_REPO_NAME or repo_root is None:
+        return None
+    try:
+        if syncer is None:
+            # Imported lazily, not at module scope: the validator is imported
+            # by the advancer daemon and by Beacon at synthesis time, where no
+            # refresh is ever attempted and the extra import would be dead cost.
+            scripts_dir = str(Path(__file__).resolve().parent)
+            if scripts_dir not in sys.path:
+                sys.path.insert(0, scripts_dir)
+            from sync_dispatch_repo_clones import sync_one
+            syncer = sync_one
+        return syncer(repo_name, str(repo_root), apply=True).line()
+    except Exception as exc:                                # pragma: no cover
+        return f'{repo_name}: error — refresh unavailable ({type(exc).__name__}: {exc})'
+
 # config/agent-models.json lives at <scripts>/../config/agent-models.json —
 # the same canonical block routing/dispatch and the advancer validate against.
 AGENT_MODELS_CONFIG = REPO_ROOT / 'config' / 'agent-models.json'
@@ -683,21 +776,50 @@ def resolve_spec_doc_repo_root(
 
     `env` / `repo_paths` are injectable for hermetic tests; they default to the
     process environment and the on-disk config map."""
+    return resolve_spec_doc_repo(seq, env=env, repo_paths=repo_paths)[1]
+
+
+def resolve_spec_doc_repo(
+    seq: Any,
+    *,
+    env: Optional[dict[str, str]] = None,
+    repo_paths: Optional[dict[str, Path]] = None,
+) -> Tuple[Optional[str], Optional[Path]]:
+    """`(repo_name, repo_root)` for a sequence's `spec_doc`.
+
+    Same resolution as `resolve_spec_doc_repo_root` (which delegates here),
+    but also returns WHICH repo the root belongs to. The name is what
+    `sync_remediation` needs to name the right syncer: a root alone cannot
+    distinguish "agent-core, synced by ourliberty-sync.service" from "a
+    dispatch-repo clone, synced by ourliberty-sync-dispatch-repos.service".
+
+    `repo_name` is None when the sequence resolves to the agent-core default
+    (no target_repo, target_repo IS agent-core, or an unmappable target). Note
+    the SPEC_DOC_REPO_ROOT_ENV override changes only the ROOT, not the name —
+    a test fixture pointed at /tmp still reports the sequence's real target so
+    the remediation text stays truthful about the repo under discussion."""
     environ = env if env is not None else os.environ
+    target = effective_target_repo(seq)
+    mapped = target if target and target != AGENT_CORE_REPO_NAME else None
+
     override = environ.get(SPEC_DOC_REPO_ROOT_ENV)
     if override:
-        return Path(override)
-    target = effective_target_repo(seq)
-    if not target or target == AGENT_CORE_REPO_NAME:
-        return None
+        return mapped, Path(override)
+    if mapped is None:
+        return None, None
     paths = repo_paths if repo_paths is not None else _load_repo_paths()
-    return paths.get(target)
+    root = paths.get(mapped)
+    # An unmappable target falls back to REPO_ROOT (root=None); report the
+    # name as None too, so the remediation doesn't name a dispatch-repo
+    # syncer for a checkout we just failed to locate.
+    return (mapped, root) if root is not None else (None, None)
 
 
 def check_spec_doc_presence(
     spec_doc: Any,
     repo_root: Optional[Path] = None,
     *,
+    repo_name: Optional[str] = None,
     git: Optional[GitRunner] = None,
     local_exists: Optional[Callable[[], bool]] = None,
 ) -> SpecDocPresence:
@@ -777,11 +899,11 @@ def check_spec_doc_presence(
             spec_doc=spec_doc,
             behind_by=behind,
             message=(
-                f'working copy is behind origin/main by {by}; spec_doc '
-                f'`{spec_doc}` EXISTS on origin/main but is not yet in this '
-                f'checkout. Run sync (`systemctl start '
-                f'ourliberty-sync.service`) before kickoff, then re-dispatch. '
-                f'This is a sync-lag, NOT a missing spec — do not re-author it.'
+                f'{_checkout_label(repo_name)} is behind origin/main by {by}; '
+                f'spec_doc `{spec_doc}` EXISTS on origin/main but is not yet '
+                f'in this checkout. {sync_remediation(repo_name)} before '
+                f'kickoff, then re-dispatch. This is a sync-lag, NOT a missing '
+                f'spec — do not re-author it.'
             ),
         )
 
@@ -849,8 +971,25 @@ def _cli_check_spec_doc(seq_id_or_path: str) -> int:
     if seq is None:
         return rc
     spec_doc = seq.get('spec_doc') if isinstance(seq, dict) else None
-    repo_root = resolve_spec_doc_repo_root(seq)
-    presence = check_spec_doc_presence(spec_doc, repo_root=repo_root)
+    repo_name, repo_root = resolve_spec_doc_repo(seq)
+    presence = check_spec_doc_presence(
+        spec_doc, repo_root=repo_root, repo_name=repo_name)
+
+    # Sync-lag self-heal. BEHIND_ORIGIN means the spec is on origin/main and
+    # this checkout just hasn't caught up — a condition the 30-minute
+    # dispatch-repo sweep will clear on its own, eventually. Pull now instead
+    # of parking the build until it does. The refresh is ff-only and declines
+    # a tree in use (see refresh_checkout), so the worst case is the same
+    # BEHIND_ORIGIN we already had, now printed with the reason it stayed.
+    if presence.status == SPEC_DOC_BEHIND_ORIGIN:
+        line = refresh_checkout(repo_name, repo_root)
+        if line is not None:
+            # Always emitted, advanced or not: a silent no-op and a working
+            # refresh must not look alike from the logs.
+            sys.stderr.write(f'REFRESH: {line}\n')
+            presence = check_spec_doc_presence(
+                spec_doc, repo_root=repo_root, repo_name=repo_name)
+
     if presence.status == SPEC_DOC_PRESENT:
         sys.stdout.write(f'OK: {presence.message}\n')
         return 0

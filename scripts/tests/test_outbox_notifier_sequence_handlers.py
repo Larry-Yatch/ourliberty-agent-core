@@ -662,6 +662,87 @@ class KickoffFailureModes(_KickoffHandlerHarness):
         self.assertIn('do not re-author', msg)
         self.assertNotIn('never authored', msg)
 
+    def test_behind_origin_is_self_healed_by_an_on_demand_refresh(self):
+        """The dispatch-repo sweep polls every 30 minutes, so a kickoff
+        dispatched minutes after its spec merged reads a stale checkout and
+        used to defer until a human noticed (rsdpm-m11-001 2026-07-24,
+        rsdpm-m14-001 2026-07-28 — both behind by exactly 1 commit). The
+        kickoff now pulls on demand and re-checks: when the refresh advances
+        the tree, the sequence goes active instead of parking."""
+        seq = _make_sequence(seq_id='pulse-upgrade-001', status='pending')
+        self._write_sequence(seq)
+        behind = bsv.SpecDocPresence(
+            status=bsv.SPEC_DOC_BEHIND_ORIGIN,
+            spec_doc='specs/M14-workspace-boundary.md',
+            message='the `RSDPM` checkout is behind origin/main by 1 commit(s)',
+            behind_by=1,
+        )
+        present = bsv.SpecDocPresence(
+            status=bsv.SPEC_DOC_PRESENT,
+            spec_doc='specs/M14-workspace-boundary.md',
+            message='present in the working copy.',
+        )
+        body = self._make_envelope()
+        with mock.patch.object(
+            bsv_handler_mod, 'check_spec_doc_presence',
+            side_effect=[behind, present],
+        ), mock.patch.object(
+            bsv_handler_mod, 'resolve_spec_doc_repo',
+            return_value=('RSDPM', Path('/home/larry/RSDPM')),
+        ), mock.patch.object(
+            bsv_handler_mod, 'refresh_checkout',
+            return_value='RSDPM: advanced (+1)',
+        ) as refreshed:
+            result = on._handle_build_sequence_advancer_kickoff(
+                body, body['result'],
+            )
+        refreshed.assert_called_once_with('RSDPM', Path('/home/larry/RSDPM'))
+        # Recovered: no deferral, and the sequence armed.
+        self.assertNotIn('spec-behind-origin', result or '')
+        self.assertEqual(self._read_sequence('pulse-upgrade-001')['status'],
+                         'active')
+        # No operator was paged for a lag the machine just fixed.
+        self.assertEqual(self._read_alerts(), [])
+
+    def test_behind_origin_still_defers_when_the_refresh_declines(self):
+        """The refresh is ff-only and declines a checkout someone is using.
+        When it cannot advance, the deferral that was already happening must
+        still happen — the self-heal adds a chance to recover, never a way to
+        proceed on a spec that is genuinely unreadable here."""
+        seq = _make_sequence(seq_id='pulse-upgrade-001', status='pending')
+        self._write_sequence(seq)
+        behind = bsv.SpecDocPresence(
+            status=bsv.SPEC_DOC_BEHIND_ORIGIN,
+            spec_doc='specs/M14-workspace-boundary.md',
+            message=('the `RSDPM` checkout is behind origin/main by 1 '
+                     'commit(s); Fast-forward the `RSDPM` checkout '
+                     '(`systemctl start ourliberty-sync-dispatch-repos.'
+                     'service`); do not re-author it.'),
+            behind_by=1,
+        )
+        body = self._make_envelope()
+        with mock.patch.object(
+            bsv_handler_mod, 'check_spec_doc_presence',
+            side_effect=[behind, behind],
+        ), mock.patch.object(
+            bsv_handler_mod, 'resolve_spec_doc_repo',
+            return_value=('RSDPM', Path('/home/larry/RSDPM')),
+        ), mock.patch.object(
+            bsv_handler_mod, 'refresh_checkout',
+            return_value='RSDPM: skipped — 2 uncommitted change(s)',
+        ):
+            result = on._handle_build_sequence_advancer_kickoff(
+                body, body['result'],
+            )
+        self.assertIn('spec-behind-origin', result)
+        self.assertEqual(self._read_sequence('pulse-upgrade-001')['status'],
+                         'pending')
+        alerts = self._read_alerts()
+        self.assertEqual(len(alerts), 1)
+        msg = alerts[0]['message'].lower()
+        self.assertIn('ourliberty-sync-dispatch-repos.service', msg)
+        self.assertIn('do not re-author', msg)
+
     def test_behind_origin_on_active_sequence_still_dedups(self):
         """Regression: the spec_doc guard must sit AFTER the idempotency
         no-op. A re-dispatched kickoff on an already-active sequence whose

@@ -394,10 +394,31 @@ def apply_kickoff_transition(
     # whose steps target RSDPM and whose BUILD_PLAN.md lives in the RSDPM
     # checkout, not agent-core — no longer false-fails NOT_AUTHORED here. An
     # agent-core-targeted sequence resolves to None → REPO_ROOT, unchanged.
+    spec_repo_name, spec_repo_root = bsv.resolve_spec_doc_repo(seq)
     presence = bsv.check_spec_doc_presence(
         seq.get('spec_doc'),
-        repo_root=bsv.resolve_spec_doc_repo_root(seq),
+        repo_root=spec_repo_root,
+        repo_name=spec_repo_name,
     )
+    # Sync-lag self-heal, mirroring the `check-spec-doc` CLI. The dispatch-repo
+    # sweep polls every 30 minutes; a kickoff dispatched minutes after its spec
+    # merged lands inside that window and would otherwise defer until a human
+    # noticed (rsdpm-m11-001, rsdpm-m14-001 — both behind by exactly 1 commit).
+    # The refresh is ff-only and declines a tree in use, so a failure to
+    # advance simply leaves the deferral that was already happening.
+    if presence.status == bsv.SPEC_DOC_BEHIND_ORIGIN:
+        refresh_line = bsv.refresh_checkout(spec_repo_name, spec_repo_root)
+        if refresh_line is not None:
+            log(
+                f'BUILD_SEQUENCE_KICKOFF seq={seq_id} spec-doc-behind-origin '
+                f'refresh: {refresh_line}',
+                'INFO',
+            )
+            presence = bsv.check_spec_doc_presence(
+                seq.get('spec_doc'),
+                repo_root=spec_repo_root,
+                repo_name=spec_repo_name,
+            )
     if presence.status == bsv.SPEC_DOC_BEHIND_ORIGIN:
         msg = (
             f'Sequence `{seq_id}` kickoff deferred: this checkout is behind '
