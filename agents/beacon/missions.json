@@ -14926,7 +14926,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-29T05:52:40.684756+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-29T05:42:37.175888+00:00"
+      "orphan_last_activity_ts": "2026-07-29T05:42:37.175888+00:00",
+      "briefing": {
+        "what": "A small wording cleanup to one of our internal instruction documents, waiting for a quick sign-off before it goes live.",
+        "why": "Clearer internal instructions keep the team aligned, but this is housekeeping \u2014 it doesn't move revenue or customers.",
+        "suggest": "Give it a quick approval so it clears the queue, but no need to rush other work aside for it."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T05:55:56.517709+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-rsdpm-pr155-mirror-review-route-001",
@@ -14943,7 +14957,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-29T05:52:40.684756+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-29T05:42:35.239006+00:00"
+      "orphan_last_activity_ts": "2026-07-29T05:42:35.239006+00:00",
+      "briefing": {
+        "what": "A piece of work your team kicked off on its own that hasn't been tied to any project or goal yet.",
+        "why": "Unassigned work can quietly consume time and effort without moving anything you actually care about forward.",
+        "suggest": "Before it goes further, have someone confirm what this is meant to accomplish and either attach it to a real priority or set it aside."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T05:55:56.517709+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
