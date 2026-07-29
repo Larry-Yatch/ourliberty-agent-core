@@ -202,6 +202,14 @@ else
     fi
 fi
 
+# --- reap ephemeral per-cycle helper scripts ---
+# The /cycle child (cwd = agents/pulse) writes ad-hoc write_journal_<iter>.py
+# helpers to build its journal entry and never deletes them; leftovers trip
+# agent_core_health_check.py's untracked-file discipline. Best-effort catch-all:
+# reap any that remain so the working tree stays clean.
+rm -f "${HOME}"/agent-core/agents/pulse/write_journal_*.py 2>/dev/null || true
+log "reaped any leftover agents/pulse/write_journal_*.py helper scripts"
+
 # --- cost capture (D2) ---
 # Append a Ledger-feed line to ~/agents/blackboard/costs.jsonl on every cycle,
 # success or failure. Best-effort: jq absence or malformed JSON is non-fatal.
