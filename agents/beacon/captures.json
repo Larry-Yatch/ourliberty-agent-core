@@ -1993,7 +1993,7 @@
       "id": "cap-title-f47b",
       "title": "--title",
       "note": "PIPELINE_BACKOFF strands a manually-fixed escalated PR for up to 3 hours",
-      "state": "parked",
+      "state": "done",
       "label": null,
       "origin": {
         "source": "desktop-chat",
@@ -2020,8 +2020,12 @@
       "spawned": {
         "kind": "delegate",
         "task_id": "delegate-cap-title-f47b",
-        "stamped_at": "2026-07-28T23:12:29.896549+00:00"
-      }
+        "stamped_at": "2026-07-28T23:12:29.896549+00:00",
+        "outcome": "merged"
+      },
+      "closed_by": "heal_missions_card_gc:terminal-backstop",
+      "shipped_note": "shipped (linked work merged)",
+      "closed_at": "2026-07-29T00:04:14.753369+00:00"
     },
     {
       "id": "cap-title-f1a1",
