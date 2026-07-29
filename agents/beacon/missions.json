@@ -9172,7 +9172,10 @@
         "at": "2026-07-15T10:43:45.682948+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-07-29T00:06:17.414400+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-fix-auto-merge-already-merged-skip-001",
@@ -14149,7 +14152,11 @@
         "at": "2026-07-28T23:23:34.984788+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-29T00:06:17.414400+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-delegate-cap-title-f47b",
