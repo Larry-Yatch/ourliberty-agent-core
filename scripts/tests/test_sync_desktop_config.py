@@ -13,6 +13,9 @@ exact defect this script exists to prevent:
   - failures are LOUD: a missing source and an unwritable destination both
     exit non-zero rather than reporting success
 
+HERMETICITY: every test that needs deployed CONTENT reads it from a fixture
+git repo built by setUpModule, never from this checkout — see _build_fixture_repo.
+
 Run:
     cd ~/agent-core && python3 -m unittest scripts.tests.test_sync_desktop_config
 """
@@ -26,6 +29,7 @@ except ImportError:  # discover loads this module top-level (no package parent)
 
 import json
 import os
+import shutil
 import stat
 import subprocess
 import sys
@@ -41,6 +45,158 @@ if str(_REPO_SCRIPTS) not in sys.path:
 import sync_desktop_config as sdc  # noqa: E402
 
 _REPO_ROOT = _REPO_SCRIPTS.parent
+
+
+# ---------- the hermetic fixture repo ----------
+#
+# WHY THIS EXISTS
+# ---------------
+# sync_desktop_config resolves every byte it deploys with
+# `git show origin/main:<path>` run against `sdc._REPO_ROOT` — the REAL
+# checkout. So each content test read live machine state: this clone's
+# remote-tracking ref, the invoking user's git config, and whatever the ~8k
+# tests ahead of this module (it sorts 340th of 364, near the very end) left
+# behind in the process environment.
+#
+# That is the shape that passes alone and fails inside a full run, and it did:
+# on the droplet this module passed 42/42 in isolation while the full suite
+# failed exactly the 20 tests whose verdict depends on `_blob()` succeeding
+# (14 in _SyncCase, 3 in FetchStatusTests, 3 in CliTests — the other 22 never
+# touch origin/main and stayed green). The regression gate compares failing
+# NAMES at head against the parent, so a failure that only sometimes occurs
+# reads as a brand-new regression: it BLOCKED agent-core #1047 and #1053,
+# neither of which touches this module, and escalated a decision card.
+#
+# The fix is the one the #866 batch used on the check_spec_doc family — the
+# test owns its state instead of reading the machine's. setUpModule builds a
+# throwaway git repo carrying a real `refs/remotes/origin/main`, and every
+# content test points the production module at THAT. Nothing here can be
+# perturbed by what ran before it.
+#
+# Deliberately NOT covered by the fixture: that the manifest's paths resolve at
+# the real origin/main. Such a test would fail on every PR that ADDS a manifest
+# entry (the path is not merged yet, by construction) — the working-tree checks
+# in ManifestTests are the right level, and the script itself already exits 2
+# loudly on a source it cannot resolve.
+
+# Ambient git config must not reach the fixture — a global hook, a core.*
+# default or a safe.directory rule read from the invoking user's ~/.gitconfig
+# is exactly the machine state this fixture exists to shut out. Applied to
+# os.environ for the whole test too, because the production `git` calls
+# inherit the environment rather than taking one from us.
+_HERMETIC_GIT_ENV = {
+    'GIT_CONFIG_GLOBAL': os.devnull,
+    'GIT_CONFIG_SYSTEM': os.devnull,
+    'GIT_CONFIG_NOSYSTEM': '1',
+    'GIT_AUTHOR_NAME': 'sync-fixture', 'GIT_AUTHOR_EMAIL': 'sync@fixture',
+    'GIT_COMMITTER_NAME': 'sync-fixture', 'GIT_COMMITTER_EMAIL': 'sync@fixture',
+    'GIT_TERMINAL_PROMPT': '0',
+}
+
+# `git -C <repo>` does NOT win over these: every one of them re-points git at
+# another repository, index or object store regardless of -C. A single one left
+# in os.environ by an earlier test would aim the fixture's own git calls — and
+# the production ones, which inherit the environment — somewhere else entirely,
+# which is the very defect class the fixture closes. Cleared, not just
+# overridden, because the meaningful value of each is "unset".
+_GIT_PLUMBING_ENV = (
+    'GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_COMMON_DIR',
+    'GIT_OBJECT_DIRECTORY', 'GIT_ALTERNATE_OBJECT_DIRECTORIES',
+    'GIT_CEILING_DIRECTORIES', 'GIT_NAMESPACE',
+)
+
+_FIXTURE_ROOT: Path | None = None
+
+
+def _fixture() -> Path:
+    if _FIXTURE_ROOT is None:  # pragma: no cover - setUpModule always runs
+        raise RuntimeError('fixture repo missing: setUpModule did not run')
+    return _FIXTURE_ROOT
+
+
+def _git(repo: Path, *args: str) -> None:
+    env = dict(os.environ)
+    env.update(_HERMETIC_GIT_ENV)
+    for var in _GIT_PLUMBING_ENV:
+        env.pop(var, None)
+    subprocess.run(['git', '-C', str(repo), *args], env=env,
+                   capture_output=True, text=True, check=True, timeout=60)
+
+
+def _fixture_bytes(source: str) -> bytes:
+    """Distinctive per-path content, so a mix-up shows up as a diff rather
+    than as two files that happen to compare equal."""
+    return (f'#!/usr/bin/env bash\n'
+            f'# fixture stand-in for {source}\n'
+            f'echo {Path(source).name}\n').encode('utf-8')
+
+
+def _build_fixture_repo(root: Path) -> None:
+    """A miniature of this repo carrying a real origin/main.
+
+    Holds the manifest's own source PATHS (so the shipped manifest still
+    drives the sync) with synthetic CONTENT (so no assertion depends on what
+    the checkout happens to hold). Every source lands 100755 — the deployed
+    hooks are invoked as bare executables, and _SyncCase asserts the bit
+    survives the copy."""
+    _git(root, 'init', '-q', '-b', 'main')
+
+    _, sources = sdc.load_manifest()
+    for src in sources:
+        path = root / src
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(_fixture_bytes(src))
+        path.chmod(0o755)
+
+    # The CLI resolves _REPO_ROOT from its OWN __file__, so CliTests must run a
+    # copy that lives INSIDE the fixture; it reads config/ from there too.
+    (root / 'config').mkdir(parents=True, exist_ok=True)
+    (root / 'scripts').mkdir(parents=True, exist_ok=True)
+    shutil.copy2(_REPO_ROOT / 'config' / 'desktop-config-sync.json',
+                 root / 'config' / 'desktop-config-sync.json')
+    shutil.copy2(_REPO_SCRIPTS / 'sync_desktop_config.py',
+                 root / 'scripts' / 'sync_desktop_config.py')
+
+    _git(root, 'add', '-A')
+    _git(root, 'commit', '-q', '-m', 'fixture')
+    # Synthesize the remote-tracking ref without a remote: `git show
+    # origin/main:<path>` resolves refs/remotes/origin/main directly, so the
+    # fixture needs no network and no fetch.
+    _git(root, 'update-ref', 'refs/remotes/origin/main', 'main')
+
+
+def setUpModule():
+    global _FIXTURE_ROOT
+    _FIXTURE_ROOT = Path(tempfile.mkdtemp(prefix='sync-desktop-fixture-'))
+    _build_fixture_repo(_FIXTURE_ROOT)
+
+
+def tearDownModule():
+    global _FIXTURE_ROOT
+    if _FIXTURE_ROOT is not None:
+        shutil.rmtree(_FIXTURE_ROOT, ignore_errors=True)
+        _FIXTURE_ROOT = None
+
+
+class _HermeticRepoMixin:
+    """Point the production module at the fixture repo for the whole test.
+
+    Patched per-test rather than once per class so a test that dies mid-way
+    still hands the next one an unpatched module — the failure mode this file
+    exists to stop is precisely one test's leftovers deciding another's
+    verdict."""
+
+    def setUp(self):
+        super().setUp()
+        for patcher in (mock.patch.dict(os.environ, _HERMETIC_GIT_ENV,
+                                        clear=False),
+                        mock.patch.object(sdc, '_REPO_ROOT', _fixture())):
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        # Safe after patch.dict has started: its restore replaces os.environ's
+        # whole contents from the saved copy, so these come back on cleanup.
+        for var in _GIT_PLUMBING_ENV:
+            os.environ.pop(var, None)
 
 
 class ManifestTests(unittest.TestCase):
@@ -125,18 +281,20 @@ class ManifestTests(unittest.TestCase):
         self.assertEqual(len(names), len(set(names)))
 
 
-class _SyncCase(unittest.TestCase):
-    """A throwaway dest dir + a real source path resolved from origin/main."""
+class _SyncCase(_HermeticRepoMixin, unittest.TestCase):
+    """A throwaway dest dir + a manifest source resolved from the FIXTURE's
+    origin/main (never this checkout's — see the fixture notes above)."""
 
     SOURCE = 'scripts/emit_capture.sh'
 
     def setUp(self):
+        super().setUp()
         self._tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self._tmp.cleanup)
         self.dest = Path(self._tmp.name)
         self.name = Path(self.SOURCE).name
         self.target = self.dest / self.name
-        # What origin/main actually holds — the content the sync must converge on.
+        # What the fixture's origin/main holds — what the sync must converge on.
         self.blob, self.executable = sdc._blob(self.SOURCE)
 
     def _sync(self, **kw):
@@ -250,6 +408,9 @@ class LoudFailureTests(_SyncCase):
         self.assertEqual(rc, 2)
         self.assertEqual(self.target.read_bytes(), self.blob)
 
+    @unittest.skipIf(os.geteuid() == 0,
+                     'root writes through a 0500 directory, so the mode bit '
+                     'cannot express "unwritable" for this user')
     def test_unwritable_destination_exits_nonzero(self):
         os.chmod(self.dest, 0o500)  # r-x: cannot create the temp file
         self.addCleanup(os.chmod, self.dest, 0o700)
@@ -342,7 +503,7 @@ class ModeParsingTests(unittest.TestCase):
             self.assertEqual(list(Path(d).iterdir()), [])
 
 
-class FetchStatusTests(unittest.TestCase):
+class FetchStatusTests(_HermeticRepoMixin, unittest.TestCase):
     """A failed fetch means the comparison basis is unverified.
 
     Before this was split out, `_fetch()` returned a bare False for both "the
@@ -405,16 +566,19 @@ class FetchStatusTests(unittest.TestCase):
             self.assertEqual(self._main(status='ok', dest=dest), 0)
 
 
-class CliTests(unittest.TestCase):
-    """The entrypoint the hook actually invokes."""
+class CliTests(_HermeticRepoMixin, unittest.TestCase):
+    """The entrypoint the hook actually invokes.
 
-    SCRIPT = _REPO_SCRIPTS / 'sync_desktop_config.py'
+    Runs the FIXTURE's copy of the script, not this checkout's: the script
+    resolves _REPO_ROOT from its own __file__, so where the file sits is the
+    only way to choose which repo a subprocess reads origin/main from."""
 
     def _run(self, *args, dest: Path):
         env = dict(os.environ)
         env['OL_SYNC_DEST_DIR'] = str(dest)
         env['OL_SYNC_SKIP_FETCH'] = '1'  # no network in tests
-        return subprocess.run([sys.executable, str(self.SCRIPT), *args],
+        script = _fixture() / 'scripts' / 'sync_desktop_config.py'
+        return subprocess.run([sys.executable, str(script), *args],
                               capture_output=True, text=True, timeout=120,
                               env=env)
 
