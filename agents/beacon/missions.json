@@ -15407,7 +15407,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-29T19:42:30.307234+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-29T19:41:12.706933+00:00"
+      "orphan_last_activity_ts": "2026-07-29T19:41:12.706933+00:00",
+      "briefing": {
+        "what": "Two small polish tasks to lock in a recently built safety feature \u2014 one adds a test to make sure it keeps working, the other shows a clarity detail on a customer-facing notice.",
+        "why": "It protects a safeguard the team just built from quietly breaking later and makes a notice clearer, but it's tidy-up work that isn't attached to any active priority yet.",
+        "suggest": "Fine to greenlight, but since it's not tied to a current priority, hold it until it can be slotted alongside related work rather than pulling focus now."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T19:42:51.285731+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-delegate-cap-confirm-all-pin-the-mixed-tier-parent-case-and-p-d5d1",
@@ -15424,7 +15438,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-29T19:42:30.307234+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-29T19:41:08.218461+00:00"
+      "orphan_last_activity_ts": "2026-07-29T19:41:08.218461+00:00",
+      "briefing": {
+        "what": "Your team started a piece of behind-the-scenes work that hasn't been tied to any active project yet.",
+        "why": "Unassigned work can quietly consume time and effort without moving any of your current priorities forward.",
+        "suggest": "Take a quick look to confirm it's still worth doing and either attach it to a real goal or set it aside."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T19:42:51.285731+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-pr-ourliberty-agent-core-1056",
@@ -15441,7 +15469,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-29T19:42:30.307234+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-29T19:39:26.383798+00:00"
+      "orphan_last_activity_ts": "2026-07-29T19:39:26.383798+00:00",
+      "briefing": {
+        "what": "A piece of work your team started on their own that isn't attached to any active project yet, now sitting and waiting for a sign-off.",
+        "why": "Unclaimed work that stalls in the review line ties up your team's time without moving a business goal forward, and the longer it waits the more it costs.",
+        "suggest": "Have someone confirm what this is meant to accomplish before approving it \u2014 a quick check now avoids paying for work that no goal actually needed."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T19:42:51.285731+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
