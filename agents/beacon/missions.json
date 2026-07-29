@@ -15089,7 +15089,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-29T18:27:20.244273+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-29T18:26:59.869738+00:00"
+      "orphan_last_activity_ts": "2026-07-29T18:26:59.869738+00:00",
+      "briefing": {
+        "what": "The team began a piece of work that isn't yet connected to any active project or goal.",
+        "why": "Unassigned work can quietly consume time and effort without moving any business priority forward.",
+        "suggest": "Before it goes further, confirm whether this ties to something you care about\u2014and if not, hold off until it does."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T18:32:16.802361+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-larry-reject-a6d05b4d4019cb6567f4db9c5e672c6f75538731",
@@ -15106,7 +15120,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-29T18:27:20.244273+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-29T18:24:34.259598+00:00"
+      "orphan_last_activity_ts": "2026-07-29T18:24:34.259598+00:00",
+      "briefing": {
+        "what": "Someone on the team began a piece of work that isn't attached to any active project or goal yet.",
+        "why": "Unassigned work that drifts can quietly eat time and effort without moving anything you actually care about forward.",
+        "suggest": "Take a quick look to confirm it's worth pursuing before anyone invests more into it \u2014 if it doesn't map to a current priority, set it aside."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T18:32:16.802361+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-larry-reject-ecda6d5d59ccbdc04d4f43f03733391f3f9b571b",
@@ -15123,7 +15151,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-29T18:27:20.244273+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-29T18:21:13.554874+00:00"
+      "orphan_last_activity_ts": "2026-07-29T18:21:13.554874+00:00",
+      "briefing": {
+        "what": "Some work the team kicked off on its own, without being attached to any active project or goal yet.",
+        "why": "Unplanned side-work can quietly pull time and attention away from the priorities you actually care about.",
+        "suggest": "Hold off on greenlighting this until someone confirms what it's for and whether it's worth continuing."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T18:32:16.802361+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
