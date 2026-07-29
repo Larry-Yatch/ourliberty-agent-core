@@ -377,12 +377,93 @@ class GraduationAskOnceTest(unittest.TestCase):
         return {'target_stage': target, 'evidence': {'completed_runs': 17},
                 'dial_note': None}
 
+    def _decision(self, status):
+        """Fake the resolved approval the ask is read back from."""
+        return mock.patch.object(
+            stage, '_graduation_decision',
+            lambda _tid: {'rejected': 'declined',
+                          'approved': 'approved'}.get(status))
+
     def test_second_run_does_not_refile(self):
-        first = stage.emit_graduation(self._candidate(), state_path=self.state)
+        first = stage.emit_graduation(self._candidate(), state_path=self.state,
+                                      completed_runs=17)
         self.assertIsNotNone(first)
-        second = stage.emit_graduation(self._candidate(), state_path=self.state)
+        second = stage.emit_graduation(self._candidate(), state_path=self.state,
+                                       completed_runs=17)
         self.assertIsNone(second)          # the nag that used to fire nightly
         self.assertEqual(len(self.emits), 1)
+
+    def test_a_decline_stays_declined_forever(self):
+        stage.emit_graduation(self._candidate(), state_path=self.state,
+                              completed_runs=17)
+        with self._decision('rejected'):
+            # far past any cooldown — a no is durable, not merely paced
+            for run in (18, 25, 100):
+                self.assertIsNone(stage.emit_graduation(
+                    self._candidate(), state_path=self.state, completed_runs=run))
+        self.assertEqual(len(self.emits), 1)
+
+    def test_approved_but_never_applied_re_asks(self):
+        # Approval is only step one: a Forge task must open a config-only PR and
+        # that PR must merge before `stage` moves. If it never lands, the
+        # guardian is still at Stage 0 — suppressing forever would trade the nag
+        # for a SILENT PERMANENT STALL on the one component whose whole defect is
+        # that it cannot tell anyone anything.
+        stage.emit_graduation(self._candidate(), state_path=self.state,
+                              completed_runs=17)
+        with self._decision('approved'):
+            # inside the cooldown: quiet, the PR may simply still be in flight
+            self.assertIsNone(stage.emit_graduation(
+                self._candidate(), state_path=self.state, completed_runs=18))
+            # past it: speak up again
+            self.assertIsNotNone(stage.emit_graduation(
+                self._candidate(), state_path=self.state, completed_runs=20))
+        self.assertEqual(len(self.emits), 2)
+
+    def test_expired_is_not_a_decline(self):
+        # `expired` means the card aged out / was reconciled away — Larry never
+        # answered. The proposal loop's lookup folds expired into 'rejected';
+        # doing that here would silence a graduation he never even saw.
+        stage.emit_graduation(self._candidate(), state_path=self.state,
+                              completed_runs=17)
+        with self._decision('expired'):    # -> None (undecided), not 'declined'
+            self.assertIsNotNone(stage.emit_graduation(
+                self._candidate(), state_path=self.state, completed_runs=21))
+
+    def test_corrupt_marker_does_not_kill_graduation(self):
+        # A partial write / hand-edit / older schema must read as "no ask on
+        # record" and re-ask, not raise into a caller that swallows exceptions
+        # and thereby disables graduation permanently and silently.
+        for bad in ('nonsense', ['a'], 42):
+            st = stage.load_stage_state(path=self.state)
+            st['graduation_asked'] = bad
+            stage.save_stage_state(st, path=self.state)
+            self.assertIsNotNone(stage.emit_graduation(
+                self._candidate(), state_path=self.state, completed_runs=17))
+
+    def test_decision_lookup_maps_statuses(self):
+        # `expired` must read as UNDECIDED, not declined — the distinction the
+        # proposal loop's own lookup collapses.
+        import types as _t
+        fake = _t.SimpleNamespace(find_by_id_any_state=None)
+        with mock.patch.dict('sys.modules',
+                             {'beacon_approval_handler': fake}):
+            for status, want in (('expired', None), ('rejected', 'declined'),
+                                 ('approved', 'approved'), ('modified', 'approved'),
+                                 ('pending', None)):
+                fake.find_by_id_any_state = (
+                    lambda _id, _s=status: {'status': _s})
+                self.assertEqual(stage._graduation_decision('x'), want, status)
+
+    def test_decision_lookup_is_fail_safe(self):
+        self.assertIsNone(stage._graduation_decision(None))
+        import types as _t
+        def _boom(_id):
+            raise RuntimeError('store unreadable')
+        fake = _t.SimpleNamespace(find_by_id_any_state=_boom)
+        with mock.patch.dict('sys.modules',
+                             {'beacon_approval_handler': fake}):
+            self.assertIsNone(stage._graduation_decision('x'))
 
     def test_failed_emit_does_not_consume_the_ask(self):
         # deps unavailable / Supabase down => _emit_card returns None. That must

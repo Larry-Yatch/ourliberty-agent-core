@@ -1222,6 +1222,7 @@ def _run_stage_maintenance(
         if candidate is not None:
             stage.emit_graduation(
                 candidate, penalty_cause=st.get('penalty_cause'), chat_id=chat_id,
+                completed_runs=completed_runs,
             )
     except Exception as exc:  # noqa: BLE001
         print(f'main_suite_guardian: graduation eval failed: {exc}',

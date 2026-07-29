@@ -408,6 +408,57 @@ def _emit_card(payload: dict[str, Any], *, chat_id: Optional[int]) -> Optional[d
         return None
 
 
+# An APPROVED graduation still has to land a config-only PR before the stage
+# actually moves (Forge dispatch -> PR -> review -> merge). Give that chain this
+# many runs before re-asking, so a slow merge does not read as a failure.
+GRAD_REASK_AFTER_RUNS = 3
+
+
+def _graduation_prior_ask(
+    state: dict[str, Any], target: int, floor: Optional[int],
+) -> Optional[dict[str, Any]]:
+    """The recorded ask for this (target stage, evidence floor), or None.
+
+    Every layer is isinstance-guarded: `load_stage_state` merges the on-disk file
+    OVER the defaults, so a partial write / hand-edit / older schema can put any
+    type in `graduation_asked`. A bare `.get()` on that raises, and the only
+    caller swallows exceptions — which would disable graduation permanently and
+    silently, with nothing but a stderr line. A malformed value reads as absent
+    (re-ask), matching this module's fail-safe house style."""
+    asked = state.get('graduation_asked')
+    if not isinstance(asked, dict):
+        return None
+    rec = asked.get(str(target))
+    if not isinstance(rec, dict):
+        return None
+    return rec if rec.get('floor') == floor else None
+
+
+def _graduation_decision(approval_id: Optional[str]) -> Optional[str]:
+    """`'declined'` | `'approved'` | None (undecided / unknown).
+
+    Deliberately NOT `main_suite_guardian._prod_lookup_decision`, which folds
+    `expired` into `'rejected'`. That is right for a fix proposal but wrong here:
+    `expired` is written when an approval AGES OUT or is reconciled away — Larry
+    never answered — and treating "never answered" as "said no" would silence the
+    graduation ask forever on a card he never even saw."""
+    if not approval_id:
+        return None
+    try:
+        import beacon_approval_handler as ah
+        entry = ah.find_by_id_any_state(approval_id)
+    except Exception:  # noqa: BLE001 — decision read is best-effort
+        return None
+    if not isinstance(entry, dict):
+        return None
+    status = entry.get('status')
+    if status == 'rejected':
+        return 'declined'
+    if status in ('approved', 'modified'):
+        return 'approved'
+    return None
+
+
 def emit_graduation(
     candidate: dict[str, Any],
     *,
@@ -415,6 +466,7 @@ def emit_graduation(
     chat_id: Optional[int] = None,
     state_path: Optional[Path] = None,
     now: Optional[datetime] = None,
+    completed_runs: Optional[int] = None,
 ) -> Optional[dict[str, Any]]:
     """Emit the graduation approval card for ``candidate`` (from
     :func:`evaluate_graduation`). The card cites the ledger evidence and any prior
@@ -432,17 +484,32 @@ def emit_graduation(
     `l8_card_filed_at`; graduation had only the pending dedup.
 
     Keyed on the L10 evidence floor as well as the stage, so a downgrade — which
-    resets the evidence Larry would be judging — legitimately re-asks. A plain
-    re-ask otherwise needs a human to clear `graduation_asked` in the stage
-    state, which is the point: a "no" should stay a no until something changes.
+    resets the evidence Larry would be judging — legitimately re-asks.
+
+    ONLY A DECLINE IS DURABLE. Recording the ask at EMIT time and suppressing on
+    it unconditionally would trade the nightly nag for a silent permanent stall:
+    approval is only the first step — a Forge task has to open a config-only PR
+    and that PR has to merge before `stage` actually moves — and every one of
+    those can fail. The guardian would then sit in Stage 0 forever and never
+    mention it again, which is a strictly worse failure for the one component
+    whose whole defect is that it cannot tell anyone anything. So a `rejected`
+    decision suppresses until the floor moves, and everything else
+    (approved-but-not-yet-applied, expired, still pending, unreadable) re-asks
+    after `GRAD_REASK_AFTER_RUNS`. A still-PENDING card is additionally a no-op
+    via `_emit_card`'s dedup, so the cooldown only ever paces a genuine re-ask.
     """
     target = candidate['target_stage']
     p = state_path or stage_state_path()
     state = load_stage_state(path=p)
     floor = evidence_floor_run(state)
-    asked = (state.get('graduation_asked') or {}).get(str(target))
-    if isinstance(asked, dict) and asked.get('floor') == floor:
-        return None
+    prior = _graduation_prior_ask(state, target, floor)
+    if prior is not None:
+        if _graduation_decision(prior.get('task_id')) == 'declined':
+            return None  # a no stays a no
+        asked_run = prior.get('asked_run')
+        if (isinstance(completed_runs, int) and isinstance(asked_run, int)
+                and completed_runs - asked_run < GRAD_REASK_AFTER_RUNS):
+            return None  # give an approved graduation time to land its PR
     body = _render_graduation_body(candidate, penalty_cause)
     payload = {
         'task_id': _graduation_task_id(target),
@@ -467,9 +534,15 @@ def emit_graduation(
         # Recorded only on a card that actually landed, so a failed emit
         # (deps unavailable, Supabase down) retries next run instead of
         # silently consuming the one ask.
-        state.setdefault('graduation_asked', {})[str(target)] = {
+        asked = state.get('graduation_asked')
+        if not isinstance(asked, dict):
+            asked = {}                      # heal a corrupt value rather than raise
+        asked[str(target)] = {
             'at': _now_iso(now), 'floor': floor,
+            'task_id': payload['task_id'],  # what the decision is read back from
+            'asked_run': completed_runs,    # cooldown anchor for the re-ask
         }
+        state['graduation_asked'] = asked
         save_stage_state(state, path=p)
     return entry
 
