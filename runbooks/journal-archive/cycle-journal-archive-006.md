@@ -69426,3 +69426,104 @@ RSDPM: #152 (deep-review hold, pending item 2). NOMINAL ✅ (all by-design)
 
 ---
 
+## Iteration ~6643 — 2026-07-29T03:48Z UTC (Larry /cycle chat, Tier 1, consecutive_clean=0→1; NOMINAL — all checks clean; pending=5 (+1 cycle-prompt APPROVAL_REQUEST by-design); PR#1052 at 42m watching)
+
+**Health:** ✅ Nominal — all 6 mandatory checks + additive clean. 2 new alerts both Tier-3 silenced. No actions taken. consecutive_clean advances 0→1.
+
+**VERIFY-BEFORE-REASSERT (from iter ~6642 at ~03:38Z UTC):**
+- **"rsdpm-driftcheck 0031_schema_migration_log.sql carry"**: UNVERIFIED — lines 563-564 are doorbell + approval_request; no driftcheck alert. [carry ⚠️ — still unverified]
+- **"system-health=healthy"**: CONFIRMED ✅ — ts=2026-07-29T03:42:30Z UTC (~6 min old). [carry ✅]
+- **"heal-stale-daemon-code.heartbeat fresh"**: CONFIRMED ✅ — 2026-07-29T03:35:02Z UTC (~13 min old; <60 min). [carry ✅]
+- **"alerts watermark=562, file_length=562"**: UPDATED — file_length=564; 2 new alerts (lines 563-564): doorbell (Tier-3) + approval_request (Tier-3). Watermark advanced 562→564. [updated ✅]
+- **"pending=4"**: UPDATED → **pending=5** — new item `cycle-prompt-tier4-no-upgrade-clause-001` (APPROVAL_REQUEST for check0-helper-override cycle-prompt PR, force_ask delivered 03:40:14Z UTC, pending item #5). By-design; tracked. [updated ✅]
+- **"PR#1051 CLOSED"**: CONFIRMED ✅ — not in open PR list. [carry ✅]
+- **"PR#1052 33 min watching"**: UPDATED → 42m at ~03:44Z UTC; below 60 min stall threshold. Approaching. [watching]
+- **"PR#1053 13 min"**: UPDATED → 22m; below threshold. [watching]
+- **"SUPABASE_DB_PASSWORD carry"**: CONFIRMED ⚠️ — 24h dedup resets ~2026-07-30T02:09Z UTC (~22h away). No re-DM. [carry ⚠️]
+- **"SUPABASE_SERVICE_ROLE_KEY dedup"**: CONFIRMED ✅ — 14d dedup through ~2026-08-03. [carry ✅]
+- **"Check I fires today ~14:13Z UTC"**: CONFIRMED ✅ — ~10.4h away. [carry ✅]
+- **"pulse-cycle-check0-helper-override VP"**: UPDATED — APPROVAL_REQUEST `cycle-prompt-tier4-no-upgrade-clause-001` delivered to Larry (pending item #5). Awaiting Larry approval; Forge builds after approval. [VP → approval-pending ✅]
+- **"captures.json dirty tree"**: RESOLVED ✅ — commit e0cd3475 committed GC healer delta; tree clean at HEAD=02ea4f44. [resolved ✅]
+- Remaining carries (III, XIV, auto-merge-conflict-route-hold, check-vi, Mirror queue-wait): CARRY as previous iter.
+
+**Check 0 — Alert triage (~03:46Z UTC):** repair-watermark: repaired=false (old=562, file_length=564). **2 new alerts (lines 563-564):**
+- **Line 563:** ts=2026-07-29T03:36:40Z UTC, source=doorbell, intent=doorbell (4 items summary) → **Tier 3** (known-pattern). Silenced. No DM. ✅
+- **Line 564:** ts=2026-07-29T03:40:14Z UTC, source=outbox-notifier, kind=approval_request, approval_id=cycle-prompt-tier4-no-upgrade-clause-001 → **Tier 3** (known-pattern). Silenced. No DM (already delivered to Larry as force_ask at 03:40:14Z UTC). ✅
+Watermark advanced 562→564. NOMINAL ✅ (no tier-reset from Tier-3 silences)
+
+**Check 1 — Log noise (~03:45Z UTC):** outbox-notifier.log last entry [2026-07-28T21:40:14-0600]=03:40:14Z UTC (~8 min old). Last notable: approval_request force_ask for `cycle-prompt-tier4-no-upgrade-clause-001` queued (null reply_chat_id fallback → Larry chat OK). No novel WARNs/ERRORs. NOMINAL ✅
+
+**Check 2 — Telegram sweep (~03:45Z UTC):** beacon_telegram_bot.log: last delivery idx=561 at [2026-07-28T21:35:41-0600]=03:35:41Z UTC (~12 min ago). No new Larry directives in 4h window. Bot alive. Doorbell delivery (line 563) and approval_request force_ask delivery (line 564) not yet in bot log — queued, expect confirmation in next iter. NOMINAL ✅
+
+**Check 3 — Pipeline stall (~03:44Z UTC):** heal_pipeline_stall.py --dry-run: FORGE_NO_PR_SKIP ×5 (MERGED: RSDPM #134/136/146/147/142); FORGE_NO_PR_SKIP fix-escalated-pr-headchange-backoff-001 (pr_exists=#1042) + m14-pr-a (pr_exists=#152 RSDPM); MIRROR_PASS_UNMERGED_SKIP m14-pr-a (held_deep_review); suppressed (cooldown): unrouted_open_pr #1050/#1049; suppressed (cooldown): stalled_active_step:rsdpm-m14-001:m14-pr-a. **0 alerts would fire**. NOMINAL ✅
+
+**Check 4 — Pending directives (~03:46Z UTC):** beacon-pending-approvals.json: **pending=5** (→ from pending=4):
+1. `rsdpm-confirmall-medium-parent-secondglance-001` (2026-07-28T23:37:55Z UTC). Awaiting Larry.
+2. `deep-review-hold-pr152-e64b6e43` (2026-07-29T01:15:50Z UTC). RSDPM M14 deep-review hold. Awaiting Larry.
+3. `unreg-approval-52da5b2c3bda` (2026-07-29T03:16:13Z UTC). Monitoring auto-resolve.
+4. `unreg-approval-9061de515dce` (2026-07-29T03:16:13Z UTC). Monitoring auto-resolve.
+5. **NEW** `cycle-prompt-tier4-no-upgrade-clause-001` (2026-07-29T03:40:14Z UTC). Doc-only: add check0 helper-authority no-upgrade clause to cycle-prompt.md § 3.0. Awaiting Larry approval; Forge builds after approval.
+NOMINAL ✅ (all tracked or by-design)
+
+**Check 5 — Stale daemon code (~03:45Z UTC):** heal-stale-daemon-code.heartbeat=2026-07-29T03:35:02Z UTC (~13 min old; <60 min). system-health overall=healthy ts=2026-07-29T03:42:30Z UTC. NOMINAL ✅
+
+**Check A — Source repo (~03:44Z UTC):** On main. Clean tree (captures.json committed e0cd3475). HEAD=02ea4f44=origin/main. NOMINAL ✅
+**Check B — Sync health (~03:44Z UTC):** last_sync=2026-07-29T03:33:19Z UTC (~15 min; <2h); status=no-change; consecutive_push_failures=0. NOMINAL ✅
+**Check C — Agent liveness (~03:44Z UTC):** system-health overall=healthy (ts=03:42:30Z UTC; ~6 min). All 4 bots alive (beacon ✅ forge ✅ mirror ✅ pulse ✅). disk=14% memory=24%. NOMINAL ✅
+**Check E — PR/merge state (~03:44Z UTC):** ourliberty-agent-core: 4 open fix/* PRs:
+- **#1053** fix/spec-doc-sync-lag-self-heal (22m, MERGEABLE, no labels) — watching.
+- **#1052** fix/dag-preflight-revision-silent-stall (42m, MERGEABLE, no labels) — watching; approaching 60m stall threshold.
+- **#1050** fix/dashboard-declined-delegation (113m, no labels) — stall alert delivered; cooldown active; awaiting Larry `claude-review` label.
+- **#1049** fix/guardian-can-actually-page (113m, no labels) — stall alert delivered; cooldown active; awaiting Larry `claude-review` label.
+RSDPM: #152 (deep-review hold, pending item 2). NOMINAL ✅ (all by-design)
+**Check H — Forge digest (~03:44Z UTC):** No forge/ PRs open. 4 fix/* PRs (Larry-authored). RSDPM M14 paused at PR#152 deep-review. NOMINAL ✅
+
+**§5.0 one-shots (~03:46Z UTC):** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅.
+
+**Credential rotation (~03:46Z UTC):** SUPABASE_SERVICE_ROLE_KEY: last_dm=2026-07-20T20:00:15Z UTC; 14d dedup through ~2026-08-03. No DM. SUPABASE_DB_PASSWORD: last healer DM idx=550 at 02:09:52Z UTC; 24h dedup resets ~2026-07-30T02:09Z UTC (~22h away). No Pulse re-DM. NOMINAL ✅
+
+**Check I artifact triage (~03:46Z UTC):** No check-i-2026-07-29.json yet. Timer fires ~14:13Z UTC (~10.4h away). NOMINAL ✅
+**Check III artifact triage (~03:46Z UTC):** Newest: check-iii-2026-07-26.json (Sun Jul 26). Next: Sun 2026-08-02. NOMINAL ✅
+
+**PRIME DIRECTIVE accounting:** iter_clean appended (tier=1, template=all-checks-nominal-iter-6643, ts=2026-07-29T03:48:23Z UTC). Trailing 30d: ratio=35.74% (systemic_fixes=50, vp=25; trend=worsening). **TIER: consecutive_clean=0→1** (cycle_tier_state.py record --checks-clean true; Tier 1; last_signal_at=2026-07-29T03:37:56Z UTC unchanged).
+
+**Patterns:**
+- `cycle-prompt-tier4-no-upgrade-clause-001` APPROVAL_REQUEST delivered: the check0-helper-override chain (iter ~6641 dispatch → iter ~6642 Beacon CLOSED G-rule + built PR → iter ~6643 approval queued) is tracking cleanly. Larry approves and Forge builds.
+- PR#1052 at 42m: next stall timer run (~6-18 min) will likely cross the 60m threshold and fire a real alert. No Pulse action now (by-design, label-gated).
+- Consecutive clean iters: 1/3 toward Tier 2 de-escalation. System quieting down post overnight sprint.
+
+**G-rule assessment:**
+- pulse-cycle-check0-helper-override: **VP** [APPROVAL_REQUEST pending Larry → Forge build pending approval]. ✅
+- sync-desktop-config-false-block-001: **1/3** [carry].
+- mirror-worktree-cleanup-mid-session: **1/3** [carry].
+- forge-marker-taskid-suffix-increment-001: **2/3** [carry].
+- medic-draft-status-false-positive: **2/3** [carry].
+- check-i-force-bypass-dm-route: **2/3** [carry].
+- auto-merge-conflict-route-hold-no-dm-001: **VP** [carry VP].
+- mirror-queue-wait-readiness: **1/3** [carry].
+- beacon-pending-approvals-path-bug: **2/3** [carry].
+- m14-pr-a-task-id-path-prefix-mismatch: **1/3** [carry].
+- sequence-dispatch-text-cap-001: **1/3** [carry].
+- stalled-pending-sequence-rsdpm-m14-001: [carry — gated on deep-review-hold-pr152].
+- Active VP carries: forge-revision-preamble-missing; forge-wip-redispatch-digest; forge-wip-redispatch-exhausted-no-pr; outbox-notifier-intent-reject; auto-dispatch-APPROVAL_REQUEST-mismatch; PR #1022 heal-wip-redispatch DAG-preflight suppression; auto-merge-conflict-route-hold-no-dm-001; orphaned-pr-review-loglevel-by-class-001; pulse-cycle-check0-helper-override.
+
+**Actions taken:**
+1. Check 0: repair-watermark no-op (repaired=false, old=562, file_length=564). Triaged line 563 → Tier 3 (doorbell known-pattern). Triaged line 564 → Tier 3 (approval_request known-pattern). Watermark advanced 562→564.
+2. §5.0 one-shots: all no-op.
+3. PRIME ledger: iter_clean appended at 2026-07-29T03:48:23Z UTC (tier=1, template=all-checks-nominal-iter-6643).
+4. Tier state: `cycle_tier_state.py record --checks-clean true` → consecutive_clean=1; Tier 1.
+
+**Escalations:**
+- [carry ⚠️ — still unverified] RSDPM 0031 staging drift: apply 0031_schema_migration_log.sql in Supabase rsdpm-staging SQL editor.
+- [carry ⚠️ — 24h dedup resets ~2026-07-30T02:09Z UTC, ~22h away] SUPABASE_DB_PASSWORD credential-drift: awaiting Larry triage.
+- [carry — no new DM] check-vi-posture-proposals-2026-07-07 (2 proposals). Awaiting Larry.
+- [carry — self-suppresses ~2026-07-30T02Z UTC, ~22h away] Mirror queue-wait p95=92.3m.
+- [carry — no new DM] Check XIV Tier-4 × 2: oversilence + fleet digest. Awaiting Larry.
+- [carry — stall alerts delivered] PRs #1049/#1050 await `claude-review` label. PR#1052 approaching stall threshold (~18m until 60m); PR#1053 below threshold.
+- [new — approval needed] `cycle-prompt-tier4-no-upgrade-clause-001`: approve to build check0 helper-authority clause PR (doc-only cycle-prompt.md § 3.0 fix).
+- [carry — monitoring] unreg-approval-52da5b2c3bda + unreg-approval-9061de515dce: expect auto-resolve.
+
+**Tier end-of-iter:** **Tier 1** (consecutive_clean=1; last_signal_at=2026-07-29T03:37:56Z UTC; 5-min cadence).
+
+---
+
