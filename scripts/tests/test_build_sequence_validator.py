@@ -1229,6 +1229,65 @@ class SpecDocSyncLagSelfHealTest(unittest.TestCase):
                 self.assertEqual(
                     self._git(self.checkout, 'rev-parse', 'HEAD'), head)
 
+    def test_no_spelling_of_the_flag_can_silently_move_the_tree(self):
+        """The invariant, stated over the whole NEIGHBOURHOOD of spellings.
+
+        The bug this pins: argparse accepts unambiguous abbreviations, so
+        `--no-ref` satisfied the parser while the exact-match extraction missed
+        it — the flag was accepted, silently dropped, and the checkout was
+        fast-forwarded anyway (measured: `advanced (+10)`, HEAD moved). The
+        previous test only covered the one spelling I had in mind, which is
+        precisely why it passed while the feature was broken.
+
+        So assert the property rather than a case: for ANY spelling near the
+        flag, the run must either honour it or refuse loudly. What must never
+        happen is a silent refresh."""
+        head = self._git(self.checkout, 'rev-parse', 'HEAD')
+        spellings = [
+            '--no-refresh',      # exact — honoured
+            '--no-refres',       # abbreviations: were silently ignored
+            '--no-ref',
+            '--no-r',
+            '--no',
+            '--no-refresh=1',    # store_true with an explicit value
+            '--norefresh',       # plausible typo
+            '--nope',            # unrelated flag
+        ]
+        for spelling in spellings:
+            with self.subTest(spelling=spelling):
+                proc = self._run_cli(self._seq_file('RSDPM'), spelling)
+                self.assertNotIn(
+                    'advanced', proc.stderr,
+                    f'{spelling!r} triggered a fast-forward; a spelling that is '
+                    f'not honoured must FAIL, never silently refresh')
+                self.assertEqual(
+                    self._git(self.checkout, 'rev-parse', 'HEAD'), head,
+                    f'{spelling!r} moved the checkout')
+                self.assertFalse(
+                    (self.checkout / self.SPEC).exists(),
+                    f'{spelling!r} pulled the spec in')
+                if spelling == '--no-refresh':
+                    self.assertEqual(proc.returncode, 3, msg=proc.stderr)
+                    self.assertIn('REFRESH: skipped — --no-refresh',
+                                  proc.stderr)
+                else:
+                    self.assertEqual(
+                        proc.returncode, 2,
+                        f'{spelling!r} should be rejected outright, got '
+                        f'{proc.returncode}: {proc.stderr[:200]}')
+
+    def test_help_still_works_with_abbreviation_disabled(self):
+        """allow_abbrev=False must not cost us --help / -h."""
+        for argv in (['--help'], ['-h']):
+            with self.subTest(argv=argv):
+                proc = subprocess.run(
+                    [sys.executable, str(self.script), *argv],
+                    capture_output=True, text=True, timeout=90,
+                    env=self._git_env,
+                )
+                self.assertEqual(proc.returncode, 0)
+                self.assertIn('--no-refresh', proc.stdout)
+
     def test_no_refresh_is_rejected_on_the_other_cli_forms(self):
         """A flag that silently does nothing reads as 'the tree is safe'."""
         seq = self._seq_file('RSDPM')

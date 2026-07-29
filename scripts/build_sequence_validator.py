@@ -1026,6 +1026,16 @@ def _cli(argv: list[str]) -> int:
     # DAG preflight, ad-hoc validation, test fixtures).
     parser = argparse.ArgumentParser(
         description='Validate a build-sequence file against spec § 5.1 + DAG checks.',
+        # allow_abbrev=False is load-bearing, not tidiness. argparse accepts
+        # unambiguous abbreviations by default, so `--no-ref` parsed happily as
+        # `--no-refresh` while the exact-match extraction below did not see it —
+        # the flag was accepted, silently ignored, and the checkout got
+        # fast-forwarded anyway. Measured on a real clone: `--no-ref` printed
+        # `advanced (+10)` and moved HEAD, destroying the pinned state the flag
+        # exists to protect. Turning abbreviation off makes the parser and the
+        # extraction agree on exactly one spelling, and anything else fails
+        # loudly instead of doing the destructive thing quietly.
+        allow_abbrev=False,
     )
     parser.add_argument(
         'args',
@@ -1055,6 +1065,12 @@ def _cli(argv: list[str]) -> int:
     # with `unrecognized arguments: <seq>`, blaming the file rather than the
     # placement. Extracting it first makes every position work. It stays
     # REGISTERED on the parser above purely so `--help` documents it.
+    #
+    # This exact-string match is only safe because the parser sets
+    # allow_abbrev=False. With abbreviation on, any spelling this match missed
+    # (`--no-ref`) still satisfied the parser, so the flag was silently dropped
+    # and the fast-forward ran. The two must agree on one spelling; see the
+    # parser comment above.
     no_refresh = '--no-refresh' in argv
     argv = [a for a in argv if a != '--no-refresh']
 

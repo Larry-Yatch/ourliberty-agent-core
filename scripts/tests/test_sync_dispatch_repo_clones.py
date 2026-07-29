@@ -293,6 +293,17 @@ class LiveConfigTest(unittest.TestCase):
         means a later grant fails this test, forcing whoever makes it to move
         the unit into FF_CAPABLE_UNITS as a conscious decision rather than
         quietly widening the outward-facing bot's reach."""
+        # Non-empty guard, mirroring the capable-units test. Without it this
+        # whole test passes hardest when there is nothing left to check: empty
+        # the tuple and the loop below runs zero times, so a cleanup that drops
+        # the beacon-bot entry would delete the protection AND the signal that
+        # it was deleted. Verified by emptying it — the suite stayed green.
+        self.assertTrue(
+            sdrc.FF_EXCLUDED_UNITS,
+            'FF_EXCLUDED_UNITS is empty, so this test guards nothing. A unit '
+            'was removed from it: either it is no longer reachable from '
+            'refresh_checkout (delete this test too, deliberately) or the '
+            'no-grant decision was dropped by accident')
         for unit_name in sdrc.FF_EXCLUDED_UNITS:
             granted = self._granted_paths(unit_name)
             for repo, path in self._syncable().items():
