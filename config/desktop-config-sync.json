@@ -1,0 +1,22 @@
+{
+  "_comment": [
+    "Canonical manifest of repo files that are DEPLOYED to the operator Mac's",
+    "~/.config/ourliberty/ and executed from there (Claude Code hooks, the",
+    "capture gesture). Sole source of truth for scripts/sync_desktop_config.py;",
+    "scripts/tests/test_sync_desktop_config.py asserts every source exists.",
+    "",
+    "Only files listed here are ever written. ~/.config/ourliberty also holds",
+    "hand-authored local-only tools (pr-routing-gate.py, prune-dev-worktrees.sh,",
+    "origin-staleness-banner.py, ol-session.sh) and the ingest-token secret,",
+    "which have no repo source and MUST NOT be touched by the sync.",
+    "",
+    "Destination filename is the basename of the source path."
+  ],
+  "dest_dir": "~/.config/ourliberty",
+  "sources": [
+    "scripts/emit_capture.sh",
+    "scripts/emit_capture_impl.py",
+    "scripts/emit_desktop_session.sh",
+    "scripts/emit_desktop_session_impl.py"
+  ]
+}
