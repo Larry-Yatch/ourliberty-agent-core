@@ -233,17 +233,29 @@ def _arm_sandbox_key_reassert() -> None:
     only while production held open records, so it read as a phantom regression.
 
     Both call sites are fixed to restore, but the class stays open as long as the
-    next tearDown can pop. So re-assert after EVERY test: whatever ran, the
-    sandbox keys must not be ABSENT going into the next one.
+    next teardown can delete. So re-assert around EVERY test.
+
+    BEFORE **and** after, deliberately. Wrapping only the tail of
+    ``TestCase.run`` would cover per-test tearDowns and nothing else:
+    ``setUpModule`` / ``tearDownModule`` / ``setUpClass`` / ``tearDownClass``
+    are driven by ``TestSuite.run``, OUTSIDE any ``TestCase.run``, and unittest
+    tears the previous module down midway through the suite — right before the
+    next module's tests. Six modules already delete OURLIBERTY_AGENTS_ROOT in
+    ``tearDownModule`` (all correctly guarded today, so no live leak, but the
+    shape is one edit away). Re-asserting on ENTRY means whatever any fixture at
+    any level did between tests, the next test body starts with the sandbox
+    intact. The trailing re-assert still covers the last test in the process.
+
+    Honest limit: a fixture that deletes a key AFTER the final test of the run
+    is not healed — nothing runs after it to be affected, so this is uncovered
+    by design rather than by oversight.
 
     Deliberately heals only the DELETED case. A key holding some other value is
-    left alone — three test modules pin their own root at import scope
-    (test_deploy_notifier, test_pulse_check_xi,
-    test_agent_telegram_bot_tier_dispatch) and must keep it across their test
-    methods, and the tests that exercise the unset-fallback
-    (`test_unset_override_falls_back_to_home`) pop and reload WITHIN one test
-    method, which still works. Fail-open: if the hook can't be installed the run
-    proceeds exactly as before."""
+    left alone — test_deploy_notifier and test_pulse_check_xi pin their own root
+    at import scope and must keep it across their test methods, and the tests
+    that exercise the unset-fallback (`test_unset_override_falls_back_to_home`)
+    delete and reload WITHIN one test method, which still works. Fail-open: if
+    the hook can't be installed the run proceeds exactly as before."""
     try:
         import unittest
     except Exception:  # pragma: no cover - unittest is stdlib
@@ -255,17 +267,22 @@ def _arm_sandbox_key_reassert() -> None:
         return
     original = unittest.TestCase.run
 
-    def run(self, result=None, _original=original, _snapshot=snapshot):
+    def _reassert(_snapshot=snapshot):
+        for key, value in _snapshot.items():
+            # `not in` — restore only what was DELETED, never overwrite a value
+            # a test/module deliberately set.
+            if value is not None and key not in os.environ:
+                os.environ[key] = value
+
+    def run(self, result=None, _original=original, _reassert=_reassert):
+        _reassert()   # heal whatever module/class fixtures did between tests
         try:
             return _original(self, result)
         finally:
-            for key, value in _snapshot.items():
-                # `not in` — restore only what was DELETED, never overwrite a
-                # value a test/module deliberately set.
-                if value is not None and key not in os.environ:
-                    os.environ[key] = value
+            _reassert()   # heal this test's own setUp/tearDown
 
     run._ourliberty_sandbox_reassert = True
+    run._ourliberty_sandbox_reassert_fn = _reassert
     unittest.TestCase.run = run
 
 

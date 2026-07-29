@@ -177,6 +177,36 @@ class SandboxKeyReassertBackstopTest(unittest.TestCase):
             if sandbox is not None:
                 os.environ['OURLIBERTY_AGENTS_ROOT'] = sandbox
 
+    def test_key_deleted_between_tests_is_healed_before_the_next_one(self) -> None:
+        """The `tearDownModule` gap. Module- and class-level fixtures run in
+        TestSuite.run, OUTSIDE any TestCase.run, and unittest tears the previous
+        module down midway through the suite — right before the next module's
+        tests. A trailing-only hook would leave the key absent for that next
+        test body. This simulates the deletion happening BETWEEN two tests and
+        pins that the second one starts clean."""
+        sandbox = os.environ.get('OURLIBERTY_AGENTS_ROOT')
+        self.assertIsNotNone(sandbox)
+        seen = {}
+
+        class Observer(unittest.TestCase):
+            def runTest(self):  # noqa: N802 - unittest naming
+                seen['at_body'] = os.environ.get('OURLIBERTY_AGENTS_ROOT')
+
+        try:
+            # Stand in for `tearDownModule`/`tearDownClass`: a deletion that
+            # happens outside any TestCase.run.
+            os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
+            self.assertNotIn('OURLIBERTY_AGENTS_ROOT', os.environ)
+            result = _run_case(Observer())
+            self.assertEqual(result.errors, [])
+            self.assertEqual(
+                seen.get('at_body'), sandbox,
+                'a key deleted between tests (module/class teardown) was still '
+                'absent when the NEXT test body ran — the re-assert must happen '
+                'on ENTRY to TestCase.run, not only in its finally')
+        finally:
+            os.environ['OURLIBERTY_AGENTS_ROOT'] = sandbox
+
     def test_every_sandbox_key_is_covered(self) -> None:
         """Not just the root — the log dir and worktrees root fall through to
         production defaults the same way."""
@@ -203,30 +233,51 @@ class SandboxKeyReassertBackstopTest(unittest.TestCase):
 
 
 class NoUnguardedSandboxPopTest(unittest.TestCase):
-    """Static backstop to the two runtime ones: a tearDown that pops a sandbox
+    """Static backstop to the two runtime ones: a teardown that DELETES a sandbox
     key without having snapshotted it is the defect, and it is cheap to spot
-    before it costs another bisect."""
+    before it costs another bisect.
+
+    Matches BOTH deletion spellings. The first version of this scan looked only
+    for `os.environ.pop('<LITERAL>'` and therefore reported the tree clean while
+    `test_rate_limit_ledger.py` was doing a bare
+    `del os.environ['OURLIBERTY_AGENTS_ROOT']` with no restore — a real instance
+    of exactly this defect, sitting in the blind spot of the check written to
+    find it. A guard that cannot tell right from wrong is worse than no guard,
+    because it is read as evidence."""
 
     _ALLOWED_UNGUARDED = {
-        # These pop INSIDE a test body to exercise the module's unset-fallback,
+        # These delete INSIDE a test body to exercise the module's unset-fallback,
         # and their own _Base.tearDown restores the value setUp snapshotted.
         ('test_heal_stale_alert_triage.py', 'test_unset_override_falls_back_to_home'),
         ('test_heal_stale_approvals.py', 'test_unset_override_falls_back_to_home'),
     }
 
-    def test_no_teardown_pops_a_sandbox_key_without_snapshotting_it(self) -> None:
+    # Deletions whose key is a VARIABLE (`os.environ.pop(k, None)` in a restore
+    # loop) cannot be resolved by a line-level scan. They are reported
+    # separately rather than silently skipped — see
+    # test_variable_key_deletions_are_surfaced_not_hidden below.
+    _SANDBOX_KEY_RE = r"OURLIBERTY_(?:AGENTS_ROOT|WORKTREES_ROOT|LOG_DIR)"
+
+    def _scan(self):
+        """Return (literal_offenders, variable_key_sites)."""
         import re
 
         tests_dir = Path(__file__).resolve().parent
-        offenders = []
-        pop_re = re.compile(
-            r"environ\.pop\(\s*['\"](OURLIBERTY_(?:AGENTS_ROOT|WORKTREES_ROOT|LOG_DIR))['\"]")
+        delete_re = re.compile(
+            r"(?:environ\.pop\(\s*['\"](?P<popkey>" + self._SANDBOX_KEY_RE + r")['\"]"
+            r"|del\s+os\.environ\[\s*['\"](?P<delkey>" + self._SANDBOX_KEY_RE + r")['\"])")
+        varpop_re = re.compile(
+            r"(?:os\.)?environ\.pop\(\s*(?![\'\"])[A-Za-z_][\w.]*\s*,"
+            r"|del\s+os\.environ\[\s*(?![\'\"])[A-Za-z_][\w.]*\s*\]")
+        offenders, variable_sites = [], []
         for path in sorted(tests_dir.glob('test_*.py')):
             if path.name == Path(__file__).name:
                 continue  # this module drops keys on purpose, to prove the backstop
             lines = path.read_text().splitlines()
             for i, line in enumerate(lines):
-                m = pop_re.search(line)
+                if varpop_re.search(line):
+                    variable_sites.append(f'{path.name}:{i + 1}: {line.strip()}')
+                m = delete_re.search(line)
                 if not m:
                     continue
                 # Guarded restore idiom: `if <snapshot> is None: pop else: set`.
@@ -250,14 +301,33 @@ class NoUnguardedSandboxPopTest(unittest.TestCase):
                 if (path.name, fname) in self._ALLOWED_UNGUARDED:
                     continue
                 offenders.append(f'{path.name}:{i + 1} (in {fname or "?"}): {line.strip()}')
+        return offenders, variable_sites
 
+    def test_no_teardown_deletes_a_sandbox_key_without_snapshotting_it(self) -> None:
+        offenders, _ = self._scan()
         self.assertEqual(
             offenders, [],
-            'These pop a sandbox key without restoring the value they were '
-            'handed. _bootstrap sets it once per process; popping it drops the '
-            'redirect for the whole run and later tests read /home/larry/agents '
-            '(live production). Snapshot in setUp and restore in tearDown:\n  '
+            'These DELETE a sandbox key without restoring the value they were '
+            'handed (`os.environ.pop(...)` or `del os.environ[...]`). _bootstrap '
+            'sets it once per process; deleting it drops the redirect for the '
+            'whole run and later tests read /home/larry/agents (live '
+            'production). Snapshot in setUp and restore in tearDown:\n  '
             + '\n  '.join(offenders))
+
+    def test_variable_key_deletions_are_surfaced_not_hidden(self) -> None:
+        """A line-level scan cannot tell whether `os.environ.pop(k, None)` targets
+        a sandbox key. Those sites are covered at RUNTIME by the _bootstrap
+        re-assert, not here — this test exists so the limit is stated in code
+        rather than assumed away, and so the count is visible if it grows."""
+        _, variable_sites = self._scan()
+        # Not an assertion about correctness — a visible inventory. The runtime
+        # backstop is what actually protects these; if that ever regresses,
+        # SandboxKeyReassertBackstopTest fails, not this.
+        self.assertIsInstance(variable_sites, list)
+        if variable_sites:
+            print(f'\n[sandbox-scan] {len(variable_sites)} variable-key env '
+                  f'deletion(s) not statically checkable; covered by the '
+                  f'_bootstrap runtime re-assert.')
 
 
 if __name__ == '__main__':
