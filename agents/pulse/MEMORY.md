@@ -124,9 +124,11 @@
 
 ---
 
-## Check 0 must call helper before manual classification (learned 2026-06-14 iter ~1812)
+## Check 0 must call helper before manual classification — helper Tier ≤ 3 is FINAL (learned 2026-06-14 iter ~1812; critical clarification 2026-07-29 iter ~6642)
 
-**Rule:** Before classifying ANY alert as Tier 4, Pulse MUST call `python3 scripts/alert_triage_state.py triage-alert --alert-id "<id>" --alert '<json>' --iter <N>` and act on the returned tier. Helper is AUTHORITATIVE. Pass VERBATIM JSON from larry-alerts.jsonl — never reconstruct with inferred fields (adding a non-null `subject` field that wasn't there overrides the `intent` fallback and fails the translation lookup).
+**Rule:** Before classifying ANY alert, Pulse MUST call `python3 scripts/alert_triage_state.py triage-alert --alert-id "<id>" --alert '<json>' --iter <N>` and act on the returned tier. Helper is AUTHORITATIVE. **If helper returns Tier ≤ 3, that IS the final classification — LLM reasoning CANNOT upgrade it to Tier 4.** Accept the helper's tier and move on. Pass VERBATIM JSON from larry-alerts.jsonl — never reconstruct with inferred fields (adding a non-null `subject` field that wasn't there overrides the `intent` fallback and fails the translation lookup).
+
+**Why this is hard:** alert-translations.json may already have a translation (e.g., `source=medic, intent=medic-diagnosis → Tier 3` via PR #515, 2026-06-12). Pulse's LLM can convince itself it's "novel" by looking at context and overriding the helper. This is wrong. The helper is ground-truth; the LLM's impression of novelty is not. Confirmed by Beacon at iter ~6642: medic-diagnosis was Tier-3 in translations all along; 3 iterations of false Tier-4 dispatches were all LLM overrides of a correct Tier-3 result.
 
 ---
 

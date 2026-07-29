@@ -104,3 +104,16 @@ if [[ "${OURLIBERTY_SKIP_DROPLET_SYNC:-0}" != "1" && -n "$DROPLET_SSH" ]]; then
     echo "[merge_reviewed_pr] WARN: droplet sync nudge failed; hourly timer will catch up (skip with OURLIBERTY_SKIP_DROPLET_SYNC=1)." >&2
   fi
 fi
+
+# Refresh the operator Mac's ~/.config/ourliberty copies (the session hooks and
+# the capture gesture run from THERE, not from the checkout). Same failure mode
+# as the droplet nudge, one host closer: without this, merging a fix to
+# scripts/emit_capture.sh changes nothing about what actually runs. Best-effort
+# — the merge already landed, so a sync failure must not fail this script; the
+# SessionStart hook is the backstop.
+SYNC_DESKTOP="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/sync_desktop_config.py"
+if [[ "${OURLIBERTY_SKIP_DESKTOP_SYNC:-0}" != "1" && -f "$SYNC_DESKTOP" ]]; then
+  if ! python3 "$SYNC_DESKTOP"; then
+    echo "[merge_reviewed_pr] WARN: desktop config sync failed; next session start will retry (skip with OURLIBERTY_SKIP_DESKTOP_SYNC=1)." >&2
+  fi
+fi
