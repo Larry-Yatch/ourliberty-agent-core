@@ -14311,7 +14311,28 @@
         "at": "2026-07-29T00:24:14.415791+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-29T00:36:19.969974+00:00",
+      "retired_reason": "orphan-terminal"
+    },
+    {
+      "id": "proposed-pr-RSDPM-151",
+      "name": "PR RSDPM 151",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pr-RSDPM-151`. Last activity 2026-07-29T00:35:12.741543+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pr-RSDPM-151"
+      ],
+      "repo": null,
+      "created": "2026-07-29",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-29T00:36:19.969974+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-29T00:35:12.741543+00:00"
     }
   ]
 }
