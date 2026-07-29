@@ -2191,7 +2191,71 @@
         "at": "2026-07-29T19:32:50.692255+00:00",
         "from_state": "parked"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "spawned": {
+        "kind": "delegate",
+        "task_id": "delegate-cap-confirm-all-pin-the-mixed-tier-parent-case-and-p-d5d1",
+        "stamped_at": "2026-07-29T19:36:52.820039+00:00"
+      }
+    },
+    {
+      "id": "cap-approvals-tab-let-a-card-carry-its-own-falsifier-8bb3",
+      "title": "Approvals tab: let a card carry its own falsifier, checked on the existing 10-min tick",
+      "note": "PROBLEM: every clearing signal today answers 'did Beacon already resolve this?' (task_id in history, not pending) or 'did a PR for this task_id merge/close?' (task_terminal_state). Neither asks 'is the PREMISE still true?' A card whose premise is a fact about live state (a DB row, a file's contents, a code behavior) falls to UNKNOWN, and UNKNOWN means keep forever.\n\nEVIDENCE (2026-07-29 tab, 8 cards, 6 did not need a human): rsdpm-confirmall-medium-parent-secondglance-001 was killed by RSDPM #151 (merged 01:55Z, 3d66718) 2h18m after filing \u2014 #151 carried a different task_id, so the probe finds nothing. unreg-approval-cfd444ed29ee ('migration 0033 not live') was FALSE 8 min before Larry saw it: applied 17:22Z, promoted 17:30Z.\n\nDO NOT REBUILD WHAT EXISTS. agents/beacon/specs/approvals-queue-rework.md \u00a75 (N1) specced this and it IS built: heal_stale_approvals runs OnCalendar=*:0/10 (backup-first, reversible, idempotent), and /api/larry/cleanup-review (dashboard_api.py:11173+) is the richer engine whose subagent already fails safe (_cleanup_review_verify_uncertain returns {} on ANY failure = keep). The gap is ONE SIGNAL CLASS, not a missing mechanism.\n\nBUILD:\n1. Optional 'freshness_probe' on dispatch_payload \u2014 a deterministic predicate whose FALSITY means the ask is moot. Kinds: pr_state (exists), file_contains/file_lacks (git show at origin/main), sql (read-only), json_path, shell (allowlisted, last resort). Authors already write the evidence down: the confirm-all card cited app/queue/verdict.ts + CONFIRM_ALL_TIERS + bulkCovered; the 0033 card cited schema_migration_log with the query. Converting cited evidence into a probe is near-free at filing, impossible after.\n2. Evaluate on the EXISTING 10-min tick. On FALSE, DEMOTE to 'premise_stale' with the probe output attached; do NOT auto-clear. Larry one-taps dismiss. Auto-clear stays reserved for the exact probes already trusted (reconcile_terminal_approvals' PR-coordinate class).\n3. Run the SAME probe once at BIRTH (promotion / approval-request emit). The 0033 card could ONLY ever be caught there.\n\nLOAD-BEARING: TRUE => keep. FALSE => demote. ERROR/timeout/unparseable => KEEP. Fail toward the human \u2014 same rule as cap-check-0-reject-a-tier-4-classification-not-prece-fd54.\n\nSCOPING (verified): ~10 modules emit APPROVAL_REQUEST markers, and Beacon authors some as free LLM text parsed by extract_approval_request. The probe MUST be optional and additive \u2014 highest-volume producers first. No-probe cards keep today's behavior AND must render visibly UNVERIFIED, never silently fresh: a check covering a third of the queue while reading as total is [[existence-gates-are-false-clean-generators]].\n\nDO NOT put the verification subagent on a timer. Tempting (already written, handles the uncertain cases) but that is an LLM deciding 'still true?' every card every tick: unbounded cost, and its failure mode is silently clearing a LIVE decision \u2014 strictly worse than a stale card. The spec keeps it behind a button for that reason.\n\nREVIEW: needed. It decides what disappears from Larry's decision queue, and its failure mode looks exactly like a working tab.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "main",
+        "captured_at": "2026-07-29T19:42:19.347703+00:00"
+      },
+      "last_touched": "2026-07-29T19:42:19.347703+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "Some items in your approval list are already settled by the time you see them, because the system only checks whether we handled a request \u2014 never whether the thing it was asking about is still true.",
+        "why": "You end up spending attention on decisions that resolved themselves, and some were already moot minutes before they reached you, which quietly erodes trust in the list.",
+        "suggest": "Let each item carry a simple built-in fact-check so already-resolved ones get flagged and set aside for a quick dismissal \u2014 but roll it out gradually and conservatively, starting with the most common items, and keep anything unverified clearly marked rather than hidden."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T19:42:51.285731+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+    },
+    {
+      "id": "cap-heal-unregistered-approval-mints-permanent-cards-b921",
+      "title": "heal_unregistered_approval mints permanent cards from transient, self-declared-unparseable nudges",
+      "note": "PROBLEM: a recurring ALERT becomes a permanent Approvals-tab card with no resolution path. 4 of the 8 cards on Larry's tab on 2026-07-29 came from this one path, and three of them say it in their own summary: 'Decision needs your direction (promoted from a missed marker; could not be parsed into two options \u2014 needs triage).' The promoter is admitting it does not know what the decision IS, and mints a binary approve/reject card anyway. Both exits then route back to Beacon 'to formalize this into a proper binary approval_request' \u2014 i.e. the card's own resolution is to become a different card.\n\nDO NOT 'FIX THE DETECTOR'. Verified: the underlying alert is working exactly as designed. heal_pipeline_stall.check_unrouted_open_prs / heal-unrouted-owner-pr-nudge-001 exists specifically to catch 'a clean unrouted PR the owner forgot to label' and is deliberately 'nudge-only, preserving Larry 2026-07-11 label opt-in' (PR_UNROUTED_MIN_AGE_MIN=60). It cannot tell 'Larry forgot' from 'Larry is deliberately holding this for /code-review high' because NOTHING RECORDS THAT INTENT. Teaching it to would need either a new hold marker Larry has to set (new toil) or inferring intent \u2014 the exact thing the nudge is built not to do. The alert is not the bug; the PROMOTION is.\n\nWHAT TO BUILD (pick in preflight):\n(a) Do not promote an alert the promoter cannot parse into two real options. A card that cannot state its own choices is triage, not a decision \u2014 route it to a triage lane, not the Approvals tab.\n(b) If it IS promoted, the card must inherit the source alert's dedup/cooldown identity so it RETIRES WITH THE ALERT instead of outliving it. Today the alert de-dups and cools down; the card it spawned does not, so a transient nudge becomes permanent.\n\nNOTE: 'bare_approvable: False' is already stamped on every one of these (heal_unregistered_approval.py:717/889/1210), but it only gates a BARE 'approve' in Telegram routing (beacon_approval_handler.py:634) \u2014 it is a routing-safety flag, NOT a triage signal. The information that these are not real binary decisions is ALREADY IN THE RECORD and nothing acts on it. That is the cheapest thread to pull.\n\nRELATED: cap-approvals-tab-let-a-card-carry-its-own-falsifier-8bb3 covers the other half \u2014 cards whose PREMISE goes stale. This capture covers cards that were never answerable to begin with. Different defects, same symptom (a tab that accumulates items that do not need a human).\n\nREVIEW: needed if it changes what reaches the Approvals tab \u2014 a wrong filter silently drops a real decision, which fails looking exactly like success.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "main",
+        "captured_at": "2026-07-29T19:42:40.259181+00:00"
+      },
+      "last_touched": "2026-07-29T19:42:40.259181+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "Your approvals list is being filled with items that aren't actually decisions \u2014 they're flagged questions the system admits it can't even phrase, yet it still puts them in front of you asking for a yes/no.",
+        "why": "Half the items waiting for you right now come from this one glitch, so your decision queue looks busy with things you can't act on \u2014 burying the choices that genuinely need you and costing you time and trust in the list.",
+        "suggest": "Have these unanswerable items sent to a holding area instead of your approvals list, and make any that do slip through expire on their own; it's a low-risk cleanup, but worth a careful check so we never accidentally hide a real decision."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T19:42:51.285731+00:00",
+        "from_state": "parked"
+      }
     }
   ]
 }
