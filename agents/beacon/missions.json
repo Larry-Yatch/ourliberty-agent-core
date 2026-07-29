@@ -14895,7 +14895,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-29T05:22:34.948507+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-29T05:17:49.296288+00:00"
+      "orphan_last_activity_ts": "2026-07-29T05:17:49.296288+00:00",
+      "briefing": {
+        "what": "A piece of work your team kicked off on its own that's now waiting for your sign-off before it can move forward.",
+        "why": "It isn't tied to any active priority yet, so approving it commits time and attention that could otherwise go to your planned goals.",
+        "suggest": "Take a quick look at what it's for before giving the green light \u2014 hold off if it doesn't clearly support something you care about right now."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T05:25:55.919746+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
