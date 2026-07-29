@@ -8,6 +8,8 @@ Validates:
     missing title, missing/empty token, network error, malformed response
   - the CLI wrapper main() preserves its observable behavior (exit 2 on no
     title, exit 0 + "captured <id>" on success, non-zero on failure)
+  - the emit_capture.sh shell wrapper REFUSES a flag-style call (`--title ...`)
+    instead of silently filing a capture titled "--title"
 
 Run:
     cd ~/agent-core && python3 -m unittest scripts.tests.test_emit_capture
@@ -22,6 +24,7 @@ except ImportError:  # discover loads this module top-level (no package parent)
 
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -177,6 +180,103 @@ class EmitCaptureFailureTests(unittest.TestCase):
                 self.assertIsNone(eci.emit_capture(title="t"))
         msgs = " ".join(str(c.args[0]) for c in err.call_args_list if c.args)
         self.assertIn("500", msgs)
+
+
+class ShellWrapperFlagGuardTests(unittest.TestCase):
+    """emit_capture.sh takes POSITIONAL args; a flag-style call must REFUSE.
+
+    `--title X --note Y --repo Z` used to exit 0 having filed a capture titled
+    "--title", with the real title shifted into the note and --repo silently
+    dropped (there is no such option — origin comes from the cwd's git
+    context). Three such cards are in captures.json.
+
+    The emitter is stubbed with a fake `python3` on PATH that records the env
+    it was handed, so each case proves whether a POST would have happened at
+    all — not merely what the exit code was.
+    """
+
+    SCRIPT = _REPO_SCRIPTS / "emit_capture.sh"
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        tmp = Path(self._tmp.name)
+        self.marker = tmp / "emitter-ran.json"
+        shim_dir = tmp / "bin"
+        shim_dir.mkdir()
+        shim = shim_dir / "python3"
+        shim.write_text(
+            "#!/usr/bin/env bash\n"
+            'printf "%s" "{\\"title\\": \\"$OL_CAPTURE_TITLE\\","'
+            ' > "$OL_MARKER"\n'
+            'printf "%s" "\\"note\\": \\"$OL_CAPTURE_NOTE\\","'
+            ' >> "$OL_MARKER"\n'
+            'printf "%s" "\\"argv\\": \\"$*\\"}" >> "$OL_MARKER"\n'
+            "exit 0\n",
+            encoding="utf-8",
+        )
+        shim.chmod(0o755)
+        self.shim_dir = shim_dir
+
+    def _run(self, *args, env_extra=None):
+        env = dict(os.environ)
+        env.pop("OL_CAPTURE_TITLE", None)
+        env.pop("OL_CAPTURE_NOTE", None)
+        env["PATH"] = f"{self.shim_dir}{os.pathsep}{env['PATH']}"
+        env["OL_MARKER"] = str(self.marker)
+        env.update(env_extra or {})
+        return subprocess.run(
+            ["bash", str(self.SCRIPT), *args],
+            capture_output=True, text=True, timeout=30, env=env,
+        )
+
+    def _emitted(self):
+        """What the emitter was invoked with, or None if it never ran."""
+        if not self.marker.exists():
+            return None
+        return json.loads(self.marker.read_text(encoding="utf-8"))
+
+    # --- the guard fires -------------------------------------------------
+    def test_flag_style_call_exits_nonzero_and_posts_nothing(self):
+        out = self._run("--title", "Real title", "--note", "Body",
+                        "--repo", "SOMEREPO")
+        self.assertNotEqual(out.returncode, 0)
+        self.assertIsNone(self._emitted(), "guard must fire BEFORE the emitter")
+        self.assertEqual(out.stdout, "")
+        # The usage names the real convention AND the other half of the
+        # mistake: repo comes from the cwd, not from an argument.
+        self.assertIn('usage: emit_capture.sh "<title>" ["<note>"]', out.stderr)
+        self.assertIn("--repo", out.stderr)
+        self.assertRegex(out.stderr, r"(?i)current directory")
+
+    def test_lone_flag_is_also_refused(self):
+        out = self._run("--help")
+        self.assertNotEqual(out.returncode, 0)
+        self.assertIsNone(self._emitted())
+
+    # --- the guard stays out of the way ----------------------------------
+    def test_positional_title_and_note_still_emit(self):
+        out = self._run("A real title", "A real note")
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertEqual(
+            self._emitted(),
+            {"title": "A real title", "note": "A real note",
+             "argv": str(_REPO_SCRIPTS / "emit_capture_impl.py")},
+        )
+
+    def test_env_title_with_no_positional_still_emits(self):
+        # The `"${1:-${OL_CAPTURE_TITLE:-}}"` fallback path — $1 is absent, so
+        # the guard must not even look at it.
+        out = self._run(env_extra={"OL_CAPTURE_TITLE": "From env"})
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertEqual((self._emitted() or {}).get("title"), "From env")
+
+    def test_title_containing_dashes_is_not_mistaken_for_a_flag(self):
+        # Only a LEADING `--` is a flag; an em-dash-ish title is legitimate.
+        out = self._run("Fix the --verbose handling in run.sh")
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertEqual((self._emitted() or {}).get("title"),
+                         "Fix the --verbose handling in run.sh")
 
 
 class CliWrapperTests(unittest.TestCase):
