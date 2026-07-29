@@ -166,10 +166,19 @@ class AgentRunnerReaderParityTests(unittest.TestCase):
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
         self.root = Path(self._tmp.name)
+        # Snapshot the _bootstrap sandbox root so tearDown can RESTORE it.
+        self._agents_root_orig = os.environ.get('OURLIBERTY_AGENTS_ROOT')
         os.environ['OURLIBERTY_AGENTS_ROOT'] = str(self.root)
 
     def tearDown(self):
-        os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
+        # RESTORE, never pop — popping drops the process-wide sandbox redirect
+        # and every later test that resolves the root at call time falls through
+        # to the hardcoded `/home/larry/agents` production default. See
+        # test_sandbox_env_restored_after_teardown.py.
+        if self._agents_root_orig is None:
+            os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
+        else:
+            os.environ['OURLIBERTY_AGENTS_ROOT'] = self._agents_root_orig
         self._tmp.cleanup()
 
     def test_agent_runner_reads_what_this_module_writes(self):

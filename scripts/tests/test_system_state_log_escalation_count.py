@@ -42,17 +42,32 @@ import system_state_log as ssl  # noqa: E402
 
 
 class EscalationCountRegressionTest(unittest.TestCase):
+    # `load_for_larry_escalations` reads TWO producers off the SAME file (the
+    # 1a `escalations` list and the 1b `records` map — see its docstring), and
+    # each has its own override var. Pinning only the 1a var left 1b resolving
+    # through OURLIBERTY_AGENTS_ROOT at call time, so this test's result
+    # depended on ambient process state: when a preceding module dropped the
+    # sandbox root, 1b read `/home/larry/agents` and these counts picked up
+    # production's real open rows (2026-07-29). Pin BOTH, at one path, the way
+    # production has them.
+    _FEED_ENV_KEYS = (
+        'OURLIBERTY_FOR_LARRY_FEED_FILE',    # for_larry_escalations (1a)
+        'OURLIBERTY_FOR_LARRY_SIGNAL_FILE',  # for_larry_signal      (1b)
+    )
+
     def setUp(self):
         self._tmp = tempfile.TemporaryDirectory()
         self._feed_path = Path(self._tmp.name) / 'for-larry-escalations.json'
-        self._saved = os.environ.get('OURLIBERTY_FOR_LARRY_FEED_FILE')
-        os.environ['OURLIBERTY_FOR_LARRY_FEED_FILE'] = str(self._feed_path)
+        self._saved = {k: os.environ.get(k) for k in self._FEED_ENV_KEYS}
+        for k in self._FEED_ENV_KEYS:
+            os.environ[k] = str(self._feed_path)
 
     def tearDown(self):
-        if self._saved is None:
-            os.environ.pop('OURLIBERTY_FOR_LARRY_FEED_FILE', None)
-        else:
-            os.environ['OURLIBERTY_FOR_LARRY_FEED_FILE'] = self._saved
+        for k, v in self._saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
         self._tmp.cleanup()
 
     def _seed_three_open_records(self):
