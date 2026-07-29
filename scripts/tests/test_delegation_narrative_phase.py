@@ -61,14 +61,42 @@ class PhasePrecedenceTest(unittest.TestCase):
         self.assertIsNone(got['narrative_pr_url'])
 
     def test_handed_off(self):
-        got = _resolve(_cap(), {})
+        # `handed_off` is gated on the LEDGER RECEIPT (#974) — the team's "I've
+        # got this" — not on the click. This test asserted the pre-#974 contract
+        # and was merged red in #975 seven seconds after #974 landed; it has
+        # never passed. The receipt is what earns the calm phrasing.
+        got = _resolve(_cap(), {}, dispatched_by_origin={DELEGATE_ID: 'f-tid'})
         self.assertEqual(got['narrative_phase'], 'handed_off')
         self.assertIsNone(got['narrative_pr_url'])
 
+    def test_no_receipt_is_stalled(self):
+        # The other half of the receipt gate: delegated, past the grace window,
+        # no receipt, no build signal ⇒ nothing is carrying this. Must resolve
+        # `stalled`, NOT None — a None here is what silenced the narrator for
+        # every stalled card (found 2026-07-21: 13–29-day-old delegations that
+        # never dispatched, all rendering as calm blanks).
+        got = _resolve(_cap(), {})
+        self.assertEqual(got['narrative_phase'], 'stalled')
+        self.assertIsNone(got['narrative_pr_url'])
+
     def test_waiting_approval_wins_over_handed_off(self):
-        got = _resolve(_cap(), {}, has_open_approval=True)
+        got = _resolve(_cap(), {}, has_open_approval=True,
+                       dispatched_by_origin={DELEGATE_ID: 'f-tid'})
         self.assertEqual(got['narrative_phase'], 'waiting_approval')
         self.assertIsNone(got['narrative_pr_url'])
+
+    def test_waiting_approval_wins_over_stalled(self):
+        # A delegation parked on LARRY is waiting on him, not neglected by the
+        # team — it must never be narrated as stalled.
+        got = _resolve(_cap(), {}, has_open_approval=True)
+        self.assertEqual(got['narrative_phase'], 'waiting_approval')
+
+    def test_build_signal_wins_over_missing_receipt(self):
+        # A receipt-less card with a real review event is demonstrably being
+        # worked; the trail phase outranks the receipt gate. Guards against a
+        # regression where the stalled rung swallows live build signal.
+        got = _resolve(_cap(), {DELEGATE_ID: [_ev('review_request')]})
+        self.assertEqual(got['narrative_phase'], 'in_review')
 
     def test_building_from_native_session_start(self):
         native = {DELEGATE_ID: [{'event_type': 'session_start',

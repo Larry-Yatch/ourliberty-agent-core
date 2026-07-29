@@ -97,6 +97,7 @@ class PlanTest(unittest.TestCase):
     def _plan(self, caps, m=None, **kw):
         kw.setdefault('open_delegate_approvals', {})
         kw.setdefault('native_build_events', None)
+        kw.setdefault('dispatched_by_origin', {})
         return h.plan_delegate_narrations(
             caps, build_events_by_origin=m, **kw)
 
@@ -119,9 +120,67 @@ class PlanTest(unittest.TestCase):
                          [])
 
     def test_handed_off_one_post(self):
-        posts = self._plan([_cap()], {})
+        # Needs the LEDGER RECEIPT — #974 gated `handed_off` on the team actually
+        # picking the work up, not on Larry's click. This assertion predates that
+        # gate and was merged red in #975; the narrator never passed a receipt
+        # map through at all, so every live delegation resolved to None and went
+        # unnarrated for two weeks.
+        posts = self._plan([_cap()], {},
+                           dispatched_by_origin={DELEGATE_ID: 'f-tid'})
         self.assertEqual(len(posts), 1)
         self.assertEqual(posts[0]['phase'], 'handed_off')
+
+    def test_grace_handed_off_is_withheld_from_the_thread(self):
+        # A just-clicked delegation resolves `handed_off` off the GRACE window
+        # alone (no receipt). The dashboard card should show that; a POST must
+        # not — it claims the team picked up work nobody has touched. It is also
+        # unrecoverable: the sweep runs every 10min inside a 15min grace, so the
+        # post would be spent before the real pickup, and the deterministic
+        # event_id would then block the genuine `handed_off` forever.
+        from datetime import datetime, timezone
+        fresh = _cap(spawned={
+            'kind': 'delegate', 'task_id': DELEGATE_ID,
+            'stamped_at': datetime.now(timezone.utc).isoformat()})
+        self.assertEqual(self._plan([fresh], {}), [])
+        # ...and once the receipt lands, the SAME card posts it for real.
+        posts = self._plan([fresh], {},
+                           dispatched_by_origin={DELEGATE_ID: 'f-tid'})
+        self.assertEqual([p['phase'] for p in posts], ['handed_off'])
+
+    def test_declined_origin_is_not_narrated_as_stalled(self):
+        # Larry REJECTED this delegation. It is declined, not neglected — telling
+        # him it "may need a nudge" invites him to re-push work he stopped.
+        self.assertEqual(
+            self._plan([_cap()], {}, declined_origins={DELEGATE_ID}), [])
+        # A DIFFERENT origin being declined must not suppress this card.
+        posts = self._plan([_cap()], {}, declined_origins={'delegate-other'})
+        self.assertEqual([p['phase'] for p in posts], ['stalled'])
+
+    def test_declined_origin_still_narrates_real_progress(self):
+        # Suppression is scoped to `stalled` only. If a declined origin somehow
+        # carries real build signal, that is observed truth and must still post.
+        posts = self._plan([_cap()], {DELEGATE_ID: [_ev('review_request')]},
+                           declined_origins={DELEGATE_ID})
+        self.assertEqual([p['phase'] for p in posts], ['in_review'])
+
+    def test_receipt_map_is_required(self):
+        # Omitting it must fail at the CALL, not silently post "no sign of
+        # progress" for every card — the #975 failure mode, made loud.
+        with self.assertRaises(TypeError):
+            h.plan_delegate_narrations(
+                [_cap()], build_events_by_origin={},
+                open_delegate_approvals={}, native_build_events=None)
+
+    def test_stalled_posts_and_never_claims_it_never_started(self):
+        # No receipt, past grace, no build signal ⇒ one honest post. The wording
+        # is load-bearing: a missing receipt does NOT prove nothing ran (pre-
+        # 2026-07-11 delegations predate the stamp), so "no sign of progress" is
+        # the ceiling of what we know and "never started" is forbidden.
+        posts = self._plan([_cap()], {})
+        self.assertEqual(len(posts), 1)
+        self.assertEqual(posts[0]['phase'], 'stalled')
+        self.assertIn('no sign of progress', posts[0]['text'].lower())
+        self.assertNotIn('never started', posts[0]['text'].lower())
 
     def test_skipped_phase_only_current_narrated(self):
         # Card jumped straight to in_review: exactly ONE post (in_review), no
@@ -166,7 +225,8 @@ class PlanTest(unittest.TestCase):
         m = {'delegate-a': [{'event_type': 'review_request', 'pr_url': None,
                              'ts': '2026-07-21T11:00:00Z',
                              'payload': {'origin_task_id': 'delegate-a'}}]}
-        posts = self._plan([c1, c2], m)
+        posts = self._plan([c1, c2], m,
+                           dispatched_by_origin={'delegate-b': 'f-tid'})
         by_id = {p['capture_id']: p['phase'] for p in posts}
         self.assertEqual(by_id['cap-a'], 'in_review')
         self.assertEqual(by_id['cap-b'], 'handed_off')
@@ -218,6 +278,111 @@ class EmitTest(unittest.TestCase):
 # ---------- the sweep (idempotency + single-writer) ----------
 
 
+class ApprovalScanTest(unittest.TestCase):
+    """The receipt map counts `approved` ONLY, and rejected/expired origins are
+    reported separately as declined. Before the filter existed, a REJECTED
+    approval still handed back a receipt, and the narrator announced "Picked this
+    up" for work Larry had turned down (live instance on the 2026-07-28 board)."""
+
+    def _store(self, entries, bucket='history'):
+        import json
+        import tempfile
+        d = tempfile.TemporaryDirectory()
+        self.addCleanup(d.cleanup)
+        root = Path(d.name)
+        (root / 'state').mkdir(parents=True)
+        (root / 'state' / 'beacon-pending-approvals.json').write_text(
+            json.dumps({'version': 1, 'pending': [], 'history': [],
+                        bucket: entries}))
+        return root
+
+    def test_approved_is_a_receipt(self):
+        root = self._store([{'origin_task_id': 'delegate-a', 'id': 'fresh-1',
+                             'status': 'approved'}])
+        self.assertEqual(
+            da._delegate_dispatched_task_ids(['delegate-a'], root),
+            {'delegate-a': 'fresh-1'})
+        self.assertEqual(da._delegate_declined_origins(['delegate-a'], root),
+                         set())
+
+    def test_rejected_is_not_a_receipt_and_is_declined(self):
+        root = self._store([{'origin_task_id': 'delegate-a', 'id': 'fresh-1',
+                             'status': 'rejected'}])
+        self.assertEqual(
+            da._delegate_dispatched_task_ids(['delegate-a'], root), {})
+        self.assertEqual(da._delegate_declined_origins(['delegate-a'], root),
+                         {'delegate-a'})
+
+    def test_expired_is_not_a_receipt_and_is_declined(self):
+        root = self._store([{'origin_task_id': 'delegate-a', 'id': 'fresh-1',
+                             'status': 'expired'}])
+        self.assertEqual(
+            da._delegate_dispatched_task_ids(['delegate-a'], root), {})
+        self.assertEqual(da._delegate_declined_origins(['delegate-a'], root),
+                         {'delegate-a'})
+
+    def test_pending_is_not_a_receipt(self):
+        # Still awaiting Larry — nothing has been dispatched under it.
+        root = self._store([{'origin_task_id': 'delegate-a', 'id': 'fresh-1',
+                             'status': 'pending'}], bucket='pending')
+        self.assertEqual(
+            da._delegate_dispatched_task_ids(['delegate-a'], root), {})
+        self.assertEqual(da._delegate_declined_origins(['delegate-a'], root),
+                         set())
+
+    def test_rejected_then_re_delegated_and_approved_is_not_declined(self):
+        # A card turned down once and later re-delegated + approved is LIVE work.
+        # Declined requires the absence of ANY approved entry.
+        root = self._store([
+            {'origin_task_id': 'delegate-a', 'id': 'old', 'status': 'rejected'},
+            {'origin_task_id': 'delegate-a', 'id': 'new', 'status': 'approved'},
+        ])
+        self.assertEqual(
+            da._delegate_dispatched_task_ids(['delegate-a'], root),
+            {'delegate-a': 'new'})
+        self.assertEqual(da._delegate_declined_origins(['delegate-a'], root),
+                         set())
+
+    def test_newest_approval_wins(self):
+        # A card delegated, built, then re-delegated has TWO approved entries.
+        # Taking the FIRST would bridge to the PREVIOUS build, whose completed
+        # session_start then reads as `building` for work that has not started.
+        root = self._store([
+            {'origin_task_id': 'delegate-a', 'id': 'run-1', 'status': 'approved'},
+            {'origin_task_id': 'delegate-a', 'id': 'run-2', 'status': 'approved'},
+        ])
+        self.assertEqual(
+            da._delegate_dispatched_task_ids(['delegate-a'], root),
+            {'delegate-a': 'run-2'})
+
+    def test_scan_returns_disjoint_halves_in_one_read(self):
+        # Both halves from ONE pass, declined already net of approved — callers
+        # needing both must not read the store twice (an approval resolving
+        # between two reads yields no receipt AND no declined marking, which
+        # posts a permanent "no sign of progress" about just-approved work).
+        root = self._store([
+            {'origin_task_id': 'delegate-a', 'id': 'a1', 'status': 'approved'},
+            {'origin_task_id': 'delegate-b', 'id': 'r1', 'status': 'rejected'},
+            {'origin_task_id': 'delegate-c', 'id': 'c1', 'status': 'rejected'},
+            {'origin_task_id': 'delegate-c', 'id': 'c2', 'status': 'approved'},
+        ])
+        approved, declined = da._delegate_approval_scan(
+            ['delegate-a', 'delegate-b', 'delegate-c'], root)
+        self.assertEqual(approved, {'delegate-a': 'a1', 'delegate-c': 'c2'})
+        self.assertEqual(declined, {'delegate-b'})
+        self.assertFalse(set(approved) & declined)
+
+    def test_missing_store_is_fail_safe(self):
+        import tempfile
+        d = tempfile.TemporaryDirectory()
+        self.addCleanup(d.cleanup)
+        root = Path(d.name)
+        self.assertEqual(
+            da._delegate_dispatched_task_ids(['delegate-a'], root), {})
+        self.assertEqual(da._delegate_declined_origins(['delegate-a'], root),
+                         set())
+
+
 class SweepTest(unittest.TestCase):
     def setUp(self):
         # Isolate the trail/approval reads so the sweep logic is under test, not
@@ -226,7 +391,9 @@ class SweepTest(unittest.TestCase):
             mock.patch.object(da, '_open_delegate_approvals',
                               lambda ids, root=None: {}),
             mock.patch.object(da, '_delegate_dispatched_task_ids',
-                              lambda ids, root=None: {}),
+                              lambda ids, root=None: {DELEGATE_ID: 'f-tid'}),
+            mock.patch.object(da, '_delegate_declined_origins',
+                              lambda ids, root=None: set()),
             mock.patch.object(da, '_fetch_delegation_build_events',
                               lambda client, ids: {
                                   DELEGATE_ID: [_ev('review_request')]}),

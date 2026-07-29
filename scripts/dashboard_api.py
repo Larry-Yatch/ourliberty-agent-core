@@ -4987,30 +4987,97 @@ def _delegate_dispatched_task_ids(
     card read `building` while Forge is mid-build, instead of sitting on
     `handed_off` until the PR opens.
 
-    Scans pending AND history (a dispatched delegation is `approved` in history).
+    Scans pending AND history, and counts ONLY `status == 'approved'` entries —
+    that status IS the dispatch (`resolve` writes it when Larry approves, and
+    `dispatch_approved` then runs the build under this `id`). The filter is the
+    whole point of the map: without it a `rejected` or `expired` approval still
+    hands back a "receipt", and a receipt is read downstream as the team's "I've
+    got this". That mis-read reached the team thread — the narrator announced
+    "Picked this up" for a delegation Larry had REJECTED (live instance:
+    `delegate-cap-spec-build-xiv-b-tier-4-alert-write-back-loop-f78b`, and 36
+    rejected + 82 expired entries make it recurring). This paragraph was already
+    the documented contract before the filter existed to enforce it.
+
     Reads the store ONCE. Fail-safe: {} on a missing/unreadable store — the card
     simply keeps its coarser phase."""
+    return _delegate_approval_scan(origin_task_ids, agents_root)[0]
+
+
+# An approval that reached a TERMINAL non-approved state. Larry decided (reject)
+# or the window closed (expire); either way nothing was ever dispatched, and the
+# card is not waiting on anyone.
+_DECLINED_APPROVAL_STATUSES = frozenset({'rejected', 'expired'})
+
+
+def _delegate_declined_origins(
+    origin_task_ids: list[str],
+    agents_root: Optional[Path] = None,
+) -> set[str]:
+    """Delegate origins whose approval was REJECTED or EXPIRED and never
+    approved — i.e. the work was declined, not neglected.
+
+    Needed because `stalled` alone cannot tell "nobody picked this up" from "Larry
+    said no": both are delegated-with-no-receipt. Narrating the second as stalled
+    invites him to re-nudge work he deliberately turned down. Requires the absence
+    of ANY approved entry so a card that was rejected once and later re-delegated
+    and approved is NOT treated as declined.
+
+    Same fail-safe contract as `_delegate_dispatched_task_ids`: {} / empty set on
+    a missing or unreadable store.
+
+    A caller that needs BOTH halves should call `_delegate_approval_scan` once
+    rather than this and `_delegate_dispatched_task_ids` in sequence — two calls
+    are two independent reads, and an approval resolving between them yields an
+    inconsistent pair (see that function's docstring)."""
+    return _delegate_approval_scan(origin_task_ids, agents_root)[1]
+
+
+def _delegate_approval_scan(
+    origin_task_ids: list[str],
+    agents_root: Optional[Path] = None,
+) -> tuple[dict[str, str], set[str]]:
+    """One pass over the approval store → (approved receipts, declined origins).
+
+    The declined set is returned already NET of approved, so the two halves are
+    disjoint and neither caller has to re-derive the relationship. Call this ONCE
+    when you need both: `_delegate_dispatched_task_ids` and
+    `_delegate_declined_origins` are thin views over it, and calling those two in
+    sequence re-reads the file twice. That is not merely wasteful — a card that is
+    `rejected` at the first read and re-delegated + APPROVED before the second
+    comes back with no receipt AND no declined marking, which resolves `stalled`
+    and posts a permanent "no sign of progress" about work that was just approved.
+
+    Repeat approvals: the LAST approved entry wins (entries are appended on
+    resolve, so later == newer). Taking the first would bridge a re-delegated card
+    to its PREVIOUS build, whose completed `session_start` then reads as `building`
+    for a delegation that has not started."""
     if not origin_task_ids:
-        return {}
+        return {}, set()
     root = agents_root or _agents_root()
     try:
         data = json.loads(_beacon_pending_approvals_path(root).read_text())
     except (OSError, json.JSONDecodeError, ValueError):
-        return {}
+        return {}, set()
     if not isinstance(data, dict):
-        return {}
+        return {}, set()
     wanted = set(origin_task_ids)
-    out: dict[str, str] = {}
+    approved: dict[str, str] = {}
+    declined: set[str] = set()
     for bucket in ('pending', 'history'):
         for entry in (data.get(bucket) or []):
             if not isinstance(entry, dict):
                 continue
             origin = entry.get('origin_task_id')
-            fresh = entry.get('id')
-            if (isinstance(origin, str) and origin in wanted
-                    and isinstance(fresh, str) and fresh):
-                out.setdefault(origin, fresh)
-    return out
+            if not (isinstance(origin, str) and origin in wanted):
+                continue
+            status = entry.get('status')
+            if status == 'approved':
+                fresh = entry.get('id')
+                if isinstance(fresh, str) and fresh:
+                    approved[origin] = fresh  # last (newest) wins
+            elif status in _DECLINED_APPROVAL_STATUSES:
+                declined.add(origin)
+    return approved, {o for o in declined if o not in approved}
 
 
 def _has_forge_build_started(events: Optional[list[dict[str, Any]]]) -> bool:
@@ -5287,11 +5354,12 @@ def resolve_delegation_narrative_phase(
     build_events_by_origin: Optional[dict[str, list[dict[str, Any]]]],
     has_open_approval: bool = False,
     native_build_events: Optional[dict[str, list[dict[str, Any]]]] = None,
+    dispatched_by_origin: Optional[dict[str, str]] = None,
 ) -> dict[str, Any]:
     """The ONE narrative-phase resolver the thread narrator and the dashboard
     both read from — `{narrative_phase, narrative_pr_url}` over
     {handed_off, waiting_approval, building, in_review, review_passed, merged,
-    closed_failed, None}.
+    closed_failed, stalled, None}.
 
     Built by overlaying the GC healer's already-persisted terminal stamps
     (`spawned.outcome`, `shipped_note`/`shipped_pr_url`, `failure_signaled`) and
@@ -5304,7 +5372,18 @@ def resolve_delegation_narrative_phase(
       3. trail review_passed / in_review / building → that phase
       4. has_open_approval    → `waiting_approval`
       5. trail handed_off     → `handed_off`
-      6. else                 → None (nothing to narrate yet)
+      6. trail stalled        → `stalled`
+      7. else                 → None (nothing to narrate yet)
+
+    `dispatched_by_origin` is the ledger-receipt map (`_delegate_dispatched_task_ids`)
+    — the team's "I've got this". It MUST be threaded through: `_delegation_trail_field`
+    gates `handed_off` on that receipt (#974), so a resolver that omits it makes
+    `_has_receipt` permanently False and downgrades every past-grace delegation to
+    `stalled` — including ones the team is genuinely working. Omitted for two weeks
+    after #975, which is why the narrator went silent on live delegations; the
+    tests that caught it were merged red the same night. Optional, and `{}`-safe,
+    only because a caller with no ledger access is better served by the coarser
+    phase than by an exception.
     """
     trail = _delegation_trail_field(
         cap,
@@ -5312,6 +5391,7 @@ def resolve_delegation_narrative_phase(
         pr_state_by_url=None,
         has_open_approval=has_open_approval,
         native_build_events=native_build_events,
+        dispatched_by_origin=dispatched_by_origin,
     )
     trail_phase = trail.get('delegation_build_phase')
     trail_pr_url = trail.get('delegation_pr_url')
@@ -5334,8 +5414,12 @@ def resolve_delegation_narrative_phase(
         return {'narrative_phase': trail_phase, 'narrative_pr_url': trail_pr_url}
     if has_open_approval:
         return {'narrative_phase': 'waiting_approval', 'narrative_pr_url': None}
-    if trail_phase == 'handed_off':
-        return {'narrative_phase': 'handed_off', 'narrative_pr_url': None}
+    # `stalled` rides the same rung as `handed_off` — both are "delegated, no
+    # build signal yet"; the receipt is what tells them apart. It sits BELOW
+    # `has_open_approval` on purpose: a delegation parked on Larry is waiting on
+    # HIM, not stalled, and must never be narrated as neglected by the team.
+    if trail_phase in ('handed_off', 'stalled'):
+        return {'narrative_phase': trail_phase, 'narrative_pr_url': None}
     return {'narrative_phase': None, 'narrative_pr_url': None}
 
 
