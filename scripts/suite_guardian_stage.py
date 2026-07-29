@@ -169,6 +169,10 @@ def _empty_state() -> dict[str, Any]:
         'penalty_at': None,
         'penalty_at_run': None,
         'l8_card_filed_at': None,
+        # {"<target_stage>": {"at": iso, "floor": <run|null>}} — a graduation
+        # already ASKED at this evidence floor is never re-asked, so a decline
+        # stays declined instead of re-filing every night (see emit_graduation).
+        'graduation_asked': {},
     }
 
 
@@ -404,17 +408,132 @@ def _emit_card(payload: dict[str, Any], *, chat_id: Optional[int]) -> Optional[d
         return None
 
 
+# An APPROVED graduation still has to land a config-only PR before the stage
+# actually moves (Forge dispatch -> PR -> review -> merge). Give that chain this
+# many runs before re-asking, so a slow merge does not read as a failure.
+GRAD_REASK_AFTER_RUNS = 3
+
+
+def _graduation_prior_ask(
+    state: dict[str, Any], target: int, floor: Optional[int],
+) -> Optional[dict[str, Any]]:
+    """The recorded ask for this (target stage, evidence floor), or None.
+
+    Every layer is isinstance-guarded: `load_stage_state` merges the on-disk file
+    OVER the defaults, so a partial write / hand-edit / older schema can put any
+    type in `graduation_asked`. A bare `.get()` on that raises, and the only
+    caller swallows exceptions — which would disable graduation permanently and
+    silently, with nothing but a stderr line. A malformed value reads as absent
+    (re-ask), matching this module's fail-safe house style."""
+    asked = state.get('graduation_asked')
+    if not isinstance(asked, dict):
+        return None
+    rec = asked.get(str(target))
+    if not isinstance(rec, dict):
+        return None
+    return rec if rec.get('floor') == floor else None
+
+
+def _graduation_decision(approval_id: Optional[str]) -> Optional[str]:
+    """`'declined'` | `'approved'` | None (undecided / unknown).
+
+    Deliberately NOT `main_suite_guardian._prod_lookup_decision`, which folds
+    `expired` into `'rejected'`. That is right for a fix proposal but wrong here:
+    `expired` is written when an approval AGES OUT or is reconciled away — Larry
+    never answered — and treating "never answered" as "said no" would silence the
+    graduation ask forever on a card he never even saw.
+
+    NEWEST WINS, which is why this does not use `find_by_id_any_state`. That
+    helper returns the FIRST history match, and `_graduation_task_id` is
+    deterministic across re-asks — so once a re-ask has happened, history holds
+    more than one entry under the same id and an older `approved` SHADOWS the
+    `rejected` that came after it. The decline would never stick and the card
+    would resume re-filing on the cooldown forever: the round-2 nag, back again,
+    on the one path where declining matters most (the second ask, after Larry
+    already said yes once and it did not take). The helper's first-match
+    semantics are right for its own callers — a dedup that only asks "is this id
+    known" — so it is left alone.
+
+    A still-PENDING card outranks any history: that is the live ask, undecided.
+    """
+    if not approval_id:
+        return None
+    try:
+        import beacon_approval_handler as ah
+        s = ah.load_state()
+    except Exception:  # noqa: BLE001 — decision read is best-effort
+        return None
+    if not isinstance(s, dict):
+        return None
+    for row in (s.get('pending') or []):
+        if isinstance(row, dict) and row.get('id') == approval_id:
+            return None  # live ask still open
+    entry = None
+    for row in reversed(s.get('history') or []):
+        if isinstance(row, dict) and row.get('id') == approval_id:
+            entry = row
+            break
+    if entry is None:
+        return None
+    status = entry.get('status')
+    if status == 'rejected':
+        return 'declined'
+    if status in ('approved', 'modified'):
+        return 'approved'
+    return None
+
+
 def emit_graduation(
     candidate: dict[str, Any],
     *,
     penalty_cause: Optional[str] = None,
     chat_id: Optional[int] = None,
+    state_path: Optional[Path] = None,
+    now: Optional[datetime] = None,
+    completed_runs: Optional[int] = None,
 ) -> Optional[dict[str, Any]]:
     """Emit the graduation approval card for ``candidate`` (from
     :func:`evaluate_graduation`). The card cites the ledger evidence and any prior
     downgrade cause (L10). On approval the dispatched Forge task runs
-    ``apply-graduation`` to open the config-only PR."""
+    ``apply-graduation`` to open the config-only PR.
+
+    Fires at most ONCE per (target stage, evidence floor). `_emit_card` dedups
+    only against a card that is currently PENDING, and resolving an approval
+    removes it from pending on REJECT as well as approve — so without this guard
+    a graduation Larry DECLINES is re-filed on the next run, and every run after
+    that, forever. That is a standing recurring nag, which is exactly what the
+    default-deny alert posture exists to prevent, and declining is a reasonable
+    thing to do (holding a component in shadow one more window is a legitimate
+    call). The sibling `maybe_emit_l8_card` already guards itself this way with
+    `l8_card_filed_at`; graduation had only the pending dedup.
+
+    Keyed on the L10 evidence floor as well as the stage, so a downgrade — which
+    resets the evidence Larry would be judging — legitimately re-asks.
+
+    ONLY A DECLINE IS DURABLE. Recording the ask at EMIT time and suppressing on
+    it unconditionally would trade the nightly nag for a silent permanent stall:
+    approval is only the first step — a Forge task has to open a config-only PR
+    and that PR has to merge before `stage` actually moves — and every one of
+    those can fail. The guardian would then sit in Stage 0 forever and never
+    mention it again, which is a strictly worse failure for the one component
+    whose whole defect is that it cannot tell anyone anything. So a `rejected`
+    decision suppresses until the floor moves, and everything else
+    (approved-but-not-yet-applied, expired, still pending, unreadable) re-asks
+    after `GRAD_REASK_AFTER_RUNS`. A still-PENDING card is additionally a no-op
+    via `_emit_card`'s dedup, so the cooldown only ever paces a genuine re-ask.
+    """
     target = candidate['target_stage']
+    p = state_path or stage_state_path()
+    state = load_stage_state(path=p)
+    floor = evidence_floor_run(state)
+    prior = _graduation_prior_ask(state, target, floor)
+    if prior is not None:
+        if _graduation_decision(prior.get('task_id')) == 'declined':
+            return None  # a no stays a no
+        asked_run = prior.get('asked_run')
+        if (isinstance(completed_runs, int) and isinstance(asked_run, int)
+                and completed_runs - asked_run < GRAD_REASK_AFTER_RUNS):
+            return None  # give an approved graduation time to land its PR
     body = _render_graduation_body(candidate, penalty_cause)
     payload = {
         'task_id': _graduation_task_id(target),
@@ -434,7 +553,22 @@ def emit_graduation(
             f'other changes.'
         ),
     }
-    return _emit_card(payload, chat_id=chat_id)
+    entry = _emit_card(payload, chat_id=chat_id)
+    if entry is not None:
+        # Recorded only on a card that actually landed, so a failed emit
+        # (deps unavailable, Supabase down) retries next run instead of
+        # silently consuming the one ask.
+        asked = state.get('graduation_asked')
+        if not isinstance(asked, dict):
+            asked = {}                      # heal a corrupt value rather than raise
+        asked[str(target)] = {
+            'at': _now_iso(now), 'floor': floor,
+            'task_id': payload['task_id'],  # what the decision is read back from
+            'asked_run': completed_runs,    # cooldown anchor for the re-ask
+        }
+        state['graduation_asked'] = asked
+        save_stage_state(state, path=p)
+    return entry
 
 
 def _render_l8_body(evidence: dict[str, Any], parked: list[str]) -> str:

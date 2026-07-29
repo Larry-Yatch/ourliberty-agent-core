@@ -186,9 +186,119 @@ class RegistryHelperTest(unittest.TestCase):
         self.assertFalse(g.is_previously_green('t.C.m', g.new_registry(), 0))
 
     def test_not_previously_green_for_never_green_entry(self):
+        # Legacy entry predating `origin_run` — conservative False, unchanged.
         reg = g.new_registry()
         reg['tests']['t.C.m'] = {'ever_green': False}
         self.assertFalse(g.is_previously_green('t.C.m', reg, 5))
+
+    def test_previously_green_survives_its_own_entry(self):
+        # THE DEMOTION BUG. A test first seen red on run 11 was green on runs
+        # 1-10, so it is a genuine break. Re-deriving from `ever_green` (False —
+        # a broken test never goes green on its own) demoted it to backlog on
+        # the SECOND night, one night before escalation is allowed to fire.
+        reg = g.new_registry()
+        reg['tests']['t.C.m'] = {'ever_green': False, 'origin_run': 11}
+        self.assertTrue(g.is_previously_green('t.C.m', reg, 12))
+
+    def test_bootstrap_red_stays_debt_forever(self):
+        # The day-one flood protection this must NOT weaken: a test already red
+        # on the guardian's first-ever run is inherited debt, not a break.
+        reg = g.new_registry()
+        reg['tests']['t.C.m'] = {'ever_green': False, 'origin_run': 0}
+        self.assertFalse(g.is_previously_green('t.C.m', reg, 17))
+
+    def test_origin_run_true_is_not_read_as_one(self):
+        # bool is an int subclass; a stray True must not read as origin_run >= 1.
+        reg = g.new_registry()
+        reg['tests']['t.C.m'] = {'ever_green': False, 'origin_run': True}
+        self.assertFalse(g.is_previously_green('t.C.m', reg, 5))
+
+    def test_break_survives_two_nights_and_reaches_escalation(self):
+        # End-to-end on the exact sequence that was impossible before: the same
+        # test red on two consecutive runs must still be a genuine break on the
+        # second, because that is when `should_escalate_break` is allowed to fire.
+        # Nothing tested two runs against one test, which is why this survived
+        # review — the pieces all pass in isolation.
+        reg = g.new_registry()
+        reg['_meta']['completed_runs'] = 11
+        tid = 't.C.m'
+        for run in (11, 12):
+            cls = g.classify_red(
+                passed_alone=False, output='AssertionError: boom',
+                previously_green=g.is_previously_green(tid, reg, run),
+            )
+            g.record_red(reg, tid, cls, sha='a' * 40,
+                         now_iso='2026-07-28T00:00:00+00:00',
+                         completed_runs_before=run)
+        entry = reg['tests'][tid]
+        self.assertEqual(entry['classification'], g.CLS_GENUINE_BREAK)
+        self.assertEqual(entry['consecutive_red_runs'], 2)
+        self.assertTrue(g.should_escalate_break(entry))
+        # ...and it never flip-flopped into `unstable` on the way (flip_count
+        # bumps on a classification CHANGE, which is what the demotion was).
+        self.assertEqual(entry.get('flip_count', 0), 0)
+
+    def test_live_demoted_entry_recovers_to_break_without_parking(self):
+        # THE MIGRATION PATH — the only path that exists on the real system, and
+        # the one every other test here misses by starting from an empty
+        # registry. Seeded from the VERBATIM live shape: an entry already sitting
+        # in `backlog` with `flip_count: 1` banked from the demotion this fix
+        # undoes. Counting the correction as a second flip parked all four live
+        # tests as `unstable` instead of escalating them.
+        reg = g.new_registry()
+        reg['_meta']['completed_runs'] = 17
+        tid = 't.C.m'
+        reg['tests'][tid] = {
+            'classification': g.CLS_BACKLOG, 'flip_count': 1, 'parked': False,
+            'ever_green': False, 'origin_run': 11,
+            'consecutive_red_runs': 17, 'consecutive_green_runs': 0,
+            'history': [],
+        }
+        cls = g.classify_red(
+            passed_alone=False, output='AssertionError: boom',
+            previously_green=g.is_previously_green(tid, reg, 17),
+        )
+        self.assertEqual(cls, g.CLS_GENUINE_BREAK)
+        entry = g.record_red(reg, tid, cls, sha='a' * 40,
+                             now_iso='2026-07-29T00:00:00+00:00',
+                             completed_runs_before=17)
+        # It must SURVIVE record_red as a break — not be parked as unstable.
+        self.assertEqual(entry['classification'], g.CLS_GENUINE_BREAK)
+        self.assertFalse(entry['parked'])
+        self.assertEqual(entry['flip_count'], 1)  # not bumped by the correction
+        self.assertTrue(g.should_escalate_break(entry))
+        # ...and it must not poison the graduation gate, which requires zero
+        # unstable tests to produce a stage-0 -> 1 candidate.
+        self.assertEqual(g._unstable_count(reg), 0)
+
+    def test_genuine_instability_still_parks(self):
+        # The guard this must NOT weaken: a test that really does flip between
+        # ACTIONABLE categories still trips at 2 and parks.
+        reg = g.new_registry()
+        tid = 't.C.m'
+        for cls in (g.CLS_GENUINE_BREAK, g.CLS_ORDER_FLAKE,
+                    g.CLS_GENUINE_BREAK):
+            entry = g.record_red(reg, tid, cls, sha='a' * 40,
+                                 now_iso='2026-07-29T00:00:00+00:00',
+                                 completed_runs_before=5)
+        self.assertEqual(entry['classification'], g.CLS_UNSTABLE)
+        self.assertTrue(entry['parked'])
+
+    def test_bootstrap_debt_never_escalates_across_runs(self):
+        # Same loop, origin run 0: stays backlog, never becomes escalatable.
+        reg = g.new_registry()
+        tid = 't.C.m'
+        for run in (0, 1, 2):
+            cls = g.classify_red(
+                passed_alone=False, output='AssertionError: boom',
+                previously_green=g.is_previously_green(tid, reg, run),
+            )
+            g.record_red(reg, tid, cls, sha='a' * 40,
+                         now_iso='2026-07-28T00:00:00+00:00',
+                         completed_runs_before=run)
+        entry = reg['tests'][tid]
+        self.assertEqual(entry['classification'], g.CLS_BACKLOG)
+        self.assertFalse(g.should_escalate_break(entry))
 
     def test_select_new_reds_and_step_change(self):
         reg = g.new_registry()
@@ -215,9 +325,14 @@ class RegistryTransitionTest(unittest.TestCase):
         self.assertEqual(len(e['history']), 1)
 
     def test_flip_count_promotes_to_unstable_and_parks(self):
+        # Seeded from an ACTIONABLE class, not `backlog`. This originally opened
+        # on `backlog` purely as convenient flip-fodder, but leaving a holding
+        # lane is no longer counted as instability (see `record_red`) — so that
+        # seed would now measure one real flip, not two. The assertions, which
+        # are what this test is actually about, are unchanged.
         reg = g.new_registry()
         iso = '2026-07-08T00:00:00+00:00'
-        g.record_red(reg, 't.C.m', g.CLS_BACKLOG, sha='s' * 40, now_iso=iso,
+        g.record_red(reg, 't.C.m', g.CLS_ORDER_FLAKE, sha='s' * 40, now_iso=iso,
                      completed_runs_before=1)
         g.record_red(reg, 't.C.m', g.CLS_GENUINE_BREAK, sha='s' * 40,
                      now_iso=iso, completed_runs_before=1)  # flip 1
@@ -226,6 +341,19 @@ class RegistryTransitionTest(unittest.TestCase):
         self.assertEqual(e['flip_count'], 2)
         self.assertEqual(e['classification'], g.CLS_UNSTABLE)
         self.assertTrue(e['parked'])
+
+    def test_leaving_backlog_is_not_a_flip(self):
+        # The narrow behaviour change, pinned directly: backlog -> actionable
+        # banks no flip, so a demoted test can be corrected without being parked.
+        reg = g.new_registry()
+        iso = '2026-07-08T00:00:00+00:00'
+        g.record_red(reg, 't.C.m', g.CLS_BACKLOG, sha='s' * 40, now_iso=iso,
+                     completed_runs_before=1)
+        e = g.record_red(reg, 't.C.m', g.CLS_GENUINE_BREAK, sha='s' * 40,
+                         now_iso=iso, completed_runs_before=1)
+        self.assertEqual(e['flip_count'], 0)
+        self.assertEqual(e['classification'], g.CLS_GENUINE_BREAK)
+        self.assertFalse(e['parked'])
 
     def test_green_twice_recovers(self):
         reg = g.new_registry()
@@ -450,6 +578,149 @@ class RegBaselineLockPathTest(unittest.TestCase):
         ):
             self.assertEqual(baseline_cache.regbaseline_lock_path(),
                              Path('/tmp/scratch.lock'))
+
+
+class StageMaintenanceGateTest(unittest.TestCase):
+    """Stage bookkeeping — which files the GRADUATION evidence card — must run at
+    every stage, including 0.
+
+    It used to be nested inside `if eff_stage >= 1`, making Stage 0 a dead end:
+    the only exit from shadow is a graduation card, and the code that files it
+    could only run once already out of shadow. The guardian met the Stage-1 bar
+    around run 7 and sat in shadow through run 17 with no way to say so.
+
+    `main()` had NO test coverage at all, which is why 17 runs went by without
+    this surfacing — every piece passes in isolation; only the wiring is wrong.
+    """
+
+    def _run(self, eff_stage, status=g.RUN_RED):
+        calls = {'maintenance': 0, 'proposal': 0, 'escalation': 0}
+
+        def _maint(*_a, **_k):
+            calls['maintenance'] += 1
+
+        def _prop(*_a, **_k):
+            calls['proposal'] += 1
+            return {}
+
+        def _esc(*_a, **_k):
+            calls['escalation'] += 1
+            return {'escalated': []}
+
+        with mock.patch.object(g, 'run_guardian', return_value={'status': status}), \
+             mock.patch.object(g.stage, 'effective_stage', return_value=eff_stage), \
+             mock.patch.object(g, '_run_stage_maintenance', _maint), \
+             mock.patch.object(g, 'run_proposal_cycle', _prop), \
+             mock.patch.object(g, 'run_escalation_only', _esc), \
+             mock.patch.object(g, 'load_registry', return_value=g.new_registry()):
+            rc = g.main(['--repo-root', '/tmp/nonexistent', '--mode', 'shadow'])
+        return rc, calls
+
+    def test_stage_zero_still_files_graduation_evidence(self):
+        rc, calls = self._run(0)
+        self.assertEqual(rc, 0)
+        # The escape hatch runs...
+        self.assertEqual(calls['maintenance'], 1)
+        # ...but shadow is still shadow: no proposing, no dispatching.
+        self.assertEqual(calls['proposal'], 0)
+        # ...and it CAN speak: the notify-only half runs.
+        self.assertEqual(calls['escalation'], 1)
+
+    def test_stage_one_does_not_double_escalate(self):
+        # At Stage 1+ `run_proposal_cycle` already does the episode-reset and
+        # escalation halves. Running the shadow path too would mean two
+        # independent registry read/write passes racing in one cycle.
+        _rc, calls = self._run(1)
+        self.assertEqual(calls['proposal'], 1)
+        self.assertEqual(calls['escalation'], 0)
+
+    def test_stage_one_runs_both(self):
+        _rc, calls = self._run(1)
+        self.assertEqual(calls['maintenance'], 1)
+        self.assertEqual(calls['proposal'], 1)
+
+    def test_inconclusive_run_does_neither(self):
+        # No per-test verdict this cycle → nothing to propose and no evidence to
+        # count. Unchanged by the fix.
+        _rc, calls = self._run(1, status=g.RUN_INFRA_FLAKE)
+        self.assertEqual(calls['maintenance'], 0)
+        self.assertEqual(calls['proposal'], 0)
+        self.assertEqual(calls['escalation'], 0)
+
+
+class ShadowEscalationTest(unittest.TestCase):
+    """Stage 0 may SAY a test is broken; it still may not ACT on one.
+
+    Escalation proposes nothing, dispatches nothing, merges nothing and touches no
+    config — so gating it behind Stage 1 only meant the guardian could not report a
+    break until a human had already extended trust to a component they had never
+    seen do the job.
+    """
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.reg_path = Path(self._tmp.name) / 'registry.json'
+        self.paged = []
+
+    def _deps(self, boom=False):
+        def _esc(*, test_id, entry):
+            if boom:
+                raise RuntimeError('DM down')
+            self.paged.append(test_id)
+        return types.SimpleNamespace(escalate=_esc)
+
+    def _seed(self, **over):
+        reg = g.new_registry()
+        entry = {'classification': g.CLS_GENUINE_BREAK, 'consecutive_red_runs': 2,
+                 'consecutive_green_runs': 0, 'break_escalated': False}
+        entry.update(over)
+        reg['tests']['t.C.m'] = entry
+        g.save_registry(self.reg_path, reg)
+        return reg
+
+    def _run(self, **kw):
+        return g.run_escalation_only('/tmp/nope', registry_path=self.reg_path,
+                                     deps=self._deps(**kw))
+
+    def test_genuine_break_pages_in_shadow(self):
+        self._seed()
+        out = self._run()
+        self.assertEqual(self.paged, ['t.C.m'])
+        self.assertEqual(out['escalated'], ['t.C.m'])
+        # latched, so it pages exactly once per episode
+        self.assertTrue(g.load_registry(self.reg_path)['tests']['t.C.m']
+                        ['break_escalated'])
+
+    def test_second_run_does_not_re_page(self):
+        self._seed()
+        self._run()
+        self._run()
+        self.assertEqual(self.paged, ['t.C.m'])
+
+    def test_green_victim_rearms_for_a_new_episode(self):
+        self._seed(break_escalated=True, consecutive_red_runs=0)
+        self._run()
+        self.assertFalse(g.load_registry(self.reg_path)['tests']['t.C.m']
+                         ['break_escalated'])
+
+    def test_backlog_and_one_night_breaks_do_not_page(self):
+        self._seed(classification=g.CLS_BACKLOG)
+        self.assertEqual(self._run()['escalated'], [])
+        self._seed(consecutive_red_runs=1)   # one night only
+        self.assertEqual(self._run()['escalated'], [])
+        self.assertEqual(self.paged, [])
+
+    def test_a_failed_page_is_retried_not_swallowed(self):
+        # If the DM/alert throws, the latch must stay UNSET so the next run
+        # tries again — a lost page is the failure this whole PR is about.
+        self._seed()
+        out = g.run_escalation_only('/tmp/nope', registry_path=self.reg_path,
+                                    deps=self._deps(boom=True))
+        self.assertEqual(out['escalated'], [])
+        self.assertFalse(g.load_registry(self.reg_path)['tests']['t.C.m']
+                         .get('break_escalated'))
+        self.assertEqual(self._run()['escalated'], ['t.C.m'])
 
 
 if __name__ == '__main__':

@@ -347,5 +347,201 @@ class L4ScopeGateTest(unittest.TestCase):
         self.assertEqual(out['merge_outcome'], 'held_scope_fail_closed')
 
 
+
+class GraduationAskOnceTest(unittest.TestCase):
+    """A DECLINED graduation must stay declined.
+
+    `_emit_card` dedups only against a card that is currently PENDING, and
+    resolving an approval removes it from pending on REJECT as well as approve —
+    so without a persisted marker the card re-files on the next run, and every
+    run after that, forever. Declining is a legitimate call (holding a component
+    in shadow one more window), so it must not become a nightly nag. The sibling
+    `maybe_emit_l8_card` already guards itself this way.
+    """
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.state = Path(self._tmp.name) / 'stage-state.json'
+        self.emits = []
+
+        def _fake_emit(payload, *, chat_id=None):
+            self.emits.append(payload['task_id'])
+            return {'id': payload['task_id']}
+
+        p = mock.patch.object(stage, '_emit_card', _fake_emit)
+        p.start()
+        self.addCleanup(p.stop)
+
+    def _candidate(self, target=1):
+        return {'target_stage': target, 'evidence': {'completed_runs': 17},
+                'dial_note': None}
+
+    def _decision(self, status):
+        """Fake the resolved approval the ask is read back from."""
+        return mock.patch.object(
+            stage, '_graduation_decision',
+            lambda _tid: {'rejected': 'declined',
+                          'approved': 'approved'}.get(status))
+
+    def test_second_run_does_not_refile(self):
+        first = stage.emit_graduation(self._candidate(), state_path=self.state,
+                                      completed_runs=17)
+        self.assertIsNotNone(first)
+        second = stage.emit_graduation(self._candidate(), state_path=self.state,
+                                       completed_runs=17)
+        self.assertIsNone(second)          # the nag that used to fire nightly
+        self.assertEqual(len(self.emits), 1)
+
+    def test_a_decline_stays_declined_forever(self):
+        stage.emit_graduation(self._candidate(), state_path=self.state,
+                              completed_runs=17)
+        with self._decision('rejected'):
+            # far past any cooldown — a no is durable, not merely paced
+            for run in (18, 25, 100):
+                self.assertIsNone(stage.emit_graduation(
+                    self._candidate(), state_path=self.state, completed_runs=run))
+        self.assertEqual(len(self.emits), 1)
+
+    def test_approved_but_never_applied_re_asks(self):
+        # Approval is only step one: a Forge task must open a config-only PR and
+        # that PR must merge before `stage` moves. If it never lands, the
+        # guardian is still at Stage 0 — suppressing forever would trade the nag
+        # for a SILENT PERMANENT STALL on the one component whose whole defect is
+        # that it cannot tell anyone anything.
+        stage.emit_graduation(self._candidate(), state_path=self.state,
+                              completed_runs=17)
+        with self._decision('approved'):
+            # inside the cooldown: quiet, the PR may simply still be in flight
+            self.assertIsNone(stage.emit_graduation(
+                self._candidate(), state_path=self.state, completed_runs=18))
+            # past it: speak up again
+            self.assertIsNotNone(stage.emit_graduation(
+                self._candidate(), state_path=self.state, completed_runs=20))
+        self.assertEqual(len(self.emits), 2)
+
+    def test_expired_is_not_a_decline(self):
+        # `expired` means the card aged out / was reconciled away — Larry never
+        # answered. The proposal loop's lookup folds expired into 'rejected';
+        # doing that here would silence a graduation he never even saw.
+        stage.emit_graduation(self._candidate(), state_path=self.state,
+                              completed_runs=17)
+        with self._decision('expired'):    # -> None (undecided), not 'declined'
+            self.assertIsNotNone(stage.emit_graduation(
+                self._candidate(), state_path=self.state, completed_runs=21))
+
+    def test_corrupt_marker_does_not_kill_graduation(self):
+        # A partial write / hand-edit / older schema must read as "no ask on
+        # record" and re-ask, not raise into a caller that swallows exceptions
+        # and thereby disables graduation permanently and silently.
+        for bad in ('nonsense', ['a'], 42):
+            st = stage.load_stage_state(path=self.state)
+            st['graduation_asked'] = bad
+            stage.save_stage_state(st, path=self.state)
+            self.assertIsNotNone(stage.emit_graduation(
+                self._candidate(), state_path=self.state, completed_runs=17))
+
+    def test_decision_lookup_maps_statuses(self):
+        # `expired` must read as UNDECIDED, not declined — the distinction the
+        # proposal loop's own lookup collapses.
+        import beacon_approval_handler as ah
+        for status, want in (('expired', None), ('rejected', 'declined'),
+                             ('approved', 'approved'), ('modified', 'approved'),
+                             ('pending', None)):
+            state = {'pending': [], 'history': [{'id': 'x', 'status': status}]}
+            with mock.patch.object(ah, 'load_state', lambda _s=state: _s):
+                self.assertEqual(stage._graduation_decision('x'), want, status)
+
+    def test_unknown_id_is_undecided(self):
+        import beacon_approval_handler as ah
+        with mock.patch.object(ah, 'load_state',
+                               lambda: {'pending': [], 'history': []}):
+            self.assertIsNone(stage._graduation_decision('never-asked'))
+
+    def test_newest_decision_wins_over_a_reused_id(self):
+        # THE SHADOWING BUG. `_graduation_task_id` is deterministic and the
+        # re-ask reuses it, so history can hold TWO entries under one id.
+        # `find_by_id_any_state` returns the FIRST (oldest) match, so a decline
+        # that FOLLOWS an approval was invisible and the nag came back.
+        # Exercises the REAL lookup — the other tests fake `_graduation_decision`
+        # wholesale, which is exactly why this slipped through.
+        import beacon_approval_handler as ah
+        dup = stage._graduation_task_id(1)
+        state = {'pending': [], 'history': [
+            {'id': dup, 'status': 'approved'},   # ask #1: yes, never applied
+            {'id': dup, 'status': 'rejected'},   # ask #2: no
+        ]}
+        with mock.patch.object(ah, 'load_state', lambda: state):
+            self.assertEqual(stage._graduation_decision(dup), 'declined')
+
+    def test_a_live_pending_ask_outranks_history(self):
+        import beacon_approval_handler as ah
+        dup = stage._graduation_task_id(1)
+        state = {'pending': [{'id': dup, 'status': 'pending'}],
+                 'history': [{'id': dup, 'status': 'rejected'}]}
+        with mock.patch.object(ah, 'load_state', lambda: state):
+            self.assertIsNone(stage._graduation_decision(dup))
+
+    def test_decline_after_a_re_ask_is_durable_end_to_end(self):
+        # Full sequence through the REAL lookup: ask -> approve -> PR never
+        # lands -> re-ask -> DECLINE -> silent from then on.
+        import beacon_approval_handler as ah
+        dup = stage._graduation_task_id(1)
+        hist: list = []
+        state = {'pending': [], 'history': hist}
+        with mock.patch.object(ah, 'load_state', lambda: state):
+            self.assertIsNotNone(stage.emit_graduation(
+                self._candidate(), state_path=self.state, completed_runs=18))
+            hist.append({'id': dup, 'status': 'approved'})     # yes, unapplied
+            self.assertIsNotNone(stage.emit_graduation(        # re-ask past cooldown
+                self._candidate(), state_path=self.state, completed_runs=22))
+            hist.append({'id': dup, 'status': 'rejected'})     # no
+            for run in (26, 40, 200):
+                self.assertIsNone(stage.emit_graduation(
+                    self._candidate(), state_path=self.state, completed_runs=run))
+        self.assertEqual(len(self.emits), 2)
+
+    def test_decision_lookup_is_fail_safe(self):
+        import beacon_approval_handler as ah
+        self.assertIsNone(stage._graduation_decision(None))
+
+        def _boom():
+            raise RuntimeError('approval store unreadable')
+
+        with mock.patch.object(ah, 'load_state', _boom):
+            self.assertIsNone(stage._graduation_decision('x'))
+        # A malformed store must read as undecided, not raise.
+        with mock.patch.object(ah, 'load_state', lambda: ['not', 'a', 'dict']):
+            self.assertIsNone(stage._graduation_decision('x'))
+        with mock.patch.object(ah, 'load_state',
+                               lambda: {'pending': None, 'history': None}):
+            self.assertIsNone(stage._graduation_decision('x'))
+
+    def test_failed_emit_does_not_consume_the_ask(self):
+        # deps unavailable / Supabase down => _emit_card returns None. That must
+        # NOT burn the one ask, or a transient outage silences graduation forever.
+        with mock.patch.object(stage, '_emit_card', lambda payload, *, chat_id=None: None):
+            self.assertIsNone(stage.emit_graduation(self._candidate(),
+                                                    state_path=self.state))
+        self.assertIsNotNone(stage.emit_graduation(self._candidate(),
+                                                   state_path=self.state))
+
+    def test_a_downgrade_re_asks(self):
+        # The evidence floor moving (L10 reset) changes what Larry would be
+        # judging, so a fresh ask is legitimate.
+        stage.emit_graduation(self._candidate(), state_path=self.state)
+        st = stage.load_stage_state(path=self.state)
+        st['penalty_at_run'] = 42          # downgrade lands, floor moves
+        stage.save_stage_state(st, path=self.state)
+        self.assertIsNotNone(stage.emit_graduation(self._candidate(),
+                                                   state_path=self.state))
+        self.assertEqual(len(self.emits), 2)
+
+    def test_a_different_target_stage_is_its_own_ask(self):
+        stage.emit_graduation(self._candidate(1), state_path=self.state)
+        self.assertIsNotNone(stage.emit_graduation(self._candidate(2),
+                                                   state_path=self.state))
+
+
 if __name__ == '__main__':
     unittest.main()
