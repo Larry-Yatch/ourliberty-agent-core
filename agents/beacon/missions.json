@@ -14398,7 +14398,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-29T01:06:23.601878+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-29T01:05:11.644404+00:00"
+      "orphan_last_activity_ts": "2026-07-29T01:05:11.644404+00:00",
+      "briefing": {
+        "what": "A piece of work the team started on their own that isn't attached to any active project yet, and it's now waiting for a sign-off before it can move forward.",
+        "why": "It's been sitting in the review line, so it's tying up effort that isn't yet connected to a goal you've prioritized \u2014 worth knowing before it goes further.",
+        "suggest": "Have someone give it a careful look to confirm it's worth finishing and ties back to a real priority before we invest more into it."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T01:14:15.936105+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-pr-RSDPM-149",
@@ -14415,7 +14429,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-29T01:06:23.601878+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-29T01:05:10.918337+00:00"
+      "orphan_last_activity_ts": "2026-07-29T01:05:10.918337+00:00",
+      "briefing": {
+        "what": "A piece of work your team started and finished a first quality check on, but it hasn't been tied to any of your active priorities yet.",
+        "why": "Unassigned work that passes review can quietly ship without anyone confirming it fits the business \u2014 or sit idle after real effort was spent.",
+        "suggest": "Take a quick look and either connect it to a current priority or set it aside, rather than letting it advance on its own."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T01:14:15.936105+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-seq-rsdpm-m14-001",
@@ -14432,7 +14460,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-29T01:06:23.601878+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-29T01:05:02.542228+00:00"
+      "orphan_last_activity_ts": "2026-07-29T01:05:02.542228+00:00",
+      "briefing": {
+        "what": "A new piece of work your team has kicked off on its own, not yet connected to any active project.",
+        "why": "Unassigned work can quietly consume time and effort without advancing a goal you've actually prioritized.",
+        "suggest": "Take a quick look to confirm it's worth pursuing and either tie it to a real priority or pause it before it grows."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T01:14:15.936105+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-card-message-66964ab6f85ac8f4beaa529ba34de14cac24f11b",
@@ -14449,7 +14491,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-29T01:06:23.601878+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-29T01:01:47.809687+00:00"
+      "orphan_last_activity_ts": "2026-07-29T01:01:47.809687+00:00",
+      "briefing": {
+        "what": "Your team has kicked off a piece of work that hasn't yet been attached to any specific project or goal.",
+        "why": "Unassigned work can quietly eat time and money without anyone able to say what it's driving toward, and it's hard to hold anyone accountable for results.",
+        "suggest": "Before it goes further, have the team tie this to a clear goal or pause it \u2014 a quick check now avoids sinking effort into something that may not be a priority."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T01:14:15.936105+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
