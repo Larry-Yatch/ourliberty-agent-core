@@ -14280,7 +14280,11 @@
         "at": "2026-07-29T00:24:14.415791+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-29T01:06:23.601878+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-pr-ourliberty-agent-core-1044",
@@ -14346,7 +14350,11 @@
         "at": "2026-07-29T00:44:15.039813+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-29T02:06:50.313618+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-pr-ourliberty-agent-core-1045",
@@ -14363,7 +14371,289 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-29T00:51:21.950170+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-29T00:45:46.358581+00:00"
+      "orphan_last_activity_ts": "2026-07-29T00:45:46.358581+00:00",
+      "briefing": {
+        "what": "A piece of work the team started and is now waiting for your sign-off, but it isn't tied to any active project yet.",
+        "why": "It's sitting idle in the review line, so effort already spent stays stuck and unfinished until someone gives it direction.",
+        "suggest": "Take a quick look and decide whether it supports a current priority \u2014 if you can't place it, ask the team what it's for before green-lighting."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T00:54:15.491762+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-29T01:21:39.832371+00:00",
+      "retired_reason": "orphan-terminal"
+    },
+    {
+      "id": "proposed-pr-ourliberty-agent-core-1043",
+      "name": "PR Ourliberty Agent Core 1043",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pr-ourliberty-agent-core-1043`. Last activity 2026-07-29T01:05:11.644404+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pr-ourliberty-agent-core-1043"
+      ],
+      "repo": null,
+      "created": "2026-07-29",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-29T01:06:23.601878+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-29T01:05:11.644404+00:00",
+      "briefing": {
+        "what": "A piece of work the team started on their own that isn't attached to any active project yet, and it's now waiting for a sign-off before it can move forward.",
+        "why": "It's been sitting in the review line, so it's tying up effort that isn't yet connected to a goal you've prioritized \u2014 worth knowing before it goes further.",
+        "suggest": "Have someone give it a careful look to confirm it's worth finishing and ties back to a real priority before we invest more into it."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T01:14:15.936105+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-29T01:21:39.832371+00:00",
+      "retired_reason": "orphan-terminal"
+    },
+    {
+      "id": "proposed-pr-RSDPM-149",
+      "name": "PR RSDPM 149",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pr-RSDPM-149`. Last activity 2026-07-29T01:05:10.918337+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pr-RSDPM-149"
+      ],
+      "repo": null,
+      "created": "2026-07-29",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-29T01:06:23.601878+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-29T01:05:10.918337+00:00",
+      "briefing": {
+        "what": "A piece of work your team started and finished a first quality check on, but it hasn't been tied to any of your active priorities yet.",
+        "why": "Unassigned work that passes review can quietly ship without anyone confirming it fits the business \u2014 or sit idle after real effort was spent.",
+        "suggest": "Take a quick look and either connect it to a current priority or set it aside, rather than letting it advance on its own."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T01:14:15.936105+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-29T01:21:39.832371+00:00",
+      "retired_reason": "orphan-terminal"
+    },
+    {
+      "id": "proposed-seq-rsdpm-m14-001",
+      "name": "Seq Rsdpm M14 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `seq-rsdpm-m14-001`. Last activity 2026-07-29T01:05:02.542228+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "seq-rsdpm-m14-001"
+      ],
+      "repo": null,
+      "created": "2026-07-29",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-29T01:06:23.601878+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-29T01:05:02.542228+00:00",
+      "briefing": {
+        "what": "A new piece of work your team has kicked off on its own, not yet connected to any active project.",
+        "why": "Unassigned work can quietly consume time and effort without advancing a goal you've actually prioritized.",
+        "suggest": "Take a quick look to confirm it's worth pursuing and either tie it to a real priority or pause it before it grows."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T01:14:15.936105+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-card-message-66964ab6f85ac8f4beaa529ba34de14cac24f11b",
+      "name": "Card Message 66964ab6f85ac8f4beaa529ba34de14cac24f11b",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `card-message-66964ab6f85ac8f4beaa529ba34de14cac24f11b`. Last activity 2026-07-29T01:01:47.809687+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "card-message-66964ab6f85ac8f4beaa529ba34de14cac24f11b"
+      ],
+      "repo": null,
+      "created": "2026-07-29",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-29T01:06:23.601878+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-29T01:01:47.809687+00:00",
+      "briefing": {
+        "what": "Your team has kicked off a piece of work that hasn't yet been attached to any specific project or goal.",
+        "why": "Unassigned work can quietly eat time and money without anyone able to say what it's driving toward, and it's hard to hold anyone accountable for results.",
+        "suggest": "Before it goes further, have the team tie this to a clear goal or pause it \u2014 a quick check now avoids sinking effort into something that may not be a priority."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T01:14:15.936105+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-29T01:21:39.832371+00:00",
+      "retired_reason": "orphan-terminal"
+    },
+    {
+      "id": "proposed-deep-review-hold-pr152-e64b6e43",
+      "name": "Deep Review Hold Pr152 E64b6e43",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `deep-review-hold-pr152-e64b6e43`. Last activity 2026-07-29T01:15:50.712735+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "deep-review-hold-pr152-e64b6e43"
+      ],
+      "repo": null,
+      "created": "2026-07-29",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-29T01:21:39.832371+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-29T01:15:50.712735+00:00",
+      "briefing": {
+        "what": "Your team paused a piece of work to give it a closer look before moving ahead.",
+        "why": "It's not yet attached to any active project, so it could be time well spent or a distraction from your real priorities.",
+        "suggest": "Take a quick look and confirm whether this is worth continuing before the team invests more time in it."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T01:24:17.897124+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-pr-RSDPM-150",
+      "name": "PR RSDPM 150",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pr-RSDPM-150`. Last activity 2026-07-29T01:50:25.143181+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pr-RSDPM-150"
+      ],
+      "repo": null,
+      "created": "2026-07-29",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-29T01:51:49.537851+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-29T01:50:25.143181+00:00",
+      "briefing": {
+        "what": "A piece of work your team kicked off on its own that hasn't been tied to any active project yet, and it's now waiting for your sign-off.",
+        "why": "Unclaimed work that sits in the review line ties up your team's time and can quietly drift out of sync with your real priorities.",
+        "suggest": "Take a quick look to confirm it fits where the business is headed before green-lighting it \u2014 and if it doesn't map to a current priority, set it aside for now."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T01:54:20.536625+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-29T02:06:50.313618+00:00",
+      "retired_reason": "orphan-terminal"
+    },
+    {
+      "id": "proposed-pr-ourliberty-agent-core-1047",
+      "name": "PR Ourliberty Agent Core 1047",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pr-ourliberty-agent-core-1047`. Last activity 2026-07-29T01:40:46.843688+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pr-ourliberty-agent-core-1047"
+      ],
+      "repo": null,
+      "created": "2026-07-29",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-29T01:51:49.537851+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-29T01:40:46.843688+00:00",
+      "briefing": {
+        "what": "A piece of work your team started on their own that hasn't been tied to any project or goal yet, and it's now waiting for a sign-off.",
+        "why": "Work sitting in limbo without a clear purpose ties up your team's time and can quietly ship changes nobody asked for.",
+        "suggest": "Before approving, take a moment to confirm what this work is for and whether it fits a current priority \u2014 if it doesn't, set it aside."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T01:54:20.536625+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-mirror-review-pr-ourliberty-agent-core-1047-4d4bd164",
+      "name": "Mirror Review PR Ourliberty Agent Core 1047 4d4bd164",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `mirror-review-pr-ourliberty-agent-core-1047-4d4bd164`. Last activity 2026-07-29T02:04:51.944331+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "mirror-review-pr-ourliberty-agent-core-1047-4d4bd164"
+      ],
+      "repo": null,
+      "created": "2026-07-29",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-29T02:06:50.313618+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-29T02:04:51.944331+00:00",
+      "briefing": {
+        "what": "A piece of work your team kicked off on its own that isn't attached to any active initiative yet, and it's now waiting for your sign-off.",
+        "why": "Loose work that isn't tied to a goal can quietly eat time and attention, so it's worth a quick look before it moves forward.",
+        "suggest": "Take a moment to confirm this fits something you actually want done right now before giving it the green light."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T02:14:25.563047+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }

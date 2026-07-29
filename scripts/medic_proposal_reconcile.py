@@ -72,7 +72,7 @@ TERMINAL_RETRACT_REASONS = frozenset(
 )
 
 _DEFAULT_STATE_PATH = (
-    Path(os.environ.get('OL_AGENTS_ROOT') or (Path.home() / 'agents'))
+    Path(os.environ.get('OURLIBERTY_AGENTS_ROOT') or (Path.home() / 'agents'))
     / 'state' / 'medic-proposals.json'
 )
 

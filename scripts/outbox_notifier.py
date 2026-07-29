@@ -295,6 +295,14 @@ _DEFAULT_DEEP_REVIEW_PATHS: tuple[str, ...] = (
     'scripts/chain_event_emit.py',
     'scripts/trust_policy.py',
     'scripts/outbox_notifier.py',
+    # The dispatch backstop is the other half of the pair above: it decides
+    # whether a PR gets a Mirror review AT ALL, and a Mirror PASS auto-merges.
+    # Its failure mode is quiet in the merge direction — an over-eager back-off
+    # simply stops dispatching while the healer keeps logging and heartbeating
+    # normally, so PRs merge unreviewed with nothing raising a hand (the live
+    # PIPELINE_BACKOFF strand, RSDPM #142). Added 2026-07-28 with Larry's
+    # explicit sign-off; the cost is that every future change here waits on him.
+    'scripts/heal_undispatched_pr_review.py',
     'config/trust-policy.json',
     'config/suite-guardian.json',
     # RSDPM — customer data boundary + auth gate. This list is REPO-AGNOSTIC
