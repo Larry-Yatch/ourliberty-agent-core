@@ -14988,7 +14988,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-29T06:22:50.124732+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-29T06:08:28.816288+00:00"
+      "orphan_last_activity_ts": "2026-07-29T06:08:28.816288+00:00",
+      "briefing": {
+        "what": "Some early groundwork got started to fix a setup process that isn't lining up the way it should, but it hasn't been tied to any active initiative yet.",
+        "why": "Loose, unassigned work like this can quietly eat time and cause surprises later if it drifts without a clear owner or goal.",
+        "suggest": "Take a quick look to decide whether this is worth formally adopting into a project or setting aside, before it grows on its own."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T06:26:17.511367+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
