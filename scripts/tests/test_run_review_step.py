@@ -74,6 +74,66 @@ def _pid_alive(pid: int) -> bool:
     return True
 
 
+def _proc_cmdline(pid: int) -> str:
+    """Best-effort command line for `pid`, '' if it cannot be read.
+
+    Linux first (`/proc`, no subprocess — this runs in a poll loop), then `ps`
+    for macOS. A failure to read is '' , which the identity check below treats
+    as "not our process" — the safe direction: we would rather call a dead
+    sleeper dead than SIGKILL a stranger."""
+    try:
+        with open(f'/proc/{pid}/cmdline', 'rb') as fh:
+            return fh.read().replace(b'\0', b' ').decode('utf-8', 'replace')
+    except OSError:
+        pass
+    try:
+        out = subprocess.run(
+            ['ps', '-o', 'args=', '-p', str(pid)],
+            capture_output=True, text=True, timeout=5,
+        )
+        return out.stdout.strip()
+    except (subprocess.SubprocessError, OSError):
+        return ''
+
+
+def _wait_until_reaped(pid: int, needle: str, timeout_s: float = 10.0) -> bool:
+    """Poll until `pid` is gone (or is no longer OUR process). True == reaped.
+
+    Replaces a fixed `time.sleep(0.3)` + single `_pid_alive` check. This test was
+    the main-suite guardian's only `genuine-break` (runs 17-18) while passing in
+    isolation, with `run_review_step.sh` untouched for weeks — a harness flake,
+    not a regression in what it tests.
+
+      1. TIMING — the actual cause. 300ms is plenty on an idle box and not always
+         enough on a loaded one, where signal delivery and reaping lag behind a
+         4-core droplet running 9000 tests. Measured directly: a process that
+         exits at 1.0s reads as ALIVE at the old 0.3s checkpoint, so the old
+         assertion fails on a kill that worked perfectly. Polling to a deadline
+         is both faster in the common case (usually gone in ~1ms) and immune to
+         load; the deadline is only ever paid by a genuine regression.
+
+      2. PID REUSE — defensive, NOT what was failing here. If the sleeper's pid
+         were recycled before the check, a bare `os.kill(pid, 0)` would report
+         our long-dead sleeper as alive AND the caller's cleanup
+         `os.kill(pid, SIGKILL)` would shoot whatever innocent process now holds
+         it — plausibly another test's subprocess, turning one flake into
+         someone else's mystery failure. On this droplet that is currently
+         unreachable (`pid_max` 4194304 against ~2.8M in use, so pids do not wrap
+         within a run), so it is hardening against a smaller `pid_max` or a
+         longer-lived host rather than a live bug. It costs one `/proc` read per
+         poll and removes the only path by which this test could damage another.
+    """
+    deadline = time.monotonic() + timeout_s
+    while True:
+        if not _pid_alive(pid):
+            return True
+        if needle not in _proc_cmdline(pid):
+            return True  # pid recycled — ours is gone, and this one is NOT ours
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(0.02)
+
+
 class RunReviewStepPassthroughTest(unittest.TestCase):
     """A step that finishes within budget passes its own exit code through."""
 
@@ -147,8 +207,9 @@ class RunReviewStepTimeoutTest(unittest.TestCase):
                 child_pid = int(line.split('=', 1)[1])
                 break
         self.assertIsNotNone(child_pid, 'did not capture child pid from output')
-        time.sleep(0.3)  # allow the SIGTERM/SIGKILL to take effect
-        self.assertFalse(_pid_alive(child_pid), f'child {child_pid} lingered after timeout')
+        self.assertTrue(
+            _wait_until_reaped(child_pid, 'sleep 30'),
+            f'child {child_pid} lingered after timeout')
 
     def test_timeout_kills_the_process_group(self):
         # A timed-out step's descendants (e.g. pytest workers) must die too —
@@ -164,14 +225,17 @@ class RunReviewStepTimeoutTest(unittest.TestCase):
                 gc_pid = int(line.split('=', 1)[1])
                 break
         self.assertIsNotNone(gc_pid, 'did not capture grandchild pid from output')
-        time.sleep(0.3)
-        alive = _pid_alive(gc_pid)
-        if alive:  # don't leak a 40s sleeper if the assertion is about to fail
+        reaped = _wait_until_reaped(gc_pid, 'sleep 40')
+        if not reaped:  # don't leak a 40s sleeper if the assertion is about to fail
+            # Safe to signal: _wait_until_reaped only reports NOT-reaped while the
+            # pid still matches our sleeper's command line, so this can never hit
+            # a recycled pid belonging to another test.
             try:
                 os.kill(gc_pid, signal.SIGKILL)
             except OSError:
                 pass
-        self.assertFalse(alive, f'grandchild {gc_pid} survived the process-group kill')
+        self.assertTrue(
+            reaped, f'grandchild {gc_pid} survived the process-group kill')
 
     def test_term_ignoring_step_still_killed_within_grace(self):
         # A step that traps SIGTERM must still die at the SIGKILL escalation —
@@ -187,6 +251,50 @@ class RunReviewStepTimeoutTest(unittest.TestCase):
         # 1s ceiling + 2s grace + slack; nowhere near the 60s the step wanted.
         # (Still exercises the full SIGTERM-ignored → SIGKILL escalation path.)
         self.assertLess(elapsed, 20.0)
+
+
+class WaitUntilReapedTest(unittest.TestCase):
+    """Coverage for the liveness helper itself.
+
+    The timeout tests above were the guardian's only `genuine-break` on main
+    (runs 17-18) while passing in isolation and with `run_review_step.sh`
+    untouched for weeks — i.e. a harness flake, not a regression. Fixing a flake
+    without covering the fix just moves the blind spot, so the two properties
+    that make it robust are pinned here."""
+
+    def test_dead_pid_is_reaped_immediately(self):
+        p = subprocess.Popen(['sleep', '0'])
+        p.wait()
+        start = time.monotonic()
+        self.assertTrue(_wait_until_reaped(p.pid, 'sleep 0', timeout_s=5.0))
+        # Returns on the first poll — it must not burn the whole deadline.
+        self.assertLess(time.monotonic() - start, 1.0)
+
+    def test_recycled_pid_is_not_mistaken_for_ours(self):
+        # THE dangerous case. A live pid whose command line is not ours means our
+        # process died and the pid was reused. Reporting it alive would be a false
+        # failure AND would send the caller's cleanup SIGKILL at a stranger.
+        p = subprocess.Popen(['sleep', '30'])
+        self.addCleanup(p.wait)
+        self.addCleanup(p.kill)
+        # Same live pid, but we are looking for a different command.
+        self.assertTrue(_wait_until_reaped(p.pid, 'sleep 40', timeout_s=5.0))
+        # ...and it is genuinely still running: we reported "reaped" without
+        # touching it, which is the whole point.
+        self.assertTrue(_pid_alive(p.pid))
+
+    def test_live_matching_process_is_not_reaped(self):
+        # The assertion the timeout tests actually rely on must still be able to
+        # FAIL — a helper that always returns True would make them vacuous.
+        p = subprocess.Popen(['sleep', '30'])
+        self.addCleanup(p.wait)
+        self.addCleanup(p.kill)
+        self.assertFalse(_wait_until_reaped(p.pid, 'sleep 30', timeout_s=0.5))
+
+    def test_cmdline_of_dead_pid_is_empty_not_an_exception(self):
+        p = subprocess.Popen(['sleep', '0'])
+        p.wait()
+        self.assertEqual(_proc_cmdline(p.pid).strip(), '')
 
 
 class RunReviewStepUsageTest(unittest.TestCase):
