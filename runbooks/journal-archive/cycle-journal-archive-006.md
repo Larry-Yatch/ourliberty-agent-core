@@ -70673,3 +70673,115 @@ RSDPM: **PR#156** open (m14-pr-a); Mirror review dispatched 05:15:56Z UTC (~5 mi
 
 ---
 
+## Iteration ~6655 — 2026-07-29T05:33Z UTC (Larry /cycle chat, Tier 1, consecutive_clean=0; SIGNAL — Check 4 pending=6 carries; NEW: RSDPM PR#156 Mirror ESCALATE (sha=3e9f70e43f23, 05:20:22Z UTC) — DM routing failed (null reply_chat_id), not in pending-approvals; tier stays 1)
+
+**Health:** ⚠️ Signal — Check 4 pending=6 carries; NEW: RSDPM PR#156 Mirror ESCALATE at 05:20:22Z UTC with DM routing failure — Larry not notified via Telegram or pending-approvals. All 6 mandatory checks ran; no auto-fix actions.
+
+**VERIFY-BEFORE-REASSERT (from iter ~6654 at ~05:21Z UTC):**
+- **"rsdpm-driftcheck 0031_schema_migration_log.sql carry"**: UNVERIFIED — 0 new alerts (watermark=574, file_length=574). [carry ⚠️ — still unverified]
+- **"system-health=healthy"**: CONFIRMED ✅ — ts=2026-07-29T05:29:09Z UTC (<5 min). [carry ✅]
+- **"heal-stale-daemon-code.heartbeat"**: CONFIRMED ✅ — heartbeat=2026-07-29T05:25:55Z UTC (~7 min; <60 min). [carry ✅]
+- **"alerts watermark=574, file_length=574"**: CONFIRMED ✅ — repair-watermark no-op (repaired=false, old=574, file_length=574); 0 new alerts. [carry ✅]
+- **"pending=6 (PR#1052 deep-review-hold + PR#1054 Mirror ESCALATE chief)"**: CONFIRMED ✅ — pending=6, same 6 items as iter ~6654. [carry ⚠️] NEW: RSDPM PR#156 Mirror ESCALATE is NOT in pending (routing gap — see Check 1).
+- **"PR#1052 deep-review-hold"**: CONFIRMED ⚠️ — deep-review-hold-pr1052-d3c25ced still in pending; PR#1052 MERGEABLE. [carry ⚠️]
+- **"PR#1054 Mirror ESCALATE"**: CONFIRMED ⚠️ — mirror-review-pr-ourliberty-agent-core-1054-c78976c2 still in pending; Forge revision in-flight via Beacon. [carry ⚠️]
+- **"PR#1055 MERGED"**: STABLE ✅ — not in open PR list. [carry ✅]
+- **"SUPABASE_DB_PASSWORD carry"**: CONFIRMED ⚠️ — healer cooldown resets ~2026-07-30T02:09Z UTC (~20.6h away). No re-DM. [carry ⚠️]
+- **"SUPABASE_SERVICE_ROLE_KEY dedup"**: CONFIRMED ✅ — last DM 2026-07-20T20:00:15Z UTC; 14d expires ~2026-08-03. [carry ✅]
+- **"Check I fires today ~14:13Z UTC"**: CONFIRMED ✅ — most recent check-i-2026-07-27.json; no check-i-2026-07-29.json yet (~8.7h away). [carry ✅]
+- **"pulse-cycle-check0-helper-override VP"**: CONFIRMED — cycle-prompt-tier4-no-upgrade-clause-001 still in pending. [carry ✅]
+- **"RSDPM PR#156 OPEN + Mirror review in-flight"**: UPDATED — Mirror returned ESCALATE at 05:20:22Z UTC (sha=3e9f70e43f23). DM routing failed (null reply_chat_id at 05:23:02Z UTC). NOT in beacon-pending-approvals.json. [UPDATED ⚠️ — see Check 1]
+- **"RSDPM destructive migration alert delivered idx=573"**: STABLE ✅ — confirmed delivered at 05:19:03Z UTC; no follow-up alerts since. [carry ✅]
+- Remaining carries (III, XIV, auto-merge-conflict-route-hold, check-vi, Mirror queue-wait, PR#1049 cooldown): CARRY as previous iter.
+
+**Check 0 — Alert triage (~05:29Z UTC):** repair-watermark: no-op (repaired=false, old=574, file_length=574). 0 new alerts. NOMINAL ✅
+
+**Check 1 — Log noise (~05:29Z UTC):** New outbox-notifier.log entries since iter ~6654 (covered through 05:19:03Z UTC):
+- [2026-07-28 23:20:19 MDT=05:20:19Z UTC]: classified mirror review_escalate marker (session=a1945cfd, task='m14-pr-a').
+- [2026-07-28 23:20:20 MDT=05:20:20Z UTC]: MIRROR_REVIEW_STATUS task=m14-pr-a pr=.../RSDPM/pull/156 sha=3e9f70e43f23 state=failure posted.
+- [2026-07-28 23:20:22 MDT=05:20:22Z UTC]: MIRROR_FINDINGS_COMMENT task=m14-pr-a pr=.../RSDPM/pull/156 comment created. marker-notified beacon <- mirror (review-escalate, notify-m14-pr-a.json).
+- [2026-07-28 23:20:32 MDT=05:20:32Z UTC]: **[WARN]** beacon replan APPROVAL_REQUEST for task notify-pr-ourliberty-agent-core-1054 has no valid reply_chat_id (got None); cannot route approval DM, falling through.
+- [2026-07-28 23:23:02 MDT=05:23:02Z UTC]: **[WARN]** beacon replan APPROVAL_REQUEST for task notify-m14-pr-a has no valid reply_chat_id (got None); cannot route approval DM, falling through.
+**⚠️ SIGNAL:** RSDPM PR#156 Mirror ESCALATE at 05:20:22Z UTC + DM routing failure for both PR#1054 and RSDPM PR#156 approval_requests. RSDPM PR#156 escalate NOT in beacon-pending-approvals.json (null reply_chat_id gap). PR#1054 approval IS in pending (item 6) — apparently beacon processed that one's approval_request before the routing WARN, or it arrived via a different path.
+
+**Check 2 — Telegram sweep (~05:30Z UTC):** beacon_telegram_bot.log: last entry idx=573 at [2026-07-28T23:19:03-0600]=05:19:03Z UTC (rsdpm-rehearseprs destructive-migration alert). Nothing newer. The two null reply_chat_id routing failures at 05:20:32Z and 05:23:02Z UTC produced no Telegram entries — DMs did not reach Larry for either escalate. NOMINAL for new Larry directives ✅ (but ⚠️ DMs failed)
+
+**Check 3 — Pipeline stall (~05:29Z UTC):** heal_pipeline_stall.py --dry-run:
+- FORGE_NO_PR_SKIP ×5 (MERGED: RSDPM #134/136/146/147/142); fix-escalated-pr-headchange-backoff-001 (pr_exists=#1042); m14-pr-a (pr_exists=branch pr=#156 RSDPM)
+- MIRROR_PASS_UNMERGED_SKIP task=m14-pr-a reason=held_deep_review (intentional /code-review high hold) — stall checker suppresses m14-pr-a due to deep-review-hold state (consistent with rsdpm-rehearseprs destructive migration hold on PR#156)
+- suppressed (cooldown): unrouted_open_pr:1053; unrouted_open_pr:1049
+**DRY-RUN: 0 alert(s) would fire. NOMINAL ✅**
+
+**Check 4 — Pending directives (~05:30Z UTC):** beacon-pending-approvals.json: **pending=6** (unchanged from iter ~6654):
+1. `rsdpm-confirmall-medium-parent-secondglance-001` — Awaiting Larry. M14 PR#156 open via parallel path; may be superseded. [carry — monitoring]
+2. `unreg-approval-9061de515dce` — PR#1049 unrouted; monitoring. [carry]
+3. `cycle-prompt-tier4-no-upgrade-clause-001` — Awaiting Larry approval for check0 helper-authority clause PR. [carry]
+4. `deep-review-hold-pr1052-d3c25ced` — PR#1052 Mirror PASS, auto-merge HELD. ACTION NEEDED: `/code-review high` + `scripts/merge_reviewed_pr.sh 1052`. [carry ⚠️]
+5. `unreg-approval-3283b7a9b651` — PR#1053 no Mirror dispatch. [carry ⚠️]
+6. `mirror-review-pr-ourliberty-agent-core-1054-c78976c2` — PR#1054 Mirror ESCALATE. Forge revision in-flight via Beacon. [carry ⚠️]
+**NOTE:** RSDPM PR#156 Mirror ESCALATE approval_request (task=m14-pr-a) is NOT in this list — routing gap (null reply_chat_id).
+SIGNAL ⚠️ (pending=6 carries; PR#1052 deep-review-hold chief; RSDPM PR#156 Mirror ESCALATE unregistered)
+
+**Check 5 — Stale daemon code (~05:29Z UTC):** system-health overall=healthy ts=2026-07-29T05:29:09Z UTC (<4 min). heal-stale-daemon-code.heartbeat=2026-07-29T05:25:55Z UTC (~7 min; <60 min). All bots alive (beacon/forge/mirror/pulse: desired=up, alive=true, action=noop). disk=14% memory=18%. NOMINAL ✅
+
+**Check A — Source repo (~05:29Z UTC):** On main. Clean tree. HEAD=c6266228=origin/main ("Pulse cycle 20260729T052713Z" — wrapper from iter ~6654). NOMINAL ✅
+**Check B — Sync health (~05:29Z UTC):** last_sync=2026-07-29T04:55:21Z UTC (~37 min; <2h); status=success; consecutive_push_failures=0. NOMINAL ✅
+**Check C — Agent liveness (~05:29Z UTC):** system-health overall=healthy. All bots alive. NOMINAL ✅
+**Check E — PR/merge state (~05:30Z UTC):** ourliberty-agent-core: 4 open PRs (unchanged):
+- **#1054** fix/flaky-timeout-test-identity (~67 min, UNKNOWN, auto-review) — Mirror ESCALATE c78976c2; Forge revision in-flight. ⚠️
+- **#1053** fix/spec-doc-sync-lag-self-heal (~127 min, UNKNOWN, no labels) — unreg-3283, stall DM in cooldown. ⚠️
+- **#1052** fix/dag-preflight-revision-silent-stall (~147 min, UNKNOWN, no labels) — deep-review-hold. ACTION NEEDED. ⚠️
+- **#1049** fix/guardian-can-actually-page (~218 min, UNKNOWN, no labels) — cooldown; awaiting `claude-review` label.
+RSDPM: **PR#156** OPEN, MERGEABLE (M14 PR-A: workspaces + membership + current_workspace() + backfill). Mirror ESCALATE sha=3e9f70e43f23 at 05:20:22Z UTC. Held for deep review (rsdpm-rehearseprs destructive migration). Forge revision needed.
+⚠️ (PR#1052 deep-review-hold; PR#1054 Mirror ESCALATE; RSDPM PR#156 Mirror ESCALATE)
+
+**§5.0 one-shots (~05:31Z UTC):** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal: no-op ✅. NOMINAL ✅
+
+**Credential rotation (~05:31Z UTC):** SUPABASE_SERVICE_ROLE_KEY: last DM 2026-07-20T20:00:15Z UTC; 14d expires ~2026-08-03. No DM. SUPABASE_DB_PASSWORD: healer cooldown resets ~2026-07-30T02:09Z UTC (~20.6h away). No Pulse re-DM. NOMINAL ✅
+
+**Check I artifact triage (~05:31Z UTC):** Most recent: check-i-2026-07-27.json. Today Wed Jul 29 UTC — timer fires ~14:13Z UTC (~8.7h away). No check-i-2026-07-29.json yet. NOMINAL ✅
+**Check III artifact triage (~05:31Z UTC):** Most recent: check-iii-2026-07-26.json (Sun Jul 26). Next: Sun 2026-08-02. NOMINAL ✅
+
+**PRIME DIRECTIVE accounting:** intervention appended (tier=1, template=carries-pr1052-deepreview-pr1054-mirror-escalate-rsdpm-pr156-mirror-escalate-routing-gap, ts=2026-07-29T05:32:48Z UTC). Trailing 30d: ratio=35.9% (systemic_fixes=50, vp=25; interventions=1795+; trend=worsening). **TIER: record --checks-clean false → Tier 1 stays; consecutive_clean=0; last_signal_at=2026-07-29T05:32:51Z UTC.**
+
+**Patterns:**
+- **RSDPM PR#156 Mirror ESCALATE + DM routing failure (NEW)**: Mirror returned review_escalate for RSDPM/pull/156 (sha=3e9f70e43f23) at 05:20:22Z UTC — "M14 PR-A: workspaces + membership + current_workspace() + backfill (schema only)". Two WARNs at 05:20:32Z UTC and 05:23:02Z UTC confirm DM routing failed for both PR#1054 and m14-pr-a approval_requests (null reply_chat_id). The PR#1054 approval DID land in beacon-pending-approvals.json (item 6, created 05:17:49Z UTC) — its approval_request was likely written to the file before the routing WARN fired. The RSDPM PR#156 approval_request (task=m14-pr-a) did NOT land in pending — it relies on the beacon-replan path which failed on null reply_chat_id. This is the null-chat-id routing gap (per MEMORY.md: "phone fixed, dashboard gap remains"). The dashboard Approvals tab should still show the approval_request via chain_event; Telegram DM did not fire. Forge revision for RSDPM PR#156 not yet dispatched.
+- **Both M14 (RSDPM PR#156) and PR#1054 need Forge revision**: Two simultaneous Mirror ESCALATE findings — PR#1054 (test identity file path change) and RSDPM PR#156 (M14 PR-A schema migration). Beacon is routing both. PR#1054 is in pending approvals and will receive Forge revision dispatch. RSDPM PR#156 may be slower to unblock due to the routing gap (no pending approval registered, no Telegram DM).
+- **Pipeline stall correctly suppresses m14-pr-a**: MIRROR_PASS_UNMERGED_SKIP reason=held_deep_review — stall checker reads the deep-review-hold flag on RSDPM PR#156 (set by rsdpm-rehearseprs destructive migration guard) and suppresses the stall alert. Correct behavior — PR#156 IS intentionally held.
+
+**G-rule assessment:** (unchanged from iter ~6654 — no new 3/3 triggers)
+- pulse-cycle-check0-helper-override: **VP** [approval-pending, awaiting Larry].
+- sync-desktop-config-false-block-001: **1/3** [carry]. mirror-worktree-cleanup-mid-session: **1/3** [carry].
+- forge-marker-taskid-suffix-increment-001: **2/3** [carry]. medic-draft-status-false-positive: **2/3** [carry].
+- check-i-force-bypass-dm-route: **2/3** [carry]. auto-merge-conflict-route-hold-no-dm-001: **VP** [carry].
+- mirror-queue-wait-readiness: **1/3** [carry]. beacon-pending-approvals-path-bug: **2/3** [carry].
+- m14-pr-a-task-id-path-prefix-mismatch: **1/3** [carry]. sequence-dispatch-text-cap-001: **1/3** [carry].
+- stalled-pending-sequence-rsdpm-m14-001: **RESOLVED** ✅ — RSDPM PR#156 opened; Mirror review received. Now tracking RSDPM PR#156 Mirror ESCALATE separately.
+- Active VP carries: forge-revision-preamble-missing; forge-wip-redispatch-digest; forge-wip-redispatch-exhausted-no-pr; outbox-notifier-intent-reject; auto-dispatch-APPROVAL_REQUEST-mismatch; PR #1022 heal-wip-redispatch DAG-preflight suppression; auto-merge-conflict-route-hold-no-dm-001; orphaned-pr-review-loglevel-by-class-001; pulse-cycle-check0-helper-override.
+
+**Actions taken:**
+1. Check 0: repair-watermark no-op (repaired=false, old=574, file_length=574). 0 new alerts.
+2. §5.0 one-shots: audit_due_nudge no-op, distill_detector no-op, audit_cadence_signal no-op.
+3. PRIME ledger: intervention appended at 2026-07-29T05:32:48Z UTC (tier=1, template=carries-pr1052-deepreview-pr1054-mirror-escalate-rsdpm-pr156-mirror-escalate-routing-gap).
+4. Tier state: `cycle_tier_state.py record --checks-clean false` → Tier 1 stays; consecutive_clean=0; last_signal_at=2026-07-29T05:32:51Z UTC.
+5. pulse-escalations.json: wrote [yellow] entry for RSDPM PR#156 Mirror ESCALATE routing gap.
+
+**Escalations:**
+- [carry ⚠️ — still unverified] RSDPM 0031 staging drift: apply 0031_schema_migration_log.sql in Supabase rsdpm-staging SQL editor.
+- [carry ⚠️ — healer cooldown resets ~2026-07-30T02:09Z UTC, ~20.6h away] SUPABASE_DB_PASSWORD credential-drift: awaiting Larry triage.
+- [carry — no new DM] check-vi-posture-proposals-2026-07-07 (2 proposals). Awaiting Larry.
+- [carry — self-suppresses ~2026-07-30T02Z UTC] Mirror queue-wait p95=92.3m.
+- [carry — no new DM] Check XIV Tier-4 × 2: oversilence + fleet digest. Awaiting Larry.
+- **[carry ⚠️] PR#1052 deep-review-hold**: Mirror PASS (sha=d3c25ced) but auto-merge HELD. ACTION: `/code-review high` on PR#1052, then `scripts/merge_reviewed_pr.sh 1052`.
+- **[carry ⚠️] unreg-approval-3283b7a9b651 (PR#1053 no Mirror dispatch)**: add `auto-review` label or `dispatch mirror review pr=https://github.com/Larry-Yatch/ourliberty-agent-core/pull/1053` via Beacon chat.
+- **[carry ⚠️] PR#1054 Mirror ESCALATE**: mirror-review-pr-ourliberty-agent-core-1054-c78976c2 in pending. Forge revision in-flight via Beacon.
+- **[NEW ⚠️] RSDPM PR#156 Mirror ESCALATE — routing gap**: Mirror flagged RSDPM/pull/156 (M14 PR-A) at 05:20:22Z UTC (sha=3e9f70e43f23). DM routing failed (null reply_chat_id). NOT in beacon-pending-approvals.json. Larry must check RSDPM/pull/156 Mirror findings comment directly. Forge revision needed. Check dashboard Approvals tab — chain_event may still appear there.
+- [carry — cooldown active] PR#1049 awaits `claude-review` label.
+- [carry — approval needed] `cycle-prompt-tier4-no-upgrade-clause-001`.
+- [carry — monitoring] `unreg-approval-9061de515dce` (PR#1049 unrouted).
+- [carry — monitoring, may be superseded] `rsdpm-confirmall-medium-parent-secondglance-001`: M14 PR#156 open; Mirror ESCALATE; may need re-decision.
+
+**Tier end-of-iter:** **Tier 1** (signal: Check 4 pending=6 carries + RSDPM PR#156 Mirror ESCALATE routing gap; consecutive_clean=0; last_signal_at=2026-07-29T05:32:51Z UTC; Tier 1 cadence per cycle-prompt.md § 2).
+
+---
+
