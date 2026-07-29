@@ -107,6 +107,15 @@ PROMOTED_TASK_PREFIX = 'unreg-approval'
 # the shared state/heal-unregistered-approval-promoted.json ledger.
 FORLARRY_LEDGER_PREFIX = 'forlarry:'
 
+# Marker stamped on for-Larry-promoted cards (payload + chain_event) so the
+# dashboard can tell a promoted stranded Mirror escalation apart from every
+# other approval_request. Load-bearing for the Approve fix (agent-core #1058):
+# on a card carrying this marker + a recheck_target, Approve dispatches a
+# fresh Mirror re-review mechanically instead of the generic Beacon LLM
+# envelope (which, on this card class, decided correctly and then could not
+# act — no merge rights, recommendation stranded in a null-chat outbox).
+PROMOTED_SOURCE_FORLARRY = 'for-larry-mirror-review'
+
 # Per-tick cap on archived Beacon outboxes parsed during marker recovery, so an
 # unpruned outbox archive can't make the scan unbounded. Only in-window files
 # are eligible, newest-first; recovery is a best-effort enrichment, so a deeper
@@ -499,6 +508,39 @@ def _gh_state(kind: str, number: int, repo: str, timeout: float) -> Optional[str
     )
     state = data.get('state') if isinstance(data, dict) else None
     return state if isinstance(state, str) else None
+
+
+_PR_URL_RE = re.compile(
+    r'^https://github\.com/([\w.-]+/[\w.-]+)/pull/(\d+)/?$')
+
+
+def parse_pr_url(pr_url: Any) -> Optional[tuple[str, int]]:
+    """('<owner>/<repo>', number) from a GitHub PR URL, else None. Same
+    grammar as `dashboard_api._parse_recheck_pr_url` — the consumer of the
+    coordinate this module stamps — so a URL that parses here always parses
+    there."""
+    if not isinstance(pr_url, str):
+        return None
+    m = _PR_URL_RE.match(pr_url.strip())
+    if not m:
+        return None
+    try:
+        return m.group(1), int(m.group(2))
+    except ValueError:
+        return None
+
+
+def gh_pr_head_sha(owner_repo: str, number: int) -> Optional[str]:
+    """Live PR head SHA via `gh pr view --json headRefOid`, or None on any
+    failure. Bounded by the shared gh kernel; a None head fails the coordinate
+    stamp closed (the card is still promoted, just without auto-execution)."""
+    data = tts.gh_json(
+        ['gh', 'pr', 'view', str(number), '--repo', owner_repo,
+         '--json', 'headRefOid'],
+        timeout=GH_VIEW_TIMEOUT_SEC,
+    )
+    sha = data.get('headRefOid') if isinstance(data, dict) else None
+    return sha if isinstance(sha, str) and sha else None
 
 
 def gh_ref_resolved(number: int) -> Optional[bool]:
@@ -1164,8 +1206,52 @@ def _healer_task_registered(task_id: str, state: dict[str, Any]) -> bool:
     return task_id in ids
 
 
+def build_promoted_recheck_target(
+    record: dict[str, Any],
+    head_resolver: Any = None,
+) -> Optional[dict[str, Any]]:
+    """Structured PR coordinate for a promoted for-Larry decision card, or None.
+
+    Mirrors `outbox_notifier._build_recheck_target`'s fail-closed contract:
+    every field the dispatch needs must be present, or no coordinate is stamped
+    at all — a partial coordinate would let the dashboard resolve the card and
+    THEN fail, after the card is unrecoverable. The head comes from the record
+    when the emitting envelope carried one, else from `head_resolver` (a
+    `(owner_repo, number) -> sha` callable — live `gh` in main(), a stub in
+    tests; None keeps this function pure). `round` is 1: the promoted path
+    cannot know the prior revision round (the record does not carry it), and
+    rev1 is the bare filename the review grammar already tolerates re-running.
+    """
+    record_id = record.get('id')
+    if not isinstance(record_id, str) or ':' not in record_id:
+        return None
+    task = record_id.split(':', 1)[1]
+    parsed = parse_pr_url(record.get('pr_url'))
+    if not task or parsed is None:
+        return None
+    owner_repo, number = parsed
+    head = record.get('head_sha')
+    if not (isinstance(head, str) and head) and head_resolver is not None:
+        try:
+            head = head_resolver(owner_repo, number)
+        except Exception as e:  # noqa: BLE001 — a probe failure is "no stamp"
+            log(f'head resolve failed for {record.get("pr_url")}: '
+                f'{type(e).__name__}: {e}', 'WARN')
+            head = None
+    if not (isinstance(head, str) and head):
+        return None
+    return {
+        'task_id': task,
+        'pr_url': record['pr_url'],
+        'target_repo': owner_repo,
+        'head_sha': head,
+        'round': 1,
+    }
+
+
 def build_for_larry_approval_payload(
     record: dict[str, Any], dedup_key: str,
+    head_resolver: Any = None,
 ) -> dict[str, Any]:
     """Build the approval_request payload for a stranded for-Larry decision
     record. target_agent is always 'beacon': on approve/reject the dashboard
@@ -1173,18 +1259,43 @@ def build_for_larry_approval_payload(
     build_approval_payload's dedup/ledger/retire keys (deterministic task_id,
     promoted_from_alert, _subject, origin, bare_approvable=False) so the shared
     promote batch handles it identically; `_forlarry_norm_id` lets the batch's
-    concurrency re-check use the colon/hyphen-aware match."""
+    concurrency re-check use the colon/hyphen-aware match.
+
+    Approve-executes fix (agent-core #1058): the payload now carries
+    `promoted_source` (always) and `recheck_target` (when the full PR
+    coordinate is resolvable — see :func:`build_promoted_recheck_target`).
+    With the coordinate, the dashboard's Approve dispatches a fresh Mirror
+    re-review mechanically and the card text says so; without it, Approve is
+    refused loudly (400, card intact) rather than silently clearing, and the
+    card text says that instead. Both keys ride through add_pending into
+    dispatch_payload and through build_approval_request_chain_event into the
+    tab feed."""
     record_id = record.get('id') or dedup_key
     task_id = derive_task_id(dedup_key)
     pr_url = record.get('pr_url')
     headline = str(record.get('headline') or '').strip()
     context = str(record.get('context') or '').strip()
     task_label = record_id.split(':', 1)[1] if ':' in record_id else record_id
+    recheck_target = build_promoted_recheck_target(
+        record, head_resolver=head_resolver)
+    if recheck_target is not None:
+        approve_means = (
+            'Approve = re-dispatch the Mirror review at the PR\'s current '
+            'head (its verdict then drives the normal pipeline: pass merges, '
+            'revision routes a Forge fix, escalate raises a properly-wired '
+            'decision card). Reject = dismiss.'
+        )
+    else:
+        approve_means = (
+            'Approve cannot be auto-executed for this card (no full PR '
+            'coordinate could be resolved) — handle the PR by hand, then '
+            'Reject to dismiss.'
+        )
     summary = (
         f'Stranded Mirror review escalation for `{task_label}` needs your '
         'direction (promoted from the for-Larry feed; no APPROVAL_REQUEST was '
-        'ever registered, so it never reached the Approvals tab). '
-        'Approve = formalize and act on it; Reject = dismiss.'
+        f'ever registered, so it never reached the Approvals tab). '
+        f'{approve_means}'
         + (f'\nPR: {pr_url}' if pr_url else '')
     )
     prompt = (
@@ -1196,10 +1307,9 @@ def build_for_larry_approval_payload(
         + (f'Headline: {headline}\n' if headline else '')
         + (f'Context: {context}\n' if context else '')
         + (f'PR: {pr_url}\n' if pr_url else '')
-        + '\nApprove = formalize this stranded Mirror escalation and act on it; '
-        'Reject = dismiss it. Both route back to Beacon.'
+        + f'\n{approve_means}'
     )
-    return {
+    payload = {
         'task_id': task_id,
         'summary': summary,
         'target_agent': 'beacon',
@@ -1208,6 +1318,7 @@ def build_for_larry_approval_payload(
         'promoted_from_alert': dedup_key,
         'origin': HEALER_SOURCE,
         'bare_approvable': False,
+        'promoted_source': PROMOTED_SOURCE_FORLARRY,
         # Transient helper keys (stripped before add_pending): the record id is
         # recorded in the promoted ledger; the normalized id lets the promote
         # batch's concurrency re-check dedup against a hyphen approval Beacon may
@@ -1215,6 +1326,9 @@ def build_for_larry_approval_payload(
         '_subject': record_id,
         '_forlarry_norm_id': forlarry_norm_id(str(record_id)),
     }
+    if recheck_target is not None:
+        payload['recheck_target'] = recheck_target
+    return payload
 
 
 def evaluate_for_larry(
@@ -1222,12 +1336,17 @@ def evaluate_for_larry(
     heuristics: dict[str, Any],
     state: dict[str, Any],
     promoted: dict[str, Any],
+    head_resolver: Any = None,
 ) -> list[dict[str, Any]]:
     """Return the approval payloads to register from the for-Larry feed this
     tick. A record is promoted iff: OPEN + DECISION-class, not already promoted
     (namespaced ledger key), and not already registered as a decision approval
-    (colon/hyphen-normalized match against pending+history). Pure — no I/O;
-    main() does the registration + persistence via the shared promote batch."""
+    (colon/hyphen-normalized match against pending+history). Pure by default —
+    no I/O; main() does the registration + persistence via the shared promote
+    batch. `head_resolver` (main passes :func:`gh_pr_head_sha`) is the one
+    permitted probe: it resolves a missing PR head so the promoted card can
+    carry a full recheck_target, and it runs only for records that already
+    passed every skip gate (at most one `gh` call per genuinely-new card)."""
     out: list[dict[str, Any]] = []
     seen: set[str] = set()
     for record in records:
@@ -1246,7 +1365,8 @@ def evaluate_for_larry(
         if is_forlarry_registered(forlarry_norm_id(record_id), state) or \
                 _healer_task_registered(derive_task_id(dedup_key), state):
             continue
-        payload = build_for_larry_approval_payload(record, dedup_key)
+        payload = build_for_larry_approval_payload(
+            record, dedup_key, head_resolver=head_resolver)
         payload['_source_ts'] = record.get('ts') or record.get('updated_at')
         out.append(payload)
         seen.add(dedup_key)
@@ -1543,7 +1663,8 @@ def main() -> int:
     for_larry_records = read_for_larry_records()
     try:
         to_promote_for_larry = evaluate_for_larry(
-            for_larry_records, heuristics, state, promoted)
+            for_larry_records, heuristics, state, promoted,
+            head_resolver=gh_pr_head_sha)
     except Exception as e:  # noqa: BLE001
         log(f'for-larry evaluate failed: {type(e).__name__}: {e}', 'ERROR')
         to_promote_for_larry = []

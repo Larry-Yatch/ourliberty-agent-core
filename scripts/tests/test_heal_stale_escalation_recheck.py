@@ -213,8 +213,26 @@ class CandidateCardsTest(_IsolatedAgentsRoot):
         self.assertEqual(got[0]['pr_number'], 111)
         self.assertEqual(got[0]['head_sha'], CARD_HEAD)
 
-    def test_ignores_cards_that_are_not_mirror_review(self):
+    def test_includes_promoted_cards_that_carry_a_coordinate(self):
+        """agent-core #1058: heal_unregistered_approval's promoted stranded
+        escalations are the SAME decision class; with a recheck_target they
+        get the same ladder (retire on merge/supersede, act on stale gate)."""
         with self._with_pending([_card(card_id='unreg-approval-abc123')]):
+            got = h.candidate_cards()
+        self.assertEqual(len(got), 1)
+        self.assertEqual(got[0]['card_id'], 'unreg-approval-abc123')
+
+    def test_ignores_promoted_cards_without_a_coordinate(self):
+        """A larry-alert promotion (or a pre-fix promoted card) carries no
+        recheck_target — out of scope, exactly like a coordinate-less
+        mirror-review card."""
+        with self._with_pending([
+            _card(card_id='unreg-approval-abc123', with_target=False),
+        ]):
+            self.assertEqual(h.candidate_cards(), [])
+
+    def test_ignores_cards_that_are_not_mirror_review(self):
+        with self._with_pending([_card(card_id='graduation-tpl-widen-001')]):
             self.assertEqual(h.candidate_cards(), [])
 
     def test_ignores_a_card_with_no_recheck_target(self):

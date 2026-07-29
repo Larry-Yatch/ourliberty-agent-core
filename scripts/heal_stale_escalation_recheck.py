@@ -113,9 +113,14 @@ STATE_FILE = AGENTS_ROOT / 'state' / 'heal-stale-escalation-recheck.json'
 
 HEALER_SOURCE = 'heal-stale-escalation-recheck'
 
-# Only session-less Mirror decision cards are in scope. This is the id shape
-# minted by `_emit_no_session_decision_approval`.
-CARD_ID_PREFIX = 'mirror-review-'
+# Only session-less Mirror decision cards are in scope: the id shape minted by
+# `_emit_no_session_decision_approval`, plus `heal_unregistered_approval`'s
+# promoted stranded-escalation cards (agent-core #1058 — same decision class,
+# same recheck_target coordinate, previously invisible to this ladder because
+# of the id prefix alone). The recheck_target requirement below is what keeps
+# non-mirror `unreg-approval-*` promotions (larry-alert direction-asks, which
+# never carry a coordinate) out of scope.
+CARD_ID_PREFIXES = ('mirror-review-', 'unreg-approval-')
 
 GH_TIMEOUT_S = 60
 
@@ -307,7 +312,8 @@ def candidate_cards() -> list[dict[str, Any]]:
         if not isinstance(entry, dict):
             continue
         card_id = entry.get('id')
-        if not isinstance(card_id, str) or not card_id.startswith(CARD_ID_PREFIX):
+        if not isinstance(card_id, str) \
+                or not card_id.startswith(CARD_ID_PREFIXES):
             continue
         target = (entry.get('dispatch_payload') or {}).get('recheck_target')
         if not isinstance(target, dict):

@@ -194,6 +194,110 @@ class BuildRecheckEnvelopeTest(unittest.TestCase):
                 self.assertEqual(filename, 'review-pr-RSDPM-59-rev1.json')
 
 
+class ApprovedEscalationModeTest(unittest.TestCase):
+    """Approve on a promoted stranded-escalation card (agent-core #1058).
+
+    The generic Beacon LLM envelope had no wired action for this card class —
+    on PR #1058 the $1 Beacon session diagnosed "merge it" and then could
+    neither merge nor reach Larry, so Approve recorded the decision, cleared
+    the card, and did nothing. With a recheck_target, Approve now dispatches a
+    fresh Mirror re-review MECHANICALLY; without one it refuses pre-claim so
+    the card stays visible instead of silently clearing.
+    """
+
+    PROMOTED_PAYLOAD = {
+        'prompt': 'healer narration about the stranded escalation',
+        'promoted_source': 'for-larry-mirror-review',
+        'recheck_target': FULL_TARGET,
+    }
+
+    def _source(self, payload):
+        return {
+            'event_type': 'approval_request',
+            'event_id': 'ev-promoted-1',
+            'task_id': 'unreg-approval-de9cda4efdbd',
+            'payload': payload,
+        }
+
+    def _approve(self, payload, head=LIVE_HEAD, comment=None):
+        with mock.patch.object(
+            da, '_gh_pr_head_sha_for_recheck', return_value=head,
+        ):
+            return da._build_envelope_for_action(
+                source=self._source(payload), action='approve',
+                comment=comment, actor='larry')
+
+    def test_approve_dispatches_a_mirror_review_not_a_beacon_envelope(self):
+        agent, filename, env = self._approve(self.PROMOTED_PAYLOAD)
+        self.assertEqual(agent, 'mirror')
+        self.assertEqual(filename, 'review-pr-RSDPM-59-rev1.json')
+        self.assertEqual(env['dispatched_by'], 'dashboard-approve-escalation')
+        self.assertEqual(env['head_sha'], LIVE_HEAD)
+        self.assertEqual(env['task_id'], 'pr-RSDPM-59')
+
+    def test_approve_framing_is_on_the_merits_not_revision_applied(self):
+        # Nothing was fixed — the prompt must not claim a revision landed, and
+        # the card's meta-prose must not be presented as Mirror's findings.
+        _, _, env = self._approve(self.PROMOTED_PAYLOAD)
+        self.assertIn('Larry APPROVED', env['prompt'])
+        self.assertNotIn('has been applied', env['prompt'])
+        self.assertNotIn('previous_findings', env)
+        self.assertIn('REVIEW_PASS', env['prompt'])
+        self.assertIn('REVIEW_ESCALATE', env['prompt'])
+
+    def test_card_prose_rides_as_context_not_findings(self):
+        _, _, env = self._approve(self.PROMOTED_PAYLOAD)
+        self.assertIn('healer narration about the stranded escalation',
+                      env['prompt'])
+        self.assertNotIn('Your findings from the previous round',
+                         env['prompt'])
+
+    def test_approve_without_coordinate_is_a_400_pre_claim(self):
+        # The 400 fires in the builder, which the handler calls BEFORE the
+        # read_at claim — so the card survives the refusal intact.
+        payload = {'prompt': 'p', 'promoted_source': 'for-larry-mirror-review'}
+        with self.assertRaises(HTTPException) as ctx:
+            self._approve(payload)
+        self.assertEqual(ctx.exception.status_code, 400)
+        self.assertIn('nothing it can execute', ctx.exception.detail)
+
+    def test_ordinary_approvals_keep_the_beacon_route(self):
+        # No promoted_source ⇒ the legacy path, byte-for-byte: even a payload
+        # that happens to carry a recheck_target (every mirror-review-* card
+        # does) must NOT be hijacked — its Approve promise is a Forge
+        # revision via Beacon, not a re-review.
+        agent, filename, env = self._approve({
+            'prompt': 'findings', 'recheck_target': FULL_TARGET,
+        })
+        self.assertEqual(agent, 'beacon')
+        self.assertEqual(filename, 'larry-approval-ev-promoted-1.json')
+        self.assertIn('Larry approved the pending proposal', env['prompt'])
+
+    def test_reject_on_a_promoted_card_is_unchanged(self):
+        with mock.patch.object(
+            da, '_gh_pr_head_sha_for_recheck', return_value=LIVE_HEAD,
+        ):
+            agent, filename, _ = da._build_envelope_for_action(
+                source=self._source(self.PROMOTED_PAYLOAD), action='reject',
+                comment=None, actor='larry')
+        self.assertEqual(agent, 'beacon')
+        self.assertEqual(filename, 'larry-reject-ev-promoted-1.json')
+
+    def test_recheck_mode_output_is_unchanged_by_the_mode_param(self):
+        # The default mode must reproduce the pre-#1058 recheck prompt exactly
+        # (the "Revision N has been applied" framing and findings carry).
+        with mock.patch.object(
+            da, '_gh_pr_head_sha_for_recheck', return_value=LIVE_HEAD,
+        ):
+            _, _, env = da._build_recheck_envelope(
+                payload={'prompt': 'old findings',
+                         'recheck_target': FULL_TARGET},
+                comment=None, task_id='pr-RSDPM-59')
+        self.assertIn('Revision 1 has been applied', env['prompt'])
+        self.assertEqual(env['previous_findings'], ['old findings'])
+        self.assertEqual(env['dispatched_by'], 'dashboard-recheck')
+
+
 class RecheckWiringTest(unittest.TestCase):
     def test_recheck_is_a_valid_action(self):
         self.assertIn('recheck', da.LARRY_ACTION_VALID_ACTIONS)

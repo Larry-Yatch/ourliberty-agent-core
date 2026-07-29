@@ -1415,6 +1415,97 @@ class BuildForLarryPayloadTest(unittest.TestCase):
         self.assertEqual(payload['_subject'], FORLARRY_DECISION_RECORD['id'])
         self.assertEqual(payload['_forlarry_norm_id'], FORLARRY_HYPHEN_APPROVAL_ID)
 
+    def test_payload_is_marked_as_a_promoted_stranded_escalation(self):
+        # agent-core #1058: the dashboard keys the Approve-executes routing on
+        # this marker, so it must be stamped on EVERY for-Larry promotion.
+        key = h.forlarry_dedup_key(FORLARRY_DECISION_RECORD['id'])
+        payload = h.build_for_larry_approval_payload(FORLARRY_DECISION_RECORD, key)
+        self.assertEqual(payload['promoted_source'], h.PROMOTED_SOURCE_FORLARRY)
+
+    def test_payload_stamps_recheck_target_from_the_record(self):
+        key = h.forlarry_dedup_key(FORLARRY_DECISION_RECORD['id'])
+        payload = h.build_for_larry_approval_payload(FORLARRY_DECISION_RECORD, key)
+        self.assertEqual(payload['recheck_target'], {
+            'task_id': FORLARRY_TASK,
+            'pr_url': FORLARRY_DECISION_RECORD['pr_url'],
+            'target_repo': 'Larry-Yatch/ourliberty-agent-core',
+            'head_sha': 'abc12345',
+            'round': 1,
+        })
+        # ... and the card text promises the action Approve will now take.
+        self.assertIn('re-dispatch the Mirror review', payload['summary'])
+        self.assertIn('re-dispatch the Mirror review', payload['prompt'])
+
+    def test_payload_without_a_coordinate_says_approve_cannot_execute(self):
+        # Fail-closed twin: no pr_url ⇒ no recheck_target, and the card must
+        # SAY Approve has nothing to execute instead of promising an action.
+        rec = dict(FORLARRY_DECISION_RECORD)
+        rec.pop('pr_url')
+        key = h.forlarry_dedup_key(rec['id'])
+        payload = h.build_for_larry_approval_payload(rec, key)
+        self.assertNotIn('recheck_target', payload)
+        self.assertIn('cannot be auto-executed', payload['summary'])
+        self.assertEqual(payload['promoted_source'], h.PROMOTED_SOURCE_FORLARRY)
+
+
+class BuildPromotedRecheckTargetTest(unittest.TestCase):
+    def test_full_record_yields_a_complete_coordinate(self):
+        target = h.build_promoted_recheck_target(FORLARRY_DECISION_RECORD)
+        self.assertEqual(target['task_id'], FORLARRY_TASK)
+        self.assertEqual(target['target_repo'],
+                         'Larry-Yatch/ourliberty-agent-core')
+        self.assertEqual(target['head_sha'], 'abc12345')
+        self.assertEqual(target['round'], 1)
+
+    def test_missing_head_uses_the_resolver(self):
+        rec = dict(FORLARRY_DECISION_RECORD)
+        rec.pop('head_sha')
+        calls = []
+
+        def resolver(owner_repo, number):
+            calls.append((owner_repo, number))
+            return 'f' * 40
+
+        target = h.build_promoted_recheck_target(rec, head_resolver=resolver)
+        self.assertEqual(calls, [('Larry-Yatch/ourliberty-agent-core', 854)])
+        self.assertEqual(target['head_sha'], 'f' * 40)
+
+    def test_record_head_wins_over_the_resolver(self):
+        # The record's head is the head the review actually covered — never
+        # burn a gh call (or risk a moved-head mismatch) when it is present.
+        target = h.build_promoted_recheck_target(
+            FORLARRY_DECISION_RECORD,
+            head_resolver=lambda *_: self.fail('resolver must not be called'))
+        self.assertEqual(target['head_sha'], 'abc12345')
+
+    def test_unresolvable_head_fails_the_stamp_closed(self):
+        rec = dict(FORLARRY_DECISION_RECORD)
+        rec.pop('head_sha')
+        self.assertIsNone(h.build_promoted_recheck_target(rec))
+        self.assertIsNone(h.build_promoted_recheck_target(
+            rec, head_resolver=lambda *_: None))
+
+    def test_resolver_exception_fails_the_stamp_closed(self):
+        rec = dict(FORLARRY_DECISION_RECORD)
+        rec.pop('head_sha')
+
+        def boom(*_):
+            raise RuntimeError('gh unavailable')
+
+        self.assertIsNone(
+            h.build_promoted_recheck_target(rec, head_resolver=boom))
+
+    def test_missing_or_malformed_pr_url_fails_the_stamp_closed(self):
+        for bad in (None, '', 'https://example.com/nope',
+                    'https://github.com/o/r/issues/854'):
+            with self.subTest(pr_url=bad):
+                rec = dict(FORLARRY_DECISION_RECORD, pr_url=bad)
+                self.assertIsNone(h.build_promoted_recheck_target(rec))
+
+    def test_id_without_task_portion_fails_the_stamp_closed(self):
+        rec = dict(FORLARRY_DECISION_RECORD, id='no-colon-id')
+        self.assertIsNone(h.build_promoted_recheck_target(rec))
+
 
 class EvaluateForLarryTest(unittest.TestCase):
     def _empty_state(self):
