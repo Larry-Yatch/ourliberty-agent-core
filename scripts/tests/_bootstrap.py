@@ -210,6 +210,88 @@ def _arm_runtime_tripwire():
     atexit.register(_scan_at_exit)
 
 
+_SANDBOX_KEYS = (
+    'OURLIBERTY_AGENTS_ROOT',
+    'OURLIBERTY_WORKTREES_ROOT',
+    'OURLIBERTY_LOG_DIR',
+)
+
+
+def _arm_sandbox_key_reassert() -> None:
+    """Make the sandbox redirect survive a tearDown that DELETES it.
+
+    THE LEAK THIS CLOSES (2026-07-29): the redirects above are set ONCE per
+    process. A test class that overrides `OURLIBERTY_AGENTS_ROOT` in setUp and
+    then ``os.environ.pop``s it in tearDown — instead of restoring the value it
+    was handed — does not return to the sandbox, it returns to NOTHING. Every
+    production module resolving the root at CALL time then falls through to its
+    hardcoded ``/home/larry/agents`` default, i.e. the LIVE droplet tree, for
+    the whole remainder of the run. `test_heal_pipeline_stall` did exactly this,
+    and `test_system_state_log_escalation_count` — three modules later — read
+    production's real open for-Larry rows and failed with counts nobody seeded.
+    It reproduced only on the droplet (a Mac has no ``/home/larry/agents``) and
+    only while production held open records, so it read as a phantom regression.
+
+    Both call sites are fixed to restore, but the class stays open as long as the
+    next teardown can delete. So re-assert around EVERY test.
+
+    BEFORE **and** after, deliberately. Wrapping only the tail of
+    ``TestCase.run`` would cover per-test tearDowns and nothing else:
+    ``setUpModule`` / ``tearDownModule`` / ``setUpClass`` / ``tearDownClass``
+    are driven by ``TestSuite.run``, OUTSIDE any ``TestCase.run``, and unittest
+    tears the previous module down midway through the suite — right before the
+    next module's tests. Six modules already delete OURLIBERTY_AGENTS_ROOT in
+    ``tearDownModule`` (all correctly guarded today, so no live leak, but the
+    shape is one edit away). Re-asserting on ENTRY means whatever any fixture at
+    any level did between tests, the next test body starts with the sandbox
+    intact. The trailing re-assert still covers the last test in the process.
+
+    Honest limit: a fixture that deletes a key AFTER the final test of the run
+    is not healed — nothing runs after it to be affected, so this is uncovered
+    by design rather than by oversight.
+
+    Deliberately heals only the DELETED case. A key holding some other value is
+    left alone — test_deploy_notifier and test_pulse_check_xi pin their own root
+    at import scope and must keep it across their test methods, and the tests
+    that exercise the unset-fallback (`test_unset_override_falls_back_to_home`)
+    delete and reload WITHIN one test method, which still works. Fail-open: if
+    the hook can't be installed the run proceeds exactly as before."""
+    try:
+        import unittest
+    except Exception:  # pragma: no cover - unittest is stdlib
+        return
+    if getattr(unittest.TestCase.run, '_ourliberty_sandbox_reassert', False):
+        return  # idempotent across the dual module identity (see IDEMPOTENCY)
+    snapshot = {k: os.environ.get(k) for k in _SANDBOX_KEYS}
+    if not any(v for v in snapshot.values()):
+        return
+    original = unittest.TestCase.run
+
+    def _reassert(_snapshot=snapshot):
+        for key, value in _snapshot.items():
+            # `not in` — restore only what was DELETED, never overwrite a value
+            # a test/module deliberately set.
+            if value is not None and key not in os.environ:
+                os.environ[key] = value
+
+    def run(self, result=None, _original=original, _reassert=_reassert):
+        _reassert()   # heal whatever module/class fixtures did between tests
+        try:
+            return _original(self, result)
+        finally:
+            _reassert()   # heal this test's own setUp/tearDown
+
+    run._ourliberty_sandbox_reassert = True
+    run._ourliberty_sandbox_reassert_fn = _reassert
+    # Published ON THE HOOK, not as a module global: `_bootstrap` has two module
+    # identities (top-level under discover, `scripts.tests._bootstrap` under the
+    # dotted/pytest path) and only ONE of them runs engage(), so a module-level
+    # attribute would be missing on whichever identity a reader happens to
+    # import. The installed function is shared by construction.
+    run._ourliberty_sandbox_snapshot = dict(snapshot)
+    unittest.TestCase.run = run
+
+
 def engage() -> None:
     """Establish the test sandbox AT IMPORT. Idempotent across calls and across
     the dual module identity (guarded by a process-global env flag)."""
@@ -333,6 +415,11 @@ def engage() -> None:
     # (PostMergeBaselineWarmTest, test_regression_baseline_cache) pop it in
     # setUp — and mock Popen — to exercise the real spawn construction.
     os.environ.setdefault('REGBASELINE_WARMING', '1')
+
+    # Keep the redirects above from being DELETED by a later tearDown (see the
+    # function docstring). Armed after every redirect is in place so the
+    # snapshot it re-asserts is the final sandbox state.
+    _arm_sandbox_key_reassert()
 
     # Runtime production-write tripwire (#428). pytest owns the scan via
     # conftest's session-scoped fixture; arming here too would double-instrument

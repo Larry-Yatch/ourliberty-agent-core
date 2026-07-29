@@ -137,6 +137,17 @@ class _RunCycleTestBase(unittest.TestCase):
     def _run_cycle(self):
         env = os.environ.copy()
         env['HOME'] = str(self.home)
+        # This harness sandboxes by SWAPPING HOME, and `_read_alerts` reads back
+        # from `self.home/agents/blackboard/`. But `os.environ.copy()` inherits
+        # OURLIBERTY_AGENTS_ROOT, and larry_alerts resolves THAT ahead of $HOME —
+        # so the alert landed in the outer sandbox root and `_read_alerts` found
+        # nothing. These three tests passed only because a preceding module had
+        # DELETED the var (the 2026-07-29 sandbox-root leak), which let the
+        # writer fall back to the swapped $HOME and agree with the reader. With
+        # the leak closed they went red, so pin the root to the sandboxed HOME
+        # and make the HOME swap authoritative either way. See
+        # test_sandbox_env_restored_after_teardown.py and [[home-swap-tier-hazards]].
+        env['OURLIBERTY_AGENTS_ROOT'] = str(self.home / 'agents')
         env['PATH'] = f'{self.stub_bin}:{env["PATH"]}'
         # HOME-sandboxed tree → let the larry_alerts subprocess emit for real
         # (subprocess equivalent of test_isolation_guard.allow()); the inherited

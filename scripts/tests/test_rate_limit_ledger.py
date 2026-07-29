@@ -245,11 +245,20 @@ class AppendRateLimitEventTest(unittest.TestCase):
 
     def test_env_override_redirects_default_path(self, ):
         import os
+        # RESTORE the root we were handed, don't delete it. `_bootstrap` sets
+        # OURLIBERTY_AGENTS_ROOT once per process to the test sandbox; the
+        # previous `del` left it ABSENT, so every later test that resolves the
+        # root at call time fell through to the hardcoded `/home/larry/agents`
+        # — live production. See test_sandbox_env_restored_after_teardown.py.
+        _prior_root = os.environ.get('OURLIBERTY_AGENTS_ROOT')
         os.environ['OURLIBERTY_AGENTS_ROOT'] = self._tmp.name
         try:
             resolved = agent_runner._rate_limit_ledger_path()
         finally:
-            del os.environ['OURLIBERTY_AGENTS_ROOT']
+            if _prior_root is None:
+                os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
+            else:
+                os.environ['OURLIBERTY_AGENTS_ROOT'] = _prior_root
         self.assertEqual(
             resolved,
             Path(self._tmp.name) / 'blackboard' / 'anthropic-quota-events.jsonl',

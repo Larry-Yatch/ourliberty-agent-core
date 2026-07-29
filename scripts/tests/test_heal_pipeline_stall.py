@@ -100,6 +100,9 @@ class _TempAgentsRootMixin:
         self.agents_root.mkdir()
         (self.agents_root / 'logs').mkdir()
         (self.agents_root / 'blackboard').mkdir()
+        # Snapshot the root we were handed — that is the _bootstrap sandbox root,
+        # NOT "nothing". tearDown must put it BACK (see the note there).
+        self._agents_root_orig = os.environ.get('OURLIBERTY_AGENTS_ROOT')
         os.environ['OURLIBERTY_AGENTS_ROOT'] = str(self.agents_root)
         # Snapshot + clear Supabase env so tests don't make network calls.
         self._supabase_env_snapshot = {
@@ -113,7 +116,20 @@ class _TempAgentsRootMixin:
 
     def tearDown(self) -> None:
         self._tmpdir.cleanup()
-        os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
+        # RESTORE, never pop. `_bootstrap` sets OURLIBERTY_AGENTS_ROOT once per
+        # process to a sandbox mkdtemp; popping it here dropped that redirect for
+        # the WHOLE REST OF THE RUN, so every later module that resolves the root
+        # at CALL time fell through to the hardcoded `/home/larry/agents` default
+        # — the LIVE droplet tree. That is how `test_system_state_log_escalation
+        # _count` failed only when it ran after this module: its Source-1b reader
+        # (`for_larry_signal.active_entries`) was reading production's real open
+        # for-Larry rows. Intermittent by nature — it depends on whether live
+        # production happens to hold open records at that moment — so it surfaced
+        # as a phantom regression. See test_sandbox_env_restored_after_teardown.py.
+        if self._agents_root_orig is None:
+            os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
+        else:
+            os.environ['OURLIBERTY_AGENTS_ROOT'] = self._agents_root_orig
         # Restore Supabase env (only re-set if previously present).
         for k, v in self._supabase_env_snapshot.items():
             if v is not None:
