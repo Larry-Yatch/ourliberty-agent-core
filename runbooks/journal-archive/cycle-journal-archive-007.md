@@ -7795,3 +7795,98 @@ No merges since PR#1052 at 17:23:09Z UTC. SIGNAL ⚠️
 
 ---
 
+## Iteration ~6760 — 2026-07-29T18:06Z UTC (Larry /loop /cycle chat, Tier 1, consecutive_clean=0; SIGNAL — Check 4: pending=8 UNCHANGED; Check E: 3 open PRs unchanged; [red] RSDPM apply-on-merge FAILED carry; NEW: m14-pr-b BUILD COMPLETE → PR#157 OPENED → Mirror review dispatched; 0 new alerts; all other checks NOMINAL)
+
+**Health:** ⚠️ Signal — Check 4: pending=8 UNCHANGED (same 8 items, all Larry-gated). Check E: 3 open PRs unchanged count. [red] RSDPM apply-on-merge FAILED carry. **NEW context:** m14-pr-b Forge build COMPLETE — RSDPM PR#157 opened at 18:02:22Z UTC (feat(M14): workspace_id NOT NULL + FK on ten record tables + backfill (inert)); Mirror review dispatched 18:02:28Z UTC. All other checks NOMINAL.
+
+**VERIFY-BEFORE-REASSERT (from iter ~6759 at ~18:01Z UTC):**
+- **"system-health=healthy"**: CONFIRMED ✅ — ts=2026-07-29T18:03:09Z UTC (~3 min at check time). [carry ✅]
+- **"heal-stale-daemon-code.heartbeat"**: CONFIRMED ✅ — 2026-07-29T18:01:53Z UTC (~4 min at check time). [carry ✅]
+- **"alerts watermark=515"**: CONFIRMED ✅ — {repaired=false, old=515, file_length=515}; 0 new alerts. [carry ✅]
+- **"pending=8 UNCHANGED"**: CONFIRMED ✅ — same 8 IDs, unchanged from iter ~6759. [carry ⚠️]
+- **"[red] RSDPM apply-on-merge FAILED (0033_workspace_boundary_membership.sql)"**: CARRY — no resolution; item 8 (unreg-approval-cfd444ed29ee) still in pending. [carry ⚠️]
+- **"PR#1054 Mirror ESCALATE — Forge revision awaiting Larry approval"**: CONFIRMED ✅ — updatedAt=05:17:48Z UTC, UNKNOWN mergeable, label=auto-review unchanged. [carry ⚠️]
+- **"HEAD=248931e1=origin/main"**: CHANGED → HEAD=fcf3efd8 (wrapper committed iter ~6759 "Pulse cycle 20260729T180518Z"). HEAD=fcf3efd8=origin/main. [carry ✅]
+- **"m14-pr-b BUILD IN PROGRESS"**: RESOLVED → BUILD COMPLETE. PR#157 (RSDPM) opened 18:02:22Z UTC. Mirror review dispatched 18:02:28Z UTC. [NEW ✅]
+- Remaining carries (rsdpm-rehearseprs 1/3, pulse-source-alert 1/3, forge-marker-taskid-suffix-increment 2/3, medic-draft-status-false-positive 2/3, check-i-force-bypass-dm-route 2/3, beacon-pending-approvals-path-bug 2/3, VPs: pulse-cycle-check0-helper-override, auto-merge-conflict-route-hold, and others): CARRY as iter ~6759.
+
+**Check 0 — Alert triage (~18:06Z UTC):** `repair-watermark`: {repaired=false, old_watermark=515, file_length=515} → 0 new alerts. Watermark=515 confirmed. NOMINAL ✅
+
+**Check 1 — Log noise (~18:06Z UTC):** outbox-notifier.log: last entry [2026-07-29 12:02:28 MDT]=18:02:28Z UTC (~4 min at check time; m14-pr-b Mirror review dispatch). Activity since iter ~6759: m14-pr-b build-phase COMPLETE at 11:52 MDT; outbox-notifier restarted 11:23 MDT (signal 15 clean exit); RSDPM PR#157 opened + Mirror review dispatched at 12:02 MDT. Known WARNs: reply_chat_id=None for notify-pr-1054 + notify-m14-pr-a ([2026-07-28 23:17-23:23 MDT], >18h old; below 5/h threshold). No new WARN/ERROR patterns above threshold. NOMINAL ✅
+
+**Check 2 — Telegram sweep (~18:06Z UTC):** beacon_telegram_bot.log: last entry idx=514 [2026-07-29T11:54:02-0600]=17:54:02Z UTC (~12 min at check time). No new deliveries, no new Larry directives since iter ~6759. NOMINAL ✅
+
+**Check 3 — Pipeline stall (~18:06Z UTC):** heal_pipeline_stall.py --dry-run:
+- FORGE_NO_PR_SKIP ×4 (MERGED: RSDPM #136/146/147/142); fix-escalated-pr-headchange-backoff-001 (pr_exists=#1042); m14-pr-a (pr_exists=branch pr=#156 RSDPM)
+- suppressed (cooldown): unrouted_open_pr:1053; unrouted_open_pr:1049
+**DRY-RUN: 0 alert(s) would fire, 0 recovery(ies). NOMINAL ✅**
+
+**Check 4 — Pending directives (~18:06Z UTC):** beacon-pending-approvals.json (state/): **pending=8** (UNCHANGED from iter ~6759). Same 8 items:
+1. `rsdpm-confirmall-medium-parent-secondglance-001`
+2. `unreg-approval-9061de515dce` — PR#1049 unrouted
+3. `cycle-prompt-tier4-no-upgrade-clause-001`
+4. `unreg-approval-3283b7a9b651` — PR#1053 no Mirror dispatch
+5. `mirror-review-pr-ourliberty-agent-core-1054-c78976c2` — PR#1054 Forge revision
+6. `unreg-approval-bc806f4cbeef` — RSDPM:156/m14-pr-a Mirror REVIEW=FAILURE
+7. `pulse-write-journal-cleanup-001` — G-rule approval (awaiting Larry `approve`)
+8. `unreg-approval-cfd444ed29ee` — RSDPM apply-on-merge FAILED formally promoted
+SIGNAL ⚠️ (unchanged)
+
+**Check 5 — Stale daemon code (~18:06Z UTC):** heal-stale-daemon-code.heartbeat=2026-07-29T18:01:53Z UTC (~4 min at check time; <60 min). system-health overall=healthy ts=2026-07-29T18:03:09Z UTC (~3 min); all 4 bots alive (beacon, forge, mirror, pulse). disk=15%, memory=25%. NOMINAL ✅
+
+**Check A — Source repo (~18:06Z UTC):** On main. Clean tracked tree (untracked: agents/pulse/write_journal_6704.py — known leftover, G-rule pulse-write-journal-cleanup-001 item 7 in-flight). HEAD=fcf3efd8=origin/main. git fetch: no main branch changes. NOMINAL ✅
+**Check B — Sync health (~18:06Z UTC):** last_sync=2026-07-29T17:23:46Z (~43 min; <2h); status=success; consecutive_push_failures=0. NOMINAL ✅
+**Check C — Agent liveness (~18:06Z UTC):** system-health overall=healthy ts=2026-07-29T18:03:09Z UTC. All 4 bots alive (beacon, forge, mirror, pulse). disk=15%, memory=25%. NOMINAL ✅
+**Check E — PR/merge state (~18:06Z UTC):** ourliberty-agent-core: **3 open PRs** (unchanged in count):
+- **#1054** test(run-review-step): stop timeout tests flaking (updatedAt=05:17:48Z UTC, UNKNOWN mergeable, label=auto-review) — Mirror ESCALATE sha=c78976c2; Forge revision AWAITING LARRY APPROVAL (item 5). ⚠️
+- **#1053** fix(preflight): fresh spec merged inside sync window (updatedAt=18:06:14Z UTC — CI update only) — MERGEABLE, no labels; unreg-3283; cooldown active. ⚠️
+- **#1049** fix(guardian): demotion fix (updatedAt=04:22:45Z UTC, UNKNOWN mergeable) — cooldown; awaiting `claude-review` label.
+No merges on ourliberty-agent-core since PR#1052 at 17:23:09Z UTC. SIGNAL ⚠️
+
+**Check H — Forge digest (~18:06Z UTC):** 0 open forge/ branch PRs on ourliberty-agent-core. RSDPM: **PR#157 OPEN** (feat(M14): workspace_id NOT NULL + FK on ten record tables + backfill (inert); MERGEABLE, 18:02:22Z UTC). Mirror review dispatched 18:02:28Z UTC (12:02 MDT). NOMINAL ✅ (active progress)
+
+**§5.0 one-shots (~18:06Z UTC):** audit_due_nudge → no-op ✅. distill_detector → no-op ✅. audit_cadence_signal → no-op ✅. NOMINAL ✅
+
+**Credential rotation (~18:06Z UTC):** SUPABASE_SERVICE_ROLE_KEY: last DM 2026-07-20T20:00:15Z UTC; 14d window expires ~2026-08-03; due=2026-08-22. No DM. SUPABASE_DB_PASSWORD: carry. NOMINAL ✅
+
+**Check I artifact triage (~18:06Z UTC):** check-i-2026-07-29.json (Jul 29 08:14 MDT) — today is Wed 2026-07-29 (scheduled firing day); artifact fresh. Proposal #1 (45σ cycle review) available via `/dispatch 1`. NOMINAL ✅
+**Check III artifact triage (~18:06Z UTC):** Most recent: check-iii-2026-07-26.json. Next: Sun 2026-08-03. NOMINAL ✅
+
+**PRIME DIRECTIVE accounting:** intervention appended (tier=1, template=m14-pr-b-complete-pr157-opened-mirror-review-dispatched-pending8-unchanged, detail=iter6760-0new-alerts-watermark515-pending8-UNCHANGED-3open-prs-larry-gated-m14-pr-b-COMPLETE-pr157-opened-rsdpm-mirror-review-dispatched-rsdpm-applymigrations-CRITICAL-carry-ts-2026-07-29T18:06Z, ts=2026-07-29T18:07:26Z UTC). ratio=38.76% (interventions=1900, systemic_fixes=49, trend=worsening). **TIER: record --checks-clean false → Tier 1 stays; consecutive_clean=0; last_signal_at=2026-07-29T18:07:31Z UTC.**
+
+**Patterns:**
+- **m14-pr-b BUILD COMPLETE → PR#157 OPENED** (18:02:22Z UTC): Forge built the RSDPM next-sequence step after m14-pr-a Mirror ESCALATE (item 6). PR#157: feat(M14): workspace_id NOT NULL + FK on ten record tables + backfill (inert). Mirror review dispatched (18:02:28Z UTC). Watch next cycle for Mirror verdict.
+- **[red] RSDPM apply-on-merge FAILED (0033_workspace_boundary_membership.sql) [carry]**: Still open. No resolution. Item 8 (unreg-approval-cfd444ed29ee). Larry must decide: `--allow-destructive` if intentional, or fold/renumber migration.
+- **G-rule ourliberty-health-untracked-alert-translation-gap: AWAITING LARRY REPLY** — approval DM idx=507 delivered 14:59:14Z UTC (iter ~6731). Reply `approve` ships cleanup PR and silences recurring firings.
+- **pending=8 steady (UNCHANGED)**: All 8 items Larry-gated. Chief actionables: item 4 (`auto-review` label → PR#1053), item 5 (PR#1054 revision approval), item 6 (RSDPM:156/m14-pr-a Approve/Reject), item 7 (`approve` cleanup), item 8 (RSDPM apply-on-merge triage).
+- **Check I weekly cost spike (+206%) [carry]**: Proposal #1 (45σ cycle review) available via `/dispatch 1`.
+- **Other G-rules carry (unchanged):** forge-marker-taskid-suffix-increment: 2/3; medic-draft-status-false-positive: 2/3; check-i-force-bypass-dm-route: 2/3; beacon-pending-approvals-path-bug: 2/3. VPs: pulse-cycle-check0-helper-override, auto-merge-conflict-route-hold. All carry.
+
+**Actions taken:**
+1. Check 0: `repair-watermark` → {repaired=false, old=515, file_length=515}. 0 new alerts. Watermark=515 confirmed.
+2. §5.0 one-shots: audit_due_nudge → no-op; distill_detector → no-op; audit_cadence_signal → no-op.
+3. PRIME ledger: intervention appended at 2026-07-29T18:07:26Z UTC (tier=1, template=m14-pr-b-complete-pr157-opened-mirror-review-dispatched-pending8-unchanged).
+4. Tier state: `cycle_tier_state.py record --checks-clean false` → Tier 1 stays; consecutive_clean=0; last_signal_at=2026-07-29T18:07:31Z UTC.
+
+**Escalations:**
+- **[red] RSDPM apply-on-merge FAILED — 0033_workspace_boundary_membership.sql REFUSED (destroys existing data) [carry]**: DM delivered (idx=512, 17:20:32Z UTC). Formally promoted as unreg-approval-cfd444ed29ee (item 8). Larry must decide: `--allow-destructive` if intentional, or fold/renumber migration.
+- [carry ⚠️ — still unverified] RSDPM 0031 staging drift: apply 0031_schema_migration_log.sql in Supabase rsdpm-staging SQL editor.
+- **[carry ⚠️] credential-drift:MISSING_CREDENTIAL:SUPABASE_DB_PASSWORD**: Telegram idx=583 delivered (iter ~6677). Install credential per docs/runbooks/rotate-supabase-db-password.md OR retire entry from config/token-rotation-schedule.json.
+- [carry — no new DM] check-vi-posture-proposals-2026-07-07 (2 proposals). Awaiting Larry.
+- [carry — monitoring] Mirror queue-wait p95=92.3m.
+- [carry — no new DM] Check XIV Tier-4 × 2: oversilence + fleet digest. Awaiting Larry.
+- [carry — idx=580 delivered; no Larry reply] tier4-rsdpm-install-drift: alert-emit.py content drift under /usr/local/lib/rsdpm. Awaiting Larry triage.
+- **[carry ⚠️] unreg-approval-3283b7a9b651 (PR#1053 no Mirror dispatch)**: add `auto-review` label or dispatch Mirror review via Beacon chat (item 4).
+- **[carry ⚠️] PR#1054 Mirror ESCALATE (sha=c78976c2)**: approval_request (item 5) — Forge revision awaiting Larry approval.
+- **[carry ⚠️] unreg-approval-bc806f4cbeef (item 6) — RSDPM:156/m14-pr-a Mirror REVIEW=FAILURE**: Approve or Reject item 6 in dashboard.
+- **[carry ✅ awaiting reply] pulse-write-journal-cleanup-001 (item 7)**: Approval DM idx=507 delivered 14:59:14Z UTC. Reply `approve` to ship gitignore + run_cycle.sh cleanup PR.
+- [carry — cooldown active] PR#1049 awaits `claude-review` label.
+- [carry — approval needed] `cycle-prompt-tier4-no-upgrade-clause-001`.
+- [carry — monitoring] `unreg-approval-9061de515dce` (PR#1049 unrouted).
+- [carry — monitoring] `rsdpm-confirmall-medium-parent-secondglance-001`.
+- **[blue] Check I: weekly cost $1,201 (+206%)**. Proposal #1 (45σ cycle review) available via `/dispatch 1`.
+
+**Tier end-of-iter:** **Tier 1** (signals: Check 4 pending=8 steady + Check E 3 open PRs Larry-gated + [red] RSDPM apply-on-merge FAILED carry; consecutive_clean=0; last_signal_at=2026-07-29T18:07:31Z UTC; Tier 1 cadence per cycle-prompt.md § 2).
+
+---
+
