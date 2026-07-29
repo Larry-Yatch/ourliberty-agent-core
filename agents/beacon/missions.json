@@ -14689,6 +14689,40 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-pr-ourliberty-agent-core-1050",
+      "name": "PR Ourliberty Agent Core 1050",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pr-ourliberty-agent-core-1050`. Last activity 2026-07-29T03:50:25.112094+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pr-ourliberty-agent-core-1050"
+      ],
+      "repo": null,
+      "created": "2026-07-29",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-29T03:52:07.455344+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-29T03:50:25.112094+00:00"
+    },
+    {
+      "id": "proposed-cycle-prompt-tier4-no-upgrade-clause-001",
+      "name": "Cycle Prompt Tier4 No Upgrade Clause 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `cycle-prompt-tier4-no-upgrade-clause-001`. Last activity 2026-07-29T03:40:14.514987+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "cycle-prompt-tier4-no-upgrade-clause-001"
+      ],
+      "repo": null,
+      "created": "2026-07-29",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-29T03:52:07.455344+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-29T03:40:14.514987+00:00"
     }
   ]
 }
