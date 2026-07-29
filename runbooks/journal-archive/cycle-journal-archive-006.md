@@ -68223,3 +68223,106 @@ Trailing 30d: ratio=35.56% (systemic_fixes=50, vp=24, interventions=1778+1=1779;
 
 ---
 
+## Iteration ~6729 — 2026-07-29T07:45Z UTC (Larry /cycle chat, TIER 1; 8 pending approvals; RSDPM #156 destructive migration; PRs #1049/#1052/#1053/#1054 open; Check I TODAY ~14:13Z UTC)
+
+**Health:** ⚠️ SIGNAL — pending=8 (Check 4). Tier 1 maintained (consecutive_clean=0).
+
+**VERIFY-BEFORE-REASSERT (last detailed iter ~6669 at 02:40Z UTC):**
+- "system-health=healthy": CONFIRMED ✅ — ts=07:36:16Z UTC (~9 min). [carry ✅]
+- "heal-stale-daemon-code.heartbeat fresh": CONFIRMED ✅ — heartbeat=07:36:59Z UTC (~8 min). [carry ✅]
+- "alert watermark=582": CONFIRMED — repair-watermark no-op (old=582, file_length=582). No new unclaimed alerts. [carry ✅]
+- "RSDPM PR #156 destructive migration": CONFIRMED — PR #156 still OPEN/MERGEABLE. Migration removes `profiles.is_org_owner`. Larry notified idx=573 (05:39Z UTC). [carry ⚠️]
+- "deep-review-hold-pr1052-d3c25ced": CONFIRMED pending — PR #1052 still OPEN/MERGEABLE. [carry ⚠️]
+- "PR #1054 review_escalate DM undelivered": CONFIRMED — pending item 6; reply_chat_id=None at notifier. Larry must check Approvals tab. [carry ⚠️]
+- "deep-review-hold-pr152-e64b6e43 CLEARED": CONFIRMED RESOLVED ✅ — notifier [2026-07-28 21:57:14 MDT] cleared (RSDPM PR #152 no longer OPEN). Self-expired. [resolved ✅]
+- "PRs #1049, #1053 stall cooldown": CONFIRMED — dry-run shows suppressed cooldown. [carry — monitor]
+- "RSDPM PR #155 stall cooldown": CONFIRMED — dry-run suppressed; rsdpm-pr155-mirror-review-001 pending (idx=575 delivered). [carry ⚠️]
+- "m14-pr-a RSDPM #156 Mirror REVIEW_ESCALATE": CONFIRMED — notifier 23:20:22 MDT dispatched review_escalate; reply_chat_id=None 23:23:02 MDT. PR #156 OPEN/MERGEABLE. [carry ⚠️]
+- "RSDPM install drift": CARRY — Larry DM'd at idx=580 (prior iter). [carry FYI]
+- "Check I TODAY ~14:13Z UTC": CONFIRMED — no check-i-2026-07-29.json yet (~6.4h away). Timer handles. [carry ✅]
+
+**Check 0 — Alert triage (~07:38Z UTC):** repair-watermark: no-op (old=582, file_length=582). No new unclaimed alerts. NOMINAL ✅
+
+**Check 1 — Log noise (~07:38Z UTC):** outbox-notifier.log last entry [2026-07-28 23:42:37 MDT]=05:42:37Z UTC (~2h quiet). Notable in window since 02:40Z: PR #1050 review_escalate at 04:13Z; PR #1052 REVIEW_PASS+AUTO_MERGE_HELD_DEEP_REVIEW at 04:40Z; m14-pr-a build → PR #156 opened at 04:49–05:15Z; PR #1054 review_escalate at 05:17Z; RSDPM #156 review_escalate at 05:20Z; two reply_chat_id=None WARNs 05:20–05:23Z (known pattern). 0 novel WARNs. NOMINAL ✅
+
+**Check 2 — Telegram sweep (~07:38Z UTC):** Last delivery idx=582 at [2026-07-29T01:07:20-0600]=07:07:20Z UTC (doorbell "9 items need your call"). No Larry directives in last 4h. Bot alive. NOMINAL ✅
+
+**Check 3 — Pipeline stall (~07:42Z UTC):** heal_pipeline_stall.py --dry-run:
+- FORGE_NO_PR_SKIP ×5 (merged: RSDPM 134/136/146/147/142)
+- FORGE_NO_PR_SKIP: fix-escalated-pr-headchange-backoff-001 (pr=#1042)
+- FORGE_NO_PR_SKIP: m14-pr-a (pr=#156 RSDPM)
+- MIRROR_PASS_UNMERGED_SKIP: m14-pr-a (held_deep_review)
+- suppressed (cooldown): unrouted_open_pr:#1053, #1049 (agent-core); RSDPM:#155
+- suppressed (cooldown): red_mirror_status:RSDPM:156:3e9f70e43f23
+DRY-RUN: 0 alerts. NOMINAL ✅
+
+**Check 4 — Pending directives (~07:38Z UTC):** beacon-pending-approvals.json: **pending=8** (↑3 from iter ~6669's 5)
+1. `rsdpm-confirmall-medium-parent-secondglance-001` (carry). Awaiting Larry.
+2. `unreg-approval-9061de515dce` (NEW — unreg approval for undelivered DM). Check Approvals tab.
+3. `cycle-prompt-tier4-no-upgrade-clause-001` (carry; idx=563 delivered). Awaiting Larry.
+4. `deep-review-hold-pr1052-d3c25ced` (carry). PR #1052 held. Awaiting Larry.
+5. `unreg-approval-3283b7a9b651` (NEW — unreg approval). Check Approvals tab.
+6. `mirror-review-pr-ourliberty-agent-core-1054-c78976c2` (carry; DM undelivered). Check Approvals tab.
+7. `rsdpm-pr155-mirror-review-001` (carry; idx=575 delivered). Awaiting Larry.
+8. `unreg-approval-bc806f4cbeef` (NEW — unreg approval). Check Approvals tab.
+**SIGNAL** ⚠️
+
+**Check 5 — Stale daemon code (~07:38Z UTC):** heartbeat=07:36:59Z UTC (~8 min). system-health=healthy (07:36:16Z UTC; all bots alive). NOMINAL ✅
+
+**Check A — Source repo (~07:38Z UTC):** On main. Clean tree. HEAD=7cb1e80c==origin/main. NOMINAL ✅
+**Check B — Sync health (~07:38Z UTC):** status=no-change, last_sync=06:53:19Z UTC (~52 min; <2h). NOMINAL ✅
+**Check C — Agent liveness (~07:38Z UTC):** system-health=healthy (all 4 bots alive). NOMINAL ✅
+
+**Check E — PR/merge state (~07:38Z UTC):**
+- agent-core: 4 open PRs —
+  - **#1052** fix/dag-preflight-REVISION-operational-stalls (MERGEABLE, no labels; REVIEW_PASS+AUTO_MERGE_HELD_DEEP_REVIEW; item 4 pending)
+  - **#1054** test/run-review-step-timeout-flake (MERGEABLE, no labels; REVIEW_ESCALATE; item 6 DM undelivered)
+  - **#1053** fix/preflight-spec-merge-sync-window (MERGEABLE, no labels; stall cooldown)
+  - **#1049** fix/guardian-can-actually-page (MERGEABLE, no labels; stall cooldown)
+- RSDPM: 2 open PRs —
+  - **#156** M14 PR-A (MERGEABLE, no labels; REVIEW_ESCALATE; destructive migration removes `profiles.is_org_owner`; unreg-approvals for undelivered DMs)
+  - **#155** docs/CLAUDE.md (MERGEABLE, no labels; stall cooldown; rsdpm-pr155-mirror-review-001 pending)
+**SIGNAL** ⚠️
+
+**Check H — Forge digest (~07:38Z UTC):** 0 open Forge PRs. 0 Forge PRs merged in last 4h. NOMINAL ✅
+
+**§5.0 one-shots (~07:45Z UTC):** audit_due_nudge.py: no-op ✅. distill_detector.py: no-op ✅. audit_cadence_signal.py: no-op ✅
+
+**Credential rotation (~07:45Z UTC):** SUPABASE_SERVICE_ROLE_KEY: last DM 2026-07-20 (14d dedup through 2026-08-03). All others >60d. NOMINAL ✅
+
+**Check I artifact triage (~07:45Z UTC):** Newest: check-i-2026-07-27.json (Mon Jul 27). Next: TODAY ~14:13Z UTC (~6.4h). Timer handles. NOMINAL ✅
+**Check III artifact triage (~07:45Z UTC):** Newest: check-iii-2026-07-26.json. Next: Sun 2026-08-02. NOMINAL ✅
+
+**PRIME DIRECTIVE accounting:** 1 intervention appended:
+- 07:45:36Z UTC: kind=intervention, template=pending-approvals-queue, detail=pending=8-drs-pr1052-pr1054-rsdpm-escalations-undelivered-dms.
+Trailing 30d: ratio=36.24% (systemic_fixes=50, vp=25, trend=worsening). **Tier 1 maintained** (consecutive_clean=0; last_signal_at=07:45:46Z UTC).
+
+**Patterns:**
+- **3 new unreg-approvals since iter ~6669**: Items 2, 5, 8 are unregistered approvals created for APPROVAL_REQUESTs with reply_chat_id=None (DM unroutable). RSDPM #156 (m14-pr-a) and PR #1054 review_escalate are the likely triggers. Known gap: phone fixed, dashboard remains (MEMORY). Larry must check Approvals tab for these.
+- **RSDPM #156 destructive migration + REVIEW_ESCALATE**: Two distinct blocking signals on same PR — destructive migration (Larry-decision required even after merge; apply-on-merge refuses) AND Mirror REVIEW_ESCALATE (needs Larry's replan decision). High-attention PR.
+- **Check 3 clean streak continues**: 0 alerts in dry-run. All stalls in cooldown or skipped. System making progress.
+
+**G-rule assessment:**
+- medic-diagnosis-tier4-delivery-confirm: **2/3** [carry].
+- forge-marker-taskid-suffix-increment-001: **2/3** [carry].
+- check-i-force-bypass-dm-route: **2/3** [carry].
+- auto-merge-conflict-route-hold-no-dm-001: **VP** [carry].
+- mirror-queue-wait-readiness: **1/3** [carry — self-suppresses ~2026-07-30T02Z UTC].
+- beacon-pending-approvals-path-bug: **2/3+** [carry — new instances of reply_chat_id=None this cycle].
+- VP carries: forge-revision-preamble-missing; forge-wip-redispatch-digest/exhausted; outbox-notifier-intent-reject; auto-dispatch-APPROVAL_REQUEST-mismatch; auto-merge-conflict-route-hold-no-dm-001; orphaned-pr-review-loglevel-by-class-001.
+
+**Actions taken:**
+1. Check 0: repair-watermark no-op. Watermark confirmed at 582.
+2. PRIME ledger: intervention appended 07:45:36Z UTC.
+3. Tier state: record --checks-clean false → Tier 1 (consecutive_clean=0; last_signal_at=07:45:46Z UTC).
+
+**Escalations:**
+- [⚠️ ACTION NEEDED] **RSDPM PR #156**: Destructive migration removes `profiles.is_org_owner`. DM delivered idx=573. Mirror REVIEW_ESCALATE still open; decision DMs unrouted (unreg-approvals items 2/5/8). Check Approvals tab → approve replan decision → then manually apply migration with `--allow-destructive` after merge.
+- [⚠️ check Approvals tab] **PR #1052 deep-review-hold** (item 4): REVIEW_PASS blocked on deep-review stamp. Approve or reject.
+- [⚠️ check Approvals tab] **PR #1054 review_escalate** (item 6): DM not delivered (reply_chat_id=None). Check Approvals tab.
+- [carry] **Items 1, 3, 7** (rsdpm-confirmall, cycle-prompt-tier4, rsdpm-pr155): Awaiting Larry.
+- [carry — monitor] **PRs #1049, #1053 (agent-core), #155 (RSDPM)**: No labels, stall cooldown. Add `claude-review` label to trigger Mirror, or wait for healer to fire.
+- [carry FYI] **RSDPM install drift** (idx=580): Prior cycle DM'd Larry. No Pulse action.
+- [carry — self-suppresses ~2026-07-30T02Z UTC] Mirror queue-wait p95.
+
+**Tier end-of-iter:** **Tier 1** (consecutive_clean=0; last_signal_at=2026-07-29T07:45:46Z UTC; 5-min cadence).
