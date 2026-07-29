@@ -956,9 +956,12 @@ def check_spec_doc_presence(
             f'this checkout\'s LOCAL `origin/main` ref either. That ref is '
             f'only as fresh as the last fetch, so this means "cannot confirm '
             f'it exists" — NOT proof it was never authored; a spec merged '
-            f'since the last fetch looks identical. If a `REFRESH:` line above '
-            f'shows a fetch ran, the verdict is solid and you should author + '
-            f'merge it, then re-dispatch the kickoff. Otherwise confirm on the '
+            f'since the last fetch looks identical. A `REFRESH:` line above — '
+            f'INCLUDING a `skipped` one, because the fetch runs before any '
+            f'decline and only the merge was refused — means the ref IS '
+            f'current, so the verdict is solid: author + merge it, then '
+            f're-dispatch the kickoff. Only a missing `REFRESH:` line or '
+            f'`error — fetch failed` leaves this unconfirmed; then check the '
             f'real origin/main before authoring anything.'
         ),
     )

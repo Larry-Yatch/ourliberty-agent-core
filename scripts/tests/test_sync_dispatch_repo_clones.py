@@ -176,7 +176,16 @@ class SyncOneTest(unittest.TestCase):
                            '-m', 'local work'))),
         ):
             with self.subTest(decline=label):
-                self.setUp()          # fresh clone+origin pair per case
+                # A fresh clone+origin pair per case, with its OWN registered
+                # cleanup. Re-entering setUp() would rebind self._tmp and
+                # orphan the previous TemporaryDirectory — tearDown only ever
+                # cleans the last one, so the rest waited on GC finalizers and
+                # emitted a ResourceWarning apiece.
+                td = tempfile.TemporaryDirectory()
+                self.addCleanup(td.cleanup)
+                self.root = Path(td.name)
+                self.pair = _RepoPair(self.root)
+                self.path = str(self.pair.clone)
                 arrange()
                 self.pair.advance_origin(1)
                 before = _git(self.path, 'rev-parse',
