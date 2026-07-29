@@ -15425,7 +15425,11 @@
         "at": "2026-07-29T19:42:51.285731+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-29T20:43:19.831855+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-delegate-cap-confirm-all-pin-the-mixed-tier-parent-case-and-p-d5d1",
@@ -15553,7 +15557,11 @@
         "at": "2026-07-29T20:03:19.719471+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-29T20:43:19.831855+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-delegate-cap-heal-unregistered-approval-mints-permanent-cards-b921",
