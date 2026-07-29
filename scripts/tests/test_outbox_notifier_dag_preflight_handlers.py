@@ -386,6 +386,47 @@ class MirrorDagPreflightRevisionSyncLag(_DagHandlerHarness):
         self.assertEqual(entry['spec_doc'], 'specs/M14-workspace-boundary.md')
         self.assertEqual(entry['behind_by'], 1)
 
+    def test_audit_entry_records_the_syncer_that_can_advance_the_repo(self):
+        """The `message` this branch persists into the sequence file is the
+        remediation an operator reads later. Passing only `repo_root` makes
+        `sync_remediation` fall back to the agent-core wording, permanently
+        recording "run ourliberty-sync.service" for an RSDPM spec — the unit
+        that cannot advance that checkout.
+
+        The spy calls the REAL classifier with an injected git runner, so this
+        asserts the sentence that lands on disk, not that a kwarg was passed."""
+        seq = _make_sequence(seq_id='lag-seq', status='pending')
+        for step in seq['steps']:
+            step['target_repo'] = 'RSDPM'
+        self._write_sequence(seq)
+        real = bsv.check_spec_doc_presence
+
+        def spy(spec_doc, repo_root=None, *, repo_name=None, **kw):
+            return real(
+                spec_doc, repo_root=repo_root, repo_name=repo_name,
+                git=lambda a: (0, '2') if a[0] == 'rev-list' else (0, ''),
+                local_exists=lambda: False,
+            )
+
+        with mock.patch.object(on.bsv, 'check_spec_doc_presence', spy):
+            result = on._handle_mirror_dag_preflight_result(
+                self._revision_envelope('lag-seq'),
+            )
+        self.assertEqual(
+            result, 'mirror-dag-preflight:revision-sync-lag:lag-seq',
+        )
+        entry = next(
+            e for e in self._read_sequence('lag-seq')['audit_log']
+            if e.get('event') == 'dag-preflight-sync-lag-detected'
+        )
+        self.assertIn(
+            'ourliberty-sync-dispatch-repos.service', entry['message'],
+        )
+        self.assertNotIn(
+            'Run sync (`systemctl start ourliberty-sync.service`)',
+            entry['message'],
+        )
+
     def test_sync_lag_audit_entry_is_idempotent_on_replay(self):
         seq = _make_sequence(seq_id='lag-seq', status='pending')
         self._write_sequence(seq)

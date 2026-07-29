@@ -4060,6 +4060,45 @@ class TestDagPreflightSyncLag(_TempAgentsRootMixin, unittest.TestCase):
             'review-sequence-dag-lag-seq-synclag2',
         )
 
+    def test_alert_names_the_syncer_that_can_actually_advance_the_repo(self) -> None:
+        """Check 12's DM embeds `presence.message` verbatim. If the call site
+        passes only `repo_root`, `sync_remediation` falls back to the
+        agent-core wording and tells Larry to run `ourliberty-sync.service` —
+        which syncs agent-core ONLY and cannot advance an RSDPM checkout. The
+        same alert's `suggested_action` names both units, so it would
+        contradict itself, and this is the exact wrong-unit-followed-twice
+        failure the PR exists to end.
+
+        Deliberately NOT a "was the kwarg passed" assertion: the spy calls the
+        REAL `check_spec_doc_presence` with an injected git runner, so what is
+        checked is the operator-facing sentence, not the wiring."""
+        import build_sequence_validator as bsv
+        (self.seqdir / 'lag-seq.json').write_text(json.dumps({
+            'seq_id': 'lag-seq', 'status': 'pending',
+            'spec_doc': 'specs/M14.md',
+            'steps': [{'target_repo': 'RSDPM'}, {'target_repo': 'RSDPM'}],
+            'audit_log': [self._lag(45)],
+        }))
+        real = bsv.check_spec_doc_presence
+
+        def spy(spec_doc, repo_root=None, *, repo_name=None, **kw):
+            return real(
+                spec_doc, repo_root=repo_root, repo_name=repo_name,
+                git=lambda a: (0, '3') if a[0] == 'rev-list' else (0, ''),
+                local_exists=lambda: False,
+            )
+
+        with patch.object(self.hps.bsv, 'check_spec_doc_presence', spy):
+            alerts = self.hps.check_dag_preflight_sync_lag({})
+        self.assertEqual(len(alerts), 1)
+        msg = alerts[0]['message']
+        self.assertIn('ourliberty-sync-dispatch-repos.service', msg)
+        self.assertIn('`RSDPM` checkout is behind', msg)
+        self.assertNotIn(
+            'Run sync (`systemctl start ourliberty-sync.service`)', msg,
+            'that unit syncs agent-core ONLY and cannot advance ~/RSDPM',
+        )
+
     def test_recovery_envelope_passes_the_real_dispatch_validators(self) -> None:
         """Every other test of this recovery mocks `safe_write_inbox` — which
         IS the validation seam. So the two conditions that decide whether the
