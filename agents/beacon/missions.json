@@ -14639,7 +14639,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-29T02:06:50.313618+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-29T02:04:51.944331+00:00"
+      "orphan_last_activity_ts": "2026-07-29T02:04:51.944331+00:00",
+      "briefing": {
+        "what": "A piece of work your team kicked off on its own that isn't attached to any active initiative yet, and it's now waiting for your sign-off.",
+        "why": "Loose work that isn't tied to a goal can quietly eat time and attention, so it's worth a quick look before it moves forward.",
+        "suggest": "Take a moment to confirm this fits something you actually want done right now before giving it the green light."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T02:14:25.563047+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
