@@ -137,12 +137,22 @@ class ProjectDelegationFieldsTest(unittest.TestCase):
         self.assertIsNone(ranked[0]['delegation_needs_you'])
         self.assertEqual(ranked[0]['delegation_build_phase'], 'declined')
 
-    def test_expired_approval_reads_declined(self):
-        self._write_pending([], history=[{
-            'id': 'appr4', 'origin_task_id': DELEGATE, 'status': 'expired'}])
-        ranked = [{'id': 'm1', 'name': 'X'}]
-        da._project_delegation_fields(ranked, _StubClient([]))
-        self.assertEqual(ranked[0]['delegation_build_phase'], 'declined')
+    # NO `expired` TEST HERE ON PURPOSE — removed, not forgotten.
+    #
+    # It asserted `expired` → `declined` → "You turned this down". That is wrong:
+    # `expired` is written by three AUTO-RETIRE paths that all document it as NOT
+    # a decision (`outbox_notifier.py:6320` "Larry never acted";
+    # `heal_stale_approvals.py:528` "auto-retired"; `heal_unregistered_approval.py:1303`
+    # "auto-retired, not a [decision]"). Rendering it as his decision is the same
+    # two-states-one-label conflation `declined` was added to remove.
+    #
+    # The fix belongs to #1047, which owns `_DECLINED_APPROVAL_STATUSES` and is
+    # being changed in parallel — so this PR must not assert EITHER answer for
+    # `expired` in the meantime. agent-core has no CI, so nothing would run the
+    # two branches together and a contradictory test here would survive to main
+    # ([[parallel-prs-green-apart-conflict-on-main]]). Re-add the assertion —
+    # expecting `stalled`, the honest floor for "nobody ever answered" — once
+    # #1047's split lands and this branch is rebased onto it.
 
     def test_rejected_then_approved_is_not_declined(self):
         # Re-delegated and approved: the scan nets declined against approved, so
