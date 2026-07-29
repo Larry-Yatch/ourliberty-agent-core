@@ -4987,16 +4987,20 @@ def _delegate_dispatched_task_ids(
     card read `building` while Forge is mid-build, instead of sitting on
     `handed_off` until the PR opens.
 
-    Scans pending AND history, and counts ONLY `status == 'approved'` entries —
-    that status IS the dispatch (`resolve` writes it when Larry approves, and
-    `dispatch_approved` then runs the build under this `id`). The filter is the
-    whole point of the map: without it a `rejected` or `expired` approval still
+    Scans pending AND history, and hands back a receipt ONLY when the origin's
+    LATEST terminal entry is `approved` — that status IS the dispatch (`resolve`
+    writes it when Larry approves, and `dispatch_approved` then runs the build
+    under this `id`). Without that, a `rejected` or `expired` approval still
     hands back a "receipt", and a receipt is read downstream as the team's "I've
     got this". That mis-read reached the team thread — the narrator announced
     "Picked this up" for a delegation Larry had REJECTED (live instance:
     `delegate-cap-spec-build-xiv-b-tier-4-alert-write-back-loop-f78b`, and 36
     rejected + 82 expired entries make it recurring). This paragraph was already
-    the documented contract before the filter existed to enforce it.
+    the documented contract before the code existed to enforce it.
+
+    LATEST, not "any": an approval that a later rejection supersedes leaves no
+    receipt, so a re-delegated-then-rejected card cannot claim `handed_off` off
+    the previous round. See `_delegate_approval_scan`.
 
     Reads the store ONCE. Fail-safe: {} on a missing/unreadable store — the card
     simply keeps its coarser phase."""
@@ -5032,14 +5036,22 @@ def _delegate_declined_origins(
     origin_task_ids: list[str],
     agents_root: Optional[Path] = None,
 ) -> set[str]:
-    """Delegate origins whose approval was REJECTED or EXPIRED and never
-    approved — i.e. the work was declined, not neglected.
+    """Delegate origins whose LATEST terminal approval is a REJECTION — i.e. the
+    work was declined, not neglected.
 
     Needed because `stalled` alone cannot tell "nobody picked this up" from "Larry
     said no": both are delegated-with-no-receipt. Narrating the second as stalled
-    invites him to re-nudge work he deliberately turned down. Requires the absence
-    of ANY approved entry so a card that was rejected once and later re-delegated
-    and approved is NOT treated as declined.
+    invites him to re-nudge work he deliberately turned down.
+
+    LATEST wins, in both directions — this is not "rejected and never approved".
+    A card rejected once and later re-delegated + approved is NOT declined (it is
+    live again); a card approved once and later re-delegated + REJECTED IS
+    declined (and loses its now-superseded receipt). Getting only the first
+    direction right is what let "the team picked this up" post about work Larry
+    had just turned down.
+
+    `expired` is deliberately NOT here — see `_DECLINED_APPROVAL_STATUSES`. It is
+    an auto-retirement, not a decision, and belongs on the `stalled` floor.
 
     Same fail-safe contract as `_delegate_dispatched_task_ids`: {} / empty set on
     a missing or unreadable store.
@@ -5057,19 +5069,32 @@ def _delegate_approval_scan(
 ) -> tuple[dict[str, str], set[str]]:
     """One pass over the approval store → (approved receipts, declined origins).
 
-    The declined set is returned already NET of approved, so the two halves are
-    disjoint and neither caller has to re-derive the relationship. Call this ONCE
-    when you need both: `_delegate_dispatched_task_ids` and
+    Both views are derived from ONE record per origin: its LATEST terminal entry
+    (`approved` vs `_DECLINED_APPROVAL_STATUSES`, ordered by `resolved_at`). So
+    the two halves are disjoint BY CONSTRUCTION — an origin appears in exactly
+    one, or in neither — and the answer to "which decision is current" is a
+    property of that record rather than of subtracting two sets. An earlier
+    approval leaves NO receipt once a later rejection lands; callers therefore do
+    not need to check `declined` before trusting `approved`.
+
+    That disjointness is load-bearing, not incidental: it was briefly false under
+    an intermediate fix that netted by position, and the overlap forced
+    `_delegation_trail_field` to gate its ledger-bridge `building` override on
+    `not _declined` to stop a rejected retry rendering "Building" off the
+    previous round's finished build. Keep it true and that guard stays mere
+    defence in depth.
+
+    Call this ONCE when you need both: `_delegate_dispatched_task_ids` and
     `_delegate_declined_origins` are thin views over it, and calling those two in
     sequence re-reads the file twice. That is not merely wasteful — a card that is
     `rejected` at the first read and re-delegated + APPROVED before the second
     comes back with no receipt AND no declined marking, which resolves `stalled`
     and posts a permanent "no sign of progress" about work that was just approved.
 
-    Repeat approvals: the LAST approved entry wins (entries are appended on
-    resolve, so later == newer). Taking the first would bridge a re-delegated card
-    to its PREVIOUS build, whose completed `session_start` then reads as `building`
-    for a delegation that has not started."""
+    Repeat rounds: the LATEST terminal entry wins outright. Taking an earlier one
+    would bridge a re-delegated card to its PREVIOUS build, whose completed
+    `session_start` then reads as `building` for a delegation that has not
+    started — or, worse, as `handed_off` for one that was rejected."""
     if not origin_task_ids:
         return {}, set()
     root = agents_root or _agents_root()
@@ -5080,11 +5105,14 @@ def _delegate_approval_scan(
     if not isinstance(data, dict):
         return {}, set()
     wanted = set(origin_task_ids)
-    approved: dict[str, str] = {}
-    # Append position of each origin's newest approval / newest rejection. The
-    # WINNER is whichever came last — see the netting note below.
-    _approved_at: dict[str, int] = {}
-    _declined_at: dict[str, int] = {}
+    # ONE record per origin — its LATEST terminal entry, as (sort_key, status,
+    # receipt_id). Two independent collections cannot express "which terminal
+    # status came last", which is the whole question here: netting an `approved`
+    # set against a `declined` set picks a different wrong answer depending on
+    # which way you subtract. Deriving both views from a single latest-wins
+    # record makes the question answerable and the two outputs disjoint by
+    # construction.
+    latest: dict[str, tuple[tuple[str, int], str, Optional[str]]] = {}
     seq = 0
     for bucket in ('pending', 'history'):
         for entry in (data.get(bucket) or []):
@@ -5095,31 +5123,43 @@ def _delegate_approval_scan(
             if not (isinstance(origin, str) and origin in wanted):
                 continue
             status = entry.get('status')
-            if status == 'approved':
-                # Position is recorded even when the id is unusable: the entry is
-                # still an approval, and still supersedes an earlier rejection.
-                # Only the RECEIPT needs a usable id.
-                _approved_at[origin] = seq
-                fresh = entry.get('id')
-                if isinstance(fresh, str) and fresh:
-                    approved[origin] = fresh  # last (newest) wins
-            elif status in _DECLINED_APPROVAL_STATUSES:
-                _declined_at[origin] = seq
-    # NEWEST-WINS, not set difference. The old netting was
-    # `{o for o in declined if o not in approved}`, which never compared
-    # positions — so ANY approval anywhere in history cancelled a rejection, even
-    # one that came after it. Concretely: delegate → approve → build FAILS →
+            if (status != 'approved'
+                    and status not in _DECLINED_APPROVAL_STATUSES):
+                continue  # `pending`/`modified` decide nothing
+            # RECENCY IS `resolved_at`, NOT SCAN POSITION. Position would rest on
+            # the `pending` bucket never holding a terminal entry — true in the
+            # live store today, but `_open_delegate_approvals` defensively skips
+            # non-`pending` rows in that bucket, so someone thought it reachable
+            # (a `resolve()` dying between the history append and the pending
+            # removal). A stuck `rejected` row is scanned FIRST, would take a
+            # lower position than an older `approved`, and would silently drop
+            # out of `declined` — this bug again, through the ordering instead of
+            # the set logic. All 559 live history entries carry `resolved_at`.
+            # A terminal entry missing it sorts as oldest among its peers and
+            # loses to any timestamped one; position only breaks exact ties.
+            resolved = entry.get('resolved_at')
+            key = (resolved if isinstance(resolved, str) else '', seq)
+            if origin in latest and key < latest[origin][0]:
+                continue
+            fresh = entry.get('id')
+            latest[origin] = (
+                key, status,
+                fresh if isinstance(fresh, str) and fresh else None,
+            )
+    # A rejected-LAST origin yields no receipt at all, so the stale-receipt half
+    # of the bug cannot survive either: `_has_receipt` goes False and the
+    # `handed_off` claim is unreachable without the trail having to out-rank it.
+    # Concretely, what this fixes: delegate → approve → build FAILS →
     # re-delegate (which `_already_delegated_short_circuit` permits precisely
-    # because `failure_signaled` is set) → Larry REJECTS the retry. The origin
-    # fell out of `declined`, kept the stale receipt, and the card read
-    # `handed_off` — "the team picked this up" about a delegation he had just
-    # turned down. In the narrator that post is permanent.
-    #
-    # Entries are appended on resolve, so append position IS recency; `pending`
-    # is scanned first but contributes nothing here (its rows are `status
-    # == 'pending'`, neither approved nor rejected), so the ordering across the
-    # two buckets never matters.
-    declined = {o for o, at in _declined_at.items() if at > _approved_at.get(o, -1)}
+    # because `failure_signaled` is set) → Larry REJECTS the retry. The old
+    # `{o for o in declined if o not in approved}` dropped the origin from
+    # `declined`, kept the superseded receipt, and the card read `handed_off` —
+    # "the team picked this up" about a delegation he had just turned down. In
+    # the narrator that post is permanent and cannot be retracted.
+    approved = {o: rec[2] for o, rec in latest.items()
+                if rec[1] == 'approved' and rec[2]}
+    declined = {o for o, rec in latest.items()
+                if rec[1] in _DECLINED_APPROVAL_STATUSES}
     return approved, declined
 
 

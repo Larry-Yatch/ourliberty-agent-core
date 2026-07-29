@@ -364,15 +364,58 @@ class ApprovalScanTest(unittest.TestCase):
         # Larry had just turned down.
         root = self._store([
             {'origin_task_id': 'delegate-a', 'id': 'fresh-1',
-             'status': 'approved'},
+             'status': 'approved', 'resolved_at': '2026-07-01T00:00:00Z'},
             {'origin_task_id': 'delegate-a', 'id': 'appr-2',
-             'status': 'rejected'},
+             'status': 'rejected', 'resolved_at': '2026-07-02T00:00:00Z'},
         ])
         approved, declined = da._delegate_approval_scan(['delegate-a'], root)
         self.assertEqual(declined, {'delegate-a'})
-        # The superseded receipt is still returned — the trail must beat it on
-        # `declined`, not by pretending the earlier build never happened.
-        self.assertEqual(approved, {'delegate-a': 'fresh-1'})
+        # And the superseded receipt is GONE — the rejection is the origin's
+        # current terminal state, so there is no "the team has it" to out-rank.
+        # This is what makes the two halves disjoint by construction.
+        self.assertEqual(approved, {})
+
+    def test_the_two_halves_are_disjoint_by_construction(self):
+        # The property the scan's contract promises, and that
+        # `_delegation_trail_field` is allowed to rely on. It was briefly FALSE
+        # under a positional netting fix, which is what forced the ledger-bridge
+        # `building` override to be gated on `not _declined`.
+        root = self._store([
+            {'origin_task_id': 'delegate-a', 'id': 'r1', 'status': 'rejected',
+             'resolved_at': '2026-07-01T00:00:00Z'},
+            {'origin_task_id': 'delegate-a', 'id': 'a1', 'status': 'approved',
+             'resolved_at': '2026-07-02T00:00:00Z'},
+            {'origin_task_id': 'delegate-b', 'id': 'a2', 'status': 'approved',
+             'resolved_at': '2026-07-01T00:00:00Z'},
+            {'origin_task_id': 'delegate-b', 'id': 'r2', 'status': 'rejected',
+             'resolved_at': '2026-07-02T00:00:00Z'},
+        ])
+        approved, declined = da._delegate_approval_scan(
+            ['delegate-a', 'delegate-b'], root)
+        self.assertEqual(approved, {'delegate-a': 'a1'})
+        self.assertEqual(declined, {'delegate-b'})
+        self.assertFalse(set(approved) & declined)
+
+    def test_recency_is_resolved_at_not_scan_position(self):
+        # A terminal entry stranded in the `pending` bucket (a `resolve()` dying
+        # between the history append and the pending removal — the case
+        # `_open_delegate_approvals` defensively guards) is scanned FIRST and so
+        # has the LOWER position. Ordering on position would let the older
+        # approval win and silently un-decline the card.
+        root = self._store(
+            [{'origin_task_id': 'delegate-a', 'id': 'r1', 'status': 'rejected',
+              'resolved_at': '2026-07-09T00:00:00Z'}],
+            bucket='pending')
+        import json
+        p = root / 'state' / 'beacon-pending-approvals.json'
+        data = json.loads(p.read_text())
+        data['history'] = [{'origin_task_id': 'delegate-a', 'id': 'a1',
+                            'status': 'approved',
+                            'resolved_at': '2026-07-01T00:00:00Z'}]
+        p.write_text(json.dumps(data))
+        approved, declined = da._delegate_approval_scan(['delegate-a'], root)
+        self.assertEqual(declined, {'delegate-a'})
+        self.assertEqual(approved, {})
 
     def test_approval_with_an_unusable_id_still_supersedes_a_rejection(self):
         # The entry is an approval whether or not its id is usable, so it must

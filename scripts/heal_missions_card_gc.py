@@ -1880,7 +1880,9 @@ def plan_delegate_narrations(
         pickup, and the deterministic event_id means the genuine `handed_off`
         could then never fire. Withholding it means the post lands exactly once,
         when it is true.
-      * `declined` — rejected/expired approvals. Larry turned the work down; a
+      * `declined` — an origin whose LATEST terminal approval is a REJECTION
+        (`expired` is NOT one: it is an auto-retirement, so those cards keep the
+        honest `stalled` post). Larry turned the work down; a
         "may need a nudge" post invites him to re-push what he deliberately
         stopped, and there is nothing to tell him about his own decision. The
         caller still supplies `declined_origins` (it is what lets the resolver
