@@ -15045,7 +15045,11 @@
         "at": "2026-07-29T15:00:20.257913+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-29T19:42:30.307234+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-deep-review-hold-pr157-357b5b3c",
@@ -15387,6 +15391,57 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-rsdpm-confirmall-cleanups-001",
+      "name": "Rsdpm Confirmall Cleanups 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `rsdpm-confirmall-cleanups-001`. Last activity 2026-07-29T19:41:12.706933+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "rsdpm-confirmall-cleanups-001"
+      ],
+      "repo": null,
+      "created": "2026-07-29",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-29T19:42:30.307234+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-29T19:41:12.706933+00:00"
+    },
+    {
+      "id": "proposed-delegate-cap-confirm-all-pin-the-mixed-tier-parent-case-and-p-d5d1",
+      "name": "Delegate Cap Confirm All Pin The Mixed Tier Parent Case And P D5d1",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `delegate-cap-confirm-all-pin-the-mixed-tier-parent-case-and-p-d5d1`. Last activity 2026-07-29T19:41:08.218461+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "delegate-cap-confirm-all-pin-the-mixed-tier-parent-case-and-p-d5d1"
+      ],
+      "repo": null,
+      "created": "2026-07-29",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-29T19:42:30.307234+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-29T19:41:08.218461+00:00"
+    },
+    {
+      "id": "proposed-pr-ourliberty-agent-core-1056",
+      "name": "PR Ourliberty Agent Core 1056",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pr-ourliberty-agent-core-1056`. Last activity 2026-07-29T19:39:26.383798+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pr-ourliberty-agent-core-1056"
+      ],
+      "repo": null,
+      "created": "2026-07-29",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-29T19:42:30.307234+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-29T19:39:26.383798+00:00"
     }
   ]
 }
