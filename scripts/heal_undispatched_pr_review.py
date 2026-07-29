@@ -81,8 +81,12 @@ and deliberately NOT head-keyed. While it is set the recency leg stays fully
 head-blind; the one window it cannot cover (it clears at re-review DISPATCH,
 before that re-review runs) is held by the live-inbox and `.claimed/` legs,
 which are head-agnostic by construction and were widened here to include
-`.claimed/` for exactly that reason. Every uncertainty — no recorded head, no
-current head, an unreadable ledger — keeps the old back-off.
+`.claimed/` for exactly that reason. That `.claimed/` leg is itself
+window-bounded, so a claim BOTH the 35-min review ceiling and
+`heal_orphaned_mirror_claims` failed to resolve stays rescuable rather than
+blocking the backstop forever — a permanent block would just be this same
+strand class in a new shape. Every uncertainty — no recorded head, no current
+head, an unreadable ledger — keeps the old back-off.
 
 Why a LABEL and not a branch rule: neither branch prefix nor PR author can
 separate Larry's hand-opened PRs from the agent team's. The team commits as
@@ -590,14 +594,22 @@ def recent_review_record(
     non-recursive): died-verdictless re-dispatch pacing is owned by the dedup
     predicate's debounce+cap, not this time window.
 
-    - a matching file LIVE in the inbox, or relocated into `.claimed/<slot>/`,
-      blocks regardless of age (a queued or claimed review is pending no matter
-      how long it has queued — `.claimed/` is the window where Mirror is
-      literally executing the review, so it is the LAST record shape that may
-      be read as orphaned; the sibling dedup predicate
-      `outbox_notifier._review_request_already_dispatched` blocks on it for the
-      same reason, and `heal_orphaned_mirror_claims` archives a claim whose
-      session died, which restores the age bound below);
+    - a matching file LIVE in the inbox root blocks regardless of age. A queued
+      task has no execution ceiling — inbox_watcher claims it whenever a slot
+      frees — so age says nothing about whether it is still going to run;
+    - a matching `.claimed/<slot>/` record blocks head-AGNOSTICALLY (Mirror is
+      literally executing that review; never pile on) but only within
+      `window_minutes`. It is deliberately NOT age-independent: a claim DOES
+      have a hard ceiling (`agent_runner.REVIEW_SESSION_CEILING_SECONDS`, 35
+      min), and `heal_orphaned_mirror_claims` sweeps every ~10 min past a 45-min
+      grace to archive a concluded/terminal claim or RE-INJECT a still-open one.
+      So a claim older than this window is one BOTH of those bounds failed to
+      resolve — provably stranded, and the backstop is the last net under it.
+      Blocking such a claim forever would convert a bounded strand into a
+      permanent one: `_review_request_already_dispatched`'s `.claimed` check
+      matches only the exact `review-<task>.json`, so a stranded `-rev<N>` claim
+      does NOT stop the PR being selected as orphaned every tick — it would just
+      back off here, forever, with nothing else left to rescue it;
     - a matching `.archive/` / `.invalid/` record blocks only while its mtime
       (= dispatch time; archive is a plain rename) is younger than
       `window_minutes`. A future mtime (clock skew) also blocks: conservative.
@@ -624,7 +636,7 @@ def recent_review_record(
         - record's head == current head → blocks (that record covers this head);
         - caller passes None → blocks (the caller is the one that knows whether
           a Forge revision is in flight; see `pipeline_backoff_reason`);
-        - live/claimed records are head-agnostic, as above.
+        - live-inbox and `.claimed/` records are head-agnostic, as above.
       Records are evaluated individually, so a task holding BOTH a drifted
       round-0 record and a current-head `-rev<N>` record still backs off on the
       latter.
@@ -636,27 +648,30 @@ def recent_review_record(
     name_re = outbox_notifier.review_record_name_re(review_stem)
     glob_pat = f'{glob.escape(review_stem)}*.json'
     head_aware = isinstance(current_head_sha, str) and bool(current_head_sha)
-    # Live legs first (age-independent): the inbox root, then every claim slot.
-    # Globbing the slot dirs (not the record name) keeps a metacharacter-bearing
-    # task_id from widening the scan.
-    live_dirs = [(mirror_inbox, 'still queued in Mirror inbox')]
+    # The LIVE inbox root — the one age-independent leg (see docstring).
     try:
-        live_dirs.extend(
-            (s, 'claimed by a live Mirror slot')
+        entries = mirror_inbox.glob(glob_pat)
+    except OSError:
+        entries = iter(())
+    for p in entries:
+        if name_re.fullmatch(p.name):
+            return f'{p.name} still queued in Mirror inbox'
+    # Everything else is window-bounded. `.claimed/<slot>/` is scanned first and
+    # head-AGNOSTICALLY (a live review covers whatever head it checked out);
+    # `.archive/` + `.invalid/` are head-aware. Slot dirs are globbed (not the
+    # record name) so a metacharacter-bearing task_id can't widen the scan.
+    scan: list[tuple[Path, str, bool]] = []  # (dir, label, apply head-awareness)
+    try:
+        scan.extend(
+            (s, f'.claimed/{s.name}', False)
             for s in (mirror_inbox / '.claimed').glob('*') if s.is_dir()
         )
     except OSError:
         pass
-    for d, why in live_dirs:
-        try:
-            entries = d.glob(glob_pat)
-        except OSError:
-            continue
-        for p in entries:
-            if name_re.fullmatch(p.name):
-                return f'{p.name} {why}'
-    for sub in ('.archive', '.invalid'):
-        d = mirror_inbox / sub
+    scan.extend(
+        (mirror_inbox / sub, sub, True) for sub in ('.archive', '.invalid')
+    )
+    for d, sub, head_gated in scan:
         try:
             entries = d.glob(glob_pat)
         except OSError:
@@ -664,7 +679,7 @@ def recent_review_record(
         for p in entries:
             if not name_re.fullmatch(p.name):
                 continue
-            if head_aware:
+            if head_gated and head_aware:
                 recorded = outbox_notifier._recorded_review_head_sha(p)
                 if isinstance(recorded, str) and recorded and \
                         recorded != current_head_sha:

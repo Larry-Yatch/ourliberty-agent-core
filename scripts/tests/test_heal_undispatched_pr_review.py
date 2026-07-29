@@ -1216,6 +1216,58 @@ class TestRecentReviewRecordHeadAware(unittest.TestCase):
         # No `.claimed/` at all (the temp tree above) must scan cleanly.
         self.assertIsNone(self._probe(self.NEW_HEAD))
 
+    # ---- but the `.claimed/` leg is WINDOW-BOUNDED, not permanent ----
+
+    def test_stranded_claim_past_the_window_does_not_block(self):
+        # A claim older than the window is one that BOTH the 35-min review
+        # ceiling AND heal_orphaned_mirror_claims (10-min sweep past a 45-min
+        # grace: archive-if-concluded / re-inject-if-open, SPARE on gh-unknown)
+        # failed to resolve. Blocking it forever would strand the PR with
+        # nothing left to rescue it — `_review_request_already_dispatched`'s
+        # `.claimed` check matches only the exact `review-<task>.json`, so this
+        # `-rev1` claim does NOT stop the PR being selected as orphaned every
+        # tick; this guard would just silently refuse it, permanently. That is
+        # the same never-concludes shape this whole change exists to remove.
+        self._write(f'.claimed/slot-1/review-{self.TASK}-rev1.json',
+                    head=self.OLD_HEAD,
+                    age_minutes=h.RECENT_REVIEW_ACTIVITY_MINUTES + 30)
+        self.assertIsNone(self._probe(self.NEW_HEAD))
+
+    def test_stranded_claim_past_the_window_does_not_block_head_blind(self):
+        # Same rescue with no head supplied — the age bound is independent of
+        # head-awareness (a stranded claim records the head it was dispatched
+        # for, which may well still be the current one).
+        self._write(f'.claimed/slot-1/review-{self.TASK}-rev1.json',
+                    head=self.NEW_HEAD,
+                    age_minutes=h.RECENT_REVIEW_ACTIVITY_MINUTES + 30)
+        self.assertIsNone(h.recent_review_record(
+            f'review-{self.TASK}', self.inbox, self.now))
+
+    def test_claim_at_the_window_boundary_still_blocks(self):
+        self._write(f'.claimed/slot-1/review-{self.TASK}-rev1.json',
+                    head=self.OLD_HEAD,
+                    age_minutes=h.RECENT_REVIEW_ACTIVITY_MINUTES - 1)
+        self.assertIsNotNone(self._probe(self.NEW_HEAD))
+
+    def test_stale_claim_does_not_mask_a_fresh_one(self):
+        # A stranded claim in one slot must not suppress a genuinely live claim
+        # in another — the scan judges each record on its own age.
+        self._write(f'.claimed/slot-1/review-{self.TASK}-rev1.json',
+                    head=self.OLD_HEAD,
+                    age_minutes=h.RECENT_REVIEW_ACTIVITY_MINUTES + 30)
+        self._write(f'.claimed/slot-2/review-{self.TASK}-rev2.json',
+                    head=self.OLD_HEAD, age_minutes=3)
+        r = self._probe(self.NEW_HEAD)
+        self.assertIsNotNone(r)
+        self.assertIn('-rev2.json', r)
+
+    def test_live_inbox_leg_stays_age_independent(self):
+        # Unchanged, and deliberately NOT window-bounded: a queued task has no
+        # execution ceiling, so age says nothing about whether it will run.
+        self._write(f'review-{self.TASK}.json', head=self.OLD_HEAD,
+                    age_minutes=h.RECENT_REVIEW_ACTIVITY_MINUTES * 10)
+        self.assertIsNotNone(self._probe(self.NEW_HEAD))
+
 
 class TestPipelineBackoffHeadAwareWiring(unittest.TestCase):
     """End-to-end through `pipeline_backoff_reason` with a REAL inbox tree —
@@ -1244,17 +1296,67 @@ class TestPipelineBackoffHeadAwareWiring(unittest.TestCase):
 
     def _run(self, *, head, task_id=None, in_flight=False, live=(False, ''),
              passing=False):
+        """Run the guard against the real inbox tree. `_revision_in_flight` is
+        stubbed (the ledger lives outside this temp tree) but `recent_review_
+        record` is only SPIED — `wraps` calls straight through — so the scan is
+        the real one AND the arguments handed to it stay assertable. Both spies
+        are parked on self for the argument-contract tests below."""
         from unittest import mock
         pr = {'number': 142, 'task_id': task_id if task_id is not None else self.TASK,
               '_repo': 'Larry-Yatch/RSDPM', 'headRefOid': head}
         with mock.patch.object(h.pipeline_live_state, 'pr_review_in_progress',
                                return_value=live), \
                 mock.patch.object(h, '_revision_in_flight',
-                                  return_value=in_flight), \
+                                  return_value=in_flight) as flight_spy, \
+                mock.patch.object(h, 'recent_review_record',
+                                  wraps=h.recent_review_record) as rec_spy, \
                 mock.patch.object(h, 'head_has_passing_review_status',
                                   return_value=passing):
-            return h.pipeline_backoff_reason(
+            result = h.pipeline_backoff_reason(
                 pr, self.inbox, f'review-{self.TASK}', self.now)
+        self.flight_spy = flight_spy
+        self.rec_spy = rec_spy
+        return result
+
+    def _recency_head_arg(self):
+        """The `current_head_sha` the guard actually handed the recency scan."""
+        self.assertEqual(self.rec_spy.call_count, 1)
+        return self.rec_spy.call_args.kwargs.get('current_head_sha')
+
+    # ---- ARGUMENT CONTRACT ----
+    # Both values the guard derives and passes down are load-bearing and both
+    # fail QUIET if wrong: a bad ledger key makes `is_in_flight` always False
+    # (guard always head-aware → duplicate dispatch mid-cascade, the #865
+    # regression), and a bad head makes every archived record read as drifted
+    # (back-off never fires → dispatch every tick). Neither shows up in the
+    # guard's return value, so assert the arguments, not just the outcome.
+
+    def test_ledger_is_keyed_on_the_prs_task_id(self):
+        # NOT the review stem (`review-pr-RSDPM-142`) — the ledger stores rows
+        # under the canonical task_id, so a stem lookup silently finds nothing.
+        self._archive(f'review-{self.TASK}.json', self.OLD_HEAD)
+        self._run(head=self.NEW_HEAD)
+        self.flight_spy.assert_called_once_with(self.TASK)
+
+    def test_recency_scan_receives_the_prs_current_head(self):
+        self._archive(f'review-{self.TASK}.json', self.OLD_HEAD)
+        self._run(head=self.NEW_HEAD)
+        self.assertEqual(self._recency_head_arg(), self.NEW_HEAD)
+
+    def test_recency_scan_receives_no_head_while_in_flight(self):
+        # The #865 contract at the argument level: in-flight must hand DOWN
+        # None, not merely happen to return a back-off reason for some other
+        # reason.
+        self._archive(f'review-{self.TASK}.json', self.OLD_HEAD)
+        self._run(head=self.NEW_HEAD, in_flight=True)
+        self.assertIsNone(self._recency_head_arg())
+
+    def test_ledger_not_consulted_when_head_is_unknown(self):
+        # No head → nothing to compare → head-blind without paying a ledger read.
+        self._archive(f'review-{self.TASK}.json', self.OLD_HEAD)
+        self._run(head=None)
+        self.flight_spy.assert_not_called()
+        self.assertIsNone(self._recency_head_arg())
 
     def test_manually_fixed_escalated_pr_is_dispatchable(self):
         # THE DEFECT, end to end: terminal ESCALATE (nothing in flight), human
