@@ -940,10 +940,26 @@ def check_spec_doc_presence(
     return SpecDocPresence(
         status=SPEC_DOC_NOT_AUTHORED,
         spec_doc=spec_doc,
+        # Says what was actually checked, unconditionally.
+        #
+        # The old wording asserted the spec is not "on origin/main" as fact.
+        # Nothing here ever contacted origin: this compares against the LOCAL
+        # `refs/remotes/origin/main`, which is only as fresh as the last fetch.
+        # A spec merged since then is indistinguishable from one never written
+        # — and stating the strong claim is precisely how incident 2026-06-10
+        # sent someone to re-author merged PR #415. The caveat has to live in
+        # the message itself rather than being added by callers that happen to
+        # have attempted a refresh: the agent-core path attempts none, and that
+        # is the exact repo the incident happened in.
         message=(
-            f'spec_doc `{spec_doc}` not found in the working copy or on '
-            f'origin/main — author + merge it first, then re-dispatch the '
-            f'kickoff.'
+            f'spec_doc `{spec_doc}` is not in the working copy, and not in '
+            f'this checkout\'s LOCAL `origin/main` ref either. That ref is '
+            f'only as fresh as the last fetch, so this means "cannot confirm '
+            f'it exists" — NOT proof it was never authored; a spec merged '
+            f'since the last fetch looks identical. If a `REFRESH:` line above '
+            f'shows a fetch ran, the verdict is solid and you should author + '
+            f'merge it, then re-dispatch the kickoff. Otherwise confirm on the '
+            f'real origin/main before authoring anything.'
         ),
     )
 

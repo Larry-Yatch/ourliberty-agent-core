@@ -203,16 +203,37 @@ def sync_one(repo: str, path: str, apply: bool = False) -> RepoOutcome:
     if rc != 0:
         return out('skipped', 'not a git repository')
 
+    # FETCH FIRST — before any reason we might decline to merge.
+    #
+    # A fetch only updates remote-tracking refs. It never moves HEAD, never
+    # touches the working tree, and cannot disturb whoever is using this
+    # checkout — so it is safe on a branch, on a detached HEAD, and on a dirty
+    # tree alike. Doing it here means `refs/remotes/origin/main` is fresh no
+    # matter which skip we take below.
+    #
+    # That ordering is load-bearing, not tidiness. `check_spec_doc_presence`
+    # classifies a spec against this checkout's LOCAL origin/main ref and never
+    # fetches on its own, so a stale ref makes a spec that IS merged read as
+    # NOT_AUTHORED — and the caller is told to author a spec that already
+    # exists (incident 2026-06-10, merged PR #415 reported as never-authored).
+    # With the fetch below the branch check, that held for a dirty tree but NOT
+    # for one parked on a feature branch: it returned before fetching, so the
+    # ref stayed stale and the verdict stayed wrong. Proven on a real clone
+    # parked on `wip/…` with the spec genuinely on origin/main — exit 1,
+    # "author + merge it first". Fetching first makes every decline path leave
+    # the classification honest, rather than only the one that was tested.
+    rc, _, err = _git(path, 'fetch', 'origin', 'main')
+    if rc != 0:
+        return out('error', f'fetch failed: {err[:160]}')
+
     rc, branch, _ = _git(path, 'rev-parse', '--abbrev-ref', 'HEAD')
     if rc != 0:
         return out('error', 'could not read HEAD')
     if branch != 'main':
         # Detached HEAD reports 'HEAD'. Either way somebody is using this tree.
+        # The fetch above already ran, so the tracking ref is current even
+        # though we decline to move anything.
         return out('skipped', f'on {branch!r}, not main')
-
-    rc, _, err = _git(path, 'fetch', 'origin', 'main')
-    if rc != 0:
-        return out('error', f'fetch failed: {err[:160]}')
 
     # TRACKED modifications only (-uno). Untracked files are deliberately NOT a
     # skip reason: every long-lived checkout accumulates build litter

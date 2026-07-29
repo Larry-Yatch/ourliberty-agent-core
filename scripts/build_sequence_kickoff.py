@@ -466,12 +466,21 @@ def apply_kickoff_transition(
         # distinguish "never authored" from "a sync-lag we could not clear",
         # and telling Larry to author the spec without that caveat is how the
         # 2026-06-10 mis-diagnosis happened.
+        # Both arms say something — the no-refresh arm is the WEAKER evidence,
+        # not the stronger. Gating this on `refresh_line` dropped the caveat
+        # exactly when nothing had been done to rule staleness out: agent-core
+        # is never refreshed here (refresh_checkout returns None for it), which
+        # is the very repo the 2026-06-10 mis-diagnosis happened in.
         caveat = (
             f' (an on-demand fast-forward was attempted first — `{refresh_line}` '
             f'— so if that line does not say `advanced`, this verdict is based '
             f'on a checkout that could not be refreshed; confirm on origin/main '
             f'before authoring anything.)'
-            if refresh_line else ''
+            if refresh_line else
+            f' (NO on-demand refresh was attempted for this repo, so the '
+            f'`origin/main` ref this verdict rests on is only as fresh as the '
+            f'last scheduled sync — confirm on the real origin/main before '
+            f'authoring anything.)'
         )
         msg = (
             f'Sequence `{seq_id}` kickoff failed: {presence.message}{caveat} '

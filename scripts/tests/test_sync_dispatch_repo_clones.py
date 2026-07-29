@@ -150,6 +150,50 @@ class SyncOneTest(unittest.TestCase):
         self.assertEqual(
             _git(self.path, 'rev-parse', 'HEAD').stdout.strip(), head_before)
 
+    def test_every_decline_path_still_refreshes_the_tracking_ref(self):
+        """The property, over EVERY reason we decline — not just the one that
+        was tested.
+
+        `check_spec_doc_presence` classifies a spec against this checkout's
+        local `refs/remotes/origin/main` and never fetches, so a stale tracking
+        ref makes a merged spec read as NOT_AUTHORED and the caller is told to
+        author a spec that already exists (incident 2026-06-10). A fetch cannot
+        disturb anyone — it moves no HEAD and no file — so there is no decline
+        reason that justifies leaving the ref stale. Before this, the fetch sat
+        below the branch check: a dirty tree got a fresh ref and a checkout
+        parked on a branch did not.
+        """
+        for label, arrange in (
+            ('dirty tree',
+             lambda: (self.pair.clone / 'seed.txt').write_text('mid-edit\n')),
+            ('on a feature branch',
+             lambda: _git(self.path, 'checkout', '-q', '-b', 'feature/wip')),
+            ('detached HEAD',
+             lambda: _git(self.path, 'checkout', '-q', '--detach',
+                          _git(self.path, 'rev-parse', 'HEAD').stdout.strip())),
+            ('local commits ahead',
+             lambda: (_git(self.path, 'commit', '-q', '--allow-empty',
+                           '-m', 'local work'))),
+        ):
+            with self.subTest(decline=label):
+                self.setUp()          # fresh clone+origin pair per case
+                arrange()
+                self.pair.advance_origin(1)
+                before = _git(self.path, 'rev-parse',
+                              'refs/remotes/origin/main').stdout.strip()
+                out = sdrc.sync_one('demo', self.path, apply=True)
+                after = _git(self.path, 'rev-parse',
+                             'refs/remotes/origin/main').stdout.strip()
+                # It still refuses to move anything...
+                self.assertNotEqual(
+                    out.action, 'advanced',
+                    f'{label}: the tree must NOT be moved')
+                # ...but the classification input is now current.
+                self.assertNotEqual(
+                    before, after,
+                    f'{label}: declined without fetching, so origin/main is '
+                    f'stale and a merged spec will read as never-authored')
+
     def test_non_main_branch_is_skipped(self):
         _git(self.path, 'checkout', '-q', '-b', 'feature/wip')
         self.pair.advance_origin(1)
