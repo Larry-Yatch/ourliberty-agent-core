@@ -15788,7 +15788,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-29T23:29:13.833742+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-29T23:28:11.68123+00:00"
+      "orphan_last_activity_ts": "2026-07-29T23:28:11.68123+00:00",
+      "briefing": {
+        "what": "The team started making sure that when several parts of the system update the same shared record files at once, they can't accidentally overwrite each other and quietly lose entries.",
+        "why": "Right now there's a small window where important records \u2014 including safety logs and the automatic backstops that catch stalled work \u2014 can vanish without anyone noticing, which undermines trust in our own records.",
+        "suggest": "Worth doing, but let's have it carefully reviewed and tested before it goes live, since it touches the plumbing that protects our records."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T23:35:10.468995+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     },
     {
       "id": "proposed-delegate-cap-thirteen-writers-do-unlocked-read-modify-write-o-4b31",
@@ -15805,7 +15819,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-29T23:29:13.833742+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-29T23:28:11.009871+00:00"
+      "orphan_last_activity_ts": "2026-07-29T23:28:11.009871+00:00",
+      "briefing": {
+        "what": "The team started work on a fix so that when several helpers update the same shared file at once, their changes don't overwrite each other.",
+        "why": "Without it, simultaneous updates can quietly clobber each other and lose data, which erodes trust in the system's reliability.",
+        "suggest": "Worth doing, but confirm the scope and have someone double-check it before it goes live, since data-safety changes deserve a careful second look."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T23:35:10.468995+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-pr-ourliberty-agent-core-1061",
@@ -15822,7 +15850,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-29T23:29:13.833742+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-29T23:27:43.316148+00:00"
+      "orphan_last_activity_ts": "2026-07-29T23:27:43.316148+00:00",
+      "briefing": {
+        "what": "A piece of work the team kicked off on its own that hasn't been tied to any of your active priorities yet.",
+        "why": "Unassigned work that sits waiting can quietly eat time and attention that belongs to the goals you've actually committed to.",
+        "suggest": "Take a quick look to confirm it's worth pursuing before it moves forward \u2014 if it doesn't map to a current priority, set it aside."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T23:35:10.468995+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
