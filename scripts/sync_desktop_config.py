@@ -13,8 +13,10 @@ source gained a usage guard.
 
 Content comes from **origin/main**, not the working tree: "deployed" means
 "what is merged", so a dirty checkout or a feature branch can never leak out.
-A best-effort `git fetch` runs first; if it fails (offline), the last known
-origin/main is still used, and that is reported.
+A `git fetch` runs first. If it FAILS, everything below is compared against a
+possibly-stale ref, so the run says so on stderr and exits non-zero even when
+nothing looked stale — reporting "clean" against a ref we could not refresh is
+the same silent false-clean this script exists to prevent.
 
 Only paths listed in config/desktop-config-sync.json are ever written.
 ~/.config/ourliberty also holds hand-authored local-only tools and the ingest
@@ -28,9 +30,17 @@ Usage:
     sync_desktop_config.py --check      # report only; exit 1 if drifted
     sync_desktop_config.py --verbose    # also name files already in sync
 
+Exit codes:
+    0  in sync (and verified against a freshly fetched origin/main)
+    1  --check only: something drifted
+    2  a file could not be synced (missing source, unwritable destination,
+       unreadable manifest)
+    3  the fetch failed, so the comparison basis is unverified
+
 Env:
     OL_SYNC_DEST_DIR      override the destination (tests; default from config)
-    OL_SYNC_SKIP_FETCH=1  skip the pre-sync `git fetch`
+    OL_SYNC_SKIP_FETCH=1  skip the pre-sync `git fetch` (an explicit opt-out;
+                          unlike a FAILED fetch this does not force exit 3)
 """
 
 from __future__ import annotations
@@ -65,21 +75,48 @@ def load_manifest(config_path: Path = _CONFIG) -> tuple[Path, list[str]]:
     sources = list(data['sources'])
     if not sources:
         raise ValueError(f'{config_path} lists no sources')
+    # Destinations are keyed on the basename, so two sources sharing one would
+    # silently collide: apply would rewrite the file on every run (last writer
+    # wins) and still exit 0, while --check reported drift forever. Refuse the
+    # manifest instead of deploying whichever entry happens to be last.
+    seen: dict[str, str] = {}
+    for src in sources:
+        name = Path(src).name
+        if name in seen:
+            raise ValueError(
+                f'{config_path}: {src} and {seen[name]} share the destination '
+                f'basename {name!r} — they would overwrite each other')
+        seen[name] = src
     return dest, sources
 
 
-def _fetch() -> bool:
-    """Best-effort refresh of the origin/main ref. False if it did not run."""
+def _fetch() -> tuple[str, str]:
+    """Refresh the origin/main ref. Returns (status, detail) where status is
+    'ok', 'skipped' (caller opted out) or 'failed'.
+
+    'failed' must NOT be conflated with 'skipped'. A failed fetch means every
+    comparison below is against a possibly-stale ref, so the run cannot honestly
+    claim the deployed copies match main — see main(). The likely trigger here
+    is not being offline: the SessionStart hook runs against a checkout that
+    other automation fetches and commits into concurrently, so a transient
+    'cannot lock ref refs/remotes/origin/main' is expected."""
     if os.environ.get('OL_SYNC_SKIP_FETCH') == '1':
-        return False
+        return 'skipped', 'OL_SYNC_SKIP_FETCH=1'
     try:
         r = subprocess.run(
             ['git', '-C', str(_REPO_ROOT), 'fetch', '--quiet', 'origin', 'main'],
             capture_output=True, text=True, timeout=_FETCH_TIMEOUT,
         )
-        return r.returncode == 0
-    except Exception:  # noqa: BLE001 — offline/slow is survivable, not fatal
-        return False
+        if r.returncode == 0:
+            return 'ok', ''
+        # git is chatty on failure; this line lands in a SessionStart hook, so
+        # collapse it to one readable line rather than a five-line wall.
+        detail = ' '.join((r.stderr or r.stdout or '').split())
+        return 'failed', (detail[:200] or f'exit {r.returncode}')
+    except subprocess.TimeoutExpired:
+        return 'failed', f'timed out after {_FETCH_TIMEOUT}s'
+    except Exception as exc:  # noqa: BLE001 — report it, never swallow it
+        return 'failed', str(exc)
 
 
 def _blob(source: str) -> tuple[bytes, bool]:
@@ -96,9 +133,33 @@ def _blob(source: str) -> tuple[bytes, bool]:
         ['git', '-C', str(_REPO_ROOT), 'ls-tree', _REF, source],
         capture_output=True, text=True, timeout=30,
     )
-    # "100755 blob <sha>\t<path>" — the mode is what makes a hook runnable.
-    mode = ls.stdout.split(' ', 1)[0] if ls.stdout else ''
-    return show.stdout, mode == '100755'
+    return show.stdout, is_executable_mode(source, ls.returncode, ls.stdout)
+
+
+def is_executable_mode(source: str, returncode: int, stdout: str) -> bool:
+    """Parse `git ls-tree` output into "should this land executable?".
+
+    Raises rather than guessing. The deployed files are invoked as bare
+    executables by the Claude Code hooks (settings.json runs the .sh directly,
+    not `bash <file>`), so landing one 0644 breaks it with permission-denied on
+    every session start. Silently defaulting to non-executable whenever this
+    output is unexpected would make that the failure mode of every surprise."""
+    if returncode != 0:
+        raise ValueError(f'{source}: git ls-tree {_REF} failed (exit {returncode})')
+    if not stdout.strip():
+        raise ValueError(
+            f'{source}: git ls-tree {_REF} returned no entry — `git show` and '
+            '`git ls-tree` disagree about this path')
+    # "100755 blob <sha>\t<path>"
+    mode = stdout.split(' ', 1)[0]
+    if mode not in ('100644', '100755'):
+        # 120000 symlink, 160000 gitlink, 040000 tree — `git show` yields the
+        # link target / nothing useful, so copying it as a regular file would
+        # deploy something quietly wrong.
+        raise ValueError(
+            f'{source}: unsupported git mode {mode} at {_REF} — only regular '
+            'files (100644/100755) can be deployed')
+    return mode == '100755'
 
 
 def sync(dest_dir: Path, sources: list[str], *, check: bool = False,
@@ -177,10 +238,22 @@ def main(argv: list[str] | None = None) -> int:
         _err(f'cannot read {_CONFIG}: {exc}')
         return 2
 
-    if not _fetch() and args.verbose:
-        _out(f'fetch skipped/failed — comparing against the last known {_REF}')
+    status, detail = _fetch()
+    if status == 'skipped' and args.verbose:
+        _out(f'fetch skipped ({detail}) — comparing against the local {_REF}')
 
-    return sync(dest_dir, sources, check=args.check, verbose=args.verbose)
+    rc = sync(dest_dir, sources, check=args.check, verbose=args.verbose)
+
+    if status == 'failed':
+        # Everything above compared against a ref we could not refresh, so a
+        # clean result here means "matches a possibly-stale origin/main", not
+        # "matches main". Reporting 0 in that state is the silent false-clean
+        # this whole script exists to prevent — say so and exit non-zero even
+        # when nothing looked stale.
+        _err(f'git fetch failed ({detail}) — compared against a possibly-stale '
+             f'{_REF}; the deployed copies are NOT verified against main')
+        return rc or 3
+    return rc
 
 
 if __name__ == '__main__':
