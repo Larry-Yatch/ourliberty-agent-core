@@ -283,6 +283,18 @@ class ApprovedEscalationModeTest(unittest.TestCase):
         self.assertEqual(agent, 'beacon')
         self.assertEqual(filename, 'larry-reject-ev-promoted-1.json')
 
+    def test_marker_string_matches_the_promoter_constant(self):
+        # dashboard_api keys the routing on a literal (importing the healer
+        # into the API process is undesirable); this pins the two against
+        # drift — if the promoter's constant ever changes, this fails before
+        # the routing silently stops matching.
+        import heal_unregistered_approval as hua
+        self.assertEqual(hua.PROMOTED_SOURCE_FORLARRY,
+                         'for-larry-mirror-review')
+        self.assertEqual(
+            self.PROMOTED_PAYLOAD['promoted_source'],
+            hua.PROMOTED_SOURCE_FORLARRY)
+
     def test_recheck_mode_output_is_unchanged_by_the_mode_param(self):
         # The default mode must reproduce the pre-#1058 recheck prompt exactly
         # (the "Revision N has been applied" framing and findings carry).
