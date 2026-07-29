@@ -71,6 +71,73 @@ class BuildIdentityPinSystemPromptTest(unittest.TestCase):
         self.assertIn('ignore', pin.lower())
 
 
+class AgentManualPathTest(unittest.TestCase):
+    """The manual must be reachable from a worktree of ANY target repo.
+
+    Regression for the lens-loading gap (2026-07-28, specs/mirror-lens-loading-gap.md):
+    the pin named `agents/<agent>/CLAUDE.md` relatively, which resolves against
+    cwd — a worktree of the repo under review. It therefore resolved ONLY when
+    the target repo was agent-core. On RSDPM the manual was unreachable, so
+    Mirror never read step 4b and the bug-hunt lenses (A–J) did not run on a
+    single RSDPM PR: 178 reviews, median 40s, vs 325s on agent-core.
+
+    Each test here FAILS against the pre-fix pin string, which is the point —
+    a guard only ever observed passing proves nothing (standing rule 9).
+    """
+
+    def test_candidate_paths_are_absolute(self):
+        for path in ar.agent_manual_paths('mirror'):
+            self.assertTrue(
+                Path(path).is_absolute(),
+                'manual path must not depend on cwd: ' + path,
+            )
+
+    def test_candidates_cover_runtime_and_repo_copies(self):
+        runtime, in_repo = ar.agent_manual_paths('mirror')
+        self.assertTrue(runtime.endswith('agents/mirror/workspace/CLAUDE.md'))
+        self.assertTrue(in_repo.endswith('agents/mirror/CLAUDE.md'))
+
+    def test_honors_agents_root_redirect(self):
+        # Resolved at call time so the sandbox redirect (and any relocation of
+        # the runtime tree) is honored — not baked to a literal /home/larry.
+        import os as _os
+        prior = _os.environ.get('OURLIBERTY_AGENTS_ROOT')
+        _os.environ['OURLIBERTY_AGENTS_ROOT'] = '/tmp/redirected-agents-root'
+        try:
+            runtime = ar.agent_manual_paths('mirror')[0]
+        finally:
+            if prior is None:
+                _os.environ.pop('OURLIBERTY_AGENTS_ROOT', None)
+            else:
+                _os.environ['OURLIBERTY_AGENTS_ROOT'] = prior
+        self.assertEqual(
+            runtime,
+            '/tmp/redirected-agents-root/agents/mirror/workspace/CLAUDE.md',
+        )
+
+    def test_pin_carries_the_absolute_paths(self):
+        pin = ar.build_identity_pin_system_prompt('mirror')
+        for path in ar.agent_manual_paths('mirror'):
+            self.assertIn(path, pin)
+
+    def test_pin_forbids_resolving_the_manual_against_cwd(self):
+        pin = ar.build_identity_pin_system_prompt('mirror')
+        self.assertIn('relative to your cwd', pin.lower())
+
+    def test_pin_denies_the_target_repo_rulebook_as_a_substitute(self):
+        # The decoy is the active ingredient: RSDPM/CLAUDE.md auto-loads from
+        # the review worktree, is titled "build-agent rulebook", and heads a
+        # section "Standing rules — Mirror REJECTS a PR that breaks any of
+        # these". It addressed Mirror by name, passed her identity check, and
+        # ended her search. An absent manual makes a worker hunt harder; a
+        # plausible wrong one makes it stop. So the pin must say, explicitly,
+        # that being named by a repo rulebook does not make it the manual.
+        pin = ar.build_identity_pin_system_prompt('mirror').lower()
+        self.assertIn('target repo', pin)
+        self.assertIn('by name', pin)
+        self.assertIn('never instead of it', pin)
+
+
 class IdentityPinArgsTest(unittest.TestCase):
     """The CLI-arg wrapper consumed by run_claude's spawn path."""
 
