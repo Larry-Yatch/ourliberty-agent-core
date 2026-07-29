@@ -4005,6 +4005,42 @@ class TestDagPreflightSyncLag(_TempAgentsRootMixin, unittest.TestCase):
 
     # ---- review findings: the check-level half ----
 
+    def test_escalation_uses_episode_dedup_not_the_flat_hour(self) -> None:
+        """A wedged sync is an infrastructure outage lasting hours. On the flat
+        1h ALERT_DEDUP_HOURS this re-DMs Larry every hour all night for one
+        unchanged fact — the pattern config/pipeline-stall-rules.json calls the
+        dominant false-alert source. The escalation takes the 24h episode
+        window; the re-dispatch branch must NOT (a cleared lag has to be
+        re-dispatched promptly)."""
+        import build_sequence_validator as bsv
+        self._write_seq('lag-seq', audit=[self._lag(45)])
+        with self._patch_presence(bsv.SPEC_DOC_BEHIND_ORIGIN):
+            escalation = self.hps.check_dag_preflight_sync_lag({})[0]
+        self.assertEqual(escalation.get('re_dm_hours'), 24)
+
+        with self._patch_presence(bsv.SPEC_DOC_PRESENT):
+            redispatch = self.hps.check_dag_preflight_sync_lag({})[0]
+        self.assertIsNone(
+            redispatch.get('re_dm_hours'),
+            'the re-dispatch branch must stay on the tight window',
+        )
+
+        # And it actually suppresses: 12h after firing, still quiet.
+        state: dict = {}
+        self.hps.record_alert(state, escalation['key'])
+        state[escalation['key']] = _iso(12 * 60)
+        self.assertFalse(
+            self.hps.should_alert(state, escalation['key'],
+                                  escalation.get('re_dm_hours')),
+            'a still-wedged sync must not re-DM 12h in',
+        )
+        # …but the 24h backstop still re-arms.
+        state[escalation['key']] = _iso(25 * 60)
+        self.assertTrue(
+            self.hps.should_alert(state, escalation['key'],
+                                  escalation.get('re_dm_hours')),
+        )
+
     def test_indeterminate_does_not_count_as_caught_up(self) -> None:
         """A transient `git` failure (15s timeout, unresolvable origin/main)
         yields INDETERMINATE. Treating that as 'the spec is readable' would
