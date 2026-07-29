@@ -14266,7 +14266,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-29T00:21:17.460354+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-29T00:20:41.865544+00:00"
+      "orphan_last_activity_ts": "2026-07-29T00:20:41.865544+00:00",
+      "briefing": {
+        "what": "A piece of work your team began that hasn't been connected to any active project yet, and it's now waiting for a sign-off before it can move forward.",
+        "why": "Unclaimed work that stalls in the review line ties up your team's effort without delivering anything and can quietly become wasted time.",
+        "suggest": "Take a quick look to confirm it still fits your priorities before greenlighting it \u2014 worth a short pause rather than an automatic yes."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T00:24:14.415791+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-pr-ourliberty-agent-core-1044",
@@ -14283,7 +14297,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-29T00:21:17.460354+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-29T00:20:40.012174+00:00"
+      "orphan_last_activity_ts": "2026-07-29T00:20:40.012174+00:00",
+      "briefing": {
+        "what": "A piece of work the team started on their own that isn't attached to any of your active priorities yet.",
+        "why": "It's sitting in line waiting for a sign-off, and until someone weighs in it just ties up attention without moving anything forward.",
+        "suggest": "Have someone give it a quick look to confirm it's worth finishing before it goes further \u2014 no rush, but don't let it linger unclaimed."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T00:24:14.415791+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
