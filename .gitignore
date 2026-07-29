@@ -50,6 +50,8 @@ npm-debug.log
 *.swp
 *.swo
 *~
+# Ephemeral per-cycle helper scripts the Pulse LLM writes under agents/pulse/
+agents/pulse/write_journal_*.py
 
 # --- Large binaries (don't commit; route through Drive/S3 if ever needed) ---
 *.mp4
