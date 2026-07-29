@@ -599,11 +599,14 @@ def recent_review_record(
       frees — so age says nothing about whether it is still going to run;
     - a matching `.claimed/<slot>/` record blocks head-AGNOSTICALLY (Mirror is
       literally executing that review; never pile on) but only within
-      `window_minutes`. It is deliberately NOT age-independent: a claim DOES
-      have a hard ceiling (`agent_runner.REVIEW_SESSION_CEILING_SECONDS`, 35
-      min), and `heal_orphaned_mirror_claims` sweeps every ~10 min past a 45-min
-      grace to archive a concluded/terminal claim or RE-INJECT a still-open one.
-      So a claim older than this window is one BOTH of those bounds failed to
+      `window_minutes` OF ITS CLAIM — `max(mtime, ctime)`, because the claim is
+      an `os.rename` that preserves mtime and bumps ctime, so mtime alone would
+      measure the DISPATCH and a long-queued review would read as stale the
+      instant it started running. It is deliberately NOT age-independent: a
+      claim has a hard ceiling (`agent_runner.REVIEW_SESSION_CEILING_SECONDS`,
+      35 min), and `heal_orphaned_mirror_claims` sweeps every ~10 min past a
+      45-min grace to archive a concluded/terminal claim or RE-INJECT a
+      still-open one. So a claim this old is one BOTH of those bounds failed to
       resolve — provably stranded, and the backstop is the last net under it.
       Blocking such a claim forever would convert a bounded strand into a
       permanent one: `_review_request_already_dispatched`'s `.claimed` check
@@ -660,18 +663,18 @@ def recent_review_record(
     # head-AGNOSTICALLY (a live review covers whatever head it checked out);
     # `.archive/` + `.invalid/` are head-aware. Slot dirs are globbed (not the
     # record name) so a metacharacter-bearing task_id can't widen the scan.
-    scan: list[tuple[Path, str, bool]] = []  # (dir, label, apply head-awareness)
+    scan: list[tuple[Path, str, str]] = []  # (dir, label, kind)
     try:
         scan.extend(
-            (s, f'.claimed/{s.name}', False)
+            (s, f'.claimed/{s.name}', 'claimed')
             for s in (mirror_inbox / '.claimed').glob('*') if s.is_dir()
         )
     except OSError:
         pass
     scan.extend(
-        (mirror_inbox / sub, sub, True) for sub in ('.archive', '.invalid')
+        (mirror_inbox / sub, sub, 'archived') for sub in ('.archive', '.invalid')
     )
-    for d, sub, head_gated in scan:
+    for d, sub, kind in scan:
         try:
             entries = d.glob(glob_pat)
         except OSError:
@@ -679,18 +682,39 @@ def recent_review_record(
         for p in entries:
             if not name_re.fullmatch(p.name):
                 continue
-            if head_gated and head_aware:
+            if kind == 'archived' and head_aware:
                 recorded = outbox_notifier._recorded_review_head_sha(p)
                 if isinstance(recorded, str) and recorded and \
                         recorded != current_head_sha:
                     continue  # covers a superseded head — proves nothing
             try:
-                mtime = datetime.fromtimestamp(
-                    p.stat().st_mtime, tz=timezone.utc,
-                )
+                st = p.stat()
             except OSError:
                 continue
-            age_min = (now - mtime).total_seconds() / 60.0
+            # WHICH clock, per leg — they measure different events and are NOT
+            # interchangeable:
+            #   'archived' → st_mtime. Both the claim and the archive are plain
+            #     renames, which PRESERVE mtime, so an archived record's mtime is
+            #     still its DISPATCH time. That is exactly what this window wants
+            #     (it must span dispatch → NEXT-round dispatch — see the comment
+            #     on RECENT_REVIEW_ACTIVITY_MINUTES). Switching this leg to ctime
+            #     would silently re-anchor it on the ARCHIVE (verdict) time and
+            #     shorten the interval it was sized for.
+            #   'claimed'  → max(mtime, ctime) ≈ CLAIM time. The claim rename
+            #     bumps ctime while preserving mtime, so mtime here is the
+            #     dispatch time and can be arbitrarily old: a review that queued
+            #     in the inbox root longer than the window (slot saturation — the
+            #     readiness trip-wire watches for oldest-wait ≥ 3600s) would read
+            #     as "stale" the instant a slot picked it up, and this leg would
+            #     stop blocking at exactly the moment Mirror STARTED executing —
+            #     protected while merely queued, unprotected while running, which
+            #     is the #865 pile-on. `max` rather than bare ctime so a platform
+            #     that does not bump ctime on rename degrades to the old
+            #     behaviour instead of reading as brand-new forever.
+            ts = max(st.st_mtime, st.st_ctime) if kind == 'claimed' \
+                else st.st_mtime
+            stamp = datetime.fromtimestamp(ts, tz=timezone.utc)
+            age_min = (now - stamp).total_seconds() / 60.0
             if age_min <= window_minutes:
                 return f'{sub}/{p.name} written {max(0, int(age_min))}m ago'
     return None

@@ -1218,48 +1218,146 @@ class TestRecentReviewRecordHeadAware(unittest.TestCase):
 
     # ---- but the `.claimed/` leg is WINDOW-BOUNDED, not permanent ----
 
+    # A claim is aged from max(mtime, ctime) ≈ CLAIM time, and ctime cannot be
+    # back-dated from a test (the claim rename sets it to "now"). So these age a
+    # claim by ADVANCING THE CLOCK — `recent_review_record` takes `now` — which
+    # models real elapsed time for both stamps and does not depend on which one
+    # the implementation happens to read.
+
+    def _probe_at(self, head, *, minutes_later):
+        return h.recent_review_record(
+            f'review-{self.TASK}', self.inbox,
+            self.now + timedelta(minutes=minutes_later),
+            current_head_sha=head)
+
     def test_stranded_claim_past_the_window_does_not_block(self):
-        # A claim older than the window is one that BOTH the 35-min review
-        # ceiling AND heal_orphaned_mirror_claims (10-min sweep past a 45-min
-        # grace: archive-if-concluded / re-inject-if-open, SPARE on gh-unknown)
-        # failed to resolve. Blocking it forever would strand the PR with
-        # nothing left to rescue it — `_review_request_already_dispatched`'s
-        # `.claimed` check matches only the exact `review-<task>.json`, so this
-        # `-rev1` claim does NOT stop the PR being selected as orphaned every
-        # tick; this guard would just silently refuse it, permanently. That is
-        # the same never-concludes shape this whole change exists to remove.
-        self._write(f'.claimed/slot-1/review-{self.TASK}-rev1.json',
-                    head=self.OLD_HEAD,
-                    age_minutes=h.RECENT_REVIEW_ACTIVITY_MINUTES + 30)
-        self.assertIsNone(self._probe(self.NEW_HEAD))
+        # A claim this old is one that BOTH the 35-min review ceiling AND
+        # heal_orphaned_mirror_claims (10-min sweep past a 45-min grace:
+        # archive-if-concluded / re-inject-if-open, SPARE on gh-unknown) failed
+        # to resolve. Blocking it forever would strand the PR with nothing left
+        # to rescue it — `_review_request_already_dispatched`'s `.claimed` check
+        # matches only the exact `review-<task>.json`, so this `-rev1` claim does
+        # NOT stop the PR being selected as orphaned every tick; this guard would
+        # just silently refuse it, permanently. That is the same never-concludes
+        # shape this whole change exists to remove.
+        self._claim(f'review-{self.TASK}-rev1.json', head=self.OLD_HEAD,
+                    dispatched_minutes_ago=0)
+        self.assertIsNone(self._probe_at(
+            self.NEW_HEAD,
+            minutes_later=h.RECENT_REVIEW_ACTIVITY_MINUTES + 30))
 
     def test_stranded_claim_past_the_window_does_not_block_head_blind(self):
         # Same rescue with no head supplied — the age bound is independent of
         # head-awareness (a stranded claim records the head it was dispatched
         # for, which may well still be the current one).
-        self._write(f'.claimed/slot-1/review-{self.TASK}-rev1.json',
-                    head=self.NEW_HEAD,
-                    age_minutes=h.RECENT_REVIEW_ACTIVITY_MINUTES + 30)
+        self._claim(f'review-{self.TASK}-rev1.json', head=self.NEW_HEAD,
+                    dispatched_minutes_ago=0)
         self.assertIsNone(h.recent_review_record(
-            f'review-{self.TASK}', self.inbox, self.now))
+            f'review-{self.TASK}', self.inbox,
+            self.now + timedelta(
+                minutes=h.RECENT_REVIEW_ACTIVITY_MINUTES + 30)))
 
-    def test_claim_at_the_window_boundary_still_blocks(self):
-        self._write(f'.claimed/slot-1/review-{self.TASK}-rev1.json',
-                    head=self.OLD_HEAD,
-                    age_minutes=h.RECENT_REVIEW_ACTIVITY_MINUTES - 1)
+    def test_claim_exactly_at_the_window_boundary_still_blocks(self):
+        # The guard admits `age <= window`. Pin the edge itself, not a value
+        # comfortably inside it: at `window - 1` both `<=` and `<` block, so an
+        # off-by-one on the comparison that decides whether a LIVE review gets
+        # piled on would pass unnoticed.
+        self._claim(f'review-{self.TASK}-rev1.json', head=self.OLD_HEAD,
+                    dispatched_minutes_ago=0)
+        self.assertIsNotNone(self._probe_at(
+            self.NEW_HEAD, minutes_later=h.RECENT_REVIEW_ACTIVITY_MINUTES))
+
+    def test_claim_just_past_the_window_boundary_does_not_block(self):
+        self._claim(f'review-{self.TASK}-rev1.json', head=self.OLD_HEAD,
+                    dispatched_minutes_ago=0)
+        self.assertIsNone(self._probe_at(
+            self.NEW_HEAD, minutes_later=h.RECENT_REVIEW_ACTIVITY_MINUTES + 1))
+
+    def test_archived_record_exactly_at_the_window_boundary_still_blocks(self):
+        self._write(f'.archive/review-{self.TASK}.json', head=self.NEW_HEAD,
+                    age_minutes=h.RECENT_REVIEW_ACTIVITY_MINUTES)
         self.assertIsNotNone(self._probe(self.NEW_HEAD))
 
-    def test_stale_claim_does_not_mask_a_fresh_one(self):
-        # A stranded claim in one slot must not suppress a genuinely live claim
-        # in another — the scan judges each record on its own age.
-        self._write(f'.claimed/slot-1/review-{self.TASK}-rev1.json',
-                    head=self.OLD_HEAD,
-                    age_minutes=h.RECENT_REVIEW_ACTIVITY_MINUTES + 30)
-        self._write(f'.claimed/slot-2/review-{self.TASK}-rev2.json',
-                    head=self.OLD_HEAD, age_minutes=3)
-        r = self._probe(self.NEW_HEAD)
-        self.assertIsNotNone(r)
-        self.assertIn('-rev2.json', r)
+    def test_archived_record_just_past_the_window_does_not_block(self):
+        self._write(f'.archive/review-{self.TASK}.json', head=self.NEW_HEAD,
+                    age_minutes=h.RECENT_REVIEW_ACTIVITY_MINUTES + 1)
+        self.assertIsNone(self._probe(self.NEW_HEAD))
+
+    # ---- the `.claimed/` leg ages from CLAIM time, not dispatch time ----
+
+    def _claim(self, name, *, head, dispatched_minutes_ago, slot='slot-1'):
+        """Reproduce a real claim: write the record into the inbox ROOT with a
+        dispatch-time mtime, then `os.rename` it into `.claimed/<slot>/` exactly
+        as inbox_watcher does. The rename PRESERVES mtime and bumps ctime, so
+        this yields the true on-disk shape — an ancient mtime with a fresh ctime
+        — rather than a simulation of it."""
+        import os
+        src = self._write(name, head=head, age_minutes=dispatched_minutes_ago)
+        dst = self.inbox / '.claimed' / slot / name
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        os.rename(src, dst)
+        return dst
+
+    def test_long_queued_review_still_blocks_once_claimed(self):
+        # THE REGRESSION THIS LEG MUST NOT HAVE: under slot saturation (the
+        # readiness trip-wire watches oldest-wait >= 3600s) a review can sit
+        # QUEUED past the window. While queued it is protected by the
+        # age-independent inbox-root leg. The moment a slot claims it and Mirror
+        # STARTS EXECUTING, it leaves the root — and if this leg aged from mtime
+        # (which the claim rename preserves as the DISPATCH time) it would read
+        # as stale immediately and stop blocking, so the backstop would pile a
+        # duplicate review onto a running one. Protected while idle, unprotected
+        # while running: the #865 harm, inverted.
+        self._claim(f'review-{self.TASK}-rev1.json', head=self.OLD_HEAD,
+                    dispatched_minutes_ago=h.RECENT_REVIEW_ACTIVITY_MINUTES * 3)
+        self.assertIsNotNone(self._probe(self.NEW_HEAD))
+
+    def test_archived_leg_still_ages_from_DISPATCH_not_archive_time(self):
+        # The asymmetry is load-bearing and must not be "simplified" away: the
+        # archive window is deliberately anchored on dispatch time so it spans
+        # dispatch -> NEXT-round dispatch (see RECENT_REVIEW_ACTIVITY_MINUTES).
+        # An archive is also a rename, so its ctime is the ARCHIVE (verdict)
+        # time; using max() here too would silently re-anchor and shorten it.
+        import os
+        src = self._write(f'review-{self.TASK}.json', head=self.NEW_HEAD,
+                          age_minutes=h.RECENT_REVIEW_ACTIVITY_MINUTES + 30)
+        dst = self.inbox / '.archive' / f'review-{self.TASK}.json'
+        os.rename(src, dst)  # fresh ctime, ancient mtime
+        self.assertIsNone(self._probe(self.NEW_HEAD))
+
+    def test_every_claim_slot_is_scanned(self):
+        # EVERY slot, not just the first: inbox_watcher claims into whichever
+        # slot is free, so a scan that stopped after one slot dir would miss a
+        # live review most of the time and pile a duplicate onto it. Sweeping
+        # the placement across all slots makes this independent of `glob`'s
+        # arbitrary directory order — pinning ONE placement passes or fails on
+        # which entry the filesystem happens to return first.
+        import shutil
+        slots = ('slot-1', 'slot-2', 'slot-3', 'slot-4')
+        claimed = self.inbox / '.claimed'
+        for target in slots:
+            with self.subTest(slot=target):
+                if claimed.exists():
+                    shutil.rmtree(claimed)
+                for s in slots:
+                    (claimed / s).mkdir(parents=True)
+                self._claim(f'review-{self.TASK}-rev1.json',
+                            head=self.OLD_HEAD, dispatched_minutes_ago=0,
+                            slot=target)
+                r = self._probe(self.NEW_HEAD)
+                self.assertIsNotNone(r, f'claim in {target} was not found')
+                self.assertIn(target, r)
+
+    def test_a_file_in_claimed_root_does_not_block(self):
+        # `.claimed/` holds slot DIRECTORIES; a stray file directly under it is
+        # not a claim and must not be read as one. (Doubly defended: the scan
+        # filters on `is_dir`, AND globbing under a non-directory yields nothing
+        # — so the `is_dir` call is defensive rather than load-bearing, and no
+        # test can distinguish its removal. Pinned for the PROPERTY, not the
+        # mechanism.)
+        (self.inbox / '.claimed').mkdir(parents=True, exist_ok=True)
+        (self.inbox / '.claimed' / f'review-{self.TASK}.json').write_text('{}')
+        self.assertIsNone(self._probe(self.NEW_HEAD))
 
     def test_live_inbox_leg_stays_age_independent(self):
         # Unchanged, and deliberately NOT window-bounded: a queued task has no
