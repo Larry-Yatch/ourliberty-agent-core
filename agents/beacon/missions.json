@@ -14332,7 +14332,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-29T00:36:19.969974+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-29T00:35:12.741543+00:00"
+      "orphan_last_activity_ts": "2026-07-29T00:35:12.741543+00:00",
+      "briefing": {
+        "what": "A piece of work your team built and finished that isn't attached to any active initiative yet.",
+        "why": "Finished work sitting unassigned means effort you've already paid for is delivering no value while it waits.",
+        "suggest": "Take a quick look to confirm it still fits your priorities, then either fold it into a current initiative or set it aside deliberately."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T00:44:15.039813+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
