@@ -2090,7 +2090,12 @@
         "at": "2026-07-29T00:54:15.491762+00:00",
         "from_state": "parked"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "spawned": {
+        "kind": "pr",
+        "task_id": "supersede-live-review-on-revision-dispatch",
+        "stamped_at": "2026-07-29T02:13:25.368320+00:00"
+      }
     },
     {
       "id": "cap-probe-emit-capture-verification-41850-747b",
