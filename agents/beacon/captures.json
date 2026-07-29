@@ -2096,7 +2096,7 @@
       "id": "cap-probe-emit-capture-verification-41850-747b",
       "title": "probe-emit-capture-verification-41850",
       "note": "",
-      "state": "parked",
+      "state": "dropped",
       "label": null,
       "origin": {
         "source": "desktop-chat",
@@ -2108,17 +2108,17 @@
       "last_touched": "2026-07-29T00:53:03.778241+00:00",
       "promoted_to": null,
       "briefing": {
-        "what": "A quick internal check to confirm one of our behind-the-scenes safety and record-keeping steps is actually working the way it should.",
-        "why": "If this check quietly stops working, mistakes could slip through unnoticed and we'd lose confidence that our own records are complete and trustworthy.",
-        "suggest": "Worth doing, but let's confirm the details and scope first before giving it the green light rather than rushing it through."
+        "what": "A small quality check to confirm one of our systems is reliably recording and reporting the events it's supposed to capture.",
+        "why": "If that system quietly misses events, we could be making decisions on incomplete data without realizing it.",
+        "suggest": "Worth doing, but since the details are thin, have someone spend a few minutes confirming what it covers before we greenlight it."
       },
       "risk": "medium",
       "recommended_action": "delegate",
       "briefing_provenance": {
         "by": "beacon",
         "model": "claude-opus-4-8",
-        "at": "2026-07-29T00:54:15.491762+00:00",
-        "from_state": "parked"
+        "at": "2026-07-29T01:34:19.929059+00:00",
+        "from_state": "dropped"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
