@@ -196,6 +196,42 @@ class ApplyModeTests(_SyncCase):
         self.assertEqual(local_only.read_bytes(),
                          b'# hand-authored, no repo source\n')
 
+    def test_concurrent_runs_do_not_share_a_temp_path(self):
+        # A shared temp name let a second process's truncating open() land a
+        # PARTIAL file under the first process's rename, while the sync still
+        # reported "installed". Asserted deterministically on the paths rather
+        # than by racing threads, which would be flaky either way.
+        seen = []
+        real_replace = os.replace
+
+        def spy(src, dst):
+            seen.append(str(src))
+            return real_replace(src, dst)
+
+        with mock.patch.object(sdc.os, 'replace', spy):
+            self._sync()
+            self.target.unlink()
+            self._sync()
+
+        self.assertEqual(len(seen), 2)
+        self.assertNotEqual(seen[0], seen[1],
+                            'two runs must not write through one temp path')
+        for p in seen:
+            self.assertTrue(p.endswith('.sync-tmp'), p)
+
+    def test_a_failed_rename_leaves_no_temp_behind(self):
+        # The temp is written before the rename; if the rename blows up, the
+        # next run must not find a stray half-file sitting in the config dir.
+        with mock.patch.object(sdc.os, 'replace',
+                               side_effect=OSError('rename failed')):
+            self.assertEqual(self._sync(), 2)
+        self.assertEqual(list(self.dest.iterdir()), [])
+
+    def test_deployed_file_is_not_left_group_or_world_writable(self):
+        self.assertEqual(self._sync(), 0)
+        mode = os.stat(self.target).st_mode
+        self.assertFalse(mode & (stat.S_IWGRP | stat.S_IWOTH))
+
     def test_leaves_no_temp_files_behind(self):
         self.assertEqual(self._sync(), 0)
         strays = [p.name for p in self.dest.iterdir()

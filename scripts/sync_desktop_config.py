@@ -50,6 +50,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 from pathlib import Path, PurePosixPath
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -228,18 +229,39 @@ def sync(dest_dir: Path, sources: list[str], *, check: bool = False,
             _out(f'{name}: {state} (deployed copy differs from {_REF})')
             continue
 
+        tmp: Path | None = None
         try:
             dest_dir.mkdir(parents=True, exist_ok=True)
             # Write via a temp file in the same dir, then rename: a hook firing
             # mid-sync sees either the old file or the new one, never a partial.
-            tmp = target.with_name(f'.{name}.sync-tmp')
-            tmp.write_bytes(content)
+            #
+            # The temp name must be UNIQUE PER PROCESS. SessionStart fires once
+            # per Claude session and sessions get opened in parallel, so two
+            # syncs can overlap; with one shared temp path, B's truncating
+            # `open('wb')` during A's window between write and rename made A
+            # rename a PARTIAL file into place while still reporting success. A
+            # torn shell script is worse than a stale one — bash runs whatever
+            # parses. mkstemp also creates 0600, so the content is never
+            # briefly world-readable at the mercy of the umask.
+            fd, tmp_name = tempfile.mkstemp(
+                prefix=f'.{name}.', suffix='.sync-tmp', dir=dest_dir)
+            tmp = Path(tmp_name)
+            with os.fdopen(fd, 'wb') as fh:
+                fh.write(content)
             os.chmod(tmp, 0o755 if executable else 0o644)
             os.replace(tmp, target)
+            tmp = None  # renamed away; nothing left to clean up
         except OSError as exc:
             _err(f'{target}: write failed ({exc})')
             failed.append(source)
             continue
+        finally:
+            # Never leave a half-written temp behind for the next run to find.
+            if tmp is not None:
+                try:
+                    tmp.unlink()
+                except OSError:
+                    pass
         _out(f'{name}: {"installed" if current is None else "updated"} '
              f'from {_REF}')
 
