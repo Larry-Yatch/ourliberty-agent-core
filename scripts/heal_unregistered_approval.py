@@ -1206,21 +1206,75 @@ def _healer_task_registered(task_id: str, state: dict[str, Any]) -> bool:
     return task_id in ids
 
 
+def dispatchable_target_repo(owner_repo: str) -> Optional[str]:
+    """The repo name Mirror's inbox will actually ACCEPT, or None.
+
+    Review round 1 defect: this stamped the `owner/repo` slug `parse_pr_url`
+    returns. Every gate downstream matches BARE canonical names
+    (`agent-models.json` `allowed_repos`) by EXACT membership —
+    `routing_validator.check_target_repo` does `target_repo not in allowed`
+    with no normalization, and `inbox_watcher`'s worktree leg looks the name up
+    in `repo_paths`. So the slug meant the dispatched review envelope was
+    black-holed to `mirror/.invalid` while the card cleared and the API
+    reported success — the exact silent-success class this whole change exists
+    to kill, one hop downstream.
+
+    So: normalize the spelling (`routing_validator.canonical_repo`) AND then
+    ASK THE GATE THAT WILL JUDGE IT (`check_target_repo('mirror', ...)`).
+    Anything the gate would deny returns None, which fails the coordinate
+    closed — the card is still promoted, it just says Approve cannot
+    auto-execute instead of promising a dispatch that would vanish. Validating
+    against the real predicate rather than re-deriving the name is deliberate:
+    a second copy of the allowlist rule here is exactly how this defect
+    survived its first round of tests.
+    """
+    if not owner_repo:
+        return None
+    try:
+        import routing_validator as rv  # local: keeps config IO off import
+        canonical = rv.canonical_repo(owner_repo)
+        ok, reason = rv.check_target_repo('mirror', canonical)
+    except Exception as e:  # noqa: BLE001 — unresolvable ⇒ no stamp (fail closed)
+        log(f'target_repo canonicalization failed for {owner_repo!r}: '
+            f'{type(e).__name__}: {e}', 'WARN')
+        return None
+    if not ok:
+        log(f'target_repo {canonical!r} (from {owner_repo!r}) would be denied '
+            f'at Mirror\'s inbox: {reason}; not stamping a coordinate that '
+            f'cannot dispatch', 'WARN')
+        return None
+    return canonical
+
+
 def build_promoted_recheck_target(
     record: dict[str, Any],
     head_resolver: Any = None,
 ) -> Optional[dict[str, Any]]:
     """Structured PR coordinate for a promoted for-Larry decision card, or None.
 
-    Mirrors `outbox_notifier._build_recheck_target`'s fail-closed contract:
-    every field the dispatch needs must be present, or no coordinate is stamped
-    at all — a partial coordinate would let the dashboard resolve the card and
-    THEN fail, after the card is unrecoverable. The head comes from the record
-    when the emitting envelope carried one, else from `head_resolver` (a
-    `(owner_repo, number) -> sha` callable — live `gh` in main(), a stub in
-    tests; None keeps this function pure). `round` is 1: the promoted path
-    cannot know the prior revision round (the record does not carry it), and
-    rev1 is the bare filename the review grammar already tolerates re-running.
+    Fail-closed on everything the DISPATCH needs: task_id, a parseable pr_url,
+    and a `target_repo` Mirror's inbox will accept (see
+    :func:`dispatchable_target_repo`). Missing any of those ⇒ no coordinate,
+    because a partial one would let the dashboard resolve the card and THEN
+    fail, after the card is unrecoverable.
+
+    `head_sha` is deliberately NOT in that set (review round 1 defect). The
+    consumer — `dashboard_api._build_recheck_envelope` — validates only
+    pr_url/target_repo/task_id and resolves the head LIVE at dispatch,
+    explicitly refusing to fall back to a stamped head. Requiring one here
+    therefore bought nothing for dispatch and cost everything on a flake: the
+    probe is a single un-backed-off `gh` call, and since nothing ever re-stamps
+    an existing pending card, one timeout permanently downgraded the card to
+    "Approve cannot be auto-executed". So the head is stamped when we HAVE it
+    (record first — that is the head the escalated review actually covered —
+    else one best-effort probe) and simply omitted when we do not. A headless
+    coordinate still dispatches; it is only invisible to
+    `heal_stale_escalation_recheck`'s ladder, whose merged/closed retirement
+    this module's own `reconcile_retire` already covers.
+
+    `round`/`replan_count` come from the record when the emitting path stamped
+    them, else 1/0 — see the round-accounting note in
+    :func:`build_for_larry_approval_payload`.
     """
     record_id = record.get('id')
     if not isinstance(record_id, str) or ':' not in record_id:
@@ -1230,23 +1284,36 @@ def build_promoted_recheck_target(
     if not task or parsed is None:
         return None
     owner_repo, number = parsed
+    target_repo = dispatchable_target_repo(owner_repo)
+    if not target_repo:
+        return None
     head = record.get('head_sha')
     if not (isinstance(head, str) and head) and head_resolver is not None:
         try:
             head = head_resolver(owner_repo, number)
-        except Exception as e:  # noqa: BLE001 — a probe failure is "no stamp"
+        except Exception as e:  # noqa: BLE001 — a probe failure just omits the head
             log(f'head resolve failed for {record.get("pr_url")}: '
                 f'{type(e).__name__}: {e}', 'WARN')
             head = None
-    if not (isinstance(head, str) and head):
-        return None
-    return {
+    # `revision_count` is the round already REVIEWED, so the next one is +1 —
+    # matching outbox_notifier._build_recheck_target. Absent (records written
+    # before the field existed) ⇒ round 1, the prior behavior.
+    prior_round = record.get('revision_count')
+    if not isinstance(prior_round, int) or prior_round < 0:
+        prior_round = 0
+    replan_count = record.get('replan_count')
+    if not isinstance(replan_count, int) or replan_count < 0:
+        replan_count = 0
+    target = {
         'task_id': task,
         'pr_url': record['pr_url'],
-        'target_repo': owner_repo,
-        'head_sha': head,
-        'round': 1,
+        'target_repo': target_repo,
+        'round': prior_round + 1,
+        'replan_count': replan_count,
     }
+    if isinstance(head, str) and head:
+        target['head_sha'] = head
+    return target
 
 
 def build_for_larry_approval_payload(
@@ -1262,14 +1329,24 @@ def build_for_larry_approval_payload(
     concurrency re-check use the colon/hyphen-aware match.
 
     Approve-executes fix (agent-core #1058): the payload now carries
-    `promoted_source` (always) and `recheck_target` (when the full PR
-    coordinate is resolvable — see :func:`build_promoted_recheck_target`).
-    With the coordinate, the dashboard's Approve dispatches a fresh Mirror
-    re-review mechanically and the card text says so; without it, Approve is
-    refused loudly (400, card intact) rather than silently clearing, and the
-    card text says that instead. Both keys ride through add_pending into
+    `promoted_source` (always) and `recheck_target` (when the PR coordinate is
+    resolvable — see :func:`build_promoted_recheck_target`). With the
+    coordinate, the dashboard's Approve dispatches a fresh Mirror re-review
+    mechanically and the card text says so; without it, Approve is refused
+    loudly (400, card intact) rather than silently clearing, and the card text
+    says that instead. Both keys ride through add_pending into
     dispatch_payload and through build_approval_request_chain_event into the
-    tab feed."""
+    tab feed; the dashboard additionally requires this module's
+    `PROMOTED_TASK_PREFIX` on the task_id before honoring the marker, so an
+    LLM-authored payload cannot claim the identity.
+
+    ROUND ACCOUNTING: the coordinate's round comes from the record's
+    `revision_count`/`replan_count` when the emitting path stamped them
+    (outbox_notifier does, as of the same fix). Records written before those
+    fields existed fall back to round 1 — which restarts the revision budget
+    and reuses an archived round name on a task that had already burned
+    rounds. That residue drains as old records clear; it is not worth guessing
+    a round from prose."""
     record_id = record.get('id') or dedup_key
     task_id = derive_task_id(dedup_key)
     pr_url = record.get('pr_url')
@@ -1287,8 +1364,8 @@ def build_for_larry_approval_payload(
         )
     else:
         approve_means = (
-            'Approve cannot be auto-executed for this card (no full PR '
-            'coordinate could be resolved) — handle the PR by hand, then '
+            'Approve cannot be auto-executed for this card (no dispatchable '
+            'PR coordinate could be resolved) — handle the PR by hand, then '
             'Reject to dismiss.'
         )
     summary = (

@@ -191,6 +191,8 @@ def upsert(
     head_sha: Optional[str] = None,
     dedup_identity: Optional[str] = None,
     decision_key: Optional[str] = None,
+    revision_count: Optional[int] = None,
+    replan_count: Optional[int] = None,
     now: Optional[datetime] = None,
 ) -> Optional[dict[str, Any]]:
     """Create or refresh an OPEN for-Larry record keyed by ``record_id``.
@@ -208,6 +210,15 @@ def upsert(
     ``dedup_identity`` (a fresh push) refreshes the row in place. Re-opening a
     previously resolved row flips it back to OPEN (a new escalation after a
     clear). Never raises — a write failure must not block the routing pass.
+
+    ``revision_count``/``replan_count`` are the task's round accounting at the
+    moment of the escalation, carried so a LATER promotion of this record
+    (heal_unregistered_approval) can name its re-review round correctly rather
+    than assuming round 1 — `revision_count` resets per replan, so the pair is
+    what identifies a round (the D3.5 5c-followup-2 HIGH-1 filename rule).
+    Omitted by callers that do not track rounds; absent on records written
+    before the fields existed, and consumers must treat absent as "unknown"
+    and fall back to their prior default.
     """
     if not record_id:
         return None
@@ -241,6 +252,12 @@ def upsert(
                 'ts': created,
                 'updated_at': _iso(n),
             }
+            # Round accounting rides along ONLY when the producer tracks it, so
+            # every existing caller's row stays byte-identical.
+            if isinstance(revision_count, int) and revision_count >= 0:
+                row['revision_count'] = revision_count
+            if isinstance(replan_count, int) and replan_count >= 0:
+                row['replan_count'] = replan_count
             rows = [r for r in rows if r.get('id') != record_id]
             rows.append(row)
             _save(rows, n)

@@ -1428,9 +1428,10 @@ class BuildForLarryPayloadTest(unittest.TestCase):
         self.assertEqual(payload['recheck_target'], {
             'task_id': FORLARRY_TASK,
             'pr_url': FORLARRY_DECISION_RECORD['pr_url'],
-            'target_repo': 'Larry-Yatch/ourliberty-agent-core',
+            'target_repo': 'ourliberty-agent-core',
             'head_sha': 'abc12345',
             'round': 1,
+            'replan_count': 0,
         })
         # ... and the card text promises the action Approve will now take.
         self.assertIn('re-dispatch the Mirror review', payload['summary'])
@@ -1452,10 +1453,55 @@ class BuildPromotedRecheckTargetTest(unittest.TestCase):
     def test_full_record_yields_a_complete_coordinate(self):
         target = h.build_promoted_recheck_target(FORLARRY_DECISION_RECORD)
         self.assertEqual(target['task_id'], FORLARRY_TASK)
-        self.assertEqual(target['target_repo'],
-                         'Larry-Yatch/ourliberty-agent-core')
+        self.assertEqual(target['target_repo'], 'ourliberty-agent-core')
         self.assertEqual(target['head_sha'], 'abc12345')
         self.assertEqual(target['round'], 1)
+
+    def test_target_repo_is_the_bare_name_mirrors_inbox_accepts(self):
+        """Review round 1 defect: this stamped the `owner/repo` slug from the
+        PR URL. Every gate downstream (routing_validator.check_target_repo,
+        inbox_watcher's repo_paths lookup) matches BARE canonical names by
+        exact membership — so the dispatched review was black-holed to
+        mirror/.invalid while the card cleared and the API reported success."""
+        import routing_validator as rv
+        target = h.build_promoted_recheck_target(FORLARRY_DECISION_RECORD)
+        repo = target['target_repo']
+        self.assertNotIn('/', repo)
+        # The authoritative check, not a re-derivation of the naming rule.
+        ok, reason = rv.check_target_repo('mirror', repo)
+        self.assertTrue(ok, reason)
+
+    def test_repo_outside_mirrors_allowlist_fails_the_stamp_closed(self):
+        """A PR in a repo Mirror may not target must not get a coordinate:
+        stamping one would promise an Approve that the inbox then discards."""
+        rec = dict(
+            FORLARRY_DECISION_RECORD,
+            pr_url='https://github.com/Larry-Yatch/some-other-repo/pull/7',
+        )
+        self.assertIsNone(h.build_promoted_recheck_target(rec))
+
+    def test_round_follows_the_records_revision_count(self):
+        # revision_count is the round already reviewed, so the next is +1 —
+        # matching outbox_notifier._build_recheck_target.
+        rec = dict(FORLARRY_DECISION_RECORD, revision_count=2, replan_count=1)
+        target = h.build_promoted_recheck_target(rec)
+        self.assertEqual(target['round'], 3)
+        self.assertEqual(target['replan_count'], 1)
+
+    def test_missing_round_fields_fall_back_to_round_one(self):
+        # Records written before the fields existed keep the prior behavior.
+        target = h.build_promoted_recheck_target(FORLARRY_DECISION_RECORD)
+        self.assertEqual(target['round'], 1)
+        self.assertEqual(target['replan_count'], 0)
+
+    def test_bogus_round_fields_fall_back_to_round_one(self):
+        for bogus in ('2', -1, None, [], 1.5):
+            with self.subTest(bogus=bogus):
+                rec = dict(FORLARRY_DECISION_RECORD,
+                           revision_count=bogus, replan_count=bogus)
+                target = h.build_promoted_recheck_target(rec)
+                self.assertEqual(target['round'], 1)
+                self.assertEqual(target['replan_count'], 0)
 
     def test_missing_head_uses_the_resolver(self):
         rec = dict(FORLARRY_DECISION_RECORD)
@@ -1478,22 +1524,44 @@ class BuildPromotedRecheckTargetTest(unittest.TestCase):
             head_resolver=lambda *_: self.fail('resolver must not be called'))
         self.assertEqual(target['head_sha'], 'abc12345')
 
-    def test_unresolvable_head_fails_the_stamp_closed(self):
+    def test_unresolvable_head_still_yields_a_dispatchable_coordinate(self):
+        """Review round 1 defect: an unresolvable head returned None, so ONE
+        transient gh flake permanently downgraded the card — nothing ever
+        re-stamps an existing pending entry, so Approve 400'd forever. The
+        dispatch consumer never needed the head (it resolves live and refuses
+        to use a stamped one), so the head is now simply omitted."""
         rec = dict(FORLARRY_DECISION_RECORD)
         rec.pop('head_sha')
-        self.assertIsNone(h.build_promoted_recheck_target(rec))
-        self.assertIsNone(h.build_promoted_recheck_target(
-            rec, head_resolver=lambda *_: None))
+        for resolver in (None, lambda *_: None):
+            with self.subTest(resolver=resolver):
+                target = h.build_promoted_recheck_target(
+                    rec, head_resolver=resolver)
+                self.assertIsNotNone(target)
+                self.assertNotIn('head_sha', target)
+                # Everything the dispatch actually validates is present.
+                for field in ('task_id', 'pr_url', 'target_repo'):
+                    self.assertTrue(target.get(field), field)
 
-    def test_resolver_exception_fails_the_stamp_closed(self):
+    def test_resolver_exception_omits_the_head_without_losing_the_card(self):
         rec = dict(FORLARRY_DECISION_RECORD)
         rec.pop('head_sha')
 
         def boom(*_):
             raise RuntimeError('gh unavailable')
 
-        self.assertIsNone(
-            h.build_promoted_recheck_target(rec, head_resolver=boom))
+        target = h.build_promoted_recheck_target(rec, head_resolver=boom)
+        self.assertIsNotNone(target)
+        self.assertNotIn('head_sha', target)
+
+    def test_headless_card_still_promises_the_approve_action(self):
+        # The card text is driven by coordinate presence, so a headless
+        # coordinate must still say Approve will dispatch — it will.
+        rec = dict(FORLARRY_DECISION_RECORD)
+        rec.pop('head_sha')
+        key = h.forlarry_dedup_key(rec['id'])
+        payload = h.build_for_larry_approval_payload(rec, key)
+        self.assertIn('recheck_target', payload)
+        self.assertIn('re-dispatch the Mirror review', payload['summary'])
 
     def test_missing_or_malformed_pr_url_fails_the_stamp_closed(self):
         for bad in (None, '', 'https://example.com/nope',

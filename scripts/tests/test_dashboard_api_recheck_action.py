@@ -227,11 +227,19 @@ class ApprovedEscalationModeTest(unittest.TestCase):
                 source=self._source(payload), action='approve',
                 comment=comment, actor='larry')
 
+    def _recheck(self, payload, head=LIVE_HEAD, comment=None):
+        with mock.patch.object(
+            da, '_gh_pr_head_sha_for_recheck', return_value=head,
+        ):
+            return da._build_envelope_for_action(
+                source=self._source(payload), action='recheck',
+                comment=comment, actor='larry')
+
     def test_approve_dispatches_a_mirror_review_not_a_beacon_envelope(self):
         agent, filename, env = self._approve(self.PROMOTED_PAYLOAD)
         self.assertEqual(agent, 'mirror')
         self.assertEqual(filename, 'review-pr-RSDPM-59-rev1.json')
-        self.assertEqual(env['dispatched_by'], 'dashboard-approve-escalation')
+        self.assertEqual(env['dispatched_by'], 'dashboard-stranded-escalation')
         self.assertEqual(env['head_sha'], LIVE_HEAD)
         self.assertEqual(env['task_id'], 'pr-RSDPM-59')
 
@@ -239,7 +247,7 @@ class ApprovedEscalationModeTest(unittest.TestCase):
         # Nothing was fixed — the prompt must not claim a revision landed, and
         # the card's meta-prose must not be presented as Mirror's findings.
         _, _, env = self._approve(self.PROMOTED_PAYLOAD)
-        self.assertIn('Larry APPROVED', env['prompt'])
+        self.assertIn('stranded', env['prompt'])
         self.assertNotIn('has been applied', env['prompt'])
         self.assertNotIn('previous_findings', env)
         self.assertIn('REVIEW_PASS', env['prompt'])
@@ -252,6 +260,27 @@ class ApprovedEscalationModeTest(unittest.TestCase):
         self.assertNotIn('Your findings from the previous round',
                          env['prompt'])
 
+    def test_recheck_on_a_promoted_card_uses_the_same_framing_as_approve(self):
+        # Review round 1 defect: recheck_target presence lights up the tab's
+        # third button on promoted cards, and that branch ran the default mode
+        # — telling Mirror a revision had been applied to an untouched head and
+        # handing her the healer's narration as her own prior findings, which
+        # outbox_notifier then threads into any resulting Forge revision.
+        _, _, env = self._recheck(self.PROMOTED_PAYLOAD)
+        self.assertEqual(env['dispatched_by'], 'dashboard-stranded-escalation')
+        self.assertNotIn('has been applied', env['prompt'])
+        self.assertNotIn('previous_findings', env)
+        self.assertNotIn('Your findings from the previous round',
+                         env['prompt'])
+
+    def test_recheck_on_an_ordinary_card_keeps_the_revision_framing(self):
+        _, _, env = self._recheck({
+            'prompt': 'the GRANT is inert', 'recheck_target': FULL_TARGET,
+        })
+        self.assertEqual(env['dispatched_by'], 'dashboard-recheck')
+        self.assertIn('has been applied', env['prompt'])
+        self.assertEqual(env['previous_findings'], ['the GRANT is inert'])
+
     def test_approve_without_coordinate_is_a_400_pre_claim(self):
         # The 400 fires in the builder, which the handler calls BEFORE the
         # read_at claim — so the card survives the refusal intact.
@@ -260,6 +289,16 @@ class ApprovedEscalationModeTest(unittest.TestCase):
             self._approve(payload)
         self.assertEqual(ctx.exception.status_code, 400)
         self.assertIn('nothing it can execute', ctx.exception.detail)
+
+    def test_no_coordinate_400_does_not_promise_a_url_the_card_lacks(self):
+        # The commonest no-coordinate cause is a source record with no pr_url,
+        # in which case the card body has no URL either — so the refusal must
+        # not send the operator looking for one. It names the task instead.
+        payload = {'prompt': 'p', 'promoted_source': 'for-larry-mirror-review'}
+        with self.assertRaises(HTTPException) as ctx:
+            self._approve(payload)
+        self.assertNotIn('URL in the card text', ctx.exception.detail)
+        self.assertIn('unreg-approval-de9cda4efdbd', ctx.exception.detail)
 
     def test_ordinary_approvals_keep_the_beacon_route(self):
         # No promoted_source ⇒ the legacy path, byte-for-byte: even a payload
@@ -273,6 +312,86 @@ class ApprovedEscalationModeTest(unittest.TestCase):
         self.assertEqual(filename, 'larry-approval-ev-promoted-1.json')
         self.assertIn('Larry approved the pending proposal', env['prompt'])
 
+    def test_marker_alone_cannot_hijack_a_non_promoted_card(self):
+        # beacon_approval_handler's marker parser copies LLM-authored JSON keys
+        # onto the payload verbatim, so `promoted_source` is reachable by a
+        # Beacon-authored APPROVAL_REQUEST. Without the healer-minted task_id
+        # prefix it must NOT reroute Approve — otherwise the pending entry pops
+        # as approved while the plan Larry actually approved never dispatches.
+        source = {
+            'event_type': 'approval_request',
+            'event_id': 'ev-beacon-1',
+            'task_id': 'replan-some-beacon-task-001',
+            'payload': dict(self.PROMOTED_PAYLOAD),
+        }
+        with mock.patch.object(
+            da, '_gh_pr_head_sha_for_recheck', return_value=LIVE_HEAD,
+        ):
+            agent, filename, env = da._build_envelope_for_action(
+                source=source, action='approve', comment=None, actor='larry')
+        self.assertEqual(agent, 'beacon')
+        self.assertEqual(filename, 'larry-approval-ev-beacon-1.json')
+        self.assertIn('Larry approved the pending proposal', env['prompt'])
+
+    def test_marker_alone_cannot_400_a_non_promoted_card(self):
+        # The other half: a coordinate-less imitation must not make a genuine
+        # card permanently un-approvable either.
+        source = {
+            'event_type': 'approval_request',
+            'event_id': 'ev-beacon-2',
+            'task_id': 'replan-some-beacon-task-002',
+            'payload': {'prompt': 'a real plan',
+                        'promoted_source': 'for-larry-mirror-review'},
+        }
+        agent, _, _ = da._build_envelope_for_action(
+            source=source, action='approve', comment=None, actor='larry')
+        self.assertEqual(agent, 'beacon')
+
+    def test_unknown_mode_raises_instead_of_defaulting(self):
+        # A bare else would let a typo ('approved_escalation') silently produce
+        # the revision-applied framing + findings carry on an untouched head.
+        with mock.patch.object(
+            da, '_gh_pr_head_sha_for_recheck', return_value=LIVE_HEAD,
+        ):
+            with self.assertRaises(ValueError):
+                da._build_recheck_envelope(
+                    payload=dict(self.PROMOTED_PAYLOAD), comment=None,
+                    task_id='pr-RSDPM-59', mode='approved_escalation')
+
+    def test_identity_predicate_requires_both_prefix_and_marker(self):
+        promoted = self._source(self.PROMOTED_PAYLOAD)
+        self.assertTrue(da._is_promoted_stranded_escalation(
+            promoted, promoted['payload']))
+        # marker without the healer-minted id
+        self.assertFalse(da._is_promoted_stranded_escalation(
+            {'task_id': 'replan-x'}, self.PROMOTED_PAYLOAD))
+        # healer-minted id without the marker
+        self.assertFalse(da._is_promoted_stranded_escalation(
+            {'task_id': 'unreg-approval-abc'}, {'prompt': 'p'}))
+        # neither, and a non-string task_id
+        self.assertFalse(da._is_promoted_stranded_escalation({}, {}))
+        self.assertFalse(da._is_promoted_stranded_escalation(
+            {'task_id': None}, self.PROMOTED_PAYLOAD))
+
+    def test_mode_selector_follows_the_card_not_the_action(self):
+        promoted = self._source(self.PROMOTED_PAYLOAD)
+        self.assertEqual(
+            da._recheck_mode_for_payload(promoted, promoted['payload']),
+            'stranded-escalation')
+        ordinary = self._source({'prompt': 'f', 'recheck_target': FULL_TARGET})
+        self.assertEqual(
+            da._recheck_mode_for_payload(ordinary, ordinary['payload']),
+            'operator-fixed')
+
+    def test_every_selectable_mode_is_a_known_mode(self):
+        # The selector and the builder's whitelist must not drift apart, or the
+        # builder's new ValueError becomes a 500 on a real click.
+        for src in (self._source(self.PROMOTED_PAYLOAD),
+                    self._source({'prompt': 'f'})):
+            self.assertIn(
+                da._recheck_mode_for_payload(src, src['payload']),
+                da.RECHECK_ENVELOPE_MODES)
+
     def test_reject_on_a_promoted_card_is_unchanged(self):
         with mock.patch.object(
             da, '_gh_pr_head_sha_for_recheck', return_value=LIVE_HEAD,
@@ -282,6 +401,31 @@ class ApprovedEscalationModeTest(unittest.TestCase):
                 comment=None, actor='larry')
         self.assertEqual(agent, 'beacon')
         self.assertEqual(filename, 'larry-reject-ev-promoted-1.json')
+
+    def test_pr_url_grammars_agree_across_the_producer_and_consumer(self):
+        """The promoter parses the PR URL to build the coordinate; this module
+        re-parses it at dispatch. If the two grammars drift, the healer stamps
+        a coordinate whose URL the dashboard rejects — a 400 on a card whose
+        text promises mechanical execution, discovered only when Larry clicks.
+        Table-driven so it pins BEHAVIOR, not a shared regex literal."""
+        import heal_unregistered_approval as hua
+        cases = [
+            'https://github.com/Larry-Yatch/RSDPM/pull/59',
+            'https://github.com/Larry-Yatch/RSDPM/pull/59/',
+            '  https://github.com/Larry-Yatch/RSDPM/pull/59  ',
+            'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/1058',
+            'https://github.com/Larry-Yatch/RSDPM/issues/59',
+            'https://github.com/Larry-Yatch/RSDPM/pull/59/files',
+            'https://github.com/Larry-Yatch/RSDPM/pull/abc',
+            'https://evil.example/Larry-Yatch/RSDPM/pull/59',
+            'https://github.com/RSDPM/pull/59',
+            '', 'nonsense',
+        ]
+        for url in cases:
+            with self.subTest(url=url):
+                self.assertEqual(
+                    hua.parse_pr_url(url), da._parse_recheck_pr_url(url),
+                    f'PR-URL grammars disagree on {url!r}')
 
     def test_marker_string_matches_the_promoter_constant(self):
         # dashboard_api keys the routing on a literal (importing the healer
