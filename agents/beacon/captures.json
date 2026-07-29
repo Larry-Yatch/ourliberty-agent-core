@@ -2167,7 +2167,7 @@
       "id": "cap-confirm-all-pin-the-mixed-tier-parent-case-and-p-d5d1",
       "title": "Confirm-all: pin the mixed-tier parent case, and put confidence on the knock-on notice",
       "note": "Two small pieces left over after RSDPM #151 made bulk coverage ancestor-closed. The GUARD ITSELF IS ALREADY BUILT \u2014 do not rebuild it. Approval rsdpm-confirmall-medium-parent-secondglance-001 (filed 2026-07-28 23:37Z) was made moot by #151 (merged 2026-07-29 01:55Z, 3d66718) and should be rejected, not built.\n\n1. TEST GAP (the real one). Every parented fixture in app/queue/__tests__/queue-state-machine.test.tsx is SAME-TIER (3 under 3, or 4 under 4). No test anywhere builds a tier-3 child under a tier-4 parent \u2014 the exact case the approval was about. bulkCovered handles it correctly by construction (eligible() = CONFIRM_ALL_TIERS.includes(tier), CONFIRM_ALL_TIERS = [1,3], so a tier-4 parent fails eligible and ancestorOf filters the child out), but nothing pins it: a refactor of eligible() could silently reopen the hole and the suite would stay green.\n\n   Add a mixed-tier parented fixture asserting a tier-4 (MEDIUM/LOW) parent excludes its tier-3 child from Confirm-all coverage, and that the child keeps its own Confirm which auto-bundles the parent.\n\n   WHY THIS EXACT SHAPE: the file already learned this lesson one axis over. Its own comment at ~L605 says 'Every fixture above is PARENTLESS ... A covered tile made unsendable by its ANCESTOR sailed through the whole suite. The invariant was right; its inputs were too narrow.' They fixed parentless->parented and stopped; they never went same-tier->mixed-tier. Same defect class, one generation later.\n\n2. UX (small). The knock-on notice in app/queue/components/QueueCard.tsx (~L557) reads 'Confirming this also confirms what it sits under \u2014 {parentTitle}' \u2014 title only, no confidence. On the single-tap path a host confirming a HIGH child still implicitly writes a MEDIUM/LOW parent, disclosed by name but not by how shaky it is. Add the parent's confidence to that line.",
-      "state": "parked",
+      "state": "review_close",
       "label": null,
       "origin": {
         "source": "desktop-chat",
@@ -2195,8 +2195,12 @@
       "spawned": {
         "kind": "delegate",
         "task_id": "delegate-cap-confirm-all-pin-the-mixed-tier-parent-case-and-p-d5d1",
-        "stamped_at": "2026-07-29T19:36:52.820039+00:00"
-      }
+        "stamped_at": "2026-07-29T19:36:52.820039+00:00",
+        "outcome": "merged"
+      },
+      "closed_by": "heal_missions_card_gc:terminal-backstop",
+      "shipped_note": "shipped (linked work merged)",
+      "awaiting_ack": true
     },
     {
       "id": "cap-approvals-tab-let-a-card-carry-its-own-falsifier-8bb3",
