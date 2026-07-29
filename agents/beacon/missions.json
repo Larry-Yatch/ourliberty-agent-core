@@ -14553,6 +14553,40 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-pr-RSDPM-150",
+      "name": "PR RSDPM 150",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pr-RSDPM-150`. Last activity 2026-07-29T01:50:25.143181+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pr-RSDPM-150"
+      ],
+      "repo": null,
+      "created": "2026-07-29",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-29T01:51:49.537851+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-29T01:50:25.143181+00:00"
+    },
+    {
+      "id": "proposed-pr-ourliberty-agent-core-1047",
+      "name": "PR Ourliberty Agent Core 1047",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pr-ourliberty-agent-core-1047`. Last activity 2026-07-29T01:40:46.843688+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pr-ourliberty-agent-core-1047"
+      ],
+      "repo": null,
+      "created": "2026-07-29",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-29T01:51:49.537851+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-29T01:40:46.843688+00:00"
     }
   ]
 }
