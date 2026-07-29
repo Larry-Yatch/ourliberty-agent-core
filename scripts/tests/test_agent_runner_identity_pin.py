@@ -138,6 +138,87 @@ class AgentManualPathTest(unittest.TestCase):
         self.assertIn('never instead of it', pin)
 
 
+class IdentityAssertionPreambleTest(unittest.TestCase):
+    """The soft preamble must not be satisfiable by the decoy either.
+
+    Review finding on this PR: fixing only the pin left
+    `build_expected_agent_assertion` still saying "verify that the CLAUDE.md
+    LOADED into your context identifies you as `mirror` ... if it matches,
+    proceed normally". That is the instruction Mirror actually followed on
+    RSDPM #152 — the target rulebook named her and no other agent, so the
+    assertion passed and told her to proceed, and she never opened her real
+    manual. A bouncer a decoy walks past is not a bouncer.
+    """
+
+    def test_preamble_points_at_the_absolute_manual(self):
+        pre = ar.build_expected_agent_assertion('mirror')
+        for path in ar.agent_manual_paths('mirror'):
+            self.assertIn(path, pre)
+
+    def test_preamble_does_not_accept_a_cwd_claude_md(self):
+        pre = ar.build_expected_agent_assertion('mirror').lower()
+        self.assertIn('target repo', pre)
+        self.assertIn('does not satisfy this', pre)
+
+    def test_preamble_keeps_the_mismatch_contract(self):
+        # The escape hatch this preamble exists for must survive the rewrite.
+        pre = ar.build_expected_agent_assertion('mirror')
+        self.assertIn('IDENTITY_MISMATCH: expected=mirror', pre)
+        self.assertIn(ar.IDENTITY_ASSERTION_MARKER, pre)
+
+    def test_preamble_honors_an_explicit_agents_root(self):
+        pre = ar.build_expected_agent_assertion('mirror', agents_root='/srv/ar')
+        self.assertIn('/srv/ar/agents/mirror/workspace/CLAUDE.md', pre)
+
+
+class PinInstructionSafetyTest(unittest.TestCase):
+    """Two review findings on the pin's new wording."""
+
+    def test_missing_manual_still_demands_a_marker(self):
+        # "Say so rather than proceeding" invites a prose-only answer, and a
+        # markerless response cannot be routed — the PR #16 shape, where a
+        # marker-contract failure left a PR unmerged for 7h+. Failing closed
+        # is right; failing closed WITH a marker is what routes.
+        pin = ar.build_identity_pin_system_prompt('mirror').lower()
+        self.assertIn('marker block', pin)
+        self.assertIn('cannot be routed', pin)
+
+    def test_full_read_is_scoped_to_the_first_turn(self):
+        # The pin is appended on every invocation INCLUDING --resume, so an
+        # unconditional "read it in full" makes every revision round re-read
+        # a 44-86 KB manual already in context. The sibling preamble
+        # suppresses itself on resume for exactly this reason.
+        pin = ar.build_identity_pin_system_prompt('mirror').lower()
+        self.assertIn('already read it in\nthis session', pin)
+
+
+class AgentsRootThreadingTest(unittest.TestCase):
+    """The pin must advertise the root the CHILD gets, not the parent's.
+
+    `run_claude` pins `OURLIBERTY_AGENTS_ROOT` into the child env and then
+    builds the pin; deriving the root twice, independently, is how a path
+    silently starts pointing nowhere — the failure class this PR fixes.
+    """
+
+    def test_explicit_root_wins_over_process_env(self):
+        runtime = ar.agent_manual_paths('mirror', agents_root='/srv/agents')[0]
+        self.assertEqual(
+            runtime, '/srv/agents/agents/mirror/workspace/CLAUDE.md')
+
+    def test_pin_args_thread_the_root_through(self):
+        args = ar.identity_pin_args('mirror', agents_root='/srv/agents')
+        self.assertIn('/srv/agents/agents/mirror/workspace/CLAUDE.md', args[1])
+
+    def test_repo_candidate_is_absolute_without_symlink_resolution(self):
+        # .absolute() not .resolve(): absolute is the invariant, following
+        # symlinks in a swapped deploy tree is not wanted.
+        in_repo = ar.agent_manual_paths('mirror')[1]
+        expected = Path(ar.__file__).absolute().parent.parent / \
+            'agents' / 'mirror' / 'CLAUDE.md'
+        self.assertEqual(in_repo, str(expected))
+        self.assertTrue(Path(in_repo).is_absolute())
+
+
 class IdentityPinArgsTest(unittest.TestCase):
     """The CLI-arg wrapper consumed by run_claude's spawn path."""
 
