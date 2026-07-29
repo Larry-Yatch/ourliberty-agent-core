@@ -2304,7 +2304,7 @@
       "id": "cap-re-scoped-2-of-6-defects-in-merged-1052-sync-lag-02e0",
       "title": "Re-scoped: 2 of 6 defects in merged #1052 sync-lag arc worth building",
       "note": "SUPERSEDES cap-six-live-defects-in-merged-1052-dag-preflight-sy-cbb3, which over-captured: it listed six findings because six were found, not because six were worth building. Re-scoped after measuring the trigger. MEASURED EXPOSURE: ~85 DAG preflights in 79 days of notifier log, 14 REVISION events (~16%), bursty and clustered around active build pushes with nothing for the four weeks before 2026-07-21. CURRENT EXPOSURE IS ZERO: the only live sequence (rsdpm-m14-001) is status=active, and both checks gate on status != pending and skip (heal_pipeline_stall.py:2601 and :2810); the PASS branch transitions pending->active permanently, so an active sequence can never re-enter the preflight arc. M14's remaining 3 steps cannot fire any of these. The clock starts on the NEXT NEW sequence authored. Also: agent-core #1053, once landed, shrinks the whole arc further because its refresh clears the lag before Mirror ever reports BEHIND_ORIGIN, leaving this path as a fallback for when the refresh is refused. BUILD THESE TWO. (1) heal_pipeline_stall._append_sequence_audit does an unlocked read-modify-write on sequence files that the notifier/advancer/Beacon also RMW; a lost dag-preflight-sync-lag-detected entry means Check 12 never arms and the sequence parks with no signal. Narrow window (concurrent writer inside a sub-ms critical section) but it is the ONLY one of the six that can restore the original silent stall #1052 was written to fix. Use atomic_io.locked_update; note its caveat that all writers of a path must migrate together. (2) Check 12's escalation sets no re_dm_hours, so a wedged sync re-DMs hourly - the pattern config/pipeline-stall-rules.json calls the dominant false-alert source. Three lines. CONDITIONAL, DECIDE AFTER #1053 LANDS. (3) outbox_notifier._dag_revision_is_sync_lag diverts only on SPEC_DOC_BEHIND_ORIGIN, but check_spec_doc_presence never fetches - it reads the local refs/remotes/origin/main - so a merged spec on a stale-ref checkout classifies not_authored, falls through to Beacon's amend path, and tells someone to re-author a spec that already exists. Proven with real git, no mocks. May be solved outright by adopting whatever refreshing entry point #1053 settles on rather than hand-rolling a fetch; ask that PR's owner for the final name. WON'T FIX - deliberate, recorded so they are not silently rediscovered. (4) Check 9 and Check 12 double-fire with contradictory diagnoses when a sequence moves from amend path to sync-lag path: bounded, visible, self-limiting toil. (5) The -synclagN round counter cannot advance in its own audit-write-failure path: requires an EROFS/ENOSPC on the sequence file. (6) acted_after_revision counts any newer audit entry as evidence Beacon acted, so a human note masks the no-op-resolution detector: degrades an optimization that the attempt budget already backstops. BLOCKED ON #1053: at head c9c56f09 it touches scripts/heal_pipeline_stall.py, scripts/outbox_notifier.py and both of the test modules a follow-up needs, so a parallel PR would collide. Do not start until it lands. Full reproductions in three comments on agent-core PR #1053.",
-      "state": "parked",
+      "state": "dropped",
       "label": null,
       "origin": {
         "source": "desktop-chat",
@@ -2316,16 +2316,51 @@
       "last_touched": "2026-07-29T22:03:11.942754+00:00",
       "promoted_to": null,
       "briefing": {
-        "what": "A small cleanup of two rough edges in the tool that watches for stuck work: one that could let a problem slip by silently, and one that spams the same alert every hour.",
-        "why": "The silent one is the same kind of blind spot we just finished fixing, so leaving it open risks a repeat; the hourly repeat is our single biggest source of false alarms.",
-        "suggest": "Worth doing, but not yet \u2014 hold until the related change we're already shipping lands, then fix the silent gap first and decide on the alert-spam fix afterward."
+        "what": "A small, targeted fix to two rough edges in the automated system that keeps our work moving on its own \u2014 one that closes a rare gap where a stuck job could go completely unnoticed, and one that stops it from pestering us with repeat alerts.",
+        "why": "The silent-stall gap is the same failure we already fixed once and don't want back, and the repeat alerts are our single biggest source of false alarms \u2014 together they protect both reliability and our attention.",
+        "suggest": "Hold for now: there's no live risk today, and a related fix already underway may shrink or absorb part of this, so let that settle first and then greenlight just the one silent-stall safeguard."
       },
       "risk": "careful",
       "recommended_action": "delegate",
       "briefing_provenance": {
         "by": "beacon",
         "model": "claude-opus-4-8",
-        "at": "2026-07-29T22:04:20.108926+00:00",
+        "at": "2026-07-29T23:24:59.187492+00:00",
+        "from_state": "dropped"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+    },
+    {
+      "id": "cap-thirteen-writers-do-unlocked-read-modify-write-o-4b31",
+      "title": "Thirteen writers do unlocked read-modify-write on build-sequence files",
+      "note": "STANDING HAZARD, broader than the #1052 arc that surfaced it. Build-sequence JSON files under ~/agents/blackboard/build-sequences/ are read-modify-written by THIRTEEN separate scripts, none of which takes a lock: beacon_approval_handler, build_sequence_advancer, build_sequence_kickoff, dashboard_api, heal_completed_sequence_mission_reconcile, heal_forge_wip_only_redispatch, heal_pipeline_stall, launch_dedup_gc, launch_queue_drain, outbox_notifier, pr_terminal_fanout, sequence_shortcut_helpers, system_state_log. Each reads the whole file, mutates a field or appends an audit entry, and atomically replaces it. Atomic replace makes each WRITE safe; it does nothing about the read-modify-write WINDOW, so when two of these overlap the later write silently discards the earlier one. Demonstrated concretely for the heal_pipeline_stall + outbox_notifier pair: an audit entry written by one vanishes entirely when the other replaces the file from a snapshot read moments earlier. The consequence is not cosmetic. These audit entries are a CONTROL CHANNEL, not just a log. dag-preflight-sync-lag-detected is what arms heal_pipeline_stall Check 12; dag-preflight-revision-routed is what arms Check 9; dag-preflight-pass-kickoff is what proves a preflight round closed. Losing one to a lost update disarms the backstop that watches a stalled build, which returns the system to the exact silent-stall failure #1052 was written to end. Also at risk: step status transitions and current_steps, i.e. two writers could disagree about which step is live. THE FIX: migrate all thirteen writers to atomic_io.locked_update, which is the repo's established advisory-lock helper and is already used for ledgers. Its docstring is explicit that the guarantee holds ONLY if EVERY writer of a path goes through it, so all writers of a given file must be migrated TOGETHER. That is why this is a project and not a patch, and why a partial migration is worse than none in one specific sense: it protects one pair while reading like a closed hole. locked_update is fail-open by design (runs unserialized rather than wedging when the lock cannot be taken), so the migration cannot deadlock a daemon. SCOPE ESTIMATE: 13 call-site migrations, most of which are a with-block around an existing read/mutate/write; the real work is finding EVERY write path in each file (several scripts write sequence files from more than one function) and a test that proves interleaved writers no longer lose an entry. PRIORITY: not urgent. The window is sub-millisecond per write and the pair-specific trigger needs a sync-lag incident, which agent-core #1053 made much rarer. But it is a standing correctness hazard on shared state that will outlive the sync-lag arc, and the cost only grows as more writers are added. Filed after #1061 deliberately excluded it rather than half-fixing it. Evidence and the lost-update demonstration are in the review comments on agent-core PR #1053 and in PR #1061's description.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "nostalgic-hermann-c31963",
+        "branch": "fix/sync-lag-escalation-episode-dedup",
+        "captured_at": "2026-07-29T23:18:49.904451+00:00"
+      },
+      "last_touched": "2026-07-29T23:18:49.904451+00:00",
+      "promoted_to": null,
+      "spawned": {
+        "kind": "delegate",
+        "task_id": "delegate-cap-thirteen-writers-do-unlocked-read-modify-write-o-4b31",
+        "stamped_at": "2026-07-29T23:25:00.993192+00:00"
+      },
+      "briefing": {
+        "what": "A shared set of coordination files gets updated by many different parts of the system at once, and once in a while one update silently overwrites another \u2014 sometimes erasing the safety alarms that are supposed to catch stalled work.",
+        "why": "If one of those alarms gets wiped out, a stuck job can sit unnoticed with nobody alerted \u2014 quietly reopening the exact silent-stall problem we recently closed.",
+        "suggest": "It's a real weakness but rarely triggers, so schedule it as a planned cleanup in the near term rather than an emergency \u2014 and insist it's finished in one complete pass, since a partial fix looks solved without actually being safe."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T23:24:59.187492+00:00",
         "from_state": "parked"
       },
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
