@@ -15701,7 +15701,11 @@
         "at": "2026-07-29T23:04:46.824073+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-29T23:29:13.833742+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-ourliberty-health-untracked-files-cleanup-001",
@@ -15763,7 +15767,62 @@
         "at": "2026-07-29T23:14:58.839389+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-29T23:29:13.833742+00:00",
+      "retired_reason": "orphan-terminal"
+    },
+    {
+      "id": "proposed-seq-file-locked-rmw-migration-001",
+      "name": "Seq File Locked Rmw Migration 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `seq-file-locked-rmw-migration-001`. Last activity 2026-07-29T23:28:11.68123+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "seq-file-locked-rmw-migration-001"
+      ],
+      "repo": null,
+      "created": "2026-07-29",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-29T23:29:13.833742+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-29T23:28:11.68123+00:00"
+    },
+    {
+      "id": "proposed-delegate-cap-thirteen-writers-do-unlocked-read-modify-write-o-4b31",
+      "name": "Delegate Cap Thirteen Writers Do Unlocked Read Modify Write O 4b31",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `delegate-cap-thirteen-writers-do-unlocked-read-modify-write-o-4b31`. Last activity 2026-07-29T23:28:11.009871+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "delegate-cap-thirteen-writers-do-unlocked-read-modify-write-o-4b31"
+      ],
+      "repo": null,
+      "created": "2026-07-29",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-29T23:29:13.833742+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-29T23:28:11.009871+00:00"
+    },
+    {
+      "id": "proposed-pr-ourliberty-agent-core-1061",
+      "name": "PR Ourliberty Agent Core 1061",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pr-ourliberty-agent-core-1061`. Last activity 2026-07-29T23:27:43.316148+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pr-ourliberty-agent-core-1061"
+      ],
+      "repo": null,
+      "created": "2026-07-29",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-29T23:29:13.833742+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-29T23:27:43.316148+00:00"
     }
   ]
 }
