@@ -81,6 +81,17 @@ def load_manifest(config_path: Path = _CONFIG) -> tuple[Path, list[str]]:
     # manifest instead of deploying whichever entry happens to be last.
     seen: dict[str, str] = {}
     for src in sources:
+        # A directory is not deployable, and a TRAILING SLASH is the dangerous
+        # spelling of one: `git show <ref>:scripts/` succeeds with a tree
+        # listing and `git ls-tree <ref> scripts/` lists the directory's
+        # CHILDREN, so the first child's mode passes the 100755 check below and
+        # the listing text lands as an executable file. Bare `scripts` is
+        # caught by the 040000 mode; only this spelling slipped through.
+        if src.endswith('/'):
+            raise ValueError(
+                f'{config_path}: {src!r} names a directory — only regular '
+                'files can be deployed; drop the trailing slash and list the '
+                'file(s) individually')
         name = Path(src).name
         if name in seen:
             raise ValueError(
@@ -146,12 +157,20 @@ def is_executable_mode(source: str, returncode: int, stdout: str) -> bool:
     output is unexpected would make that the failure mode of every surprise."""
     if returncode != 0:
         raise ValueError(f'{source}: git ls-tree {_REF} failed (exit {returncode})')
-    if not stdout.strip():
+    lines = stdout.strip().splitlines()
+    if not lines:
         raise ValueError(
             f'{source}: git ls-tree {_REF} returned no entry — `git show` and '
             '`git ls-tree` disagree about this path')
+    if len(lines) != 1:
+        # More than one entry means the path resolved to a directory's
+        # contents, not to a file. Reading the mode off `lines[0]` would take a
+        # child's bit and deploy `git show`'s tree-listing TEXT as that file.
+        raise ValueError(
+            f'{source}: git ls-tree {_REF} returned {len(lines)} entries — '
+            'this path is a directory, not a single file')
     # "100755 blob <sha>\t<path>"
-    mode = stdout.split(' ', 1)[0]
+    mode = lines[0].split(' ', 1)[0]
     if mode not in ('100644', '100755'):
         # 120000 symlink, 160000 gitlink, 040000 tree — `git show` yields the
         # link target / nothing useful, so copying it as a regular file would

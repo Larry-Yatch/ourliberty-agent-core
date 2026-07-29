@@ -99,6 +99,26 @@ class ManifestTests(unittest.TestCase):
         self.assertIn('emit_capture.sh', msg)
         self.assertIn('hooks/emit_capture.sh', msg)
 
+    def test_trailing_slash_directory_source_is_refused(self):
+        # The dangerous spelling of a directory: `git show <ref>:scripts/`
+        # SUCCEEDS with a tree listing and `git ls-tree <ref> scripts/` lists
+        # the children, so the first child's 100755 used to pass the mode check
+        # and the listing text landed as an executable file, exit 0.
+        with tempfile.TemporaryDirectory() as d:
+            bad = Path(d) / 'dir.json'
+            bad.write_text(json.dumps({'dest_dir': d, 'sources': ['scripts/']}),
+                           encoding='utf-8')
+            with self.assertRaises(ValueError) as ctx:
+                sdc.load_manifest(bad)
+        self.assertIn('directory', str(ctx.exception))
+
+    def test_shipped_manifest_names_only_regular_files(self):
+        _, sources = sdc.load_manifest()
+        for src in sources:
+            with self.subTest(source=src):
+                self.assertFalse(src.endswith('/'))
+                self.assertTrue((_REPO_ROOT / src).is_file())
+
     def test_shipped_manifest_has_no_basename_collision(self):
         _, sources = sdc.load_manifest()  # raises if it ever gains one
         names = [Path(s).name for s in sources]
@@ -224,6 +244,20 @@ class ModeParsingTests(unittest.TestCase):
         # two disagree about the path — that is a bug to surface, not a 0644.
         with self.assertRaises(ValueError):
             sdc.is_executable_mode('s', 0, '')
+
+    def test_multiple_entries_raise_instead_of_taking_the_first(self):
+        # Real `git ls-tree <ref> scripts/` output. Reading the mode off line 1
+        # would take a CHILD's executable bit and deploy `git show`'s tree
+        # listing as that file, reporting success.
+        listing = ('100755 blob 78981922613b2afb6025042ff6bd878ac1994e85\tscripts/a.sh\n'
+                   '100644 blob 61780798228d17af2d34fce4cfbdf35556832472\tscripts/b.sh\n')
+        with self.assertRaises(ValueError) as ctx:
+            sdc.is_executable_mode('scripts/', 0, listing)
+        self.assertIn('directory', str(ctx.exception))
+
+    def test_a_single_entry_with_a_trailing_newline_is_fine(self):
+        self.assertTrue(sdc.is_executable_mode(
+            's', 0, '100755 blob abc123\tscripts/a.sh\n'))
 
     def test_symlink_and_gitlink_modes_raise(self):
         for mode in ('120000', '160000', '040000'):
