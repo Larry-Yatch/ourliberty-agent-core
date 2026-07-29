@@ -15504,7 +15504,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-29T19:57:30.970898+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-29T19:56:07.237892+00:00"
+      "orphan_last_activity_ts": "2026-07-29T19:56:07.237892+00:00",
+      "briefing": {
+        "what": "A piece of work your team started on their own that isn't yet connected to any active project on your roadmap.",
+        "why": "Unassigned work can quietly consume time and attention that belongs to your stated priorities, and right now it's paused waiting for your go-ahead.",
+        "suggest": "Take a quick look before approving \u2014 confirm it supports a current priority, and if it doesn't, hold it until you know where it fits."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T20:03:19.719471+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-pr-RSDPM-158",
@@ -15521,7 +15535,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-29T19:57:30.970898+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-29T19:50:21.955975+00:00"
+      "orphan_last_activity_ts": "2026-07-29T19:50:21.955975+00:00",
+      "briefing": {
+        "what": "A piece of work your team started on their own that isn't tied to any active project yet.",
+        "why": "Unassigned work can quietly consume time and drift from your priorities if no one confirms it's worth doing.",
+        "suggest": "Take a quick look to confirm it fits your goals before the team invests more into it."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T20:03:19.719471+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-delegate-cap-heal-unregistered-approval-mints-permanent-cards-b921",
@@ -15538,7 +15566,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-29T19:57:30.970898+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-29T19:47:35.920285+00:00"
+      "orphan_last_activity_ts": "2026-07-29T19:47:35.920285+00:00",
+      "briefing": {
+        "what": "The team started building a safeguard that stops a routine approval step from accidentally handing out permanent access passes that were never meant to be permanent.",
+        "why": "Left unchecked, this quietly grants lasting permissions nobody signed off on \u2014 the kind of access creep that becomes a security and cleanup headache later.",
+        "suggest": "Worth finishing, but have someone confirm the fix behaves as intended before it goes live, since it touches who gets lasting access."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T20:03:19.719471+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
