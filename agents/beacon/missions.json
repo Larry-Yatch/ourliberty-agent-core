@@ -14705,7 +14705,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-29T03:52:07.455344+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-29T03:50:25.112094+00:00"
+      "orphan_last_activity_ts": "2026-07-29T03:50:25.112094+00:00",
+      "briefing": {
+        "what": "A new piece of work your team kicked off on its own that hasn't been tied to any goal or project yet, and it's now waiting for your sign-off.",
+        "why": "Unclaimed work that stalls in the review line ties up your team's time without a clear payoff, and no one has confirmed it's worth finishing.",
+        "suggest": "Before greenlighting it, ask what problem this solves and which goal it serves \u2014 if there's no clear answer, hold off until it's justified."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T03:55:20.349581+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-cycle-prompt-tier4-no-upgrade-clause-001",
@@ -14722,7 +14736,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-29T03:52:07.455344+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-29T03:40:14.514987+00:00"
+      "orphan_last_activity_ts": "2026-07-29T03:40:14.514987+00:00",
+      "briefing": {
+        "what": "A small rulebook update that stops our automated assistant from second-guessing and overriding the settled severity call on an incoming alert.",
+        "why": "It keeps the system from quietly escalating routine issues into false emergencies, which protects your team's time and trust in the alerts they get.",
+        "suggest": "Approve it, but have someone give the wording a quick once-over first since it changes how alerts are handled."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T03:55:20.349581+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
