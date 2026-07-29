@@ -39,6 +39,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 _REPO_SCRIPTS = Path(__file__).resolve().parent.parent
 if str(_REPO_SCRIPTS) not in sys.path:
@@ -313,6 +314,197 @@ class MirrorDagPreflightRevision(_DagHandlerHarness):
         self.assertEqual(len(rev_entries), 1)
         # Still no Larry DM.
         self.assertEqual(self._read_alerts(), [])
+
+
+class MirrorDagPreflightRevisionSyncLag(_DagHandlerHarness):
+    """The `rsdpm-m14-001` class (2026-07-28): Mirror's REVISION is Check 0
+    `BEHIND_ORIGIN` — a sync-lag whose remediation is OPERATIONAL (run the
+    sync, re-dispatch), not an artifact edit. Routing it to Beacon's amend
+    path hands her a revision with nothing to amend; she records
+    `dag-preflight-revision-resolved` having changed nothing, and the Larry
+    DM has already been suppressed on the assumption the autonomous path
+    owns the outcome. It does not — so the notifier must NOT claim it does.
+    """
+
+    def _revision_envelope(self, seq_id):
+        return {
+            'agent': 'mirror',
+            'source': 'beacon',
+            'task_id': f'review-sequence-dag-{seq_id}',
+            'prompt': f'review-sequence-dag {seq_id}',
+            'result': (
+                'Check 0 resolves to **BEHIND_ORIGIN (exit 3)** — a sync-lag, '
+                'not a missing spec. Checks 1-4 deliberately not run.\n\n'
+                'result: REVISION\n'
+            ),
+        }
+
+    def _patch_behind_origin(self, behind_by=1):
+        return mock.patch.object(
+            on.bsv, 'check_spec_doc_presence',
+            return_value=bsv.SpecDocPresence(
+                status=bsv.SPEC_DOC_BEHIND_ORIGIN,
+                spec_doc='specs/M14-workspace-boundary.md',
+                behind_by=behind_by,
+                message=(
+                    'working copy is behind origin/main by 1 commit(s); '
+                    'spec_doc EXISTS on origin/main but is not yet in this '
+                    'checkout.'
+                ),
+            ),
+        )
+
+    def test_sync_lag_revision_is_not_routed_to_beacon(self):
+        seq = _make_sequence(seq_id='lag-seq', status='pending')
+        self._write_sequence(seq)
+        with self._patch_behind_origin():
+            result = on._handle_mirror_dag_preflight_result(
+                self._revision_envelope('lag-seq'),
+            )
+        self.assertEqual(
+            result, 'mirror-dag-preflight:revision-sync-lag:lag-seq',
+        )
+        # Nothing to amend → Beacon's amend path is NOT engaged.
+        self.assertEqual(self._read_beacon_notifies(), [])
+        # …and the amend-path stall signal is NOT written, because the amend
+        # path never ran. A `dag-preflight-revision-routed` entry here would
+        # arm the Check 9 backstop, whose only recovery is to re-route the
+        # same un-amendable revision to Beacon again.
+        on_disk = self._read_sequence('lag-seq')
+        self.assertEqual(on_disk['status'], 'pending')
+        events = [e.get('event') for e in on_disk['audit_log']]
+        self.assertNotIn('dag-preflight-revision-routed', events)
+        self.assertIn('dag-preflight-sync-lag-detected', events)
+        entry = next(
+            e for e in on_disk['audit_log']
+            if e.get('event') == 'dag-preflight-sync-lag-detected'
+        )
+        self.assertEqual(entry['actor'], 'outbox-notifier')
+        self.assertEqual(
+            entry['mirror_task_id'], 'review-sequence-dag-lag-seq',
+        )
+        self.assertEqual(entry['spec_doc'], 'specs/M14-workspace-boundary.md')
+        self.assertEqual(entry['behind_by'], 1)
+
+    def test_sync_lag_audit_entry_is_idempotent_on_replay(self):
+        seq = _make_sequence(seq_id='lag-seq', status='pending')
+        self._write_sequence(seq)
+        env = self._revision_envelope('lag-seq')
+        with self._patch_behind_origin():
+            on._handle_mirror_dag_preflight_result(env)
+            on._handle_mirror_dag_preflight_result(env)
+        on_disk = self._read_sequence('lag-seq')
+        lag_entries = [
+            e for e in on_disk['audit_log']
+            if e.get('event') == 'dag-preflight-sync-lag-detected'
+        ]
+        self.assertEqual(len(lag_entries), 1)
+
+    def test_non_sync_lag_revision_still_routes_to_beacon(self):
+        """Regression guard: only BEHIND_ORIGIN diverts. A present spec_doc
+        (the mechanical Check-3 case) keeps today's Beacon amend route."""
+        seq = _make_sequence(seq_id='amendable-seq', status='pending')
+        self._write_sequence(seq)
+        with mock.patch.object(
+            on.bsv, 'check_spec_doc_presence',
+            return_value=bsv.SpecDocPresence(
+                status=bsv.SPEC_DOC_PRESENT,
+                spec_doc='agents/beacon/specs/build-sequence-orchestrator.md',
+                message='present',
+            ),
+        ):
+            result = on._handle_mirror_dag_preflight_result(
+                self._revision_envelope('amendable-seq'),
+            )
+        self.assertEqual(
+            result, 'mirror-dag-preflight:revision:amendable-seq',
+        )
+        self.assertEqual(len(self._read_beacon_notifies()), 1)
+        events = [
+            e.get('event')
+            for e in self._read_sequence('amendable-seq')['audit_log']
+        ]
+        self.assertIn('dag-preflight-revision-routed', events)
+
+    def test_lost_audit_entry_on_sync_lag_dms_larry(self):
+        """The sync-lag branch writes NO Beacon notify by design, so the audit
+        entry is the sole artifact. If it can't be written (EROFS/ENOSPC, or a
+        torn read while the advancer rewrites the file concurrently) the
+        REVISION would otherwise vanish entirely: no audit, no notify, no DM,
+        and the outbox archived as handled. That is the silent stall this
+        whole arc exists to end, so it must escalate."""
+        seq = _make_sequence(seq_id='lost-seq', status='pending')
+        self._write_sequence(seq)
+        with self._patch_behind_origin(), mock.patch.object(
+            on.os, 'replace',
+            side_effect=OSError('EROFS: read-only file system'),
+        ):
+            result = on._handle_mirror_dag_preflight_result(
+                self._revision_envelope('lost-seq'),
+            )
+        self.assertEqual(
+            result,
+            'mirror-dag-preflight:revision-sync-lag-unrecorded:lost-seq',
+        )
+        events = [
+            e.get('event')
+            for e in self._read_sequence('lost-seq')['audit_log']
+        ]
+        self.assertNotIn('dag-preflight-sync-lag-detected', events)
+        self.assertNotIn('dag-preflight-revision-routed', events)
+        self.assertEqual(self._read_beacon_notifies(), [])
+        alerts = self._read_alerts()
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(
+            alerts[0]['subject'], 'mirror-dag-audit-unrecorded:lost-seq',
+        )
+        self.assertIn('NOTHING is now watching', alerts[0]['message'])
+
+    def test_lost_audit_entry_on_amend_route_also_dms_larry(self):
+        """The amend route DOES leave a live Beacon notify, so this is not the
+        total-silence case — but without the audit entry Check 9 cannot arm,
+        so a Beacon no-op goes uncaught. Same class, one step removed."""
+        seq = _make_sequence(seq_id='amend-lost', status='pending')
+        self._write_sequence(seq)
+        with mock.patch.object(
+            on.bsv, 'check_spec_doc_presence',
+            return_value=bsv.SpecDocPresence(
+                status=bsv.SPEC_DOC_PRESENT, spec_doc='x.md', message='p',
+            ),
+        ), mock.patch.object(
+            # Targeted, not `os.replace`: the notify write is also atomic, so
+            # breaking os-level replace would fail the write this test needs
+            # to SUCCEED. False is exactly what the helper returns on a real
+            # OSError (covered end-to-end by the sync-lag test above).
+            on, '_append_dag_revision_audit', return_value=False,
+        ):
+            result = on._handle_mirror_dag_preflight_result(
+                self._revision_envelope('amend-lost'),
+            )
+        self.assertEqual(result, 'mirror-dag-preflight:revision:amend-lost')
+        # The notify IS live — the autonomous path still has a chance.
+        self.assertEqual(len(self._read_beacon_notifies()), 1)
+        alerts = self._read_alerts()
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(
+            alerts[0]['subject'], 'mirror-dag-audit-unrecorded:amend-lost',
+        )
+
+    def test_classifier_failure_falls_back_to_beacon_route(self):
+        """Fail-safe: an unreadable/raising classifier must not swallow the
+        REVISION. Degrade to today's behaviour (route to Beacon), never to
+        silence."""
+        seq = _make_sequence(seq_id='boom-seq', status='pending')
+        self._write_sequence(seq)
+        with mock.patch.object(
+            on.bsv, 'check_spec_doc_presence',
+            side_effect=RuntimeError('git exploded'),
+        ):
+            result = on._handle_mirror_dag_preflight_result(
+                self._revision_envelope('boom-seq'),
+            )
+        self.assertEqual(result, 'mirror-dag-preflight:revision:boom-seq')
+        self.assertEqual(len(self._read_beacon_notifies()), 1)
 
 
 class MirrorDagPreflightMalformed(_DagHandlerHarness):
