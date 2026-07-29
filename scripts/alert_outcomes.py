@@ -38,8 +38,7 @@ from typing import Any, Optional
 import file_lock
 from test_isolation_guard import refuse_under_test
 
-AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT')
-                   or Path.home() / 'agents')
+AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT') or Path.home() / 'agents')
 OUTCOMES_FILE = AGENTS_ROOT / 'blackboard' / 'alert-outcomes.jsonl'
 
 # Bounded wait for the sidecar flock, mirroring larry_alerts._locked_append.

@@ -1077,6 +1077,443 @@ class TestPipelineBackoffReason(unittest.TestCase):
         self.assertIsNone(r)
 
 
+class TestRecentReviewRecordHeadAware(unittest.TestCase):
+    """`current_head_sha`: an ARCHIVED record covering a superseded head is not
+    evidence the pipeline owns the PR (the manually-fixed-escalation strand,
+    RSDPM #142). Every uncertainty must keep the old, head-blind back-off."""
+
+    TASK = 'pr-RSDPM-142'
+    # The live shapes from the incident: the archived record recorded the head
+    # that Mirror ESCALATEd, the PR now carries the human's manual-fix head.
+    OLD_HEAD = 'ca78b2dacf69b0599024139036ff93213d60db6b'
+    NEW_HEAD = '99f370378b8fc07da194c392ec2de315dab54d98'
+
+    def setUp(self):
+        import tempfile
+        self._tmp = tempfile.TemporaryDirectory()
+        self.inbox = Path(self._tmp.name)
+        (self.inbox / '.archive').mkdir()
+        (self.inbox / '.invalid').mkdir()
+        self.now = datetime.now(timezone.utc)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _write(self, relpath, *, head=None, age_minutes=24.0, nest=False):
+        """Write a review record. `nest` puts head_sha under `context`, the
+        chain-envelope shape `_recorded_review_head_sha` also reads."""
+        import os
+        p = self.inbox / relpath
+        p.parent.mkdir(parents=True, exist_ok=True)
+        body = {'task_id': self.TASK}
+        if head is not None:
+            if nest:
+                body['context'] = {'head_sha': head}
+            else:
+                body['head_sha'] = head
+        p.write_text(json.dumps(body))
+        ts = (self.now - timedelta(minutes=age_minutes)).timestamp()
+        os.utime(p, (ts, ts))
+        return p
+
+    def _probe(self, head):
+        return h.recent_review_record(
+            f'review-{self.TASK}', self.inbox, self.now, current_head_sha=head)
+
+    # ---- the defect: drifted archived record must NOT hold the backstop off ----
+
+    def test_drifted_archived_record_does_not_block(self):
+        self._write(f'.archive/review-{self.TASK}.json', head=self.OLD_HEAD)
+        self.assertIsNone(self._probe(self.NEW_HEAD))
+
+    def test_drifted_archived_record_still_blocks_when_head_blind(self):
+        # The SAME record, probed the old way (no head) — proves the relaxation
+        # is opt-in and that this record is what stranded the PR for 180min.
+        self._write(f'.archive/review-{self.TASK}.json', head=self.OLD_HEAD)
+        self.assertIsNotNone(h.recent_review_record(
+            f'review-{self.TASK}', self.inbox, self.now))
+
+    def test_drifted_rev_round_record_does_not_block(self):
+        self._write(f'.archive/review-{self.TASK}-rev1.json', head=self.OLD_HEAD)
+        self.assertIsNone(self._probe(self.NEW_HEAD))
+
+    def test_drifted_invalid_leg_record_does_not_block(self):
+        self._write(f'.invalid/review-{self.TASK}.json', head=self.OLD_HEAD)
+        self.assertIsNone(self._probe(self.NEW_HEAD))
+
+    def test_nested_context_head_is_read(self):
+        # A chain-envelope record nests head_sha under `context`; drift there
+        # must be seen too, or the guard is head-aware in name only.
+        self._write(f'.archive/review-{self.TASK}.json',
+                    head=self.OLD_HEAD, nest=True)
+        self.assertIsNone(self._probe(self.NEW_HEAD))
+
+    # ---- every uncertainty keeps the back-off ----
+
+    def test_matching_head_still_blocks(self):
+        self._write(f'.archive/review-{self.TASK}.json', head=self.NEW_HEAD)
+        self.assertIsNotNone(self._probe(self.NEW_HEAD))
+
+    def test_record_without_recorded_head_still_blocks(self):
+        # Can't prove drift → conservative. (The pre-#539 round records.)
+        self._write(f'.archive/review-{self.TASK}-rev1.json', head=None)
+        self.assertIsNotNone(self._probe(self.NEW_HEAD))
+
+    def test_unparseable_record_still_blocks(self):
+        import os
+        p = self.inbox / '.archive' / f'review-{self.TASK}.json'
+        p.write_text('{not json')
+        ts = (self.now - timedelta(minutes=24)).timestamp()
+        os.utime(p, (ts, ts))
+        self.assertIsNotNone(self._probe(self.NEW_HEAD))
+
+    def test_current_head_record_wins_over_drifted_sibling(self):
+        # Records are judged INDIVIDUALLY: a task holding a superseded round-0
+        # record AND a current-head rev round must still back off on the latter,
+        # whichever order the directory scan happens to yield.
+        self._write(f'.archive/review-{self.TASK}.json', head=self.OLD_HEAD)
+        self._write(f'.archive/review-{self.TASK}-rev1.json', head=self.NEW_HEAD)
+        r = self._probe(self.NEW_HEAD)
+        self.assertIsNotNone(r)
+        self.assertIn('-rev1.json', r)
+
+    def test_stale_matching_head_record_still_does_not_block(self):
+        # Head-awareness must not RESURRECT the window: a same-head record
+        # older than the window is still not a back-off reason.
+        self._write(f'.archive/review-{self.TASK}.json', head=self.NEW_HEAD,
+                    age_minutes=h.RECENT_REVIEW_ACTIVITY_MINUTES + 30)
+        self.assertIsNone(self._probe(self.NEW_HEAD))
+
+    # ---- live legs are head-agnostic by construction ----
+
+    def test_live_inbox_record_blocks_despite_drift(self):
+        # A queued review picks up the PR's CURRENT head when Mirror runs it,
+        # so its recorded head is irrelevant — never pile on.
+        self._write(f'review-{self.TASK}.json', head=self.OLD_HEAD)
+        self.assertIsNotNone(self._probe(self.NEW_HEAD))
+
+    def test_claimed_record_blocks_despite_drift(self):
+        # THE #865 GUARD after the ledger clears: between a re-review's dispatch
+        # and its verdict the record lives in `.claimed/<slot>/` and the
+        # in-flight flag is already cleared. If this leg missed it, a drifted
+        # round-0 record would let a duplicate review through onto a LIVE one.
+        self._write(f'.claimed/slot-1/review-{self.TASK}-rev1.json',
+                    head=self.OLD_HEAD)
+        self.assertIsNotNone(self._probe(self.NEW_HEAD))
+
+    def test_claimed_record_blocks_head_blind_too(self):
+        self._write(f'.claimed/slot-1/review-{self.TASK}.json', head=None)
+        self.assertIsNotNone(h.recent_review_record(
+            f'review-{self.TASK}', self.inbox, self.now))
+
+    def test_claimed_sibling_task_does_not_block(self):
+        # The name grammar still gates the `.claimed/` leg.
+        self._write(f'.claimed/slot-1/review-{self.TASK}-extra-leg.json',
+                    head=self.OLD_HEAD)
+        self.assertIsNone(self._probe(self.NEW_HEAD))
+
+    def test_missing_claimed_dir_is_not_an_error(self):
+        # No `.claimed/` at all (the temp tree above) must scan cleanly.
+        self.assertIsNone(self._probe(self.NEW_HEAD))
+
+    # ---- but the `.claimed/` leg is WINDOW-BOUNDED, not permanent ----
+
+    # A claim is aged from max(mtime, ctime) ≈ CLAIM time, and ctime cannot be
+    # back-dated from a test (the claim rename sets it to "now"). So these age a
+    # claim by ADVANCING THE CLOCK — `recent_review_record` takes `now` — which
+    # models real elapsed time for both stamps and does not depend on which one
+    # the implementation happens to read.
+
+    def _probe_at(self, head, *, minutes_later):
+        return h.recent_review_record(
+            f'review-{self.TASK}', self.inbox,
+            self.now + timedelta(minutes=minutes_later),
+            current_head_sha=head)
+
+    def test_stranded_claim_past_the_window_does_not_block(self):
+        # A claim this old is one that BOTH the 35-min review ceiling AND
+        # heal_orphaned_mirror_claims (10-min sweep past a 45-min grace:
+        # archive-if-concluded / re-inject-if-open, SPARE on gh-unknown) failed
+        # to resolve. Blocking it forever would strand the PR with nothing left
+        # to rescue it — `_review_request_already_dispatched`'s `.claimed` check
+        # matches only the exact `review-<task>.json`, so this `-rev1` claim does
+        # NOT stop the PR being selected as orphaned every tick; this guard would
+        # just silently refuse it, permanently. That is the same never-concludes
+        # shape this whole change exists to remove.
+        self._claim(f'review-{self.TASK}-rev1.json', head=self.OLD_HEAD,
+                    dispatched_minutes_ago=0)
+        self.assertIsNone(self._probe_at(
+            self.NEW_HEAD,
+            minutes_later=h.RECENT_REVIEW_ACTIVITY_MINUTES + 30))
+
+    def test_stranded_claim_past_the_window_does_not_block_head_blind(self):
+        # Same rescue with no head supplied — the age bound is independent of
+        # head-awareness (a stranded claim records the head it was dispatched
+        # for, which may well still be the current one).
+        self._claim(f'review-{self.TASK}-rev1.json', head=self.NEW_HEAD,
+                    dispatched_minutes_ago=0)
+        self.assertIsNone(h.recent_review_record(
+            f'review-{self.TASK}', self.inbox,
+            self.now + timedelta(
+                minutes=h.RECENT_REVIEW_ACTIVITY_MINUTES + 30)))
+
+    def test_claim_exactly_at_the_window_boundary_still_blocks(self):
+        # The guard admits `age <= window`. Pin the edge itself, not a value
+        # comfortably inside it: at `window - 1` both `<=` and `<` block, so an
+        # off-by-one on the comparison that decides whether a LIVE review gets
+        # piled on would pass unnoticed.
+        self._claim(f'review-{self.TASK}-rev1.json', head=self.OLD_HEAD,
+                    dispatched_minutes_ago=0)
+        self.assertIsNotNone(self._probe_at(
+            self.NEW_HEAD, minutes_later=h.RECENT_REVIEW_ACTIVITY_MINUTES))
+
+    def test_claim_just_past_the_window_boundary_does_not_block(self):
+        self._claim(f'review-{self.TASK}-rev1.json', head=self.OLD_HEAD,
+                    dispatched_minutes_ago=0)
+        self.assertIsNone(self._probe_at(
+            self.NEW_HEAD, minutes_later=h.RECENT_REVIEW_ACTIVITY_MINUTES + 1))
+
+    def test_archived_record_exactly_at_the_window_boundary_still_blocks(self):
+        self._write(f'.archive/review-{self.TASK}.json', head=self.NEW_HEAD,
+                    age_minutes=h.RECENT_REVIEW_ACTIVITY_MINUTES)
+        self.assertIsNotNone(self._probe(self.NEW_HEAD))
+
+    def test_archived_record_just_past_the_window_does_not_block(self):
+        self._write(f'.archive/review-{self.TASK}.json', head=self.NEW_HEAD,
+                    age_minutes=h.RECENT_REVIEW_ACTIVITY_MINUTES + 1)
+        self.assertIsNone(self._probe(self.NEW_HEAD))
+
+    # ---- the `.claimed/` leg ages from CLAIM time, not dispatch time ----
+
+    def _claim(self, name, *, head, dispatched_minutes_ago, slot='slot-1'):
+        """Reproduce a real claim: write the record into the inbox ROOT with a
+        dispatch-time mtime, then `os.rename` it into `.claimed/<slot>/` exactly
+        as inbox_watcher does. The rename PRESERVES mtime and bumps ctime, so
+        this yields the true on-disk shape — an ancient mtime with a fresh ctime
+        — rather than a simulation of it."""
+        import os
+        src = self._write(name, head=head, age_minutes=dispatched_minutes_ago)
+        dst = self.inbox / '.claimed' / slot / name
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        os.rename(src, dst)
+        return dst
+
+    def test_long_queued_review_still_blocks_once_claimed(self):
+        # THE REGRESSION THIS LEG MUST NOT HAVE: under slot saturation (the
+        # readiness trip-wire watches oldest-wait >= 3600s) a review can sit
+        # QUEUED past the window. While queued it is protected by the
+        # age-independent inbox-root leg. The moment a slot claims it and Mirror
+        # STARTS EXECUTING, it leaves the root — and if this leg aged from mtime
+        # (which the claim rename preserves as the DISPATCH time) it would read
+        # as stale immediately and stop blocking, so the backstop would pile a
+        # duplicate review onto a running one. Protected while idle, unprotected
+        # while running: the #865 harm, inverted.
+        self._claim(f'review-{self.TASK}-rev1.json', head=self.OLD_HEAD,
+                    dispatched_minutes_ago=h.RECENT_REVIEW_ACTIVITY_MINUTES * 3)
+        self.assertIsNotNone(self._probe(self.NEW_HEAD))
+
+    def test_archived_leg_still_ages_from_DISPATCH_not_archive_time(self):
+        # The asymmetry is load-bearing and must not be "simplified" away: the
+        # archive window is deliberately anchored on dispatch time so it spans
+        # dispatch -> NEXT-round dispatch (see RECENT_REVIEW_ACTIVITY_MINUTES).
+        # An archive is also a rename, so its ctime is the ARCHIVE (verdict)
+        # time; using max() here too would silently re-anchor and shorten it.
+        import os
+        src = self._write(f'review-{self.TASK}.json', head=self.NEW_HEAD,
+                          age_minutes=h.RECENT_REVIEW_ACTIVITY_MINUTES + 30)
+        dst = self.inbox / '.archive' / f'review-{self.TASK}.json'
+        os.rename(src, dst)  # fresh ctime, ancient mtime
+        self.assertIsNone(self._probe(self.NEW_HEAD))
+
+    def test_every_claim_slot_is_scanned(self):
+        # EVERY slot, not just the first: inbox_watcher claims into whichever
+        # slot is free, so a scan that stopped after one slot dir would miss a
+        # live review most of the time and pile a duplicate onto it. Sweeping
+        # the placement across all slots makes this independent of `glob`'s
+        # arbitrary directory order — pinning ONE placement passes or fails on
+        # which entry the filesystem happens to return first.
+        import shutil
+        slots = ('slot-1', 'slot-2', 'slot-3', 'slot-4')
+        claimed = self.inbox / '.claimed'
+        for target in slots:
+            with self.subTest(slot=target):
+                if claimed.exists():
+                    shutil.rmtree(claimed)
+                for s in slots:
+                    (claimed / s).mkdir(parents=True)
+                self._claim(f'review-{self.TASK}-rev1.json',
+                            head=self.OLD_HEAD, dispatched_minutes_ago=0,
+                            slot=target)
+                r = self._probe(self.NEW_HEAD)
+                self.assertIsNotNone(r, f'claim in {target} was not found')
+                self.assertIn(target, r)
+
+    def test_a_file_in_claimed_root_does_not_block(self):
+        # `.claimed/` holds slot DIRECTORIES; a stray file directly under it is
+        # not a claim and must not be read as one. (Doubly defended: the scan
+        # filters on `is_dir`, AND globbing under a non-directory yields nothing
+        # — so the `is_dir` call is defensive rather than load-bearing, and no
+        # test can distinguish its removal. Pinned for the PROPERTY, not the
+        # mechanism.)
+        (self.inbox / '.claimed').mkdir(parents=True, exist_ok=True)
+        (self.inbox / '.claimed' / f'review-{self.TASK}.json').write_text('{}')
+        self.assertIsNone(self._probe(self.NEW_HEAD))
+
+    def test_live_inbox_leg_stays_age_independent(self):
+        # Unchanged, and deliberately NOT window-bounded: a queued task has no
+        # execution ceiling, so age says nothing about whether it will run.
+        self._write(f'review-{self.TASK}.json', head=self.OLD_HEAD,
+                    age_minutes=h.RECENT_REVIEW_ACTIVITY_MINUTES * 10)
+        self.assertIsNotNone(self._probe(self.NEW_HEAD))
+
+
+class TestPipelineBackoffHeadAwareWiring(unittest.TestCase):
+    """End-to-end through `pipeline_backoff_reason` with a REAL inbox tree —
+    the recency leg is head-aware only when no Forge revision is in flight."""
+
+    TASK = 'pr-RSDPM-142'
+    OLD_HEAD = 'ca78b2dacf69b0599024139036ff93213d60db6b'
+    NEW_HEAD = '99f370378b8fc07da194c392ec2de315dab54d98'
+
+    def setUp(self):
+        import tempfile
+        self._tmp = tempfile.TemporaryDirectory()
+        self.inbox = Path(self._tmp.name)
+        (self.inbox / '.archive').mkdir()
+        self.now = datetime.now(timezone.utc)
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _archive(self, name, head):
+        import os
+        p = self.inbox / '.archive' / name
+        p.write_text(json.dumps({'task_id': self.TASK, 'head_sha': head}))
+        ts = (self.now - timedelta(minutes=24)).timestamp()
+        os.utime(p, (ts, ts))
+
+    def _run(self, *, head, task_id=None, in_flight=False, live=(False, ''),
+             passing=False):
+        """Run the guard against the real inbox tree. `_revision_in_flight` is
+        stubbed (the ledger lives outside this temp tree) but `recent_review_
+        record` is only SPIED — `wraps` calls straight through — so the scan is
+        the real one AND the arguments handed to it stay assertable. Both spies
+        are parked on self for the argument-contract tests below."""
+        from unittest import mock
+        pr = {'number': 142, 'task_id': task_id if task_id is not None else self.TASK,
+              '_repo': 'Larry-Yatch/RSDPM', 'headRefOid': head}
+        with mock.patch.object(h.pipeline_live_state, 'pr_review_in_progress',
+                               return_value=live), \
+                mock.patch.object(h, '_revision_in_flight',
+                                  return_value=in_flight) as flight_spy, \
+                mock.patch.object(h, 'recent_review_record',
+                                  wraps=h.recent_review_record) as rec_spy, \
+                mock.patch.object(h, 'head_has_passing_review_status',
+                                  return_value=passing):
+            result = h.pipeline_backoff_reason(
+                pr, self.inbox, f'review-{self.TASK}', self.now)
+        self.flight_spy = flight_spy
+        self.rec_spy = rec_spy
+        return result
+
+    def _recency_head_arg(self):
+        """The `current_head_sha` the guard actually handed the recency scan."""
+        self.assertEqual(self.rec_spy.call_count, 1)
+        return self.rec_spy.call_args.kwargs.get('current_head_sha')
+
+    # ---- ARGUMENT CONTRACT ----
+    # Both values the guard derives and passes down are load-bearing and both
+    # fail QUIET if wrong: a bad ledger key makes `is_in_flight` always False
+    # (guard always head-aware → duplicate dispatch mid-cascade, the #865
+    # regression), and a bad head makes every archived record read as drifted
+    # (back-off never fires → dispatch every tick). Neither shows up in the
+    # guard's return value, so assert the arguments, not just the outcome.
+
+    def test_ledger_is_keyed_on_the_prs_task_id(self):
+        # NOT the review stem (`review-pr-RSDPM-142`) — the ledger stores rows
+        # under the canonical task_id, so a stem lookup silently finds nothing.
+        self._archive(f'review-{self.TASK}.json', self.OLD_HEAD)
+        self._run(head=self.NEW_HEAD)
+        self.flight_spy.assert_called_once_with(self.TASK)
+
+    def test_recency_scan_receives_the_prs_current_head(self):
+        self._archive(f'review-{self.TASK}.json', self.OLD_HEAD)
+        self._run(head=self.NEW_HEAD)
+        self.assertEqual(self._recency_head_arg(), self.NEW_HEAD)
+
+    def test_recency_scan_receives_no_head_while_in_flight(self):
+        # The #865 contract at the argument level: in-flight must hand DOWN
+        # None, not merely happen to return a back-off reason for some other
+        # reason.
+        self._archive(f'review-{self.TASK}.json', self.OLD_HEAD)
+        self._run(head=self.NEW_HEAD, in_flight=True)
+        self.assertIsNone(self._recency_head_arg())
+
+    def test_ledger_not_consulted_when_head_is_unknown(self):
+        # No head → nothing to compare → head-blind without paying a ledger read.
+        self._archive(f'review-{self.TASK}.json', self.OLD_HEAD)
+        self._run(head=None)
+        self.flight_spy.assert_not_called()
+        self.assertIsNone(self._recency_head_arg())
+
+    def test_manually_fixed_escalated_pr_is_dispatchable(self):
+        # THE DEFECT, end to end: terminal ESCALATE (nothing in flight), human
+        # pushed a fix, archived record covers the pre-fix head → no back-off.
+        self._archive(f'review-{self.TASK}.json', self.OLD_HEAD)
+        self.assertIsNone(self._run(head=self.NEW_HEAD))
+
+    def test_same_record_backs_off_while_a_revision_is_in_flight(self):
+        # THE #865 SHAPE: the identical drifted record, but a Forge revision is
+        # genuinely in flight — the head is moving under a LIVE cascade, so the
+        # guard stays head-blind and holds.
+        self._archive(f'review-{self.TASK}.json', self.OLD_HEAD)
+        r = self._run(head=self.NEW_HEAD, in_flight=True)
+        self.assertIsNotNone(r)
+        self.assertIn('recent review record', r)
+
+    def test_backs_off_when_pr_head_unknown(self):
+        self._archive(f'review-{self.TASK}.json', self.OLD_HEAD)
+        self.assertIsNotNone(self._run(head=None))
+
+    def test_backs_off_when_task_id_missing(self):
+        # No task_id → can't ask the ledger → can't prove nothing owns the PR.
+        self._archive(f'review-{self.TASK}.json', self.OLD_HEAD)
+        self.assertIsNotNone(self._run(head=self.NEW_HEAD, task_id=''))
+
+    def test_active_review_still_short_circuits(self):
+        r = self._run(head=self.NEW_HEAD, live=(True, 'live_pid'))
+        self.assertIn('active review', r)
+
+    def test_passing_status_on_current_head_still_backs_off(self):
+        # Leg 3 is untouched and already head-keyed: it probes headRefOid.
+        r = self._run(head=self.NEW_HEAD, passing=True)
+        self.assertIn('passing mirror-review status', r)
+
+
+class TestRevisionInFlightWrapper(unittest.TestCase):
+    """`_revision_in_flight` fails toward "in flight" so a broken ledger can only
+    make the recency guard MORE conservative (back off), never open the
+    duplicate-dispatch window."""
+
+    def test_delegates_to_the_ledger(self):
+        from unittest import mock
+        import revision_in_flight_ledger
+        with mock.patch.object(revision_in_flight_ledger, 'is_in_flight',
+                               return_value=True) as p:
+            self.assertTrue(h._revision_in_flight('t-1'))
+        p.assert_called_once_with('t-1')
+        with mock.patch.object(revision_in_flight_ledger, 'is_in_flight',
+                               return_value=False):
+            self.assertFalse(h._revision_in_flight('t-1'))
+
+    def test_ledger_failure_reads_as_in_flight(self):
+        from unittest import mock
+        import revision_in_flight_ledger
+        with mock.patch.object(revision_in_flight_ledger, 'is_in_flight',
+                               side_effect=RuntimeError('boom')):
+            self.assertTrue(h._revision_in_flight('t-1'))
+
+
 class TestCanonicalTaskIdForPr(unittest.TestCase):
     """canonical_task_id_for_pr: recover the build-outbox task_id by PR-URL match,
     regardless of how the head branch mangled the id (G-rule
