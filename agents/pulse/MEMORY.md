@@ -60,7 +60,7 @@
 
 ## beacon-pending-approvals.json correct path and structure (learned 2026-06-12, corrected 2026-06-30)
 
-**Rule:** Lives at `~/agents/state/beacon-pending-approvals.json`. NOT `~/agents/blackboard/`. Structure: `{"version": 1, "pending": [...], "history": [...]}` — NOT a dict keyed by approval ID. Check for pending items via `d["pending"]` list length. **The DM-delivery field is `chat_id` (integer), NOT `reply_chat_id`.** Querying `p.get("reply_chat_id")` always returns None even when the DM path is intact; always use `p.get("chat_id")`.
+**Rule:** Lives at `~/agents/state/beacon-pending-approvals.json`. NOT `~/agents/blackboard/`. Structure: `{"version": 1, "pending": [...], "history": [...]}` — NOT a dict keyed by approval ID. Check for pending items via `d["pending"]` list length. **Each item's identifier is `p["id"]` (NOT `p["task_id"]` — that key does not exist on pending items).** `origin_task_id` is the originating task reference (separate field). **The DM-delivery field is `chat_id` (integer), NOT `reply_chat_id`.** Querying `p.get("reply_chat_id")` always returns None even when the DM path is intact; always use `p.get("chat_id")`. Confirmed pending item keys (iter ~6704): id, created_at, chat_id, plan_summary, target_agent, dispatch_payload, status, reminders_sent, queued_during_pause, origin_task_id, decision_key.
 
 ---
 
