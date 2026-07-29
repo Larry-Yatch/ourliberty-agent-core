@@ -15248,7 +15248,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-29T19:12:25.163215+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-29T19:11:47.383434+00:00"
+      "orphan_last_activity_ts": "2026-07-29T19:11:47.383434+00:00",
+      "briefing": {
+        "what": "Someone on the team began a piece of work that hasn't been connected to any active project or goal yet.",
+        "why": "Unassigned work can quietly consume time and effort without moving any of your priorities forward.",
+        "suggest": "Take a quick look to confirm it's worth pursuing and tie it to a real goal, or set it aside until it is."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T19:12:41.009351+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-mirror-review-pr-ourliberty-agent-core-1053-fe6b252a",
@@ -15265,7 +15279,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-29T19:12:25.163215+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-29T19:09:49.875899+00:00"
+      "orphan_last_activity_ts": "2026-07-29T19:09:49.875899+00:00",
+      "briefing": {
+        "what": "A quality check on a piece of work the team started that isn't yet tied to any specific project.",
+        "why": "Loose ends like this can quietly pile up and waste effort or create confusion if they're never tied back to a real goal.",
+        "suggest": "Take a quick look to confirm it's still worth pursuing before it moves forward, and tie it to a clear objective if so."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T19:12:41.009351+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
