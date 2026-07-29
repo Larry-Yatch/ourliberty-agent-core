@@ -5003,10 +5003,29 @@ def _delegate_dispatched_task_ids(
     return _delegate_approval_scan(origin_task_ids, agents_root)[0]
 
 
-# An approval that reached a TERMINAL non-approved state. Larry decided (reject)
-# or the window closed (expire); either way nothing was ever dispatched, and the
-# card is not waiting on anyone.
-_DECLINED_APPROVAL_STATUSES = frozenset({'rejected', 'expired'})
+# An approval Larry DECIDED against. `rejected` only — deliberately NOT
+# `expired`.
+#
+# `expired` is an AUTO-RETIREMENT, not a decision, and the three writers all say
+# so in as many words:
+#   - outbox_notifier.py:6320  "NOT approved/rejected: Larry never acted, the
+#                               merge made the decision moot"
+#   - heal_stale_approvals.py:528  "auto-retired by heal-stale-approvals"
+#   - heal_unregistered_approval.py:1303  "status 'expired' = auto-retired, not
+#                               a [decision]"
+#
+# Lumping the two together renders "You turned this down" over a delegation he
+# never answered — asserting a decision he did not make, in the muted tone
+# reserved for settled work, on exactly the card that still needs him. It also
+# withheld the thread's `stalled` post for those cards, which is the silence this
+# whole arc exists to remove.
+#
+# An expired approval is honestly `stalled`: delegated, no receipt, nothing
+# carrying it — "no sign of progress, worth a look" is TRUE and actionable. So
+# `expired` is simply absent here and falls through the receipt gate on its own.
+# Kept a frozenset (not a bare `== 'rejected'`) because `modified` may later need
+# a home — but add nothing here that Larry did not personally decide.
+_DECLINED_APPROVAL_STATUSES = frozenset({'rejected'})
 
 
 def _delegate_declined_origins(
@@ -5062,9 +5081,14 @@ def _delegate_approval_scan(
         return {}, set()
     wanted = set(origin_task_ids)
     approved: dict[str, str] = {}
-    declined: set[str] = set()
+    # Append position of each origin's newest approval / newest rejection. The
+    # WINNER is whichever came last — see the netting note below.
+    _approved_at: dict[str, int] = {}
+    _declined_at: dict[str, int] = {}
+    seq = 0
     for bucket in ('pending', 'history'):
         for entry in (data.get(bucket) or []):
+            seq += 1
             if not isinstance(entry, dict):
                 continue
             origin = entry.get('origin_task_id')
@@ -5072,12 +5096,31 @@ def _delegate_approval_scan(
                 continue
             status = entry.get('status')
             if status == 'approved':
+                # Position is recorded even when the id is unusable: the entry is
+                # still an approval, and still supersedes an earlier rejection.
+                # Only the RECEIPT needs a usable id.
+                _approved_at[origin] = seq
                 fresh = entry.get('id')
                 if isinstance(fresh, str) and fresh:
                     approved[origin] = fresh  # last (newest) wins
             elif status in _DECLINED_APPROVAL_STATUSES:
-                declined.add(origin)
-    return approved, {o for o in declined if o not in approved}
+                _declined_at[origin] = seq
+    # NEWEST-WINS, not set difference. The old netting was
+    # `{o for o in declined if o not in approved}`, which never compared
+    # positions — so ANY approval anywhere in history cancelled a rejection, even
+    # one that came after it. Concretely: delegate → approve → build FAILS →
+    # re-delegate (which `_already_delegated_short_circuit` permits precisely
+    # because `failure_signaled` is set) → Larry REJECTS the retry. The origin
+    # fell out of `declined`, kept the stale receipt, and the card read
+    # `handed_off` — "the team picked this up" about a delegation he had just
+    # turned down. In the narrator that post is permanent.
+    #
+    # Entries are appended on resolve, so append position IS recency; `pending`
+    # is scanned first but contributes nothing here (its rows are `status
+    # == 'pending'`, neither approved nor rejected), so the ordering across the
+    # two buckets never matters.
+    declined = {o for o, at in _declined_at.items() if at > _approved_at.get(o, -1)}
+    return approved, declined
 
 
 def _has_forge_build_started(events: Optional[list[dict[str, Any]]]) -> bool:
@@ -5271,10 +5314,21 @@ def _delegation_trail_field(
     declined set against approved, so a rejected-then-approved re-delegation is
     not in it at all and keeps its real build trail.)
 
-    A real build event still wins over `declined` — if something actually ran,
-    the trail says so rather than the approval's verdict. That cannot happen off
-    the ledger bridge (a declined origin has no receipt, so no native events to
-    join), only off a genuine origin-tagged event.
+    An origin-tagged build event still wins over `declined` — if something
+    actually ran, the trail says so rather than the approval's verdict. The
+    ledger-bridge `building` signal explicitly does NOT (see the guard below):
+    that bridge is keyed to the approval receipt, and since the netting is
+    newest-wins a declined card can still carry the receipt of a SUPERSEDED
+    round, whose finished build would otherwise render as live work.
+
+    KNOWN GAP, deliberately not closed here: `chain_events` are origin-tagged
+    with `delegate-<cid>`, which identifies the CARD, not the delegation round.
+    So a card that was delegated, built, re-delegated and then rejected still
+    shows the first round's `in_review`/`review_passed` trail. Distinguishing
+    rounds needs the events compared against the rejection timestamp, which the
+    trail has no access to on this path. The bounded harm is that a stale round
+    reads as live; the unbounded one — claiming the team holds work Larry just
+    rejected — is what the guard below removes.
 
     Neutral None before any build event joins — never a misleading claim."""
     neutral = {'delegation_build_phase': None, 'delegation_pr_url': None}
@@ -5324,7 +5378,12 @@ def _delegation_trail_field(
     # session_start (reached via the ledger bridge, since those events aren't
     # origin-tagged) proves Forge is actually on it. Only consulted when the
     # origin-tagged review trail has nothing yet — a real review event always wins.
-    if (delegated and not has_open_approval
+    # NOT for a declined origin: the bridge is keyed to the ledger RECEIPT, and
+    # since the netting went newest-wins a declined card can still carry the
+    # receipt of a SUPERSEDED round. Without this guard, approve → build → reject
+    # renders "Building" off the old build for a delegation Larry just rejected —
+    # the same stale-round bug the netting fix closes, one line further down.
+    if (delegated and not has_open_approval and not _declined
             and _has_forge_build_started(
                 (native_build_events or {}).get(_delegate_tid))):
         fallback = {'delegation_build_phase': 'building',

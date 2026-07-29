@@ -137,22 +137,30 @@ class ProjectDelegationFieldsTest(unittest.TestCase):
         self.assertIsNone(ranked[0]['delegation_needs_you'])
         self.assertEqual(ranked[0]['delegation_build_phase'], 'declined')
 
-    # NO `expired` TEST HERE ON PURPOSE — removed, not forgotten.
-    #
-    # It asserted `expired` → `declined` → "You turned this down". That is wrong:
-    # `expired` is written by three AUTO-RETIRE paths that all document it as NOT
-    # a decision (`outbox_notifier.py:6320` "Larry never acted";
-    # `heal_stale_approvals.py:528` "auto-retired"; `heal_unregistered_approval.py:1303`
-    # "auto-retired, not a [decision]"). Rendering it as his decision is the same
-    # two-states-one-label conflation `declined` was added to remove.
-    #
-    # The fix belongs to #1047, which owns `_DECLINED_APPROVAL_STATUSES` and is
-    # being changed in parallel — so this PR must not assert EITHER answer for
-    # `expired` in the meantime. agent-core has no CI, so nothing would run the
-    # two branches together and a contradictory test here would survive to main
-    # ([[parallel-prs-green-apart-conflict-on-main]]). Re-add the assertion —
-    # expecting `stalled`, the honest floor for "nobody ever answered" — once
-    # #1047's split lands and this branch is rebased onto it.
+    def test_expired_approval_is_not_declined(self):
+        # `expired` = auto-retired, NOT a decision (three writers say so). It
+        # must never render "You turned this down" over a delegation Larry never
+        # answered. On THIS surface it stays at the neutral None the elif chain
+        # already produces — `_delegation_outcome_evidence` treats a non-approved
+        # origin as no evidence — which is the operator queue's pre-existing
+        # blank-row behaviour for an unanswered card, unchanged by this PR.
+        self._write_pending([], history=[{
+            'id': 'appr4', 'origin_task_id': DELEGATE, 'status': 'expired'}])
+        ranked = [{'id': 'm1', 'name': 'X'}]
+        da._project_delegation_fields(ranked, _StubClient([]))
+        self.assertNotEqual(ranked[0]['delegation_build_phase'], 'declined')
+
+    def test_approved_then_rejected_reads_declined_not_handed_off(self):
+        # Newest-terminal-wins. Before the fix the approval cancelled the later
+        # rejection by set difference, leaving a stale receipt and a card that
+        # said "Handed to the team" about work Larry had just rejected.
+        self._write_pending([], history=[
+            {'id': 'a1', 'origin_task_id': DELEGATE, 'status': 'approved'},
+            {'id': 'a2', 'origin_task_id': DELEGATE, 'status': 'rejected'},
+        ])
+        ranked = [{'id': 'm1', 'name': 'X'}]
+        da._project_delegation_fields(ranked, _StubClient([]))
+        self.assertEqual(ranked[0]['delegation_build_phase'], 'declined')
 
     def test_rejected_then_approved_is_not_declined(self):
         # Re-delegated and approved: the scan nets declined against approved, so

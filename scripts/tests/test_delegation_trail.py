@@ -217,6 +217,30 @@ class DelegationTrailFieldTest(unittest.TestCase):
             cap, {}, declined_origins={'delegate-someone-else'}, now=NOW)
         self.assertEqual(got['delegation_build_phase'], 'stalled')
 
+    def test_declined_beats_a_superseded_rounds_native_build(self):
+        # The netting is newest-wins, so a DECLINED card can still carry the
+        # ledger receipt of an earlier approved round — and `native_build_events`
+        # is keyed off exactly that receipt. Without the guard, approve → build →
+        # reject renders "Building" off the finished old build for a delegation
+        # Larry just rejected. The declined verdict must win over the bridge.
+        cap = _delegate_cap(stamped_at='2026-06-28T00:00:00+00:00')
+        native = {DELEGATE_ID: [{'event_type': 'session_start',
+                                 'agent': 'forge'}]}
+        got = da._delegation_trail_field(
+            cap, {}, None, native_build_events=native,
+            dispatched_by_origin=RECEIPT, declined_origins={DELEGATE_ID},
+            now=NOW)
+        self.assertEqual(got['delegation_build_phase'], 'declined')
+
+    def test_declined_beats_a_superseded_receipt(self):
+        # Same shape without the native events: the stale receipt must not
+        # resurrect the calm "Handed to the team".
+        cap = _delegate_cap(stamped_at='2026-06-28T00:00:00+00:00')
+        got = da._delegation_trail_field(
+            cap, {}, dispatched_by_origin=RECEIPT,
+            declined_origins={DELEGATE_ID}, now=NOW)
+        self.assertEqual(got['delegation_build_phase'], 'declined')
+
     def test_declined_defaults_off_so_stalled_is_unchanged(self):
         # Callers that never pass the set keep exactly today's behaviour.
         cap = _delegate_cap(stamped_at='2026-06-28T00:00:00+00:00')

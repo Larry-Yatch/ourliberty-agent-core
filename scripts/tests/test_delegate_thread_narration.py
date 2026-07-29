@@ -298,10 +298,16 @@ class EmitTest(unittest.TestCase):
 
 
 class ApprovalScanTest(unittest.TestCase):
-    """The receipt map counts `approved` ONLY, and rejected/expired origins are
-    reported separately as declined. Before the filter existed, a REJECTED
-    approval still handed back a receipt, and the narrator announced "Picked this
-    up" for work Larry had turned down (live instance on the 2026-07-28 board)."""
+    """The receipt map counts `approved` ONLY, and origins whose NEWEST terminal
+    entry is a rejection are reported separately as declined. Before the filter
+    existed, a REJECTED approval still handed back a receipt, and the narrator
+    announced "Picked this up" for work Larry had turned down (live instance on
+    the 2026-07-28 board).
+
+    Two properties this class pins, both found by review of the consuming PR:
+      - `expired` is NOT declined — it is an auto-retirement, not a decision.
+      - The netting is NEWEST-WINS, not a set difference, so a rejection that
+        follows an approval is honoured instead of being cancelled by it."""
 
     def _store(self, entries, bucket='history'):
         import json
@@ -332,13 +338,53 @@ class ApprovalScanTest(unittest.TestCase):
         self.assertEqual(da._delegate_declined_origins(['delegate-a'], root),
                          {'delegate-a'})
 
-    def test_expired_is_not_a_receipt_and_is_declined(self):
+    def test_expired_is_not_a_receipt_and_is_NOT_declined(self):
+        # `expired` is an AUTO-RETIREMENT, not a decision — its three writers all
+        # say so (`outbox_notifier.py:6320` "Larry never acted";
+        # `heal_stale_approvals.py:528`; `heal_unregistered_approval.py:1303`).
+        # It was originally lumped in with `rejected`, which rendered "You turned
+        # this down" over a delegation Larry never answered AND withheld the
+        # thread's stalled post for it. Not a receipt (nothing dispatched) and
+        # not declined (he decided nothing) — it falls through to the honest
+        # `stalled` floor, which is exactly what an unanswered delegation is.
         root = self._store([{'origin_task_id': 'delegate-a', 'id': 'fresh-1',
                              'status': 'expired'}])
         self.assertEqual(
             da._delegate_dispatched_task_ids(['delegate-a'], root), {})
         self.assertEqual(da._delegate_declined_origins(['delegate-a'], root),
-                         {'delegate-a'})
+                         set())
+
+    def test_newest_terminal_wins_approved_then_rejected_is_declined(self):
+        # ORDER, not set membership. The old netting was
+        # `{o for o in declined if o not in approved}`, so ANY approval anywhere
+        # in history cancelled a rejection — even one that came AFTER it.
+        # delegate → approve → build fails → re-delegate → REJECT left the origin
+        # non-declined with a stale receipt, so the card read `handed_off` and
+        # the narrator posted a permanent "the team picked this up" about work
+        # Larry had just turned down.
+        root = self._store([
+            {'origin_task_id': 'delegate-a', 'id': 'fresh-1',
+             'status': 'approved'},
+            {'origin_task_id': 'delegate-a', 'id': 'appr-2',
+             'status': 'rejected'},
+        ])
+        approved, declined = da._delegate_approval_scan(['delegate-a'], root)
+        self.assertEqual(declined, {'delegate-a'})
+        # The superseded receipt is still returned — the trail must beat it on
+        # `declined`, not by pretending the earlier build never happened.
+        self.assertEqual(approved, {'delegate-a': 'fresh-1'})
+
+    def test_approval_with_an_unusable_id_still_supersedes_a_rejection(self):
+        # The entry is an approval whether or not its id is usable, so it must
+        # still win the recency comparison; only the RECEIPT needs a real id.
+        root = self._store([
+            {'origin_task_id': 'delegate-a', 'id': 'appr-1',
+             'status': 'rejected'},
+            {'origin_task_id': 'delegate-a', 'id': '', 'status': 'approved'},
+        ])
+        approved, declined = da._delegate_approval_scan(['delegate-a'], root)
+        self.assertEqual(declined, set())
+        self.assertEqual(approved, {})
 
     def test_pending_is_not_a_receipt(self):
         # Still awaiting Larry — nothing has been dispatched under it.
