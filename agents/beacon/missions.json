@@ -15652,7 +15652,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-29T22:58:59.825270+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-29T22:54:55.123006+00:00"
+      "orphan_last_activity_ts": "2026-07-29T22:54:55.123006+00:00",
+      "briefing": {
+        "what": "A piece of work your team began that's waiting on your sign-off before it can move forward.",
+        "why": "It's stuck in limbo and tying up effort that could be finishing something else until you weigh in.",
+        "suggest": "Take a quick look and confirm it fits a current priority before giving the go-ahead, since it isn't yet tied to a clear goal."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T23:04:46.824073+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-pr-RSDPM-160",
@@ -15669,7 +15683,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-29T22:58:59.825270+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-29T22:54:10.112609+00:00"
+      "orphan_last_activity_ts": "2026-07-29T22:54:10.112609+00:00",
+      "briefing": {
+        "what": "A piece of work your team picked up on its own that hasn't been tied to any of your active priorities yet.",
+        "why": "Effort is going into it and it has cleared an internal quality check, but with no project attached it may not be advancing anything you actually care about right now.",
+        "suggest": "Before it goes further, take a quick look and either claim it for a real priority or set it aside \u2014 don't greenlight it blindly."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T23:04:46.824073+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-ourliberty-health-untracked-files-cleanup-001",
@@ -15686,7 +15714,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-29T22:58:59.825270+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-29T22:50:36.503143+00:00"
+      "orphan_last_activity_ts": "2026-07-29T22:50:36.503143+00:00",
+      "briefing": {
+        "what": "Some loose files got left behind during recent work on the Ourliberty Health side and aren't attached to any active project.",
+        "why": "Leftover clutter like this can quietly pile up and make it harder to tell what's real work versus stray leftovers down the road.",
+        "suggest": "Have someone who knows what these files are take a quick look and clear them out, rather than letting the team automate it blindly."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T23:04:46.824073+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
