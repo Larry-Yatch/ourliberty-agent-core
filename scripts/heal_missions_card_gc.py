@@ -1824,6 +1824,16 @@ def _narration_text(phase: str, pr_url: Optional[str]) -> str:
         # not the work happened. Claiming it never started would be the same
         # dishonesty in the other direction as the old unconditional `handed_off`.
         return ("No sign of progress on this yet — it may need a nudge.")
+    if phase == 'declined':
+        # DELIBERATE SILENCE — the one phase the board shows and the thread does
+        # not. The resolver reports `declined` to both (that symmetry is the
+        # point: one resolver, one answer), but a thread post is permanent and
+        # one-shot, and there is nothing to tell Larry about a decision he just
+        # made himself. The BOARD still says it, because a card that renders
+        # nothing is the silence problem this whole arc exists to remove.
+        # Returning '' rather than `continue`-ing at the call site keeps the
+        # withhold next to the wording it is a judgement about.
+        return ''
     return ''
 
 
@@ -1870,10 +1880,14 @@ def plan_delegate_narrations(
         pickup, and the deterministic event_id means the genuine `handed_off`
         could then never fire. Withholding it means the post lands exactly once,
         when it is true.
-      * `stalled` for a DECLINED origin — rejected/expired approvals. Larry turned
-        the work down; "it may need a nudge" invites him to re-push what he
-        deliberately stopped. `stalled` cannot tell the two apart on its own, so
-        the caller supplies the declined set.
+      * `declined` — rejected/expired approvals. Larry turned the work down; a
+        "may need a nudge" post invites him to re-push what he deliberately
+        stopped, and there is nothing to tell him about his own decision. The
+        caller still supplies `declined_origins` (it is what lets the resolver
+        SEE the phase), but the withhold itself now lives in `_narration_text`,
+        which has no honest wording to return. The dashboard card DOES render
+        this phase — that asymmetry is intended and is the whole point: a
+        permanent post and a re-rendered card have different bars.
 
     No side effects, no Supabase, no captures.json — the caller emits. Because the
     event_id is deterministic on (capture_id, phase), the emit is idempotent: the
@@ -1900,18 +1914,25 @@ def plan_delegate_narrations(
             has_open_approval=has_open_approval,
             native_build_events=native_build_events,
             dispatched_by_origin=dispatched_by_origin,
+            declined_origins=declined_origins,
         )
         phase = resolved.get('narrative_phase')
         if not phase:
             continue
-        # Withhold the two phases that would post something untrue (see docstring).
-        # Both are checked HERE, not in the resolver: the resolver's answers are
+        # Withhold `handed_off` when it would post something untrue (see
+        # docstring). Checked HERE, not in the resolver: the resolver's answer is
         # right for the dashboard card, which renders a current state that can be
-        # re-rendered next tick. A post is permanent, so it needs the stricter bar.
+        # re-rendered next tick. A post is permanent, so it needs the stricter
+        # bar. It has to live at the call site because the disqualifier (no ledger
+        # receipt) is not recoverable from the phase string alone.
         if phase == 'handed_off' and not (dispatched_by_origin or {}).get(origin_tid):
             continue  # grace-window only — nobody has actually picked it up yet
-        if phase == 'stalled' and origin_tid in (declined_origins or set()):
-            continue  # Larry declined it; it is not neglected, and needs no nudge
+        # NOTE: the declined case used to be caught here as `stalled` + a declined
+        # origin, because `stalled` was the only phase a rejected delegation could
+        # reach. It now resolves as its own `declined` phase (both read paths, one
+        # resolver), so the withhold moved to `_narration_text`, which returns ''
+        # for it — the disqualifier IS the phase, so it belongs with the wording.
+        # Re-adding a guard here would be dead code that reads as live.
         text = _narration_text(phase, resolved.get('narrative_pr_url'))
         if not text:
             continue

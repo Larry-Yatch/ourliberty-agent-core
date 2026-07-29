@@ -147,17 +147,36 @@ class PlanTest(unittest.TestCase):
                            dispatched_by_origin={DELEGATE_ID: 'f-tid'})
         self.assertEqual([p['phase'] for p in posts], ['handed_off'])
 
-    def test_declined_origin_is_not_narrated_as_stalled(self):
+    def test_declined_origin_is_not_narrated(self):
         # Larry REJECTED this delegation. It is declined, not neglected — telling
         # him it "may need a nudge" invites him to re-push work he stopped.
+        # The card now resolves its own `declined` phase rather than `stalled`
+        # (one resolver, one answer for both read paths); the thread stays silent
+        # because `_narration_text` has no honest wording for a decision Larry
+        # just made, NOT because the resolver hides the phase from it. The BOARD
+        # renders that same phase — see test_delegation_trail.
         self.assertEqual(
             self._plan([_cap()], {}, declined_origins={DELEGATE_ID}), [])
         # A DIFFERENT origin being declined must not suppress this card.
         posts = self._plan([_cap()], {}, declined_origins={'delegate-other'})
         self.assertEqual([p['phase'] for p in posts], ['stalled'])
 
+    def test_declined_phase_resolves_but_yields_no_post(self):
+        # Pins the split explicitly: the shared resolver reports `declined` for
+        # this exact card while the planner emits nothing for it. If a future
+        # change makes the resolver return None instead, this fails — that would
+        # be the dashboard going blank again, silently.
+        import dashboard_api as _dash  # noqa: PLC0415
+        self.assertEqual(
+            _dash.resolve_delegation_narrative_phase(
+                _cap(), {}, declined_origins={DELEGATE_ID},
+            )['narrative_phase'],
+            'declined')
+        self.assertEqual(
+            self._plan([_cap()], {}, declined_origins={DELEGATE_ID}), [])
+
     def test_declined_origin_still_narrates_real_progress(self):
-        # Suppression is scoped to `stalled` only. If a declined origin somehow
+        # Suppression is scoped to the declined phase only. If a declined origin
         # carries real build signal, that is observed truth and must still post.
         posts = self._plan([_cap()], {DELEGATE_ID: [_ev('review_request')]},
                            declined_origins={DELEGATE_ID})

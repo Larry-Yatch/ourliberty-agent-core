@@ -122,6 +122,61 @@ class ProjectDelegationFieldsTest(unittest.TestCase):
         self.assertIsNone(ranked[0]['delegation_needs_you'])
         self.assertEqual(ranked[0]['delegation_build_phase'], 'in_review')
 
+    # ---- declined ----------------------------------------------------------
+
+    def test_rejected_approval_reads_declined_not_blank(self):
+        # This surface's own version of the bug. `_delegation_outcome_evidence`
+        # returns None for a rejected-only origin (a rejection is deliberately
+        # NOT evidence of a dispatch), so before the fix a declined card fell out
+        # of the elif chain and the queue left it at `None` — a BLANK row, which
+        # reads as "never delegated" for work Larry explicitly stopped.
+        self._write_pending([], history=[{
+            'id': 'appr3', 'origin_task_id': DELEGATE, 'status': 'rejected'}])
+        ranked = [{'id': 'm1', 'name': 'X'}]
+        da._project_delegation_fields(ranked, _StubClient([]))
+        self.assertIsNone(ranked[0]['delegation_needs_you'])
+        self.assertEqual(ranked[0]['delegation_build_phase'], 'declined')
+
+    def test_expired_approval_reads_declined(self):
+        self._write_pending([], history=[{
+            'id': 'appr4', 'origin_task_id': DELEGATE, 'status': 'expired'}])
+        ranked = [{'id': 'm1', 'name': 'X'}]
+        da._project_delegation_fields(ranked, _StubClient([]))
+        self.assertEqual(ranked[0]['delegation_build_phase'], 'declined')
+
+    def test_rejected_then_approved_is_not_declined(self):
+        # Re-delegated and approved: the scan nets declined against approved, so
+        # the card keeps its live phase instead of being frozen at a superseded
+        # verdict. `handed_off` here — approved receipt, no build event yet.
+        self._write_pending([], history=[
+            {'id': 'a1', 'origin_task_id': DELEGATE, 'status': 'rejected'},
+            {'id': 'a2', 'origin_task_id': DELEGATE, 'status': 'approved'},
+        ])
+        ranked = [{'id': 'm1', 'name': 'X'}]
+        da._project_delegation_fields(ranked, _StubClient([]))
+        self.assertEqual(ranked[0]['delegation_build_phase'], 'handed_off')
+
+    def test_build_events_beat_declined(self):
+        self._write_pending([], history=[{
+            'id': 'appr5', 'origin_task_id': DELEGATE, 'status': 'rejected'}])
+        rows = [{'event_type': 'review_request', 'ts': 't',
+                 'payload': {'origin_task_id': DELEGATE}}]
+        ranked = [{'id': 'm1', 'name': 'X'}]
+        da._project_delegation_fields(ranked, _StubClient(rows))
+        self.assertEqual(ranked[0]['delegation_build_phase'], 'in_review')
+
+    def test_open_approval_beats_declined(self):
+        # Rejected once, re-delegated, now parked on Larry again.
+        self._write_pending(
+            [{'id': 'appr6', 'origin_task_id': DELEGATE, 'status': 'pending',
+              'created_at': '2026-07-11T12:00:00Z'}],
+            history=[{'id': 'a0', 'origin_task_id': DELEGATE,
+                      'status': 'rejected'}])
+        ranked = [{'id': 'm1', 'name': 'X'}]
+        da._project_delegation_fields(ranked, _StubClient([]))
+        self.assertIsNotNone(ranked[0]['delegation_needs_you'])
+        self.assertIsNone(ranked[0]['delegation_build_phase'])
+
     def test_non_delegated_entry_is_neutral(self):
         self._write_pending([])
         ranked = [{'id': 'm2', 'name': 'never delegated'}]

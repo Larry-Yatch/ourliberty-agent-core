@@ -91,6 +91,32 @@ class PhasePrecedenceTest(unittest.TestCase):
         got = _resolve(_cap(), {}, has_open_approval=True)
         self.assertEqual(got['narrative_phase'], 'waiting_approval')
 
+    def test_declined_resolves_declined_not_stalled(self):
+        # The resolver is the ONE place the board and the thread agree on what a
+        # card's state IS, so a rejected delegation must resolve `declined` here
+        # — not `stalled` with the declined logic bolted onto one read path. What
+        # differs downstream is what each DOES with it (the board renders it, the
+        # narrator withholds the post); that split is tested in the narration
+        # suite, not by giving the two surfaces different answers.
+        got = _resolve(_cap(), {}, declined_origins={DELEGATE_ID})
+        self.assertEqual(got['narrative_phase'], 'declined')
+        self.assertIsNone(got['narrative_pr_url'])
+
+    def test_waiting_approval_wins_over_declined(self):
+        got = _resolve(_cap(), {}, has_open_approval=True,
+                       declined_origins={DELEGATE_ID})
+        self.assertEqual(got['narrative_phase'], 'waiting_approval')
+
+    def test_build_signal_wins_over_declined(self):
+        got = _resolve(_cap(), {DELEGATE_ID: [_ev('review_request')]},
+                       declined_origins={DELEGATE_ID})
+        self.assertEqual(got['narrative_phase'], 'in_review')
+
+    def test_declined_defaults_off(self):
+        # Omitting the set keeps the pre-fix answer, so no caller changes meaning
+        # by accident.
+        self.assertEqual(_resolve(_cap(), {})['narrative_phase'], 'stalled')
+
     def test_build_signal_wins_over_missing_receipt(self):
         # A receipt-less card with a real review event is demonstrably being
         # worked; the trail phase outranks the receipt gate. Guards against a
