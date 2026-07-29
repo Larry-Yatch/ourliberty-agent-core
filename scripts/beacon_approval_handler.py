@@ -1134,6 +1134,64 @@ def build_autonomy_decision_chain_event(
 
 # -------------------- dispatch step --------------------
 
+def _supersede_live_review_for_approval(
+    entry: dict[str, Any], payload: dict[str, Any],
+) -> None:
+    """Cancel any live Mirror review covered by this approval's PR. No-op for
+    every approval type that is not a Mirror-review escalation. Never raises.
+
+    Deliberately returns nothing: there is no outcome the caller may act on,
+    because the dispatch proceeds either way (see the call site).
+    """
+    target = payload.get('recheck_target')
+    if not isinstance(target, dict):
+        return
+    pipeline_task_id = target.get('task_id')
+    if not isinstance(pipeline_task_id, str) or not pipeline_task_id:
+        return
+    try:
+        import mirror_review_supersede
+        outcome = mirror_review_supersede.supersede_live_review(
+            pipeline_task_id,
+            _review_stem_for_task(pipeline_task_id),
+            reason='superseded by an approved escalation revision',
+            root=AGENTS_ROOT,
+        )
+    except Exception:  # noqa: BLE001 — a supersede error must never block a click
+        return
+    if not outcome.attempted:
+        return
+    # This module is otherwise silent (a pure library — see the header), but a
+    # cancelled review is paid work being thrown away and an unacked cancel is
+    # the one residual stale-verdict window. Both callers of `dispatch_approved`
+    # (the Telegram bot, the notifier's auto-approve) run under systemd, so
+    # stderr lands in journald next to their own lines. Content-free: record
+    # names and counts only.
+    print(outcome.log_line(pipeline_task_id), file=sys.stderr)
+    # `session_reason`, not `cancel_acked is False` alone — a session that had
+    # already exited also reports False and is the benign shape.
+    if outcome.cancel_acked is False and outcome.session_reason:
+        print(
+            f'MIRROR_REVIEW_SUPERSEDE_UNACKED task={pipeline_task_id} '
+            f'session={outcome.session_reason} — a LIVE review did not consume '
+            f'the cancel marker within the ack window; cleared so it cannot '
+            f'cancel the dispatched Forge task. That review may still deliver a '
+            f'verdict against a superseded head; the dispatch proceeds.',
+            file=sys.stderr,
+        )
+
+
+def _review_stem_for_task(task_id: str) -> str:
+    """The canonical on-disk review-record stem, spelled the way
+    `outbox_notifier._dispatch_mirror_review` writes it. Single-sourced from
+    `safe_write_inbox.canonical_inbox_name` (already imported here) rather than
+    from the notifier, so this pure-logic module does not pull the notifier in
+    just to build a filename; `outbox_notifier.review_stem_for_task` is the
+    twin, and a cross-module test pins the two equal."""
+    name = safe_write_inbox.canonical_inbox_name(f'review-{task_id}.json')
+    return name[:-len('.json')] if name.endswith('.json') else name
+
+
 def dispatch_approved(entry: dict[str, Any]) -> Path:
     """Call safe_write_inbox to land the task in target_agent's inbox.
 
@@ -1217,6 +1275,28 @@ def dispatch_approved(entry: dict[str, Any]) -> Path:
         task_dict['max_replans'] = (
             entry.get('_max_replans') or DEFAULT_MAX_REPLANS
         )
+    # Supersede any LIVE Mirror review before Forge starts moving the PR head
+    # (2026-07-28). This is the human-click half of the gap `outbox_notifier.
+    # _supersede_live_review_before_forge` closes on the REVIEW_REVISION half:
+    # approving a session-less `mirror-review-*` escalation writes a Forge task
+    # that pushes a `[WIP][session-start]` checkpoint plus work commits, and a
+    # review executing at that moment returns a verdict against a head that no
+    # longer exists (the #865 harm).
+    #
+    # SUPERSEDE, NOT SUPPRESS: this never withholds the dispatch. Larry's click
+    # has nothing to defer into — skipping the write would resolve the card and
+    # strand the PR with no "I fixed it myself" exit, which is the
+    # approval-reject-strands-pr shape.
+    #
+    # `recheck_target` is the discriminator, not a heuristic: it is stamped by
+    # exactly one writer (`_emit_no_session_decision_approval`), so its presence
+    # means "this card is a Mirror-review escalation" and its `task_id` is the
+    # PIPELINE task, distinct from `payload['task_id']` (the head-scoped
+    # APPROVAL id). A card whose head was unresolvable carries no
+    # `recheck_target` and is dispatched unguarded, exactly as before — the
+    # alternative is string-surgery on the approval id to strip an optional
+    # `-<head8>`, the parse-the-id trap this field exists to remove.
+    _supersede_live_review_for_approval(entry, payload)
     # Filename — use task_id stem.
     filename = f'{payload["task_id"]}.json'
     return safe_write_inbox.safe_write_inbox(

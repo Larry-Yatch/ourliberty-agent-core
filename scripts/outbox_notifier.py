@@ -86,6 +86,7 @@ import for_larry_escalations        # noqa: E402  # mirror-review-visibility: ac
 import forge_preflight_handler as fph  # noqa: E402
 import larry_alerts                # noqa: E402
 import mirror_review_handler as mrh  # noqa: E402
+import mirror_review_supersede      # noqa: E402  # converse guard: cancel a live review before a revision
 import no_session_ledger            # noqa: E402  # S1: cold-start obligation ledger
 import rebase_obligation_ledger     # noqa: E402  # post-open auto-rebase obligation ledger
 import revision_in_flight_ledger    # noqa: E402  # dup-review guard: Forge revision-in-flight flag
@@ -4629,6 +4630,65 @@ def review_record_name_re(stem: str) -> 're.Pattern[str]':
     )
 
 
+def review_stem_for_task(task_id: str) -> str:
+    """The CANONICAL on-disk review-record stem for `task_id`.
+
+    The one place this spelling is derived, so every scanner
+    (`review_record_name_re` consumers, the supersede probe) agrees with what
+    `_dispatch_mirror_review` actually wrote. `canonical_inbox_name` matters:
+    a task_id that `sanitize_component` rewrites lands under its rewritten
+    name, and matching the raw form would silently find nothing."""
+    name = safe_write_inbox.canonical_inbox_name(f'review-{task_id}.json')
+    return name[:-len('.json')] if name.endswith('.json') else name
+
+
+def _supersede_live_review_before_forge(task_id: str, why: str) -> None:
+    """Cancel any LIVE Mirror review of `task_id` before a Forge task that will
+    push to the PR branch is written. Never raises.
+
+    THE CONVERSE OF THE REVISION-IN-FLIGHT GUARD (2026-07-28).
+    `_dispatch_mirror_review` refuses to dispatch a review while a Forge
+    revision is in flight; nothing asked the mirror question on the way out.
+    Forge pushes a `[WIP][session-start]` checkpoint plus work commits as soon
+    as it starts, so a review executing at that moment returns findings and a
+    commit status against a head that no longer exists — the #865 stale-verdict
+    harm, reachable here on a human click.
+
+    SUPERSEDE, NOT SUPPRESS (Larry's decision). This helper cancels; it never
+    reports "don't dispatch", and it has no return value for a caller to
+    branch on. Skipping the dispatch would make Approve silently do nothing —
+    the card resolves, the PR sits, and there is no "I fixed it myself" exit
+    (the approval-reject-strands-pr shape). Every failure mode inside
+    `mirror_review_supersede` therefore degrades to "dispatch anyway", which is
+    exactly today's behavior.
+
+    Logged only when something was actually superseded (the overwhelmingly
+    common case is a clean no-op), and content-free: record names and counts,
+    never a review body.
+    """
+    outcome = mirror_review_supersede.supersede_live_review(
+        task_id, review_stem_for_task(task_id), reason=why,
+    )
+    if not outcome.attempted:
+        return
+    log(outcome.log_line(task_id), 'WARN' if outcome.failures else 'INFO')
+    # Gate the warning on `session_reason`, not on `cancel_acked is False`
+    # alone: a not-live session also reports False, and that is the BENIGN
+    # shape (the session already delivered its verdict and exited — its claim
+    # was simply still on disk for another microsecond). Warning on it would
+    # bury the one case that matters under routine noise.
+    if outcome.cancel_acked is False and outcome.session_reason:
+        log(
+            f'MIRROR_REVIEW_SUPERSEDE_UNACKED task={task_id} '
+            f'session={outcome.session_reason} — a LIVE review did not consume '
+            f'the cancel marker within the ack window, and the marker has been '
+            f'cleared so it cannot cancel the Forge task being dispatched. That '
+            f'review may still deliver a verdict against a superseded head '
+            f'(pre-fix behavior); the dispatch proceeds regardless.',
+            'WARN',
+        )
+
+
 def _recorded_review_head_sha(path: Path) -> Optional[str]:
     """Read the `head_sha` a review-request was dispatched for, or None.
 
@@ -5750,6 +5810,17 @@ def _dispatch_revision_to_forge(
     # review finding 2-#1) — see _dispatch_build_phase for rationale.
     if not _enforce_cost_budget(task_id, 'revision-to-forge', data):
         return
+
+    # Converse of the revision-in-flight guard in `_dispatch_mirror_review`:
+    # cancel any Mirror review executing on this PR before Forge starts moving
+    # the head under it. Placed HERE — after both the idempotency early-return
+    # and the budget gate, immediately before the write — so it fires once, on
+    # the branch that actually creates a new Forge task. Superseding on the
+    # idempotent re-process path would cancel the review a moment after a
+    # legitimate re-review of the LANDED revision was dispatched.
+    _supersede_live_review_before_forge(
+        task_id, f'superseded by Forge revision {next_count}',
+    )
 
     try:
         dest = safe_write_inbox.safe_write_inbox(
