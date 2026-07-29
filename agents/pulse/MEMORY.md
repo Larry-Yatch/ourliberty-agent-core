@@ -210,9 +210,9 @@ PR #796 MERGED at 14:08 MDT 2026-07-01 (REVIEW_PASS ×2, auto-merged). G-rule pi
 
 ---
 
-## G-rule ourliberty-health-untracked-files-tier4-noise-001 — 2/3 (new, iter ~6788)
+## G-rule ourliberty-health-untracked-files-tier4-noise-001 → COMPLETE ✅ (iter ~6797)
 
-**Rule:** The ourliberty-health healer fires Tier-4 alerts about untracked files `alert_522_tmp.json` + `triage_alert_522.py` in `agents/pulse/`. These are debugging artifacts from a prior Pulse session (named for alert #522 triage). PR #1057 (pulse-write-journal-cleanup) apparently didn't fully clean them up. The ourliberty-health healer fires repeatedly (approx hourly). Each new alert is Tier-4 (no translation match). Fix at 3/3: dispatch direction-ask to Beacon — delete these two temp files (or add to .gitignore). Occurrences: iter ~6786 (1/3, bot-delivered idx=532 at 20:43:39Z UTC); iter ~6788 (2/3, line 535 at 21:40:10Z UTC, duplicate DM suppressed).
+Beacon direction-ask dispatched at iter ~6796 (22:48Z UTC). Beacon confirmed deletion of `alert_522_tmp.json` + `triage_alert_522.py` from `agents/pulse/` at 22:51:25Z UTC. Tree clean. Hourly ourliberty-health escalation for these files stopped. Moving to Completed G-rules. Occurrences: iter ~6786 (1/3); iter ~6788 (2/3); iter ~6796 (3/3, dispatched); iter ~6797 (VERIFIED — files gone, tree clean).
 
 ---
 
