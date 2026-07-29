@@ -283,6 +283,12 @@ def _arm_sandbox_key_reassert() -> None:
 
     run._ourliberty_sandbox_reassert = True
     run._ourliberty_sandbox_reassert_fn = _reassert
+    # Published ON THE HOOK, not as a module global: `_bootstrap` has two module
+    # identities (top-level under discover, `scripts.tests._bootstrap` under the
+    # dotted/pytest path) and only ONE of them runs engage(), so a module-level
+    # attribute would be missing on whichever identity a reader happens to
+    # import. The installed function is shared by construction.
+    run._ourliberty_sandbox_snapshot = dict(snapshot)
     unittest.TestCase.run = run
 
 

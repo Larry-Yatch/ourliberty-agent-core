@@ -131,13 +131,33 @@ class SandboxKeySurvivesTeardownTest(unittest.TestCase):
             case, 'AgentRunnerReaderParityTests.tearDown')
 
 
+def _bootstrap_snapshot() -> dict:
+    """The values the backstop re-asserts, read off the INSTALLED hook.
+
+    The contract is 'a deleted key comes back as the _bootstrap sandbox value',
+    NOT 'comes back as whatever it happened to hold a moment ago'. Those differ
+    in a full-suite run: `test_deploy_notifier` and `test_pulse_check_xi` pin
+    their own root at module-import scope and never restore it, so by the time
+    this module runs, the ambient root is THEIR tmpdir. Asserting against the
+    ambient value made these tests pass standalone and fail in `discover` — the
+    very order-dependence this file exists to stamp out.
+
+    Read off the hook function rather than a `_bootstrap` module global: that
+    module has two identities (top-level under discover,
+    `scripts.tests._bootstrap` under the dotted/pytest path) and only one runs
+    engage(), so a module attribute may be absent on the one we imported."""
+    return dict(getattr(unittest.TestCase.run, '_ourliberty_sandbox_snapshot', {}))
+
+
 class SandboxKeyReassertBackstopTest(unittest.TestCase):
     """`_bootstrap._arm_sandbox_key_reassert` — the process-level guard that
-    keeps the NEXT class that pops from reopening the leak."""
+    keeps the NEXT class that deletes from reopening the leak."""
 
     def test_deleted_key_is_reasserted_after_the_test_that_dropped_it(self) -> None:
-        sandbox = os.environ.get('OURLIBERTY_AGENTS_ROOT')
-        self.assertIsNotNone(sandbox)
+        expected = _bootstrap_snapshot().get('OURLIBERTY_AGENTS_ROOT')
+        self.assertIsNotNone(
+            expected, 'the backstop is not armed (no snapshot on TestCase.run)')
+        ambient = os.environ.get('OURLIBERTY_AGENTS_ROOT')
 
         class Dropper(unittest.TestCase):
             def runTest(self):  # noqa: N802 - unittest naming
@@ -148,14 +168,16 @@ class SandboxKeyReassertBackstopTest(unittest.TestCase):
             result = _run_case(Dropper())
             self.assertEqual(result.errors, [])
             self.assertEqual(
-                os.environ.get('OURLIBERTY_AGENTS_ROOT'), sandbox,
+                os.environ.get('OURLIBERTY_AGENTS_ROOT'), expected,
                 'the backstop did not re-assert the sandbox root after a test '
                 'deleted it — _arm_sandbox_key_reassert is not armed')
         finally:
-            # Restore unconditionally: if the backstop IS broken, this test must
-            # not itself become the leak it is asserting against and take the
-            # rest of the run down with it.
-            os.environ['OURLIBERTY_AGENTS_ROOT'] = sandbox
+            # Put the AMBIENT value back (which may be a module's own pinned
+            # root, not the bootstrap one) so this test leaves no trace. If the
+            # backstop is broken, this test must not itself become the leak it
+            # is asserting against and take the rest of the run down with it.
+            if ambient is not None:
+                os.environ['OURLIBERTY_AGENTS_ROOT'] = ambient
 
     def test_backstop_does_not_clobber_a_value_a_test_set(self) -> None:
         """Three modules pin their own root at import scope and must keep it;
@@ -184,8 +206,9 @@ class SandboxKeyReassertBackstopTest(unittest.TestCase):
         tests. A trailing-only hook would leave the key absent for that next
         test body. This simulates the deletion happening BETWEEN two tests and
         pins that the second one starts clean."""
-        sandbox = os.environ.get('OURLIBERTY_AGENTS_ROOT')
-        self.assertIsNotNone(sandbox)
+        expected = _bootstrap_snapshot().get('OURLIBERTY_AGENTS_ROOT')
+        self.assertIsNotNone(expected)
+        ambient = os.environ.get('OURLIBERTY_AGENTS_ROOT')
         seen = {}
 
         class Observer(unittest.TestCase):
@@ -200,17 +223,20 @@ class SandboxKeyReassertBackstopTest(unittest.TestCase):
             result = _run_case(Observer())
             self.assertEqual(result.errors, [])
             self.assertEqual(
-                seen.get('at_body'), sandbox,
+                seen.get('at_body'), expected,
                 'a key deleted between tests (module/class teardown) was still '
                 'absent when the NEXT test body ran — the re-assert must happen '
                 'on ENTRY to TestCase.run, not only in its finally')
         finally:
-            os.environ['OURLIBERTY_AGENTS_ROOT'] = sandbox
+            if ambient is not None:
+                os.environ['OURLIBERTY_AGENTS_ROOT'] = ambient
 
     def test_every_sandbox_key_is_covered(self) -> None:
         """Not just the root — the log dir and worktrees root fall through to
         production defaults the same way."""
-        snapshot = {k: os.environ.get(k) for k in _SANDBOX_KEYS}
+        expected = _bootstrap_snapshot()
+        self.assertTrue(expected, 'the backstop is not armed')
+        ambient = {k: os.environ.get(k) for k in _SANDBOX_KEYS}
 
         class Dropper(unittest.TestCase):
             def runTest(self):  # noqa: N802 - unittest naming
@@ -220,14 +246,14 @@ class SandboxKeyReassertBackstopTest(unittest.TestCase):
         try:
             result = _run_case(Dropper())
             self.assertEqual(result.errors, [])
-            for key, value in snapshot.items():
+            for key, value in expected.items():
                 if value is None:
                     continue
                 self.assertEqual(
                     os.environ.get(key), value,
                     f'{key} was not re-asserted after a test deleted it')
         finally:
-            for key, value in snapshot.items():  # see the note above
+            for key, value in ambient.items():  # see the note above
                 if value is not None:
                     os.environ[key] = value
 
