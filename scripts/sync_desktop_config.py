@@ -50,7 +50,7 @@ import json
 import os
 import subprocess
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _CONFIG = _REPO_ROOT / 'config' / 'desktop-config-sync.json'
@@ -163,14 +163,24 @@ def is_executable_mode(source: str, returncode: int, stdout: str) -> bool:
             f'{source}: git ls-tree {_REF} returned no entry — `git show` and '
             '`git ls-tree` disagree about this path')
     if len(lines) != 1:
-        # More than one entry means the path resolved to a directory's
-        # contents, not to a file. Reading the mode off `lines[0]` would take a
-        # child's bit and deploy `git show`'s tree-listing TEXT as that file.
         raise ValueError(
             f'{source}: git ls-tree {_REF} returned {len(lines)} entries — '
             'this path is a directory, not a single file')
     # "100755 blob <sha>\t<path>"
-    mode = lines[0].split(' ', 1)[0]
+    head, _, entry_path = lines[0].partition('\t')
+    # The entry must be the path we ASKED for. Counting lines is not enough:
+    # `git ls-tree <ref> solo/` on a directory holding exactly one file returns
+    # a single line for the CHILD (`solo/only.sh`), whose 100755 would sail
+    # through the mode check below while `git show <ref>:solo/` hands back a
+    # tree LISTING to deploy as that file. Comparing paths catches every
+    # directory arity, and still accepts a './'-prefixed spelling because
+    # PurePosixPath normalises './scripts/a.sh' to 'scripts/a.sh'. A path git
+    # quotes (special characters) simply mismatches — which fails safe.
+    if PurePosixPath(entry_path) != PurePosixPath(source):
+        raise ValueError(
+            f'{source}: git ls-tree {_REF} resolved to {entry_path!r} instead '
+            '— this path is a directory, not a single file')
+    mode = head.split(' ', 1)[0]
     if mode not in ('100644', '100755'):
         # 120000 symlink, 160000 gitlink, 040000 tree — `git show` yields the
         # link target / nothing useful, so copying it as a regular file would

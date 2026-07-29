@@ -231,9 +231,9 @@ class ModeParsingTests(unittest.TestCase):
 
     def test_executable_and_regular_modes(self):
         self.assertTrue(sdc.is_executable_mode(
-            's', 0, '100755 blob abc123\tscripts/a.sh\n'))
+            'scripts/a.sh', 0, '100755 blob abc123\tscripts/a.sh\n'))
         self.assertFalse(sdc.is_executable_mode(
-            's', 0, '100644 blob abc123\tscripts/a.txt\n'))
+            'scripts/a.txt', 0, '100644 blob abc123\tscripts/a.txt\n'))
 
     def test_nonzero_returncode_raises(self):
         with self.assertRaises(ValueError):
@@ -244,6 +244,31 @@ class ModeParsingTests(unittest.TestCase):
         # two disagree about the path — that is a bug to surface, not a 0644.
         with self.assertRaises(ValueError):
             sdc.is_executable_mode('s', 0, '')
+
+    def test_single_child_directory_raises(self):
+        # The case a line COUNT cannot catch: `git ls-tree <ref> solo/` on a
+        # directory holding exactly one file returns ONE line, for the child.
+        # Its 100755 used to pass, and `git show <ref>:solo/` hands back a tree
+        # listing — so the listing text deployed as a 0755 file, exit 0.
+        with self.assertRaises(ValueError) as ctx:
+            sdc.is_executable_mode(
+                'solo/', 0, '100755 blob abc123\tsolo/only.sh\n')
+        self.assertIn('solo/only.sh', str(ctx.exception))
+
+    def test_dot_slash_prefixed_source_is_still_accepted(self):
+        # The path check must not reject a legitimate './'-spelled entry:
+        # PurePosixPath normalises './scripts/a.sh' to 'scripts/a.sh'.
+        self.assertTrue(sdc.is_executable_mode(
+            './scripts/a.sh', 0, '100755 blob abc123\tscripts/a.sh\n'))
+
+    def test_entry_for_a_different_path_raises(self):
+        with self.assertRaises(ValueError):
+            sdc.is_executable_mode(
+                'scripts/a.sh', 0, '100755 blob abc123\tscripts/OTHER.sh\n')
+
+    def test_missing_tab_separator_fails_safe(self):
+        with self.assertRaises(ValueError):
+            sdc.is_executable_mode('scripts/a.sh', 0, '100755 blob abc123\n')
 
     def test_multiple_entries_raise_instead_of_taking_the_first(self):
         # Real `git ls-tree <ref> scripts/` output. Reading the mode off line 1
@@ -257,13 +282,18 @@ class ModeParsingTests(unittest.TestCase):
 
     def test_a_single_entry_with_a_trailing_newline_is_fine(self):
         self.assertTrue(sdc.is_executable_mode(
-            's', 0, '100755 blob abc123\tscripts/a.sh\n'))
+            'scripts/a.sh', 0, '100755 blob abc123\tscripts/a.sh\n'))
 
     def test_symlink_and_gitlink_modes_raise(self):
+        # Source and entry paths MATCH here on purpose, so each case reaches
+        # the mode check and fails for the reason under test rather than
+        # passing vacuously on the path mismatch above it.
         for mode in ('120000', '160000', '040000'):
             with self.subTest(mode=mode):
-                with self.assertRaises(ValueError):
-                    sdc.is_executable_mode('s', 0, f'{mode} blob abc\tp\n')
+                with self.assertRaises(ValueError) as ctx:
+                    sdc.is_executable_mode(
+                        'scripts/a.sh', 0, f'{mode} blob abc\tscripts/a.sh\n')
+                self.assertIn('unsupported git mode', str(ctx.exception))
 
     def test_a_bad_mode_fails_the_sync_loudly(self):
         # End-to-end: the raise must surface as a non-zero exit, not a file
