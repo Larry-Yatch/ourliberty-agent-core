@@ -15232,6 +15232,40 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-larry-reject-0c21a291688b8f32227b787a14ed87a2f6be7439",
+      "name": "Larry Reject 0c21a291688b8f32227b787a14ed87a2f6be7439",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `larry-reject-0c21a291688b8f32227b787a14ed87a2f6be7439`. Last activity 2026-07-29T19:11:47.383434+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "larry-reject-0c21a291688b8f32227b787a14ed87a2f6be7439"
+      ],
+      "repo": null,
+      "created": "2026-07-29",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-29T19:12:25.163215+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-29T19:11:47.383434+00:00"
+    },
+    {
+      "id": "proposed-mirror-review-pr-ourliberty-agent-core-1053-fe6b252a",
+      "name": "Mirror Review PR Ourliberty Agent Core 1053 Fe6b252a",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `mirror-review-pr-ourliberty-agent-core-1053-fe6b252a`. Last activity 2026-07-29T19:09:49.875899+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "mirror-review-pr-ourliberty-agent-core-1053-fe6b252a"
+      ],
+      "repo": null,
+      "created": "2026-07-29",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-29T19:12:25.163215+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-29T19:09:49.875899+00:00"
     }
   ]
 }
