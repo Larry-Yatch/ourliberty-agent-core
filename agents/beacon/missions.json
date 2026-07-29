@@ -15621,7 +15621,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-29T22:43:49.757086+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-29T22:43:47.630751+00:00"
+      "orphan_last_activity_ts": "2026-07-29T22:43:47.630751+00:00",
+      "briefing": {
+        "what": "A piece of work the team began that hasn't yet been connected to any active project or goal.",
+        "why": "Unassigned work can quietly consume time and attention without a clear payoff for the business.",
+        "suggest": "Take a quick look to confirm it's worth continuing before giving it the green light, since its purpose isn't yet clear."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T22:44:41.531550+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
