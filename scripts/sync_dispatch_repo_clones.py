@@ -79,6 +79,56 @@ SELF_SYNCED_REPOS = frozenset({'ourliberty-agent-core'})
 # and the next tick should get it instead.
 GIT_TIMEOUT_SEC = 120
 
+# Every systemd unit that can reach `sync_one` and therefore fast-forward a
+# registered checkout. This was ONE unit until the on-demand sync-lag self-heal
+# (`build_sequence_validator.refresh_checkout`) started calling `sync_one`
+# inline from the DAG-preflight and kickoff paths, which run under different
+# units with their own sandboxes.
+#
+# ⚠ ADDING A DISPATCH REPO: its checkout path must be added to the
+# `ReadWritePaths=` of EVERY unit listed here, not just the timer's. All of
+# them run `ProtectHome=read-only`, so a repo in `repo_paths` that is missing
+# from one unit's allowlist is a READ-ONLY FILESYSTEM to that caller alone.
+# That is the worst-shaped failure available here: the 30-minute sweep keeps
+# succeeding, so the checkout looks maintained, while the on-demand path dies
+# silently and the preflight stalls exactly as it did before the self-heal.
+# `test_unit_grants_write_to_every_syncable_repo` asserts this across the whole
+# tuple so the omission fails a test run instead of a production tick.
+FF_CAPABLE_UNITS = (
+    'ourliberty-sync-dispatch-repos.service',  # the 30-min sweep — run()
+    'ourliberty-inbox-watcher.service',        # hosts Mirror's check-spec-doc preflight
+    'ourliberty-outbox-notifier.service',      # hosts the build-sequence kickoff
+)
+
+# Units that CAN reach `sync_one` but are deliberately NOT granted write to the
+# dispatch-repo checkouts. The refresh is a no-op there — `sync_one` returns
+# `error — fetch failed: … Read-only file system` and the caller falls back to
+# exactly the behaviour it had before the self-heal existed.
+#
+# `ourliberty-beacon-bot.service` reaches it through the chat-approve kickoff
+# (`beacon_approval_handler.dispatch_approved` → `apply_kickoff_transition`).
+# It is excluded ON PURPOSE. The bot is the fleet's outward-facing process, and
+# granting it git-write on a product checkout is a permanent widening of what a
+# bug or a compromise there can touch.
+#
+# MEASURED before deciding (2026-07-29, ~3 months of logs), because two common
+# halves are not a common intersection:
+#   - sequences activate via the Mirror DAG-preflight PASS path ......... 71×
+#   - `apply_kickoff_transition` (the path this would serve) ran ......... 2×
+#     …both for agent-core, which `sync_one` skips by design → 0 usable
+#   - the Telegram `approve sequence` tap was attempted .................. 1×
+#     …and failed on a not-authored spec, not a sync-lag
+# So the combination the grant would buy has never once occurred.
+#
+# Consequence, accepted: on that path a behind-origin checkout still defers, and
+# the operator still gets the DM naming the syncer that can advance it. If that
+# ever becomes a real cost, the fix is to move the unit into FF_CAPABLE_UNITS
+# *and* grant the paths — `test_excluded_units_are_not_granted_write` fails the
+# moment someone grants without moving, so the decision cannot be made silently.
+FF_EXCLUDED_UNITS = (
+    'ourliberty-beacon-bot.service',           # chat-approve kickoff — see above
+)
+
 
 @dataclass
 class RepoOutcome:
@@ -153,16 +203,37 @@ def sync_one(repo: str, path: str, apply: bool = False) -> RepoOutcome:
     if rc != 0:
         return out('skipped', 'not a git repository')
 
+    # FETCH FIRST — before any reason we might decline to merge.
+    #
+    # A fetch only updates remote-tracking refs. It never moves HEAD, never
+    # touches the working tree, and cannot disturb whoever is using this
+    # checkout — so it is safe on a branch, on a detached HEAD, and on a dirty
+    # tree alike. Doing it here means `refs/remotes/origin/main` is fresh no
+    # matter which skip we take below.
+    #
+    # That ordering is load-bearing, not tidiness. `check_spec_doc_presence`
+    # classifies a spec against this checkout's LOCAL origin/main ref and never
+    # fetches on its own, so a stale ref makes a spec that IS merged read as
+    # NOT_AUTHORED — and the caller is told to author a spec that already
+    # exists (incident 2026-06-10, merged PR #415 reported as never-authored).
+    # With the fetch below the branch check, that held for a dirty tree but NOT
+    # for one parked on a feature branch: it returned before fetching, so the
+    # ref stayed stale and the verdict stayed wrong. Proven on a real clone
+    # parked on `wip/…` with the spec genuinely on origin/main — exit 1,
+    # "author + merge it first". Fetching first makes every decline path leave
+    # the classification honest, rather than only the one that was tested.
+    rc, _, err = _git(path, 'fetch', 'origin', 'main')
+    if rc != 0:
+        return out('error', f'fetch failed: {err[:160]}')
+
     rc, branch, _ = _git(path, 'rev-parse', '--abbrev-ref', 'HEAD')
     if rc != 0:
         return out('error', 'could not read HEAD')
     if branch != 'main':
         # Detached HEAD reports 'HEAD'. Either way somebody is using this tree.
+        # The fetch above already ran, so the tracking ref is current even
+        # though we decline to move anything.
         return out('skipped', f'on {branch!r}, not main')
-
-    rc, _, err = _git(path, 'fetch', 'origin', 'main')
-    if rc != 0:
-        return out('error', f'fetch failed: {err[:160]}')
 
     # TRACKED modifications only (-uno). Untracked files are deliberately NOT a
     # skip reason: every long-lived checkout accumulates build litter

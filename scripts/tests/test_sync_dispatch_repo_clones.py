@@ -21,6 +21,7 @@ import json
 import subprocess
 import sys
 import tempfile
+from unittest import mock
 import unittest
 from pathlib import Path
 
@@ -149,6 +150,59 @@ class SyncOneTest(unittest.TestCase):
         self.assertEqual(
             _git(self.path, 'rev-parse', 'HEAD').stdout.strip(), head_before)
 
+    def test_every_decline_path_still_refreshes_the_tracking_ref(self):
+        """The property, over EVERY reason we decline — not just the one that
+        was tested.
+
+        `check_spec_doc_presence` classifies a spec against this checkout's
+        local `refs/remotes/origin/main` and never fetches, so a stale tracking
+        ref makes a merged spec read as NOT_AUTHORED and the caller is told to
+        author a spec that already exists (incident 2026-06-10). A fetch cannot
+        disturb anyone — it moves no HEAD and no file — so there is no decline
+        reason that justifies leaving the ref stale. Before this, the fetch sat
+        below the branch check: a dirty tree got a fresh ref and a checkout
+        parked on a branch did not.
+        """
+        for label, arrange in (
+            ('dirty tree',
+             lambda: (self.pair.clone / 'seed.txt').write_text('mid-edit\n')),
+            ('on a feature branch',
+             lambda: _git(self.path, 'checkout', '-q', '-b', 'feature/wip')),
+            ('detached HEAD',
+             lambda: _git(self.path, 'checkout', '-q', '--detach',
+                          _git(self.path, 'rev-parse', 'HEAD').stdout.strip())),
+            ('local commits ahead',
+             lambda: (_git(self.path, 'commit', '-q', '--allow-empty',
+                           '-m', 'local work'))),
+        ):
+            with self.subTest(decline=label):
+                # A fresh clone+origin pair per case, with its OWN registered
+                # cleanup. Re-entering setUp() would rebind self._tmp and
+                # orphan the previous TemporaryDirectory — tearDown only ever
+                # cleans the last one, so the rest waited on GC finalizers and
+                # emitted a ResourceWarning apiece.
+                td = tempfile.TemporaryDirectory()
+                self.addCleanup(td.cleanup)
+                self.root = Path(td.name)
+                self.pair = _RepoPair(self.root)
+                self.path = str(self.pair.clone)
+                arrange()
+                self.pair.advance_origin(1)
+                before = _git(self.path, 'rev-parse',
+                              'refs/remotes/origin/main').stdout.strip()
+                out = sdrc.sync_one('demo', self.path, apply=True)
+                after = _git(self.path, 'rev-parse',
+                             'refs/remotes/origin/main').stdout.strip()
+                # It still refuses to move anything...
+                self.assertNotEqual(
+                    out.action, 'advanced',
+                    f'{label}: the tree must NOT be moved')
+                # ...but the classification input is now current.
+                self.assertNotEqual(
+                    before, after,
+                    f'{label}: declined without fetching, so origin/main is '
+                    f'stale and a merged spec will read as never-authored')
+
     def test_non_main_branch_is_skipped(self):
         _git(self.path, 'checkout', '-q', '-b', 'feature/wip')
         self.pair.advance_origin(1)
@@ -227,23 +281,123 @@ class LiveConfigTest(unittest.TestCase):
         for repo, path in paths.items():
             self.assertTrue(path.startswith('/'), f'{repo} path not absolute')
 
-    def test_unit_grants_write_to_every_syncable_repo(self):
-        """A repo in repo_paths that the unit can't write to fails every tick.
+    def _granted_paths(self, unit_name: str) -> list[str]:
+        """Every path the unit grants write to.
 
-        This is the trap the unit comments warn about: adding a dispatch repo
-        without extending ReadWritePaths yields a silent per-tick error."""
+        systemd ACCUMULATES repeated `ReadWritePaths=` directives, so this
+        reads all of them, not just the first. Taking only the first would
+        mis-report a grant that someone added on a fresh line — the natural
+        way to extend an allowlist that is already a dozen entries long — and
+        fail a config that is in fact correct."""
         unit = (Path(sdrc.__file__).resolve().parent.parent
-                / 'systemd' / 'ourliberty-sync-dispatch-repos.service')
-        text = unit.read_text()
-        rw_line = next(l for l in text.splitlines()
-                       if l.startswith('ReadWritePaths='))
-        granted = rw_line.split('=', 1)[1].split()
-        for repo, path in sdrc.load_repo_paths().items():
-            if repo in sdrc.SELF_SYNCED_REPOS:
-                continue
-            self.assertIn(
-                path, granted,
-                f'{repo} ({path}) is in repo_paths but the unit cannot write it')
+                / 'systemd' / unit_name)
+        self.assertTrue(
+            unit.is_file(),
+            f'{unit_name} is listed in FF_CAPABLE_UNITS/FF_EXCLUDED_UNITS but '
+            f'has no unit file at {unit} — its allowlist cannot be checked')
+        rw_lines = [l for l in unit.read_text().splitlines()
+                    if l.startswith('ReadWritePaths=')]
+        self.assertTrue(
+            rw_lines,
+            f'{unit_name} has no ReadWritePaths= line; if its sandbox changed '
+            f'shape, this invariant needs rechecking, not skipping')
+        granted: list[str] = []
+        for line in rw_lines:
+            granted.extend(line.split('=', 1)[1].split())
+        return granted
+
+    def _syncable(self) -> dict:
+        syncable = {repo: path
+                    for repo, path in sdrc.load_repo_paths().items()
+                    if repo not in sdrc.SELF_SYNCED_REPOS}
+        self.assertTrue(syncable, 'expected at least one syncable repo')
+        return syncable
+
+    def test_multi_line_read_write_paths_are_all_collected(self):
+        """systemd accumulates repeated ReadWritePaths=; so must we.
+
+        Reading only the first line would fail a correct config the moment
+        someone extends an allowlist by adding a line instead of editing a
+        twelve-entry one — a false alarm pointing at a non-problem."""
+        unit = (Path(sdrc.__file__).resolve().parent.parent / 'systemd'
+                / 'ourliberty-sync-dispatch-repos.service')
+        text = unit.read_text().replace(
+            'ReadWritePaths=/home/larry/ourliberty-dashboard',
+            'ReadWritePaths=/home/larry/ourliberty-dashboard\n'
+            'ReadWritePaths=/home/larry/SPLIT-ACROSS-LINES', 1)
+        td = tempfile.TemporaryDirectory()
+        self.addCleanup(td.cleanup)
+        tmp = Path(td.name)
+        (tmp / 'systemd').mkdir()
+        (tmp / 'systemd' / 'probe.service').write_text(text)
+        with mock.patch.object(
+                sdrc, '__file__', str(tmp / 'scripts' / 'x.py')):
+            granted = self._granted_paths('probe.service')
+        # Both the original line's entries AND the appended line's are seen.
+        self.assertIn('/home/larry/RSDPM', granted)
+        self.assertIn('/home/larry/SPLIT-ACROSS-LINES', granted)
+
+    def test_excluded_units_are_not_granted_write(self):
+        """The deliberate exclusions must stay exclusions.
+
+        ourliberty-beacon-bot reaches sync_one via the chat-approve kickoff but
+        is intentionally denied write on the product checkouts (see
+        FF_EXCLUDED_UNITS for the measurement behind that call). Pinning it here
+        means a later grant fails this test, forcing whoever makes it to move
+        the unit into FF_CAPABLE_UNITS as a conscious decision rather than
+        quietly widening the outward-facing bot's reach."""
+        # Non-empty guard, mirroring the capable-units test. Without it this
+        # whole test passes hardest when there is nothing left to check: empty
+        # the tuple and the loop below runs zero times, so a cleanup that drops
+        # the beacon-bot entry would delete the protection AND the signal that
+        # it was deleted. Verified by emptying it — the suite stayed green.
+        self.assertTrue(
+            sdrc.FF_EXCLUDED_UNITS,
+            'FF_EXCLUDED_UNITS is empty, so this test guards nothing. A unit '
+            'was removed from it: either it is no longer reachable from '
+            'refresh_checkout (delete this test too, deliberately) or the '
+            'no-grant decision was dropped by accident')
+        for unit_name in sdrc.FF_EXCLUDED_UNITS:
+            granted = self._granted_paths(unit_name)
+            for repo, path in self._syncable().items():
+                self.assertNotIn(
+                    path, granted,
+                    f'{unit_name} now grants write to {repo} ({path}). If that '
+                    f'is intended, MOVE it to FF_CAPABLE_UNITS — an ff-capable '
+                    f'unit must be covered by the grants-write invariant, not '
+                    f'sitting in the excluded list claiming it cannot write')
+
+    def test_capable_and_excluded_unit_lists_are_disjoint(self):
+        """A unit cannot be both, and every reachable unit needs a verdict."""
+        self.assertFalse(
+            set(sdrc.FF_CAPABLE_UNITS) & set(sdrc.FF_EXCLUDED_UNITS),
+            'a unit listed as both ff-capable and ff-excluded has no defined '
+            'expectation — the two invariants would contradict each other')
+
+    def test_unit_grants_write_to_every_syncable_repo(self):
+        """A repo in repo_paths that a unit can't write to fails there alone.
+
+        This is the trap the unit comments warn about, and the on-demand
+        self-heal widened it: `sync_one` is now also called inline from the
+        DAG-preflight (under ourliberty-inbox-watcher) and the kickoff (under
+        ourliberty-outbox-notifier), each with its own ProtectHome=read-only
+        sandbox. Checking only the timer's unit would leave the newer callers
+        free to EROFS on the next repo onboarded — and because the timer would
+        still be succeeding, the checkout would look maintained while the
+        on-demand path was silently dead. Assert across ALL of them."""
+        syncable = {repo: path
+                    for repo, path in sdrc.load_repo_paths().items()
+                    if repo not in sdrc.SELF_SYNCED_REPOS}
+        self.assertTrue(syncable, 'expected at least one syncable repo')
+        self.assertTrue(sdrc.FF_CAPABLE_UNITS, 'the unit list must not be empty')
+        for unit_name in sdrc.FF_CAPABLE_UNITS:
+            granted = self._granted_paths(unit_name)
+            for repo, path in syncable.items():
+                self.assertIn(
+                    path, granted,
+                    f'{repo} ({path}) is in repo_paths but {unit_name} cannot '
+                    f'write it — its fast-forward will EROFS there while the '
+                    f'other units keep succeeding')
 
 
 class MainTest(unittest.TestCase):

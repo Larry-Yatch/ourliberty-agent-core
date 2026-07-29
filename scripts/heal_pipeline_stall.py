@@ -2738,9 +2738,18 @@ def _spec_doc_presence_for(seq: dict):
     """Classify the sequence's `spec_doc` against its own target-repo
     checkout — the same deterministic call Mirror's Check 0 makes. Injectable
     seam for tests; raises nothing the caller must handle beyond the generic
-    guard in `check_dag_preflight_sync_lag`."""
+    guard in `check_dag_preflight_sync_lag`.
+
+    `repo_name` is threaded, not just `repo_root`: this presence object's
+    `message` is embedded verbatim in the Larry DM below, and without the name
+    `sync_remediation` falls back to the agent-core wording and tells him to
+    run `ourliberty-sync.service` — the unit that syncs agent-core ONLY and
+    cannot advance an RSDPM checkout. That is the wrong-unit-followed-twice
+    bug this PR exists to end, and the same alert's `suggested_action` names
+    both units, so it would contradict itself."""
+    repo_name, repo_root = bsv.resolve_spec_doc_repo(seq)
     return bsv.check_spec_doc_presence(
-        seq.get('spec_doc'), repo_root=bsv.resolve_spec_doc_repo_root(seq),
+        seq.get('spec_doc'), repo_root=repo_root, repo_name=repo_name,
     )
 
 

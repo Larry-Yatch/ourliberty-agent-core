@@ -68,6 +68,99 @@ SPEC_DOC_REPO_ROOT_ENV = 'OURLIBERTY_SPEC_DOC_REPO_ROOT'
 # byte-for-byte identical to before the target_repo resolution was added.
 AGENT_CORE_REPO_NAME = 'ourliberty-agent-core'
 
+# -------------------- who actually advances which checkout --------------------
+#
+# Incident 2026-07-24 (rsdpm-m11-001) + 2026-07-28 (rsdpm-m14-001): both
+# DAG-preflights hit BEHIND_ORIGIN on `/home/larry/RSDPM` and told the operator
+# to run `ourliberty-sync.service`. That unit runs `sync_agent_core.sh`, which
+# is agent-core-ONLY by design (atomic swap into ~/agents) and can never
+# advance an RSDPM checkout — so the remediation was unfollowable for the exact
+# repo it was printed about.
+#
+# The two trees have different keepers, and naming the wrong one sends the
+# operator to a unit that will report success while changing nothing:
+#   agent-core           → ourliberty-sync.service (sync_agent_core.sh)
+#   every other repo_paths
+#   checkout (RSDPM, …)  → ourliberty-sync-dispatch-repos.service
+#                          (sync_dispatch_repo_clones.py, ff-only, every 30min)
+AGENT_CORE_SYNC_UNIT = 'ourliberty-sync.service'
+DISPATCH_REPO_SYNC_UNIT = 'ourliberty-sync-dispatch-repos.service'
+
+
+def sync_remediation(repo_name: Optional[str]) -> str:
+    """The remediation clause naming the mechanism that can actually advance
+    `repo_name`'s droplet checkout.
+
+    `None` / agent-core → the agent-core syncer. Any other repo → the
+    dispatch-repo syncer, stated together with the fact that the agent-core
+    unit cannot help, because that is precisely the wrong turn the old
+    message caused twice."""
+    if not repo_name or repo_name == AGENT_CORE_REPO_NAME:
+        return f'Run sync (`systemctl start {AGENT_CORE_SYNC_UNIT}`)'
+    return (
+        f'Fast-forward the `{repo_name}` checkout (`systemctl start '
+        f'{DISPATCH_REPO_SYNC_UNIT}` — note `{AGENT_CORE_SYNC_UNIT}` syncs '
+        f'agent-core ONLY and cannot advance this repo)'
+    )
+
+
+def _checkout_label(repo_name: Optional[str]) -> str:
+    """How to refer to the lagging checkout in operator-facing text."""
+    return 'working copy' if not repo_name else f'the `{repo_name}` checkout'
+
+
+def refresh_checkout(
+    repo_name: Optional[str],
+    repo_root: Optional[Path],
+    *,
+    syncer: Optional[Callable[..., Any]] = None,
+) -> Optional[str]:
+    """Best-effort fast-forward of a lagging dispatch-repo checkout.
+
+    Returns a one-line state string (`RSDPM: advanced (+1)`, `RSDPM: skipped —
+    2 uncommitted change(s) …`) or None when no refresh was attempted.
+
+    WHY this exists at all: `/home/larry/RSDPM` is NOT unkept — since #1008
+    `ourliberty-sync-dispatch-repos.timer` fast-forwards every registered
+    repo_paths checkout every 30 minutes, ff-only, logging a state line per
+    repo per tick. What it cannot do is beat its own poll interval, and that
+    interval is the whole failure: a spec merges, a kickoff dispatches minutes
+    later, and the preflight reads a checkout that is up to 30 minutes stale.
+    Both observed incidents were behind by exactly ONE commit — a spec that had
+    merged inside the current window. rsdpm-m11-001 (2026-07-24 21:10) and
+    rsdpm-m14-001 (2026-07-28 17:08, 4 minutes before the 17:12 tick that
+    would have cleared it) each parked a build until a human noticed.
+
+    Shortening the timer only shrinks the window; pulling on demand CLOSES it.
+    So on BEHIND_ORIGIN we run the same sweep's per-repo function inline and
+    re-check, turning a 90-minute park into a few seconds.
+
+    Deliberately delegates to `sync_dispatch_repo_clones.sync_one` rather than
+    reimplementing a pull: that function is the reviewed one that is ff-only,
+    refuses a tree that is dirty / not on main / ahead of origin, and never
+    resets. A second, subtly-different pull path on a SHARED checkout is
+    exactly the machine-owned-file single-committer trap. Inheriting it means
+    the on-demand path cannot be less safe than the timer.
+
+    agent-core is never refreshed here — `sync_agent_core.sh` owns that tree
+    (sync_one skips it by name for the same reason). Any failure degrades to
+    None so a refresh problem can never be worse than the stall it treats."""
+    if not repo_name or repo_name == AGENT_CORE_REPO_NAME or repo_root is None:
+        return None
+    try:
+        if syncer is None:
+            # Imported lazily, not at module scope: the validator is imported
+            # by the advancer daemon and by Beacon at synthesis time, where no
+            # refresh is ever attempted and the extra import would be dead cost.
+            scripts_dir = str(Path(__file__).resolve().parent)
+            if scripts_dir not in sys.path:
+                sys.path.insert(0, scripts_dir)
+            from sync_dispatch_repo_clones import sync_one
+            syncer = sync_one
+        return syncer(repo_name, str(repo_root), apply=True).line()
+    except Exception as exc:                                # pragma: no cover
+        return f'{repo_name}: error — refresh unavailable ({type(exc).__name__}: {exc})'
+
 # config/agent-models.json lives at <scripts>/../config/agent-models.json —
 # the same canonical block routing/dispatch and the advancer validate against.
 AGENT_MODELS_CONFIG = REPO_ROOT / 'config' / 'agent-models.json'
@@ -568,6 +661,36 @@ SPEC_DOC_BEHIND_ORIGIN = 'behind_origin'  # missing locally, present on origin/m
 SPEC_DOC_NOT_AUTHORED = 'not_authored'    # absent both locally and on origin/main → author it
 SPEC_DOC_INDETERMINATE = 'indeterminate'  # missing locally and origin/main doesn't resolve here
 
+# Statuses on which an on-demand fast-forward is worth attempting.
+#
+# NOT_AUTHORED is in here, and that is the whole point. `check_spec_doc_presence`
+# never fetches — it reads this checkout's LOCAL `refs/remotes/origin/main`. So
+# the two statuses are not "behind" vs "absent"; they are two different
+# staleness depths of the same condition:
+#
+#   spec merged, checkout fetched but not merged  → BEHIND_ORIGIN
+#   spec merged, checkout has not fetched at all  → NOT_AUTHORED
+#
+# The second is the MORE likely shape in the window this self-heal exists for.
+# The dispatch-repo sweep fetches and fast-forwards in one step, so between
+# ticks a clean checkout normally has a tracking ref as old as its HEAD — and a
+# spec that merged four minutes ago is invisible in both. Gating the refresh on
+# BEHIND_ORIGIN alone therefore skipped the case it was written to fix, and
+# NOT_AUTHORED tells Mirror the spec was "never authored" (agents/mirror/
+# CLAUDE.md exit 1: *"author + merge it before re-dispatching"*) for a spec that
+# is already on main — the precise re-authoring this arc exists to prevent, and
+# an outcome already observed once (incident 2026-06-10, merged PR #415
+# reported as never-authored because the checkout lagged by one commit).
+#
+# Cost on a genuinely unauthored spec: one `git fetch`, then the same
+# NOT_AUTHORED verdict. `sync_one` is ff-only and declines a dirty / off-main /
+# ahead tree, so attempting it here is no less safe than on BEHIND_ORIGIN.
+#
+# INDETERMINATE is deliberately NOT included: it means `origin/main` does not
+# resolve at all (not a synced checkout — an export, a fixture), where there is
+# no tracking ref for a fetch to advance and the honest answer is "cannot tell".
+SPEC_DOC_REFRESHABLE = (SPEC_DOC_BEHIND_ORIGIN, SPEC_DOC_NOT_AUTHORED)
+
 
 @dataclass
 class SpecDocPresence:
@@ -683,21 +806,50 @@ def resolve_spec_doc_repo_root(
 
     `env` / `repo_paths` are injectable for hermetic tests; they default to the
     process environment and the on-disk config map."""
+    return resolve_spec_doc_repo(seq, env=env, repo_paths=repo_paths)[1]
+
+
+def resolve_spec_doc_repo(
+    seq: Any,
+    *,
+    env: Optional[dict[str, str]] = None,
+    repo_paths: Optional[dict[str, Path]] = None,
+) -> Tuple[Optional[str], Optional[Path]]:
+    """`(repo_name, repo_root)` for a sequence's `spec_doc`.
+
+    Same resolution as `resolve_spec_doc_repo_root` (which delegates here),
+    but also returns WHICH repo the root belongs to. The name is what
+    `sync_remediation` needs to name the right syncer: a root alone cannot
+    distinguish "agent-core, synced by ourliberty-sync.service" from "a
+    dispatch-repo clone, synced by ourliberty-sync-dispatch-repos.service".
+
+    `repo_name` is None when the sequence resolves to the agent-core default
+    (no target_repo, target_repo IS agent-core, or an unmappable target). Note
+    the SPEC_DOC_REPO_ROOT_ENV override changes only the ROOT, not the name —
+    a test fixture pointed at /tmp still reports the sequence's real target so
+    the remediation text stays truthful about the repo under discussion."""
     environ = env if env is not None else os.environ
+    target = effective_target_repo(seq)
+    mapped = target if target and target != AGENT_CORE_REPO_NAME else None
+
     override = environ.get(SPEC_DOC_REPO_ROOT_ENV)
     if override:
-        return Path(override)
-    target = effective_target_repo(seq)
-    if not target or target == AGENT_CORE_REPO_NAME:
-        return None
+        return mapped, Path(override)
+    if mapped is None:
+        return None, None
     paths = repo_paths if repo_paths is not None else _load_repo_paths()
-    return paths.get(target)
+    root = paths.get(mapped)
+    # An unmappable target falls back to REPO_ROOT (root=None); report the
+    # name as None too, so the remediation doesn't name a dispatch-repo
+    # syncer for a checkout we just failed to locate.
+    return (mapped, root) if root is not None else (None, None)
 
 
 def check_spec_doc_presence(
     spec_doc: Any,
     repo_root: Optional[Path] = None,
     *,
+    repo_name: Optional[str] = None,
     git: Optional[GitRunner] = None,
     local_exists: Optional[Callable[[], bool]] = None,
 ) -> SpecDocPresence:
@@ -777,21 +929,40 @@ def check_spec_doc_presence(
             spec_doc=spec_doc,
             behind_by=behind,
             message=(
-                f'working copy is behind origin/main by {by}; spec_doc '
-                f'`{spec_doc}` EXISTS on origin/main but is not yet in this '
-                f'checkout. Run sync (`systemctl start '
-                f'ourliberty-sync.service`) before kickoff, then re-dispatch. '
-                f'This is a sync-lag, NOT a missing spec — do not re-author it.'
+                f'{_checkout_label(repo_name)} is behind origin/main by {by}; '
+                f'spec_doc `{spec_doc}` EXISTS on origin/main but is not yet '
+                f'in this checkout. {sync_remediation(repo_name)} before '
+                f'kickoff, then re-dispatch. This is a sync-lag, NOT a missing '
+                f'spec — do not re-author it.'
             ),
         )
 
     return SpecDocPresence(
         status=SPEC_DOC_NOT_AUTHORED,
         spec_doc=spec_doc,
+        # Says what was actually checked, unconditionally.
+        #
+        # The old wording asserted the spec is not "on origin/main" as fact.
+        # Nothing here ever contacted origin: this compares against the LOCAL
+        # `refs/remotes/origin/main`, which is only as fresh as the last fetch.
+        # A spec merged since then is indistinguishable from one never written
+        # — and stating the strong claim is precisely how incident 2026-06-10
+        # sent someone to re-author merged PR #415. The caveat has to live in
+        # the message itself rather than being added by callers that happen to
+        # have attempted a refresh: the agent-core path attempts none, and that
+        # is the exact repo the incident happened in.
         message=(
-            f'spec_doc `{spec_doc}` not found in the working copy or on '
-            f'origin/main — author + merge it first, then re-dispatch the '
-            f'kickoff.'
+            f'spec_doc `{spec_doc}` is not in the working copy, and not in '
+            f'this checkout\'s LOCAL `origin/main` ref either. That ref is '
+            f'only as fresh as the last fetch, so this means "cannot confirm '
+            f'it exists" — NOT proof it was never authored; a spec merged '
+            f'since the last fetch looks identical. A `REFRESH:` line above — '
+            f'INCLUDING a `skipped` one, because the fetch runs before any '
+            f'decline and only the merge was refused — means the ref IS '
+            f'current, so the verdict is solid: author + merge it, then '
+            f're-dispatch the kickoff. Only a missing `REFRESH:` line or '
+            f'`error — fetch failed` leaves this unconfirmed; then check the '
+            f'real origin/main before authoring anything.'
         ),
     )
 
@@ -818,8 +989,8 @@ def _read_seq_json(path: Path) -> Tuple[Optional[Any], int]:
         return None, 1
 
 
-def _cli_check_spec_doc(seq_id_or_path: str) -> int:
-    """CLI for `check-spec-doc <seq-id|path>`.
+def _cli_check_spec_doc(seq_id_or_path: str, *, refresh: bool = True) -> int:
+    """CLI for `check-spec-doc <seq-id|path> [--no-refresh]`.
 
     Resolves the sequence file (a bare token expands to the canonical
     blackboard path; anything containing a path separator or `.json` is
@@ -831,7 +1002,15 @@ def _cli_check_spec_doc(seq_id_or_path: str) -> int:
       1  not_authored — genuinely missing; author + merge first
       3  behind_origin — spec exists on main; run sync, don't re-author
 
-    Repo-root resolution (resolve_spec_doc_repo_root): SPEC_DOC_REPO_ROOT_ENV,
+    NOT a pure query by default: on BEHIND_ORIGIN this fast-forwards the target
+    repo's checkout (see the self-heal below). `refresh=False` (`--no-refresh`)
+    restores the pure-classifier behavior for anyone who needs to inspect a
+    checkout WITHOUT moving it — e.g. an operator who has reset `~/RSDPM` back
+    to an older commit on `main` to reproduce something and wants the
+    classification without losing the pinned state. Mirror's preflight leaves
+    it on: the whole point there is not to park a build on a stale tree.
+
+    Repo-root resolution (resolve_spec_doc_repo): SPEC_DOC_REPO_ROOT_ENV,
     when set, wins and anchors local-file resolution + the `git -C <root>`
     probes at that path (the SpecDocCliTest /tmp-fixture seam). Otherwise the
     sequence's effective target_repo picks the checkout: agent-core / unset /
@@ -849,8 +1028,29 @@ def _cli_check_spec_doc(seq_id_or_path: str) -> int:
     if seq is None:
         return rc
     spec_doc = seq.get('spec_doc') if isinstance(seq, dict) else None
-    repo_root = resolve_spec_doc_repo_root(seq)
-    presence = check_spec_doc_presence(spec_doc, repo_root=repo_root)
+    repo_name, repo_root = resolve_spec_doc_repo(seq)
+    presence = check_spec_doc_presence(
+        spec_doc, repo_root=repo_root, repo_name=repo_name)
+
+    # Sync-lag self-heal. BEHIND_ORIGIN means the spec is on origin/main and
+    # this checkout just hasn't caught up — a condition the 30-minute
+    # dispatch-repo sweep will clear on its own, eventually. Pull now instead
+    # of parking the build until it does. The refresh is ff-only and declines
+    # a tree in use (see refresh_checkout), so the worst case is the same
+    # BEHIND_ORIGIN we already had, now printed with the reason it stayed.
+    if refresh and presence.status in SPEC_DOC_REFRESHABLE:
+        line = refresh_checkout(repo_name, repo_root)
+        if line is not None:
+            # Always emitted, advanced or not: a silent no-op and a working
+            # refresh must not look alike from the logs.
+            sys.stderr.write(f'REFRESH: {line}\n')
+            presence = check_spec_doc_presence(
+                spec_doc, repo_root=repo_root, repo_name=repo_name)
+    elif not refresh and presence.status in SPEC_DOC_REFRESHABLE:
+        # Say so. Otherwise --no-refresh looks identical to a refresh that ran
+        # and silently declined, and the operator can't tell which they got.
+        sys.stderr.write('REFRESH: skipped — --no-refresh\n')
+
     if presence.status == SPEC_DOC_PRESENT:
         sys.stdout.write(f'OK: {presence.message}\n')
         return 0
@@ -875,6 +1075,16 @@ def _cli(argv: list[str]) -> int:
     # DAG preflight, ad-hoc validation, test fixtures).
     parser = argparse.ArgumentParser(
         description='Validate a build-sequence file against spec § 5.1 + DAG checks.',
+        # allow_abbrev=False is load-bearing, not tidiness. argparse accepts
+        # unambiguous abbreviations by default, so `--no-ref` parsed happily as
+        # `--no-refresh` while the exact-match extraction below did not see it —
+        # the flag was accepted, silently ignored, and the checkout got
+        # fast-forwarded anyway. Measured on a real clone: `--no-ref` printed
+        # `advanced (+10)` and moved HEAD, destroying the pinned state the flag
+        # exists to protect. Turning abbreviation off makes the parser and the
+        # extraction agree on exactly one spelling, and anything else fails
+        # loudly instead of doing the destructive thing quietly.
+        allow_abbrev=False,
     )
     parser.add_argument(
         'args',
@@ -887,14 +1097,48 @@ def _cli(argv: list[str]) -> int:
             'to a sequence file (JSON). Exits 0 if valid, 1 otherwise.'
         ),
     )
+    parser.add_argument(
+        '--no-refresh',
+        action='store_true',
+        help=(
+            'check-spec-doc only: do NOT fast-forward the target repo\'s '
+            'checkout on behind-origin. Use when inspecting a checkout you '
+            'have deliberately parked on an older commit; the classification '
+            'is reported without moving the tree.'
+        ),
+    )
+    # Pull `--no-refresh` out of argv BEFORE argparse sees it. argparse cannot
+    # interleave an optional with a `nargs='+'` positional: the positional
+    # greedily takes the subcommand, the flag parses, and the trailing sequence
+    # argument has nowhere to go — so `check-spec-doc --no-refresh <seq>` died
+    # with `unrecognized arguments: <seq>`, blaming the file rather than the
+    # placement. Extracting it first makes every position work. It stays
+    # REGISTERED on the parser above purely so `--help` documents it.
+    #
+    # This exact-string match is only safe because the parser sets
+    # allow_abbrev=False. With abbreviation on, any spelling this match missed
+    # (`--no-ref`) still satisfied the parser, so the flag was silently dropped
+    # and the fast-forward ran. The two must agree on one spelling; see the
+    # parser comment above.
+    no_refresh = '--no-refresh' in argv
+    argv = [a for a in argv if a != '--no-refresh']
+
     parsed = parser.parse_args(argv)
     raw_args = parsed.args
+
+    if no_refresh and not (
+            len(raw_args) == 2 and raw_args[0] == 'check-spec-doc'):
+        # Fail loudly rather than accepting a flag that would do nothing —
+        # a silently-ignored --no-refresh reads as "the tree is safe".
+        sys.stderr.write(
+            'ERROR: --no-refresh only applies to `check-spec-doc`\n')
+        return 2
 
     if len(raw_args) == 2 and raw_args[0] == 'validate':
         seq_id = raw_args[1]
         path = DEFAULT_BLACKBOARD_DIR / f'{seq_id}.json'
     elif len(raw_args) == 2 and raw_args[0] == 'check-spec-doc':
-        return _cli_check_spec_doc(raw_args[1])
+        return _cli_check_spec_doc(raw_args[1], refresh=not no_refresh)
     elif len(raw_args) == 1:
         path = Path(raw_args[0])
     else:

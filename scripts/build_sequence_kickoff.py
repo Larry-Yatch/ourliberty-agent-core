@@ -394,10 +394,48 @@ def apply_kickoff_transition(
     # whose steps target RSDPM and whose BUILD_PLAN.md lives in the RSDPM
     # checkout, not agent-core — no longer false-fails NOT_AUTHORED here. An
     # agent-core-targeted sequence resolves to None → REPO_ROOT, unchanged.
+    spec_repo_name, spec_repo_root = bsv.resolve_spec_doc_repo(seq)
     presence = bsv.check_spec_doc_presence(
         seq.get('spec_doc'),
-        repo_root=bsv.resolve_spec_doc_repo_root(seq),
+        repo_root=spec_repo_root,
+        repo_name=spec_repo_name,
     )
+    # Sync-lag self-heal, mirroring the `check-spec-doc` CLI. The dispatch-repo
+    # sweep polls every 30 minutes; a kickoff dispatched minutes after its spec
+    # merged lands inside that window and would otherwise defer until a human
+    # noticed (rsdpm-m11-001, rsdpm-m14-001 — both behind by exactly 1 commit).
+    # The refresh is ff-only and declines a tree in use, so a failure to
+    # advance simply leaves the deferral that was already happening.
+    #
+    # NOT effective on BOTH entry paths, deliberately. The chat/dashboard
+    # approve path reaches here from `ourliberty-beacon-bot.service`, which is
+    # denied write on the product checkouts on purpose — the refresh returns
+    # `error — fetch failed: … Read-only file system` there and the deferral
+    # stands (with the DM naming the syncer to run). See `FF_EXCLUDED_UNITS` in
+    # sync_dispatch_repo_clones for the measurement behind that call: this
+    # function has run twice in three months, both for agent-core, which the
+    # refresh skips anyway. The load-bearing copy of this self-heal is the one
+    # in `check-spec-doc`, which is what Mirror's preflight actually runs.
+    #
+    # Guarded on SPEC_DOC_REFRESHABLE, not BEHIND_ORIGIN alone: the classifier
+    # reads this checkout's LOCAL origin/main ref and never fetches, so a spec
+    # that merged since the last fetch reads as NOT_AUTHORED rather than
+    # BEHIND_ORIGIN — and that branch below FAILS the kickoff telling Larry to
+    # author a spec that is already on main. See SPEC_DOC_REFRESHABLE.
+    refresh_line = None
+    if presence.status in bsv.SPEC_DOC_REFRESHABLE:
+        refresh_line = bsv.refresh_checkout(spec_repo_name, spec_repo_root)
+        if refresh_line is not None:
+            log(
+                f'BUILD_SEQUENCE_KICKOFF seq={seq_id} '
+                f'spec-doc-{presence.status} refresh: {refresh_line}',
+                'INFO',
+            )
+            presence = bsv.check_spec_doc_presence(
+                seq.get('spec_doc'),
+                repo_root=spec_repo_root,
+                repo_name=spec_repo_name,
+            )
     if presence.status == bsv.SPEC_DOC_BEHIND_ORIGIN:
         msg = (
             f'Sequence `{seq_id}` kickoff deferred: this checkout is behind '
@@ -422,8 +460,30 @@ def apply_kickoff_transition(
             sentinel=f'sequence-kickoff:spec-behind-origin:{seq_id}',
         )
     if presence.status == bsv.SPEC_DOC_NOT_AUTHORED:
+        # Carry the refresh outcome when one was attempted. NOT_AUTHORED is an
+        # assertion about a possibly-stale origin/main ref; if the on-demand
+        # pull DECLINED (dirty tree, off main, fetch failure) we still cannot
+        # distinguish "never authored" from "a sync-lag we could not clear",
+        # and telling Larry to author the spec without that caveat is how the
+        # 2026-06-10 mis-diagnosis happened.
+        # Both arms say something — the no-refresh arm is the WEAKER evidence,
+        # not the stronger. Gating this on `refresh_line` dropped the caveat
+        # exactly when nothing had been done to rule staleness out: agent-core
+        # is never refreshed here (refresh_checkout returns None for it), which
+        # is the very repo the 2026-06-10 mis-diagnosis happened in.
+        caveat = (
+            f' (an on-demand fast-forward was attempted first — `{refresh_line}` '
+            f'— so if that line does not say `advanced`, this verdict is based '
+            f'on a checkout that could not be refreshed; confirm on origin/main '
+            f'before authoring anything.)'
+            if refresh_line else
+            f' (NO on-demand refresh was attempted for this repo, so the '
+            f'`origin/main` ref this verdict rests on is only as fresh as the '
+            f'last scheduled sync — confirm on the real origin/main before '
+            f'authoring anything.)'
+        )
         msg = (
-            f'Sequence `{seq_id}` kickoff failed: {presence.message} '
+            f'Sequence `{seq_id}` kickoff failed: {presence.message}{caveat} '
             f'Sequence file: `{seq_path}`.'
         )
         larry_alerts.append_alert(

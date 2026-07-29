@@ -34,6 +34,16 @@ MemoryHigh=128M
 # unit must then be reinstalled to /etc/systemd (daemon-reload alone loads the
 # stale copy).
 #
+# ⚠ AND TO TWO MORE UNITS. This is no longer the only place sync_one runs: the
+# sync-lag self-heal calls it inline from the DAG-preflight (under
+# ourliberty-inbox-watcher.service) and the build-sequence kickoff (under
+# ourliberty-outbox-notifier.service). Miss one of those and the failure is
+# invisible in the worst way — THIS timer keeps succeeding, so the checkout
+# looks maintained, while the on-demand pull EROFSes and preflights stall as if
+# the self-heal had never shipped. The canonical list is FF_CAPABLE_UNITS in
+# scripts/sync_dispatch_repo_clones.py, enforced by
+# test_unit_grants_write_to_every_syncable_repo.
+#
 # agent-core is deliberately NOT writable here — sync_agent_core.sh owns that
 # tree, and the script skips it for the same reason.
 NoNewPrivileges=true

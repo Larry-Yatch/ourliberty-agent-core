@@ -4232,9 +4232,17 @@ def _dag_revision_is_sync_lag(seq_path: Path, seq_id: str):
         seq = json.loads(seq_path.read_text())
         if not isinstance(seq, dict):
             return None
+        # `repo_name` as well as `repo_root`: this presence object's `message`
+        # is persisted verbatim into the `dag-preflight-sync-lag-detected`
+        # audit entry below. Without the name, `sync_remediation` falls back to
+        # the agent-core wording and the sequence file permanently records
+        # "run ourliberty-sync.service" for an RSDPM spec — the unit that
+        # cannot advance that checkout.
+        repo_name, repo_root = bsv.resolve_spec_doc_repo(seq)
         presence = bsv.check_spec_doc_presence(
             seq.get('spec_doc'),
-            repo_root=bsv.resolve_spec_doc_repo_root(seq),
+            repo_root=repo_root,
+            repo_name=repo_name,
         )
     except Exception as e:  # noqa: BLE001 — classification must never break routing
         log(

@@ -899,5 +899,499 @@ class TargetRepoSpecDocPresenceTest(unittest.TestCase):
         self.assertFalse(presence)
 
 
+class SyncRemediationTest(unittest.TestCase):
+    """The BEHIND_ORIGIN remediation must name the syncer that can actually
+    advance the checkout being reported on.
+
+    Incidents 2026-07-24 (rsdpm-m11-001) and 2026-07-28 (rsdpm-m14-001): both
+    preflights told the operator to run `ourliberty-sync.service` for a lag in
+    `/home/larry/RSDPM`. That unit runs sync_agent_core.sh, which is
+    agent-core-only — it exits 0 having changed nothing, so the remediation
+    reads as "done, still broken"."""
+
+    def test_agent_core_names_the_agent_core_syncer(self):
+        for name in (None, bsv.AGENT_CORE_REPO_NAME):
+            with self.subTest(repo_name=name):
+                text = bsv.sync_remediation(name)
+                self.assertIn(bsv.AGENT_CORE_SYNC_UNIT, text)
+                self.assertNotIn(bsv.DISPATCH_REPO_SYNC_UNIT, text)
+
+    def test_dispatch_repo_names_the_dispatch_syncer(self):
+        text = bsv.sync_remediation('RSDPM')
+        self.assertIn(bsv.DISPATCH_REPO_SYNC_UNIT, text)
+        self.assertIn('RSDPM', text)
+
+    def test_dispatch_repo_says_the_agent_core_unit_cannot_help(self):
+        """Naming the right unit is not enough — the wrong one was followed
+        twice, so the message must say explicitly that it does nothing here."""
+        text = bsv.sync_remediation('RSDPM')
+        self.assertIn(bsv.AGENT_CORE_SYNC_UNIT, text)
+        self.assertIn('cannot advance', text)
+
+    def test_behind_origin_message_carries_the_repo_specific_remediation(self):
+        git = _fake_git({
+            ('rev-parse', '--verify', '--quiet', 'origin/main'): (0, 'abc123'),
+            ('cat-file', '-e', 'origin/main:specs/M14.md'): (0, ''),
+            ('rev-list', '--count', 'HEAD..origin/main'): (0, '1'),
+        })
+        res = bsv.check_spec_doc_presence(
+            'specs/M14.md', repo_root=Path('/home/larry/RSDPM'),
+            repo_name='RSDPM', git=git, local_exists=lambda: False,
+        )
+        self.assertEqual(res.status, bsv.SPEC_DOC_BEHIND_ORIGIN)
+        self.assertIn(bsv.DISPATCH_REPO_SYNC_UNIT, res.message)
+        self.assertIn('RSDPM', res.message)
+        self.assertIn('do not re-author', res.message.lower())
+
+
+class ResolveSpecDocRepoNameTest(unittest.TestCase):
+    """resolve_spec_doc_repo returns the repo NAME alongside the root — a root
+    alone cannot tell agent-core's syncer from a dispatch-repo's."""
+
+    REPO_PATHS = {
+        'ourliberty-agent-core': Path('/home/larry/agent-core'),
+        'RSDPM': Path('/home/larry/RSDPM'),
+    }
+
+    def test_mapped_cross_repo_target_returns_name_and_root(self):
+        name, root = bsv.resolve_spec_doc_repo(
+            _seq_with_target('RSDPM'), env={}, repo_paths=self.REPO_PATHS)
+        self.assertEqual(name, 'RSDPM')
+        self.assertEqual(root, Path('/home/larry/RSDPM'))
+
+    def test_agent_core_target_returns_no_name(self):
+        name, root = bsv.resolve_spec_doc_repo(
+            _seq_with_target('ourliberty-agent-core'),
+            env={}, repo_paths=self.REPO_PATHS)
+        self.assertIsNone(name)
+        self.assertIsNone(root)
+
+    def test_unmapped_target_returns_no_name(self):
+        """We failed to locate the checkout, so we must not claim the
+        dispatch-repo syncer would fix it."""
+        name, root = bsv.resolve_spec_doc_repo(
+            _seq_with_target('some-unknown-repo'),
+            env={}, repo_paths=self.REPO_PATHS)
+        self.assertIsNone(name)
+        self.assertIsNone(root)
+
+    def test_env_override_changes_root_but_not_the_reported_repo(self):
+        """The /tmp fixture seam must not make the remediation lie about which
+        repo is under discussion."""
+        name, root = bsv.resolve_spec_doc_repo(
+            _seq_with_target('RSDPM'),
+            env={bsv.SPEC_DOC_REPO_ROOT_ENV: '/tmp/fixture'},
+            repo_paths=self.REPO_PATHS,
+        )
+        self.assertEqual(name, 'RSDPM')
+        self.assertEqual(root, Path('/tmp/fixture'))
+
+    def test_root_resolution_matches_the_legacy_wrapper(self):
+        for seq in (_seq_with_target('RSDPM'),
+                    _seq_with_target('ourliberty-agent-core'),
+                    _seq_with_target('some-unknown-repo')):
+            with self.subTest(seq=seq['steps'][0]['target_repo']):
+                self.assertEqual(
+                    bsv.resolve_spec_doc_repo_root(
+                        seq, env={}, repo_paths=self.REPO_PATHS),
+                    bsv.resolve_spec_doc_repo(
+                        seq, env={}, repo_paths=self.REPO_PATHS)[1],
+                )
+
+
+class RefreshCheckoutTest(unittest.TestCase):
+    """refresh_checkout delegates to the reviewed ff-only syncer, and refuses
+    to touch the trees that are not its to touch."""
+
+    def test_agent_core_is_never_refreshed(self):
+        """sync_agent_core.sh owns that tree — a second writer on one checkout
+        is the machine-owned-file single-committer trap."""
+        called = []
+        for name in (None, bsv.AGENT_CORE_REPO_NAME):
+            with self.subTest(repo_name=name):
+                line = bsv.refresh_checkout(
+                    name, Path('/home/larry/agent-core'),
+                    syncer=lambda *a, **k: called.append(a),
+                )
+                self.assertIsNone(line)
+        self.assertEqual(called, [])
+
+    def test_unresolved_root_is_not_refreshed(self):
+        line = bsv.refresh_checkout('RSDPM', None, syncer=lambda *a, **k: None)
+        self.assertIsNone(line)
+
+    def test_delegates_to_the_syncer_in_apply_mode(self):
+        seen = {}
+
+        class _Outcome:
+            def line(self):
+                return 'RSDPM: advanced (+1)'
+
+        def _syncer(repo, path, apply=False):
+            seen.update(repo=repo, path=path, apply=apply)
+            return _Outcome()
+
+        line = bsv.refresh_checkout(
+            'RSDPM', Path('/home/larry/RSDPM'), syncer=_syncer)
+        self.assertEqual(line, 'RSDPM: advanced (+1)')
+        self.assertEqual(seen['repo'], 'RSDPM')
+        self.assertEqual(seen['path'], '/home/larry/RSDPM')
+        self.assertTrue(seen['apply'])
+
+    def test_a_broken_syncer_degrades_instead_of_raising(self):
+        """A refresh failure must never be worse than the stall it treats."""
+        def _boom(*_a, **_k):
+            raise RuntimeError('git exploded')
+
+        line = bsv.refresh_checkout(
+            'RSDPM', Path('/home/larry/RSDPM'), syncer=_boom)
+        self.assertIsNotNone(line)
+        self.assertIn('error', line)
+
+
+class SpecDocSyncLagSelfHealTest(unittest.TestCase):
+    """End-to-end, against a real git checkout: a BEHIND_ORIGIN preflight now
+    pulls on demand instead of parking until the 30-minute sweep.
+
+    `/home/larry/RSDPM` IS kept fresh — ourliberty-sync-dispatch-repos.timer
+    fast-forwards it every 30 minutes, ff-only. What it cannot do is beat its
+    own poll interval, and that is what both incidents were: a spec merged
+    inside the current window (each behind by exactly 1 commit), a kickoff
+    dispatched minutes later, and a build parked on a checkout that was about
+    to be correct. These tests prove BOTH directions of the on-demand pull —
+    it advances a behind tree, and it declines a dirty one."""
+
+    SPEC = 'specs/M14-workspace-boundary.md'
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.tmpdir = Path(self._tmp.name)
+        self.script = _SCRIPTS_DIR / 'build_sequence_validator.py'
+        self._git_env = {
+            **os.environ,
+            'GIT_CONFIG_GLOBAL': os.devnull,
+            'GIT_CONFIG_SYSTEM': os.devnull,
+            'GIT_AUTHOR_NAME': 'Forge Test',
+            'GIT_AUTHOR_EMAIL': 'forge-test@example.invalid',
+            'GIT_COMMITTER_NAME': 'Forge Test',
+            'GIT_COMMITTER_EMAIL': 'forge-test@example.invalid',
+        }
+        self.checkout = self._build_behind_checkout()
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    def _git(self, cwd: Path, *args: str) -> str:
+        return subprocess.run(
+            ['git', '-C', str(cwd), *args],
+            check=True, capture_output=True, text=True,
+            env=self._git_env, timeout=30,
+        ).stdout.strip()
+
+    def _build_behind_checkout(self) -> Path:
+        """A clean checkout on `main`, one commit behind an origin that has
+        SPEC. Exactly the shape both incidents were observed in."""
+        work = self.tmpdir / 'RSDPM'
+        origin = self.tmpdir / 'origin.git'
+        work.mkdir()
+        self._git(work, 'init', '-q')
+        self._git(work, 'symbolic-ref', 'HEAD', 'refs/heads/main')
+        (work / 'README.md').write_text('# fixture\n')
+        self._git(work, 'add', 'README.md')
+        self._git(work, 'commit', '-q', '-m', 'base')
+        subprocess.run(['git', 'init', '-q', '--bare', str(origin)],
+                       check=True, capture_output=True, env=self._git_env)
+        self._git(work, 'remote', 'add', 'origin', str(origin))
+        self._git(work, 'push', '-q', '-u', 'origin', 'main')
+        # Merge the spec to origin/main, then rewind the checkout to before it.
+        spec = work / self.SPEC
+        spec.parent.mkdir(parents=True, exist_ok=True)
+        spec.write_text('# M14\n')
+        self._git(work, 'add', self.SPEC)
+        self._git(work, 'commit', '-q', '-m', 'spec(M14)')
+        self._git(work, 'push', '-q', 'origin', 'main')
+        self._git(work, 'reset', '-q', '--hard', 'HEAD~1')
+        self.assertFalse((work / self.SPEC).exists())
+        return work
+
+    def _seq_file(self, target_repo: str) -> Path:
+        seq = _seq_with_target(target_repo, spec_doc=self.SPEC)
+        path = self.tmpdir / 'seq.json'
+        path.write_text(json.dumps(seq))
+        return path
+
+    def _run_cli(self, seq_path: Path,
+                 *extra: str) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            [sys.executable, str(self.script), 'check-spec-doc',
+             str(seq_path), *extra],
+            capture_output=True, text=True, timeout=90,
+            env={**self._git_env,
+                 bsv.SPEC_DOC_REPO_ROOT_ENV: str(self.checkout)},
+        )
+
+    def test_behind_checkout_is_pulled_and_the_preflight_passes(self):
+        """Direction 1: it advances a behind tree. Before this change the run
+        exited 3 and the sequence waited for a human."""
+        proc = self._run_cli(self._seq_file('RSDPM'))
+        self.assertEqual(proc.returncode, 0, msg=proc.stderr)
+        self.assertIn('OK:', proc.stdout)
+        self.assertIn('REFRESH: RSDPM: advanced (+1)', proc.stderr)
+        # The pull actually landed in the tree, not just in the log line.
+        self.assertTrue((self.checkout / self.SPEC).is_file())
+
+    def _make_tracking_ref_stale(self) -> None:
+        """Make the checkout's own `origin/main` ref as old as its HEAD — i.e.
+        NOTHING has fetched since the spec merged.
+
+        `_build_behind_checkout` pushes and then rewinds HEAD, which leaves the
+        tracking ref pointing at the NEW commit — the shape you get after a
+        fetch that was not followed by a merge. That is only half the window.
+        The dispatch-repo sweep fetches and fast-forwards in ONE step, so
+        between ticks a clean checkout normally has a tracking ref as old as
+        its HEAD, and a spec that merged four minutes ago is invisible in both.
+        The bare origin still has the spec, so a fetch resolves it."""
+        self._git(self.checkout, 'update-ref', 'refs/remotes/origin/main',
+                  'HEAD')
+
+    def test_stale_tracking_ref_is_pulled_and_the_preflight_passes(self):
+        """The classifier NEVER fetches — it reads the local origin/main ref.
+        So the deeper-staleness half of the same window classifies
+        NOT_AUTHORED, not BEHIND_ORIGIN, and gating the refresh on
+        BEHIND_ORIGIN alone skipped the case this self-heal exists for.
+
+        Worse than a miss: NOT_AUTHORED routes to Mirror's exit-1 branch,
+        *'author + merge it before re-dispatching'*, for a spec already on
+        main — the re-authoring this whole arc exists to prevent, and an
+        outcome already observed once (2026-06-10, merged PR #415 reported as
+        never-authored because the checkout lagged by one commit)."""
+        self._make_tracking_ref_stale()
+        # Precondition: this really is the not_authored branch, not behind.
+        parked = bsv.check_spec_doc_presence(
+            self.SPEC, repo_root=self.checkout, repo_name='RSDPM')
+        self.assertEqual(parked.status, bsv.SPEC_DOC_NOT_AUTHORED)
+
+        proc = self._run_cli(self._seq_file('RSDPM'))
+        self.assertEqual(proc.returncode, 0, msg=proc.stderr)
+        self.assertIn('OK:', proc.stdout)
+        self.assertIn('REFRESH: RSDPM: advanced (+1)', proc.stderr)
+        self.assertTrue((self.checkout / self.SPEC).is_file())
+        self.assertNotIn('author', proc.stderr.lower())
+
+    def test_genuinely_unauthored_spec_still_exits_one_after_a_refresh(self):
+        """The other direction. Attempting the pull on NOT_AUTHORED must not
+        turn a real missing spec into a pass — it costs one fetch and reaches
+        the same verdict, which is what makes widening the guard safe."""
+        seq = _seq_with_target('RSDPM', spec_doc='specs/never-written.md')
+        path = self.tmpdir / 'seq-missing.json'
+        path.write_text(json.dumps(seq))
+        proc = self._run_cli(path)
+        self.assertEqual(proc.returncode, 1)
+        self.assertIn('NOT_AUTHORED', proc.stderr)
+        # The refresh was tried (and reported), it just could not help.
+        self.assertIn('REFRESH: RSDPM:', proc.stderr)
+
+    def test_stale_tracking_ref_on_a_dirty_tree_upgrades_the_diagnosis(self):
+        """Widening the guard must not widen what the refresh will MOVE — a
+        concurrent session's edits still outrank the preflight. But the attempt
+        is not wasted, and this is the most valuable case of the three.
+
+        `sync_one` fetches BEFORE it inspects the working tree, so even when it
+        then declines the merge, the tracking ref has advanced. The re-check
+        therefore turns an unknowable NOT_AUTHORED ('author + merge it first')
+        into a definite BEHIND_ORIGIN ('the spec EXISTS on main — do NOT
+        re-author it; your tree is dirty'). Same refusal to touch the tree,
+        strictly better diagnosis: exit 3, not exit 1."""
+        self._make_tracking_ref_stale()
+        (self.checkout / 'README.md').write_text('# someone is mid-edit\n')
+        proc = self._run_cli(self._seq_file('RSDPM'))
+        self.assertEqual(proc.returncode, 3, msg=proc.stderr)
+        self.assertIn('BEHIND_ORIGIN:', proc.stderr)
+        self.assertIn('NOT a missing spec', proc.stderr)
+        self.assertIn('REFRESH: RSDPM: skipped', proc.stderr)
+        self.assertIn('uncommitted change(s)', proc.stderr)
+        # Declined, not forced: the edit survives and the spec never arrived.
+        self.assertEqual(
+            (self.checkout / 'README.md').read_text(),
+            '# someone is mid-edit\n')
+        self.assertFalse((self.checkout / self.SPEC).exists())
+
+    def test_dirty_checkout_is_declined_and_stays_behind(self):
+        """Direction 2: it declines a dirty tree. This is a SHARED checkout —
+        a concurrent session's edits outrank a preflight's convenience, so the
+        sequence keeps waiting rather than having work moved under it."""
+        (self.checkout / 'README.md').write_text('# someone is mid-edit\n')
+        proc = self._run_cli(self._seq_file('RSDPM'))
+        self.assertEqual(proc.returncode, 3)
+        self.assertIn('REFRESH: RSDPM: skipped', proc.stderr)
+        self.assertIn('uncommitted change(s)', proc.stderr)
+        # Declined, not forced: the edit survives and the spec never arrived.
+        self.assertEqual(
+            (self.checkout / 'README.md').read_text(),
+            '# someone is mid-edit\n')
+        self.assertFalse((self.checkout / self.SPEC).exists())
+        # And the operator is pointed at the syncer that owns this tree.
+        self.assertIn(bsv.DISPATCH_REPO_SYNC_UNIT, proc.stderr)
+
+    def test_checkout_on_another_branch_is_declined(self):
+        """A tree someone has parked on a feature branch is in use — moving it
+        would be the reset this refresh exists to never do."""
+        self._git(self.checkout, 'checkout', '-q', '-b', 'wip/someone-else')
+        proc = self._run_cli(self._seq_file('RSDPM'))
+        self.assertEqual(proc.returncode, 3)
+        self.assertIn('REFRESH: RSDPM: skipped', proc.stderr)
+        self.assertIn('not main', proc.stderr)
+        self.assertEqual(
+            self._git(self.checkout, 'rev-parse', '--abbrev-ref', 'HEAD'),
+            'wip/someone-else')
+
+    def test_every_run_emits_a_state_line(self):
+        """A silent no-op and a working refresh must not look alike. Run twice:
+        the second finds nothing to do and still says so."""
+        first = self._run_cli(self._seq_file('RSDPM'))
+        self.assertIn('REFRESH: RSDPM: advanced (+1)', first.stderr)
+        second = self._run_cli(self._seq_file('RSDPM'))
+        self.assertEqual(second.returncode, 0)
+        # Now PRESENT locally, so no refresh is needed — and the run says OK
+        # rather than going quiet about a check it silently skipped.
+        self.assertIn('OK:', second.stdout)
+
+    def test_no_refresh_classifies_without_moving_the_tree(self):
+        """`check-spec-doc` reads as a query, and by default it is not one —
+        it fast-forwards. `--no-refresh` restores the pure classifier for an
+        operator inspecting a checkout they parked on an older commit on
+        purpose (clean + on `main`, so the ff-only guards would NOT save it)."""
+        head_before = self._git(self.checkout, 'rev-parse', 'HEAD')
+        proc = self._run_cli(self._seq_file('RSDPM'), '--no-refresh')
+        self.assertEqual(proc.returncode, 3)
+        # The classification still happens, and still names the right syncer.
+        self.assertIn('BEHIND_ORIGIN:', proc.stderr)
+        self.assertIn(bsv.DISPATCH_REPO_SYNC_UNIT, proc.stderr)
+        # But nothing moved.
+        self.assertEqual(
+            self._git(self.checkout, 'rev-parse', 'HEAD'), head_before)
+        self.assertFalse((self.checkout / self.SPEC).exists())
+
+    def test_no_refresh_says_it_declined_rather_than_going_quiet(self):
+        """Suppressed and 'ran but declined' must not read alike."""
+        proc = self._run_cli(self._seq_file('RSDPM'), '--no-refresh')
+        self.assertIn('REFRESH: skipped — --no-refresh', proc.stderr)
+        self.assertNotIn('advanced', proc.stderr)
+
+    def test_no_refresh_works_in_every_argument_position(self):
+        """argparse cannot interleave an optional with a `nargs='+'`
+        positional, so `check-spec-doc --no-refresh <seq>` used to die with
+        `unrecognized arguments: <seq>` — blaming the sequence file for the
+        flag's placement. All three orderings must behave identically."""
+        head = self._git(self.checkout, 'rev-parse', 'HEAD')
+        seq = self._seq_file('RSDPM')
+        placements = (
+            ['check-spec-doc', str(seq), '--no-refresh'],   # trailing
+            ['--no-refresh', 'check-spec-doc', str(seq)],   # leading
+            ['check-spec-doc', '--no-refresh', str(seq)],   # interleaved
+        )
+        for argv in placements:
+            with self.subTest(placement=argv):
+                proc = subprocess.run(
+                    [sys.executable, str(self.script), *argv],
+                    capture_output=True, text=True, timeout=90,
+                    env={**self._git_env,
+                         bsv.SPEC_DOC_REPO_ROOT_ENV: str(self.checkout)},
+                )
+                self.assertEqual(proc.returncode, 3, msg=proc.stderr)
+                self.assertIn('REFRESH: skipped — --no-refresh', proc.stderr)
+                self.assertNotIn('unrecognized arguments', proc.stderr)
+                # Suppression held in every ordering — nothing moved.
+                self.assertEqual(
+                    self._git(self.checkout, 'rev-parse', 'HEAD'), head)
+
+    def test_no_spelling_of_the_flag_can_silently_move_the_tree(self):
+        """The invariant, stated over the whole NEIGHBOURHOOD of spellings.
+
+        The bug this pins: argparse accepts unambiguous abbreviations, so
+        `--no-ref` satisfied the parser while the exact-match extraction missed
+        it — the flag was accepted, silently dropped, and the checkout was
+        fast-forwarded anyway (measured: `advanced (+10)`, HEAD moved). The
+        previous test only covered the one spelling I had in mind, which is
+        precisely why it passed while the feature was broken.
+
+        So assert the property rather than a case: for ANY spelling near the
+        flag, the run must either honour it or refuse loudly. What must never
+        happen is a silent refresh."""
+        head = self._git(self.checkout, 'rev-parse', 'HEAD')
+        spellings = [
+            '--no-refresh',      # exact — honoured
+            '--no-refres',       # abbreviations: were silently ignored
+            '--no-ref',
+            '--no-r',
+            '--no',
+            '--no-refresh=1',    # store_true with an explicit value
+            '--norefresh',       # plausible typo
+            '--nope',            # unrelated flag
+        ]
+        for spelling in spellings:
+            with self.subTest(spelling=spelling):
+                proc = self._run_cli(self._seq_file('RSDPM'), spelling)
+                self.assertNotIn(
+                    'advanced', proc.stderr,
+                    f'{spelling!r} triggered a fast-forward; a spelling that is '
+                    f'not honoured must FAIL, never silently refresh')
+                self.assertEqual(
+                    self._git(self.checkout, 'rev-parse', 'HEAD'), head,
+                    f'{spelling!r} moved the checkout')
+                self.assertFalse(
+                    (self.checkout / self.SPEC).exists(),
+                    f'{spelling!r} pulled the spec in')
+                if spelling == '--no-refresh':
+                    self.assertEqual(proc.returncode, 3, msg=proc.stderr)
+                    self.assertIn('REFRESH: skipped — --no-refresh',
+                                  proc.stderr)
+                else:
+                    self.assertEqual(
+                        proc.returncode, 2,
+                        f'{spelling!r} should be rejected outright, got '
+                        f'{proc.returncode}: {proc.stderr[:200]}')
+
+    def test_help_still_works_with_abbreviation_disabled(self):
+        """allow_abbrev=False must not cost us --help / -h."""
+        for argv in (['--help'], ['-h']):
+            with self.subTest(argv=argv):
+                proc = subprocess.run(
+                    [sys.executable, str(self.script), *argv],
+                    capture_output=True, text=True, timeout=90,
+                    env=self._git_env,
+                )
+                self.assertEqual(proc.returncode, 0)
+                self.assertIn('--no-refresh', proc.stdout)
+
+    def test_no_refresh_is_rejected_on_the_other_cli_forms(self):
+        """A flag that silently does nothing reads as 'the tree is safe'."""
+        seq = self._seq_file('RSDPM')
+        for argv in (['validate', 'some-seq'], [str(seq)]):
+            with self.subTest(argv=argv):
+                proc = subprocess.run(
+                    [sys.executable, str(self.script), *argv, '--no-refresh'],
+                    capture_output=True, text=True, timeout=90,
+                    env=self._git_env,
+                )
+                self.assertEqual(proc.returncode, 2)
+                self.assertIn('--no-refresh only applies', proc.stderr)
+
+    def test_default_still_refreshes(self):
+        """The opt-out must not become the default by accident."""
+        proc = self._run_cli(self._seq_file('RSDPM'))
+        self.assertEqual(proc.returncode, 0)
+        self.assertIn('REFRESH: RSDPM: advanced (+1)', proc.stderr)
+
+    def test_agent_core_target_is_not_pulled_and_names_its_own_syncer(self):
+        """agent-core keeps its own syncer; this path must not touch it."""
+        proc = self._run_cli(self._seq_file(bsv.AGENT_CORE_REPO_NAME))
+        self.assertEqual(proc.returncode, 3)
+        self.assertNotIn('REFRESH:', proc.stderr)
+        self.assertIn(bsv.AGENT_CORE_SYNC_UNIT, proc.stderr)
+        self.assertNotIn(bsv.DISPATCH_REPO_SYNC_UNIT, proc.stderr)
+        self.assertFalse((self.checkout / self.SPEC).exists())
+
+
 if __name__ == '__main__':
     unittest.main()
