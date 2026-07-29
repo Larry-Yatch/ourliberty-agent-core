@@ -15058,7 +15058,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-29T18:12:20.011500+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-29T18:07:09.179039+00:00"
+      "orphan_last_activity_ts": "2026-07-29T18:07:09.179039+00:00",
+      "briefing": {
+        "what": "Your team paused a piece of in-progress work for a closer look before moving it forward.",
+        "why": "It isn't tied to any active project yet, so it's spending effort without a clear payoff until you decide where it fits.",
+        "suggest": "Take a quick look and either give it a home in a current priority or set it aside, rather than letting it sit in limbo."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T18:22:16.282556+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
