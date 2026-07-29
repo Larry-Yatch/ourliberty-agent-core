@@ -942,6 +942,69 @@ def _build_batch_summary(proposals: list[dict]) -> str:
     return '\n'.join(lines)
 
 
+def run_escalation_only(
+    repo_root,
+    *,
+    registry_path=None,
+    deps: Optional[ProposalDeps] = None,
+    chat_id: int = 0,
+) -> dict:
+    """Shadow-stage paging: the episode-reset + escalation halves of
+    `run_proposal_cycle`, and nothing else.
+
+    Stage 0 must be able to SAY something. It was never meant to be mute — it was
+    meant not to ACT, and telling Larry a test is broken is not acting: escalation
+    proposes nothing, dispatches nothing, merges nothing, and touches no config.
+    Everything that grants or exercises authority (the propose/approve/dispatch
+    drain, the fix dispatch, the L8/graduation config path) stays behind
+    `eff_stage >= 1`.
+
+    Without this the guardian could detect a genuine break, classify it
+    correctly, and still be structurally unable to report it until a human had
+    already granted Stage 1 — which asks Larry to extend trust to a component he
+    has never once seen do the job. It also makes "show me it pages before I grant
+    anything" achievable, which is the reasonable thing to ask of a component that
+    was confidently wrong for 17 consecutive nights.
+
+    Shares `should_escalate_break`'s latch with the Stage-1+ path, so a standing
+    break still pages exactly ONCE per episode no matter which path ran it, and a
+    victim returning green re-arms it. Called only when `eff_stage == 0` — at
+    Stage 1+ `run_proposal_cycle` already does both halves, and running both would
+    mean two independent registry read/write passes racing each other.
+    """
+    registry_path = Path(registry_path) if registry_path else default_registry_path()
+    if deps is None:
+        deps = default_proposal_deps(Path(repo_root), chat_id=chat_id)
+    summary: dict = {'escalated': []}
+    registry = load_registry(registry_path)
+    tests = registry.setdefault('tests', {})
+    dirty = False
+
+    # Episode reset: a victim that is currently green clears its latch so a NEW
+    # break episode can page again (D2.3). Must run at Stage 0 too, or a break
+    # escalated in shadow could never page a second time.
+    for entry in tests.values():
+        if entry.get('consecutive_red_runs', 0) == 0 and entry.get('break_escalated'):
+            entry['break_escalated'] = False
+            dirty = True
+
+    for tid, entry in tests.items():
+        if should_escalate_break(entry):
+            try:
+                deps.escalate(test_id=tid, entry=entry)
+            except Exception as exc:  # noqa: BLE001 — one bad page must not wedge
+                print(f'main_suite_guardian: escalate failed for {tid}: {exc}',
+                      file=sys.stderr)
+                continue  # leave the latch UNSET so the next run retries
+            entry['break_escalated'] = True
+            dirty = True
+            summary['escalated'].append(tid)
+
+    if dirty:
+        save_registry(registry_path, registry)
+    return summary
+
+
 def run_proposal_cycle(
     repo_root,
     run_result: dict,
@@ -1235,7 +1298,8 @@ def main(argv: Optional[list] = None) -> int:
     # to propose, drain, or count toward evidence this cycle.
     if result.get('status') in (RUN_GREEN, RUN_RED):
         # Propose->approve->dispatch loop (D2) runs at Stage 1+ only. Stage 0
-        # (shadow) detects + records only.
+        # gets the notify-only half: it may SAY a test is broken, it may not act
+        # on it. See `run_escalation_only`.
         if eff_stage >= 1:
             registry = load_registry(
                 Path(args.registry) if args.registry else default_registry_path())
@@ -1248,6 +1312,14 @@ def main(argv: Optional[list] = None) -> int:
                 result['proposal'] = proposal
             except Exception as exc:  # noqa: BLE001 — must never wedge the timer
                 print(f'main_suite_guardian: proposal cycle failed: {exc}',
+                      file=sys.stderr)
+        else:
+            try:
+                result['escalation'] = run_escalation_only(
+                    repo_root, registry_path=args.registry,
+                )
+            except Exception as exc:  # noqa: BLE001 — must never wedge the timer
+                print(f'main_suite_guardian: shadow escalation failed: {exc}',
                       file=sys.stderr)
         # Stage bookkeeping (window closing, GRADUATION, L8 card) runs at EVERY
         # stage, including 0. Gating it on `eff_stage >= 1` made Stage 0 a dead

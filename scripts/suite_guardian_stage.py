@@ -169,6 +169,10 @@ def _empty_state() -> dict[str, Any]:
         'penalty_at': None,
         'penalty_at_run': None,
         'l8_card_filed_at': None,
+        # {"<target_stage>": {"at": iso, "floor": <run|null>}} — a graduation
+        # already ASKED at this evidence floor is never re-asked, so a decline
+        # stays declined instead of re-filing every night (see emit_graduation).
+        'graduation_asked': {},
     }
 
 
@@ -409,12 +413,36 @@ def emit_graduation(
     *,
     penalty_cause: Optional[str] = None,
     chat_id: Optional[int] = None,
+    state_path: Optional[Path] = None,
+    now: Optional[datetime] = None,
 ) -> Optional[dict[str, Any]]:
     """Emit the graduation approval card for ``candidate`` (from
     :func:`evaluate_graduation`). The card cites the ledger evidence and any prior
     downgrade cause (L10). On approval the dispatched Forge task runs
-    ``apply-graduation`` to open the config-only PR."""
+    ``apply-graduation`` to open the config-only PR.
+
+    Fires at most ONCE per (target stage, evidence floor). `_emit_card` dedups
+    only against a card that is currently PENDING, and resolving an approval
+    removes it from pending on REJECT as well as approve — so without this guard
+    a graduation Larry DECLINES is re-filed on the next run, and every run after
+    that, forever. That is a standing recurring nag, which is exactly what the
+    default-deny alert posture exists to prevent, and declining is a reasonable
+    thing to do (holding a component in shadow one more window is a legitimate
+    call). The sibling `maybe_emit_l8_card` already guards itself this way with
+    `l8_card_filed_at`; graduation had only the pending dedup.
+
+    Keyed on the L10 evidence floor as well as the stage, so a downgrade — which
+    resets the evidence Larry would be judging — legitimately re-asks. A plain
+    re-ask otherwise needs a human to clear `graduation_asked` in the stage
+    state, which is the point: a "no" should stay a no until something changes.
+    """
     target = candidate['target_stage']
+    p = state_path or stage_state_path()
+    state = load_stage_state(path=p)
+    floor = evidence_floor_run(state)
+    asked = (state.get('graduation_asked') or {}).get(str(target))
+    if isinstance(asked, dict) and asked.get('floor') == floor:
+        return None
     body = _render_graduation_body(candidate, penalty_cause)
     payload = {
         'task_id': _graduation_task_id(target),
@@ -434,7 +462,16 @@ def emit_graduation(
             f'other changes.'
         ),
     }
-    return _emit_card(payload, chat_id=chat_id)
+    entry = _emit_card(payload, chat_id=chat_id)
+    if entry is not None:
+        # Recorded only on a card that actually landed, so a failed emit
+        # (deps unavailable, Supabase down) retries next run instead of
+        # silently consuming the one ask.
+        state.setdefault('graduation_asked', {})[str(target)] = {
+            'at': _now_iso(now), 'floor': floor,
+        }
+        save_stage_state(state, path=p)
+    return entry
 
 
 def _render_l8_body(evidence: dict[str, Any], parked: list[str]) -> str:

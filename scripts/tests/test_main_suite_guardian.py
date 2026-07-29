@@ -594,7 +594,7 @@ class StageMaintenanceGateTest(unittest.TestCase):
     """
 
     def _run(self, eff_stage, status=g.RUN_RED):
-        calls = {'maintenance': 0, 'proposal': 0}
+        calls = {'maintenance': 0, 'proposal': 0, 'escalation': 0}
 
         def _maint(*_a, **_k):
             calls['maintenance'] += 1
@@ -603,10 +603,15 @@ class StageMaintenanceGateTest(unittest.TestCase):
             calls['proposal'] += 1
             return {}
 
+        def _esc(*_a, **_k):
+            calls['escalation'] += 1
+            return {'escalated': []}
+
         with mock.patch.object(g, 'run_guardian', return_value={'status': status}), \
              mock.patch.object(g.stage, 'effective_stage', return_value=eff_stage), \
              mock.patch.object(g, '_run_stage_maintenance', _maint), \
              mock.patch.object(g, 'run_proposal_cycle', _prop), \
+             mock.patch.object(g, 'run_escalation_only', _esc), \
              mock.patch.object(g, 'load_registry', return_value=g.new_registry()):
             rc = g.main(['--repo-root', '/tmp/nonexistent', '--mode', 'shadow'])
         return rc, calls
@@ -618,6 +623,16 @@ class StageMaintenanceGateTest(unittest.TestCase):
         self.assertEqual(calls['maintenance'], 1)
         # ...but shadow is still shadow: no proposing, no dispatching.
         self.assertEqual(calls['proposal'], 0)
+        # ...and it CAN speak: the notify-only half runs.
+        self.assertEqual(calls['escalation'], 1)
+
+    def test_stage_one_does_not_double_escalate(self):
+        # At Stage 1+ `run_proposal_cycle` already does the episode-reset and
+        # escalation halves. Running the shadow path too would mean two
+        # independent registry read/write passes racing in one cycle.
+        _rc, calls = self._run(1)
+        self.assertEqual(calls['proposal'], 1)
+        self.assertEqual(calls['escalation'], 0)
 
     def test_stage_one_runs_both(self):
         _rc, calls = self._run(1)
@@ -630,6 +645,82 @@ class StageMaintenanceGateTest(unittest.TestCase):
         _rc, calls = self._run(1, status=g.RUN_INFRA_FLAKE)
         self.assertEqual(calls['maintenance'], 0)
         self.assertEqual(calls['proposal'], 0)
+        self.assertEqual(calls['escalation'], 0)
+
+
+class ShadowEscalationTest(unittest.TestCase):
+    """Stage 0 may SAY a test is broken; it still may not ACT on one.
+
+    Escalation proposes nothing, dispatches nothing, merges nothing and touches no
+    config — so gating it behind Stage 1 only meant the guardian could not report a
+    break until a human had already extended trust to a component they had never
+    seen do the job.
+    """
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.reg_path = Path(self._tmp.name) / 'registry.json'
+        self.paged = []
+
+    def _deps(self, boom=False):
+        def _esc(*, test_id, entry):
+            if boom:
+                raise RuntimeError('DM down')
+            self.paged.append(test_id)
+        return types.SimpleNamespace(escalate=_esc)
+
+    def _seed(self, **over):
+        reg = g.new_registry()
+        entry = {'classification': g.CLS_GENUINE_BREAK, 'consecutive_red_runs': 2,
+                 'consecutive_green_runs': 0, 'break_escalated': False}
+        entry.update(over)
+        reg['tests']['t.C.m'] = entry
+        g.save_registry(self.reg_path, reg)
+        return reg
+
+    def _run(self, **kw):
+        return g.run_escalation_only('/tmp/nope', registry_path=self.reg_path,
+                                     deps=self._deps(**kw))
+
+    def test_genuine_break_pages_in_shadow(self):
+        self._seed()
+        out = self._run()
+        self.assertEqual(self.paged, ['t.C.m'])
+        self.assertEqual(out['escalated'], ['t.C.m'])
+        # latched, so it pages exactly once per episode
+        self.assertTrue(g.load_registry(self.reg_path)['tests']['t.C.m']
+                        ['break_escalated'])
+
+    def test_second_run_does_not_re_page(self):
+        self._seed()
+        self._run()
+        self._run()
+        self.assertEqual(self.paged, ['t.C.m'])
+
+    def test_green_victim_rearms_for_a_new_episode(self):
+        self._seed(break_escalated=True, consecutive_red_runs=0)
+        self._run()
+        self.assertFalse(g.load_registry(self.reg_path)['tests']['t.C.m']
+                         ['break_escalated'])
+
+    def test_backlog_and_one_night_breaks_do_not_page(self):
+        self._seed(classification=g.CLS_BACKLOG)
+        self.assertEqual(self._run()['escalated'], [])
+        self._seed(consecutive_red_runs=1)   # one night only
+        self.assertEqual(self._run()['escalated'], [])
+        self.assertEqual(self.paged, [])
+
+    def test_a_failed_page_is_retried_not_swallowed(self):
+        # If the DM/alert throws, the latch must stay UNSET so the next run
+        # tries again — a lost page is the failure this whole PR is about.
+        self._seed()
+        out = g.run_escalation_only('/tmp/nope', registry_path=self.reg_path,
+                                    deps=self._deps(boom=True))
+        self.assertEqual(out['escalated'], [])
+        self.assertFalse(g.load_registry(self.reg_path)['tests']['t.C.m']
+                         .get('break_escalated'))
+        self.assertEqual(self._run()['escalated'], ['t.C.m'])
 
 
 if __name__ == '__main__':

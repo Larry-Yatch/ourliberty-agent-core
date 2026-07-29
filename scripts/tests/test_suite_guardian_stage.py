@@ -347,5 +347,68 @@ class L4ScopeGateTest(unittest.TestCase):
         self.assertEqual(out['merge_outcome'], 'held_scope_fail_closed')
 
 
+
+class GraduationAskOnceTest(unittest.TestCase):
+    """A DECLINED graduation must stay declined.
+
+    `_emit_card` dedups only against a card that is currently PENDING, and
+    resolving an approval removes it from pending on REJECT as well as approve —
+    so without a persisted marker the card re-files on the next run, and every
+    run after that, forever. Declining is a legitimate call (holding a component
+    in shadow one more window), so it must not become a nightly nag. The sibling
+    `maybe_emit_l8_card` already guards itself this way.
+    """
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.state = Path(self._tmp.name) / 'stage-state.json'
+        self.emits = []
+
+        def _fake_emit(payload, *, chat_id=None):
+            self.emits.append(payload['task_id'])
+            return {'id': payload['task_id']}
+
+        p = mock.patch.object(stage, '_emit_card', _fake_emit)
+        p.start()
+        self.addCleanup(p.stop)
+
+    def _candidate(self, target=1):
+        return {'target_stage': target, 'evidence': {'completed_runs': 17},
+                'dial_note': None}
+
+    def test_second_run_does_not_refile(self):
+        first = stage.emit_graduation(self._candidate(), state_path=self.state)
+        self.assertIsNotNone(first)
+        second = stage.emit_graduation(self._candidate(), state_path=self.state)
+        self.assertIsNone(second)          # the nag that used to fire nightly
+        self.assertEqual(len(self.emits), 1)
+
+    def test_failed_emit_does_not_consume_the_ask(self):
+        # deps unavailable / Supabase down => _emit_card returns None. That must
+        # NOT burn the one ask, or a transient outage silences graduation forever.
+        with mock.patch.object(stage, '_emit_card', lambda payload, *, chat_id=None: None):
+            self.assertIsNone(stage.emit_graduation(self._candidate(),
+                                                    state_path=self.state))
+        self.assertIsNotNone(stage.emit_graduation(self._candidate(),
+                                                   state_path=self.state))
+
+    def test_a_downgrade_re_asks(self):
+        # The evidence floor moving (L10 reset) changes what Larry would be
+        # judging, so a fresh ask is legitimate.
+        stage.emit_graduation(self._candidate(), state_path=self.state)
+        st = stage.load_stage_state(path=self.state)
+        st['penalty_at_run'] = 42          # downgrade lands, floor moves
+        stage.save_stage_state(st, path=self.state)
+        self.assertIsNotNone(stage.emit_graduation(self._candidate(),
+                                                   state_path=self.state))
+        self.assertEqual(len(self.emits), 2)
+
+    def test_a_different_target_stage_is_its_own_ask(self):
+        stage.emit_graduation(self._candidate(1), state_path=self.state)
+        self.assertIsNotNone(stage.emit_graduation(self._candidate(2),
+                                                   state_path=self.state))
+
+
 if __name__ == '__main__':
     unittest.main()
