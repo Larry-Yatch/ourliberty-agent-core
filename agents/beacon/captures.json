@@ -2128,6 +2128,40 @@
         "from_state": "dropped"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "cap-check-0-reject-a-tier-4-classification-not-prece-fd54",
+      "title": "Check 0: reject a Tier-4 classification not preceded by a same-iter triage-alert call",
+      "note": "Build the runtime check that runbooks/cycle-prompt.md:177 deferred.\n\nWHY NOW: line 175 already states the rule in prose ('the helper's classification is AUTHORITATIVE ... the helper wins \u2014 Pulse adopts the helper's tier, not Tier 4'). Line 177 predicted this exact failure ('a future Pulse session skips the helper call and re-derives Tier 4 in-prompt'), named this check as the fix, deferred it, and bet on prose + Mirror's doctrine-of-doctrine review instead. On 2026-07-29 the bet lost.\n\nTHE INCIDENT: Pulse's cycle LLM called scripts/alert_triage_state.py triage-alert on a medic/medic-diagnosis alert, observed tier=3, then hand-wrote Tier 4 in the cycle because 'there was no translation match visible to me' \u2014 the helper had already matched against config the LLM cannot see. config/alert-translations.json carries medic|medic-diagnosis (tier FYI, severity INFO) since PR #515, so this is NOT a config gap. A spurious Tier 4 fires a tier-reset and adds a false intervention count to the PRIME DIRECTIVE ledger.\n\nBUILD: Check 0 rejects a Tier-4 classification that was not preceded by a same-iter triage-alert call for that same alert; on rejection, fall back to the helper's returned tier. Failure mode to design against: the check must not silently pass when the helper call is missing (fail toward the helper, never toward Tier 4).\n\nDO NOT re-file the prose clause. Approval cycle-prompt-tier4-no-upgrade-clause-001 was REJECTED 2026-07-29 for restating line 175 verbatim; more emphatic prose to the same LLM that already ignored it is not a fix.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "main",
+        "captured_at": "2026-07-29T19:09:06.126317+00:00"
+      },
+      "last_touched": "2026-07-29T19:09:06.126317+00:00",
+      "promoted_to": null,
+      "spawned": {
+        "kind": "delegate",
+        "task_id": "delegate-cap-check-0-reject-a-tier-4-classification-not-prece-fd54",
+        "stamped_at": "2026-07-29T19:12:06.318215+00:00"
+      },
+      "briefing": {
+        "what": "A safety catch that stops our automated system from crying wolf \u2014 flagging a fake emergency when nothing's actually wrong.",
+        "why": "Right now it occasionally logs false alarms that pollute our records and make it harder to trust the system's judgment when a real problem hits.",
+        "suggest": "Go ahead and build it \u2014 it's a small, low-stakes fix that closes a known gap we've already watched cause trouble once."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T19:12:41.009351+00:00",
+        "from_state": "parked"
+      }
     }
   ]
 }
