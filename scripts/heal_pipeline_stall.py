@@ -465,6 +465,13 @@ _DEFAULT_RE_DM_HOURS = {
     'pr_no_mirror_dispatch': 24,
     'mirror_pass_unmerged': 24,
     'unrouted_open_pr': 24,
+    # Check 12's escalation fires when a checkout has NOT caught up past
+    # SYNC_LAG_STALL_MIN — i.e. the sync itself is wedged. That is an
+    # infrastructure outage measured in hours, not the minutes-long condition
+    # the flat 1h ALERT_DEDUP_HOURS is sized for, so without an episode window
+    # one stuck sync re-DMs Larry every hour all night for a single unchanged
+    # fact. Same reasoning as the slow-PR checks above.
+    'dag_preflight_sync_lag': 24,
 }
 
 
@@ -2926,6 +2933,11 @@ def check_dag_preflight_sync_lag(state: dict) -> list[dict]:
                 f'`git -C <checkout> rev-list --count HEAD..origin/main`. '
                 f'Once it has, the preflight re-dispatches on the next tick.'
             ),
+            # Episode dedup: alert on onset, then stay quiet while the SAME
+            # wedged sync persists. Only the escalation branch takes this — the
+            # caught-up/re-dispatch branch keys separately and must stay on the
+            # tight window so a cleared lag is re-dispatched promptly.
+            're_dm_hours': re_dm_hours_for('dag_preflight_sync_lag'),
         })
     return alerts
 
