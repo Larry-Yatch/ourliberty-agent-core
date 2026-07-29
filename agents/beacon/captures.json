@@ -2270,7 +2270,7 @@
       "id": "cap-six-live-defects-in-merged-1052-dag-preflight-sy-cbb3",
       "title": "Six live defects in merged #1052 DAG-preflight sync-lag arc",
       "note": "All six are in merged main (89a8bd9c) and were found by my round-2 /code-review high on #1052 plus one after merge; the deep-review session that merged it reviewed the same head independently and never saw them. Its source_agent fix (f8d0f654) moved two from latent to live by making the healer a real sequence-file writer for the first time. Priority order. (1) heal_pipeline_stall._append_sequence_audit does an UNLOCKED read-modify-write on sequence files, which the notifier/advancer/Beacon also RMW; lost-update demonstrated both directions, and losing a dag-preflight-sync-lag-detected entry means Check 12 silently never arms. atomic_io.locked_update is the helper; note its caveat that all writers of a path must migrate together. (2) outbox_notifier._dag_revision_is_sync_lag diverts only on SPEC_DOC_BEHIND_ORIGIN, but check_spec_doc_presence never fetches - it reads the local refs/remotes/origin/main - so a spec that IS merged on a stale-ref checkout classifies not_authored, falls through to Beacon's amend path, and tells someone to re-author a spec that already exists (the incident-2026-06-10 class). Proven with real git, no mocks. Fix is fetch-then-classify, or adopt whatever refreshing entry point agent-core #1053 settles on - coordinate with that PR first. (3) check_stalled_pending_sequence and check_dag_preflight_sync_lag double-fire with contradictory diagnoses when a sequence moves from amend path to sync-lag path; Check 9 reports an inflated age and still spends its one-attempt budget re-routing an amend request for something now operational. (4) _recover_dag_preflight_sync_lag derives its -synclagN round counter by counting dag-preflight-sync-lag-cleared entries, the very entry whose write failure defines the degraded path, so the suffix cannot advance there and recreates the permanent-disarm it was added to prevent. (5) acted_after_revision counts ANY newer audit entry as evidence Beacon acted, so a human note masks the no-op-resolution detector; the real rsdpm-m14-001 file carries exactly that shape. (6) Check 12's escalation sets no re_dm_hours, so a wedged sync re-DMs hourly - the pattern config/pipeline-stall-rules.json calls the dominant false-alert source. Full detail with reproductions in two comments on agent-core PR #1053. Do not start until #1053 lands; it changes how often this arc fires and may rename the classifier entry point.",
-      "state": "parked",
+      "state": "dropped",
       "label": null,
       "origin": {
         "source": "desktop-chat",
@@ -2282,17 +2282,17 @@
       "last_touched": "2026-07-29T19:44:53.217288+00:00",
       "promoted_to": null,
       "briefing": {
-        "what": "A batch of six flaws was found in the automated safety-net that's supposed to catch and flag stalls in our operations pipeline.",
-        "why": "Left unfixed, that safety-net can quietly miss real problems while also firing repeated false alarms \u2014 undermining the very trust it exists to provide.",
-        "suggest": "Hold off for now and schedule these fixes deliberately once a closely related decision settles, rather than moving before the ground is stable."
+        "what": "Our automated safety-net has six flaws that can make it miss real problems while also crying wolf \u2014 pinging people hourly about issues that are already fine and telling them to redo work that's already done.",
+        "why": "It quietly erodes trust in the whole warning system: if it misses genuine failures and spams false alarms, the team starts ignoring it, which defeats the purpose of having it.",
+        "suggest": "Worth fixing, but hold off starting until a related piece of work lands first, since that could change the approach \u2014 line it up now and move once the coast is clear."
       },
       "risk": "careful",
       "recommended_action": "delegate",
       "briefing_provenance": {
         "by": "beacon",
         "model": "claude-opus-4-8",
-        "at": "2026-07-29T19:52:52.014830+00:00",
-        "from_state": "parked"
+        "at": "2026-07-29T22:14:23.163128+00:00",
+        "from_state": "dropped"
       },
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     },
