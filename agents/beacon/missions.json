@@ -15749,7 +15749,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-29T23:14:06.653018+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-29T23:05:09.512953+00:00"
+      "orphan_last_activity_ts": "2026-07-29T23:05:09.512953+00:00",
+      "briefing": {
+        "what": "A piece of work your team started on their own that hasn't been tied to any of your active priorities yet.",
+        "why": "It's been sitting and waiting for your sign-off, so it's stalled until someone decides whether it's worth finishing.",
+        "suggest": "Before green-lighting it, ask what problem it solves and whether it fits your current priorities \u2014 since it isn't linked to anything, it's worth a quick look rather than an automatic yes."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-29T23:14:58.839389+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
