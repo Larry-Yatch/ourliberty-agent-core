@@ -1048,10 +1048,20 @@ def _cli(argv: list[str]) -> int:
             'is reported without moving the tree.'
         ),
     )
+    # Pull `--no-refresh` out of argv BEFORE argparse sees it. argparse cannot
+    # interleave an optional with a `nargs='+'` positional: the positional
+    # greedily takes the subcommand, the flag parses, and the trailing sequence
+    # argument has nowhere to go — so `check-spec-doc --no-refresh <seq>` died
+    # with `unrecognized arguments: <seq>`, blaming the file rather than the
+    # placement. Extracting it first makes every position work. It stays
+    # REGISTERED on the parser above purely so `--help` documents it.
+    no_refresh = '--no-refresh' in argv
+    argv = [a for a in argv if a != '--no-refresh']
+
     parsed = parser.parse_args(argv)
     raw_args = parsed.args
 
-    if parsed.no_refresh and not (
+    if no_refresh and not (
             len(raw_args) == 2 and raw_args[0] == 'check-spec-doc'):
         # Fail loudly rather than accepting a flag that would do nothing —
         # a silently-ignored --no-refresh reads as "the tree is safe".
@@ -1063,8 +1073,7 @@ def _cli(argv: list[str]) -> int:
         seq_id = raw_args[1]
         path = DEFAULT_BLACKBOARD_DIR / f'{seq_id}.json'
     elif len(raw_args) == 2 and raw_args[0] == 'check-spec-doc':
-        return _cli_check_spec_doc(
-            raw_args[1], refresh=not parsed.no_refresh)
+        return _cli_check_spec_doc(raw_args[1], refresh=not no_refresh)
     elif len(raw_args) == 1:
         path = Path(raw_args[0])
     else:

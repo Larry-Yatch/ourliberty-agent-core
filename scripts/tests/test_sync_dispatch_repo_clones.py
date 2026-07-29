@@ -21,6 +21,7 @@ import json
 import subprocess
 import sys
 import tempfile
+from unittest import mock
 import unittest
 from pathlib import Path
 
@@ -228,20 +229,86 @@ class LiveConfigTest(unittest.TestCase):
             self.assertTrue(path.startswith('/'), f'{repo} path not absolute')
 
     def _granted_paths(self, unit_name: str) -> list[str]:
+        """Every path the unit grants write to.
+
+        systemd ACCUMULATES repeated `ReadWritePaths=` directives, so this
+        reads all of them, not just the first. Taking only the first would
+        mis-report a grant that someone added on a fresh line — the natural
+        way to extend an allowlist that is already a dozen entries long — and
+        fail a config that is in fact correct."""
         unit = (Path(sdrc.__file__).resolve().parent.parent
                 / 'systemd' / unit_name)
         self.assertTrue(
             unit.is_file(),
-            f'{unit_name} is listed in FF_CAPABLE_UNITS but has no unit file '
-            f'at {unit} — the allowlist below cannot be checked for it')
-        rw_line = next(
-            (l for l in unit.read_text().splitlines()
-             if l.startswith('ReadWritePaths=')), None)
-        self.assertIsNotNone(
-            rw_line,
+            f'{unit_name} is listed in FF_CAPABLE_UNITS/FF_EXCLUDED_UNITS but '
+            f'has no unit file at {unit} — its allowlist cannot be checked')
+        rw_lines = [l for l in unit.read_text().splitlines()
+                    if l.startswith('ReadWritePaths=')]
+        self.assertTrue(
+            rw_lines,
             f'{unit_name} has no ReadWritePaths= line; if its sandbox changed '
             f'shape, this invariant needs rechecking, not skipping')
-        return rw_line.split('=', 1)[1].split()
+        granted: list[str] = []
+        for line in rw_lines:
+            granted.extend(line.split('=', 1)[1].split())
+        return granted
+
+    def _syncable(self) -> dict:
+        syncable = {repo: path
+                    for repo, path in sdrc.load_repo_paths().items()
+                    if repo not in sdrc.SELF_SYNCED_REPOS}
+        self.assertTrue(syncable, 'expected at least one syncable repo')
+        return syncable
+
+    def test_multi_line_read_write_paths_are_all_collected(self):
+        """systemd accumulates repeated ReadWritePaths=; so must we.
+
+        Reading only the first line would fail a correct config the moment
+        someone extends an allowlist by adding a line instead of editing a
+        twelve-entry one — a false alarm pointing at a non-problem."""
+        unit = (Path(sdrc.__file__).resolve().parent.parent / 'systemd'
+                / 'ourliberty-sync-dispatch-repos.service')
+        text = unit.read_text().replace(
+            'ReadWritePaths=/home/larry/ourliberty-dashboard',
+            'ReadWritePaths=/home/larry/ourliberty-dashboard\n'
+            'ReadWritePaths=/home/larry/SPLIT-ACROSS-LINES', 1)
+        td = tempfile.TemporaryDirectory()
+        self.addCleanup(td.cleanup)
+        tmp = Path(td.name)
+        (tmp / 'systemd').mkdir()
+        (tmp / 'systemd' / 'probe.service').write_text(text)
+        with mock.patch.object(
+                sdrc, '__file__', str(tmp / 'scripts' / 'x.py')):
+            granted = self._granted_paths('probe.service')
+        # Both the original line's entries AND the appended line's are seen.
+        self.assertIn('/home/larry/RSDPM', granted)
+        self.assertIn('/home/larry/SPLIT-ACROSS-LINES', granted)
+
+    def test_excluded_units_are_not_granted_write(self):
+        """The deliberate exclusions must stay exclusions.
+
+        ourliberty-beacon-bot reaches sync_one via the chat-approve kickoff but
+        is intentionally denied write on the product checkouts (see
+        FF_EXCLUDED_UNITS for the measurement behind that call). Pinning it here
+        means a later grant fails this test, forcing whoever makes it to move
+        the unit into FF_CAPABLE_UNITS as a conscious decision rather than
+        quietly widening the outward-facing bot's reach."""
+        for unit_name in sdrc.FF_EXCLUDED_UNITS:
+            granted = self._granted_paths(unit_name)
+            for repo, path in self._syncable().items():
+                self.assertNotIn(
+                    path, granted,
+                    f'{unit_name} now grants write to {repo} ({path}). If that '
+                    f'is intended, MOVE it to FF_CAPABLE_UNITS — an ff-capable '
+                    f'unit must be covered by the grants-write invariant, not '
+                    f'sitting in the excluded list claiming it cannot write')
+
+    def test_capable_and_excluded_unit_lists_are_disjoint(self):
+        """A unit cannot be both, and every reachable unit needs a verdict."""
+        self.assertFalse(
+            set(sdrc.FF_CAPABLE_UNITS) & set(sdrc.FF_EXCLUDED_UNITS),
+            'a unit listed as both ff-capable and ff-excluded has no defined '
+            'expectation — the two invariants would contradict each other')
 
     def test_unit_grants_write_to_every_syncable_repo(self):
         """A repo in repo_paths that a unit can't write to fails there alone.

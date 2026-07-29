@@ -1202,6 +1202,33 @@ class SpecDocSyncLagSelfHealTest(unittest.TestCase):
         self.assertIn('REFRESH: skipped — --no-refresh', proc.stderr)
         self.assertNotIn('advanced', proc.stderr)
 
+    def test_no_refresh_works_in_every_argument_position(self):
+        """argparse cannot interleave an optional with a `nargs='+'`
+        positional, so `check-spec-doc --no-refresh <seq>` used to die with
+        `unrecognized arguments: <seq>` — blaming the sequence file for the
+        flag's placement. All three orderings must behave identically."""
+        head = self._git(self.checkout, 'rev-parse', 'HEAD')
+        seq = self._seq_file('RSDPM')
+        placements = (
+            ['check-spec-doc', str(seq), '--no-refresh'],   # trailing
+            ['--no-refresh', 'check-spec-doc', str(seq)],   # leading
+            ['check-spec-doc', '--no-refresh', str(seq)],   # interleaved
+        )
+        for argv in placements:
+            with self.subTest(placement=argv):
+                proc = subprocess.run(
+                    [sys.executable, str(self.script), *argv],
+                    capture_output=True, text=True, timeout=90,
+                    env={**self._git_env,
+                         bsv.SPEC_DOC_REPO_ROOT_ENV: str(self.checkout)},
+                )
+                self.assertEqual(proc.returncode, 3, msg=proc.stderr)
+                self.assertIn('REFRESH: skipped — --no-refresh', proc.stderr)
+                self.assertNotIn('unrecognized arguments', proc.stderr)
+                # Suppression held in every ordering — nothing moved.
+                self.assertEqual(
+                    self._git(self.checkout, 'rev-parse', 'HEAD'), head)
+
     def test_no_refresh_is_rejected_on_the_other_cli_forms(self):
         """A flag that silently does nothing reads as 'the tree is safe'."""
         seq = self._seq_file('RSDPM')

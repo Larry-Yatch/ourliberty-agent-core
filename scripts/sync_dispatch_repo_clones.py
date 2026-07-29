@@ -100,6 +100,35 @@ FF_CAPABLE_UNITS = (
     'ourliberty-outbox-notifier.service',      # hosts the build-sequence kickoff
 )
 
+# Units that CAN reach `sync_one` but are deliberately NOT granted write to the
+# dispatch-repo checkouts. The refresh is a no-op there — `sync_one` returns
+# `error — fetch failed: … Read-only file system` and the caller falls back to
+# exactly the behaviour it had before the self-heal existed.
+#
+# `ourliberty-beacon-bot.service` reaches it through the chat-approve kickoff
+# (`beacon_approval_handler.dispatch_approved` → `apply_kickoff_transition`).
+# It is excluded ON PURPOSE. The bot is the fleet's outward-facing process, and
+# granting it git-write on a product checkout is a permanent widening of what a
+# bug or a compromise there can touch.
+#
+# MEASURED before deciding (2026-07-29, ~3 months of logs), because two common
+# halves are not a common intersection:
+#   - sequences activate via the Mirror DAG-preflight PASS path ......... 71×
+#   - `apply_kickoff_transition` (the path this would serve) ran ......... 2×
+#     …both for agent-core, which `sync_one` skips by design → 0 usable
+#   - the Telegram `approve sequence` tap was attempted .................. 1×
+#     …and failed on a not-authored spec, not a sync-lag
+# So the combination the grant would buy has never once occurred.
+#
+# Consequence, accepted: on that path a behind-origin checkout still defers, and
+# the operator still gets the DM naming the syncer that can advance it. If that
+# ever becomes a real cost, the fix is to move the unit into FF_CAPABLE_UNITS
+# *and* grant the paths — `test_excluded_units_are_not_granted_write` fails the
+# moment someone grants without moving, so the decision cannot be made silently.
+FF_EXCLUDED_UNITS = (
+    'ourliberty-beacon-bot.service',           # chat-approve kickoff — see above
+)
+
 
 @dataclass
 class RepoOutcome:

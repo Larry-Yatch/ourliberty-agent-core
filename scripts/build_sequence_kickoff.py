@@ -406,6 +406,16 @@ def apply_kickoff_transition(
     # noticed (rsdpm-m11-001, rsdpm-m14-001 — both behind by exactly 1 commit).
     # The refresh is ff-only and declines a tree in use, so a failure to
     # advance simply leaves the deferral that was already happening.
+    #
+    # NOT effective on BOTH entry paths, deliberately. The chat/dashboard
+    # approve path reaches here from `ourliberty-beacon-bot.service`, which is
+    # denied write on the product checkouts on purpose — the refresh returns
+    # `error — fetch failed: … Read-only file system` there and the deferral
+    # stands (with the DM naming the syncer to run). See `FF_EXCLUDED_UNITS` in
+    # sync_dispatch_repo_clones for the measurement behind that call: this
+    # function has run twice in three months, both for agent-core, which the
+    # refresh skips anyway. The load-bearing copy of this self-heal is the one
+    # in `check-spec-doc`, which is what Mirror's preflight actually runs.
     if presence.status == bsv.SPEC_DOC_BEHIND_ORIGIN:
         refresh_line = bsv.refresh_checkout(spec_repo_name, spec_repo_root)
         if refresh_line is not None:
