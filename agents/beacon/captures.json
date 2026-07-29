@@ -2031,7 +2031,7 @@
       "id": "cap-title-f1a1",
       "title": "--title",
       "note": "RSDPM: Confirm-all implicitly confirms MEDIUM-confidence records via the parent closure",
-      "state": "parked",
+      "state": "dropped",
       "label": null,
       "origin": {
         "source": "desktop-chat",
@@ -2043,23 +2043,24 @@
       "last_touched": "2026-07-28T23:17:29.259324+00:00",
       "promoted_to": null,
       "briefing": {
-        "what": "When someone approves everything at once, records the system was only moderately sure about get waved through along with the confident ones.",
-        "why": "It means bulk approvals can quietly let in less-certain information, which could erode trust in the data your team relies on.",
-        "suggest": "Worth a quick look but no rush \u2014 consider having the moderately-sure records call for a second glance before they're accepted."
+        "what": "When you use the 'approve everything' button, it also signs off on records the system was only moderately sure about, not just the ones it's confident in.",
+        "why": "That means some uncertain entries could be treated as fully verified without anyone giving them a second look, which could let small errors slip through unnoticed.",
+        "suggest": "Worth a quick look when you have a moment \u2014 consider whether the moderately-sure items should get their own confirmation step before being accepted."
       },
       "risk": "safe",
       "recommended_action": "delegate",
       "briefing_provenance": {
         "by": "beacon",
         "model": "claude-opus-4-8",
-        "at": "2026-07-28T23:23:34.984788+00:00",
-        "from_state": "parked"
+        "at": "2026-07-29T00:24:14.415791+00:00",
+        "from_state": "dropped"
       },
       "spawned": {
         "kind": "delegate",
         "task_id": "delegate-cap-title-f1a1",
         "stamped_at": "2026-07-28T23:33:08.530985+00:00"
-      }
+      },
+      "drop_reason": "Decided and implemented in RSDPM #151 (option a) \u2014 coverage is now ancestor-closed, so the bulk verb cannot confirm an out-of-tier parent."
     }
   ]
 }
