@@ -3751,6 +3751,218 @@ class TestStalledPendingSequence(_TempAgentsRootMixin, unittest.TestCase):
         self.hps.record_alert(state, a1['key'])
         self.assertFalse(self.hps.should_alert(state, a1['key']))
 
+    # ---- rsdpm-m14-001 (2026-07-28): `resolved` must mean something ----
+
+    @staticmethod
+    def _resolved(minutes_ago):
+        return {
+            'ts': _iso(minutes_ago),
+            'event': 'dag-preflight-revision-resolved',
+            'actor': 'beacon',
+        }
+
+    @staticmethod
+    def _amend(minutes_ago):
+        return {
+            'ts': _iso(minutes_ago),
+            'event': 'dag-preflight-revision-amend',
+            'actor': 'beacon',
+            'reason': 'serialized s2 behind s1',
+        }
+
+    def test_resolution_without_amend_alerts_and_does_not_recover(self) -> None:
+        """Beacon declared the revision `resolved` but changed nothing and
+        never re-dispatched (rsdpm-m14-001). Re-routing the SAME revision to
+        her is provably useless — she already looked. Escalate instead."""
+        self._write_seq(
+            'noop-seq', status='pending',
+            audit=[self._rev(45), self._resolved(20)],
+        )
+        alerts = self.hps.check_stalled_pending_sequence({})
+        self.assertEqual(len(alerts), 1)
+        a = alerts[0]
+        self.assertIsNone(
+            a.get('recovery'),
+            'a no-op resolution must NOT re-route to the amend path',
+        )
+        self.assertEqual(
+            a['subject'], 'stalled-pending-sequence:noop-seq',
+        )
+        self.assertIn('resolved', a['message'])
+
+    def test_resolution_with_amend_still_recovers(self) -> None:
+        """Beacon DID amend the file but the re-dispatch never landed — the
+        amend path owns this one, so the re-route is still the right first
+        move."""
+        self._write_seq(
+            'amended-seq', status='pending',
+            audit=[self._rev(45), self._amend(40), self._resolved(38)],
+        )
+        alerts = self.hps.check_stalled_pending_sequence({})
+        self.assertEqual(len(alerts), 1)
+        self.assertIsNotNone(alerts[0].get('recovery'))
+
+    def test_recovery_is_bounded_and_then_alerts(self) -> None:
+        """The silence itself: `_recover_stalled_sequence` returns True on
+        'notify written', the run loop stamps the cooldown, and the next
+        window re-attempts — forever. rsdpm-v0-001 burned 11 rounds over
+        10.5h without one Larry alert. Bound it: after the attempt budget,
+        the alert fires."""
+        self._write_seq('loop-seq', status='pending', audit=[self._rev(45)])
+        state: dict = {}
+        first = self.hps.check_stalled_pending_sequence(state)[0]
+        self.assertIsNotNone(first.get('recovery'))
+        # Simulate the run loop: the recovery ran and reported success.
+        with patch.object(self.hps, '_route_revision_notify_to_beacon',
+                          return_value=True):
+            self.assertTrue(first['recovery']())
+        second = self.hps.check_stalled_pending_sequence(state)[0]
+        self.assertIsNone(
+            second.get('recovery'),
+            'attempt budget exhausted — must fall through to a Larry alert',
+        )
+
+    def test_recovery_budget_rearms_on_a_fresh_revision_round(self) -> None:
+        """A NEW Mirror REVISION is a new round: the amend path deserves a
+        fresh attempt rather than inheriting the previous round's budget."""
+        self._write_seq('rearm-seq', status='pending', audit=[self._rev(45)])
+        state: dict = {}
+        first = self.hps.check_stalled_pending_sequence(state)[0]
+        with patch.object(self.hps, '_route_revision_notify_to_beacon',
+                          return_value=True):
+            self.assertTrue(first['recovery']())
+        self.assertIsNone(
+            self.hps.check_stalled_pending_sequence(state)[0].get('recovery'),
+        )
+        # Mirror re-reviewed and returned REVISION again → new routed entry.
+        self._write_seq(
+            'rearm-seq', status='pending',
+            audit=[self._rev(200, task='t1'), self._rev(45, task='t2')],
+        )
+        again = self.hps.check_stalled_pending_sequence(state)[0]
+        self.assertIsNotNone(again.get('recovery'))
+
+
+class TestDagPreflightSyncLag(_TempAgentsRootMixin, unittest.TestCase):
+    """Check 12 — a sequence parked on a Check 0 `BEHIND_ORIGIN` sync-lag.
+
+    The remediation is operational and mechanical: wait for the sync to
+    advance the checkout, then re-dispatch the DAG preflight. Recovery is
+    outcome-based — it fires only once the spec_doc is actually readable,
+    and the alert fires when the sync never advances."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.seqdir = self.agents_root / 'blackboard' / 'build-sequences'
+        self.seqdir.mkdir(parents=True, exist_ok=True)
+
+    def _write_seq(self, seq_id, status='pending', audit=None,
+                   spec_doc='specs/M14.md'):
+        seq = {
+            'seq_id': seq_id,
+            'status': status,
+            'spec_doc': spec_doc,
+            'steps': [],
+            'audit_log': audit or [],
+        }
+        (self.seqdir / f'{seq_id}.json').write_text(json.dumps(seq, indent=2))
+
+    @staticmethod
+    def _lag(minutes_ago, task='review-sequence-dag-seq'):
+        return {
+            'ts': _iso(minutes_ago),
+            'event': 'dag-preflight-sync-lag-detected',
+            'actor': 'outbox-notifier',
+            'mirror_task_id': task,
+            'spec_doc': 'specs/M14.md',
+            'behind_by': 1,
+        }
+
+    def _patch_presence(self, status):
+        import build_sequence_validator as bsv
+        return patch.object(
+            self.hps, '_spec_doc_presence_for',
+            return_value=bsv.SpecDocPresence(
+                status=status, spec_doc='specs/M14.md', message='m',
+            ),
+        )
+
+    def test_still_behind_within_threshold_is_silent(self) -> None:
+        import build_sequence_validator as bsv
+        self._write_seq('lag-seq', audit=[self._lag(5)])
+        with self._patch_presence(bsv.SPEC_DOC_BEHIND_ORIGIN):
+            self.assertEqual(self.hps.check_dag_preflight_sync_lag({}), [])
+
+    def test_still_behind_past_threshold_alerts(self) -> None:
+        import build_sequence_validator as bsv
+        self._write_seq('lag-seq', audit=[self._lag(45)])
+        with self._patch_presence(bsv.SPEC_DOC_BEHIND_ORIGIN):
+            alerts = self.hps.check_dag_preflight_sync_lag({})
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(
+            alerts[0]['subject'], 'dag-preflight-sync-lag:lag-seq',
+        )
+        self.assertIsNone(
+            alerts[0].get('recovery'),
+            'the sync is not advancing — nothing mechanical is left to try',
+        )
+
+    def test_spec_now_present_recovers_by_redispatching_preflight(self) -> None:
+        import build_sequence_validator as bsv
+        self._write_seq('lag-seq', audit=[self._lag(45)])
+        writer = MagicMock(return_value=Path('/tmp/review-seq-dag.json'))
+        with self._patch_presence(bsv.SPEC_DOC_PRESENT), \
+                patch.object(self.hps.safe_write_inbox, 'safe_write_inbox',
+                             writer):
+            alerts = self.hps.check_dag_preflight_sync_lag({})
+            self.assertEqual(len(alerts), 1)
+            recovery = alerts[0].get('recovery')
+            self.assertIsNotNone(recovery)
+            self.assertTrue(recovery())
+        # The preflight was re-dispatched to Mirror, in the exact shape the
+        # orchestrator uses (see ~/agents/inboxes/mirror/.archive/
+        # review-sequence-dag-rsdpm-m14-001.json).
+        self.assertEqual(writer.call_count, 1)
+        kwargs = writer.call_args.kwargs
+        self.assertEqual(kwargs['target_agent'], 'mirror')
+        task = kwargs['task_dict']
+        self.assertEqual(task['task_id'], 'review-sequence-dag-lag-seq')
+        self.assertEqual(task['prompt'], 'review-sequence-dag lag-seq')
+        self.assertEqual(task['task_type'], 'code-review')
+        self.assertEqual(task['phase'], 'routing-signal')
+        self.assertEqual(task['target_repo'], 'ourliberty-agent-core')
+        # …and the clearing signal disarms the check.
+        on_disk = json.loads((self.seqdir / 'lag-seq.json').read_text())
+        events = [e.get('event') for e in on_disk['audit_log']]
+        self.assertIn('dag-preflight-sync-lag-cleared', events)
+        with self._patch_presence(bsv.SPEC_DOC_PRESENT):
+            self.assertEqual(self.hps.check_dag_preflight_sync_lag({}), [])
+
+    def test_silent_once_preflight_passes(self) -> None:
+        import build_sequence_validator as bsv
+        self._write_seq(
+            'lag-seq', status='pending',
+            audit=[
+                self._lag(45),
+                {'ts': _iso(5), 'event': 'dag-preflight-pass-kickoff',
+                 'actor': 'outbox-notifier'},
+            ],
+        )
+        with self._patch_presence(bsv.SPEC_DOC_BEHIND_ORIGIN):
+            self.assertEqual(self.hps.check_dag_preflight_sync_lag({}), [])
+
+    def test_silent_for_active_sequence(self) -> None:
+        import build_sequence_validator as bsv
+        self._write_seq('lag-seq', status='active', audit=[self._lag(45)])
+        with self._patch_presence(bsv.SPEC_DOC_BEHIND_ORIGIN):
+            self.assertEqual(self.hps.check_dag_preflight_sync_lag({}), [])
+
+    def test_silent_outside_scan_window(self) -> None:
+        import build_sequence_validator as bsv
+        self._write_seq('lag-seq', audit=[self._lag(2 * 24 * 60)])
+        with self._patch_presence(bsv.SPEC_DOC_BEHIND_ORIGIN):
+            self.assertEqual(self.hps.check_dag_preflight_sync_lag({}), [])
+
 
 class TestStalledActiveStep(_TempAgentsRootMixin, unittest.TestCase):
     """Check 11 — an `active` sequence step stuck `dispatched` with no PR
