@@ -114,6 +114,15 @@ ALERT_TRANSLATIONS_FILE = _CONFIG_DIR / 'alert-translations.json'
 # only knew the 3 acted tiers. record_triage accepts all four.
 VALID_TIERS = (1, 2, 3, 4)
 
+# The least-harm tier the Tier-4 guard falls to when classify() cannot run at
+# all (alert JSON missing/unparseable). Tier 3 (silence→digest) fires NO
+# tier-reset and records NO intervention in the PRIME DIRECTIVE ledger, so a
+# guard that cannot see the alert defaults to the journal-only outcome rather
+# than a spurious Tier-4 novel-DM. It NEVER falls to Tier 4 — a false Tier 4 is
+# the exact failure this guard exists to prevent (fail toward the helper / the
+# lowest safe tier, never toward Tier 4).
+GUARD_FALLBACK_TIER = 3
+
 # Agent name stamped on a Tier-1 auto-fix dispatch row. The remediation is
 # acted by Pulse / existing healers (Phase B does not build a dispatcher); this
 # names the actor for the audit trail.
@@ -234,13 +243,20 @@ def _write_state(state: dict[str, dict[str, Any]]) -> None:
 
 def record_triage(alert_id: str, tier: int, decision: str,
                   rationale: str, route: Optional[str] = None,
-                  template: Optional[str] = None) -> dict[str, Any]:
+                  template: Optional[str] = None,
+                  last_triaged_iter: Optional[int] = None) -> dict[str, Any]:
     """Move (or initialize) ``alert_id`` to ``triaged-tier-N``.
     Overwrites prior triage decisions (re-triage is expected when an
     alert resurfaces). ``route`` is the delivery destination
     (escalate|closure|digest) stamped by Check 0 per § 6.6; ``template`` is the
-    registry action-template the signal mapped to (None for Tier 3/4). Returns
-    the post-mutation row."""
+    registry action-template the signal mapped to (None for Tier 3/4).
+
+    ``last_triaged_iter`` records the cycle iter this classification ran in. It
+    is the substrate the Tier-4 guard (``guard_tier4``) reads to prove a
+    ``triage-alert`` call actually happened THIS iter — a hand-rolled ``triage``
+    or a legacy/direct call leaves it None, which the guard treats as "no
+    same-iter call". A non-int (or bool) is normalized to None. Returns the
+    post-mutation row."""
     if not isinstance(alert_id, str) or not alert_id:
         raise ValueError('alert_id must be a non-empty string')
     if tier not in VALID_TIERS:
@@ -255,6 +271,10 @@ def record_triage(alert_id: str, tier: int, decision: str,
         'rationale': str(rationale),
         'route': route,
         'template': template,
+        'last_triaged_iter': (int(last_triaged_iter)
+                              if isinstance(last_triaged_iter, int)
+                              and not isinstance(last_triaged_iter, bool)
+                              else None),
         'status': f'triaged-tier-{tier}',
         'triaged_at': now,
         'dispatched_at': existing.get('dispatched_at'),
@@ -804,7 +824,7 @@ def triage_alert(alert_id: str, alert: dict[str, Any], *, iter_num: int = 0,
 
     record_triage(alert_id, tier=result['tier'], decision=result['decision'],
                   rationale=result['rationale'], route=result['route'],
-                  template=result['template'])
+                  template=result['template'], last_triaged_iter=iter_num)
 
     now = _now_iso()
     if result['tier'] == 1:
@@ -832,6 +852,100 @@ def triage_alert(alert_id: str, alert: dict[str, Any], *, iter_num: int = 0,
     return read_state()[alert_id]
 
 
+# -------------------- Tier-4 override guard (Check 0 authority) --------------------
+
+
+def guard_tier4(alert_id: str, alert: Optional[dict[str, Any]], *,
+                iter_num: Optional[int], claimed_tier: int,
+                registry: Optional[dict[str, dict[str, Any]]] = None,
+                translations: Optional[dict[str, Any]] = None,
+                route_fn: Optional[Callable[[str, Optional[str], bool], str]] = None,
+                ) -> dict[str, Any]:
+    """Structural gate making the deterministic helper authoritative over any
+    in-prompt Tier-4 classification.
+
+    A Tier-4 outcome is authoritative ONLY when BOTH hold:
+      (a) ``same_iter_call`` — a same-iter ``triage-alert`` row is recorded for
+          ``alert_id`` (its persisted ``last_triaged_iter`` equals ``iter_num``),
+          proving the helper was actually invoked THIS iter, AND
+      (b) ``helper_tier == 4`` — a FRESH deterministic ``classify()`` of the
+          alert also returns Tier 4.
+
+    ``accepted`` is true iff both hold; then ``authoritative_tier == 4``.
+    Otherwise ``authoritative_tier == helper_tier`` — the deterministic helper
+    wins (fail toward the helper). If ``classify()`` cannot run at all (alert
+    missing/unparseable), there is no helper tier, so the verdict falls to
+    ``GUARD_FALLBACK_TIER`` — NEVER Tier 4.
+
+    This is the mechanism closing the 2026-07-29 incident: the helper returned
+    Tier 3 on a ``medic/medic-diagnosis`` alert and the cycle LLM hand-wrote
+    Tier 4 anyway. Re-running the pure, data-driven ``classify()`` here means a
+    skipped OR overridden helper call can never yield a persisted Tier 4.
+
+    Pure: reads state + runs ``classify``; writes nothing. Returns
+    ``{authoritative_tier:int, accepted:bool, helper_tier:int,
+    same_iter_call:bool, reason:str}``."""
+    if not isinstance(alert_id, str) or not alert_id:
+        raise ValueError('alert_id must be a non-empty string')
+
+    # (a) Was a same-iter triage-alert call recorded for this alert?
+    row = read_state().get(alert_id)
+    last_iter = row.get('last_triaged_iter') if isinstance(row, dict) else None
+    same_iter_call = bool(
+        isinstance(last_iter, int) and not isinstance(last_iter, bool)
+        and isinstance(iter_num, int) and not isinstance(iter_num, bool)
+        and last_iter == iter_num)
+
+    # (b) Fresh deterministic helper tier. A missing/unparseable alert means
+    # classify() cannot run — fall to the safe tier, never Tier 4.
+    if not isinstance(alert, dict):
+        return {
+            'authoritative_tier': GUARD_FALLBACK_TIER,
+            'accepted': False,
+            'helper_tier': GUARD_FALLBACK_TIER,
+            'same_iter_call': same_iter_call,
+            'reason': ('alert missing/unparseable — classify() cannot run; '
+                       f'falling to safe Tier {GUARD_FALLBACK_TIER}, never Tier 4'),
+        }
+    reg = registry if registry is not None else load_registry()
+    trans = translations if translations is not None else load_translations()
+    try:
+        helper = classify(alert, registry=reg, translations=trans,
+                          route_fn=route_fn)
+        helper_tier = int(helper['tier'])
+    except Exception as e:  # noqa: BLE001 — a guard failure must never yield Tier 4
+        _log(f'guard_tier4: classify() failed for {alert_id!r}: '
+             f'{type(e).__name__}: {e}', 'WARN')
+        return {
+            'authoritative_tier': GUARD_FALLBACK_TIER,
+            'accepted': False,
+            'helper_tier': GUARD_FALLBACK_TIER,
+            'same_iter_call': same_iter_call,
+            'reason': (f'classify() failed ({type(e).__name__}); falling to safe '
+                       f'Tier {GUARD_FALLBACK_TIER}, never Tier 4'),
+        }
+
+    accepted = bool(helper_tier == 4 and same_iter_call)
+    if accepted:
+        reason = ('accepted: helper classify()==4 AND a same-iter triage-alert '
+                  f'call is recorded (iter={iter_num}) — genuine novel Tier 4')
+    elif helper_tier == 4:
+        reason = ('rejected: helper classify()==4 but NO same-iter triage-alert '
+                  f'call for iter={iter_num} (skip-helper/stale-iter) — persist '
+                  'Tier 4 via the triage-alert path, not an unguarded write')
+    else:
+        reason = (f'rejected: claimed Tier {claimed_tier} but helper '
+                  f'classify()=={helper_tier} — the deterministic helper is '
+                  f'authoritative; adopt Tier {helper_tier}')
+    return {
+        'authoritative_tier': 4 if accepted else helper_tier,
+        'accepted': accepted,
+        'helper_tier': helper_tier,
+        'same_iter_call': same_iter_call,
+        'reason': reason,
+    }
+
+
 # -------------------- CLI --------------------
 
 
@@ -841,8 +955,54 @@ def _cli_read(_args) -> int:
 
 
 def _cli_triage(args) -> int:
+    if args.tier == 4:
+        # Structural enforcement: a Tier-4 row is persistable ONLY through the
+        # guard. This low-level subcommand is the injection point that bypasses
+        # classify() entirely, so route its Tier-4 branch through guard_tier4.
+        # The guard needs the alert JSON + iter to re-run classify() and confirm
+        # a same-iter triage-alert call; both are required when --tier 4.
+        if args.alert is None or args.iter is None:
+            verdict = {
+                'authoritative_tier': GUARD_FALLBACK_TIER,
+                'accepted': False,
+                'helper_tier': GUARD_FALLBACK_TIER,
+                'same_iter_call': False,
+                'reason': ('triage --tier 4 requires --alert and --iter to run '
+                           'the guard; refusing to persist an unguarded Tier 4'),
+            }
+            print(json.dumps(verdict))
+            return 1
+        try:
+            alert = json.loads(args.alert)
+        except (json.JSONDecodeError, TypeError):
+            alert = None
+        verdict = guard_tier4(args.alert_id, alert, iter_num=args.iter,
+                              claimed_tier=4)
+        if not verdict['accepted']:
+            # Rejected: do NOT write the Tier-4 row. The verdict carries the
+            # authoritative (helper) tier for the caller to adopt.
+            print(json.dumps(verdict))
+            return 1
+        row = record_triage(args.alert_id, args.tier, args.decision,
+                            args.rationale, last_triaged_iter=args.iter)
+        print(json.dumps(row))
+        return 0
     row = record_triage(args.alert_id, args.tier, args.decision, args.rationale)
     print(json.dumps(row))
+    return 0
+
+
+def _cli_guard_tier4(args) -> int:
+    """Emit ONE JSON verdict on whether a claimed Tier-4 classification is
+    authoritative. Read-only (no writes); Pulse branches on ``accepted`` /
+    ``authoritative_tier``. A missing/unparseable --alert degrades to the safe
+    fallback tier, never Tier 4."""
+    try:
+        alert = json.loads(args.alert)
+    except (json.JSONDecodeError, TypeError):
+        alert = None
+    print(json.dumps(guard_tier4(args.alert_id, alert, iter_num=args.iter,
+                                 claimed_tier=args.claimed_tier)))
     return 0
 
 
@@ -904,6 +1064,12 @@ def main(argv: Optional[list[str]] = None) -> int:
     p_t.add_argument('--tier', required=True, type=int, choices=list(VALID_TIERS))
     p_t.add_argument('--decision', required=True)
     p_t.add_argument('--rationale', required=True)
+    p_t.add_argument('--alert',
+                     help='Alert object as JSON. REQUIRED when --tier 4 (the '
+                          'guard re-runs classify() on it); ignored otherwise.')
+    p_t.add_argument('--iter', type=int,
+                     help='Cycle iter. REQUIRED when --tier 4 (the guard checks '
+                          'a same-iter triage-alert call); ignored otherwise.')
     p_c = sub.add_parser('classify',
                          help='Print the § 6.6 tier+route for an alert (no writes).')
     p_c.add_argument('--alert', required=True, help='Alert object as JSON.')
@@ -917,6 +1083,17 @@ def main(argv: Optional[list[str]] = None) -> int:
                       help='Execution outcome to record for a Tier-1 fix. '
                            'Defaults to "unverified"; pass "success" ONLY from '
                            'a verifier path that ran a real probe.')
+    p_g = sub.add_parser('guard-tier4',
+                         help='Print a JSON verdict on whether a claimed Tier-4 '
+                              'classification is authoritative (accepted only '
+                              'when classify()==4 AND a same-iter triage-alert '
+                              'call). Never yields Tier 4 on a bad alert.')
+    p_g.add_argument('--alert-id', required=True)
+    p_g.add_argument('--alert', required=True, help='Alert object as JSON.')
+    p_g.add_argument('--iter', required=True, type=int)
+    p_g.add_argument('--claimed-tier', required=True, type=int,
+                     choices=list(VALID_TIERS),
+                     help='The tier the caller wants to assert (typically 4).')
     p_d = sub.add_parser('dispatched', help='Mark an alert as dispatched.')
     p_d.add_argument('--alert-id', required=True)
     p_d.add_argument('--dispatch-ts', required=True)
@@ -943,6 +1120,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         return _cli_classify(args)
     if args.cmd == 'triage-alert':
         return _cli_triage_alert(args)
+    if args.cmd == 'guard-tier4':
+        return _cli_guard_tier4(args)
     if args.cmd == 'dispatched':
         return _cli_dispatch(args)
     if args.cmd == 'resolved':
