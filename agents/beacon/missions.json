@@ -15483,7 +15483,62 @@
         "at": "2026-07-29T19:42:51.285731+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-29T19:57:30.970898+00:00",
+      "retired_reason": "orphan-terminal"
+    },
+    {
+      "id": "proposed-deep-review-hold-pr1053-c9c56f09",
+      "name": "Deep Review Hold Pr1053 C9c56f09",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `deep-review-hold-pr1053-c9c56f09`. Last activity 2026-07-29T19:56:07.237892+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "deep-review-hold-pr1053-c9c56f09"
+      ],
+      "repo": null,
+      "created": "2026-07-29",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-29T19:57:30.970898+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-29T19:56:07.237892+00:00"
+    },
+    {
+      "id": "proposed-pr-RSDPM-158",
+      "name": "PR RSDPM 158",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pr-RSDPM-158`. Last activity 2026-07-29T19:50:21.955975+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pr-RSDPM-158"
+      ],
+      "repo": null,
+      "created": "2026-07-29",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-29T19:57:30.970898+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-29T19:50:21.955975+00:00"
+    },
+    {
+      "id": "proposed-delegate-cap-heal-unregistered-approval-mints-permanent-cards-b921",
+      "name": "Delegate Cap Heal Unregistered Approval Mints Permanent Cards B921",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `delegate-cap-heal-unregistered-approval-mints-permanent-cards-b921`. Last activity 2026-07-29T19:47:35.920285+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "delegate-cap-heal-unregistered-approval-mints-permanent-cards-b921"
+      ],
+      "repo": null,
+      "created": "2026-07-29",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-29T19:57:30.970898+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-29T19:47:35.920285+00:00"
     }
   ]
 }
