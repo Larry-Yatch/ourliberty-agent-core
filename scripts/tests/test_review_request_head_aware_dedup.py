@@ -431,12 +431,43 @@ class TestCrossRoundAntiStorm(_DedupBase):
             ob._review_request_already_dispatched(
                 'review-t.json', None, task_id='t'))
 
-    def test_without_task_id_sibling_does_not_block(self):
-        # Back-compat: callers that don't pass task_id keep the exact-name-only
-        # behavior — a rev sibling does NOT block (no cross-round awareness).
+    # --- boundary with the head-aware leg (no task_id) -------------------
+    # Dropping `task_id` does NOT buy exact-name-only behaviour whenever a head
+    # is supplied. This test originally asserted it did (#918, merged 21:09 on
+    # 2026-07-10); #874 — branched before #918 and merged 2h later — taught the
+    # head-aware scan to read the LIVE inbox with the round-name grammar, so
+    # neither PR's own test run saw the clash and the stale expectation landed
+    # on main. The contract that actually ships, and that the three tests below
+    # pin from both directions:
+    #   head given  → a round record (live/archive/.invalid) recording THAT
+    #                 EXACT head blocks; one recording any other head does not.
+    #   head None   → exact-name-only; no round record can block.
+    # Head-AGNOSTIC cross-round blocking stays the `task_id` leg's job alone.
+
+    def test_without_task_id_live_same_head_sibling_blocks(self):
+        # A queued rev1 re-review recording the current head means a review of
+        # THIS head is already pending — never queue a duplicate alongside it
+        # (a second Mirror verdict on the same head can auto-merge). Same
+        # contract as TestHeadAwareDedup.test_live_rev_round_matching_head_blocks.
+        self._write('', 'review-t-rev1.json', head_sha='h')
+        self.assertTrue(
+            ob._review_request_already_dispatched('review-t.json', 'h'))
+
+    def test_without_task_id_live_other_head_sibling_does_not_block(self):
+        # The other direction, and why the live leg is not over-broad: it is
+        # head-SPECIFIC, so a live rev sibling recording an OLDER head cannot
+        # strand a needed re-review of newly-pushed commits.
+        self._write('', 'review-t-rev1.json', head_sha='oldhead')
+        self.assertFalse(
+            ob._review_request_already_dispatched('review-t.json', 'newhead'))
+
+    def test_without_task_id_and_without_head_sibling_does_not_block(self):
+        # The back-compat guarantee that IS real: `current_head_sha=None` (the
+        # reconcile sweep's original call shape) stays exact-name existence —
+        # there is no head to compare, so no round record can block.
         self._write('', 'review-t-rev1.json', head_sha='h')
         self.assertFalse(
-            ob._review_request_already_dispatched('review-t.json', 'h'))
+            ob._review_request_already_dispatched('review-t.json', None))
 
     def test_archived_sibling_does_not_trigger_anti_storm(self):
         # LIVE-only: an ARCHIVED rev sibling is a PAST review, not Mirror
