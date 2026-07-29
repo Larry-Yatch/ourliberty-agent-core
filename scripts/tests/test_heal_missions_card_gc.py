@@ -1130,21 +1130,57 @@ class ReconcileTerminalCapturesTest(unittest.TestCase):
         self.assertEqual(seen, [['delegate-d1']])
 
     def test_bridge_reader_maps_origin_to_fresh_id(self):
+        # `approved` ONLY, and the LAST approved wins. A pending/rejected/expired
+        # entry has no build under its id, so bridging to it probes a task that
+        # never existed; behaviour is unchanged for those cards because `probe_id`
+        # falls back to the origin id, which also never matches (UNKNOWN → KEEP).
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             (root / 'state').mkdir()
             (root / 'state' / 'beacon-pending-approvals.json').write_text(json.dumps({
-                'pending': [{'id': 'fresh-pending-001',
+                'pending': [{'id': 'fresh-pending-001', 'status': 'pending',
                              'origin_task_id': 'delegate-a'},
-                            {'id': 'no-origin-001'}],
-                'history': [{'id': 'fresh-approved-001',
+                            {'id': 'no-origin-001', 'status': 'approved'}],
+                'history': [{'id': 'fresh-approved-001', 'status': 'approved',
                              'origin_task_id': 'delegate-b'},
-                            {'id': 'fresh-dupe-001', 'origin_task_id': 'delegate-a'}],
+                            {'id': 'fresh-rejected-001', 'status': 'rejected',
+                             'origin_task_id': 'delegate-a'}],
             }))
             out = h.delegate_dispatched_task_ids(
                 ['delegate-a', 'delegate-b', 'delegate-missing'], agents_root=root)
-        self.assertEqual(out, {'delegate-a': 'fresh-pending-001',   # first wins
-                               'delegate-b': 'fresh-approved-001'})
+        # delegate-a has only a pending + a rejected entry → no bridge at all.
+        self.assertEqual(out, {'delegate-b': 'fresh-approved-001'})
+
+    def test_bridge_reader_matches_the_dashboard_copy(self):
+        # The mirroring in the docstring is a real contract: these two read one
+        # file and must classify a given entry identically, or the board and the
+        # terminal backstop disagree about the same card. This PR's first pass
+        # filtered only the dashboard copy and drifted them.
+        import dashboard_api as da  # noqa: PLC0415
+        entries = {
+            'pending': [{'id': 'p1', 'status': 'pending',
+                         'origin_task_id': 'delegate-a'}],
+            'history': [{'id': 'r1', 'status': 'rejected',
+                         'origin_task_id': 'delegate-b'},
+                        {'id': 'x1', 'status': 'expired',
+                         'origin_task_id': 'delegate-c'},
+                        {'id': 'a1', 'status': 'approved',
+                         'origin_task_id': 'delegate-d'},
+                        {'id': 'a2', 'status': 'approved',
+                         'origin_task_id': 'delegate-d'}],
+        }
+        ids = ['delegate-a', 'delegate-b', 'delegate-c', 'delegate-d']
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / 'state').mkdir()
+            (root / 'state' / 'beacon-pending-approvals.json').write_text(
+                json.dumps(entries))
+            mine = h.delegate_dispatched_task_ids(ids, agents_root=root)
+            theirs = da._delegate_dispatched_task_ids(ids, root)
+        self.assertEqual(mine, theirs)
+        # ...and both take the NEWEST approval, so a re-delegated card bridges to
+        # its CURRENT build rather than a completed previous one.
+        self.assertEqual(mine, {'delegate-d': 'a2'})
 
     def test_bridge_reader_is_fail_safe_on_missing_store(self):
         with tempfile.TemporaryDirectory() as td:

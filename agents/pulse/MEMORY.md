@@ -60,7 +60,7 @@
 
 ## beacon-pending-approvals.json correct path and structure (learned 2026-06-12, corrected 2026-06-30)
 
-**Rule:** Lives at `~/agents/state/beacon-pending-approvals.json`. NOT `~/agents/blackboard/`. Structure: `{"version": 1, "pending": [...], "history": [...]}` — NOT a dict keyed by approval ID. Check for pending items via `d["pending"]` list length. **The DM-delivery field is `chat_id` (integer), NOT `reply_chat_id`.** Querying `p.get("reply_chat_id")` always returns None even when the DM path is intact; always use `p.get("chat_id")`.
+**Rule:** Lives at `~/agents/state/beacon-pending-approvals.json`. NOT `~/agents/blackboard/`. Structure: `{"version": 1, "pending": [...], "history": [...]}` — NOT a dict keyed by approval ID. Check for pending items via `d["pending"]` list length. **Each item's identifier is `p["id"]` (NOT `p["task_id"]` — that key does not exist on pending items).** `origin_task_id` is the originating task reference (separate field). **The DM-delivery field is `chat_id` (integer), NOT `reply_chat_id`.** Querying `p.get("reply_chat_id")` always returns None even when the DM path is intact; always use `p.get("chat_id")`. Confirmed pending item keys (iter ~6704): id, created_at, chat_id, plan_summary, target_agent, dispatch_payload, status, reminders_sent, queued_during_pause, origin_task_id, decision_key.
 
 ---
 
@@ -124,9 +124,11 @@
 
 ---
 
-## Check 0 must call helper before manual classification (learned 2026-06-14 iter ~1812)
+## Check 0 must call helper before manual classification — helper Tier ≤ 3 is FINAL (learned 2026-06-14 iter ~1812; critical clarification 2026-07-29 iter ~6642)
 
-**Rule:** Before classifying ANY alert as Tier 4, Pulse MUST call `python3 scripts/alert_triage_state.py triage-alert --alert-id "<id>" --alert '<json>' --iter <N>` and act on the returned tier. Helper is AUTHORITATIVE. Pass VERBATIM JSON from larry-alerts.jsonl — never reconstruct with inferred fields (adding a non-null `subject` field that wasn't there overrides the `intent` fallback and fails the translation lookup).
+**Rule:** Before classifying ANY alert, Pulse MUST call `python3 scripts/alert_triage_state.py triage-alert --alert-id "<id>" --alert '<json>' --iter <N>` and act on the returned tier. Helper is AUTHORITATIVE. **If helper returns Tier ≤ 3, that IS the final classification — LLM reasoning CANNOT upgrade it to Tier 4.** Accept the helper's tier and move on. Pass VERBATIM JSON from larry-alerts.jsonl — never reconstruct with inferred fields (adding a non-null `subject` field that wasn't there overrides the `intent` fallback and fails the translation lookup).
+
+**Why this is hard:** alert-translations.json may already have a translation (e.g., `source=medic, intent=medic-diagnosis → Tier 3` via PR #515, 2026-06-12). Pulse's LLM can convince itself it's "novel" by looking at context and overriding the helper. This is wrong. The helper is ground-truth; the LLM's impression of novelty is not. Confirmed by Beacon at iter ~6642: medic-diagnosis was Tier-3 in translations all along; 3 iterations of false Tier-4 dispatches were all LLM overrides of a correct Tier-3 result.
 
 ---
 

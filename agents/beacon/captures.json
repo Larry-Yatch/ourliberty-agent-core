@@ -2066,7 +2066,7 @@
       "id": "cap-escalation-approve-can-start-forge-while-a-mirro-07da",
       "title": "Escalation approve can start Forge while a Mirror review is live",
       "note": "No live-review guard on the revision-dispatch path. _dispatch_mirror_review consults revision_in_flight_ledger.is_in_flight to suppress a review while a revision runs, but the CONVERSE does not exist: _dispatch_revision_to_forge (outbox_notifier.py:5447) checks no pipeline_live_state / review-record signal before writing a revision task to Forge. So approving an escalation card while a Mirror review is executing starts Forge concurrently; Forge pushes its [WIP][session-start] checkpoint and work commits while Mirror is reviewing, and Mirror returns a verdict against a head that moved under it \u2014 the stale-verdict harm PR #865 documents. Pre-existing hole, but agent-core PR #1043 (head-aware PIPELINE_BACKOFF) shrinks the window in which approving is safe from ~180 min to roughly one healer tick: after a terminal REVIEW_ESCALATE plus a manual push, the backstop now dispatches a review promptly instead of waiting out the recency window. Related to the known session-less-review-escalate-approve-mismatch footgun. Fix: add a live-review check to the revision-dispatch path (pipeline_live_state.pr_review_in_progress plus the review-record scan, since that probe is blind for forge task_ids whose worktree is wt-mirror-<slug> rather than wt-mirror-pr-<repo>-<N>). Deliberately kept out of #1043: it is a control-flow change to outbox_notifier.py and that PR already carries three concerns.",
-      "state": "parked",
+      "state": "dropped",
       "label": null,
       "origin": {
         "source": "desktop-chat",
@@ -2078,19 +2078,26 @@
       "last_touched": "2026-07-29T00:45:53.439138+00:00",
       "promoted_to": null,
       "briefing": {
-        "what": "When you approve a flagged item while our system is still double-checking earlier work, it can kick off a second round of work at the same time, and the quality check then judges the wrong version \u2014 so the review comes back unreliable.",
-        "why": "It means an approval you make in good faith can quietly produce a bad or misleading result, wasting rework and eroding trust in our own checks.",
-        "suggest": "Worth fixing, but do it as its own small, focused change rather than bundling it in \u2014 schedule it soon and keep approvals cautious in the meantime."
+        "what": "A quick-approve button can accidentally kick off a new round of work on the same item while a quality check on it is still running.",
+        "why": "When that happens, the reviewer signs off on an older version than what actually shipped, so we can end up trusting a result that no longer matches reality.",
+        "suggest": "Worth fixing, but no fire drill \u2014 schedule it as a deliberate, well-tested change rather than rushing it in alongside unrelated work."
       },
       "risk": "medium",
       "recommended_action": "delegate",
       "briefing_provenance": {
         "by": "beacon",
         "model": "claude-opus-4-8",
-        "at": "2026-07-29T00:54:15.491762+00:00",
-        "from_state": "parked"
+        "at": "2026-07-29T03:35:02.831158+00:00",
+        "from_state": "dropped"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "spawned": {
+        "kind": "pr",
+        "task_id": "supersede-live-review-on-revision-dispatch",
+        "stamped_at": "2026-07-29T02:13:25.368320+00:00",
+        "outcome": "closed"
+      },
+      "drop_reason": "Measured before building: 2.5 months of outbox-notifier.log shows 131 revision dispatches and 947 verdict publications, with ZERO clean instances of a verdict published while a revision ran mid-review (one ambiguous hit, gg-s1-foundations/#916 on 2026-07-10, inside the known guardian-gauge incident window, with the existing revision-in-flight guard firing correctly around it). The human-click trigger has fired 11 times ever, last on 2026-07-11, and coincides with the harm zero times. agent-core PR #1051 built the fix and was closed unmerged: at n=0 a new branch on the verdict-publish path (which also drives auto-merge) risks more than it prevents. The capture's own 121/223 numbers were two halves never intersected; the intersection is 0. Detector recorded in memory - rebuild only if the count moves off zero."
     },
     {
       "id": "cap-probe-emit-capture-verification-41850-747b",

@@ -4987,30 +4987,180 @@ def _delegate_dispatched_task_ids(
     card read `building` while Forge is mid-build, instead of sitting on
     `handed_off` until the PR opens.
 
-    Scans pending AND history (a dispatched delegation is `approved` in history).
+    Scans pending AND history, and hands back a receipt ONLY when the origin's
+    LATEST terminal entry is `approved` — that status IS the dispatch (`resolve`
+    writes it when Larry approves, and `dispatch_approved` then runs the build
+    under this `id`). Without that, a `rejected` or `expired` approval still
+    hands back a "receipt", and a receipt is read downstream as the team's "I've
+    got this". That mis-read reached the team thread — the narrator announced
+    "Picked this up" for a delegation Larry had REJECTED (live instance:
+    `delegate-cap-spec-build-xiv-b-tier-4-alert-write-back-loop-f78b`, and 36
+    rejected + 82 expired entries make it recurring). This paragraph was already
+    the documented contract before the code existed to enforce it.
+
+    LATEST, not "any": an approval that a later rejection supersedes leaves no
+    receipt, so a re-delegated-then-rejected card cannot claim `handed_off` off
+    the previous round. See `_delegate_approval_scan`.
+
     Reads the store ONCE. Fail-safe: {} on a missing/unreadable store — the card
     simply keeps its coarser phase."""
+    return _delegate_approval_scan(origin_task_ids, agents_root)[0]
+
+
+# An approval Larry DECIDED against. `rejected` only — deliberately NOT
+# `expired`.
+#
+# `expired` is an AUTO-RETIREMENT, not a decision, and the three writers all say
+# so in as many words:
+#   - outbox_notifier.py:6320  "NOT approved/rejected: Larry never acted, the
+#                               merge made the decision moot"
+#   - heal_stale_approvals.py:528  "auto-retired by heal-stale-approvals"
+#   - heal_unregistered_approval.py:1303  "status 'expired' = auto-retired, not
+#                               a [decision]"
+#
+# Lumping the two together renders "You turned this down" over a delegation he
+# never answered — asserting a decision he did not make, in the muted tone
+# reserved for settled work, on exactly the card that still needs him. It also
+# withheld the thread's `stalled` post for those cards, which is the silence this
+# whole arc exists to remove.
+#
+# An expired approval is honestly `stalled`: delegated, no receipt, nothing
+# carrying it — "no sign of progress, worth a look" is TRUE and actionable. So
+# `expired` is simply absent here and falls through the receipt gate on its own.
+# Kept a frozenset (not a bare `== 'rejected'`) because `modified` may later need
+# a home — but add nothing here that Larry did not personally decide.
+_DECLINED_APPROVAL_STATUSES = frozenset({'rejected'})
+
+
+def _delegate_declined_origins(
+    origin_task_ids: list[str],
+    agents_root: Optional[Path] = None,
+) -> set[str]:
+    """Delegate origins whose LATEST terminal approval is a REJECTION — i.e. the
+    work was declined, not neglected.
+
+    Needed because `stalled` alone cannot tell "nobody picked this up" from "Larry
+    said no": both are delegated-with-no-receipt. Narrating the second as stalled
+    invites him to re-nudge work he deliberately turned down.
+
+    LATEST wins, in both directions — this is not "rejected and never approved".
+    A card rejected once and later re-delegated + approved is NOT declined (it is
+    live again); a card approved once and later re-delegated + REJECTED IS
+    declined (and loses its now-superseded receipt). Getting only the first
+    direction right is what let "the team picked this up" post about work Larry
+    had just turned down.
+
+    `expired` is deliberately NOT here — see `_DECLINED_APPROVAL_STATUSES`. It is
+    an auto-retirement, not a decision, and belongs on the `stalled` floor.
+
+    Same fail-safe contract as `_delegate_dispatched_task_ids`: {} / empty set on
+    a missing or unreadable store.
+
+    A caller that needs BOTH halves should call `_delegate_approval_scan` once
+    rather than this and `_delegate_dispatched_task_ids` in sequence — two calls
+    are two independent reads, and an approval resolving between them yields an
+    inconsistent pair (see that function's docstring)."""
+    return _delegate_approval_scan(origin_task_ids, agents_root)[1]
+
+
+def _delegate_approval_scan(
+    origin_task_ids: list[str],
+    agents_root: Optional[Path] = None,
+) -> tuple[dict[str, str], set[str]]:
+    """One pass over the approval store → (approved receipts, declined origins).
+
+    Both views are derived from ONE record per origin: its LATEST terminal entry
+    (`approved` vs `_DECLINED_APPROVAL_STATUSES`, ordered by `resolved_at`). So
+    the two halves are disjoint BY CONSTRUCTION — an origin appears in exactly
+    one, or in neither — and the answer to "which decision is current" is a
+    property of that record rather than of subtracting two sets. An earlier
+    approval leaves NO receipt once a later rejection lands; callers therefore do
+    not need to check `declined` before trusting `approved`.
+
+    That disjointness is load-bearing, not incidental: it was briefly false under
+    an intermediate fix that netted by position, and the overlap forced
+    `_delegation_trail_field` to gate its ledger-bridge `building` override on
+    `not _declined` to stop a rejected retry rendering "Building" off the
+    previous round's finished build. Keep it true and that guard stays mere
+    defence in depth.
+
+    Call this ONCE when you need both: `_delegate_dispatched_task_ids` and
+    `_delegate_declined_origins` are thin views over it, and calling those two in
+    sequence re-reads the file twice. That is not merely wasteful — a card that is
+    `rejected` at the first read and re-delegated + APPROVED before the second
+    comes back with no receipt AND no declined marking, which resolves `stalled`
+    and posts a permanent "no sign of progress" about work that was just approved.
+
+    Repeat rounds: the LATEST terminal entry wins outright. Taking an earlier one
+    would bridge a re-delegated card to its PREVIOUS build, whose completed
+    `session_start` then reads as `building` for a delegation that has not
+    started — or, worse, as `handed_off` for one that was rejected."""
     if not origin_task_ids:
-        return {}
+        return {}, set()
     root = agents_root or _agents_root()
     try:
         data = json.loads(_beacon_pending_approvals_path(root).read_text())
     except (OSError, json.JSONDecodeError, ValueError):
-        return {}
+        return {}, set()
     if not isinstance(data, dict):
-        return {}
+        return {}, set()
     wanted = set(origin_task_ids)
-    out: dict[str, str] = {}
+    # ONE record per origin — its LATEST terminal entry, as (sort_key, status,
+    # receipt_id). Two independent collections cannot express "which terminal
+    # status came last", which is the whole question here: netting an `approved`
+    # set against a `declined` set picks a different wrong answer depending on
+    # which way you subtract. Deriving both views from a single latest-wins
+    # record makes the question answerable and the two outputs disjoint by
+    # construction.
+    latest: dict[str, tuple[tuple[str, int], str, Optional[str]]] = {}
+    seq = 0
     for bucket in ('pending', 'history'):
         for entry in (data.get(bucket) or []):
+            seq += 1
             if not isinstance(entry, dict):
                 continue
             origin = entry.get('origin_task_id')
+            if not (isinstance(origin, str) and origin in wanted):
+                continue
+            status = entry.get('status')
+            if (status != 'approved'
+                    and status not in _DECLINED_APPROVAL_STATUSES):
+                continue  # `pending`/`modified` decide nothing
+            # RECENCY IS `resolved_at`, NOT SCAN POSITION. Position would rest on
+            # the `pending` bucket never holding a terminal entry — true in the
+            # live store today, but `_open_delegate_approvals` defensively skips
+            # non-`pending` rows in that bucket, so someone thought it reachable
+            # (a `resolve()` dying between the history append and the pending
+            # removal). A stuck `rejected` row is scanned FIRST, would take a
+            # lower position than an older `approved`, and would silently drop
+            # out of `declined` — this bug again, through the ordering instead of
+            # the set logic. All 559 live history entries carry `resolved_at`.
+            # A terminal entry missing it sorts as oldest among its peers and
+            # loses to any timestamped one; position only breaks exact ties.
+            resolved = entry.get('resolved_at')
+            key = (resolved if isinstance(resolved, str) else '', seq)
+            if origin in latest and key < latest[origin][0]:
+                continue
             fresh = entry.get('id')
-            if (isinstance(origin, str) and origin in wanted
-                    and isinstance(fresh, str) and fresh):
-                out.setdefault(origin, fresh)
-    return out
+            latest[origin] = (
+                key, status,
+                fresh if isinstance(fresh, str) and fresh else None,
+            )
+    # A rejected-LAST origin yields no receipt at all, so the stale-receipt half
+    # of the bug cannot survive either: `_has_receipt` goes False and the
+    # `handed_off` claim is unreachable without the trail having to out-rank it.
+    # Concretely, what this fixes: delegate → approve → build FAILS →
+    # re-delegate (which `_already_delegated_short_circuit` permits precisely
+    # because `failure_signaled` is set) → Larry REJECTS the retry. The old
+    # `{o for o in declined if o not in approved}` dropped the origin from
+    # `declined`, kept the superseded receipt, and the card read `handed_off` —
+    # "the team picked this up" about a delegation he had just turned down. In
+    # the narrator that post is permanent and cannot be retracted.
+    approved = {o: rec[2] for o, rec in latest.items()
+                if rec[1] == 'approved' and rec[2]}
+    declined = {o for o, rec in latest.items()
+                if rec[1] in _DECLINED_APPROVAL_STATUSES}
+    return approved, declined
 
 
 def _has_forge_build_started(events: Optional[list[dict[str, Any]]]) -> bool:
@@ -5160,11 +5310,13 @@ def _delegation_trail_field(
     has_open_approval: bool = False,
     native_build_events: Optional[dict[str, list[dict[str, Any]]]] = None,
     dispatched_by_origin: Optional[dict[str, str]] = None,
+    declined_origins: Optional[set[str]] = None,
     now: Optional[datetime] = None,
 ) -> dict[str, Any]:
     """Surface a card's spawned-build review trail — `delegation_build_phase`
-    (handed_off | building | in_review | review_passed | merged | None) + `delegation_pr_url` — joined
-    against chain_events tagged with `payload.origin_task_id`.
+    (handed_off | building | in_review | review_passed | merged | stalled |
+    declined | None) + `delegation_pr_url` — joined against chain_events tagged
+    with `payload.origin_task_id`.
 
     Two origins feed the trail, both read-side (no ref stamped for the second):
       - Delegate (Slice 2b): a card Larry delegated carries a `spawned` ref of
@@ -5188,6 +5340,35 @@ def _delegation_trail_field(
     ledger receipt, no build events and past the grace window has nothing
     carrying it. It replaces the old unconditional `handed_off` fallback, which
     claimed the team had work that had in fact never been dispatched.
+
+    `declined` splits that floor. `stalled` and "Larry said no" are IDENTICAL to
+    the receipt gate — both are delegated-with-no-receipt — but they are opposite
+    instructions to the reader: `stalled` renders "no sign of progress — worth a
+    look", which asks him to go nudge work he deliberately turned down. The
+    approval store already knows the difference (`_delegate_approval_scan`'s
+    second half); `declined_origins` is that set, and it is checked BEFORE the
+    receipt/grace gate because a rejection is a conclusion, not a card that has
+    yet to be picked up. It stays UNDER `has_open_approval` for the same reason
+    `stalled` does: a card rejected once and re-delegated is parked on Larry NOW,
+    and "waiting on your approval" is the truer thing to say. (The scan nets the
+    declined set against approved, so a rejected-then-approved re-delegation is
+    not in it at all and keeps its real build trail.)
+
+    An origin-tagged build event still wins over `declined` — if something
+    actually ran, the trail says so rather than the approval's verdict. The
+    ledger-bridge `building` signal explicitly does NOT (see the guard below):
+    that bridge is keyed to the approval receipt, and since the netting is
+    newest-wins a declined card can still carry the receipt of a SUPERSEDED
+    round, whose finished build would otherwise render as live work.
+
+    KNOWN GAP, deliberately not closed here: `chain_events` are origin-tagged
+    with `delegate-<cid>`, which identifies the CARD, not the delegation round.
+    So a card that was delegated, built, re-delegated and then rejected still
+    shows the first round's `in_review`/`review_passed` trail. Distinguishing
+    rounds needs the events compared against the rejection timestamp, which the
+    trail has no access to on this path. The bounded harm is that a stale round
+    reads as live; the unbounded one — claiming the team holds work Larry just
+    rejected — is what the guard below removes.
 
     Neutral None before any build event joins — never a misleading claim."""
     neutral = {'delegation_build_phase': None, 'delegation_pr_url': None}
@@ -5215,19 +5396,34 @@ def _delegation_trail_field(
     # started": delegations older than ~2026-07-11 predate the origin_task_id
     # stamp, so a missing receipt doesn't PROVE nothing ran for those.
     _has_receipt = bool((dispatched_by_origin or {}).get(_delegate_tid))
+    _declined = _delegate_tid in (declined_origins or set())
     if delegated and not has_open_approval:
-        fallback = (
-            {'delegation_build_phase': 'handed_off', 'delegation_pr_url': None}
-            if (_has_receipt or _delegation_receipt_grace_active(spawned, now))
-            else {'delegation_build_phase': 'stalled', 'delegation_pr_url': None}
-        )
+        if _declined:
+            # Ahead of receipt AND grace: a rejection concludes the delegation,
+            # so "give it another 15 minutes" is as wrong as "go nudge it".
+            fallback = {'delegation_build_phase': 'declined',
+                        'delegation_pr_url': None}
+        else:
+            fallback = (
+                {'delegation_build_phase': 'handed_off',
+                 'delegation_pr_url': None}
+                if (_has_receipt
+                    or _delegation_receipt_grace_active(spawned, now))
+                else {'delegation_build_phase': 'stalled',
+                      'delegation_pr_url': None}
+            )
     else:
         fallback = neutral
     # `building` sits between handed_off and in_review: the dispatched build's OWN
     # session_start (reached via the ledger bridge, since those events aren't
     # origin-tagged) proves Forge is actually on it. Only consulted when the
     # origin-tagged review trail has nothing yet — a real review event always wins.
-    if (delegated and not has_open_approval
+    # NOT for a declined origin: the bridge is keyed to the ledger RECEIPT, and
+    # since the netting went newest-wins a declined card can still carry the
+    # receipt of a SUPERSEDED round. Without this guard, approve → build → reject
+    # renders "Building" off the old build for a delegation Larry just rejected —
+    # the same stale-round bug the netting fix closes, one line further down.
+    if (delegated and not has_open_approval and not _declined
             and _has_forge_build_started(
                 (native_build_events or {}).get(_delegate_tid))):
         fallback = {'delegation_build_phase': 'building',
@@ -5287,11 +5483,13 @@ def resolve_delegation_narrative_phase(
     build_events_by_origin: Optional[dict[str, list[dict[str, Any]]]],
     has_open_approval: bool = False,
     native_build_events: Optional[dict[str, list[dict[str, Any]]]] = None,
+    dispatched_by_origin: Optional[dict[str, str]] = None,
+    declined_origins: Optional[set[str]] = None,
 ) -> dict[str, Any]:
     """The ONE narrative-phase resolver the thread narrator and the dashboard
     both read from — `{narrative_phase, narrative_pr_url}` over
     {handed_off, waiting_approval, building, in_review, review_passed, merged,
-    closed_failed, None}.
+    closed_failed, stalled, declined, None}.
 
     Built by overlaying the GC healer's already-persisted terminal stamps
     (`spawned.outcome`, `shipped_note`/`shipped_pr_url`, `failure_signaled`) and
@@ -5304,7 +5502,29 @@ def resolve_delegation_narrative_phase(
       3. trail review_passed / in_review / building → that phase
       4. has_open_approval    → `waiting_approval`
       5. trail handed_off     → `handed_off`
-      6. else                 → None (nothing to narrate yet)
+      6. trail stalled        → `stalled`
+      7. trail declined       → `declined`
+      8. else                 → None (nothing to narrate yet)
+
+    `declined_origins` (`_delegate_approval_scan`'s second half) is threaded for
+    the same reason `dispatched_by_origin` is: this resolver is the ONE place the
+    board and the thread agree on what a card's state IS, so a declined card must
+    resolve `declined` for BOTH. What differs is what each does with it — the
+    board renders `declined`; the narrator withholds the post, because a post is
+    permanent and there is nothing to tell Larry about a decision he just made.
+    That split lives at the narrator's `_narration_text`, not here: putting the
+    declined logic on only one of the two read paths is precisely the asymmetry
+    this resolver exists to prevent.
+
+    `dispatched_by_origin` is the ledger-receipt map (`_delegate_dispatched_task_ids`)
+    — the team's "I've got this". It MUST be threaded through: `_delegation_trail_field`
+    gates `handed_off` on that receipt (#974), so a resolver that omits it makes
+    `_has_receipt` permanently False and downgrades every past-grace delegation to
+    `stalled` — including ones the team is genuinely working. Omitted for two weeks
+    after #975, which is why the narrator went silent on live delegations; the
+    tests that caught it were merged red the same night. Optional, and `{}`-safe,
+    only because a caller with no ledger access is better served by the coarser
+    phase than by an exception.
     """
     trail = _delegation_trail_field(
         cap,
@@ -5312,6 +5532,8 @@ def resolve_delegation_narrative_phase(
         pr_state_by_url=None,
         has_open_approval=has_open_approval,
         native_build_events=native_build_events,
+        dispatched_by_origin=dispatched_by_origin,
+        declined_origins=declined_origins,
     )
     trail_phase = trail.get('delegation_build_phase')
     trail_pr_url = trail.get('delegation_pr_url')
@@ -5334,8 +5556,14 @@ def resolve_delegation_narrative_phase(
         return {'narrative_phase': trail_phase, 'narrative_pr_url': trail_pr_url}
     if has_open_approval:
         return {'narrative_phase': 'waiting_approval', 'narrative_pr_url': None}
-    if trail_phase == 'handed_off':
-        return {'narrative_phase': 'handed_off', 'narrative_pr_url': None}
+    # `stalled` and `declined` ride the same rung as `handed_off` — all three are
+    # "delegated, no build signal yet"; the receipt tells `handed_off` from the
+    # other two, and the approval verdict tells those two apart. The rung sits
+    # BELOW `has_open_approval` on purpose: a delegation parked on Larry is
+    # waiting on HIM, not stalled and not concluded, and must never be narrated
+    # as neglected by the team.
+    if trail_phase in ('handed_off', 'stalled', 'declined'):
+        return {'narrative_phase': trail_phase, 'narrative_pr_url': None}
     return {'narrative_phase': None, 'narrative_pr_url': None}
 
 
@@ -5441,6 +5669,7 @@ def _parked_from_captures(
     pr_state_by_url: Optional[dict[str, str]] = None,
     native_build_events: Optional[dict[str, list[dict[str, Any]]]] = None,
     dispatched_by_origin: Optional[dict[str, str]] = None,
+    declined_origins: Optional[set[str]] = None,
 ) -> list[dict[str, Any]]:
     """Build the `parked[]` array (§ 3.3) from captures.json. Only state=='parked'
     captures; `aging` is the GC healer's persisted flag (Phase 1 — never
@@ -5482,7 +5711,8 @@ def _parked_from_captures(
             cap, build_events_by_origin, pr_state_by_url,
             has_open_approval=_needs_you.get('delegation_needs_you') is not None,
             native_build_events=native_build_events,
-            dispatched_by_origin=dispatched_by_origin, now=now))
+            dispatched_by_origin=dispatched_by_origin,
+            declined_origins=declined_origins, now=now))
         out.append(entry)
     return out
 
@@ -5880,6 +6110,7 @@ def _build_derived_response(
     build_events_by_origin: Optional[dict[str, list[dict[str, Any]]]] = None,
     native_build_events: Optional[dict[str, list[dict[str, Any]]]] = None,
     dispatched_by_origin: Optional[dict[str, str]] = None,
+    declined_origins: Optional[set[str]] = None,
 ) -> dict[str, Any]:
     """Pure derive: build the full /api/missions/derived response (pre-filter).
 
@@ -5978,7 +6209,7 @@ def _build_derived_response(
     parked = _parked_from_captures(
         captures, now, events_by_task_id, open_delegate_approvals,
         build_events_by_origin, pr_state_by_url, native_build_events,
-        dispatched_by_origin)
+        dispatched_by_origin, declined_origins)
     return {
         'schema_version': 1,
         'missions': missions,
@@ -6160,8 +6391,13 @@ def _handle_missions_derived(
     open_delegate_approvals = _open_delegate_approvals(parked_spawned_ids)
     # Ledger bridge (delegate origin → the FRESH task id its dispatch runs under)
     # so a delegated card can read `building` off the build's OWN session_start —
-    # those events are never origin-tagged, so this is the only join to them.
-    _dispatched_by_origin = _delegate_dispatched_task_ids(parked_spawned_ids)
+    # those events are never origin-tagged, so this is the only join to them —
+    # PLUS the declined half, which tells a card Larry turned down apart from one
+    # nobody picked up. ONE scan for both: two calls are two independent reads,
+    # and an approval resolving between them yields a card with no receipt AND no
+    # declined marking, i.e. a false `stalled`.
+    _dispatched_by_origin, _declined_origins = _delegate_approval_scan(
+        parked_spawned_ids)
     for _fid in _dispatched_by_origin.values():
         if _fid not in seen:
             seen.add(_fid)
@@ -6238,6 +6474,7 @@ def _handle_missions_derived(
         build_events_by_origin=build_events_by_origin,
         native_build_events=native_build_events,
         dispatched_by_origin=_dispatched_by_origin,
+        declined_origins=_declined_origins,
     )
     response = _apply_derived_filters(
         response, repo=repo, task_id=task_id, now=now,
@@ -12455,13 +12692,14 @@ def _project_delegation_fields(
     except Exception:  # noqa: BLE001 — never 500 the always-200 operator queue
         build_events = {}
     # Ledger bridge → the dispatched build's OWN events, so a card can read
-    # `building` while Forge works it (those events are never origin-tagged).
+    # `building` while Forge works it (those events are never origin-tagged) —
+    # plus the declined half from the SAME scan (see `_delegate_approval_scan`).
     try:
-        _dispatched = _delegate_dispatched_task_ids(origin_ids)
+        _dispatched, _declined = _delegate_approval_scan(origin_ids)
         _native = _fetch_events_for_task_ids(
             supabase_client, sorted(set(_dispatched.values())))
     except Exception:  # noqa: BLE001 — never 500 the always-200 operator queue
-        _dispatched, _native = {}, {}
+        _dispatched, _declined, _native = {}, set(), {}
     for e in ranked:
         e['delegation_needs_you'] = None
         e['delegation_build_phase'] = None
@@ -12490,6 +12728,15 @@ def _project_delegation_fields(
         if phase is not None:
             e['delegation_build_phase'] = phase
             e['delegation_pr_url'] = pr_url
+        elif delegate_origin in _declined and not e['delegation_needs_you']:
+            # Larry turned this down. `_delegation_outcome_evidence` returns None
+            # for a rejected-only origin (rejection is deliberately NOT evidence
+            # of a dispatch), so before this branch a declined card fell out of
+            # the elif chain and left the queue at `None` — a BLANK row that
+            # reads as "never delegated" for work he explicitly stopped. Distinct
+            # from the parked derive's old bug (`stalled`, "go nudge it"), same
+            # root: this surface had no way to say "declined".
+            e['delegation_build_phase'] = 'declined'
         elif (evidence and evidence.get('status') == 'resolved'
                 and not e['delegation_needs_you']):
             _fid = _dispatched.get(delegate_origin)

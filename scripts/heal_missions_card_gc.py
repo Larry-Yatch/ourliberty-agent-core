@@ -1254,9 +1254,24 @@ def delegate_dispatched_task_ids(
 
     Mirrors `dashboard_api._delegate_dispatched_task_ids` (same store, same
     semantics) but stdlib-only, keeping this healer's probe seam free of the
-    dashboard import. Scans pending AND history (a dispatched delegation is
-    `approved` in history). Reads the store ONCE. Fail-safe: {} on a
-    missing/unreadable store — every card then falls back to today's behavior."""
+    dashboard import. That mirroring is a REAL contract, not a comment: the two
+    read one file and must classify a given entry identically, or the board and
+    the backstop disagree about the same card. Kept in lockstep deliberately —
+    when one changes, change both.
+
+    Scans pending AND history and counts ONLY `status == 'approved'` — that
+    status IS the dispatch. A `pending`, `rejected`, or `expired` entry has no
+    build running under its id, so bridging to it probes a task that never
+    existed. Behaviour is unchanged for those cards: `probe_id` falls back to the
+    ORIGIN id, which (per the docstring above) also can never match — both routes
+    yield UNKNOWN → KEEP. What it fixes is the semantics drifting from the
+    dashboard copy, which counts `approved` only for the same reason.
+
+    Repeat approvals: LAST wins (appended on resolve, so later == newer), so a
+    re-delegated card bridges to its CURRENT build, not its previous one.
+
+    Reads the store ONCE. Fail-safe: {} on a missing/unreadable store — every card
+    then falls back to today's behavior."""
     if not origin_task_ids:
         return {}
     try:
@@ -1271,11 +1286,13 @@ def delegate_dispatched_task_ids(
         for entry in (data.get(bucket) or []):
             if not isinstance(entry, dict):
                 continue
+            if entry.get('status') != 'approved':
+                continue
             origin = entry.get('origin_task_id')
             fresh = entry.get('id')
             if (isinstance(origin, str) and origin in wanted
                     and isinstance(fresh, str) and fresh):
-                out.setdefault(origin, fresh)
+                out[origin] = fresh  # last (newest) wins
     return out
 
 
@@ -1799,6 +1816,24 @@ def _narration_text(phase: str, pr_url: Optional[str]) -> str:
             'Merged and shipped (linked work merged).')
     if phase == 'closed_failed':
         return 'The linked PR was closed without merging — needs your eyes.'
+    if phase == 'stalled':
+        # WORDING IS LOAD-BEARING (dashboard_api `_delegation_trail_field`): say
+        # "no sign of progress", NEVER "never started". A missing ledger receipt
+        # does not PROVE nothing ran — delegations older than ~2026-07-11 predate
+        # the origin_task_id stamp, so for those the receipt is absent whether or
+        # not the work happened. Claiming it never started would be the same
+        # dishonesty in the other direction as the old unconditional `handed_off`.
+        return ("No sign of progress on this yet — it may need a nudge.")
+    if phase == 'declined':
+        # DELIBERATE SILENCE — the one phase the board shows and the thread does
+        # not. The resolver reports `declined` to both (that symmetry is the
+        # point: one resolver, one answer), but a thread post is permanent and
+        # one-shot, and there is nothing to tell Larry about a decision he just
+        # made himself. The BOARD still says it, because a card that renders
+        # nothing is the silence problem this whole arc exists to remove.
+        # Returning '' rather than `continue`-ing at the call site keeps the
+        # withhold next to the wording it is a judgement about.
+        return ''
     return ''
 
 
@@ -1818,12 +1853,43 @@ def plan_delegate_narrations(
     build_events_by_origin: Optional[dict[str, list[dict[str, Any]]]],
     open_delegate_approvals: dict[str, dict[str, Any]],
     native_build_events: Optional[dict[str, list[dict[str, Any]]]],
+    dispatched_by_origin: dict[str, str],
+    declined_origins: Optional[set[str]] = None,
 ) -> list[dict[str, Any]]:
     """Pure planner: for each DELEGATED capture, resolve its current narrative
     phase (via the ONE shared `dashboard_api.resolve_delegation_narrative_phase`)
     and build the post that narrates it. Returns a list of post dicts
     ``{capture_id, phase, event_id, text}`` — one per card that has a narratable
     phase. A card with phase None (nothing has happened yet) yields no post.
+
+    `dispatched_by_origin` is REQUIRED (no default) on purpose. It is the ledger
+    receipt map, and omitting it does not degrade to silence — it makes every
+    past-grace delegation resolve `stalled` and post "no sign of progress", a
+    permanent false claim (each (card, phase) posts once, forever, and cannot be
+    retracted). That omission is not hypothetical: #975 forgot this exact argument
+    and the narrator was wrong for two weeks. A missing arg must fail at the call,
+    not in the thread.
+
+    Two phases are deliberately WITHHELD even when the resolver reports them:
+
+      * `handed_off` with no receipt — grace-window only. The resolver honestly
+        renders it (a just-clicked delegation is not yet late) and the dashboard
+        card should show it, but POSTING it claims the team picked up work nobody
+        has touched. It is also unrecoverable: the sweep runs every 10min inside a
+        15min grace, so the post would almost always be spent BEFORE the real
+        pickup, and the deterministic event_id means the genuine `handed_off`
+        could then never fire. Withholding it means the post lands exactly once,
+        when it is true.
+      * `declined` — an origin whose LATEST terminal approval is a REJECTION
+        (`expired` is NOT one: it is an auto-retirement, so those cards keep the
+        honest `stalled` post). Larry turned the work down; a
+        "may need a nudge" post invites him to re-push what he deliberately
+        stopped, and there is nothing to tell him about his own decision. The
+        caller still supplies `declined_origins` (it is what lets the resolver
+        SEE the phase), but the withhold itself now lives in `_narration_text`,
+        which has no honest wording to return. The dashboard card DOES render
+        this phase — that asymmetry is intended and is the whole point: a
+        permanent post and a re-rendered card have different bars.
 
     No side effects, no Supabase, no captures.json — the caller emits. Because the
     event_id is deterministic on (capture_id, phase), the emit is idempotent: the
@@ -1849,10 +1915,26 @@ def plan_delegate_narrations(
             build_events_by_origin,
             has_open_approval=has_open_approval,
             native_build_events=native_build_events,
+            dispatched_by_origin=dispatched_by_origin,
+            declined_origins=declined_origins,
         )
         phase = resolved.get('narrative_phase')
         if not phase:
             continue
+        # Withhold `handed_off` when it would post something untrue (see
+        # docstring). Checked HERE, not in the resolver: the resolver's answer is
+        # right for the dashboard card, which renders a current state that can be
+        # re-rendered next tick. A post is permanent, so it needs the stricter
+        # bar. It has to live at the call site because the disqualifier (no ledger
+        # receipt) is not recoverable from the phase string alone.
+        if phase == 'handed_off' and not (dispatched_by_origin or {}).get(origin_tid):
+            continue  # grace-window only — nobody has actually picked it up yet
+        # NOTE: the declined case used to be caught here as `stalled` + a declined
+        # origin, because `stalled` was the only phase a rejected delegation could
+        # reach. It now resolves as its own `declined` phase (both read paths, one
+        # resolver), so the withhold moved to `_narration_text`, which returns ''
+        # for it — the disqualifier IS the phase, so it belongs with the wording.
+        # Re-adding a guard here would be dead code that reads as live.
         text = _narration_text(phase, resolved.get('narrative_pr_url'))
         if not text:
             continue
@@ -1940,7 +2022,13 @@ def author_delegate_thread_narration(
         spawned_ids = [c['spawned']['task_id'] for c in delegated]
         open_delegate_approvals = dash._open_delegate_approvals(
             spawned_ids, agents_root)
-        dispatched_by_origin = dash._delegate_dispatched_task_ids(
+        # ONE read for both halves. Calling `_delegate_dispatched_task_ids` and
+        # `_delegate_declined_origins` in sequence re-reads the store twice, and a
+        # card that is `rejected` at the first read but re-delegated + APPROVED
+        # before the second comes back with no receipt AND no declined marking —
+        # which resolves `stalled` and posts a permanent "no sign of progress"
+        # about work that was just approved.
+        dispatched_by_origin, declined_origins = dash._delegate_approval_scan(
             spawned_ids, agents_root)
         # Origins for the review trail: the delegate ref (`delegate-<cid>`) AND
         # the discuss key (`card-message-<cid>`) — a delegated card may ALSO have
@@ -1975,6 +2063,8 @@ def author_delegate_thread_narration(
             build_events_by_origin=build_events_by_origin,
             open_delegate_approvals=open_delegate_approvals,
             native_build_events=native_build_events,
+            dispatched_by_origin=dispatched_by_origin,
+            declined_origins=declined_origins,
         )
     except Exception as e:  # noqa: BLE001 — fail-safe
         log(f'delegate-thread narration: planning failed: '

@@ -168,6 +168,87 @@ class DelegationTrailFieldTest(unittest.TestCase):
             cap, {}, None, native_build_events=native, now=NOW)
         self.assertEqual(got['delegation_build_phase'], 'building')
 
+    # ---- declined: "Larry said no" is not "nobody picked it up" -------------
+    # `stalled` and a rejected delegation are IDENTICAL to the receipt gate (both
+    # are delegated-with-no-receipt) but opposite instructions to the reader:
+    # `stalled` renders "no sign of progress — worth a look", which asks Larry to
+    # nudge work he deliberately turned down. Live instance 2026-07-28:
+    # `delegate-cap-spec-build-xiv-b-tier-4-alert-write-back-loop-f78b`, rejected,
+    # rendering `handed_off` before the receipt filter and `stalled` after it.
+
+    def test_declined_origin_is_declined_not_stalled(self):
+        cap = _delegate_cap(stamped_at='2026-06-28T00:00:00+00:00')
+        got = da._delegation_trail_field(
+            cap, {}, declined_origins={DELEGATE_ID}, now=NOW)
+        self.assertEqual(got['delegation_build_phase'], 'declined')
+        self.assertIsNone(got['delegation_pr_url'])
+
+    def test_declined_beats_the_grace_window(self):
+        # A rejection CONCLUDES the delegation, so "give it another 15 minutes"
+        # is as wrong as "go nudge it". A fast reject lands inside the grace
+        # window, which would otherwise render the calm `handed_off`.
+        cap = _delegate_cap(stamped_at='2026-07-11T11:55:00+00:00')  # 5 min old
+        got = da._delegation_trail_field(
+            cap, {}, declined_origins={DELEGATE_ID}, now=NOW)
+        self.assertEqual(got['delegation_build_phase'], 'declined')
+
+    def test_open_approval_beats_declined(self):
+        # Rejected once, re-delegated, now parked on Larry: "waiting on your
+        # approval" is truer than a verdict he has already superseded.
+        cap = _delegate_cap(stamped_at='2026-06-28T00:00:00+00:00')
+        got = da._delegation_trail_field(
+            cap, {}, None, has_open_approval=True,
+            declined_origins={DELEGATE_ID}, now=NOW)
+        self.assertIsNone(got['delegation_build_phase'])
+
+    def test_real_events_beat_declined(self):
+        # If something actually ran, the trail says so rather than the approval's
+        # verdict — a build is stronger evidence than a rejection record.
+        cap = _delegate_cap(stamped_at='2026-06-28T00:00:00+00:00')
+        got = da._delegation_trail_field(
+            cap, {DELEGATE_ID: [_ev('review_request')]},
+            declined_origins={DELEGATE_ID}, now=NOW)
+        self.assertEqual(got['delegation_build_phase'], 'in_review')
+
+    def test_undeclined_card_is_unaffected_by_a_populated_declined_set(self):
+        # The set is keyed by origin: another card's rejection must not bleed.
+        cap = _delegate_cap(stamped_at='2026-06-28T00:00:00+00:00')
+        got = da._delegation_trail_field(
+            cap, {}, declined_origins={'delegate-someone-else'}, now=NOW)
+        self.assertEqual(got['delegation_build_phase'], 'stalled')
+
+    def test_declined_beats_a_superseded_rounds_native_build(self):
+        # The netting is newest-wins, so a DECLINED card can still carry the
+        # ledger receipt of an earlier approved round — and `native_build_events`
+        # is keyed off exactly that receipt. Without the guard, approve → build →
+        # reject renders "Building" off the finished old build for a delegation
+        # Larry just rejected. The declined verdict must win over the bridge.
+        cap = _delegate_cap(stamped_at='2026-06-28T00:00:00+00:00')
+        native = {DELEGATE_ID: [{'event_type': 'session_start',
+                                 'agent': 'forge'}]}
+        got = da._delegation_trail_field(
+            cap, {}, None, native_build_events=native,
+            dispatched_by_origin=RECEIPT, declined_origins={DELEGATE_ID},
+            now=NOW)
+        self.assertEqual(got['delegation_build_phase'], 'declined')
+
+    def test_declined_beats_a_superseded_receipt(self):
+        # Same shape without the native events: the stale receipt must not
+        # resurrect the calm "Handed to the team".
+        cap = _delegate_cap(stamped_at='2026-06-28T00:00:00+00:00')
+        got = da._delegation_trail_field(
+            cap, {}, dispatched_by_origin=RECEIPT,
+            declined_origins={DELEGATE_ID}, now=NOW)
+        self.assertEqual(got['delegation_build_phase'], 'declined')
+
+    def test_declined_defaults_off_so_stalled_is_unchanged(self):
+        # Callers that never pass the set keep exactly today's behaviour.
+        cap = _delegate_cap(stamped_at='2026-06-28T00:00:00+00:00')
+        self.assertEqual(
+            da._delegation_trail_field(cap, {}, now=NOW)[
+                'delegation_build_phase'],
+            'stalled')
+
     def test_forge_session_start_reads_building(self):
         # Ledger bridge: the dispatched build's OWN session_start (not
         # origin-tagged) is what proves Forge is mid-build.
@@ -238,6 +319,25 @@ class DelegationTrailFieldTest(unittest.TestCase):
         cap = _delegate_cap(stamped_at='2026-06-28T00:00:00+00:00')
         parked = da._parked_from_captures([cap], NOW, {})
         self.assertEqual(parked[0]['delegation_build_phase'], 'stalled')
+
+    def test_parked_declined_delegation_reads_declined(self):
+        # End-to-end through the parked derive — the board render for the live
+        # 2026-07-28 rejected card. THE gap this fix closes: there was no
+        # dashboard-path test for a declined delegation's rendered phase, which
+        # is why it shipped as `stalled` unnoticed.
+        cap = _delegate_cap(stamped_at='2026-06-28T00:00:00+00:00')
+        parked = da._parked_from_captures(
+            [cap], NOW, {}, declined_origins={DELEGATE_ID})
+        self.assertEqual(parked[0]['delegation_build_phase'], 'declined')
+        self.assertIsNone(parked[0]['delegation_pr_url'])
+
+    def test_parked_declined_never_renders_blank(self):
+        # Blank is the OTHER failure mode: silence is what let 13-29-day-old dead
+        # delegations sit unnoticed. A declined card must say something.
+        cap = _delegate_cap(stamped_at='2026-06-28T00:00:00+00:00')
+        parked = da._parked_from_captures(
+            [cap], NOW, {}, declined_origins={DELEGATE_ID})
+        self.assertIsNotNone(parked[0]['delegation_build_phase'])
 
     def test_parked_open_approval_shows_needs_you_not_handed_off(self):
         # End-to-end precedence through the parked derive.
