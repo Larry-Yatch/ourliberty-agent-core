@@ -913,5 +913,232 @@ class TestLoaders(_ATSTestBase):
         self.assertIn('rotate-credential', reg)
 
 
+class TestLastTriagedIterPersistence(_ATSTestBase):
+    """The guard substrate: record_triage stores last_triaged_iter, triage_alert
+    threads iter_num, and legacy/direct calls default it to None (back-compat)."""
+
+    def test_record_triage_defaults_iter_none(self):
+        row = ats.record_triage('a', 3, 'silence', 'why')
+        self.assertIsNone(row['last_triaged_iter'])
+        self.assertIsNone(ats.read_state()['a']['last_triaged_iter'])
+
+    def test_record_triage_persists_explicit_iter(self):
+        row = ats.record_triage('a', 4, 'ask', 'novel', last_triaged_iter=17)
+        self.assertEqual(row['last_triaged_iter'], 17)
+        self.assertEqual(ats.read_state()['a']['last_triaged_iter'], 17)
+
+    def test_record_triage_normalizes_bool_iter_to_none(self):
+        # A bool is not a valid iter (isinstance(True, int) is True in Python).
+        row = ats.record_triage('a', 3, 'silence', 'why', last_triaged_iter=True)
+        self.assertIsNone(row['last_triaged_iter'])
+
+    def test_triage_alert_threads_iter_num_onto_row(self):
+        ats.triage_alert('a-novel', {'source': 's', 'subject': 'sub'},
+                        iter_num=88, registry=_FIXTURE_REGISTRY,
+                        translations=_FIXTURE_TRANSLATIONS, route_fn=_route_stub)
+        self.assertEqual(ats.read_state()['a-novel']['last_triaged_iter'], 88)
+
+    def test_triage_alert_idempotent_preserves_iter(self):
+        alert = {'source': 's', 'subject': 'sub'}
+        ats.triage_alert('a-novel', alert, iter_num=5, registry=_FIXTURE_REGISTRY,
+                        translations=_FIXTURE_TRANSLATIONS, route_fn=_route_stub)
+        # A re-run at a DIFFERENT iter is idempotent for Tier-4-awaiting? No —
+        # Tier 4 stays 'triaged-tier-4' (not terminal), so it re-triages. But a
+        # terminal (resolved) alert stays put with its original iter.
+        ats.triage_alert('a-known', {'source': 'heal-known',
+                                     'subject': 'known-subject'},
+                        iter_num=9, registry=_FIXTURE_REGISTRY,
+                        translations=_FIXTURE_TRANSLATIONS, route_fn=_route_stub)
+        ats.triage_alert('a-known', {'source': 'heal-known',
+                                     'subject': 'known-subject'},
+                        iter_num=99, registry=_FIXTURE_REGISTRY,
+                        translations=_FIXTURE_TRANSLATIONS, route_fn=_route_stub)
+        # Resolved on iter 9; the idempotent re-run at iter 99 does not overwrite.
+        self.assertEqual(ats.read_state()['a-known']['status'], 'resolved')
+        self.assertEqual(ats.read_state()['a-known']['last_triaged_iter'], 9)
+
+
+class TestGuardTier4(_ATSTestBase):
+    """The Tier-4 override guard: the deterministic helper is authoritative over
+    any in-prompt Tier-4 claim (spec check0-tier4-guard-001)."""
+
+    def _guard(self, alert_id, alert, *, iter_num, claimed_tier=4):
+        return ats.guard_tier4(alert_id, alert, iter_num=iter_num,
+                               claimed_tier=claimed_tier,
+                               registry=_FIXTURE_REGISTRY,
+                               translations=_FIXTURE_TRANSLATIONS,
+                               route_fn=_route_stub)
+
+    def _record_same_iter(self, alert_id, alert, iter_num):
+        """Persist a same-iter triage-alert row (the (a) precondition)."""
+        ats.triage_alert(alert_id, alert, iter_num=iter_num,
+                        registry=_FIXTURE_REGISTRY,
+                        translations=_FIXTURE_TRANSLATIONS, route_fn=_route_stub)
+
+    # (a) The incident, on LIVE config: a medic/medic-diagnosis alert the helper
+    # classifies Tier 3, with the LLM claiming Tier 4. Rejected → Tier 3.
+    def test_incident_medic_diagnosis_helper3_claim4_rejected(self):
+        alert = {'source': 'medic', 'subject': None, 'intent': 'medic-diagnosis'}
+        # Ground truth: the live helper classifies this Tier 3, decision silence.
+        helper = ats.classify(alert, registry=ats.load_registry(),
+                             translations=ats.load_translations())
+        self.assertEqual(helper['tier'], 3)
+        self.assertEqual(helper['decision'], 'silence')
+        # The compliant path recorded a same-iter triage-alert call (helper=3).
+        ats.triage_alert('medic-diag', alert, iter_num=7)
+        # The LLM now claims Tier 4 anyway. The guard (LIVE config) rejects it.
+        verdict = ats.guard_tier4('medic-diag', alert, iter_num=7, claimed_tier=4)
+        self.assertFalse(verdict['accepted'])
+        self.assertEqual(verdict['helper_tier'], 3)
+        self.assertEqual(verdict['authoritative_tier'], 3)
+        self.assertTrue(verdict['same_iter_call'])
+
+    # (b) Skip-helper: a genuinely-novel alert (helper==4) but NO same-iter row.
+    # Rejected → the write cannot land via the unguarded path.
+    def test_skip_helper_novel_no_same_iter_call_rejected(self):
+        alert = {'source': 's', 'subject': 'sub'}  # fixture-novel → Tier 4
+        verdict = self._guard('a-novel', alert, iter_num=3)
+        self.assertFalse(verdict['accepted'])
+        self.assertFalse(verdict['same_iter_call'])
+        self.assertEqual(verdict['helper_tier'], 4)
+        # Authoritative falls to the helper's tier (which is genuinely 4), but
+        # accepted=False keeps the unguarded write out — the fix is to persist
+        # via the triage-alert path, which records the same-iter call.
+        self.assertEqual(verdict['authoritative_tier'], verdict['helper_tier'])
+
+    # (c) Genuine novel: helper==4 AND a same-iter triage-alert call → accepted.
+    def test_genuine_novel_with_same_iter_call_accepted_tier4(self):
+        alert = {'source': 's', 'subject': 'sub'}  # fixture-novel → Tier 4
+        self._record_same_iter('a-novel', alert, iter_num=12)
+        verdict = self._guard('a-novel', alert, iter_num=12)
+        self.assertTrue(verdict['accepted'])
+        self.assertTrue(verdict['same_iter_call'])
+        self.assertEqual(verdict['helper_tier'], 4)
+        self.assertEqual(verdict['authoritative_tier'], 4)
+
+    # (d) Stale-iter: a row exists but last_triaged_iter != current iter.
+    def test_stale_iter_rejected_falls_to_helper(self):
+        alert = {'source': 's', 'subject': 'sub'}  # helper == 4
+        self._record_same_iter('a-novel', alert, iter_num=5)
+        verdict = self._guard('a-novel', alert, iter_num=6)  # different iter
+        self.assertFalse(verdict['accepted'])
+        self.assertFalse(verdict['same_iter_call'])
+        self.assertEqual(verdict['authoritative_tier'], verdict['helper_tier'])
+
+    def test_stale_iter_helper3_adopts_tier3(self):
+        # Stale iter AND a Tier-3 helper: unambiguously falls to Tier 3.
+        alert = {'source': 'heal-known', 'subject': 'known-subject'}
+        self._record_same_iter('a-known', alert, iter_num=5)
+        verdict = self._guard('a-known', alert, iter_num=6)
+        self.assertFalse(verdict['accepted'])
+        self.assertEqual(verdict['authoritative_tier'], 3)
+
+    # (e) Missing/unparseable alert never yields Tier 4.
+    def test_missing_alert_never_tier4(self):
+        verdict = ats.guard_tier4('a', None, iter_num=1, claimed_tier=4)
+        self.assertFalse(verdict['accepted'])
+        self.assertEqual(verdict['authoritative_tier'], ats.GUARD_FALLBACK_TIER)
+        self.assertNotEqual(verdict['authoritative_tier'], 4)
+
+    def test_missing_alert_never_tier4_even_with_same_iter_row(self):
+        # Even a valid same-iter row can't manufacture a Tier 4 from an
+        # unreadable alert — classify() can't run, so it falls to the safe tier.
+        ats.record_triage('a', 4, 'ask', 'novel', last_triaged_iter=4)
+        verdict = ats.guard_tier4('a', None, iter_num=4, claimed_tier=4)
+        self.assertTrue(verdict['same_iter_call'])
+        self.assertFalse(verdict['accepted'])
+        self.assertEqual(verdict['authoritative_tier'], ats.GUARD_FALLBACK_TIER)
+
+    def test_non_dict_alert_never_tier4(self):
+        for bad in (['a', 'list'], 'a-string', 42, None):
+            verdict = ats.guard_tier4('a', bad, iter_num=1, claimed_tier=4)
+            self.assertFalse(verdict['accepted'])
+            self.assertNotEqual(verdict['authoritative_tier'], 4)
+
+
+class TestGuardTier4CLI(_ATSTestBase):
+    """The write-boundary + verdict-surface CLIs."""
+
+    def _run(self, argv):
+        from io import StringIO
+        from contextlib import redirect_stdout
+        buf = StringIO()
+        with redirect_stdout(buf):
+            rc = ats.main(argv)
+        out = buf.getvalue().strip()
+        return rc, (json.loads(out) if out else None)
+
+    def test_guard_tier4_cli_emits_single_verdict_object(self):
+        alert = json.dumps({'source': 'novel-src-xyz', 'subject': 'unheard'})
+        rc, payload = self._run(['guard-tier4', '--alert-id', 'n', '--alert',
+                                 alert, '--iter', '2', '--claimed-tier', '4'])
+        self.assertEqual(rc, 0)
+        self.assertEqual(set(payload), {'authoritative_tier', 'accepted',
+                                        'helper_tier', 'same_iter_call', 'reason'})
+        self.assertFalse(payload['accepted'])  # no same-iter row
+
+    def test_guard_tier4_cli_unparseable_alert_never_tier4(self):
+        rc, payload = self._run(['guard-tier4', '--alert-id', 'n', '--alert',
+                                 '{bad json', '--iter', '2', '--claimed-tier', '4'])
+        self.assertEqual(rc, 0)
+        self.assertFalse(payload['accepted'])
+        self.assertEqual(payload['authoritative_tier'], ats.GUARD_FALLBACK_TIER)
+
+    def test_triage_cli_tier4_requires_alert_and_iter(self):
+        rc, payload = self._run(['triage', '--alert-id', 'x', '--tier', '4',
+                                 '--decision', 'ask', '--rationale', 'r'])
+        self.assertEqual(rc, 1)
+        self.assertFalse(payload['accepted'])
+        # Nothing was persisted.
+        self.assertEqual(ats.read_state(), {})
+
+    def test_triage_cli_tier4_rejected_when_no_same_iter_call(self):
+        alert = json.dumps({'source': 'novel-src-xyz', 'subject': 'unheard'})
+        rc, payload = self._run(['triage', '--alert-id', 'x', '--tier', '4',
+                                 '--decision', 'ask', '--rationale', 'r',
+                                 '--alert', alert, '--iter', '3'])
+        self.assertEqual(rc, 1)
+        self.assertFalse(payload['accepted'])
+        self.assertEqual(ats.read_state(), {})  # write rejected
+
+    def test_triage_cli_tier4_accepted_after_triage_alert_call(self):
+        alert = json.dumps({'source': 'novel-src-xyz', 'subject': 'unheard'})
+        # Compliant flow: triage-alert first (records the same-iter row, helper
+        # classifies this LIVE-novel alert Tier 4), THEN the low-level write.
+        rc0, _ = self._run(['triage-alert', '--alert-id', 'x', '--alert', alert,
+                            '--iter', '9'])
+        self.assertEqual(rc0, 0)
+        rc, row = self._run(['triage', '--alert-id', 'x', '--tier', '4',
+                             '--decision', 'ask', '--rationale', 'r',
+                             '--alert', alert, '--iter', '9'])
+        self.assertEqual(rc, 0)
+        self.assertEqual(row['tier'], 4)
+        self.assertEqual(row['last_triaged_iter'], 9)
+
+    def test_triage_cli_incident_medic_diagnosis_rejected(self):
+        # End-to-end at the CLI boundary: the exact incident is refused.
+        alert = json.dumps({'source': 'medic', 'subject': None,
+                            'intent': 'medic-diagnosis'})
+        self._run(['triage-alert', '--alert-id', 'md', '--alert', alert,
+                  '--iter', '4'])  # helper records Tier 3
+        rc, payload = self._run(['triage', '--alert-id', 'md', '--tier', '4',
+                                 '--decision', 'ask', '--rationale', 'novel',
+                                 '--alert', alert, '--iter', '4'])
+        self.assertEqual(rc, 1)
+        self.assertEqual(payload['authoritative_tier'], 3)
+        # The persisted row is still Tier 3 (resolved), never overwritten to 4.
+        self.assertEqual(ats.read_state()['md']['tier'], 3)
+
+    def test_triage_cli_lower_tiers_unaffected(self):
+        # Tiers 1/2/3 need no --alert/--iter and write normally (back-compat).
+        for tier, decision in ((1, 'auto-fix'), (2, 'ask'), (3, 'silence')):
+            rc, row = self._run(['triage', '--alert-id', f't{tier}', '--tier',
+                                 str(tier), '--decision', decision,
+                                 '--rationale', 'r'])
+            self.assertEqual(rc, 0)
+            self.assertEqual(row['tier'], tier)
+            self.assertIsNone(row['last_triaged_iter'])
+
+
 if __name__ == '__main__':
     unittest.main()
