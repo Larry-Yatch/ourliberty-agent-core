@@ -4060,6 +4060,49 @@ class TestDagPreflightSyncLag(_TempAgentsRootMixin, unittest.TestCase):
             'review-sequence-dag-lag-seq-synclag2',
         )
 
+    def test_recovery_envelope_passes_the_real_dispatch_validators(self) -> None:
+        """Every other test of this recovery mocks `safe_write_inbox` — which
+        IS the validation seam. So the two conditions that decide whether the
+        heal can ever land in production were invisible to the whole suite,
+        and both were wrong: the envelope declares `source: 'orchestrator'`
+        while the caller declared `source_agent='heal-pipeline-stall'` (an
+        immediate "source mismatch" DispatchRejected), and that source has no
+        legal route to ANY agent (absent from `ALLOWED_SOURCES` and from
+        `FRESH_DISPATCH_ROUTES`/`SYSTEM_SOURCES`). The recovery returned False
+        on every tick, so Check 12 never re-dispatched anything and degraded to
+        the Larry DM it exists to avoid — while the suite stayed green.
+
+        Run what the recovery actually builds through the REAL validators,
+        in the order `safe_write_inbox` applies them."""
+        import build_sequence_validator as bsv
+        import dispatch_validator
+        import routing_validator
+        self._write_seq('lag-seq', audit=[self._lag(45)])
+        writer = MagicMock(return_value=Path('/tmp/x.json'))
+        with self._patch_presence(bsv.SPEC_DOC_PRESENT), \
+                patch.object(self.hps.safe_write_inbox, 'safe_write_inbox',
+                             writer):
+            self.assertTrue(
+                self.hps.check_dag_preflight_sync_lag({})[0]['recovery']())
+        kwargs = writer.call_args.kwargs
+        task, declared = kwargs['task_dict'], kwargs['source_agent']
+        self.assertEqual(
+            declared, task['source'],
+            'declared source_agent must equal the envelope\'s own `source` — '
+            'safe_write_inbox raises DispatchRejected("source mismatch") '
+            'before it writes anything',
+        )
+        ok, reason = dispatch_validator.validate_task(task)
+        self.assertTrue(ok, f'layer-1 schema rejected the envelope: {reason}')
+        ok, reason = routing_validator.check_hard_topology(
+            declared, kwargs['target_agent'])
+        self.assertTrue(
+            ok, f'layer-2 topology denied {declared}->'
+                f'{kwargs["target_agent"]}: {reason}')
+        ok, reason = routing_validator.check_target_repo(
+            kwargs['target_agent'], task.get('target_repo'))
+        self.assertTrue(ok, f'layer-2b repo scope denied: {reason}')
+
     def test_dispatch_ok_but_audit_write_fails_reports_truthfully(self) -> None:
         """The dispatch landed; only the bookkeeping failed. Returning False
         would fire the caller's alert, whose text says the re-dispatch did NOT

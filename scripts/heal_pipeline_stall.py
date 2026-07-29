@@ -3995,10 +3995,26 @@ def _recover_dag_preflight_sync_lag(seq_id: str, seq_path: str) -> bool:
             f'{type(e).__name__}: {e}', 'WARN')
         return False
     try:
+        # `source_agent` MUST equal the envelope's own `source`, and that
+        # source must be dispatch-legal to Mirror. Both are load-bearing and
+        # both are checked inside safe_write_inbox, which every test of this
+        # recovery mocks out — so neither is observable from this suite:
+        #   * safe_write_inbox rejects a source_agent that disagrees with
+        #     `task['source']` ("source mismatch"), and this envelope declares
+        #     `source: 'orchestrator'` to match the shape Mirror is dispatched
+        #     with (verified against ~/agents/inboxes/mirror/.archive/
+        #     review-sequence-dag-rsdpm-m14-001.2.json).
+        #   * 'heal-pipeline-stall' is in neither `dispatch_validator.
+        #     ALLOWED_SOURCES` nor `routing_validator.FRESH_DISPATCH_ROUTES`/
+        #     `SYSTEM_SOURCES`, so it has no legal route to ANY agent.
+        # Declaring the source the envelope actually carries is the same move
+        # `_route_revision_notify_to_beacon` makes above with 'mirror-result'.
+        # `test_recovery_envelope_passes_the_real_dispatch_validators` pins
+        # both against the real validators, unmocked.
         dest = safe_write_inbox.safe_write_inbox(
             target_agent='mirror',
             task_dict=task,
-            source_agent='heal-pipeline-stall',
+            source_agent=task['source'],
             filename=f'{task_id}.json',
         )
     except (safe_write_inbox.DispatchRejected,
