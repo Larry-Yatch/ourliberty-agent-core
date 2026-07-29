@@ -661,6 +661,36 @@ SPEC_DOC_BEHIND_ORIGIN = 'behind_origin'  # missing locally, present on origin/m
 SPEC_DOC_NOT_AUTHORED = 'not_authored'    # absent both locally and on origin/main → author it
 SPEC_DOC_INDETERMINATE = 'indeterminate'  # missing locally and origin/main doesn't resolve here
 
+# Statuses on which an on-demand fast-forward is worth attempting.
+#
+# NOT_AUTHORED is in here, and that is the whole point. `check_spec_doc_presence`
+# never fetches — it reads this checkout's LOCAL `refs/remotes/origin/main`. So
+# the two statuses are not "behind" vs "absent"; they are two different
+# staleness depths of the same condition:
+#
+#   spec merged, checkout fetched but not merged  → BEHIND_ORIGIN
+#   spec merged, checkout has not fetched at all  → NOT_AUTHORED
+#
+# The second is the MORE likely shape in the window this self-heal exists for.
+# The dispatch-repo sweep fetches and fast-forwards in one step, so between
+# ticks a clean checkout normally has a tracking ref as old as its HEAD — and a
+# spec that merged four minutes ago is invisible in both. Gating the refresh on
+# BEHIND_ORIGIN alone therefore skipped the case it was written to fix, and
+# NOT_AUTHORED tells Mirror the spec was "never authored" (agents/mirror/
+# CLAUDE.md exit 1: *"author + merge it before re-dispatching"*) for a spec that
+# is already on main — the precise re-authoring this arc exists to prevent, and
+# an outcome already observed once (incident 2026-06-10, merged PR #415
+# reported as never-authored because the checkout lagged by one commit).
+#
+# Cost on a genuinely unauthored spec: one `git fetch`, then the same
+# NOT_AUTHORED verdict. `sync_one` is ff-only and declines a dirty / off-main /
+# ahead tree, so attempting it here is no less safe than on BEHIND_ORIGIN.
+#
+# INDETERMINATE is deliberately NOT included: it means `origin/main` does not
+# resolve at all (not a synced checkout — an export, a fixture), where there is
+# no tracking ref for a fetch to advance and the honest answer is "cannot tell".
+SPEC_DOC_REFRESHABLE = (SPEC_DOC_BEHIND_ORIGIN, SPEC_DOC_NOT_AUTHORED)
+
 
 @dataclass
 class SpecDocPresence:
@@ -989,7 +1019,7 @@ def _cli_check_spec_doc(seq_id_or_path: str, *, refresh: bool = True) -> int:
     # of parking the build until it does. The refresh is ff-only and declines
     # a tree in use (see refresh_checkout), so the worst case is the same
     # BEHIND_ORIGIN we already had, now printed with the reason it stayed.
-    if refresh and presence.status == SPEC_DOC_BEHIND_ORIGIN:
+    if refresh and presence.status in SPEC_DOC_REFRESHABLE:
         line = refresh_checkout(repo_name, repo_root)
         if line is not None:
             # Always emitted, advanced or not: a silent no-op and a working
@@ -997,7 +1027,7 @@ def _cli_check_spec_doc(seq_id_or_path: str, *, refresh: bool = True) -> int:
             sys.stderr.write(f'REFRESH: {line}\n')
             presence = check_spec_doc_presence(
                 spec_doc, repo_root=repo_root, repo_name=repo_name)
-    elif not refresh and presence.status == SPEC_DOC_BEHIND_ORIGIN:
+    elif not refresh and presence.status in SPEC_DOC_REFRESHABLE:
         # Say so. Otherwise --no-refresh looks identical to a refresh that ran
         # and silently declined, and the operator can't tell which they got.
         sys.stderr.write('REFRESH: skipped — --no-refresh\n')

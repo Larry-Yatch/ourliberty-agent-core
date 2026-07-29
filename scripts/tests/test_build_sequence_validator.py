@@ -1140,6 +1140,82 @@ class SpecDocSyncLagSelfHealTest(unittest.TestCase):
         # The pull actually landed in the tree, not just in the log line.
         self.assertTrue((self.checkout / self.SPEC).is_file())
 
+    def _make_tracking_ref_stale(self) -> None:
+        """Make the checkout's own `origin/main` ref as old as its HEAD — i.e.
+        NOTHING has fetched since the spec merged.
+
+        `_build_behind_checkout` pushes and then rewinds HEAD, which leaves the
+        tracking ref pointing at the NEW commit — the shape you get after a
+        fetch that was not followed by a merge. That is only half the window.
+        The dispatch-repo sweep fetches and fast-forwards in ONE step, so
+        between ticks a clean checkout normally has a tracking ref as old as
+        its HEAD, and a spec that merged four minutes ago is invisible in both.
+        The bare origin still has the spec, so a fetch resolves it."""
+        self._git(self.checkout, 'update-ref', 'refs/remotes/origin/main',
+                  'HEAD')
+
+    def test_stale_tracking_ref_is_pulled_and_the_preflight_passes(self):
+        """The classifier NEVER fetches — it reads the local origin/main ref.
+        So the deeper-staleness half of the same window classifies
+        NOT_AUTHORED, not BEHIND_ORIGIN, and gating the refresh on
+        BEHIND_ORIGIN alone skipped the case this self-heal exists for.
+
+        Worse than a miss: NOT_AUTHORED routes to Mirror's exit-1 branch,
+        *'author + merge it before re-dispatching'*, for a spec already on
+        main — the re-authoring this whole arc exists to prevent, and an
+        outcome already observed once (2026-06-10, merged PR #415 reported as
+        never-authored because the checkout lagged by one commit)."""
+        self._make_tracking_ref_stale()
+        # Precondition: this really is the not_authored branch, not behind.
+        parked = bsv.check_spec_doc_presence(
+            self.SPEC, repo_root=self.checkout, repo_name='RSDPM')
+        self.assertEqual(parked.status, bsv.SPEC_DOC_NOT_AUTHORED)
+
+        proc = self._run_cli(self._seq_file('RSDPM'))
+        self.assertEqual(proc.returncode, 0, msg=proc.stderr)
+        self.assertIn('OK:', proc.stdout)
+        self.assertIn('REFRESH: RSDPM: advanced (+1)', proc.stderr)
+        self.assertTrue((self.checkout / self.SPEC).is_file())
+        self.assertNotIn('author', proc.stderr.lower())
+
+    def test_genuinely_unauthored_spec_still_exits_one_after_a_refresh(self):
+        """The other direction. Attempting the pull on NOT_AUTHORED must not
+        turn a real missing spec into a pass — it costs one fetch and reaches
+        the same verdict, which is what makes widening the guard safe."""
+        seq = _seq_with_target('RSDPM', spec_doc='specs/never-written.md')
+        path = self.tmpdir / 'seq-missing.json'
+        path.write_text(json.dumps(seq))
+        proc = self._run_cli(path)
+        self.assertEqual(proc.returncode, 1)
+        self.assertIn('NOT_AUTHORED', proc.stderr)
+        # The refresh was tried (and reported), it just could not help.
+        self.assertIn('REFRESH: RSDPM:', proc.stderr)
+
+    def test_stale_tracking_ref_on_a_dirty_tree_upgrades_the_diagnosis(self):
+        """Widening the guard must not widen what the refresh will MOVE — a
+        concurrent session's edits still outrank the preflight. But the attempt
+        is not wasted, and this is the most valuable case of the three.
+
+        `sync_one` fetches BEFORE it inspects the working tree, so even when it
+        then declines the merge, the tracking ref has advanced. The re-check
+        therefore turns an unknowable NOT_AUTHORED ('author + merge it first')
+        into a definite BEHIND_ORIGIN ('the spec EXISTS on main — do NOT
+        re-author it; your tree is dirty'). Same refusal to touch the tree,
+        strictly better diagnosis: exit 3, not exit 1."""
+        self._make_tracking_ref_stale()
+        (self.checkout / 'README.md').write_text('# someone is mid-edit\n')
+        proc = self._run_cli(self._seq_file('RSDPM'))
+        self.assertEqual(proc.returncode, 3, msg=proc.stderr)
+        self.assertIn('BEHIND_ORIGIN:', proc.stderr)
+        self.assertIn('NOT a missing spec', proc.stderr)
+        self.assertIn('REFRESH: RSDPM: skipped', proc.stderr)
+        self.assertIn('uncommitted change(s)', proc.stderr)
+        # Declined, not forced: the edit survives and the spec never arrived.
+        self.assertEqual(
+            (self.checkout / 'README.md').read_text(),
+            '# someone is mid-edit\n')
+        self.assertFalse((self.checkout / self.SPEC).exists())
+
     def test_dirty_checkout_is_declined_and_stays_behind(self):
         """Direction 2: it declines a dirty tree. This is a SHARED checkout —
         a concurrent session's edits outrank a preflight's convenience, so the

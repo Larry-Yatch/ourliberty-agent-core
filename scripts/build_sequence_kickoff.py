@@ -416,12 +416,19 @@ def apply_kickoff_transition(
     # function has run twice in three months, both for agent-core, which the
     # refresh skips anyway. The load-bearing copy of this self-heal is the one
     # in `check-spec-doc`, which is what Mirror's preflight actually runs.
-    if presence.status == bsv.SPEC_DOC_BEHIND_ORIGIN:
+    #
+    # Guarded on SPEC_DOC_REFRESHABLE, not BEHIND_ORIGIN alone: the classifier
+    # reads this checkout's LOCAL origin/main ref and never fetches, so a spec
+    # that merged since the last fetch reads as NOT_AUTHORED rather than
+    # BEHIND_ORIGIN — and that branch below FAILS the kickoff telling Larry to
+    # author a spec that is already on main. See SPEC_DOC_REFRESHABLE.
+    refresh_line = None
+    if presence.status in bsv.SPEC_DOC_REFRESHABLE:
         refresh_line = bsv.refresh_checkout(spec_repo_name, spec_repo_root)
         if refresh_line is not None:
             log(
-                f'BUILD_SEQUENCE_KICKOFF seq={seq_id} spec-doc-behind-origin '
-                f'refresh: {refresh_line}',
+                f'BUILD_SEQUENCE_KICKOFF seq={seq_id} '
+                f'spec-doc-{presence.status} refresh: {refresh_line}',
                 'INFO',
             )
             presence = bsv.check_spec_doc_presence(
@@ -453,8 +460,21 @@ def apply_kickoff_transition(
             sentinel=f'sequence-kickoff:spec-behind-origin:{seq_id}',
         )
     if presence.status == bsv.SPEC_DOC_NOT_AUTHORED:
+        # Carry the refresh outcome when one was attempted. NOT_AUTHORED is an
+        # assertion about a possibly-stale origin/main ref; if the on-demand
+        # pull DECLINED (dirty tree, off main, fetch failure) we still cannot
+        # distinguish "never authored" from "a sync-lag we could not clear",
+        # and telling Larry to author the spec without that caveat is how the
+        # 2026-06-10 mis-diagnosis happened.
+        caveat = (
+            f' (an on-demand fast-forward was attempted first — `{refresh_line}` '
+            f'— so if that line does not say `advanced`, this verdict is based '
+            f'on a checkout that could not be refreshed; confirm on origin/main '
+            f'before authoring anything.)'
+            if refresh_line else ''
+        )
         msg = (
-            f'Sequence `{seq_id}` kickoff failed: {presence.message} '
+            f'Sequence `{seq_id}` kickoff failed: {presence.message}{caveat} '
             f'Sequence file: `{seq_path}`.'
         )
         larry_alerts.append_alert(
