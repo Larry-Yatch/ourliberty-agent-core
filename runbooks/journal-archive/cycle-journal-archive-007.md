@@ -13415,3 +13415,117 @@ SIGNAL ⚠️ (PR#163 142min; queue: #167 blocked behind it)
 
 ---
 
+## Iteration ~6839 — 2026-07-30T02:23Z UTC (Larry /cycle chat, Tier 1, consecutive_clean=0; MAJOR POSITIVES: PR#1064 MERGED ✅ + PR#1063 MERGED ✅ + RSDPM ALL CLEAR ✅ (PR#163+#166+#167 merged); Check A: ff applied (aca25a04→7254fd00); SIGNAL: PR#1060 deep-review gate fired; pending=2 (deep-review-pr1060 + unreg-M14-drop))
+
+**Health:** ⚠️ Signal — Check 4: pending=2 (deep-review-hold-pr1060-c9eb3c85 + unreg-approval-2fefe6e404fa). Check E: PR#1060 deep-review gate fired (action required). Check A: behind → ff applied (PR#1064+#1063 merges). MASSIVE POSITIVES: PR#1064 MERGED ✅; PR#1063 MERGED ✅; RSDPM entirely clear (PR#163+#167+#166 all merged 02:13-02:17Z UTC, 0 open RSDPM PRs). Check 3 CLEAN. Rate-limit: self-resolved (no new events this iter).
+
+**VERIFY-BEFORE-REASSERT (from iter ~6838 at ~02:12Z UTC):**
+- **"system-health=healthy ts=02:00:57Z UTC"**: CONFIRMED ✅ → ts=2026-07-30T02:16:16Z UTC (fresh ~7 min at check time). All 4 bots alive. [carry ✅]
+- **"heal-stale-daemon-code.heartbeat"**: CONFIRMED ✅ → 2026-07-30T02:16:16Z UTC (fresh ~7 min; <60 min). [carry ✅]
+- **"alerts watermark=575=file_length=575"**: CHANGED — file_length grew to 579 (4 new alerts L576-579 triaged). Watermark advanced to 579. [SIGNAL → see Check 0]
+- **"pending=5 unreg-approvals [SIGNAL ⚠️]"**: CHANGED ✅ → pending=2 (stale items auto-retired: ref:163/164/165/1051; deep-review-pr1064 resolved after merge; remaining: unreg-M14-drop + deep-review-pr1060). [SIGNAL CHANGED ⚠️ still pending]
+- **"PR#1064 deep-review gate [SIGNAL ⚠️ — ACTION REQUIRED]"**: CHANGED ✅ **MAJOR POSITIVE** → PR#1064 MERGED at ~02:20Z UTC (SHA aca25a04, `fix: closed-PR dispatch wedge via generation-in-marker + loud skip + deadline reconciler`). Larry approved deep-review between iters. deep-review-hold-pr1064-cc193879 resolved (approval retired). [MERGED ✅]
+- **"PR#1063 — deep-review gate will fire after #1064 merges"**: CHANGED ✅ **MAJOR POSITIVE** → PR#1063 MERGED at 02:20:09Z UTC (SHA 7254fd00, `fix: serialize build-sequence RMW through atomic_io.locked_update`). Had `deep-review-passed` label — auto-merge succeeded immediately after #1064 cleared. Worktrees torn down; regression baseline spawned. [MERGED ✅]
+- **"PR#1060 auto-review + held-behind-#1063"**: CHANGED ⚠️ **SIGNAL** → `held-behind-#1063` label gone (blocker merged). Now labels=['auto-review'], MERGEABLE, sha=c9eb3c85. **Deep-review hold fired at ~02:20:17Z UTC**: `deep-review-hold-pr1060-c9eb3c85` surfaced in Approvals tab. [SIGNAL ⚠️ ACTION REQUIRED]
+- **"HEAD=origin/main=86a2fa39"**: CHANGED ✅ → 7254fd00 (after ff). [ALWAYS-FIX applied ✅]
+- **"PR#163 RSDPM bottleneck (142min, 12th carry)"**: CHANGED ✅ **MAJOR POSITIVE** → MERGED at 2026-07-30T02:13:42Z UTC (`fix(leak-harness): retry the fixture purge — it races t...`). 12-carry bottleneck CLEARED. [MERGED ✅]
+- **"PR#166 in Mirror review"**: CHANGED ✅ **MAJOR POSITIVE** → MERGED at 2026-07-30T02:17:36Z UTC (`fix(drift-gate): make the applied audit prove it covers`). [MERGED ✅]
+- **"PR#167 held-behind-#163"**: CHANGED ✅ **MAJOR POSITIVE** → MERGED at 2026-07-30T02:13:57Z UTC (`fix(seed-check): one() must not report a failed read as...`). [MERGED ✅]
+- **"GitHub rate-limit consecutive=4 [MONITORING]"**: CONFIRMED RESOLVED ✅ → no new rate-limit events this iter; log quiet after 02:14Z UTC. [carry — resolved ✅]
+- **"direction-ask-rsdpm-no-autolabel-review-gap-001 (verification_pending)"**: CARRY → confirmed per Beacon .archive/. The fix appears to have unblocked PR#163 chain (all RSDPM PRs now merged). [VP carry — may be verifiable]
+- **"rsdpm-0037-staging-drift Tier-4 [carry]"**: CARRY — awaiting Larry. [carry]
+- Other G-rule carries (2/3 unchanged): forge-marker-taskid-suffix-increment; medic-draft-status-false-positive; check-i-force-bypass-dm-route; beacon-pending-approvals-path-bug; deep-review-hold-approved-loop-post-merge-001. VPs: pulse-cycle-check0-helper-override, auto-merge-conflict-route-hold, direction-ask-rsdpm-no-autolabel-review-gap-001.
+
+**Check 0 — Alert triage (~02:19Z UTC):** `repair-watermark` → `{"repaired": false, "old_watermark": 575, "file_length": 579}` — no rotation gap. `get-watermark` → 575. **4 new alerts** (lines 576-579):
+- **Line 576** — ts=02:10:01Z UTC, source=outbox-notifier, intent=pending_auto_merge_exhausted, PR#1064. `triage-alert` → **Tier 4** (novel: no registry template). PR#1064 MERGED post-triage; this alert is superseded. Note: DM idx=575 already delivered to Larry at 02:10:57Z UTC. ✅
+- **Line 577** — ts=02:10:01Z UTC, source=outbox-notifier, pending_auto_merge_exhausted PR#1063, route=hold (not delivered). `triage-alert` → **Tier 4** (novel). PR#1063 MERGED post-triage; superseded. ✅
+- **Line 578** — ts=02:10:21Z UTC, source=doorbell, intent=doorbell, "6 items need your call." `triage-alert` → **Tier 3** (known-pattern). Silence ✅. Already delivered idx=577.
+- **Line 579** — ts=02:16:12Z UTC, source=pulse, subject=pending-approvals:unreg-batch:5-items. `triage-alert` → **Tier 4** (novel; self-generated stale carry). Superseded by Check 4 current state (pending=2). ✅
+`set-watermark --line 579` ✅. Tier-4 × 3 (all superseded by post-triage merges) — logging for G-rule tracking (pending_auto_merge_exhausted allowlist candidate when pattern hits 3/3). SIGNAL ⚠️ (Tier-4 presence; post-triage superseded)
+
+**Check 1 — Log noise (~02:19Z UTC):** Notable events since iter ~6838 (~02:12Z UTC):
+- 20:09-20:10Z MDT (02:09-02:10Z UTC): AUTO_MERGE_HELD_DEEP_REVIEW × 6 retries for PR#1064 → AUTO_MERGE_PENDING_EXHAUSTED (both #1064 and #1063). Root cause: deep-review gate holding #1064. Self-resolved when Larry approved + merged. ✅
+- 20:14:53-0600 (02:14:53Z): `beacon replan APPROVAL_REQUEST for task notify-pr-RSDPM-166 has no valid reply_chat_id (got None); cannot route approval DM` — null chat-id routing gap (G-rule beacon-pending-approvals-path-bug carry 2/3). 1 occurrence; not above 5/h threshold.
+- 20:20:07-17Z UTC: BASELINE_WARM for PR#1063 spawned; worktrees torn down; PR#1060 auto-merge attempted → AUTO_MERGE_HELD_DEEP_REVIEW fired. ✅ chain working correctly.
+- Log quiet after 02:20:32Z UTC. 0 WARN patterns >5/h in steady state.
+NOMINAL ✅ (burst contained; self-resolved)
+
+**Check 2 — Telegram sweep (~02:19Z UTC):** Last delivery: idx=577 at [2026-07-29T20:10:57-0600] = 02:10:57Z UTC (doorbell). Larry's last message: "why is 167 sitting?" at [2026-07-29T19:44:39-0600] = 01:44:39Z UTC (~39 min before this iter). Handled per iter ~6836 (Beacon replied + directed). No new Larry messages. No orphan directives. NOMINAL ✅
+
+**Check 3 — Pipeline stall (~02:18Z UTC):** heal_pipeline_stall.py --dry-run → **DRY-RUN: 0 stalls detected** ✅
+- FORGE_NO_PR_SKIP ×9 (all known patterns; m14-pr-c=PR#161 MERGED etc.)
+- MIRROR_PASS_UNMERGED_SKIP task=closed-pr-dedup-wedge-fix-001 (held_deep_review) → PR#1064 NOW MERGED ✅ (correct suppression; PR merged mid-cycle)
+- MIRROR_PASS_UNMERGED_SKIP task=seq-file-locked-rmw-migration-001 (held_deep_review) → PR#1063 NOW MERGED ✅ (same; merged mid-cycle)
+NOMINAL ✅ **POSITIVE — both previously-held PRs now merged**
+
+**Check 4 — Pending directives (~02:22Z UTC, post-merge re-read):** beacon-pending-approvals.json (state/): **pending=2** ⚠️ SIGNAL
+- `deep-review-hold-pr1060-c9eb3c85`: `fix(approvals): Approve on a promoted stranded-escalation case` — PR#1060 PASSED Mirror, critical-path change, no `deep-review-passed` stamp. **Needs Larry's `/code-review high 1060`** → approve in Approvals tab → `scripts/merge_reviewed_pr.sh 1060`.
+- `unreg-approval-2fefe6e404fa`: M14 destructive migration 0033 (DROP profiles.is_org_owner from public.profiles). **Needs Larry's approve/reject decision.** No auto-resolve possible — this is a data-destructive change.
+(3 stale items from iter ~6838 batch retired: ref:163/164/165/1051 auto-removed after PR merges; deep-review-pr1064 resolved.) SIGNAL ⚠️
+
+**Check 5 — Stale daemon code (~02:19Z UTC):** heal-stale-daemon-code.heartbeat=2026-07-30T02:16:16Z UTC (~7 min; <60 min). system-health overall=healthy ts=2026-07-30T02:16:16Z UTC. NOMINAL ✅
+
+**Check A — Source repo (~02:22Z UTC):** On main. Working tree clean. **BEHIND** (initial check ~02:19Z UTC: HEAD=0daa9fba vs origin/main=aca25a04 after fetch). ALWAYS-FIX: `git -C ~/agent-core pull --ff-only` → Updated aca25a04..7254fd00 (PR#1063 merge: 7 files changed, 1090 insertions, 418 deletions — build_sequence_advancer.py, build_sequence_kickoff.py, heal_pipeline_stall.py, launch_queue_drain.py, outbox_notifier.py, sequence_shortcut_helpers.py, + new test_sequence_locked_rmw.py). HEAD=origin/main=7254fd00. NOMINAL (after fix) ✅
+**Check B — Sync health (~02:19Z UTC):** last_sync=2026-07-30T01:23:59Z UTC (~55 min; <2h); status=no-change; push_fails=0. NOMINAL ✅
+**Check C — Agent liveness (~02:19Z UTC):** system-health=healthy ts=2026-07-30T02:16:16Z UTC (fresh ~7 min). All 4 bots alive (beacon/forge/mirror/pulse desired=up alive=true action=noop). Note: outbox-notifier cycled at 02:20:27-02:20:29Z UTC (signal 15 / restart); resumed immediately. NOMINAL ✅
+**Check E — PR/merge state (~02:22Z UTC):** ourliberty-agent-core: **1 open PR**:
+- **#1060** fix(approvals): Approve on a promoted stranded-escalation case (age=~206 min; labels=['auto-review']; MERGEABLE; sha=c9eb3c85). Mirror PASSED (prior). **Deep-review gate FIRED at ~02:20:17Z UTC** — `deep-review-hold-pr1060-c9eb3c85` in pending approvals. ⚠️ ACTION REQUIRED
+- **#1064 MERGED ✅** at ~02:20Z UTC
+- **#1063 MERGED ✅** at 02:20:09Z UTC
+SIGNAL ⚠️ (PR#1060 deep-review hold — Larry action required)
+
+**Check H — RSDPM digest (~02:21Z UTC): 0 OPEN PRs ✅ ALL MERGED**
+- PR#163 MERGED at 02:13:42Z UTC (`fix(leak-harness)`) — **12-carry bottleneck CLEARED** ✅
+- PR#167 MERGED at 02:13:57Z UTC (`fix(seed-check)`) — cascade after #163 ✅
+- PR#166 MERGED at 02:17:36Z UTC (`fix(drift-gate)`) ✅
+- (PR#168/164/165 merged in prior iters)
+RSDPM backlog: ENTIRELY CLEAR. No open RSDPM PRs. **MAJOR POSITIVE ✅✅**
+
+**§5.0 one-shots (~02:19Z UTC):** audit_due_nudge → no-op ✅. distill_detector → no-op ✅. silence_file_auditor → 5 files (1 expired 0-suppressed, 4 permanent 0-suppressed) ✅. NOMINAL ✅
+
+**§5 periodic — Check I (carry):** Most recent: check-i-2026-07-29.json. Next: Fri 2026-08-01. Carry: $1,201/wk +206%; proposal #1 (45σ cycle review) via `/dispatch 1`.
+**§5 periodic — Check III (carry):** Most recent: check-iii-2026-07-26.json. Next: Sun 2026-08-03. NOMINAL ✅
+
+**Credential rotation (~02:19Z UTC):** SUPABASE_SERVICE_ROLE_KEY: last DM 2026-07-20T20:00:15Z UTC; 14d dedup expires ~2026-08-03; due=2026-08-22 (23d). Within dedup window — no DM. SUPABASE_DB_PASSWORD: MISSING_CREDENTIAL (Tier-4 carry — no new alert this iter; install per runbook OR retire from config/token-rotation-schedule.json). NOMINAL (KEY) / CARRY (PASSWORD).
+
+**PRIME DIRECTIVE accounting:** intervention appended (tier=1, template=check4-pending2-deep-review-pr1060-unreg-m14-drop-pr1064-pr1063-merged, ts=2026-07-30T02:22:30Z UTC). ratio≈39.75 (systemic_fixes=48, verification_pending=23, trend=worsening). **TIER: Tier 1 (signals: Check A ff-applied + Check 4 pending=2 + Check E PR#1060 deep-review hold; consecutive_clean=0; last_signal_at=2026-07-30T02:22:58Z UTC).**
+
+**Patterns:**
+- **PR#1064 + PR#1063 MERGED [MAJOR POSITIVE ✅✅]**: Larry approved the PR#1064 deep-review hold between iters ~6838 and ~6839. Auto-merge chain fired: #1064 (aca25a04) merged at ~02:20Z UTC; #1063 (7254fd00) had `deep-review-passed` label → merged immediately at 02:20:09Z UTC. Build scripts overhauled (outbox_notifier.py, build_sequence_advancer.py, heal_pipeline_stall.py). Regression baseline spawned post-merge.
+- **RSDPM queue ENTIRELY CLEAR [MAJOR POSITIVE ✅✅]**: PR#163 (12th-carry bottleneck) merged at 02:13:42Z UTC; cascade: PR#167 merged at 02:13:57Z UTC; PR#166 (in Mirror review this cycle) merged at 02:17:36Z UTC. 0 open RSDPM PRs — first time in many cycles. Direction-ask-rsdpm-no-autolabel-review-gap-001 (dispatched to Beacon, verification_pending) likely contributed by unblocking auto-review labeling. VP verification: if main RSDPM branch is now fully up-to-date, this verification_pending can resolve.
+- **PR#1060 deep-review gate [SIGNAL ⚠️ — NEXT ACTION REQUIRED]**: The same deep-review chain mechanics. `fix(approvals): Approve on a promoted stranded-escalation case` passed Mirror but lacks a `deep-review-passed` stamp. This is the 3rd consecutive PR hitting the deep-review gate in this release window (#1064, then #1063 approved and had it, now #1060). Pattern: deep-review-gate fires are becoming the normal merge cadence for critical-path changes. Larry needs to: (1) run `/code-review high 1060`, (2) approve `deep-review-hold-pr1060-c9eb3c85` in Approvals tab, (3) run `scripts/merge_reviewed_pr.sh 1060`.
+- **auto-merge-exhausted Tier-4 alerts (L576, L577) — G-rule candidate [1/3]**: First occurrence of `pending_auto_merge_exhausted` alert shape hitting Tier-4 (no registry template). Root cause: deep-review hold is a design-intentional block, not a technical failure — yet the exhausted-retry alert fires and routes as novel. When this shape next recurs (after another deep-review hold → retry exhaustion), that's 2/3. At 3/3, dispatch Beacon direction-ask to add `pending_auto_merge_exhausted` with `held_deep_review` context to `alert-translations.json` as Tier-3 known-pattern.
+- **outbox-notifier restart at 02:20:27-02:20:29Z UTC [NOMINAL]**: signal 15 (SIGTERM) → clean exit → restart within 2 seconds. Unrelated to the deep-review chain work; likely a systemd timer or graceful reload. All subsequent log entries nominal. Pattern: 0/3 for notifier-restart G-rule.
+- G-rule carries (2/3 unchanged): forge-marker-taskid-suffix-increment; medic-draft-status-false-positive; check-i-force-bypass-dm-route; beacon-pending-approvals-path-bug; deep-review-hold-approved-loop-post-merge-001. VPs: pulse-cycle-check0-helper-override, auto-merge-conflict-route-hold, direction-ask-rsdpm-no-autolabel-review-gap-001 (VP may be resolvable — RSDPM clear).
+
+**Actions taken:**
+1. Check 0: `repair-watermark` → {repaired=false, old=575, file=579} — no rotation gap. ✅
+2. Check 0: `triage-alert` L576 (pending_auto_merge_exhausted:PR#1064) → Tier 4 (novel; post-triage PR merged — superseded). ✅
+3. Check 0: `triage-alert` L577 (pending_auto_merge_exhausted:PR#1063) → Tier 4 (novel; route=hold; post-triage PR merged — superseded). ✅
+4. Check 0: `triage-alert` L578 (doorbell) → Tier 3 silence. ✅
+5. Check 0: `triage-alert` L579 (pulse:unreg-batch) → Tier 4 (novel; stale/superseded by Check 4). ✅
+6. Check 0: `set-watermark --line 579` → confirmed 579. ✅
+7. Check A: `git -C ~/agent-core pull --ff-only` → Updated aca25a04..7254fd00 (PR#1063 merge; 7 files). ✅
+8. §5.0 one-shots: all three → no-op ✅.
+9. PRIME ledger: intervention appended at 2026-07-30T02:22:30Z UTC (tier=1, template=check4-pending2-deep-review-pr1060-unreg-m14-drop-pr1064-pr1063-merged).
+10. Tier state: `cycle_tier_state.py record --checks-clean false` → Tier 1; consecutive_clean=0; last_signal_at=2026-07-30T02:22:58Z UTC.
+
+**Escalations:**
+- **[yellow — ACTION REQUIRED] PR#1060 deep-review gate fired**: `fix(approvals): Approve on a promoted stranded-escalation case`, sha=c9eb3c85, MERGEABLE. `deep-review-hold-pr1060-c9eb3c85` is in Approvals tab. Larry must: (1) `/code-review high 1060` → (2) approve in Approvals tab → (3) `scripts/merge_reviewed_pr.sh 1060`.
+- **[yellow — ACTION REQUIRED] M14 destructive migration 0033**: `unreg-approval-2fefe6e404fa` (irreversibly DROP profiles.is_org_owner). Approve or reject in Approvals tab.
+- **[blue — MAJOR POSITIVE] PR#1064 MERGED ✅**: `fix: closed-PR dispatch wedge via generation-in-marker + loud skip + deadline reconciler`.
+- **[blue — MAJOR POSITIVE] PR#1063 MERGED ✅**: `fix: serialize build-sequence RMW through atomic_io.locked_update`.
+- **[blue — MAJOR POSITIVE] RSDPM CLEAR ✅**: PR#163+#167+#166 all merged; 0 open RSDPM PRs.
+- **[carry ⚠️] RSDPM staging drift (0035, 0036, 0037)**: Awaiting Larry ssh investigation.
+- **[carry ⚠️] credential-drift:MISSING_CREDENTIAL:SUPABASE_DB_PASSWORD**: Install per runbook OR retire from config/token-rotation-schedule.json.
+- [carry] check-vi-posture-proposals-2026-07-07 (2 proposals). Awaiting Larry.
+- [carry — monitoring] Mirror queue-wait p95=92.3m.
+- [carry — no Larry reply] Check XIV Tier-4 × 2: oversilence + fleet digest.
+- [carry — monitoring] tier4-rsdpm-install-drift.
+- [carry — monitoring] forge-wip-redispatch EXHAUSTED (rsdpm-pr155).
+- **[blue] Check I: weekly cost $1,201 (+206%)**. Proposal #1 via `/dispatch 1`.
+
+**Tier end-of-iter:** **Tier 1** (signals: Check A ff-applied + Check 4 pending=2 + Check E PR#1060 deep-review hold; consecutive_clean=0; last_signal_at=2026-07-30T02:22:58Z UTC).
+
+---
+
