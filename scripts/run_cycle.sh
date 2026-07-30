@@ -234,7 +234,11 @@ if command -v jq >/dev/null 2>&1 && [ -s "$CYCLE_OUT" ]; then
             agent: "pulse",
             task_id: ("cycle-" + ($ts | gsub("[^0-9]"; ""))),
             task_type: "cycle",
-            model: (.modelUsage // {} | keys | first // "claude-sonnet-4-6"),
+            # The work model is the one that generated the most output, NOT the
+            # alphabetically-first key. Claude Code reports a utility model
+            # (haiku) in modelUsage alongside the real model; `keys | first`
+            # sorts, so haiku always won and every cycle was mislabelled.
+            model: ((.modelUsage // {} | to_entries | max_by(.value.outputTokens // 0) | .key) // "claude-sonnet-4-6"),
             account: $acct,
             cost_usd: (.total_cost_usd // .cost_usd // null),
             input_tokens: (.usage.input_tokens // null),
