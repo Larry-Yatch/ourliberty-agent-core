@@ -2422,6 +2422,11 @@
         "model": "claude-opus-4-8",
         "at": "2026-07-30T00:45:28.494433+00:00",
         "from_state": "parked"
+      },
+      "spawned": {
+        "kind": "delegate",
+        "task_id": "delegate-cap-closed-pr-step-wedged-forever-by-headless-dispat-37d6",
+        "stamped_at": "2026-07-30T00:48:41.785148+00:00"
       }
     }
   ]
