@@ -10329,3 +10329,66 @@ SIGNAL ⚠️ (PR#1058/PR#1053/PR#157 carries; no state change this iter)
 
 ---
 
+## Iteration ~6787 — 2026-07-29T21:39Z UTC (Larry /cycle chat, Tier 1, consecutive_clean=0→1; NOMINAL carry — all 6 mandatory checks NOMINAL; pending=4 UNCHANGED; PR#1058/PR#1053/PR#157 carries; 0 new alerts; Check 3: stall-checker cooldown still active + check0-tier4-guard-001 now FORGE_NO_PR_SKIP [new positive])
+
+**Health:** ✅ Nominal carry — all mandatory checks NOMINAL; 0 new alerts; pending=4 UNCHANGED; no new actionable findings. Carries unchanged: PR#1058 OPEN (stall-checker cooldown still active), PR#1053 deep-review hold, RSDPM PR#157 pending not self-resolved.
+
+**VERIFY-BEFORE-REASSERT (from iter ~6786 at ~21:33Z UTC):**
+- **"system-health=healthy ts=2026-07-29T21:31:39Z UTC"**: CONFIRMED ✅ — ts=2026-07-29T21:36:49Z UTC (FRESH ~3 min). [carry ✅]
+- **"heal-stale-daemon-code.heartbeat 21:24:16Z UTC"**: CONFIRMED ✅ — heartbeat=2026-07-29T21:34:17Z UTC (~5 min; <60 min). [carry ✅]
+- **"alerts watermark=533 file_length=533"**: CONFIRMED ✅ — {repaired=false, old_watermark=533, file_length=533}. 0 new alerts. [carry ✅ NOMINAL]
+- **"pending=4 CHANGED (was 3)"**: CONFIRMED ✅ — pending=4 UNCHANGED (rsdpm-confirmall-medium-parent-secondglance-001; deep-review-hold-pr157-db391ec4; deep-review-hold-pr1053-c9c56f09; unreg-approval-de9cda4efdbd). [carry ✅ NOMINAL]
+- **"PR#1058 OPEN (MERGEABLE; stall-checker cooldown active)"**: CONFIRMED ⚠️ — UNKNOWN mergeable; updatedAt=20:32:19Z UNCHANGED; stall-checker cooldown still suppressing red_mirror_status:1058. [carry ⚠️]
+- **"PR#1053 AUTO_MERGE_HELD_DEEP_REVIEW"**: CONFIRMED ⚠️ — UNKNOWN mergeable; updatedAt=19:56:01Z UNCHANGED. [carry ⚠️]
+- **"RSDPM PR#157 deep-review-passed; pending not self-resolved"**: CONFIRMED ⚠️ — PR#157 OPEN, MERGEABLE, labels=['deep-review-passed'], updatedAt=21:21:36Z UNCHANGED; deep-review-hold-pr157-db391ec4 still pending. [carry ⚠️]
+- **"HEAD=a05042f9=origin/main"**: CHANGED ✅ — HEAD=21ae77d9=origin/main (wrapper "Pulse cycle 20260729T213452Z"). In sync. [carry ✅]
+- Remaining G-rule carries (rsdpm-rehearseprs 1/3, pulse-source-alert 1/3, forge-marker-taskid-suffix-increment 2/3, medic-draft-status-false-positive 2/3, check-i-force-bypass-dm-route 2/3, beacon-pending-approvals-path-bug 2/3, outbox-notifier-review-escalate-delivery-confirm-tier4-001 1/3, ourliberty-health-untracked-files-tier4-noise-001 1/3. VPs: pulse-cycle-check0-helper-override, auto-merge-conflict-route-hold, forge-wip-redispatch-digest-tier4-001, outbox-notifier-notification-intent-reject-tier4-001, forge-wip-redispatch-exhausted-genuine-no-pr-001): CARRY unchanged.
+
+**Check 0 — Alert triage (~21:38Z UTC):** `repair-watermark`: {repaired=false, old_watermark=533, file_length=533} — 0 new alerts. NOMINAL ✅
+
+**Check 1 — Log noise (~21:38Z UTC):** outbox-notifier.log: last entry [2026-07-29 14:46:12] MDT (20:46:12Z UTC) — no new entries since iter ~6786. NOMINAL ✅
+
+**Check 2 — Telegram sweep (~21:38Z UTC):** beacon_telegram_bot.log: last entry `[2026-07-29T14:43:39-0600]`=20:43:39Z UTC — alert idx=532 (ourliberty-health untracked; carry). No new Larry directives. NOMINAL ✅
+
+**Check 3 — Pipeline stall (~21:38Z UTC):** heal_pipeline_stall.py --dry-run: FORGE_NO_PR_SKIP ×8 (was ×7; new entry: check0-tier4-guard-001 now FORGE_NO_PR_SKIP reason=pr_exists match=branch pr=#1058 [✅ stall-checker now recognizes PR#1058 exists]); MIRROR_PASS_UNMERGED_SKIP task=m14-pr-b reason=held_deep_review; `suppressed (cooldown): red_mirror_status:Larry-Yatch/ourliberty-agent-core:1058:a85bf31f26cc`. **DRY-RUN: 0 stalls detected. NOMINAL ✅** (cooldown still active)
+
+**Check 4 — Pending directives (~21:38Z UTC):** beacon-pending-approvals.json (state/): **pending=4 UNCHANGED**.
+1. `rsdpm-confirmall-medium-parent-secondglance-001` — carry
+2. `deep-review-hold-pr157-db391ec4` — RSDPM PR#157 held (carry)
+3. `deep-review-hold-pr1053-c9c56f09` — PR#1053 deep-review hold (carry)
+4. `unreg-approval-de9cda4efdbd` — stranded Mirror review escalation PR#1058 (carry from iter ~6786)
+NOMINAL ✅ (count unchanged; no new items)
+
+**Check 5 — Stale daemon code (~21:38Z UTC):** heal-stale-daemon-code.heartbeat=2026-07-29T21:34:17Z UTC (~5 min; <60 min). system-health overall=healthy ts=2026-07-29T21:36:49Z UTC (FRESH). All checks/bots status=ok (disk 15%, memory 18%). NOMINAL ✅
+
+**Check A — Source repo (~21:38Z UTC):** On main. HEAD=21ae77d9=origin/main (in sync). Untracked: alert_522_tmp.json, triage_alert_522.py (carry). NOMINAL ✅
+**Check B — Sync health (~21:38Z UTC):** last_sync=2026-07-29T21:23:30Z (~16 min; <2h); status=no-change; consecutive_push_failures=0. NOMINAL ✅
+**Check C — Agent liveness (~21:38Z UTC):** system-health overall=healthy ts=2026-07-29T21:36:49Z UTC (FRESH). All bots/checks status=ok. NOMINAL ✅
+**Check E — PR/merge state (~21:38Z UTC):** ourliberty-agent-core: **2 open PRs (UNCHANGED)**:
+- **#1058** "feat(pulse): Check 0 guard" (UNKNOWN mergeable; updatedAt=20:32:19Z UNCHANGED; stall-checker cooldown active) ⚠️
+- **#1053** "fix(preflight): fresh spec in sync window" (UNKNOWN mergeable; updatedAt=19:56:01Z UNCHANGED; AUTO_MERGE_HELD_DEEP_REVIEW) ⚠️
+RSDPM: **1 open PR** — #157 (MERGEABLE, labels=['deep-review-passed'], updatedAt=21:21:36Z UNCHANGED; pending not resolved) ⚠️
+SIGNAL ⚠️ (PR#1058/PR#1053/PR#157 carries; no state change this iter)
+
+**§5.0 one-shots (~21:38Z UTC):** audit_due_nudge.py → no-op ✅. distill_detector.py → no-op ✅. silence_file_auditor.py → 3 expired (agent-runner-forge×2, agent-runner-pulse×1; 48.7d) + 4 permanent (0 suppressed); informational only. NOMINAL ✅
+
+**PRIME DIRECTIVE (~21:39Z UTC):** ratio=39.18, trend=worsening (interventions=1920, systemic_fixes=49, verification_pending=24). iter_clean row appended (tier=1, template=carry-pr1058-pr1053-pr157-pending4-unchanged-all-checks-nominal). Tier state: consecutive_clean advanced to 1; last_signal_at=2026-07-29T21:33:05Z UTC. **Tier 1 stays.**
+
+**Actions taken:**
+1. Check 0: `repair-watermark` → {repaired=false, old=533, file_length=533} — no repair needed.
+2. Check 0: 0 new alerts. Watermark confirmed at 533.
+3. §5.0 one-shots: all three → no-op ✅.
+4. PRIME ledger: iter_clean appended at 2026-07-29T21:39:16Z UTC (tier=1, template=carry-pr1058-pr1053-pr157-pending4-unchanged-all-checks-nominal).
+5. Tier state: `cycle_tier_state.py record --checks-clean true` → consecutive_clean=1; Tier 1 stays.
+
+**Escalations:** None this iter. All carries from prior iters; no new actionable findings.
+
+**Patterns:**
+- **Check 3: check0-tier4-guard-001 now FORGE_NO_PR_SKIP [informational positive]**: stall-checker now recognizes PR#1058 via pr_exists match. This means the FORGE_NO_PR_SKIP list grew from 7→8 entries. Positive sign — the stall-checker won't treat task check0-tier4-guard-001 as a "built but no PR" stall once the cooldown expires.
+- **PR#1058 multi-path still unresolved**: pending=4 unchanged; unreg-approval-de9cda4efdbd still awaiting Larry direction. Once Larry decides (Approve → Forge re-addresses Mirror; Reject → `gh pr merge 1058 --admin --squash`), the stall-checker cooldown expiry becomes moot.
+- G-rule carries unchanged.
+
+**Tier end-of-iter:** **Tier 1** (consecutive_clean=1; last_signal_at=2026-07-29T21:33:05Z UTC; Tier 1 stays; 2 more consecutive clean iters needed to de-escalate to Tier 2).
+
+---
+
