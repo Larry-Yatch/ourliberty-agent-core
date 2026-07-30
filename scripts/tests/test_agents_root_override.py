@@ -30,9 +30,25 @@ subordinate to a genuine read of the override —
 
 A bare fallback assigned directly, or guarded only by a variable that is
 never bound from the env read, is an offender — whatever anything is named.
-Bare fallbacks embedded in string literals (python -c payloads, heredocs)
-are scanned textually, since the code that runs in a spawned child is
-exactly where the HOME swap bites.
+Binding-trust is strict about WHERE and HOW OFTEN the name is bound,
+because the check is flow-insensitive: EVERY binding of the name in the
+enclosing scope must contain the env read (one rebind from anywhere else —
+or a live wrong-var binding beside a dead-branch env read — voids the
+trust), and nested function definitions are opaque (a function-local
+binding cannot bless a module-level use, nor a nested def its outer
+function).
+
+Bare fallbacks embedded in string literals (python -c payloads, shell
+command strings) are scanned textually, since the code that runs in a
+spawned child is exactly where the HOME swap bites; f-string constant
+fragments are joined before matching so a guard split across fragments is
+seen. WAIVER: a string passes only when it contains a READ spelling of the
+override (getenv(/environ.get(/environ[ with the quoted var) — merely
+NAMING the var (an export line, prose) proves nothing about the fallback
+beside it. Deliberately OUT OF SCOPE for the text channel: a bare
+``~/agents`` token (pervasive in docstring prose, so it cannot
+discriminate payloads from documentation) and home-alias spellings (see
+the ALLOWED_FILES note) — those rely on the AST channel or the allowlist.
 """
 try:  # engage the test sandbox before any production import reads env/paths
     from . import _bootstrap  # noqa: F401
@@ -45,6 +61,7 @@ import os
 import re
 import unittest
 from pathlib import Path
+from unittest import mock
 
 SCRIPTS = Path(__file__).resolve().parent.parent
 ENV_VAR = "OURLIBERTY_AGENTS_ROOT"
@@ -55,12 +72,44 @@ ENV_VAR = "OURLIBERTY_AGENTS_ROOT"
 # jail at the sandbox and defeat it. (This replaces the old blanket
 # `test_*` skip, which silently exempted production infrastructure like
 # test_regression_check.py — the Mirror merge gate.)
+#
+# Known-INVISIBLE cousins (not allowlisted because the scanner cannot see
+# them today): test_regression_check.py's REAL_AGENTS (bound via the
+# REAL_HOME = Path.home() alias) and test_isolation_wall.py's ro_targets()
+# (os.path.join(home, sub) from a variable). Both are INTENTIONAL real-home
+# paths — the jail's RO-bind targets and the outside-jail tripwire. If a
+# refactor ever surfaces them to the scanner, the fix is an ALLOWED_FILES
+# entry, NEVER wrapping them in the override: an override-honoring jail
+# would RO-bind/tripwire the sandbox itself and defeat the test jail.
+# (Alias tracking is deliberately absent — it would flag exactly these
+# correct sites. And test_regression_check.py must not be whole-file
+# allowlisted either: its AGENTS_ROOT genuinely honors the override and
+# must stay in scope.)
 ALLOWED_FILES = {"test_isolation_guard.py"}
 
 # Bare fallback spelled inside a string literal (a python -c payload, a
-# heredoc): the AST cannot parse embedded code, so match the text. A string
-# that also names the env var is presumed to read it.
-TEXT_BARE = re.compile(r"(?:Path\.home\(\)|(?<!\w)HOME)\s*/\s*['\"]agents['\"]")
+# shell command): the AST cannot parse embedded code, so match the text.
+# Python spellings plus the shell ones ($HOME/agents, ${HOME}/agents). A
+# bare `~/agents` token is deliberately NOT matched — it is pervasive in
+# docstring prose, so it cannot discriminate a payload from documentation;
+# tilde spellings are caught only where a call wrapper names them
+# (expanduser('~/agents')).
+TEXT_BARE = re.compile(
+    r"(?:Path\.home\(\)|(?<!\w)HOME)\s*/\s*['\"]agents['\"]"
+    r"|expanduser\(\s*['\"]~/agents"
+    r"|\bhome\(\)\s*\.\s*joinpath\(\s*['\"]agents['\"]"
+    r"|\$HOME/agents|\$\{HOME\}/agents"
+)
+
+# A string is presumed guarded only when it contains a READ spelling of the
+# override. Merely naming the var (an export line, a docstring mentioning
+# it) used to waive — that blessed any payload that set the var without
+# reading it.
+TEXT_READ = re.compile(
+    r"(?:(?<!\w)getenv\s*\(|environ\.get\s*\(|environ\[)\s*['\"]"
+    + re.escape(ENV_VAR)
+    + r"['\"]"
+)
 
 
 def _is_home_base(node):
@@ -158,13 +207,35 @@ def _enclosing_scope(node, parents):
     return n
 
 
+def _scope_walk(scope):
+    """Walk `scope` WITHOUT descending into nested function definitions:
+    their local bindings are invisible to the enclosing scope, and trusting
+    them blessed cross-scope (a function-local `root = <env read>` cleared
+    an unrelated module-level `root`, and a nested def cleared its outer
+    function)."""
+    stack = list(ast.iter_child_nodes(scope))
+    while stack:
+        node = stack.pop()
+        yield node
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            stack.extend(ast.iter_child_nodes(node))
+
+
 def _binds_env_read(name, scope):
-    """True if `name` is assigned from an expression containing a genuine
-    env read of the override anywhere in `scope` (the standard two-line
-    idiom: `root = os.environ.get(ENV_VAR)` then `... if root else ...`)."""
+    """True if `name` is bound from an expression containing a genuine env
+    read of the override in `scope` (the standard two-line idiom:
+    `root = os.environ.get(ENV_VAR)` then `... if root else ...`).
+
+    The check is flow-insensitive — it cannot see WHICH binding reaches the
+    fallback — so it compensates by being strict about the binding set:
+    EVERY binding of the name in the scope must contain the read. One
+    rebind from anywhere else (`root = args.root` after the read), or a
+    live wrong-var binding beside a dead `if False:` env read, voids the
+    trust. Nested defs are excluded from the walk (see _scope_walk)."""
     if scope is None:
         return False
-    for sub in ast.walk(scope):
+    bound_values = []
+    for sub in _scope_walk(scope):
         value = None
         if isinstance(sub, ast.Assign):
             if any(isinstance(t, ast.Name) and t.id == name for t in sub.targets):
@@ -172,9 +243,11 @@ def _binds_env_read(name, scope):
         elif isinstance(sub, (ast.AnnAssign, ast.NamedExpr)):
             if isinstance(sub.target, ast.Name) and sub.target.id == name:
                 value = sub.value
-        if value is not None and any(_is_env_read(v) for v in ast.walk(value)):
-            return True
-    return False
+        if value is not None:
+            bound_values.append(value)
+    return bool(bound_values) and all(
+        any(_is_env_read(n) for n in ast.walk(v)) for v in bound_values
+    )
 
 
 def _reads_override(expr, scope):
@@ -222,22 +295,37 @@ def find_bare_agents_roots(source, filename="<source>"):
         for kid in ast.iter_child_nodes(node):
             parents[kid] = node
     offenders = []
+
+    def _flag_text(node, text):
+        if TEXT_BARE.search(text) and not TEXT_READ.search(text):
+            offenders.append(
+                f"{filename}:{node.lineno}: [in string] "
+                + " ".join(text.split())[:80]
+            )
+
     for node in ast.walk(tree):
         if _is_agents_fallback(node) and not _is_guarded(node, parents):
             segment = ast.get_source_segment(source, node) or ""
             offenders.append(
                 f"{filename}:{node.lineno}: {' '.join(segment.split())}"
             )
+        elif isinstance(node, ast.JoinedStr):
+            # An f-string is ONE string at runtime but many Constant
+            # fragments in the AST: the env read can sit in a different
+            # fragment from the fallback. Join the constant fragments
+            # before matching — scanned per-fragment, the waiver could
+            # never see the read, leaving a guarded payload no exit but
+            # ALLOWED_FILES.
+            _flag_text(node, "".join(
+                v.value for v in node.values
+                if isinstance(v, ast.Constant) and isinstance(v.value, str)
+            ))
         elif (
             isinstance(node, ast.Constant)
             and isinstance(node.value, str)
-            and TEXT_BARE.search(node.value)
-            and ENV_VAR not in node.value
+            and not isinstance(parents.get(node), ast.JoinedStr)
         ):
-            offenders.append(
-                f"{filename}:{node.lineno}: [in string] "
-                + " ".join(node.value.split())[:80]
-            )
+            _flag_text(node, node.value)
     return offenders
 
 
@@ -264,7 +352,6 @@ class TestAgentsRootOverride(unittest.TestCase):
         bogus tier-2 home, lightweight modules resolve their root under the
         override, not under HOME."""
         override = "/tmp/ol-test-agents-root"
-        old = {k: os.environ.get(k) for k in ("OURLIBERTY_AGENTS_ROOT", "HOME")}
         mods = [
             ("larry_alerts", "AGENTS_ROOT"),
             ("concurrency_guard", "AGENTS_ROOT"),
@@ -272,25 +359,23 @@ class TestAgentsRootOverride(unittest.TestCase):
             ("kill_switch", "AGENTS_ROOT"),
             ("active_tier", "AGENTS_ROOT"),
         ]
-        os.environ["OURLIBERTY_AGENTS_ROOT"] = override
-        os.environ["HOME"] = "/tmp/ol-bogus-tier2-home"
         try:
-            for modname, attr in mods:
-                mod = importlib.import_module(modname)
-                importlib.reload(mod)
-                val = str(getattr(mod, attr))
-                self.assertTrue(
-                    val.startswith(override),
-                    f"{modname}.{attr} = {val!r} did not honor override {override!r}",
-                )
+            with mock.patch.dict(os.environ, {
+                "OURLIBERTY_AGENTS_ROOT": override,
+                "HOME": "/tmp/ol-bogus-tier2-home",
+            }):
+                for modname, attr in mods:
+                    mod = importlib.import_module(modname)
+                    importlib.reload(mod)
+                    val = str(getattr(mod, attr))
+                    self.assertTrue(
+                        val.startswith(override),
+                        f"{modname}.{attr} = {val!r} did not honor override {override!r}",
+                    )
         finally:
-            for k, v in old.items():
-                if v is None:
-                    os.environ.pop(k, None)
-                else:
-                    os.environ[k] = v
-            # Re-freeze module state against the RESTORED env: without this,
-            # the five modules' AGENTS_ROOT (and every derived constant) stay
+            # Re-freeze module state against the RESTORED env — this must run
+            # AFTER the with-block has unwound the patch: without it, the
+            # five modules' AGENTS_ROOT (and every derived constant) stay
             # pinned to the bogus override for the rest of the process — the
             # same leak class ApprovalRootEnvTest's tearDown re-reload exists
             # to prevent (test_beacon_approval_root_env.py).
@@ -374,6 +459,85 @@ class TestGuardScanner(unittest.TestCase):
             "r = stale_env.get('OURLIBERTY_AGENTS_ROOT',"
             " str(Path.home() / 'agents'))\n")
 
+    def test_flags_rebind_after_env_read(self):
+        # Flow-insensitivity compensated by the EVERY-binding rule: one
+        # binding reads the env, but a rebind from anywhere else means the
+        # name reaching the fallback may not be the override at all.
+        self.assert_flags(
+            "def f(args):\n"
+            "    root = os.environ.get('OURLIBERTY_AGENTS_ROOT')\n"
+            "    root = args.root\n"
+            "    return Path(root) if root else Path.home() / 'agents'\n")
+
+    def test_flags_dead_branch_env_read_with_wrong_var_live_binding(self):
+        # A dead `if False:` env read must not bless the live binding from
+        # the WRONG var sitting next to it.
+        self.assert_flags(
+            "def f():\n"
+            "    if False:\n"
+            "        root = os.environ.get('OURLIBERTY_AGENTS_ROOT')\n"
+            "    root = os.environ.get('SOME_OTHER_VAR')\n"
+            "    return Path(root) if root else Path.home() / 'agents'\n")
+
+    def test_flags_module_use_with_only_function_local_binding(self):
+        # Cross-scope blessing: a function-LOCAL `root = <env read>` is
+        # invisible at module level — the module-level `root` guarding the
+        # fallback is a different (unbound) name entirely.
+        self.assert_flags(
+            "def f():\n"
+            "    root = os.environ.get('OURLIBERTY_AGENTS_ROOT')\n"
+            "    return root\n"
+            "p = Path(root) if root else Path.home() / 'agents'\n")
+
+    def test_flags_nested_def_binding_does_not_bless_outer(self):
+        # Same rule one level down: a nested def's local binding cannot
+        # clear its outer function's fallback.
+        self.assert_flags(
+            "def outer():\n"
+            "    def inner():\n"
+            "        root = os.environ.get('OURLIBERTY_AGENTS_ROOT')\n"
+            "        return root\n"
+            "    return Path(root) if root else Path.home() / 'agents'\n")
+
+    def test_flags_string_mentioning_var_without_reading_it(self):
+        # The round-1 waiver blessed any string that NAMED the var. Setting
+        # it is not reading it — the payload's fallback is still bare.
+        self.assert_flags(
+            "cmd = \"export OURLIBERTY_AGENTS_ROOT=/x; "
+            "python3 -c 'print(Path.home() / \\\"agents\\\")'\"\n")
+
+    def test_flags_bare_fallback_in_fstring_payload(self):
+        # Joined-fragment scanning must still FLAG an f-string whose joined
+        # text has the fallback and no read.
+        self.assert_flags(
+            "cmd = f\"HOME={home} python3 -c "
+            "'print(Path.home() / \\\"agents\\\")'\"\n")
+
+    def test_flags_shell_home_spelling_in_string(self):
+        self.assert_flags('cmd = "ls $HOME/agents/state"\n')
+
+    def test_flags_shell_braced_home_spelling_in_string(self):
+        self.assert_flags('cmd = "cat ${HOME}/agents/rotation.disabled"\n')
+
+    def test_flags_expanduser_spelling_in_string(self):
+        self.assert_flags(
+            "cmd = \"python3 -c 'import os; "
+            "print(os.path.expanduser(\\\"~/agents\\\"))'\"\n")
+
+    def test_flags_joinpath_spelling_in_string(self):
+        self.assert_flags(
+            "cmd = \"python3 -c 'from pathlib import Path; "
+            "print(Path.home().joinpath(\\\"agents\\\"))'\"\n")
+
+    def test_flags_docstring_spelling_the_fallback(self):
+        # Pin the string-channel contract for prose: a docstring is a
+        # string constant like any other. Round 1 waived prose, round 2
+        # silently reversed that; this is the first test of either. A doc
+        # that verbatim spells the bare fallback FLAGS — fix the doc, or
+        # (for a true payload) guard it with a read spelling.
+        self.assert_flags(
+            '"""Reads Path.home() / \'agents\' at startup."""\n')
+
     def test_reports_file_and_line(self):
         offenders = find_bare_agents_roots(
             "x = 1\np = Path.home() / 'agents'\n", filename="victim.py")
@@ -447,6 +611,35 @@ class TestGuardScanner(unittest.TestCase):
     def test_ignores_comments_and_plain_prose(self):
         self.assert_quiet(
             "# was hardcoded to HOME/'agents' before the audit\n"
+            "x = 1\n")
+
+    def test_allows_fstring_payload_guarded_across_fragments(self):
+        # The read sits in one constant fragment, the fallback in another
+        # (an interpolation between them splits the AST constants). Scanned
+        # per-fragment this genuinely-guarded payload had no exit but
+        # ALLOWED_FILES; joined, the waiver sees the read.
+        self.assert_quiet(
+            "cmd = f\"python3 -c 'print(os.environ.get("
+            "\\\"OURLIBERTY_AGENTS_ROOT\\\") or {opt} "
+            "or Path.home() / \\\"agents\\\")'\"\n")
+
+    def test_allows_aliased_home_as_out_of_scope(self):
+        # test_regression_check.py's REAL_AGENTS shape: Path.home() bound
+        # to a name first. The scanner deliberately does NOT track aliases
+        # — the live sites spelled this way are INTENTIONAL real-home paths
+        # (the jail's RO-bind targets and tripwire), where the correct
+        # response to being surfaced is an ALLOWED_FILES entry, never the
+        # override (see the ALLOWED_FILES note).
+        self.assert_quiet(
+            "REAL_HOME = Path.home()\n"
+            "REAL_AGENTS = REAL_HOME / 'agents'\n")
+
+    def test_allows_tilde_agents_in_docstring_prose(self):
+        # Bare ~/agents tokens are OUT OF SCOPE for the text channel: they
+        # are pervasive in docstring prose across scripts/ and cannot
+        # discriminate a payload from documentation.
+        self.assert_quiet(
+            '"""State lives in ~/agents/state/ (see ~/agents/logs/)."""\n'
             "x = 1\n")
 
 
