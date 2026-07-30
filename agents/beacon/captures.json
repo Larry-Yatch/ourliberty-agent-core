@@ -2210,7 +2210,7 @@
       "id": "cap-approvals-tab-let-a-card-carry-its-own-falsifier-8bb3",
       "title": "Approvals tab: let a card carry its own falsifier, checked on the existing 10-min tick",
       "note": "PROBLEM: every clearing signal today answers 'did Beacon already resolve this?' (task_id in history, not pending) or 'did a PR for this task_id merge/close?' (task_terminal_state). Neither asks 'is the PREMISE still true?' A card whose premise is a fact about live state (a DB row, a file's contents, a code behavior) falls to UNKNOWN, and UNKNOWN means keep forever.\n\nEVIDENCE (2026-07-29 tab, 8 cards, 6 did not need a human): rsdpm-confirmall-medium-parent-secondglance-001 was killed by RSDPM #151 (merged 01:55Z, 3d66718) 2h18m after filing \u2014 #151 carried a different task_id, so the probe finds nothing. unreg-approval-cfd444ed29ee ('migration 0033 not live') was FALSE 8 min before Larry saw it: applied 17:22Z, promoted 17:30Z.\n\nDO NOT REBUILD WHAT EXISTS. agents/beacon/specs/approvals-queue-rework.md \u00a75 (N1) specced this and it IS built: heal_stale_approvals runs OnCalendar=*:0/10 (backup-first, reversible, idempotent), and /api/larry/cleanup-review (dashboard_api.py:11173+) is the richer engine whose subagent already fails safe (_cleanup_review_verify_uncertain returns {} on ANY failure = keep). The gap is ONE SIGNAL CLASS, not a missing mechanism.\n\nBUILD:\n1. Optional 'freshness_probe' on dispatch_payload \u2014 a deterministic predicate whose FALSITY means the ask is moot. Kinds: pr_state (exists), file_contains/file_lacks (git show at origin/main), sql (read-only), json_path, shell (allowlisted, last resort). Authors already write the evidence down: the confirm-all card cited app/queue/verdict.ts + CONFIRM_ALL_TIERS + bulkCovered; the 0033 card cited schema_migration_log with the query. Converting cited evidence into a probe is near-free at filing, impossible after.\n2. Evaluate on the EXISTING 10-min tick. On FALSE, DEMOTE to 'premise_stale' with the probe output attached; do NOT auto-clear. Larry one-taps dismiss. Auto-clear stays reserved for the exact probes already trusted (reconcile_terminal_approvals' PR-coordinate class).\n3. Run the SAME probe once at BIRTH (promotion / approval-request emit). The 0033 card could ONLY ever be caught there.\n\nLOAD-BEARING: TRUE => keep. FALSE => demote. ERROR/timeout/unparseable => KEEP. Fail toward the human \u2014 same rule as cap-check-0-reject-a-tier-4-classification-not-prece-fd54.\n\nSCOPING (verified): ~10 modules emit APPROVAL_REQUEST markers, and Beacon authors some as free LLM text parsed by extract_approval_request. The probe MUST be optional and additive \u2014 highest-volume producers first. No-probe cards keep today's behavior AND must render visibly UNVERIFIED, never silently fresh: a check covering a third of the queue while reading as total is [[existence-gates-are-false-clean-generators]].\n\nDO NOT put the verification subagent on a timer. Tempting (already written, handles the uncertain cases) but that is an LLM deciding 'still true?' every card every tick: unbounded cost, and its failure mode is silently clearing a LIVE decision \u2014 strictly worse than a stale card. The spec keeps it behind a button for that reason.\n\nREVIEW: needed. It decides what disappears from Larry's decision queue, and its failure mode looks exactly like a working tab.",
-      "state": "parked",
+      "state": "dropped",
       "label": null,
       "origin": {
         "source": "desktop-chat",
@@ -2222,17 +2222,17 @@
       "last_touched": "2026-07-29T19:42:19.347703+00:00",
       "promoted_to": null,
       "briefing": {
-        "what": "Some items in your approval list are already settled by the time you see them, because the system only checks whether we handled a request \u2014 never whether the thing it was asking about is still true.",
-        "why": "You end up spending attention on decisions that resolved themselves, and some were already moot minutes before they reached you, which quietly erodes trust in the list.",
-        "suggest": "Let each item carry a simple built-in fact-check so already-resolved ones get flagged and set aside for a quick dismissal \u2014 but roll it out gradually and conservatively, starting with the most common items, and keep anything unverified clearly marked rather than hidden."
+        "what": "A small upgrade to your approvals list so each item can quietly re-check whether it still needs you, and flag the ones already settled \u2014 while never hiding anything that's still a live decision.",
+        "why": "Right now several items sit in your queue after the thing they asked about is already handled, so your decision list looks busier and less trustworthy than it really is.",
+        "suggest": "Worth doing, but roll it out carefully and reviewed \u2014 start with the highest-volume items, keep flagged-stale ones as a one-tap dismiss rather than auto-removing, and clearly mark anything not yet self-checking so nothing looks settled that isn't."
       },
       "risk": "careful",
       "recommended_action": "delegate",
       "briefing_provenance": {
         "by": "beacon",
         "model": "claude-opus-4-8",
-        "at": "2026-07-29T19:42:51.285731+00:00",
-        "from_state": "parked"
+        "at": "2026-07-30T19:47:17.764003+00:00",
+        "from_state": "dropped"
       },
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
       "spawned": {
@@ -2569,7 +2569,12 @@
         "at": "2026-07-30T16:36:16.248516+00:00",
         "from_state": "parked"
       },
-      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
+      "spawned": {
+        "kind": "delegate",
+        "task_id": "delegate-cap-approvals-freshness-1-3-add-an-optional-freshnes-582f",
+        "stamped_at": "2026-07-30T19:43:45.533340+00:00"
+      }
     },
     {
       "id": "cap-approvals-freshness-2-3-evaluate-the-probe-on-th-9902",
@@ -2697,7 +2702,12 @@
         "at": "2026-07-30T16:36:16.248516+00:00",
         "from_state": "parked"
       },
-      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
+      "spawned": {
+        "kind": "delegate",
+        "task_id": "delegate-cap-promoted-larry-alert-cards-1060-skips-them-and-n-7629",
+        "stamped_at": "2026-07-30T19:43:39.379671+00:00"
+      }
     }
   ]
 }
