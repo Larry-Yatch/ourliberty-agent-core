@@ -59,6 +59,12 @@ _LIB_PUSH = _REPO_ROOT / 'scripts' / '_lib_push_with_rebase.sh'
 # auto-commit path set, shared with sync_agent_core.sh); the fake scripts dir
 # must carry it or the script dies at the `source` line under `set -e`.
 _LIB_PULSE = _REPO_ROOT / 'scripts' / '_lib_pulse_runtime.sh'
+# run_cycle.sh sources _lib_cost_capture.sh (the single definition of the
+# costs.jsonl row + the work-model selector, shared with run_medic.sh) from its
+# OWN directory. The source is guarded, so a missing lib degrades to a logged
+# skip rather than aborting — but then no cost row is written and every
+# cost-row assertion in this harness's subclasses goes vacuous. Copy it.
+_LIB_COST = _REPO_ROOT / 'scripts' / '_lib_cost_capture.sh'
 
 
 _CLAUDE_STUB = '''#!/usr/bin/env bash
@@ -93,7 +99,7 @@ class _RunCycleTestBase(unittest.TestCase):
         (runbooks_dir / 'cycle-journal.md').write_text('')
         (runbooks_dir / 'cycle-actions.jsonl').write_text('')
         # Copy real production scripts under test + their deps.
-        for src in (_RUN_CYCLE, _LIB_PUSH, _LIB_PULSE):
+        for src in (_RUN_CYCLE, _LIB_PUSH, _LIB_PULSE, _LIB_COST):
             shutil.copy2(src, self.scripts_dir / src.name)
         # larry_alerts.py + its sibling-module deps (single source of truth).
         copy_larry_alerts_cli(self.scripts_dir)

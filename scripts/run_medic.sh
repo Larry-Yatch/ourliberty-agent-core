@@ -25,7 +25,26 @@ LOCK_MAX_AGE_SEC=$((30 * 60))   # 30 minutes -- stale lock threshold
 LOG_DIR="${HOME}/agents/logs"
 LOG_FILE="${LOG_DIR}/medic.log"
 
+# The model this wrapper dispatches on. SINGLE SOURCE: it is both the value
+# passed to `claude --model` below and the $wm the cost-row selector falls back
+# to (see _lib_cost_capture.sh). A second literal anywhere in this file would
+# let the dispatched model and the recorded model drift apart.
+WORK_MODEL="claude-sonnet-4-6"
+
 mkdir -p "$LOCK_DIR" "$LOG_DIR"
+
+# Single definition of the costs.jsonl row + the model selector, shared with
+# run_cycle.sh (they carried byte-identical hand-copies until 2026-07-30).
+# Resolved RELATIVE TO THIS SCRIPT, not $HOME, so it is found wherever the
+# wrapper is invoked from. GUARDED: under `set -e` an unguarded `source` of a
+# missing file aborts the entire medic tick — strictly worse than the
+# best-effort cost row it would protect. A missing lib degrades to a logged
+# skip below.
+_COST_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_lib_cost_capture.sh"
+if [ -f "$_COST_LIB" ]; then
+    # shellcheck source=_lib_cost_capture.sh
+    source "$_COST_LIB"
+fi
 
 log() {
     echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] run_medic: $*" | tee -a "$LOG_FILE"
@@ -118,7 +137,7 @@ if (
             CLAUDE_CODE_OAUTH_TOKEN=*) export "$kv" ;;
         esac
     done <<< "$DISPATCH_ENV_LINES"
-    exec timeout "$CLAUDE_TIMEOUT" claude --print --model claude-sonnet-4-6 --output-format json "$PROMPT_BODY" > "$MEDIC_OUT" 2>&1
+    exec timeout "$CLAUDE_TIMEOUT" claude --print --model "$WORK_MODEL" --output-format json "$PROMPT_BODY" > "$MEDIC_OUT" 2>&1
 ); then
     log "Medic operator completed successfully"
     MEDIC_OK=1
@@ -141,48 +160,28 @@ else
 fi
 
 # --- cost capture (mirror run_cycle.sh) ---
+# Runs on success or failure — a failed paid tick still burned quota, and
+# rolling_5h_token_volume must see it; the `success:` field carries the
+# outcome. (A TIMED-OUT tick exits 124 above and never reaches here; that is
+# pre-existing and pinned by test_run_medic_timeout.)
+#
+# The row (and the work-model selector) live in _lib_cost_capture.sh so this
+# wrapper and run_cycle.sh cannot drift. $WORK_MODEL is the SAME variable
+# passed to `claude --model` above.
 COSTS_FILE="${HOME}/agents/blackboard/costs.jsonl"
 mkdir -p "$(dirname "$COSTS_FILE")"
-if command -v jq >/dev/null 2>&1 && [ -s "$MEDIC_OUT" ]; then
-    # Account attribution: the pool-selected tier when the pool dispatched
-    # this tick; otherwise the legacy active-tier.json read (fallback path).
-    ACCOUNT_TIER="$DISPATCH_TIER"
-    if [ -z "$ACCOUNT_TIER" ]; then
-        ACTIVE_TIER_FILE="${HOME}/agents/blackboard/active-tier.json"
-        ACCOUNT_TIER="$(jq -r '.tier // "tier1"' "$ACTIVE_TIER_FILE" 2>/dev/null || echo tier1)"
-        if [ -z "$ACCOUNT_TIER" ] || [ "$ACCOUNT_TIER" = "null" ]; then
-            ACCOUNT_TIER="tier1"
-        fi
-    fi
-    if COST_LINE=$(jq -c --arg ts "$(date -u +%Y-%m-%dT%H:%M:%S%z)" --argjson ok "$MEDIC_OK" --arg acct "$ACCOUNT_TIER" '
-        {
-            ts: $ts,
-            agent: "medic",
-            task_id: ("medic-" + ($ts | gsub("[^0-9]"; ""))),
-            task_type: "medic-escalate",
-            # The work model is the one that generated the most output, NOT the
-            # alphabetically-first key. Claude Code reports a utility model
-            # (haiku) in modelUsage alongside the real model; `keys | first`
-            # sorts, so haiku always won and every medic run was mislabelled.
-            model: ((.modelUsage // {} | to_entries | max_by(.value.outputTokens // 0) | .key) // "claude-sonnet-4-6"),
-            account: $acct,
-            cost_usd: (.total_cost_usd // .cost_usd // null),
-            input_tokens: (.usage.input_tokens // null),
-            output_tokens: (.usage.output_tokens // null),
-            cache_read: (.usage.cache_read_input_tokens // null),
-            cache_creation: (.usage.cache_creation_input_tokens // null),
-            duration_sec: (.duration_ms // null | if . then ./1000 else null end),
-            success: ($ok == 1),
-            source: "run_medic.sh"
-        }
-    ' "$MEDIC_OUT" 2>/dev/null); then
-        echo "$COST_LINE" >> "$COSTS_FILE"
-        log "cost record appended to $COSTS_FILE"
-    else
-        log "cost-capture: jq parse failed; skipping"
-    fi
+if command -v capture_cost_row >/dev/null 2>&1; then
+    COST_RC=0
+    capture_cost_row \
+        "$MEDIC_OUT" "medic" "medic-escalate" "medic-" "$MEDIC_OK" \
+        "$DISPATCH_TIER" "run_medic.sh" "$WORK_MODEL" "$COSTS_FILE" || COST_RC=$?
+    case "$COST_RC" in
+        0)  log "cost record appended to $COSTS_FILE" ;;
+        20) log "cost-capture: jq parse failed; skipping" ;;
+        *)  log "cost-capture: jq missing or empty output; skipping" ;;
+    esac
 else
-    log "cost-capture: jq missing or empty output; skipping"
+    log "cost-capture: lib missing; skipping"
 fi
 
 if [ "$MEDIC_OK" = "1" ]; then
