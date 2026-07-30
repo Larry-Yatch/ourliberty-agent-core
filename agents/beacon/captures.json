@@ -2394,6 +2394,35 @@
         "from_state": "parked"
       },
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+    },
+    {
+      "id": "cap-closed-pr-step-wedged-forever-by-headless-dispat-37d6",
+      "title": "Closed-PR step wedged forever by headless dispatch dedup (3rd of class)",
+      "note": "Once a Forge build step completes and its PR is later CLOSED, that step_id can never be dispatched again -- silently, while the sequence keeps reporting the step as healthy `dispatched`.\n\nDEFECT: scripts/outbox_notifier.py, headless-approval-request path (~13193-13232). The guard is EXISTENCE-only: if `<task_id>.json` is in inboxes/forge/, .archive/ or .invalid/, it skips the write. The 2026-06-11 override (`_prior_dispatch_was_definitive_non_run`, mirroring PR #403) fires ONLY on a definitive non-run (spawn failure / identity reject, no PR). A run that COMPLETED, made a PR, and whose PR was later closed is uncovered -- and that is normal (spec revised mid-build, step must be rebuilt). Only recovery is a human moving the archive file aside.\n\nEVIDENCE (2026-07-28, seq rsdpm-m14-001 step m14-pr-a, after RSDPM #152 was deliberately closed): notifier logged \"already dispatched for task m14-pr-a (archive or .invalid present); skipping duplicate write\" on two consecutive advancer dispatches. Forge inbox empty, nothing claimed, no worktree. Hand-fixed TWICE -- ~/agents/inboxes/forge/.archive/m14-pr-a.json.superseded-pr152-closed (18:50) and .superseded-225434 (22:54); dispatch worked immediately after each mv. 6 such skips in 7 days, 4 of them this incident.\n\n3RD OF CLASS: _review_request_already_dispatched missed re-pushes -> head-aware in PR #539. PIPELINE_BACKOFF recency leg claimed ownership nothing held -> PR #1043. This one.\n\nNOT a one-file fix -- both obvious discriminators are wrong-shaped:\n(1) Reading PR closed/merged state puts a network read in the dispatch hot path; gh quota flake is a known family here, so it trades a rare silent wedge for a commoner one.\n(2) A generation counter is right, BUT deriving N by counting archived files REGRESSES crash-recovery -- the archive is exactly the state the guard distrusts. Replay the outbox event after a crash, it counts 1 archived attempt, dispatches attempt 2 = double-dispatch. The generation must be CARRIED in Beacon's APPROVAL_REQUEST marker and used verbatim: same marker -> same filename -> existence check still protects; genuine rebuild -> new generation -> dispatches. Touches scripts/beacon_approval_handler.py too. Live precedent: resume-<task>-r<N>.json, revision-<task>-<n>.json.\n\n2ND DEFECT (skip invisible outside the log; dashboard showed a healthy step ~1h) cannot be built as \"advancer verifies the Forge task file after dispatching\" -- _dispatch_step (scripts/build_sequence_advancer.py:793) writes BEACON's inbox, not Forge's, so its `err is None` is honest about its own hop; between advancer and Forge sit a Beacon LLM turn and a notifier tick. Splits in two: (a) notifier DMs on skip -- only actor that knows a dispatch produced nothing, and the part that cost the hour; (b) deadline reconciler for steps sitting `dispatched` with no Forge activity, which catches EVERY skip reason.\n\nSHAPE: one PR, three pieces -- generation-in-marker (notifier + beacon handler), loud skip with DM, deadline reconciler.\n\nTIMING: deferred 2026-07-29 on purpose. Nothing blocked (M14 a/b merged, c/d in review, e pending) and the trigger is a step REBUILD, not a spec revision -- revisions use the revision-<n> path, which already carries a counter and does not wedge. Do it after M14 lands.\n\nGATES: outbox_notifier.py is on the deep-review fileset -> holds for /code-review high, expected. Route at creation (claude/* or auto-review) or it sits forever. Suite: python3 -m unittest, scripts/tests/, needs py3.12 (3.9 cannot import the tree); test_outbox_notifier ~589 tests must stay green. Mutation-verify BOTH directions, show the test failing first -- existence gates are false-clean generators. Verify on droplet (larry@134.209.44.80): ~/agents/inboxes/forge/, .archive/, journalctl -u ourliberty-outbox-notifier.service.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "main",
+        "captured_at": "2026-07-30T00:38:32.983831+00:00"
+      },
+      "last_touched": "2026-07-30T00:38:32.983831+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "When a piece of work is scrapped and needs to be redone from scratch, our system quietly refuses to restart it while still showing it as running normally, so it stalls until someone fixes it by hand.",
+        "why": "Work looks like it's moving when it's actually frozen, which has already cost real time to catch and untangle by hand \u2014 and it's the third time this same blind spot has bitten us.",
+        "suggest": "Schedule the fix as planned once the current initiative wraps up; it's a known, contained issue with a clear plan, so there's no need to rush it ahead of active work."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-30T00:45:28.494433+00:00",
+        "from_state": "parked"
+      }
     }
   ]
 }
