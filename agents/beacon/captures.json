@@ -2506,7 +2506,7 @@
       "id": "cap-four-card-types-one-missing-verb-no-button-says-71d1",
       "title": "Four card types, one missing verb: no button says 'the work is fine, merge it'",
       "note": "PATTERN, not a one-off. Every PR that reached a decision card on 2026-07-29/30 was finished by a human typing 'gh pr merge': RSDPM #157, #160, #161, #165, #166 \u2014 five in about five hours \u2014 plus agent-core #1058 earlier the same day, which sat 34 min owned by nobody after Approve did nothing at all. Measured from the written record; note that GitHub's merged_by is useless as evidence here because the automation merges with Larry's token, so EVERY merge reads 'Larry-Yatch' whether a human or a healer did it.\n\nFOUR CARD TYPES, FOUR DIFFERENT BROKEN APPROVES, ONE ROOT CAUSE:\n1. Session-less mirror-review escalate (mirror-review-*): Approve dispatches a fresh Forge revision against code that is already correct. RSDPM #166 (2026-07-30) \u2014 Mirror escalated a legitimate SCOPE question (the PR deliberately did not do its brief, with evidence the brief's premise was false); Approve would have sent Forge to make the exact change the PR argues causes false DRIFT. Also agent-core #884, RSDPM #111.\n2. Deep-review hold (deep-review-hold-*): Approve posts the token and never merges, re-posting every 60s forever. RSDPM #157, #160, #161, #165 all needed a manual merge after stamping. See cap-deep-review-hold-approve-posts-the-token-but-nev-2d25.\n3. Promoted/orphaned (unreg-approval-*): Approve is a total no-op \u2014 no dispatch, no merge, no error. agent-core #1058. agent-core PR #1060 fixes only this one variant and is still OPEN.\n4. Larry-alert promotions: #1060 leaves them out of scope and NEITHER button works. See cap-larry-alert-promotions-1060-leaves-them-out-of-s-aaf0.\nAnd on all four, Reject archives the card, dispatches nothing, and strands the PR permanently \u2014 review dispatch is head-blind once a task concludes, so nothing ever picks it up (RSDPM #59).\n\nTHE ROOT CAUSE: every card offers only 'go change the code' (approve) or 'abandon it' (reject). The most common true answer \u2014 'this is reviewed and correct, finish it' \u2014 has no button, so it always falls to a human. The four captures above are four symptoms of that one gap, and patching them individually means four fixes and four chances to get it wrong.\n\nPROPOSED: one new action verb, e.g. 'ship', that merges the PR as it stands and then clears the card. Spans two repos: ourliberty-dashboard (app/api/approvals/action/route.ts ACTIONS currently allows only approve|reject|comment|mark_done \u2014 add the verb and the button in app/approvals/components/) and ourliberty-agent-core (droplet-side handler does the merge + card retire). It works on all four card types because all four already sit on a PR that has been reviewed \u2014 that precondition is what makes a one-click merge safe here, and it is also why the verb must NOT be offered on cards that carry no reviewed PR.\n\nRELATED CAPTURES THIS SUBSUMES: cap-deep-review-hold-approve-posts-the-token-but-nev-2d25, cap-larry-alert-promotions-1060-leaves-them-out-of-s-aaf0, cap-approvals-tab-let-a-card-carry-its-own-falsifier-8bb3, cap-heal-unregistered-approval-mints-permanent-cards-b921. Close or fold those if this is built.\n\nCAUTION: this button is a real merge, one click, no undo. Gate it on the card carrying a resolvable PR coordinate AND a completed review, and fail closed (show nothing) when either is missing, rather than rendering a button that might merge the wrong head.",
-      "state": "parked",
+      "state": "review_close",
       "label": null,
       "origin": {
         "source": "desktop-chat",
@@ -2534,8 +2534,12 @@
       "spawned": {
         "kind": "delegate",
         "task_id": "delegate-cap-four-card-types-one-missing-verb-no-button-says-71d1",
-        "stamped_at": "2026-07-30T02:30:10.487234+00:00"
-      }
+        "stamped_at": "2026-07-30T02:30:10.487234+00:00",
+        "outcome": "merged"
+      },
+      "closed_by": "heal_missions_card_gc:terminal-backstop",
+      "shipped_note": "shipped (linked work merged)",
+      "awaiting_ack": true
     },
     {
       "id": "cap-approvals-freshness-1-3-add-an-optional-freshnes-582f",
