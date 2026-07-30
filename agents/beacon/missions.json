@@ -16463,7 +16463,7 @@
     {
       "id": "merge-verb-operator-action",
       "name": "Operator 'Merge It' Verb",
-      "phase": "drafting",
+      "phase": "shipped",
       "brief": "Fourth operator verb ('the work is fine, merge it') for the review/approvals surface. Lets an operator publish a reviewed-but-stuck PR with one click instead of a hand-merge. Backend half (merge-verb-backend-001): a `merge` action in dashboard_api._handle_larry_action that re-verifies server-side (Mirror REVIEW_PASS on record + PR open+unmerged) and publishes through the SAME gated auto-merge machinery, plus a `merge_target` stamp on review-passed/open/held approval cards. Gated in TWO places (stamp condition AND server re-verify); available ONLY on review-passed items; no undo. Frontend button/PendingCard is a follow-up dashboard PR.",
       "spec_docs": [],
       "task_ids": [
@@ -16471,7 +16471,10 @@
       ],
       "repo": "ourliberty-agent-core",
       "created": "2026-07-30",
-      "deferred_reason": null
+      "deferred_reason": null,
+      "shipped_at": "2026-07-30T18:16:44.438835+00:00",
+      "shipped_by": "heal_missions_card_gc",
+      "prior_phase": "drafting"
     },
     {
       "id": "proposed-delegate-cap-four-card-types-one-missing-verb-no-button-says-71d1",
