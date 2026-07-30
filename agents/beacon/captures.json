@@ -2654,6 +2654,11 @@
         "model": "claude-opus-4-8",
         "at": "2026-07-30T16:36:16.248516+00:00",
         "from_state": "parked"
+      },
+      "spawned": {
+        "kind": "delegate",
+        "task_id": "delegate-cap-a-delegation-that-dies-looks-exactly-like-one-no-2cbe",
+        "stamped_at": "2026-07-30T16:42:10.825037+00:00"
       }
     },
     {
