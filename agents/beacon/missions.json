@@ -16009,7 +16009,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-30T00:59:44.338778+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-30T00:57:50.265239+00:00"
+      "orphan_last_activity_ts": "2026-07-30T00:57:50.265239+00:00",
+      "briefing": {
+        "what": "A piece of unplanned work the team picked up to fix a problem where a canceled task quietly gets stuck and never restarts, even though the system still reports it as running fine.",
+        "why": "Right now a job can silently stall with no one noticing, which means work you think is getting done may actually be dead in the water until someone stumbles on it.",
+        "suggest": "Worth doing, but since it touches how the system tracks and restarts its own work, give it a quick review before greenlighting rather than approving on the spot."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-30T01:05:34.512811+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-delegate-cap-closed-pr-step-wedged-forever-by-headless-dispat-37d6",
@@ -16026,7 +16040,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-30T00:59:44.338778+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-30T00:57:45.895872+00:00"
+      "orphan_last_activity_ts": "2026-07-30T00:57:45.895872+00:00",
+      "briefing": {
+        "what": "A piece of unassigned work aimed at fixing an internal process that can get permanently stuck and stop moving forward on its own.",
+        "why": "When this step jams, work quietly stalls with no one noticing, which delays delivery and erodes trust that things are getting done.",
+        "suggest": "Worth fixing, but first tie it to an owner and a goal so it doesn't become an open-ended side project \u2014 confirm the scope before greenlighting."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-30T01:05:34.512811+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-deep-review-hold-pr161-d4827b88",
@@ -16043,7 +16071,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-30T00:59:44.338778+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-30T00:47:40.460381+00:00"
+      "orphan_last_activity_ts": "2026-07-30T00:47:40.460381+00:00",
+      "briefing": {
+        "what": "A piece of work the team started on its own that's waiting on your sign-off before it can move forward.",
+        "why": "It's stalled in limbo and not yet tied to any active project, so it's tying up effort without delivering anything until someone decides its fate.",
+        "suggest": "Take a quick look and either give it the green light or set it aside, but confirm it fits a real priority before you commit more time to it."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-30T01:05:34.512811+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
