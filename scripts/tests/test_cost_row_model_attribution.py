@@ -140,12 +140,16 @@ class Case:
 
     def __init__(self, name, model_usage, expected_model, *,
                  exit_code=0, is_error=False, why='',
-                 raw_stub=None, expect_log=None):
+                 raw_stub=None, expect_log=None, expect_row=None):
         self.name = name
-        self.expect_row = raw_stub is None
+        # A raw stub usually carries the NEGATIVE contract, but not always:
+        # the multi-document cases below hand-build a capture holding several
+        # JSON documents and still expect exactly ONE row, so expect_row is
+        # overridable.
+        self.expect_row = (raw_stub is None) if expect_row is None else expect_row
         self.raw_stub = raw_stub
         self.envelope = (_envelope(model_usage, is_error=is_error)
-                         if self.expect_row else None)
+                         if raw_stub is None else None)
         self.expected_model = expected_model
         self.exit_code = exit_code
         self.expect_log = expect_log
@@ -169,6 +173,22 @@ echo 'Claude Code exited: rate limit reached. Not JSON at all.'
 exit 0
 """
 
+# A structured stderr diagnostic: valid JSON, no cost/usage shape. The `2>&1`
+# in both wrappers is how one lands in the same capture as the result envelope.
+_STRAY_LOG_DOC = {'level': 'warn', 'msg': 'mcp server restarted', 'attempt': 2}
+
+
+def _multi_doc_stub(*docs, exit_code=0):
+    """A claude stub whose capture holds MORE THAN ONE JSON document.
+
+    This is the shape a streaming `jq -c` turned into N appended burn rows —
+    same ``ts``, therefore the same ``task_id``, and nothing downstream dedups.
+    The matrix asserts exactly one row for every one of these, at BOTH wrapper
+    surfaces, so the invariant is proven where it actually has to hold.
+    """
+    return _STUB_TMPL.format(
+        body='\n'.join(json.dumps(d) for d in docs), exit_code=exit_code)
+
 
 _CASES = [
     # --- rule 1: the dispatched model is named in modelUsage --------------
@@ -185,6 +205,63 @@ _CASES = [
          WORK_MODEL + '-20260101',
          why='live keys are versioned; recorded VERBATIM, not collapsed to the '
              'bare literal. Guards against simplifying startswith to =='),
+
+    # --- rule 1's tie-break: evidence first, determinism LAST ---------------
+    # Two keys of the DISPATCHED family in one envelope is what a mid-window
+    # model-snapshot rollover produces. `sort_by(.key) | first` as rule 1's
+    # first choice records the alphabetically-first one — routinely the idle
+    # snapshot that burned nothing — over the one that burned everything.
+    # Both key orders, because a fix that leans on `first`/`last` position
+    # passes one order and fails the other.
+    Case('named_versioned_pair_order_a',
+         {WORK_MODEL + '-20260101': {'outputTokens': 0},
+          WORK_MODEL + '-20260701': {'outputTokens': 3841}},
+         WORK_MODEL + '-20260701',
+         why='two snapshots of the dispatched family: the one that produced '
+             'output wins, not the alphabetically-first one'),
+    Case('named_versioned_pair_order_b',
+         {WORK_MODEL + '-20260701': {'outputTokens': 3841},
+          WORK_MODEL + '-20260101': {'outputTokens': 0}},
+         WORK_MODEL + '-20260701',
+         why='same data, other key order — the answer must not move'),
+    Case('named_alias_and_versioned_order_a',
+         {WORK_MODEL: {'outputTokens': 0},
+          WORK_MODEL + '-20260701': {'outputTokens': 3841}},
+         WORK_MODEL + '-20260701',
+         why='the bare alias sorts first but burned nothing; the versioned '
+             'snapshot that burned wins'),
+    Case('named_alias_and_versioned_order_b',
+         {WORK_MODEL + '-20260701': {'outputTokens': 3841},
+          WORK_MODEL: {'outputTokens': 0}},
+         WORK_MODEL + '-20260701',
+         why='same data, other key order'),
+    Case('named_pair_tied_positive_order_a',
+         {WORK_MODEL + '-20260101': {'outputTokens': 3841},
+          WORK_MODEL + '-20260701': {'outputTokens': 3841}},
+         WORK_MODEL + '-20260101',
+         why='no evidence separates them, so the sorted key breaks the tie — '
+             'the determinism the header promises, kept as the LAST resort'),
+    Case('named_pair_tied_positive_order_b',
+         {WORK_MODEL + '-20260701': {'outputTokens': 3841},
+          WORK_MODEL + '-20260101': {'outputTokens': 3841}},
+         WORK_MODEL + '-20260101',
+         why='same tie, other key order — the sorted-key answer must not move'),
+    Case('named_pair_both_zero_order_a',
+         {WORK_MODEL + '-20260101': {'outputTokens': 0},
+          WORK_MODEL + '-20260701': {'outputTokens': 0}},
+         WORK_MODEL + '-20260101',
+         why='nothing burned inside the name match either; sorted key again'),
+    Case('named_pair_both_zero_order_b',
+         {WORK_MODEL + '-20260701': {'outputTokens': 0},
+          WORK_MODEL + '-20260101': {'outputTokens': 0}},
+         WORK_MODEL + '-20260101',
+         why='same all-zero pair, other key order'),
+    Case('named_pair_nonnumeric_output',
+         {WORK_MODEL + '-20260101': {'outputTokens': '9999'},
+          WORK_MODEL + '-20260701': {'outputTokens': 12}},
+         WORK_MODEL + '-20260701',
+         why='jq sorts strings ABOVE every number, so the type filter must '
+             'guard the NAME-MATCHED branch too, not only the global one'),
 
     # --- rule 2: highest positive output, uniquely -------------------------
     # FOREIGN is deliberately NOT the dispatched model, so rule 1 cannot fire
@@ -296,6 +373,31 @@ _CASES = [
          raw_stub=_PLAIN_TEXT_STUB, exit_code=0,
          expect_log='cost-capture: jq parse failed; skipping',
          why='a plain-text wall must skip, not append a garbage row'),
+
+    # --- MORE THAN ONE JSON document in the capture ------------------------
+    # The capture is the child's merged stdout+stderr, so this is reachable.
+    # Streaming jq emitted one output per document and the appender wrote them
+    # all: N burn rows with one `ts` and therefore one `task_id`, which nothing
+    # downstream can undo. The matrix's "exactly one appended row" assertion is
+    # what these cases exist to reach — proven at BOTH wrapper surfaces, not
+    # only against the lib in isolation.
+    Case('multidoc_log_then_envelope', None, WORK_MODEL, expect_row=True,
+         raw_stub=_multi_doc_stub(
+             _STRAY_LOG_DOC,
+             _envelope({WORK_MODEL: {'outputTokens': 3841}})),
+         why='the row must come from the ENVELOPE, not the stray log line — '
+             'and there must be exactly one of it'),
+    Case('multidoc_envelope_then_log', None, WORK_MODEL, expect_row=True,
+         raw_stub=_multi_doc_stub(
+             _envelope({WORK_MODEL: {'outputTokens': 3841}}),
+             _STRAY_LOG_DOC),
+         why='other document order — `head -1` passes one of this pair and '
+             'fails the other, `tail -1` the reverse'),
+    Case('multidoc_envelope_twice', None, WORK_MODEL, expect_row=True,
+         raw_stub=_multi_doc_stub(
+             _envelope({WORK_MODEL: {'outputTokens': 3841}}),
+             _envelope({WORK_MODEL: {'outputTokens': 3841}})),
+         why='a CLI that prints its result twice must still cost one row'),
 ]
 
 # Names the matrix MUST keep. Deleting one of these silently removes the only
@@ -309,6 +411,20 @@ _REQUIRED_CASE_NAMES = {
     'type_confusion', 'degenerate_number_value',
     'work_model_named_but_outproduced', 'single_zero_output_foreign',
     'failure_work_model_zero_output', 'unparseable_plain_text',
+    # rule 1's tie-break: the only cases with TWO prefix-matching keys, so the
+    # only ones that can tell "positive output first" from "sorted key first".
+    'named_versioned_pair_order_a', 'named_versioned_pair_order_b',
+    'named_alias_and_versioned_order_a', 'named_alias_and_versioned_order_b',
+    'named_pair_tied_positive_order_a', 'named_pair_tied_positive_order_b',
+    'named_pair_both_zero_order_a', 'named_pair_both_zero_order_b',
+    'named_pair_nonnumeric_output',
+    # the only cases whose capture holds more than one JSON document.
+    'multidoc_log_then_envelope', 'multidoc_envelope_then_log',
+    'multidoc_envelope_twice',
+    # a VALID document with no usage data must still append a row: the
+    # empty-output gate has to discriminate "zero documents" from "one empty
+    # document", or it silently starts dropping real failure-path rows.
+    'degenerate_empty_object', 'modelusage_absent',
 }
 
 
@@ -328,7 +444,9 @@ def _assert_matrix_is_discriminating(t):
     # Both key orders must exist for every ordering-sensitive pair — a case in
     # only one order cannot tell "highest output wins" from "last key wins".
     for stem in ('magnitude_foreign', 'tie_zero_order',
-                 'tie_positive_order', 'rename_higher'):
+                 'tie_positive_order', 'rename_higher',
+                 'named_versioned_pair', 'named_alias_and_versioned',
+                 'named_pair_tied_positive', 'named_pair_both_zero'):
         pair = sorted(n for n in names if n.startswith(stem))
         t.assertEqual(len(pair), 2,
                       f'{stem} must appear in BOTH key orders: {pair}')
@@ -505,26 +623,60 @@ class MedicCostRowMatrixTest(_CostRowMatrixMixin, _MedicTierPoolBase):
         return self._run()
 
 
+_UNPARSEABLE_LIB = """#!/usr/bin/env bash
+# A truncated lib: the function body is never closed, so `bash -n` fails.
+capture_cost_row() {
+    echo 'never reached'
+"""
+
+# The lib STATES a wrapper can meet, and the log line each one must produce.
+# ABSENCE was the only member the guard originally covered; the other three
+# failure members all killed the tick under `set -e` before the wrapper could
+# write a single line anywhere. `healthy` is the anti-vacuity member.
+#
+# The strings are per-state ON PURPOSE: routing every failure into the existing
+# "lib missing" arm would be a fresh honesty defect of exactly the class this
+# batch closes — a log naming a cause that is not the cause.
+_LIB_STATES = {
+    'absent': 'cost-capture: lib missing; skipping',
+    'path_is_a_directory': 'cost-capture: lib missing; skipping',
+    'mode_000': 'could not be loaded',
+    'syntax_error': 'could not be loaded',
+    'empty_file': 'lib loaded but defines no capture_cost_row',
+    'healthy': 'cost record appended',
+}
+# Members that root can't exercise (root ignores the mode bits).
+_ROOT_BLIND_STATES = {'mode_000'}
+
+
 @unittest.skipUnless(_HAS_JQ, 'jq required for the cost-record parse')
-class MissingLibDegradesGracefullyTest(_RunCycleTestBase):
-    """A missing _lib_cost_capture.sh must skip the row, NOT abort the run.
+class LibStateDegradesGracefullyTest(_RunCycleTestBase):
+    """PROPERTY over the SET of _lib_cost_capture.sh states, BOTH wrappers.
 
-    The lib is sourced under `set -e`. An unguarded `source` of a missing file
-    would kill the whole /cycle (or medic tick) — far worse than the
-    best-effort cost row the lib exists to write.
+    For EVERY member: the wrapper reaches its normal exit code, writes at least
+    one line to its own log file, and logs a cost-capture outcome whose text
+    names the ACTUAL state.
 
-    EVIDENCE THIS TEST CAN AND CANNOT CARRY, stated so nobody over-reads it:
-    the hazard is created by the extraction itself, so no pre-extraction tree
-    exists in which the lib is present but its source unguarded. These two
-    tests therefore carry no evidence for the five review findings — they are
-    killed by a mutation OF THE FIX (drop the `[ -f "$_COST_LIB" ]` guard, or
-    the `command -v capture_cost_row` check, and both go red on the wrapper you
-    mutated), which is the only mutation that can reach them. Kept because the
-    failure they guard is a dead /cycle, not a dropped row.
+    The lib is sourced under `set -e`. `[ -f ]` alone covers only ABSENCE — a
+    lib that exists but cannot be read or parsed aborted the wrapper at the
+    `source` line, which sits above `log()`, above the lock write and above the
+    EXIT trap, so the tick died with zero lines in cycle.log/medic.log and the
+    only evidence was a journal entry. Note `source X || …` does NOT survive a
+    parse error (bash still exits 2 through the `||`), which is why the fix
+    needs the `bash -n` precheck and why deleting it turns the syntax-error
+    member red.
+
+    EVIDENCE THIS TEST CAN AND CANNOT CARRY: the hazard is created by the
+    extraction itself, so there is no pre-extraction tree in which the lib is
+    present but unsourceable. It is killed by mutations OF THE FIX — drop the
+    `bash -n` precheck, drop `[ -r ]`, drop `command -v capture_cost_row`,
+    collapse the tri-state back into one `else` — which is the only class of
+    mutation that can reach it. Kept because the failure it guards is a dead
+    /cycle, not a dropped row.
     """
 
     def _lib_copy(self):
-        """The harness's copy of the lib — asserted present, then removed.
+        """The harness's copy of the lib — asserted present before use.
 
         assertTrue rather than a bare unlink(): against a tree without the lib
         this must read as "the single definition is missing", not as a
@@ -532,63 +684,144 @@ class MissingLibDegradesGracefullyTest(_RunCycleTestBase):
         """
         lib = self.scripts_dir / '_lib_cost_capture.sh'
         self.assertTrue(
-            lib.exists(),
+            lib.exists() or lib.is_dir(),
             'the single cost-row definition (scripts/_lib_cost_capture.sh) is '
-            'not in the wrapper directory — nothing to remove, so this test '
+            'not in the wrapper directory — nothing to mutate, so this test '
             'cannot say anything about the guarded source')
         return lib
 
-    def test_cycle_completes_without_the_lib(self):
-        self._lib_copy().unlink()
+    def _reset_lib(self):
+        """Restore a healthy lib so each member starts from the same state."""
+        lib = self.scripts_dir / '_lib_cost_capture.sh'
+        if lib.is_dir():
+            shutil.rmtree(lib)
+        elif lib.exists():
+            os.chmod(lib, 0o600)
+            lib.unlink()
+        shutil.copy2(_SCRIPTS / '_lib_cost_capture.sh', lib)
+
+    def _apply_state(self, state):
+        lib = self._lib_copy()
+        if state == 'healthy':
+            return
+        if state == 'absent':
+            lib.unlink()
+        elif state == 'path_is_a_directory':
+            lib.unlink()
+            lib.mkdir()
+        elif state == 'mode_000':
+            os.chmod(lib, 0o000)
+            self.addCleanup(lambda: os.chmod(lib, 0o600) if lib.exists() else None)
+        elif state == 'syntax_error':
+            lib.write_text(_UNPARSEABLE_LIB)
+        elif state == 'empty_file':
+            lib.write_text('')
+        else:  # pragma: no cover - guarded by the membership assert below
+            raise AssertionError(f'unknown lib state {state!r}')
+
+    def _install_stub(self):
         stub = self.stub_bin / 'claude'
         stub.write_text(_STUB_TMPL.format(
             body=json.dumps(_envelope({WORK_MODEL: {'outputTokens': 3841}})),
             exit_code=0))
         os.chmod(stub, 0o755)
 
-        result = self._run_cycle()
+    def _costs(self):
+        return self.home / 'agents' / 'blackboard' / 'costs.jsonl'
 
-        self.assertEqual(result.returncode, 0,
-                         f'stderr={result.stderr.decode()[:800]}')
-        self.assertIn('cost-capture: lib missing; skipping',
-                      result.stdout.decode())
-        costs = self.home / 'agents' / 'blackboard' / 'costs.jsonl'
-        self.assertFalse(costs.exists() and costs.read_text().strip(),
-                         'no row can be written without the lib')
+    def _prepare(self, state):
+        self._reset_lib()
+        self._install_stub()
+        if self._costs().exists():
+            self._costs().unlink()
+        # run_cycle.sh self-throttles on the tier window (300s for tier 1), so
+        # clear the idempotency anchor or every member after the first skips
+        # before it can reach the cost block — and the property would then be
+        # green for a wrapper that never ran.
+        flag = self.home / 'agents' / 'state' / 'cycle-last-run.flag'
+        if flag.exists():
+            flag.unlink()
+        self._apply_state(state)
 
-    def test_medic_completes_without_the_lib(self):
-        """Same guard on the medic wrapper, run from a lib-less directory.
+    def _assert_property(self, state, returncode, stdout, log_file):
+        expected = _LIB_STATES[state]
+        self.assertEqual(
+            returncode, 0,
+            f'{state}: the wrapper must reach its normal exit code; '
+            f'out={stdout[-800:]}')
+        self.assertIn(
+            expected, stdout,
+            f'{state}: the log must name the ACTUAL state; out={stdout[-800:]}')
+        self.assertTrue(
+            log_file.exists() and log_file.read_text().strip(),
+            f'{state}: the wrapper wrote nothing to {log_file.name} — a tick '
+            f'that dies above log() leaves no evidence anywhere but the '
+            f'journal')
+        rows = ([ln for ln in self._costs().read_text().splitlines() if ln.strip()]
+                if self._costs().exists() else [])
+        if state == 'healthy':
+            # ANTI-VACUITY: without this member the whole property is
+            # satisfied by a harness that never reaches the cost block.
+            self.assertEqual(len(rows), 1,
+                             f'healthy lib must append exactly one row: {rows}')
+        else:
+            self.assertEqual(rows, [],
+                             f'{state}: no row can be written')
+            self.assertIn('cost-capture:', stdout,
+                          f'{state}: the skip must be logged')
+
+    def test_the_state_set_is_covered(self):
+        """Scaffolding integrity: the runnable set must not be empty, and the
+        two members that carry the NEW direction must be in it."""
+        runnable = set(_LIB_STATES) - (
+            _ROOT_BLIND_STATES if os.geteuid() == 0 else set())
+        self.assertIn('healthy', runnable)
+        self.assertIn('syntax_error', runnable)
+        self.assertIn('absent', runnable)
+        self.assertGreaterEqual(len(runnable), 5)
+
+    def test_cycle_survives_every_lib_state(self):
+        for state in sorted(_LIB_STATES):
+            if state in _ROOT_BLIND_STATES and os.geteuid() == 0:
+                continue
+            with self.subTest(lib_state=state):
+                self._prepare(state)
+                log_file = self.home / 'agents' / 'logs' / 'cycle.log'
+                if log_file.exists():
+                    log_file.unlink()
+                result = self._run_cycle()
+                self._assert_property(state, result.returncode,
+                                      result.stdout.decode(), log_file)
+
+    def test_medic_survives_every_lib_state(self):
+        """Same property on the medic wrapper, run from the harness dir.
 
         run_medic.sh normally resolves the lib out of the real repo, so to
-        exercise its absence we run a COPY from the harness's fake scripts dir
-        (whose copy of the lib we remove first).
+        mutate the lib we run a COPY from the harness's fake scripts dir. Note
+        run_medic.sh had NO `source` on main, so this class enters the medic
+        wrapper for the first time with this PR.
         """
-        lib_less = self.scripts_dir
-        self._lib_copy().unlink()
-        shutil.copy2(_RUN_MEDIC, lib_less / 'run_medic.sh')
+        shutil.copy2(_RUN_MEDIC, self.scripts_dir / 'run_medic.sh')
         # run_medic.sh chdirs into ${HOME}/agent-core/agents/medic under set -e.
         (self.repo_dir / 'agents' / 'medic').mkdir(parents=True, exist_ok=True)
         batch = self.tmp_path / 'batch.json'
         batch.write_text(json.dumps({'alerts': []}))
-        stub = self.stub_bin / 'claude'
-        stub.write_text(_STUB_TMPL.format(
-            body=json.dumps(_envelope({WORK_MODEL: {'outputTokens': 3841}})),
-            exit_code=0))
-        os.chmod(stub, 0o755)
-
-        env = os.environ.copy()
-        env['HOME'] = str(self.home)
-        env['PATH'] = f'{self.stub_bin}:{env["PATH"]}'
-        result = subprocess.run(
-            ['bash', str(lib_less / 'run_medic.sh'), str(batch)],
-            env=env, capture_output=True, text=True, timeout=30)
-
-        self.assertEqual(result.returncode, 0,
-                         f'stderr={result.stderr[:800]}')
-        self.assertIn('cost-capture: lib missing; skipping', result.stdout)
-        costs = self.home / 'agents' / 'blackboard' / 'costs.jsonl'
-        self.assertFalse(costs.exists() and costs.read_text().strip(),
-                         'no row can be written without the lib')
+        for state in sorted(_LIB_STATES):
+            if state in _ROOT_BLIND_STATES and os.geteuid() == 0:
+                continue
+            with self.subTest(lib_state=state):
+                self._prepare(state)
+                log_file = self.home / 'agents' / 'logs' / 'medic.log'
+                if log_file.exists():
+                    log_file.unlink()
+                env = os.environ.copy()
+                env['HOME'] = str(self.home)
+                env['PATH'] = f'{self.stub_bin}:{env["PATH"]}'
+                result = subprocess.run(
+                    ['bash', str(self.scripts_dir / 'run_medic.sh'), str(batch)],
+                    env=env, capture_output=True, text=True, timeout=30)
+                self._assert_property(state, result.returncode,
+                                      result.stdout, log_file)
 
 
 class StructuralAntiDriftTest(unittest.TestCase):
@@ -661,6 +894,78 @@ class StructuralAntiDriftTest(unittest.TestCase):
             self.assertIn(f'WORK_MODEL="{WORK_MODEL}"', text,
                           f'{name} dispatches a model this matrix does not '
                           f'expect; update WORK_MODEL here too')
+
+    # --- the rc surface: one lib, two hand-maintained case blocks ---------
+    def _capture_fn_body(self):
+        text = (_SCRIPTS / '_lib_cost_capture.sh').read_text()
+        start = text.index('capture_cost_row() {')
+        end = text.index('\n}\n', start)
+        return text[start:end]
+
+    def _cost_rc_case_block(self, text, name):
+        block = re.search(r'case "\$COST_RC" in\n(.*?)\n[ \t]*esac',
+                          text, re.S)
+        self.assertIsNotNone(block, f'{name}: no `case "$COST_RC"` block')
+        return block.group(1)
+
+    def test_every_lib_return_code_has_an_arm_in_both_wrappers(self):
+        """The rc surface is six-wide and lives in TWO hand-copied case blocks.
+
+        This is the guard the two-copies history says gets missed next: a code
+        added to the lib and wired into only one wrapper is invisible until the
+        other wrapper hits it in production and logs the wrong cause.
+        """
+        codes = set(re.findall(r'\breturn\s+(\d+)', self._capture_fn_body()))
+        codes.add('0')  # the success path is `return 0` too, but pin it anyway
+        # Anti-vacuity: if the extraction regex ever stops matching, an empty
+        # `codes` would make the loop below pass without asserting anything.
+        self.assertGreaterEqual(
+            len(codes), 6,
+            f'capture_cost_row should expose at least six outcomes: {codes}')
+        for name, text in self._wrapper_sources().items():
+            block = self._cost_rc_case_block(text, name)
+            for code in sorted(codes):
+                self.assertRegex(
+                    block, rf'(?m)^\s*{code}\)\s',
+                    f'{name} has no `case` arm for rc {code}, which '
+                    f'_lib_cost_capture.sh can return')
+
+    def test_neither_wrappers_catch_all_arm_asserts_a_cause(self):
+        """`*)` used to say "jq missing or empty output; skipping" — which
+        would MISLABEL every code added since. A catch-all may report the rc;
+        it may not name a cause it did not check."""
+        for name, text in self._wrapper_sources().items():
+            block = self._cost_rc_case_block(text, name)
+            catch_all = re.search(r'(?m)^\s*\*\)\s*(.*)$', block)
+            self.assertIsNotNone(catch_all, f'{name}: no catch-all arm')
+            arm = catch_all.group(1)
+            self.assertIn('rc=$COST_RC', arm,
+                          f'{name}: the catch-all must report the rc it got')
+            for claim in ('jq', 'missing', 'parse', 'lib'):
+                self.assertNotIn(
+                    claim, arm,
+                    f'{name}: the catch-all asserts a cause ({claim!r}) it '
+                    f'never checked: {arm}')
+
+    def test_the_lib_source_block_sits_below_log_and_above_the_lock(self):
+        """Placement is load-bearing in BOTH directions.
+
+        BELOW `log()`: an unloadable lib must be reportable in cycle.log /
+        medic.log, not only in the journal. ABOVE the lock write: sourcing
+        after the lock would change abort semantics and could strand a lock
+        file, which the "never abort the tick" contract depends on not
+        happening.
+        """
+        for name, text in self._wrapper_sources().items():
+            log_def = text.index('log() {')
+            source_block = text.index('_COST_LIB=')
+            lock_write = text.index('echo "$$" > "$LOCK_FILE"')
+            self.assertLess(log_def, source_block,
+                            f'{name}: the lib source block moved ABOVE log(), '
+                            f'so an unloadable lib is unreportable')
+            self.assertLess(source_block, lock_write,
+                            f'{name}: the lib source block moved BELOW the '
+                            f'lock write, changing abort semantics')
 
     def test_wrappers_resolve_the_lib_relative_to_themselves(self):
         """NOT via $HOME: run_medic.sh is invoked from the real repo path with
