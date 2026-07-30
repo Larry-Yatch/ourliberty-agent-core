@@ -16475,7 +16475,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-30T02:45:16.225290+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-30T02:41:04.879828+00:00"
+      "orphan_last_activity_ts": "2026-07-30T02:41:04.879828+00:00",
+      "briefing": {
+        "what": "This builds the behind-the-scenes plumbing for a one-click \"this looks good, ship it\" button so you can approve finished work without any manual steps.",
+        "why": "It removes a bottleneck where completed work waits on you, letting the team move faster while still keeping your final sign-off in place.",
+        "suggest": "Give it the go-ahead, but confirm the safeguards only let you approve work that has already passed review before it goes live."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-30T02:46:20.035187+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-delegate-cap-four-card-types-one-missing-verb-no-button-says-71d1",
@@ -16492,7 +16506,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-30T02:45:16.225290+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-30T02:39:09.106145+00:00"
+      "orphan_last_activity_ts": "2026-07-30T02:39:09.106145+00:00",
+      "briefing": {
+        "what": "Your team started building a feature that shows four kinds of cards, but one of them is missing a key action and another has no button to click.",
+        "why": "Half-finished features that quietly stall tie up your team's time and can ship gaps that frustrate customers if they slip through unnoticed.",
+        "suggest": "Have someone confirm what this work was meant to accomplish and whether it's still worth finishing before pouring more time into it."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-30T02:46:20.035187+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
