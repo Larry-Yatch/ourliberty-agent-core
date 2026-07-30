@@ -1051,6 +1051,15 @@ def build_approval_request_chain_event(
     recheck_target = payload.get('recheck_target')
     if isinstance(recheck_target, dict) and recheck_target:
         chain_payload['recheck_target'] = recheck_target
+    # Promoted-card marker (heal_unregistered_approval, agent-core #1058 fix):
+    # lets the dashboard tell a promoted stranded Mirror escalation apart from
+    # every other approval_request, so Approve can execute mechanically (with a
+    # recheck_target) or refuse loudly (without one) instead of routing the
+    # generic Beacon envelope. Absent on every other producer's payload, so
+    # their chain events stay byte-identical.
+    promoted_source = payload.get('promoted_source')
+    if isinstance(promoted_source, str) and promoted_source:
+        chain_payload['promoted_source'] = promoted_source
     # Null-chat leg (fix-pulse-auto-dispatch-null-chat-chain-event-001): when the
     # notifier resolved a chat destination (a valid inbound int, or the Larry
     # fallback for a null reply_chat_id), thread it into the chain event AND both

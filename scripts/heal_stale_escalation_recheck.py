@@ -58,6 +58,18 @@ THE DECISION LADDER (first match wins, per candidate card):
      `gh pr update-branch`, then retire 'expired'.
   4. Anything else -> LEAVE PENDING. Uncertain is not stale.
 
+TWO CARD CLASSES, TWO LADDER DEPTHS. Rules 2 and 3 both end in a retire, and
+they are justified ONLY by Contract D — "a review of the new head emits its own
+card". That premise is true for `mirror-review-*` cards and FALSE for
+`heal_unregistered_approval`'s promoted `unreg-approval-*` cards, whose retire
+is unrecoverable (source record already cleared, re-promotion blocked by the
+history match, and the modal case cuts no replacement card at all). Promoted
+cards therefore get rule 1 only; see PROMOTED_CARD_PREFIX. Applying the full
+ladder to them would automate the exact #1058 stranding this healer's sibling
+fix exists to prevent — rule 2 would fire on the first tick for any PR pushed
+since its escalation, because the promoted coordinate carries the
+escalation-era head.
+
 ON RULE 3 AND CODE-FLAVOURED ESCALATIONS: the signature does not attempt to
 parse Mirror's prose to decide whether it blamed the gate or the diff, because
 prose parsing is exactly the trap that makes these cards brittle. It does not
@@ -103,6 +115,7 @@ sys.path.insert(0, str(_SCRIPTS_DIR))
 from atomic_io import atomic_write_json  # noqa: E402
 from test_isolation_guard import gh_write  # noqa: E402
 import beacon_approval_handler as approval  # noqa: E402
+import heal_unregistered_approval as hua  # noqa: E402 — owns the promoted-card id shape
 import larry_alerts as la  # noqa: E402
 
 AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', '/home/larry/agents'))
@@ -113,9 +126,35 @@ STATE_FILE = AGENTS_ROOT / 'state' / 'heal-stale-escalation-recheck.json'
 
 HEALER_SOURCE = 'heal-stale-escalation-recheck'
 
-# Only session-less Mirror decision cards are in scope. This is the id shape
-# minted by `_emit_no_session_decision_approval`.
+# Session-less Mirror decision cards: the id shape minted by
+# `_emit_no_session_decision_approval`. These carry the FULL ladder, because
+# their class satisfies the Contract D premise rules 2/3 depend on — a review
+# of a new head emits its own per-head card, so retiring a superseded one
+# loses nothing.
 CARD_ID_PREFIX = 'mirror-review-'
+
+# `heal_unregistered_approval`'s promoted stranded-escalation cards (agent-core
+# #1058). Same decision class, same coordinate — but they get a STRICTLY
+# NARROWER ladder (see `_full_ladder_card`), because the Contract D premise is
+# FALSE for them and retiring one is unrecoverable:
+#
+#   * the source for-Larry record is cleared at promote time
+#     (heal_unregistered_approval's resolve-on-promote), and
+#   * `_healer_task_registered` matches the retired card in HISTORY, so the
+#     record can never be re-promoted, and
+#   * the modal promoted card originates from the notifier's ACTION_NEEDED
+#     bucket, which by design cuts NO Approvals card at all — so a repeat
+#     escalation writes only another for-Larry record under the same id, whose
+#     promotion is now blocked.
+#
+# Rules 2/3 would therefore delete Larry's ONLY decision surface with nothing
+# done — and rule 2 fires on the very first tick for any PR pushed since its
+# escalation, because the promoted coordinate carries the escalation-era head.
+# That is the #1058 stranding, automated. Only rule 1 (the PR reached a
+# terminal state, so the decision is genuinely moot) is safe here.
+PROMOTED_CARD_PREFIX = f'{hua.PROMOTED_TASK_PREFIX}-'
+
+CARD_ID_PREFIXES = (CARD_ID_PREFIX, PROMOTED_CARD_PREFIX)
 
 GH_TIMEOUT_S = 60
 
@@ -290,12 +329,25 @@ def branch_is_behind_base(repo: str, base_ref: str, head_sha: str) -> bool:
 # -------------------- card scanning --------------------
 
 def candidate_cards() -> list[dict[str, Any]]:
-    """Pending session-less Mirror decision cards carrying a full PR coordinate.
+    """Pending session-less Mirror decision cards carrying a PR coordinate.
 
     The coordinate comes from `recheck_target`, the same structured field the
     Approvals tab's third action uses. A card without one cannot be acted on
     (we would be guessing the PR), so it is skipped rather than parsed out of
     the prose summary.
+
+    `head_sha` is required only for FULL-ladder cards, whose rules 2/3 compare
+    against it. Promoted cards run rule 1 alone, which needs nothing but the
+    repo and PR number — and requiring a head there stranded them (review
+    round 2): a promoted coordinate may legitimately omit `head_sha` when the
+    promote-time probe failed, and rule 1 is the ONLY thing that retires a
+    promoted card once its PR merges. Verified there is no other path —
+    `heal_unregistered_approval.reconcile_retire` finds no `#N` in the
+    `mirror-review:<task>` ledger subject so it never gh-probes,
+    `heal_stale_approvals`' coordinate expiry requires the `mirror-review-pr-`
+    wrapper, and `outbox_notifier._reconcile_no_session_decision_on_merge`
+    matches `mirror-review-*` only. So a headless promoted card would sit on
+    the tab forever after its PR merged.
     """
     try:
         pending = approval.load_state().get('pending', [])
@@ -307,14 +359,22 @@ def candidate_cards() -> list[dict[str, Any]]:
         if not isinstance(entry, dict):
             continue
         card_id = entry.get('id')
-        if not isinstance(card_id, str) or not card_id.startswith(CARD_ID_PREFIX):
+        if not isinstance(card_id, str) \
+                or not card_id.startswith(CARD_ID_PREFIXES):
             continue
         target = (entry.get('dispatch_payload') or {}).get('recheck_target')
         if not isinstance(target, dict):
             continue
         pr_url = target.get('pr_url')
         head_sha = target.get('head_sha')
-        if not (isinstance(pr_url, str) and isinstance(head_sha, str)):
+        if not isinstance(pr_url, str):
+            continue
+        if not isinstance(head_sha, str) or not head_sha:
+            head_sha = None
+        full_ladder = _full_ladder_card(card_id)
+        if full_ladder and head_sha is None:
+            # Rules 2/3 compare against the card's head; without one there is
+            # nothing to compare and the full ladder cannot run.
             continue
         coord = parse_pr_url(pr_url)
         if coord is None:
@@ -326,8 +386,21 @@ def candidate_cards() -> list[dict[str, Any]]:
             'pr_number': pr_number,
             'head_sha': head_sha,
             'pr_url': pr_url,
+            'full_ladder': full_ladder,
         })
     return out
+
+
+def _full_ladder_card(card_id: str) -> bool:
+    """True iff every rung may act on this card.
+
+    False for promoted stranded-escalation cards, which get rule 1 only — see
+    PROMOTED_CARD_PREFIX for why retiring one is unrecoverable. Keyed on the id
+    prefix the promoter owns, not on the coordinate's shape: the coordinate is
+    incidental data that another promotion class could grow, and this ladder
+    runs an irreversible verb.
+    """
+    return not card_id.startswith(PROMOTED_CARD_PREFIX)
 
 
 def parse_pr_url(pr_url: str) -> Optional[tuple[str, int]]:
@@ -367,17 +440,36 @@ def evaluate(card: dict[str, Any], ledger: dict[str, Any], dry_run: bool,
              budget: list[int]) -> str:
     """Apply the ladder to one card. Returns an outcome tag for the summary."""
     repo, pr_number = card['repo'], card['pr_number']
-    card_id, card_head = card['card_id'], card['head_sha']
+    card_id, card_head = card['card_id'], card.get('head_sha')
 
     pr = probe_pr(repo, pr_number)
     if pr is None:
         return 'probe-failed'
 
-    # Rule 1 — terminal PR.
+    # Rule 1 — terminal PR. Safe for EVERY card class: the PR reached a
+    # terminal state, so there is no decision left to lose.
     state = pr.get('state')
     if state in ('MERGED', 'CLOSED'):
         retire(card_id, f'PR {state.lower()}; decision moot', dry_run)
         return f'retired-{state.lower()}'
+
+    # Rules 2 and 3 both END in a retire, and retiring a promoted card is
+    # unrecoverable (PROMOTED_CARD_PREFIX). Stop here for that class: an open
+    # PR keeps its card, which is the whole point of the card.
+    #
+    # Derived from the id here rather than read off `card['full_ladder']`:
+    # candidate_cards stamps that key for observability, but a caller that
+    # builds a card dict without it must not silently change which rungs run
+    # (in either direction). One pure predicate, one source of truth.
+    if not _full_ladder_card(card_id):
+        return 'left-pending-promoted-card'
+
+    # Belt-and-braces: candidate_cards guarantees a head on full-ladder cards,
+    # so this is unreachable from the healer's own scan. A hand-built card dict
+    # must degrade to "uncertain, leave it" rather than crash the tick or, far
+    # worse, compare a live head against None and retire as superseded.
+    if not isinstance(card_head, str) or not card_head:
+        return 'left-pending-no-card-head'
 
     # Rule 2 — the card describes a head that is no longer the PR's.
     live_head = pr.get('headRefOid')

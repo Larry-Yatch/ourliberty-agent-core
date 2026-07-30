@@ -6668,6 +6668,13 @@ def _route_no_session_review(
             pr_url=pr_url,
             head_sha=data.get('head_sha'),
             dedup_identity=_no_session_dedup_identity(data, marker_decision),
+            # Round accounting for a LATER promotion of this record (see
+            # heal_unregistered_approval.build_promoted_recheck_target): without
+            # it the promoted card can only ever spell round 1, restarting the
+            # revision budget and reusing an archived round name on a task that
+            # had already burned rounds/replans.
+            revision_count=data.get('revision_count'),
+            replan_count=data.get('replan_count'),
         )
         if written is not None:
             log(

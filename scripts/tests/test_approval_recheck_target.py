@@ -251,6 +251,21 @@ class ChainEventRecheckTargetTest(unittest.TestCase):
         payload = self._payload(recheck_target={'pr_url': PR_URL})
         self.assertNotIn('suggested_envelope_for_recheck', payload)
 
+    def test_promoted_source_forwarded_when_present(self):
+        # agent-core #1058: the dashboard's Approve-executes routing keys on
+        # this marker in the CHAIN payload (it only ever sees the chain row).
+        payload = self._payload(promoted_source='for-larry-mirror-review')
+        self.assertEqual(payload['promoted_source'], 'for-larry-mirror-review')
+
+    def test_promoted_source_absent_by_default(self):
+        self.assertNotIn('promoted_source', self._payload())
+
+    def test_non_string_promoted_source_is_not_forwarded(self):
+        for bogus in ('', None, 0, [], {}):
+            with self.subTest(bogus=bogus):
+                self.assertNotIn(
+                    'promoted_source', self._payload(promoted_source=bogus))
+
 
 if __name__ == '__main__':
     unittest.main()

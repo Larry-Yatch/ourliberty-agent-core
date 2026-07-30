@@ -10043,6 +10043,50 @@ def _atomic_write_envelope(path: Path, payload: dict[str, Any]) -> None:
 
 RECHECK_GH_TIMEOUT_S = 15
 
+# Prompt framings `_build_recheck_envelope` knows how to build. Anything else
+# raises there rather than silently selecting a default framing.
+RECHECK_ENVELOPE_MODES = frozenset({'operator-fixed', 'stranded-escalation'})
+
+# Marker `heal_unregistered_approval` stamps on the cards it promotes out of the
+# for-Larry feed (its PROMOTED_SOURCE_FORLARRY; pinned by a drift test rather
+# than imported — the healer must not be pulled into the API process).
+PROMOTED_STRANDED_ESCALATION_SOURCE = 'for-larry-mirror-review'
+
+# Id prefix those same promoted cards carry (the healer's PROMOTED_TASK_PREFIX).
+# The marker alone is NOT a sufficient gate: `beacon_approval_handler`'s marker
+# parser copies LLM-authored JSON keys onto the payload verbatim, so a Beacon
+# marker that happened to carry `promoted_source` could otherwise reroute its
+# own Approve — the first pass-through key able to change what Approve DOES.
+# The task_id is minted by the healer, never by a model, so requiring both
+# closes that.
+PROMOTED_STRANDED_ESCALATION_ID_PREFIX = 'unreg-approval-'
+
+
+def _is_promoted_stranded_escalation(
+    source: dict[str, Any], payload: dict[str, Any],
+) -> bool:
+    """True iff this approval_request is one of the healer's promoted stranded
+    Mirror escalations — matched on BOTH the healer-minted task_id prefix and
+    the marker, so an LLM-authored payload cannot claim the identity."""
+    task_id = source.get('task_id')
+    if not isinstance(task_id, str) \
+            or not task_id.startswith(PROMOTED_STRANDED_ESCALATION_ID_PREFIX):
+        return False
+    return payload.get('promoted_source') == PROMOTED_STRANDED_ESCALATION_SOURCE
+
+
+def _recheck_mode_for_payload(
+    source: dict[str, Any], payload: dict[str, Any],
+) -> str:
+    """Prompt framing for a Mirror re-review of this card. Keyed on the CARD,
+    so every button that dispatches a review off a promoted stranded-escalation
+    card gets the on-the-merits framing rather than the revision-applied one."""
+    return (
+        'stranded-escalation'
+        if _is_promoted_stranded_escalation(source, payload)
+        else 'operator-fixed'
+    )
+
 
 def _gh_pr_head_sha_for_recheck(target_repo: str, pr_number: int) -> Optional[str]:
     """Live PR head SHA via `gh pr view --json headRefOid`, or None.
@@ -10078,8 +10122,40 @@ def _build_recheck_envelope(
     payload: dict[str, Any],
     comment: Optional[str],
     task_id: Optional[str],
+    mode: str = 'operator-fixed',
 ) -> tuple[str, str, dict[str, Any]]:
     """Build the Mirror re-review envelope for action=recheck.
+
+    `mode` selects the prompt framing; everything mechanical (coordinate
+    validation, live head resolution, filename grammar, envelope fields) is
+    shared:
+
+      - 'operator-fixed' (default; action=recheck): the operator addressed
+        Mirror's findings by hand — frame the dispatch as "revision applied,
+        verify the findings are resolved". Byte-identical to the pre-`mode`
+        output.
+      - 'stranded-escalation' (EITHER action on a promoted stranded-escalation
+        card, agent-core #1058): NOTHING has necessarily changed — the operator
+        dispatched a re-review of an escalation that never got a real decision
+        surface. Frame it as a fresh on-the-merits re-review, and do NOT
+        present the card's meta-prose as review findings (`previous_findings`
+        is omitted: the promoted card's prompt is healer narration, not
+        Mirror's findings).
+
+    The mode is chosen from the CARD, not from the button — see
+    :func:`_recheck_mode_for_payload`. Review round 1 shipped this keyed to
+    `action == 'approve'` only, which left the tab's third button ("Fixed —
+    re-review") on the very same promoted card running 'operator-fixed': it
+    told Mirror a revision had been applied to an untouched head and handed
+    her healer narration as her own prior findings, which
+    `outbox_notifier` then threads verbatim into any resulting Forge revision
+    prompt. Both buttons on a promoted card mean "re-review this PR", so both
+    get the same framing.
+
+    An unrecognized `mode` RAISES rather than falling through to the default.
+    A bare `else` would make a typo (`approved_escalation`) silently produce
+    the exact two lies this parameter exists to prevent, with every test still
+    green.
 
     Unlike approve/reject — which write an LLM envelope to Beacon and let her
     work out the routing — this writes the review request to Mirror DIRECTLY.
@@ -10105,6 +10181,11 @@ def _build_recheck_envelope(
     reports `head_moved` so the UI can warn when the head is unchanged; a
     deliberate re-run on an unmoved head is allowed (spec §8 Q2).
     """
+    if mode not in RECHECK_ENVELOPE_MODES:
+        raise ValueError(
+            f'unknown _build_recheck_envelope mode={mode!r} '
+            f'(expected one of {sorted(RECHECK_ENVELOPE_MODES)})'
+        )
     target = payload.get('recheck_target')
     if not isinstance(target, dict):
         raise HTTPException(
@@ -10156,36 +10237,74 @@ def _build_recheck_envelope(
         replan_count = 0
 
     prior = str(payload.get('prompt') or '').strip()
-    lines = [
-        f'Re-review phase. Revision {round_num} has been applied on task '
-        f'`{review_task_id}` per your earlier review findings.',
-        '',
-        'Dispatched by the operator via the Approvals tab ("Fixed — '
-        're-review"): they addressed your findings themselves rather than '
-        'routing a Forge revision.',
-    ]
-    if comment:
-        # Operator context, explicitly framed as context. Mirror's review
-        # protocol (her CLAUDE.md) governs what she does; this text never
-        # licenses acting outside it.
-        lines += ['', f"Operator's note on what changed: {comment}"]
-    lines += [
-        '',
-        f'Task: `{review_task_id}`',
-        f'PR: {pr_url}',
-    ]
-    if prior:
-        lines += ['', 'Your findings from the previous round:', f'  1. {prior}']
-    lines += [
-        '',
-        f'Read the updated PR diff (`gh pr diff {parsed[1]}` — same PR, now at '
-        f'head {live_head[:8]}). Verify each finding above is resolved in the '
-        'new diff AND no new issues were introduced. Emit one marker: '
-        'REVIEW_PASS (if findings resolved cleanly), REVIEW_REVISION (if more '
-        f'changes needed; next would be round {round_num + 1}), '
-        'REVIEW_ESCALATE (if the revision approach is wrong), or '
-        'REVIEW_EMERGENCY_HALT (safety issue).',
-    ]
+    if mode == 'stranded-escalation':
+        lines = [
+            f'Re-review request. The operator dispatched this from the '
+            f'Approvals tab for task `{review_task_id}`, acting on a stranded '
+            'session-less escalation (a promoted card: the original review '
+            'round ended in an escalation that never got a real decision '
+            'surface).',
+            '',
+            'No revision has necessarily been applied since that review — the '
+            'head may be unchanged. Re-review the PR at its current head on '
+            'its merits.',
+        ]
+        if comment:
+            # Operator context, explicitly framed as context. Mirror's review
+            # protocol (her CLAUDE.md) governs what she does; this text never
+            # licenses acting outside it.
+            lines += ['', f"Operator's note: {comment}"]
+        lines += [
+            '',
+            f'Task: `{review_task_id}`',
+            f'PR: {pr_url}',
+        ]
+        if prior:
+            lines += ['', 'The promoted card\'s context (why this stranded):',
+                      f'  {prior}']
+        lines += [
+            '',
+            f'Read the PR diff (`gh pr diff {parsed[1]}` — now at head '
+            f'{live_head[:8]}). Emit one marker per your review protocol: '
+            'REVIEW_PASS (mergeable on its merits), REVIEW_REVISION (changes '
+            f'needed; next would be round {round_num + 1}), REVIEW_ESCALATE '
+            '(a human must decide — state exactly what call is needed), or '
+            'REVIEW_EMERGENCY_HALT (safety issue).',
+        ]
+        dispatched_by = 'dashboard-stranded-escalation'
+    else:
+        lines = [
+            f'Re-review phase. Revision {round_num} has been applied on task '
+            f'`{review_task_id}` per your earlier review findings.',
+            '',
+            'Dispatched by the operator via the Approvals tab ("Fixed — '
+            're-review"): they addressed your findings themselves rather than '
+            'routing a Forge revision.',
+        ]
+        if comment:
+            # Operator context, explicitly framed as context. Mirror's review
+            # protocol (her CLAUDE.md) governs what she does; this text never
+            # licenses acting outside it.
+            lines += ['', f"Operator's note on what changed: {comment}"]
+        lines += [
+            '',
+            f'Task: `{review_task_id}`',
+            f'PR: {pr_url}',
+        ]
+        if prior:
+            lines += ['', 'Your findings from the previous round:',
+                      f'  1. {prior}']
+        lines += [
+            '',
+            f'Read the updated PR diff (`gh pr diff {parsed[1]}` — same PR, '
+            f'now at head {live_head[:8]}). Verify each finding above is '
+            'resolved in the new diff AND no new issues were introduced. Emit '
+            'one marker: REVIEW_PASS (if findings resolved cleanly), '
+            f'REVIEW_REVISION (if more changes needed; next would be round '
+            f'{round_num + 1}), REVIEW_ESCALATE (if the revision approach is '
+            'wrong), or REVIEW_EMERGENCY_HALT (safety issue).',
+        ]
+        dispatched_by = 'dashboard-recheck'
 
     envelope = {
         'task_id': review_task_id,
@@ -10193,7 +10312,7 @@ def _build_recheck_envelope(
         'source': 'dashboard',
         'phase': 'review',
         'max_revisions': 3,
-        'dispatched_by': 'dashboard-recheck',
+        'dispatched_by': dispatched_by,
         'head_sha': live_head,
         'head_moved': live_head != stamped_head,
         'pr_url': pr_url,
@@ -10206,7 +10325,10 @@ def _build_recheck_envelope(
     # replan budget at the next hop.
     if replan_count > 0:
         envelope['replan_count'] = replan_count
-    if prior:
+    # The promoted card's prompt is healer narration, not Mirror's findings —
+    # carrying it as previous_findings would feed the review protocol prose
+    # that was never a finding (stranded-escalation mode omits it).
+    if prior and mode != 'stranded-escalation':
         envelope['previous_findings'] = [prior]
     if comment:
         envelope['comment'] = comment
@@ -10260,6 +10382,40 @@ def _build_envelope_for_action(
 
     if event_type == 'approval_request':
         target_agent = 'beacon'
+        # Promoted stranded-escalation card (heal_unregistered_approval,
+        # agent-core #1058): Approve must EXECUTE, not delegate. The generic
+        # Beacon envelope below is an LLM hop that, on this card class, has
+        # no wired action at all — on PR #1058 the Beacon session diagnosed
+        # the situation correctly ("merge it") and then could neither merge
+        # nor reach Larry, so Approve cleared the card and did nothing. With
+        # a recheck_target, dispatch a fresh Mirror re-review mechanically:
+        # its verdict drives the existing pipeline (PASS → auto-merge,
+        # REVISION → session-less self-heal routes a Forge revision,
+        # ESCALATE → a properly-wired `mirror-review-*` decision card).
+        # Without one, refuse loudly BEFORE the read_at claim — the card
+        # stays intact and visible instead of silently clearing.
+        if action == 'approve' \
+                and _is_promoted_stranded_escalation(source, payload):
+            if isinstance(payload.get('recheck_target'), dict):
+                return _build_recheck_envelope(
+                    payload=payload, comment=comment, task_id=task_id,
+                    mode=_recheck_mode_for_payload(source, payload),
+                )
+            # No coordinate ⇒ nothing to execute. Point at the task id, NOT at
+            # "the URL in the card text": a promoted card has no structured
+            # pr_url, and the commonest reason it has no coordinate is that its
+            # source record carried no PR link at all — in which case the card
+            # text has none either and that instruction is a dead end.
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    'this promoted stranded-escalation card carries no PR '
+                    'coordinate, so Approve has nothing it can execute. The '
+                    f'card is untouched — find the PR for task {task_id!r} '
+                    '(the card body has the details the healer captured), '
+                    'handle it by hand, then Reject to dismiss the card.'
+                ),
+            )
         if action == 'approve':
             filename = f'larry-approval-{source_event_id}.json'
             envelope = {
@@ -10301,8 +10457,14 @@ def _build_envelope_for_action(
                 envelope['comment'] = comment
             return target_agent, filename, envelope
         if action == 'recheck':
+            # Mode comes from the CARD, not the button: on a promoted
+            # stranded-escalation card the third button means the same thing
+            # Approve does, and the default framing would tell Mirror a
+            # revision had been applied and hand her the healer's narration as
+            # her own prior findings.
             return _build_recheck_envelope(
                 payload=payload, comment=comment, task_id=task_id,
+                mode=_recheck_mode_for_payload(source, payload),
             )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -10488,6 +10650,33 @@ def _handle_larry_action(
                 f'action={action!r} is only valid on '
                 f'{sorted(ALERT_RATING_EVENT_TYPES)} '
                 f'(got event_type={source.get("event_type")!r})'
+            ),
+        )
+
+    # `mark_done` is the ALERTS' dismiss affordance (spec § 8.2). On an
+    # approval_request it is a silent no-op wearing an approval's name: the
+    # side-effect block below skips the envelope builder entirely for
+    # mark_done, so the routing matrix that already rejects this pair
+    # ("action='mark_done' not valid for approval_request") never runs — and
+    # the fan-out then records outcome='approved' having dispatched nothing.
+    # That is the agent-core #1058 shape (card clears, nothing happens) on the
+    # very card class #1058 was about, and because decision_outcome_ledger
+    # feeds the govern loop's autonomy-widening learning, a dismissal would be
+    # learned as an approval. Fail it pre-claim, exactly like the alert-rating
+    # guard above, so the card survives intact.
+    #
+    # Scoped to approval_request ONLY, deliberately. clarify_request's matrix
+    # accepts just `comment`, so rejecting mark_done there would leave that
+    # card with no dismissal route at all — trading a silent no-op for a
+    # stranded card is not an improvement. approval_request has three real
+    # exits (approve / reject / recheck), so removing this one strands nothing.
+    if action == 'mark_done' and source.get('event_type') == 'approval_request':
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "action='mark_done' is not valid on an approval_request — it "
+                'would clear the decision and record it as approved without '
+                'dispatching anything. Use approve, reject, or recheck.'
             ),
         )
 
@@ -10766,13 +10955,24 @@ def _handle_larry_action(
         'target_agent': target_agent,
         'audit_persisted': audit_persisted,
     }
-    # Surface what `recheck` actually dispatched so the UI toast can name the
+    # Surface what a review dispatch actually did so the UI toast can name the
     # head, and warn when the head did NOT move (a re-review of identical bits
     # will very likely return the identical verdict — allowed, but the operator
-    # should know they are paying for it). See spec §8 Q2.
-    if action == 'recheck' and isinstance(envelope_payload, dict):
+    # should know they are paying for it). See spec §8 Q2. Keyed on the
+    # envelope's own `dispatched_by` rather than on the action, so the two
+    # buttons that can dispatch a review report identically; `_build_recheck_
+    # envelope` is the only producer of these values and always stamps it.
+    _dispatched_by = (
+        envelope_payload.get('dispatched_by')
+        if isinstance(envelope_payload, dict) else None
+    )
+    if _dispatched_by in ('dashboard-recheck', 'dashboard-stranded-escalation'):
         result['recheck_head_sha'] = envelope_payload.get('head_sha')
         result['head_moved'] = envelope_payload.get('head_moved')
+        # Approve's own affordance says "approved", which would otherwise hide
+        # that a paid Mirror review just went out (agent-core #1058 fix).
+        if _dispatched_by == 'dashboard-stranded-escalation':
+            result['review_dispatched'] = True
     if audit_error is not None:
         result['audit_error'] = audit_error
     if reconcile_detail:
