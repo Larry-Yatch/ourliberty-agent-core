@@ -42,7 +42,7 @@ tmux has-session -t "$SESSION" 2>/dev/null && tmux kill-session -t "$SESSION"
 
 # Start fresh — tmux loads the env from the parent shell
 tmux new-session -d -s "$SESSION" \
-  "set -a; . '$ENV_FILE'; set +a; exec python3 '$BOT_PY' 2>&1 | tee -a ${HOME}/agents/logs/beacon_telegram_bot.tmux.log"
+  "set -a; . '$ENV_FILE'; set +a; exec python3 '$BOT_PY' 2>&1 | tee -a ${OURLIBERTY_AGENTS_ROOT:-$HOME/agents}/logs/beacon_telegram_bot.tmux.log"
 
 sleep 1
 tmux ls | grep "$SESSION" || { echo "Failed to start tmux session"; exit 1; }

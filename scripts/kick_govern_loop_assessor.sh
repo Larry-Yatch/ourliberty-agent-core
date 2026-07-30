@@ -21,7 +21,7 @@
 set -euo pipefail
 
 REPO_DIR="${HOME}/agent-core"
-STATE_FILE="${HOME}/agents/state/govern-loop-kickoff.json"
+STATE_FILE="${OURLIBERTY_AGENTS_ROOT:-$HOME/agents}/state/govern-loop-kickoff.json"
 
 if [ "${1:-}" != "--force" ] && [ -f "$STATE_FILE" ] \
     && python3 -c "import json,sys; sys.exit(0 if json.load(open('$STATE_FILE')).get('kicked') else 1)" 2>/dev/null; then
@@ -30,6 +30,11 @@ if [ "${1:-}" != "--force" ] && [ -f "$STATE_FILE" ] \
 fi
 
 cd "$REPO_DIR/scripts"
+# The heredoc below is QUOTED (no shell expansion), so the payload cannot
+# spell the override itself. Hand it the one path this script already
+# resolved, so the stamp-writer and the "already kicked" reader above
+# cannot disagree under a swapped HOME.
+export OL_KICK_STATE_FILE="$STATE_FILE"
 python3 - <<'PYEOF'
 import json
 import os
@@ -70,7 +75,7 @@ dest = safe_write_inbox(
 )
 print(f'dispatched: {dest}')
 
-state_file = Path('~/agents/state/govern-loop-kickoff.json').expanduser()
+state_file = Path(os.environ['OL_KICK_STATE_FILE'])
 try:
     state = json.loads(state_file.read_text())
     if not isinstance(state, dict):

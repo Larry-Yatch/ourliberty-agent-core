@@ -226,7 +226,7 @@ capture_cost_row() {
     # active-tier.json; tier1 when missing/malformed.
     local account_tier="$dispatch_tier"
     if [ -z "$account_tier" ]; then
-        local active_tier_file="${HOME}/agents/blackboard/active-tier.json"
+        local active_tier_file="${OURLIBERTY_AGENTS_ROOT:-$HOME/agents}/blackboard/active-tier.json"
         account_tier="$(jq -r '.tier // "tier1"' "$active_tier_file" 2>/dev/null || echo tier1)"
         if [ -z "$account_tier" ] || [ "$account_tier" = "null" ]; then
             account_tier="tier1"

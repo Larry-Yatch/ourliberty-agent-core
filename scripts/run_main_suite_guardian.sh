@@ -24,9 +24,9 @@ set -u
 
 REPO_DIR="${HOME}/agent-core"
 GUARDIAN_PY="${REPO_DIR}/scripts/main_suite_guardian.py"
-LOG_DIR="${HOME}/agents/logs"
+LOG_DIR="${OURLIBERTY_AGENTS_ROOT:-$HOME/agents}/logs"
 LOG_FILE="${LOG_DIR}/main-suite-guardian.log"
-HALT_FLAG="${HOME}/agents/blackboard/EMERGENCY_HALT"
+HALT_FLAG="${OURLIBERTY_AGENTS_ROOT:-$HOME/agents}/blackboard/EMERGENCY_HALT"
 
 # Absolute lock path — MUST match regression_baseline_cache.REGBASELINE_LOCK_PATH
 # byte-for-byte (L7). NEVER $HOME-relative: a tier-swapped process would flock a

@@ -26,12 +26,12 @@ set -e
 REPO_DIR="${HOME}/agent-core"
 STAGE_A_PY="${REPO_DIR}/scripts/pulse_check_retrospective.py"
 STAGE_B_PY="${REPO_DIR}/scripts/pulse_check_retrospective_author.py"
-LOCK_DIR="${HOME}/agents/state"
+LOCK_DIR="${OURLIBERTY_AGENTS_ROOT:-$HOME/agents}/state"
 LOCK_FILE="${LOCK_DIR}/.retrospective.lock"
 LOCK_MAX_AGE_SEC=$((30 * 60))
-LOG_DIR="${HOME}/agents/logs"
+LOG_DIR="${OURLIBERTY_AGENTS_ROOT:-$HOME/agents}/logs"
 LOG_FILE="${LOG_DIR}/retrospective.log"
-HALT_FLAG="${HOME}/agents/blackboard/EMERGENCY_HALT"
+HALT_FLAG="${OURLIBERTY_AGENTS_ROOT:-$HOME/agents}/blackboard/EMERGENCY_HALT"
 
 # Pass-through flags (e.g. --force) forwarded to BOTH stages.
 EXTRA_ARGS=("$@")

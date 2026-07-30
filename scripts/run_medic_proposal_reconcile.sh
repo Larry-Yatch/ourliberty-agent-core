@@ -16,16 +16,16 @@ set -e
 
 REPO_DIR="${HOME}/agent-core"
 PY="${REPO_DIR}/scripts/medic_proposal_reconcile.py"
-LOCK_DIR="${HOME}/agents/state"
+LOCK_DIR="${OURLIBERTY_AGENTS_ROOT:-$HOME/agents}/state"
 LOCK_FILE="${LOCK_DIR}/.medic-proposal-reconcile.lock"
 # Runs finish in seconds; the timer fires every 15 min. A 10-min max-age
 # strictly exceeds the unit TimeoutStartSec (300s) so a systemd-bounded pass
 # never looks stale to a concurrent manual run, yet a truly dead lock clears
 # well before the next tick.
 LOCK_MAX_AGE_SEC=$((10 * 60))
-LOG_DIR="${HOME}/agents/logs"
+LOG_DIR="${OURLIBERTY_AGENTS_ROOT:-$HOME/agents}/logs"
 LOG_FILE="${LOG_DIR}/medic-proposal-reconcile.log"
-HALT_FLAG="${HOME}/agents/blackboard/EMERGENCY_HALT"
+HALT_FLAG="${OURLIBERTY_AGENTS_ROOT:-$HOME/agents}/blackboard/EMERGENCY_HALT"
 
 mkdir -p "$LOCK_DIR" "$LOG_DIR"
 

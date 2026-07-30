@@ -19,10 +19,10 @@ if [ -z "$BATCH_PATH" ]; then
 fi
 
 MEDIC_DIR="${HOME}/agent-core/agents/medic"
-LOCK_DIR="${HOME}/agents/state"
+LOCK_DIR="${OURLIBERTY_AGENTS_ROOT:-$HOME/agents}/state"
 LOCK_FILE="${LOCK_DIR}/.medic.lock"
 LOCK_MAX_AGE_SEC=$((30 * 60))   # 30 minutes -- stale lock threshold
-LOG_DIR="${HOME}/agents/logs"
+LOG_DIR="${OURLIBERTY_AGENTS_ROOT:-$HOME/agents}/logs"
 LOG_FILE="${LOG_DIR}/medic.log"
 
 # The model this wrapper dispatches on. SINGLE SOURCE: it is both the value
@@ -191,7 +191,7 @@ fi
 # The row (and the work-model selector) live in _lib_cost_capture.sh so this
 # wrapper and run_cycle.sh cannot drift. $WORK_MODEL is the SAME variable
 # passed to `claude --model` above.
-COSTS_FILE="${HOME}/agents/blackboard/costs.jsonl"
+COSTS_FILE="${OURLIBERTY_AGENTS_ROOT:-$HOME/agents}/blackboard/costs.jsonl"
 mkdir -p "$(dirname "$COSTS_FILE")"
 #
 # Every rc the lib can return gets its OWN arm. The catch-all must not assert a
