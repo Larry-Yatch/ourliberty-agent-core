@@ -6478,6 +6478,37 @@ def _build_recheck_target(
     }
 
 
+def _build_merge_target(
+    *,
+    task_id: str,
+    pr_url: Optional[str],
+    target_repo: Optional[str],
+    head_sha: Optional[str],
+) -> Optional[dict[str, Any]]:
+    """Structured PR coordinate that gates the Approvals tab's FOURTH action
+    ("merge it"), or None. merge-verb-backend-001.
+
+    Mirrors `_build_recheck_target`'s fail-closed contract: None when any of
+    `pr_url` / `target_repo` / `head_sha` is missing. A card that rendered the
+    merge button but could not honor it would resolve the approval and THEN fail
+    — unrecoverable, because the card is gone by then. Absent field ⇒ no stamp ⇒
+    no button ⇒ the operator still has the other verbs. Fails closed.
+
+    The CALLER owns the review-passed / open / unmerged precondition: this is
+    stamped only from producers that surface a PR which already PASSED review
+    (today `_surface_deep_review_hold_approval`). The stamp is a capability gate,
+    NOT proof — the dashboard re-verifies REVIEW_PASS-on-record and live PR state
+    server-side before any merge fires (Larry's two-place rule)."""
+    if not (pr_url and target_repo and head_sha):
+        return None
+    return {
+        'task_id': task_id,
+        'pr_url': pr_url,
+        'target_repo': target_repo,
+        'head_sha': head_sha,
+    }
+
+
 def _emit_no_session_decision_approval(
     data: dict[str, Any], marker_decision: dict[str, Any],
 ) -> None:
@@ -9733,6 +9764,23 @@ def _surface_deep_review_hold_approval(
         'prompt': summary,
         'pr_url': pr_url,
     }
+    # merge-verb-backend-001: THIS is the review-passed home for the merge verb.
+    # The card exists precisely because the PR PASSED Mirror and is open +
+    # unmerged (held for a human deep review), so the "merge it" verb applies:
+    # the operator authorizes the held merge with one click, published through
+    # the SAME gated machinery. Stamp the coordinate on the RAW build task_id
+    # (not `approval_id`, which may carry a head8 suffix) so the dashboard's
+    # REVIEW_PASS-on-record re-verify matches the Mirror verdict event. Absent
+    # `head_sha`/coordinate ⇒ no stamp ⇒ no button (fail-closed); the deep-review
+    # APPROVE/REJECT verbs are unaffected either way.
+    merge_target = _build_merge_target(
+        task_id=task_id,
+        pr_url=pr_url,
+        target_repo=repo_coords,
+        head_sha=head_sha,
+    )
+    if merge_target is not None:
+        payload['merge_target'] = merge_target
     try:
         approval.add_pending(payload, chat_id=chat_id)
     except Exception as e:  # noqa: BLE001 — best-effort durable store
