@@ -15993,6 +15993,57 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-closed-pr-dedup-wedge-fix-001",
+      "name": "Closed PR Dedup Wedge Fix 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `closed-pr-dedup-wedge-fix-001`. Last activity 2026-07-30T00:57:50.265239+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "closed-pr-dedup-wedge-fix-001"
+      ],
+      "repo": null,
+      "created": "2026-07-30",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-30T00:59:44.338778+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-30T00:57:50.265239+00:00"
+    },
+    {
+      "id": "proposed-delegate-cap-closed-pr-step-wedged-forever-by-headless-dispat-37d6",
+      "name": "Delegate Cap Closed PR Step Wedged Forever By Headless Dispat 37d6",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `delegate-cap-closed-pr-step-wedged-forever-by-headless-dispat-37d6`. Last activity 2026-07-30T00:57:45.895872+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "delegate-cap-closed-pr-step-wedged-forever-by-headless-dispat-37d6"
+      ],
+      "repo": null,
+      "created": "2026-07-30",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-30T00:59:44.338778+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-30T00:57:45.895872+00:00"
+    },
+    {
+      "id": "proposed-deep-review-hold-pr161-d4827b88",
+      "name": "Deep Review Hold Pr161 D4827b88",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `deep-review-hold-pr161-d4827b88`. Last activity 2026-07-30T00:47:40.460381+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "deep-review-hold-pr161-d4827b88"
+      ],
+      "repo": null,
+      "created": "2026-07-30",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-30T00:59:44.338778+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-30T00:47:40.460381+00:00"
     }
   ]
 }
