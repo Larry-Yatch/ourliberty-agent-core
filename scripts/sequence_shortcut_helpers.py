@@ -34,22 +34,26 @@ Stdlib only.
 """
 from __future__ import annotations
 
+import functools
 import json
 import os
 import re
 import shlex
 import subprocess
 import sys
+import threading
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Iterator, Optional, Union
 
 # Import the validator for read + schema-check.
 _SCRIPT_DIR = Path(__file__).resolve().parent
 if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 
+import atomic_io  # noqa: E402
 import build_sequence_validator as bsv  # noqa: E402
 import task_cancel  # noqa: E402  (shared cancel-marker contract w/ agent_runner)
 from atomic_io import atomic_write_json  # noqa: E402
@@ -91,6 +95,123 @@ class Result:
 
 def _seq_path(seq_id: str) -> Path:
     return AGENTS_ROOT / 'blackboard' / 'build-sequences' / f'{seq_id}.json'
+
+
+def _resolve_seq_path(seq_id_or_path: Union[str, Path]) -> Path:
+    """Resolve a build-sequence identifier to its on-disk path.
+
+    Accepts either a bare seq-id (``bootstrap-002``) — resolved under
+    ``AGENTS_ROOT/blackboard/build-sequences/<id>.json`` — or an already-built
+    ``Path`` / path-like string (any value that carries a path separator or a
+    ``.json`` suffix). The dual form lets the external direct writers, which
+    already hold a concrete ``Path``, route through the SAME lock as the id-based
+    ``apply_*`` helpers without re-deriving the id.
+    """
+    if isinstance(seq_id_or_path, Path):
+        return seq_id_or_path
+    s = str(seq_id_or_path)
+    if s.endswith('.json') or '/' in s or os.sep in s:
+        return Path(s)
+    return _seq_path(s)
+
+
+# Per-(process, thread, path) re-entrancy depth for locked_sequence_update. The
+# underlying flock (atomic_io.locked_update → file_lock) is NOT re-entrant: a
+# second exclusive flock on the same file from the SAME process blocks until its
+# own ``timeout`` then degrades to unserialized. That would fire whenever an
+# outer critical section (e.g. the advancer wrapping a whole per-sequence tick)
+# nests an inner one (its reconcile path calling ``apply_step_merged``). Tracking
+# depth here lets the inner ``with`` recognize the lock is already held by THIS
+# thread and run inside the existing critical section instead of re-acquiring —
+# so the choke point can be used both coarsely (wrap the whole RMW) and finely
+# (each ``apply_*``) without deadlock/degrade. Keyed by thread id so a genuine
+# cross-thread contender on the same file still takes the real flock.
+_reentrant_lock = threading.Lock()
+_held_seq_locks: dict[tuple[int, str], int] = {}
+
+
+@contextmanager
+def locked_sequence_update(seq_id_or_path: Union[str, Path]) -> Iterator[bool]:
+    """THE single choke point for a build-sequence read-modify-write.
+
+    ``atomic_write_json`` makes each write torn-free, but it does nothing for the
+    load→mutate→write WINDOW: two processes can each read the same on-disk state,
+    each mutate its own copy, and the second write clobbers the first — a lost
+    update (an audit_log control-channel entry, a step status transition, or a
+    ``current_steps`` edit silently discarded). This wraps
+    :func:`atomic_io.locked_update` on the sequence file so only one process is
+    inside the critical section at a time.
+
+    CONTRACT — the read MUST happen INSIDE the ``with`` block::
+
+        with locked_sequence_update(seq_id):
+            seq, err = _read_sequence(seq_id)   # fresh read, under the lock
+            if err is not None:
+                ...
+            seq['audit_log'].append(...)        # mutate
+            _atomic_write(path, seq)            # atomic swap, under the lock
+
+    Reading before the ``with`` re-opens the exact window this closes.
+
+    RE-ENTRANT within a process+thread: a nested ``with`` on the same file (an
+    outer writer whose body calls one of the ``apply_*`` helpers, which each take
+    this lock too) recognizes the lock is already held and runs inside the same
+    critical section rather than re-acquiring — the underlying flock is not
+    re-entrant and would otherwise self-degrade after its timeout. This is what
+    lets a coarse writer (advancer wrapping a whole per-sequence tick) and the
+    fine-grained ``apply_*`` helpers coexist through the SAME choke point.
+
+    Fail-open, inherited from :func:`atomic_io.locked_update`: NEVER raises and
+    NEVER wedges. If advisory locking is unavailable, the lock can't be acquired
+    within the timeout, or the sidecar is transiently unwritable, the body still
+    runs UNSERIALIZED (yielding ``False``) — degrading to exactly the pre-lock
+    behavior so a daemon never hangs. Yields ``True`` when the lock was held (or
+    is held by an enclosing frame on this thread).
+
+    CORRECTNESS INVARIANT (from :func:`atomic_io.locked_update`): the guarantee
+    holds ONLY if EVERY writer of the sequence file goes through this helper —
+    which is why the id-based ``apply_*`` helpers AND the external direct writers
+    (advancer / kickoff / notifier / heal_pipeline_stall / launch_queue_drain)
+    are all migrated together.
+    """
+    path = _resolve_seq_path(seq_id_or_path)
+    key = (threading.get_ident(), str(path))
+    with _reentrant_lock:
+        depth = _held_seq_locks.get(key, 0)
+        _held_seq_locks[key] = depth + 1
+    try:
+        if depth:
+            # An enclosing frame on this thread already holds the flock; run
+            # inside its critical section (no second, self-blocking acquire).
+            yield True
+            return
+        with atomic_io.locked_update(path) as held:
+            yield held
+    finally:
+        with _reentrant_lock:
+            remaining = _held_seq_locks.get(key, 1) - 1
+            if remaining <= 0:
+                _held_seq_locks.pop(key, None)
+            else:
+                _held_seq_locks[key] = remaining
+
+
+def _under_seq_lock(fn: Callable[..., 'Result']) -> Callable[..., 'Result']:
+    """Route an ``apply_*(seq_id, ...)`` helper's whole read-modify-write through
+    :func:`locked_sequence_update`, keyed on its first argument (``seq_id``).
+
+    Because the wrapped body's very first act is ``_read_sequence(seq_id)``, the
+    read now executes INSIDE the lock — the window is closed with a one-line
+    decorator rather than re-indenting each helper. Fail-open is preserved: the
+    context manager never raises, so a lock-acquisition failure just runs the
+    body unserialized, exactly as before this migration.
+    """
+    @functools.wraps(fn)
+    def wrapper(*args: Any, **kwargs: Any) -> 'Result':
+        seq_id = args[0] if args else kwargs.get('seq_id')
+        with locked_sequence_update(seq_id):
+            return fn(*args, **kwargs)
+    return wrapper
 
 
 def _now_iso() -> str:
@@ -240,6 +361,7 @@ def is_completion_signaled(seq: dict[str, Any]) -> bool:
     return False
 
 
+@_under_seq_lock
 def claim_completion_signal(seq_id: str, actor: str = 'notifier') -> Result:
     """Atomically claim the right to emit the one-time completion signal.
 
@@ -482,6 +604,7 @@ def execute_post_merge(
 # -------------------- pause / resume --------------------
 
 
+@_under_seq_lock
 def apply_pause(seq_id: str, actor: str = 'larry') -> Result:
     """Set sequence status to `paused`.
 
@@ -530,6 +653,7 @@ def apply_pause(seq_id: str, actor: str = 'larry') -> Result:
     )
 
 
+@_under_seq_lock
 def apply_resume(seq_id: str, actor: str = 'larry') -> Result:
     """Set sequence status to `active`.
 
@@ -589,6 +713,7 @@ def apply_resume(seq_id: str, actor: str = 'larry') -> Result:
 # -------------------- cancel --------------------
 
 
+@_under_seq_lock
 def apply_cancel(
     seq_id: str, actor: str = 'larry', reason: Optional[str] = None,
 ) -> Result:
@@ -752,6 +877,7 @@ def sequence_cancelled_for_step(
 # -------------------- retry --------------------
 
 
+@_under_seq_lock
 def apply_retry(
     seq_id: str, step_id: str, actor: str = 'larry',
 ) -> Result:
@@ -828,6 +954,7 @@ def apply_retry(
 # -------------------- skip --------------------
 
 
+@_under_seq_lock
 def apply_skip(
     seq_id: str, step_id: str, actor: str = 'larry',
     reason: Optional[str] = None,
@@ -896,6 +1023,7 @@ def apply_skip(
 # -------------------- step-merged (V6, orchestrator-rectification-v2) --------------------
 
 
+@_under_seq_lock
 def apply_step_merged(
     seq_id: str,
     step_id: str,
@@ -1003,6 +1131,7 @@ def apply_step_merged(
 # -------------------- step-failed (push-signal non-merge terminals) --------------------
 
 
+@_under_seq_lock
 def apply_step_failed(
     seq_id: str,
     step_id: str,
@@ -1113,6 +1242,7 @@ def apply_step_failed(
 # -------------------- step-pr-opened (pr_url + substatus at PR-open) --------------------
 
 
+@_under_seq_lock
 def apply_step_pr_opened(
     seq_id: str,
     step_id: str,
@@ -1386,6 +1516,7 @@ def gh_pr_merge_info(
 
 __all__ = [
     'Result',
+    'locked_sequence_update',
     'apply_pause',
     'apply_resume',
     'apply_cancel',

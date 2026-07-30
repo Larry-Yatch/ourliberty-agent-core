@@ -4106,53 +4106,60 @@ def _append_dag_audit_entry(
     branch writes no Beacon notify) MUST escalate when this returns False,
     or the REVISION is dropped in total silence.
     """
-    try:
-        seq = json.loads(seq_path.read_text())
-    except (OSError, json.JSONDecodeError) as e:
-        log(
-            f'MIRROR_DAG_PREFLIGHT seq={seq_id} event={event}; could not '
-            f'read sequence file to append audit entry ({type(e).__name__}: '
-            f'{e})',
-            'WARN',
-        )
-        return False
-    if not isinstance(seq.get('audit_log'), list):
-        seq['audit_log'] = []
-    already = any(
-        isinstance(e, dict)
-        and e.get('event') == event
-        and e.get('mirror_task_id') == mirror_task_id
-        for e in seq['audit_log']
-    )
-    if already:
-        return True   # this round IS recorded — the write already happened
-    entry: dict[str, Any] = {
-        'ts': datetime.now(timezone.utc).isoformat(),
-        'event': event,
-        'actor': 'outbox-notifier',
-        'mirror_task_id': mirror_task_id,
-    }
-    if extra:
-        entry.update(extra)
-    seq['audit_log'].append(entry)
-    tmp_path = seq_path.with_suffix(seq_path.suffix + '.tmp')
-    try:
-        with open(tmp_path, 'w', encoding='utf-8') as f:
-            json.dump(seq, f, indent=2)
-            f.write('\n')
-        os.replace(tmp_path, seq_path)
-    except OSError as e:
+    # Serialize the read-check-write under the sequence file lock: two notifiers
+    # (or a notifier racing the advancer) each reading before either writes would
+    # both see `already=False` and double-append the same round, or one could
+    # lose-update the other's audit entry (seq-file-locked-rmw). The read below
+    # is INSIDE the lock so the idempotency check reflects any concurrent write.
+    # Re-entrant + fail-open per locked_sequence_update.
+    with ssh.locked_sequence_update(seq_path):
         try:
-            tmp_path.unlink()
-        except OSError:
-            pass
-        log(
-            f'MIRROR_DAG_PREFLIGHT seq={seq_id} event={event}; could not '
-            f'write audit entry to sequence file ({e})',
-            'WARN',
+            seq = json.loads(seq_path.read_text())
+        except (OSError, json.JSONDecodeError) as e:
+            log(
+                f'MIRROR_DAG_PREFLIGHT seq={seq_id} event={event}; could not '
+                f'read sequence file to append audit entry ({type(e).__name__}: '
+                f'{e})',
+                'WARN',
+            )
+            return False
+        if not isinstance(seq.get('audit_log'), list):
+            seq['audit_log'] = []
+        already = any(
+            isinstance(e, dict)
+            and e.get('event') == event
+            and e.get('mirror_task_id') == mirror_task_id
+            for e in seq['audit_log']
         )
-        return False
-    return True
+        if already:
+            return True   # this round IS recorded — the write already happened
+        entry: dict[str, Any] = {
+            'ts': datetime.now(timezone.utc).isoformat(),
+            'event': event,
+            'actor': 'outbox-notifier',
+            'mirror_task_id': mirror_task_id,
+        }
+        if extra:
+            entry.update(extra)
+        seq['audit_log'].append(entry)
+        tmp_path = seq_path.with_suffix(seq_path.suffix + '.tmp')
+        try:
+            with open(tmp_path, 'w', encoding='utf-8') as f:
+                json.dump(seq, f, indent=2)
+                f.write('\n')
+            os.replace(tmp_path, seq_path)
+        except OSError as e:
+            try:
+                tmp_path.unlink()
+            except OSError:
+                pass
+            log(
+                f'MIRROR_DAG_PREFLIGHT seq={seq_id} event={event}; could not '
+                f'write audit entry to sequence file ({e})',
+                'WARN',
+            )
+            return False
+        return True
 
 
 def _append_dag_revision_audit(
@@ -4522,78 +4529,84 @@ def _handle_mirror_dag_preflight_result(data: dict[str, Any]) -> Optional[str]:
         )
         return f'mirror-dag-preflight:file-missing:{seq_id}'
 
-    try:
-        raw_text = seq_path.read_text()
-        seq = json.loads(raw_text)
-    except (OSError, json.JSONDecodeError) as e:
-        msg = (
-            f'Mirror DAG-preflight PASS for sequence `{seq_id}` but the '
-            f'sequence file cannot be read/parsed at `{seq_path}` ({e}).'
-        )
-        larry_alerts.append_alert(
-            source='outbox-notifier',
-            severity='warning',
-            message=msg,
-            subject=f'mirror-dag-pass-unreadable:{seq_id}',
-        )
-        log(
-            f'MIRROR_DAG_PREFLIGHT seq={seq_id} verdict=PASS FAILED '
-            f'read/parse task={task_id}: {e}',
-            'WARN',
-        )
-        return f'mirror-dag-preflight:unreadable:{seq_id}'
-
-    current_status = seq.get('status')
-    if current_status != 'pending':
-        # Idempotent no-op — sequence already moved on. Mirror's PASS
-        # arriving late on a sequence that's already active/complete/
-        # etc. is not an error; just log + archive.
-        log(
-            f'MIRROR_DAG_PREFLIGHT seq={seq_id} verdict=PASS WARN '
-            f'already-kicked-off status={current_status} task={task_id}; '
-            f'no-op',
-            'WARN',
-        )
-        return f'mirror-dag-preflight:already-active:{seq_id}'
-
-    seq['status'] = 'active'
-    audit_entry = {
-        'ts': datetime.now(timezone.utc).isoformat(),
-        'event': 'dag-preflight-pass-kickoff',
-        'actor': 'outbox-notifier',
-        'mirror_task_id': task_id,
-    }
-    if not isinstance(seq.get('audit_log'), list):
-        seq['audit_log'] = []
-    seq['audit_log'].append(audit_entry)
-
-    tmp_path = seq_path.with_suffix(seq_path.suffix + '.tmp')
-    try:
-        with open(tmp_path, 'w', encoding='utf-8') as f:
-            json.dump(seq, f, indent=2)
-            f.write('\n')
-        os.replace(tmp_path, seq_path)
-    except OSError as e:
+    # Serialize the PASS read→pending→active write under the sequence file lock
+    # so a concurrent writer (the advancer's own kickoff drain, a shortcut) can't
+    # interleave a lost update between this read and write (seq-file-locked-rmw).
+    # The read is INSIDE the lock so the status idempotency gate reflects any
+    # concurrent transition. Re-entrant + fail-open per locked_sequence_update.
+    with ssh.locked_sequence_update(seq_path):
         try:
-            tmp_path.unlink()
-        except OSError:
-            pass
-        msg = (
-            f'Mirror DAG-preflight PASS for sequence `{seq_id}` but '
-            f'cannot write the sequence file at `{seq_path}` ({e}).'
-        )
-        larry_alerts.append_alert(
-            source='outbox-notifier',
-            severity='warning',
-            message=msg,
-            subject=f'mirror-dag-pass-write-error:{seq_id}',
-        )
-        log(
-            f'MIRROR_DAG_PREFLIGHT seq={seq_id} verdict=PASS FAILED '
-            f'write-error task={task_id}: {e}',
-            'WARN',
-        )
-        return f'mirror-dag-preflight:write-error:{seq_id}'
+            raw_text = seq_path.read_text()
+            seq = json.loads(raw_text)
+        except (OSError, json.JSONDecodeError) as e:
+            msg = (
+                f'Mirror DAG-preflight PASS for sequence `{seq_id}` but the '
+                f'sequence file cannot be read/parsed at `{seq_path}` ({e}).'
+            )
+            larry_alerts.append_alert(
+                source='outbox-notifier',
+                severity='warning',
+                message=msg,
+                subject=f'mirror-dag-pass-unreadable:{seq_id}',
+            )
+            log(
+                f'MIRROR_DAG_PREFLIGHT seq={seq_id} verdict=PASS FAILED '
+                f'read/parse task={task_id}: {e}',
+                'WARN',
+            )
+            return f'mirror-dag-preflight:unreadable:{seq_id}'
+
+        current_status = seq.get('status')
+        if current_status != 'pending':
+            # Idempotent no-op — sequence already moved on. Mirror's PASS
+            # arriving late on a sequence that's already active/complete/
+            # etc. is not an error; just log + archive.
+            log(
+                f'MIRROR_DAG_PREFLIGHT seq={seq_id} verdict=PASS WARN '
+                f'already-kicked-off status={current_status} task={task_id}; '
+                f'no-op',
+                'WARN',
+            )
+            return f'mirror-dag-preflight:already-active:{seq_id}'
+
+        seq['status'] = 'active'
+        audit_entry = {
+            'ts': datetime.now(timezone.utc).isoformat(),
+            'event': 'dag-preflight-pass-kickoff',
+            'actor': 'outbox-notifier',
+            'mirror_task_id': task_id,
+        }
+        if not isinstance(seq.get('audit_log'), list):
+            seq['audit_log'] = []
+        seq['audit_log'].append(audit_entry)
+
+        tmp_path = seq_path.with_suffix(seq_path.suffix + '.tmp')
+        try:
+            with open(tmp_path, 'w', encoding='utf-8') as f:
+                json.dump(seq, f, indent=2)
+                f.write('\n')
+            os.replace(tmp_path, seq_path)
+        except OSError as e:
+            try:
+                tmp_path.unlink()
+            except OSError:
+                pass
+            msg = (
+                f'Mirror DAG-preflight PASS for sequence `{seq_id}` but '
+                f'cannot write the sequence file at `{seq_path}` ({e}).'
+            )
+            larry_alerts.append_alert(
+                source='outbox-notifier',
+                severity='warning',
+                message=msg,
+                subject=f'mirror-dag-pass-write-error:{seq_id}',
+            )
+            log(
+                f'MIRROR_DAG_PREFLIGHT seq={seq_id} verdict=PASS FAILED '
+                f'write-error task={task_id}: {e}',
+                'WARN',
+            )
+            return f'mirror-dag-preflight:write-error:{seq_id}'
 
     larry_alerts.append_alert(
         source='outbox-notifier',

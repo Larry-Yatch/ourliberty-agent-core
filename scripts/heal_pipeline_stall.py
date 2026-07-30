@@ -2756,20 +2756,29 @@ def _spec_doc_presence_for(seq: dict):
 def _append_sequence_audit(seq_path: Path, entry: dict) -> bool:
     """Atomically append one audit_log entry to a sequence file. Best-effort;
     returns False on any read/write failure (the caller treats that as a
-    failed recovery rather than crashing the healer)."""
+    failed recovery rather than crashing the healer).
+
+    The read + append + write run under the sequence file lock so this healer
+    can't lose-update a concurrent writer's audit entry — the audit_log is a
+    control channel (these very entries arm Check 9 / Check 12), so a dropped
+    entry silently disarms a backstop (seq-file-locked-rmw). Re-entrant +
+    fail-open per locked_sequence_update; lazy import matches the module's
+    established ssh-import pattern."""
+    import sequence_shortcut_helpers as ssh  # lazy: shared build-sequence RMW lock
     try:
-        seq = json.loads(seq_path.read_text())
-        if not isinstance(seq, dict):
-            return False
-        if not isinstance(seq.get('audit_log'), list):
-            seq['audit_log'] = []
-        seq['audit_log'].append(entry)
-        tmp = seq_path.with_suffix(seq_path.suffix + '.tmp')
-        with open(tmp, 'w', encoding='utf-8') as f:
-            json.dump(seq, f, indent=2)
-            f.write('\n')
-        os.replace(tmp, seq_path)
-        return True
+        with ssh.locked_sequence_update(seq_path):
+            seq = json.loads(seq_path.read_text())
+            if not isinstance(seq, dict):
+                return False
+            if not isinstance(seq.get('audit_log'), list):
+                seq['audit_log'] = []
+            seq['audit_log'].append(entry)
+            tmp = seq_path.with_suffix(seq_path.suffix + '.tmp')
+            with open(tmp, 'w', encoding='utf-8') as f:
+                json.dump(seq, f, indent=2)
+                f.write('\n')
+            os.replace(tmp, seq_path)
+            return True
     except Exception as e:  # noqa: BLE001 — never crash the healer on a bad file
         log(f'_append_sequence_audit failed for {seq_path.name}: '
             f'{type(e).__name__}: {e}', 'WARN')

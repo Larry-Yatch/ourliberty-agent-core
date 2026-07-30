@@ -30,6 +30,7 @@ entry path.
 
 from __future__ import annotations
 
+import functools
 import json
 import os
 import re
@@ -44,6 +45,7 @@ if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 
 import larry_alerts  # noqa: E402
+import sequence_shortcut_helpers as ssh  # noqa: E402 — shared build-sequence RMW lock
 
 # The one target_agent value that routes a kickoff marker to this transition.
 SEQUENCE_KICKOFF_TARGET_AGENT = 'build_sequence_advancer'
@@ -97,6 +99,48 @@ def extract_seq_id(
     return None
 
 
+def _kickoff_under_lock(fn: Callable[..., 'KickoffOutcome']) -> Callable[..., 'KickoffOutcome']:
+    """Serialize the kickoff read-modify-write under the sequence file lock.
+
+    The wrapped ``apply_kickoff_transition`` reads the sequence file, runs its
+    validator + spec-doc gates, then atomically flips ``pending → active`` — an
+    unlocked RMW that could lose-update a concurrent writer (the advancer, a
+    shortcut). The lock key is the same ``seq_path`` the body derives, re-parsed
+    here from the (pure, cheap) ``extract_seq_id`` so the whole body — read
+    included — runs inside one critical section. When the prompt carries no
+    parseable seq_id there is no file to lock, so the body runs directly (it just
+    DMs + returns ``no-seq-id``). Re-entrant + fail-open per
+    :func:`sequence_shortcut_helpers.locked_sequence_update`.
+    """
+    @functools.wraps(fn)
+    def wrapper(
+        *,
+        prompt: Optional[str],
+        marker_task_id: Optional[str],
+        dispatch_task_id: str,
+        agents_root: Path,
+        log: Callable[..., None] = _default_log,
+    ) -> 'KickoffOutcome':
+        seq_id = extract_seq_id(prompt, marker_task_id)
+        call = functools.partial(
+            fn,
+            prompt=prompt,
+            marker_task_id=marker_task_id,
+            dispatch_task_id=dispatch_task_id,
+            agents_root=agents_root,
+            log=log,
+        )
+        if not seq_id:
+            return call()
+        seq_path = (
+            agents_root / 'blackboard' / 'build-sequences' / f'{seq_id}.json'
+        )
+        with ssh.locked_sequence_update(seq_path):
+            return call()
+    return wrapper
+
+
+@_kickoff_under_lock
 def apply_kickoff_transition(
     *,
     prompt: Optional[str],

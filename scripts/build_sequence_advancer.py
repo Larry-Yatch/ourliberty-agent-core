@@ -195,6 +195,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
 import build_sequence_validator as bsv  # noqa: E402
 import projects_status_writeback as psw  # noqa: E402 — phase status writeback (p3f)
 import projects_store  # noqa: E402 — shared launch-sequence id resolution (p3f)
+import sequence_shortcut_helpers as ssh  # noqa: E402 — shared build-sequence RMW lock
 import task_terminal_state as tts  # noqa: E402 — shared terminal-state probe kernel
 from id_match import id_matches  # noqa: E402
 
@@ -435,87 +436,91 @@ def _drain_kickoff_inbox(logger: logging.Logger) -> int:
             continue
 
         seq_path = BLACKBOARD_DIR / f'{seq_id}.json'
-        seq, err = _read_sequence(seq_path)
-        if seq is None:
-            reason = 'missing' if not seq_path.exists() else (err or 'unreadable')
-            logger.warning(
-                f'kickoff-inbox: kickoff for seq `{seq_id}` but sequence file '
-                f'{reason} at {seq_path}; dropping envelope'
-            )
-            _dm_larry(
-                message=(
-                    f'`approve sequence {seq_id}` was received but its sequence '
-                    f'file is {reason} at `{seq_path}`. No kickoff performed. '
-                    f'Author the sequence file, then re-issue the approval.'
-                ),
-                subject=f'kickoff-inbox-seq-{reason}:{seq_id}',
-            )
-            _unlink_quietly(env_path, logger)
-            continue
+        # Serialize the kickoff transition under the sequence file lock so the
+        # read + pending→active write can't lose-update a concurrent writer
+        # (seq-file-locked-rmw). Re-entrant + fail-open per locked_sequence_update.
+        with ssh.locked_sequence_update(seq_path):
+            seq, err = _read_sequence(seq_path)
+            if seq is None:
+                reason = 'missing' if not seq_path.exists() else (err or 'unreadable')
+                logger.warning(
+                    f'kickoff-inbox: kickoff for seq `{seq_id}` but sequence file '
+                    f'{reason} at {seq_path}; dropping envelope'
+                )
+                _dm_larry(
+                    message=(
+                        f'`approve sequence {seq_id}` was received but its sequence '
+                        f'file is {reason} at `{seq_path}`. No kickoff performed. '
+                        f'Author the sequence file, then re-issue the approval.'
+                    ),
+                    subject=f'kickoff-inbox-seq-{reason}:{seq_id}',
+                )
+                _unlink_quietly(env_path, logger)
+                continue
 
-        validation = bsv.validate_dag(seq)
-        if not validation.valid:
-            first_errs = '; '.join(validation.errors[:3])
-            logger.warning(
-                f'kickoff-inbox: seq `{seq_id}` fails DAG validation '
-                f'({first_errs}); dropping envelope, leaving sequence untouched'
-            )
-            _dm_larry(
-                message=(
-                    f'`approve sequence {seq_id}` was received but the sequence '
-                    f'file fails validation: {first_errs}. No kickoff performed. '
-                    f'Fix the file (see `python3 scripts/build_sequence_'
-                    f'validator.py validate {seq_id}`), then re-issue.'
-                ),
-                subject=f'kickoff-inbox-seq-invalid:{seq_id}',
-            )
-            _unlink_quietly(env_path, logger)
-            continue
+            validation = bsv.validate_dag(seq)
+            if not validation.valid:
+                first_errs = '; '.join(validation.errors[:3])
+                logger.warning(
+                    f'kickoff-inbox: seq `{seq_id}` fails DAG validation '
+                    f'({first_errs}); dropping envelope, leaving sequence untouched'
+                )
+                _dm_larry(
+                    message=(
+                        f'`approve sequence {seq_id}` was received but the sequence '
+                        f'file fails validation: {first_errs}. No kickoff performed. '
+                        f'Fix the file (see `python3 scripts/build_sequence_'
+                        f'validator.py validate {seq_id}`), then re-issue.'
+                    ),
+                    subject=f'kickoff-inbox-seq-invalid:{seq_id}',
+                )
+                _unlink_quietly(env_path, logger)
+                continue
 
-        status = seq.get('status')
-        if status != 'pending':
-            # Idempotent: already kicked (active/paused) or terminal. Consume
-            # the envelope without a second transition or a duplicate audit
-            # entry — mirrors the outbox handler's WARN no-op contract.
+            status = seq.get('status')
+            if status != 'pending':
+                # Idempotent: already kicked (active/paused) or terminal. Consume
+                # the envelope without a second transition or a duplicate audit
+                # entry — mirrors the outbox handler's WARN no-op contract.
+                logger.info(
+                    f'kickoff-inbox: seq `{seq_id}` already status={status!r}; '
+                    f'no-op, consuming envelope'
+                )
+                _unlink_quietly(env_path, logger)
+                continue
+
+            seq['status'] = 'active'
+            if not isinstance(seq.get('audit_log'), list):
+                seq['audit_log'] = []
+            seq['audit_log'].append(_audit_entry(
+                'kickoff-acknowledged',
+                note='chat-path kickoff consumed from advancer inbox',
+                kickoff_task_id=env.get('task_id'),
+            ))
+            try:
+                _atomic_write_sequence(seq_path, seq)
+            except OSError as e:
+                # Leave the envelope in place so the next tick retries the write.
+                logger.warning(
+                    f'kickoff-inbox: seq `{seq_id}` write failed ({e}); leaving '
+                    f'envelope for retry'
+                )
+                _dm_larry(
+                    message=(
+                        f'`approve sequence {seq_id}` could not be applied — writing '
+                        f'the sequence file at `{seq_path}` failed ({e}). Will retry '
+                        f'next tick.'
+                    ),
+                    subject=f'kickoff-inbox-write-error:{seq_id}',
+                )
+                continue
+
+            _unlink_quietly(env_path, logger)
+            kicked += 1
             logger.info(
-                f'kickoff-inbox: seq `{seq_id}` already status={status!r}; '
-                f'no-op, consuming envelope'
+                f'kickoff-inbox: seq `{seq_id}` transitioned pending → active '
+                f'(chat-path kickoff); first step dispatches this tick'
             )
-            _unlink_quietly(env_path, logger)
-            continue
-
-        seq['status'] = 'active'
-        if not isinstance(seq.get('audit_log'), list):
-            seq['audit_log'] = []
-        seq['audit_log'].append(_audit_entry(
-            'kickoff-acknowledged',
-            note='chat-path kickoff consumed from advancer inbox',
-            kickoff_task_id=env.get('task_id'),
-        ))
-        try:
-            _atomic_write_sequence(seq_path, seq)
-        except OSError as e:
-            # Leave the envelope in place so the next tick retries the write.
-            logger.warning(
-                f'kickoff-inbox: seq `{seq_id}` write failed ({e}); leaving '
-                f'envelope for retry'
-            )
-            _dm_larry(
-                message=(
-                    f'`approve sequence {seq_id}` could not be applied — writing '
-                    f'the sequence file at `{seq_path}` failed ({e}). Will retry '
-                    f'next tick.'
-                ),
-                subject=f'kickoff-inbox-write-error:{seq_id}',
-            )
-            continue
-
-        _unlink_quietly(env_path, logger)
-        kicked += 1
-        logger.info(
-            f'kickoff-inbox: seq `{seq_id}` transitioned pending → active '
-            f'(chat-path kickoff); first step dispatches this tick'
-        )
     return kicked
 
 
@@ -2694,129 +2699,138 @@ def tick(now: Optional[datetime] = None) -> int:
     repo_cache: dict[str, Optional[list[dict[str, Any]]]] = {}
     for path in _iter_sequence_files():
         seen_files += 1
-        seq, err = _read_sequence(path)
-        if seq is None:
-            _handle_unparseable_sequence(path, err or 'unknown', logger)
-            continue
-        validation = bsv.validate_dag(seq)
-        if not validation.valid:
-            _handle_invalid_sequence(path, seq, validation.errors, logger)
-            continue
-        status = seq.get('status')
-        # Reconciliation pass — flag-INDEPENDENT (§3.4a) and run for both
-        # `active` and `paused` sequences (§3.4c). A paused sequence can still
-        # hold `dispatched` steps whose PR merged after the pause; without
-        # this scan those records would never retire. Runs BEFORE the
-        # forward-dispatch leg so apply_step_merged's disk write is visible
-        # when the dispatch loop computes `merged_ids` on the same tick.
-        if status in ('active', 'paused'):
-            try:
-                reconciled_here = _reconcile_dispatched_steps(
-                    seq, logger, repo_cache,
-                )
-                # #609 follow-up: also catch a still-PENDING launch phase whose
-                # deliverables already merged elsewhere, BEFORE the forward-
-                # dispatch leg below fires a redundant Forge build. Reuses the
-                # same idempotent apply_step_merged rollup; shares the per-tick
-                # gh cache so it issues no extra `gh pr list` for a repo already
-                # queried above.
-                reconciled_predispatch = _reconcile_already_merged_launch_phase(
-                    seq, logger, now, repo_cache,
-                )
-                reconciled_here += reconciled_predispatch
-                reconciled_total += reconciled_here
-                # apply_step_merged wrote to disk; re-read so the in-memory
-                # copy matches before we hand it to _process_active_sequence.
-                if reconciled_here > 0:
-                    refreshed, _ = _read_sequence(path)
-                    if refreshed is not None:
-                        seq = refreshed
+        # Serialize this sequence's whole read-modify-write tick under its file
+        # lock (seq-file-locked-rmw): the read below and every write reached
+        # through the handlers (reconcile / escalate / review-stall / forward-
+        # dispatch) run inside ONE critical section, so a concurrent writer
+        # (outbox_notifier, a healer, a shortcut) can't interleave a lost update.
+        # The lock is per-file and re-entrant, so the nested `ssh.apply_*` calls
+        # in the reconcile passes don't self-block. Fail-open (never wedges): if
+        # the lock can't be taken the body still runs, exactly as before.
+        with ssh.locked_sequence_update(path):
+            seq, err = _read_sequence(path)
+            if seq is None:
+                _handle_unparseable_sequence(path, err or 'unknown', logger)
+                continue
+            validation = bsv.validate_dag(seq)
+            if not validation.valid:
+                _handle_invalid_sequence(path, seq, validation.errors, logger)
+                continue
+            status = seq.get('status')
+            # Reconciliation pass — flag-INDEPENDENT (§3.4a) and run for both
+            # `active` and `paused` sequences (§3.4c). A paused sequence can still
+            # hold `dispatched` steps whose PR merged after the pause; without
+            # this scan those records would never retire. Runs BEFORE the
+            # forward-dispatch leg so apply_step_merged's disk write is visible
+            # when the dispatch loop computes `merged_ids` on the same tick.
+            if status in ('active', 'paused'):
+                try:
+                    reconciled_here = _reconcile_dispatched_steps(
+                        seq, logger, repo_cache,
+                    )
+                    # #609 follow-up: also catch a still-PENDING launch phase whose
+                    # deliverables already merged elsewhere, BEFORE the forward-
+                    # dispatch leg below fires a redundant Forge build. Reuses the
+                    # same idempotent apply_step_merged rollup; shares the per-tick
+                    # gh cache so it issues no extra `gh pr list` for a repo already
+                    # queried above.
+                    reconciled_predispatch = _reconcile_already_merged_launch_phase(
+                        seq, logger, now, repo_cache,
+                    )
+                    reconciled_here += reconciled_predispatch
+                    reconciled_total += reconciled_here
+                    # apply_step_merged wrote to disk; re-read so the in-memory
+                    # copy matches before we hand it to _process_active_sequence.
+                    if reconciled_here > 0:
+                        refreshed, _ = _read_sequence(path)
+                        if refreshed is not None:
+                            seq = refreshed
+                            status = seq.get('status')
+                        # ONLY the pre-dispatch already-merged path owns the launch
+                        # phase's done + closeout signal. A launch sequence is
+                        # single-step, so it finalizes to `complete` on the same tick
+                        # its step is reconciled. Completion of a launch sequence by
+                        # the DISPATCHED-step reconcile (a build that actually RAN,
+                        # then bridged via #610) stays the notifier's job, as before —
+                        # claiming its signal here would wrongly DM Larry that a
+                        # "redundant build was skipped" and steal the notifier's richer
+                        # completion DM.
+                        if reconciled_predispatch > 0 and status == 'complete':
+                            _signal_launch_phase_done(seq.get('seq_id'), logger)
+                except Exception as e:
+                    logger.error(
+                        f'reconcile: unexpected error for {path.name}: '
+                        f'{type(e).__name__}: {e}'
+                    )
+            # Stranded-dispatch escalation — flag-INDEPENDENT (§3.4a-style backstop)
+            # but `active`-only so it never re-fires on an already-paused sequence.
+            # A `dispatched` step on an invalid target_repo (or stalled with no PR)
+            # can't be reconciled and would otherwise hang forever; escalate it
+            # (fail step + pause + DM) so a Launch can't silently wedge for hours.
+            # Runs AFTER reconcile so a step whose PR did merge is retired first.
+            if status == 'active':
+                try:
+                    if _escalate_stranded_dispatched_steps(
+                        seq, path, now, logger, valid_repos,
+                        stall_enabled=advancer_on,
+                        supabase_client=supabase_client,
+                    ):
+                        escalated_total += 1
+                        # The pass mutates `seq` in place (status → paused) AND
+                        # atomic-writes it. Trust the in-memory copy — do NOT
+                        # re-read from disk: if the write FAILED, the on-disk file
+                        # is still `active`, and re-reading it would resurrect the
+                        # stale status, letting the forward-dispatch leg act on the
+                        # very step the pass just tried to pause. The write retries
+                        # next tick from the still-active on-disk state.
                         status = seq.get('status')
-                    # ONLY the pre-dispatch already-merged path owns the launch
-                    # phase's done + closeout signal. A launch sequence is
-                    # single-step, so it finalizes to `complete` on the same tick
-                    # its step is reconciled. Completion of a launch sequence by
-                    # the DISPATCHED-step reconcile (a build that actually RAN,
-                    # then bridged via #610) stays the notifier's job, as before —
-                    # claiming its signal here would wrongly DM Larry that a
-                    # "redundant build was skipped" and steal the notifier's richer
-                    # completion DM.
-                    if reconciled_predispatch > 0 and status == 'complete':
-                        _signal_launch_phase_done(seq.get('seq_id'), logger)
-            except Exception as e:
-                logger.error(
-                    f'reconcile: unexpected error for {path.name}: '
-                    f'{type(e).__name__}: {e}'
-                )
-        # Stranded-dispatch escalation — flag-INDEPENDENT (§3.4a-style backstop)
-        # but `active`-only so it never re-fires on an already-paused sequence.
-        # A `dispatched` step on an invalid target_repo (or stalled with no PR)
-        # can't be reconciled and would otherwise hang forever; escalate it
-        # (fail step + pause + DM) so a Launch can't silently wedge for hours.
-        # Runs AFTER reconcile so a step whose PR did merge is retired first.
-        if status == 'active':
+                except Exception as e:
+                    logger.error(
+                        f'escalate: unexpected error for {path.name}: '
+                        f'{type(e).__name__}: {e}'
+                    )
+            # With-PR review-stall recover-or-route (completeness-pr2 Face 2 / Fix B)
+            # — flag-INDEPENDENT (a wedged review is wedged regardless of whether
+            # forward-dispatch is on) but `active`-only: a sequence just paused by
+            # the escalate pass above is skipped. Unlike escalate, this pass never
+            # pauses — a re-dispatched review keeps the sequence live.
+            if status == 'active':
+                try:
+                    _recover_review_stalled_steps(seq, path, now, logger)
+                except Exception as e:
+                    logger.error(
+                        f'review-stall: unexpected error for {path.name}: '
+                        f'{type(e).__name__}: {e}'
+                    )
+            # Forward-dispatch leg — flag-GATED and active-only. Paused sequences
+            # (incl. any just paused by escalation above) are never advanced here.
+            if not advancer_on or status != 'active':
+                continue
             try:
-                if _escalate_stranded_dispatched_steps(
-                    seq, path, now, logger, valid_repos,
-                    stall_enabled=advancer_on,
-                    supabase_client=supabase_client,
-                ):
-                    escalated_total += 1
-                    # The pass mutates `seq` in place (status → paused) AND
-                    # atomic-writes it. Trust the in-memory copy — do NOT
-                    # re-read from disk: if the write FAILED, the on-disk file
-                    # is still `active`, and re-reading it would resurrect the
-                    # stale status, letting the forward-dispatch leg act on the
-                    # very step the pass just tried to pause. The write retries
-                    # next tick from the still-active on-disk state.
-                    status = seq.get('status')
+                _process_active_sequence(path, seq, supabase_client, now, logger)
+                processed += 1
             except Exception as e:
+                # Catch-all defense: a bug in per-sequence processing must not
+                # poison the entire tick. Log + DM, then move on to the next
+                # file. Other sequences keep advancing per spec § 5.4.
                 logger.error(
-                    f'escalate: unexpected error for {path.name}: '
+                    f'unexpected error processing {path.name}: '
                     f'{type(e).__name__}: {e}'
                 )
-        # With-PR review-stall recover-or-route (completeness-pr2 Face 2 / Fix B)
-        # — flag-INDEPENDENT (a wedged review is wedged regardless of whether
-        # forward-dispatch is on) but `active`-only: a sequence just paused by
-        # the escalate pass above is skipped. Unlike escalate, this pass never
-        # pauses — a re-dispatched review keeps the sequence live.
-        if status == 'active':
-            try:
-                _recover_review_stalled_steps(seq, path, now, logger)
-            except Exception as e:
-                logger.error(
-                    f'review-stall: unexpected error for {path.name}: '
-                    f'{type(e).__name__}: {e}'
+                _dm_larry(
+                    message=(
+                        f'build_sequence_advancer hit an unexpected error '
+                        f'processing `{path.name}`: '
+                        f'{type(e).__name__}: {e}\n\n'
+                        f'Other sequences in this tick continued normally. '
+                        f'The next tick will retry this file. If this repeats, '
+                        f'inspect the daemon log: journalctl -u '
+                        f'ourliberty-build-sequence-advancer.service --since '
+                        f'"30 min ago" | tail -100'
+                    ),
+                    subject=f'sequence-tick-error:{path.name}',
+                    severity='warning',
                 )
-        # Forward-dispatch leg — flag-GATED and active-only. Paused sequences
-        # (incl. any just paused by escalation above) are never advanced here.
-        if not advancer_on or status != 'active':
-            continue
-        try:
-            _process_active_sequence(path, seq, supabase_client, now, logger)
-            processed += 1
-        except Exception as e:
-            # Catch-all defense: a bug in per-sequence processing must not
-            # poison the entire tick. Log + DM, then move on to the next
-            # file. Other sequences keep advancing per spec § 5.4.
-            logger.error(
-                f'unexpected error processing {path.name}: '
-                f'{type(e).__name__}: {e}'
-            )
-            _dm_larry(
-                message=(
-                    f'build_sequence_advancer hit an unexpected error '
-                    f'processing `{path.name}`: '
-                    f'{type(e).__name__}: {e}\n\n'
-                    f'Other sequences in this tick continued normally. '
-                    f'The next tick will retry this file. If this repeats, '
-                    f'inspect the daemon log: journalctl -u '
-                    f'ourliberty-build-sequence-advancer.service --since '
-                    f'"30 min ago" | tail -100'
-                ),
-                subject=f'sequence-tick-error:{path.name}',
-                severity='warning',
-            )
     logger.info(
         f'tick: files={seen_files} processed={processed} '
         f'reconciled_steps={reconciled_total} escalated_seqs={escalated_total}'
