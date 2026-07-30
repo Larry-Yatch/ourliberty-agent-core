@@ -4,6 +4,108 @@
 
 ---
 
+## Iteration ~6826 — 2026-07-30T00:22Z UTC (Larry /cycle chat, Tier 1, consecutive_clean=0; SIGNAL — Check 4: pending=3 Larry-gated; Check E: PR#1060 no labels ~84min (7th carry); Check H: PR#161 RSDPM 102min UNSTABLE; PR#163 at 30-min threshold; POSITIVE: PR#162 MERGED ✅ + Check 3 CLEAN)
+
+**Health:** ⚠️ Signal — Check 4: **pending=3** (CHANGED from 4; deep-review-hold-pr161-fd631ce1 RESOLVED/DROPPED; items 1–3 Larry-gated carries). Check E: PR#1060 no labels ~84 min (7th carry). Check H: PR#161 RSDPM 102+ min UNSTABLE (needs /code-review high); PR#163 at 30-min threshold. POSITIVE: **PR#162 MERGED** ✅ at 00:14:52Z UTC; **Check 3 CLEAN** (0 alerts, was SIGNAL last iter).
+
+**VERIFY-BEFORE-REASSERT (from iter ~6825 at ~00:15Z UTC):**
+- **"system-health=healthy ts=00:09:36Z UTC"**: CONFIRMED ✅ → system-health=healthy ts=2026-07-30T00:14:40Z UTC (fresh ~8 min at check time). [carry ✅]
+- **"heal-stale-daemon-code.heartbeat=00:05:20Z UTC"**: CHANGED ✅ → heartbeat=2026-07-30T00:15:21Z UTC (~7 min at check time; <60 min). [carry ✅]
+- **"alerts watermark=553=file_length=553"**: CONFIRMED ✅ — repair-watermark: {repaired=false, old=553, file_length=553}; 0 new alerts. [carry ✅]
+- **"pending=4 (deep-review-hold-pr161-fd631ce1 NEW)"**: CHANGED ✅ → **pending=3** (deep-review-hold-pr161-fd631ce1 RESOLVED/DROPPED; items 1–3 carry unchanged). [CHANGED ✅]
+- **"PR#1060 no labels ~77 min (6th carry)"**: CONFIRMED ⚠️ → ~84 min at check time (createdAt=22:55:15Z UTC). [7th carry ⚠️]
+- **"HEAD=origin/main=baf3da92"**: CHANGED ✅ → HEAD=origin/main=a67d5415 (Pulse cycle 20260730T001800Z committed by wrapper post-iter ~6825). [carry ✅]
+- **"rsdpm-0037-staging-drift Tier-4"**: CARRY — DM delivered (idx=550, 23:29:45Z UTC). Awaiting Larry. [carry — Larry-gated]
+- **"unreg-approval-9da4cfc8b9d1 [item 2]"**: CONFIRMED ⚠️ — still in pending. [carry]
+- **"unreg-approval-67747fb0837e [item 3]"**: CONFIRMED ⚠️ — still in pending. [carry]
+- **"deep-review-hold-pr161-fd631ce1 [item 4 NEW]"**: CHANGED ✅ → **GONE from pending** (reason not confirmed — may have been auto-cleared when PR#162 merged or another process resolved it). [POSITIVE ✅]
+- **"mirror_pass_unmerged:m14-pr-d dry-run (carry)"**: CHANGED ✅ → **PR#162 MERGED** at 00:14:52Z UTC; Check 3 CLEAN this iter. [POSITIVE ✅]
+- **"PR#162 held-behind-#161"**: CHANGED ✅ → **MERGED** at 00:14:52Z UTC (auto-merge proceeded once Mirror PASS was confirmed; held-behind label was a tracking note, not a merge gate). [POSITIVE ✅]
+- **"PR#163 RSDPM approaching 30-min threshold (~29 min)"**: CHANGED → PR#163 now **37 min** old at check time; MERGEABLE, no labels. [SIGNAL ⚠️ AT threshold]
+- Other G-rule carries (unchanged): forge-marker-taskid-suffix-increment 2/3; medic-draft-status-false-positive 2/3; check-i-force-bypass-dm-route 2/3; beacon-pending-approvals-path-bug 2/3. VPs: pulse-cycle-check0-helper-override, auto-merge-conflict-route-hold.
+
+**Check 0 — Alert triage (~00:20Z UTC):** `repair-watermark` → `{"repaired": false, "old_watermark": 553, "file_length": 553}`. watermark=553=file_length → 0 new alerts. NOMINAL ✅
+
+**Check 1 — Log noise (~00:20Z UTC):** journalctl (30-min window): ORPHANED_PR_REVIEW × 3 from heal-undispatched-pr-review (PR#161 at 00:00:16Z; PR#162 at 00:10:07Z; PR#161 again at 00:15:18Z) + AUTO_MERGE_HELD_DEEP_REVIEW for PR#161 at 00:07:05Z (known pattern; deep-review hold working as designed). Sub-threshold (<5/hour averaged). outbox-notifier.log last WARN: `[2026-07-29 18:07:05]` = 00:07:05Z UTC (AUTO_MERGE_HELD_DEEP_REVIEW, same). No patterns above threshold. NOMINAL ✅
+
+**Check 2 — Telegram sweep (~00:20Z UTC):** beacon_telegram_bot.log last entry: `[2026-07-29T18:06:09-0600]` = 00:06:09Z UTC (notification idx=552: medic-diagnosis). Larry's last message: "yes check on that" at 17:38:47 MDT=23:38:47Z UTC; Beacon answered at 17:40:54 MDT. No new Larry messages since last iter. No orphan directives. NOMINAL ✅
+
+**Check 3 — Pipeline stall (~00:19Z UTC):** heal_pipeline_stall.py --dry-run:
+- FORGE_NO_PR_SKIP ×5 (m14-pr-a pr=#156; m14-pr-b pr=#157; pulse-write-journal-cleanup-001 pr=#1057; check0-tier4-guard-001 pr=#1058; rsdpm-confirmall-cleanups-001 pr=#159)
+- pr-RSDPM-158: FORGE_NO_PR_SKIP reason=pr_task_id_closed_or_merged (MERGED ✅)
+- FORGE_NO_PR_SKIP: m14-pr-c pr=#161; m14-pr-d pr=#162 (MERGED ✅)
+- MIRROR_PASS_UNMERGED_SKIP task=m14-pr-c reason=held_deep_review (intentional)
+- **DRY-RUN: 0 alert(s) would fire, 0 recovery(ies) would be attempted** — CLEAN
+- unrouted_open_pr:1060 SUPPRESSED (cooldown)
+**NOMINAL ✅ (POSITIVE: was SIGNAL last iter — mirror_pass_unmerged:m14-pr-d self-resolved via PR#162 merge)**
+
+**Check 4 — Pending directives (~00:20Z UTC):** beacon-pending-approvals.json (state/): **pending=3** (CHANGED from 4; deep-review-hold-pr161-fd631ce1 DROPPED):
+1. `rsdpm-confirmall-medium-parent-secondglance-001` — RSDPM Confirm-all MEDIUM/LOW PARENT [carry]
+2. `unreg-approval-9da4cfc8b9d1` — "Decision needs your direction (promoted from missed marker)" [carry]
+3. `unreg-approval-67747fb0837e` — PR#1060 routing gap (externally-authored PR, no auto-dispatch) [carry]
+SIGNAL ⚠️ (pending=3; all Larry-gated)
+
+**Check 5 — Stale daemon code (~00:20Z UTC):** heal-stale-daemon-code.heartbeat=2026-07-30T00:15:21Z UTC (~7 min; <60 min). system-health overall=healthy ts=2026-07-30T00:14:40Z UTC (fresh ~8 min). All bots alive (inferred from overall=healthy). NOMINAL ✅
+
+**Check A — Source repo (~00:21Z UTC):** On main. Working tree clean. HEAD=origin/main=a67d5415 (Pulse cycle 20260730T001800Z). NOMINAL ✅
+**Check B — Sync health (~00:21Z UTC):** last_sync=2026-07-29T23:23:38Z (~59 min; <2h); status=no-change; consecutive_push_failures=0. NOMINAL ✅
+**Check C — Agent liveness (~00:21Z UTC):** system-health=healthy ts=00:14:40Z UTC (fresh ~8 min). Overall healthy — all bots alive. NOMINAL ✅
+**Check E — PR/merge state (~00:21Z UTC):** ourliberty-agent-core: **2 open PRs**:
+- **#1062** fix(tests): make agents-root override guard expression-aware (createdAt=00:00:46Z; ~19 min old; no labels; <30-min threshold). NOMINAL ✅ (monitoring)
+- **#1060** fix(approvals): no labels; ~84 min old (createdAt=22:55:15Z UTC); mergeable=UNKNOWN; no autoMerge; no reviewDecision. ⚠️ SIGNAL (7th carry; externally-authored; skip auto-dispatch by design per unreg-approval-67747fb0837e)
+SIGNAL ⚠️ (PR#1060 stale >60 min, no labels; 7th carry)
+
+**Check H — Forge digest (~00:21Z UTC):** RSDPM: **4 open PRs** (CHANGED: PR#162 MERGED ✅):
+- **PR#165** fix(sec): revoke anon EXECUTE on rsdpm_apply_suggested_rename (0038) (age=~17 min; MERGEABLE). NOMINAL ✅
+- **PR#164** fix(drift-gate): read schema as of last migration, not first (age=~22 min; MERGEABLE). NOMINAL ✅
+- **PR#163** fix(leak-harness): retry the fixture purge (age=~37 min; MERGEABLE; no labels; **AT 30-min threshold**). SIGNAL ⚠️ [monitoring — heal-undispatched-pr-review did NOT emit ORPHANED_PR_REVIEW for it at 00:15:18Z run; review dispatch may already be queued]
+- **PR#161** feat(M14): PR-C — RLS policies (age=~102 min; MERGEABLE/UNSTABLE; no labels; deep-review-hold dropped from pending). SIGNAL ⚠️ [carry — needs /code-review high from Larry]
+- **PR#162** feat(m14): PR-D — MERGED at 2026-07-30T00:14:52Z UTC ✅
+0 open forge/ branch PRs on ourliberty-agent-core. NOMINAL ✅
+
+**§5.0 one-shots (~00:21Z UTC):** audit_due_nudge → no-op ✅. distill_detector → no-op ✅. silence_file_auditor → 7 files: 3 expired (agent-runner-{forge:tier1,forge:tier2,pulse:tier1}, 48.8d, 0 suppressed each); 4 permanent (0 suppressed each) ✅. NOMINAL ✅
+
+**§5 periodic — Check I (carry):** No new artifact since Tuesday's firing (check-i-2026-07-29.json). Next: Fri 2026-08-01. Carry: $1,201/wk +206%; proposal #1 (45σ cycle review) via `/dispatch 1`.
+**§5 periodic — Check III (carry):** Most recent: check-iii-2026-07-26.json. Next: Sun 2026-08-03. NOMINAL ✅
+
+**Credential rotation (~00:22Z UTC):** SUPABASE_SERVICE_ROLE_KEY: last DM 2026-07-20T20:00:15Z UTC; 14d dedup window expires ~2026-08-03; due=2026-08-22 (23d). Within dedup window — no DM. SUPABASE_DB_PASSWORD: MISSING_CREDENTIAL (carry). NOMINAL ✅
+
+**PRIME DIRECTIVE accounting:** intervention appended (tier=1, template=pr1060-7th-carry-pr161-stall-pr163-threshold-pending3-larry-gated-pr162-merged, ts=2026-07-30T00:23:19Z UTC). ratio≈39.83 (interventions=1912, systemic_fixes=48, verification_pending=22, trend=worsening). **TIER: Tier 1 (signals: Check 4 pending=3 Larry-gated + Check E PR#1060 no labels + Check H PR#161 stall + PR#163 at threshold; consecutive_clean=0; last_signal_at=2026-07-30T00:23:20Z UTC).**
+
+**Patterns:**
+- **PR#162 MERGED [POSITIVE ✅]**: feat(m14) PR-D (21 definer functions, migration 0036) merged at 00:14:52Z UTC. The `held-behind-#161` label was a tracking note, not a merge gate — auto-merge proceeded once Mirror PASS was confirmed. Check 3 m14-pr-d stall signal self-resolved.
+- **PR#161 RSDPM 102 min, UNSTABLE [carry ⚠️]**: deep-review-hold-pr161-fd631ce1 dropped from pending (reason unconfirmed — may have auto-cleared when PR#162 merged). PR#161 still OPEN/MERGEABLE/UNSTABLE, no labels. Larry: `/code-review high RSDPM/161` then `scripts/merge_reviewed_pr.sh 161`.
+- **PR#163 RSDPM AT 30-min threshold [monitoring ⚠️]**: age=37+ min, MERGEABLE, no labels. heal-undispatched-pr-review did NOT emit ORPHANED_PR_REVIEW for it (only PR#161 re-emitted at 00:15:18Z) — suggesting review dispatch already queued. Will signal next iter if unlabeled.
+- **PR#1060 agent-core no labels [7th carry ⚠️]**: ~84 min; externally-authored; unreg-approval-67747fb0837e still in pending. Larry: `gh pr edit 1060 --add-label "auto-review"` or Beacon chat: `dispatch mirror review pr=https://github.com/Larry-Yatch/ourliberty-agent-core/pull/1060`.
+- Other G-rule carries (unchanged): forge-marker-taskid-suffix-increment 2/3; medic-draft-status-false-positive 2/3; check-i-force-bypass-dm-route 2/3; beacon-pending-approvals-path-bug 2/3. VPs: pulse-cycle-check0-helper-override, auto-merge-conflict-route-hold.
+
+**Actions taken:**
+1. Check 0: `repair-watermark` → {repaired=false, old=553, file_length=553} — no repair.
+2. Check 0: watermark=553=file_length=553; 0 new alerts.
+3. §5.0 one-shots: all three → no-op / expired-0-suppressed ✅.
+4. PRIME ledger: intervention appended at 2026-07-30T00:23:19Z UTC (tier=1, template=pr1060-7th-carry-pr161-stall-pr163-threshold-pending3-larry-gated-pr162-merged).
+5. Tier state: `cycle_tier_state.py record --checks-clean false` → Tier 1 stays; consecutive_clean=0; last_signal_at=2026-07-30T00:23:20Z UTC.
+
+**Escalations:**
+- **[yellow] PR#161 RSDPM still open (102 min, UNSTABLE, deep-review hold dropped from pending)**: Larry: `/code-review high RSDPM/161` then `scripts/merge_reviewed_pr.sh 161` to merge and unblock the m14 pipeline.
+- **[yellow] PR#1060 agent-core no labels >84 min (7th carry)**: fix(approvals); externally-authored. Larry: `gh pr edit 1060 --add-label "auto-review"` or Beacon chat: `dispatch mirror review pr=https://github.com/Larry-Yatch/ourliberty-agent-core/pull/1060`.
+- **[yellow] unreg-approval-67747fb0837e [item 3]**: PR#1060 routing gap formalized. Same fix as above. Review Approvals tab.
+- **[carry ⚠️] rsdpm-0037-staging-drift Tier-4**: DM delivered (idx=550, 23:29:45Z UTC). Apply 0037_backfill_home_base_catchall_projects.sql fix. Awaiting Larry.
+- **[carry ⚠️] unreg-approval-9da4cfc8b9d1 [item 2]**: "Decision needs direction (promoted from missed marker)." Review Approvals tab.
+- **[carry] rsdpm-confirmall-medium-parent-secondglance-001 [item 1]**: Pending. Awaiting Larry.
+- **[carry ⚠️] RSDPM 0031 staging drift**: pre-existing carry.
+- **[carry ⚠️] credential-drift:MISSING_CREDENTIAL:SUPABASE_DB_PASSWORD**: Install per runbook OR retire from config/token-rotation-schedule.json.
+- [carry] check-vi-posture-proposals-2026-07-07 (2 proposals). Awaiting Larry.
+- [carry — monitoring] Mirror queue-wait p95=92.3m.
+- [carry — no Larry reply] Check XIV Tier-4 × 2: oversilence + fleet digest.
+- [carry — monitoring] tier4-rsdpm-install-drift.
+- [carry — monitoring] forge-wip-redispatch EXHAUSTED (rsdpm-pr155; unreg-approval-9da4cfc8b9d1 may be gateway).
+- **[blue] Check I: weekly cost $1,201 (+206%)**. Proposal #1 (45σ cycle review) via `/dispatch 1`.
+
+**Tier end-of-iter:** **Tier 1** (signals: Check 4 pending=3 Larry-gated + Check E PR#1060 no labels + Check H PR#161 stall + PR#163 at threshold; consecutive_clean=0; last_signal_at=2026-07-30T00:23:20Z UTC).
+
+---
+
 ## Iteration ~6825 — 2026-07-30T00:15Z UTC (Larry /cycle chat, Tier 1, consecutive_clean=0; SIGNAL — Check 3: mirror_pass_unmerged:m14-pr-d dry-run (carry); Check 4: pending=4 CHANGED from 3 (new deep-review-hold-pr161-fd631ce1); Check E: PR#1060 no labels ~77min (6th carry); all other checks NOMINAL)
 
 **Health:** ⚠️ Signal — Check 3: **mirror_pass_unmerged:m14-pr-d** (PR#162) dry-run would fire (carry). Check 4: **pending=4** (CHANGED from 3; new item deep-review-hold-pr161-fd631ce1 created 00:07Z UTC — Mirror re-reviewed PR#161 post-update and re-issued the deep-review hold with new marker hash). Check E: PR#1060 no labels ~77 min (6th carry). All other checks NOMINAL.
@@ -3421,96 +3523,6 @@ ourliberty-dashboard: 0 open PRs. SIGNAL ⚠️ (PR#1056 5th iter no labels; PR#
 - **[blue] Check I: weekly cost $1,201 (+206%)**. Proposal #1 (45σ cycle review) available via `/dispatch 1`.
 
 **Tier end-of-iter:** **Tier 1** (signals: Check 4 pending=4 Larry-gated UNCHANGED + Check E 3 open PRs Larry-gated + PR#1056 no labels 5th iter + PR#157 deep-review-hold carry + PR#1053 Mirror active review; consecutive_clean=0; last_signal_at=2026-07-29T19:06:23Z UTC; Tier 1 cadence per cycle-prompt.md § 2).
-
----
-
-## Iteration ~6767 — 2026-07-29T18:59Z UTC (Larry /cycle chat, Tier 1, consecutive_clean=0; SIGNAL — Check 4: pending=4 UNCHANGED count, item 4 composition changed (deep-review-hold-pr157-357b5b3c→db391ec4); Check E: 3 open PRs (PR#1056 no labels 4th iter; PR#1053 Mirror active review; PR#1049 cooldown); PR#157 Forge updated head+Mirror repass+AUTO_MERGE_HELD again; all other checks NOMINAL)
-
-**Health:** ⚠️ Signal — Check 4: **pending=4 UNCHANGED count** — item 4 composition changed: deep-review-hold-pr157-357b5b3c RESOLVED (Forge updated PR#157 head 357b5b3c→db391ec4; held entry auto-cleared); Mirror re-reviewed new sha (PASS at 18:52:43Z UTC); AUTO_MERGE_HELD_DEEP_REVIEW again; new approval deep-review-hold-pr157-**db391ec4** surfaced (18:53:26Z UTC). Check E: **3 open PRs** (count unchanged): PR#1056 no labels **4th consecutive iter** ⚠️; PR#1053 Mirror active review; PR#1049 cooldown carry. 0 new alerts (watermark=520 NOMINAL). All other checks NOMINAL.
-
-**VERIFY-BEFORE-REASSERT (from iter ~6766 at ~18:51Z UTC):**
-- **"system-health=healthy"**: CONFIRMED ✅ — ts=2026-07-29T18:54:11Z UTC (~5 min at check time). [carry ✅]
-- **"heal-stale-daemon-code.heartbeat"**: CONFIRMED ✅ — 2026-07-29T18:52:34Z UTC (~7 min at check time; <60 min). [carry ✅]
-- **"alerts watermark=520"**: CONFIRMED UNCHANGED — file_length=520, 0 new alerts. [carry ✅ NOMINAL]
-- **"pending=4 (DOWN from 5)"**: CONFIRMED 4 but composition changed → item 4 old (deep-review-hold-pr157-357b5b3c) RESOLVED; item 4 new (deep-review-hold-pr157-db391ec4) added. Count stays 4. [carry updated ⚠️ composition change]
-- **"[red] RSDPM apply-on-merge FAILED — pending gate CLEARED"**: CONFIRMED CLEARED — unreg-approval-cfd444ed29ee absent from pending. No regression. [carry ✅ resolved]
-- **"PR#1056 no labels — 3rd consecutive iter"**: CARRY UPDATED → **4th consecutive iter** (updatedAt=18:39:31Z UTC unchanged). Pattern escalation continues. [carry ⚠️]
-- **"PR#157 AUTO_MERGE_HELD_DEEP_REVIEW (deep-review-hold-pr157-357b5b3c)"**: CHANGED → old approval RESOLVED (head advanced 357b5b3c→db391ec4 at ~18:50:21Z UTC); Mirror re-reviewed and PASSED (18:52:43Z UTC); AUTO_MERGE_HELD again for new sha; new approval deep-review-hold-pr157-**db391ec4** surfaced (18:53:26Z UTC). Item 4 in pending. [carry updated ⚠️ — same block, new sha]
-- **"PR#1053 Mirror active review [improvement]"**: CARRY — Mirror dispatched at 18:45:15Z UTC; no new outbox-notifier entries for pr-ourliberty-agent-core-1053 since then; still in active review. [carry ⚠️ still reviewing]
-- **"HEAD=74bd2467=origin/main"**: CHANGED → HEAD=3f97db34 (wrapper committed iter ~6766 "Pulse cycle 20260729T185510Z"). HEAD=origin/main. [carry ✅]
-- Remaining carries (rsdpm-rehearseprs 1/3, pulse-source-alert 1/3, forge-marker-taskid-suffix-increment 2/3, medic-draft-status-false-positive 2/3, check-i-force-bypass-dm-route 2/3, beacon-pending-approvals-path-bug 2/3. VPs: pulse-cycle-check0-helper-override, auto-merge-conflict-route-hold, and others): CARRY as iter ~6766.
-
-**Check 0 — Alert triage (~18:59Z UTC):** `repair-watermark`: {repaired=false, old_watermark=520, file_length=520} → 0 new alerts. Watermark stays at 520. NOMINAL ✅
-
-**Check 1 — Log noise (~18:59Z UTC):** outbox-notifier.log last entry [2026-07-29 12:53:26 MDT]=18:53:26Z UTC (~6 min at check time). **New since iter ~6766:** 12:50:21 MDT deep-review-held entry cleared (head 357b5b3c→db391ec4); 12:50:22 MDT COST_BUDGET m14-pr-b $3.64 mirror-review (allowed); review-request dispatched mirror←beacon PR#157 new sha; 12:51:21 MDT deep-review-hold-pr157-357b5b3c RESOLVED; 12:52:41 MDT Mirror review_pass (session c527f1c7, sha=db391ec4); 12:52:46 MDT **WARN AUTO_MERGE_HELD_DEEP_REVIEW** (sha=db391ec4); 12:53:26 MDT deep-review-hold-pr157-db391ec4 surfaced. Known WARN: AUTO_MERGE_HELD_DEEP_REVIEW (carry; now for new sha=db391ec4). NOMINAL ✅ [all new events consistent with PR#157 Forge update cycle]
-
-**Check 2 — Telegram sweep (~18:59Z UTC):** beacon_telegram_bot.log: last entry idx=519 at [2026-07-29T12:44:30-0600]=18:44:30Z UTC (~15 min at check time). No new deliveries since iter ~6766. Deep-review-hold-pr157-db391ec4 approval surfaced at 18:53:26Z UTC; bot DM pending (not yet in bot log; will fire on next sweep). No new Larry directives. NOMINAL ✅
-
-**Check 3 — Pipeline stall (~18:59Z UTC):** heal_pipeline_stall.py --dry-run:
-- FORGE_NO_PR_SKIP ×3 (MERGED: RSDPM #146/147/142); fix-escalated-pr-headchange-backoff-001 (pr_exists=#1042); m14-pr-a (pr_exists=branch pr=#156 RSDPM)
-- MIRROR_PASS_UNMERGED_SKIP task=m14-pr-b reason=held_deep_review (intentional /code-review high hold)
-- suppressed (cooldown): unrouted_open_pr:1049
-**DRY-RUN: 0 alert(s) would fire, 0 recovery(ies). NOMINAL ✅**
-
-**Check 4 — Pending directives (~18:59Z UTC):** beacon-pending-approvals.json (state/): **pending=4 UNCHANGED count**. Item 4 CHANGED (old sha resolved, new sha added):
-1. `rsdpm-confirmall-medium-parent-secondglance-001`
-2. `cycle-prompt-tier4-no-upgrade-clause-001`
-3. `pulse-write-journal-cleanup-001` — G-rule approval (awaiting Larry `approve`)
-4. `deep-review-hold-pr157-db391ec4` — RSDPM PR#157 held for `/code-review high` (NEW SHA: Forge updated, Mirror passed, still held)
-SIGNAL ⚠️ (pending=4; item 4 composition changed to new sha; all Larry-gated)
-
-**Check 5 — Stale daemon code (~18:59Z UTC):** heal-stale-daemon-code.heartbeat=2026-07-29T18:52:34Z UTC (~7 min; <60 min). system-health overall=healthy ts=2026-07-29T18:54:11Z UTC (~5 min); all 4 bots alive (beacon, forge, mirror, pulse). disk=15%, memory=29%. NOMINAL ✅
-
-**Check A — Source repo (~18:59Z UTC):** On main. Clean tracked tree (untracked: agents/pulse/write_journal_6704.py — known leftover, pulse-write-journal-cleanup-001 item 3 pending). HEAD=3f97db34=origin/main. NOMINAL ✅
-**Check B — Sync health (~18:59Z UTC):** last_sync=2026-07-29T18:23:14Z (~36 min; <2h); status=no-change; consecutive_push_failures=0. NOMINAL ✅
-**Check C — Agent liveness (~18:59Z UTC):** system-health overall=healthy ts=2026-07-29T18:54:11Z UTC. All 4 bots alive (beacon, forge, mirror, pulse). inbox_watcher ok, outbox_notifier ok. disk=15%, memory=29%. NOMINAL ✅
-**Check E — PR/merge state (~18:59Z UTC):** ourliberty-agent-core: **3 open PRs** (count unchanged):
-- **#1056** Fix test-sandbox root leak (updatedAt=18:39:31Z UTC, UNKNOWN mergeable, no labels) — **4th consecutive iter with no labels**. ⚠️
-- **#1053** fix(preflight): fresh spec merged inside sync window (updatedAt=18:40:50Z UTC, MERGEABLE, labels=['auto-review']) — Mirror dispatched 18:45:15Z UTC; still in active review (~14 min). ✅
-- **#1049** fix(guardian): demotion fix (updatedAt=18:38:14Z UTC, UNKNOWN mergeable, no labels) — cooldown active. ⚠️
-ourliberty-dashboard: 0 open PRs. SIGNAL ⚠️ (PR#1056 4th iter no labels; PR#1049 cooldown carry)
-
-**Check H — Forge digest (~18:59Z UTC):** 0 open forge/ branch PRs on ourliberty-agent-core. RSDPM: **PR#157 OPEN** (feat(M14): workspace_id NOT NULL + FK on ten record tables; updatedAt=18:46:42Z UTC, MERGEABLE, no labels, sha=db391ec4; AUTO_MERGE_HELD_DEEP_REVIEW new sha). deep-review-hold-pr157-db391ec4 now item 4 in pending. Bot DM pending for new approval (not yet delivered). SIGNAL ⚠️ (active hold PR#157; Forge updated head, Mirror passed, but still needs `/code-review high`)
-
-**§5.0 one-shots (~18:59Z UTC):** audit_due_nudge.py → no-op ✅. distill_detector.py → no-op ✅. silence_file_auditor.py (`scripts/` — correct path, **NOT** `review/distill/`) → 7 silence file entries (expired/permanent only), no-op ✅. [PATH CORRECTION: prior iters may have silently failed on wrong path; correct path is `python3 ~/agent-core/scripts/silence_file_auditor.py`. Updating MEMORY.] NOMINAL ✅
-
-**Credential rotation (~18:59Z UTC):** SUPABASE_SERVICE_ROLE_KEY: last DM 2026-07-20T20:00:15Z UTC; 14d window expires ~2026-08-03; due=2026-08-22. No DM. SUPABASE_DB_PASSWORD: carry. NOMINAL ✅
-
-**Check I artifact triage (~18:59Z UTC):** check-i-2026-07-29.json (Jul 29 08:14 MDT) — today Wed 2026-07-29; artifact unchanged. Proposal #1 (45σ cycle review) available via `/dispatch 1`. NOMINAL ✅
-**Check III artifact triage (~18:59Z UTC):** Most recent: check-iii-2026-07-26.json. Next: Sun 2026-08-03. NOMINAL ✅
-
-**PRIME DIRECTIVE accounting:** intervention appended (tier=1, template=pending-4-unchanged-pr157-new-sha-db391ec4-mirror-repass-held, detail=iter6767-0new-alerts-watermark520-pending4-unchanged-count-item4-changed-357b5b3c-to-db391ec4-pr157-forge-updated-mirror-repass-auto-merge-held-again-4th-iter-pr1056-no-labels-system-healthy-ts-2026-07-29T18:59Z, ts=2026-07-29T18:59:54Z UTC). ratio=38.90% (interventions=1907, systemic_fixes=49, trend=worsening). **TIER: record --checks-clean false → Tier 1 stays; consecutive_clean=0; last_signal_at=2026-07-29T18:59:59Z UTC.**
-
-**Patterns:**
-- **PR#1056 no labels — 4th consecutive iter [pattern persists]**: "Fix test-sandbox root leak" (PR#1056, ~18:08Z UTC) has had no `auto-review` or `/code-review high` label for 4 consecutive iters (~51+ min open). Pattern threshold (3) was reached last iter; still no action. Escalating [yellow] again.
-- **PR#157 Forge updated head (357b5b3c → db391ec4) + Mirror repass + AUTO_MERGE_HELD again [progress but same block]**: Forge made meaningful progress — updated the PR. Mirror auto-re-triggered (head-change cleared the deep-review-hold lock) and PASSED the new sha. But the deep-review hold fires again because no `/code-review high` stamp. This cycle (update→repass→hold) is working as designed. The only key is Larry's `/code-review high` action.
-- **pending=4 item 4 composition change**: From sha=357b5b3c to sha=db391ec4. Net count unchanged but underlying state improved (Forge is working, Mirror is responsive). Chief actionable: item 3 (`approve` cleanup), item 4 (`/code-review high` on PR#157 + merge).
-- **§5.0 path correction — silence_file_auditor.py in scripts/ not review/distill/**: Prior iters referenced this as `review/distill/silence_file_auditor.py` (wrong); correct invocation is `python3 ~/agent-core/scripts/silence_file_auditor.py`. Prior iters that used the wrong path would have gotten `No such file or directory` and may have masked the output. MEMORY updated this iter.
-- **Other G-rules carry (unchanged):** forge-marker-taskid-suffix-increment: 2/3; medic-draft-status-false-positive: 2/3; check-i-force-bypass-dm-route: 2/3; beacon-pending-approvals-path-bug: 2/3. VPs: pulse-cycle-check0-helper-override, auto-merge-conflict-route-hold. All carry.
-
-**Actions taken:**
-1. Check 0: `repair-watermark` → {repaired=false, old=520, file_length=520}. 0 new alerts.
-2. §5.0 one-shots: audit_due_nudge.py → no-op; distill_detector.py → no-op; silence_file_auditor.py (scripts/) → expired/permanent only, no-op.
-3. PRIME ledger: intervention appended at 2026-07-29T18:59:54Z UTC (tier=1, template=pending-4-unchanged-pr157-new-sha-db391ec4-mirror-repass-held).
-4. Tier state: `cycle_tier_state.py record --checks-clean false` → Tier 1 stays; consecutive_clean=0; last_signal_at=2026-07-29T18:59:59Z UTC.
-5. MEMORY.md: updated §5.0 script paths to correct silence_file_auditor.py location (scripts/).
-
-**Escalations:**
-- **[yellow] PR#1056 no labels — 4th iter [carry]**: "Fix test-sandbox root leak" (PR#1056, ~18:08Z UTC). No `auto-review` label after 4 consecutive iters (~51+ min). Action: add `auto-review` label, or run `/code-review high` if deep review warranted.
-- **[yellow] PR#157 AUTO_MERGE_HELD_DEEP_REVIEW — new sha db391ec4 [carry updated]**: Forge updated PR, Mirror passed (18:52:43Z UTC), AUTO_MERGE_HELD for new sha. DM idx=515 delivered 18:09Z UTC (old sha); new approval deep-review-hold-pr157-db391ec4 DM pending on next bot sweep. Action: `/code-review high` → `scripts/merge_reviewed_pr.sh 157`.
-- **[yellow] PR#1054 unreviewed-merge [carry]**: DM idx=519 delivered 18:44:30Z UTC. Low risk (flaky-test fix, Larry explicitly approved). Monitor for recurrence.
-- [carry ⚠️ — still unverified] RSDPM 0031 staging drift: apply 0031_schema_migration_log.sql in Supabase rsdpm-staging SQL editor.
-- **[carry ⚠️] credential-drift:MISSING_CREDENTIAL:SUPABASE_DB_PASSWORD**: Install per docs/runbooks/rotate-supabase-db-password.md OR retire from config/token-rotation-schedule.json.
-- [carry — no new DM] check-vi-posture-proposals-2026-07-07 (2 proposals). Awaiting Larry.
-- [carry — monitoring] Mirror queue-wait p95=92.3m.
-- [carry — no new DM] Check XIV Tier-4 × 2: oversilence + fleet digest. Awaiting Larry.
-- [carry — idx=580 delivered; no Larry reply] tier4-rsdpm-install-drift: alert-emit.py content drift under /usr/local/lib/rsdpm. Awaiting Larry triage.
-- **[carry ✅ awaiting reply] pulse-write-journal-cleanup-001 (item 3)**: Approval DM idx=507 delivered 14:59:14Z UTC. Reply `approve` to ship gitignore + run_cycle.sh cleanup PR. (Also silences recurring ourliberty-health Tier-4 alerts.)
-- [carry — approval needed] `cycle-prompt-tier4-no-upgrade-clause-001`.
-- [carry — monitoring] `rsdpm-confirmall-medium-parent-secondglance-001`.
-- **[blue] Check I: weekly cost $1,201 (+206%)**. Proposal #1 (45σ cycle review) available via `/dispatch 1`.
-
-**Tier end-of-iter:** **Tier 1** (signals: Check 4 pending=4 Larry-gated item 4 composition changed + Check E 3 open PRs Larry-gated + PR#1056 no labels 4th iter + PR#157 deep-review-hold new sha + PR#1053 Mirror active review; consecutive_clean=0; last_signal_at=2026-07-29T18:59:59Z UTC; Tier 1 cadence per cycle-prompt.md § 2).
 
 ---
 
