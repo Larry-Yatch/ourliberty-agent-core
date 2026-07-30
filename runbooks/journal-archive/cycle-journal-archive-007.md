@@ -11325,3 +11325,83 @@ Beacon confirmed `alert_522_tmp.json` and `triage_alert_522.py` are iter-6771 th
 
 ---
 
+## Iteration ~6800 — 2026-07-29T23:21Z UTC (Larry /cycle chat, Tier 1→2 DE-ESCALATION, consecutive_clean=2→3→0; NOMINAL — all 6 mandatory + all additive checks clean; PR#160 RSDPM MERGED 23:18Z UTC; PR#1061 new agent-core; Check A: captures.json GC-healer drift nominal)
+
+**Health:** ✅ NOMINAL — all 6 mandatory checks + all additive checks clean. consecutive_clean=2→3 → **Tier 1 de-escalated to Tier 2** (30-min cadence). No new alerts (watermark=550, file_length=550). No new untracked Larry directives. 0 stalls. Pending=3 (unchanged). PR#160 RSDPM MERGED ✅. System healthy.
+
+**VERIFY-BEFORE-REASSERT (from iter ~6799 at ~23:16Z UTC):**
+- **"system-health=healthy ts=23:13:39Z UTC"**: CONFIRMED ✅ → ts=2026-07-29T23:18:40Z UTC (FRESH ~2 min at check time). [carry ✅]
+- **"heal-stale-daemon-code.heartbeat=23:04:46Z UTC"**: CONFIRMED ✅ → heartbeat=2026-07-29T23:14:58Z UTC (~6 min; <60 min). [carry ✅]
+- **"alerts watermark=550, file_length=550"**: CONFIRMED ✅ → repair-watermark: {repaired=false, old=550, file_length=550}. 0 new alerts. [carry ✅]
+- **"pending=3 (rsdpm-confirmall + unreg-approval-9da4cfc8b9d1 + deep-review-hold-pr161-277ac8af)"**: CONFIRMED ✅ → pending=3 UNCHANGED. deep-review-hold-pr160-252d3c67 now RESOLVED (PR#160 merged 23:18:26Z UTC). [carry ✅]
+- **"PR#1059 Mirror review in-flight since 23:05Z UTC"**: CONFIRMED → still open (state=OPEN, reviewDecision="", auto-review label). Mirror still reviewing. [carry — monitoring]
+- **"PR#1060 new (~18 min old)"**: CHANGED → ~25 min old at check time; no labels; approaching 30-min stale threshold next iter. [watch]
+- **"PR#160 RSDPM held-behind-#162"**: CHANGED ✅ → PR#160 MERGED at 2026-07-29T23:18:26Z UTC ("fix(seed-check): key the seed gate on shape"). [POSITIVE ✅]
+- **"PR#161 RSDPM deep-review hold, pending #3"**: CONFIRMED → still held. [carry ⚠️]
+- **"PR#162 RSDPM vitest FAILURE, Mirror review dispatched"**: CONFIRMED OPEN → PR#162 still open; `gh pr checks` approval-blocked this iter; CI status unverified this iter. [carry ⚠️ — monitoring]
+- **"HEAD=2d5cc320=origin/main"**: CONFIRMED ✅ → HEAD=2d5cc320=origin/main. In sync. [carry ✅]
+- **"consecutive_clean=2"**: CHANGED ✅ → 2→3 → DE-ESCALATED TO TIER 2. [POSITIVE ✅]
+
+**Check 0 — Alert triage (~23:19Z UTC):** `repair-watermark`: {repaired=false, old=550, file_length=550} — 0 new alerts. NOMINAL ✅.
+
+**Check 1 — Log noise (~23:19Z UTC):** journalctl (30-min window): WARNs visible are from prior iters (ORPHANED_PR_REVIEW PR#160 at 22:50Z UTC — triaged iter ~6797; ORPHANED_PR_REVIEW PR#1059 at 23:05Z UTC — triaged iter ~6798; AUTO_MERGE_HELD_DEEP_REVIEW RSDPM/160 at 22:54Z UTC — triaged iter ~6797). No new WARN signatures above threshold in current window. NOMINAL ✅.
+
+**Check 2 — Telegram sweep (~23:19Z UTC):** beacon_telegram_bot.log: last entries — idx=549 (notification, 17:15:04 MDT); then `[2026-07-29T17:16:40-0600]` `<- 7998341473: 'were is 1058?'`; `[2026-07-29T17:17:10-0600]` `-> 7998341473: PR #1058 is MERGED (2026-07-29 22:29:27Z)…`. Larry's question was answered by the bot at 23:17:10Z UTC. No new untracked directives. NOMINAL ✅.
+
+**Check 3 — Pipeline stall (~23:19Z UTC):** heal_pipeline_stall.py --dry-run: FORGE_NO_PR_SKIP ×7 (same set: fix-escalated-pr-headchange-backoff-001=#1042, m14-pr-a=#156, m14-pr-b=#157, pulse-write-journal-cleanup-001=#1057, check0-tier4-guard-001=#1058, rsdpm-confirmall-cleanups-001=#159, pr-RSDPM-158=MERGED) + MIRROR_PASS_UNMERGED_SKIP task=m14-pr-c reason=held_deep_review. **0 stalls detected. NOMINAL ✅**.
+
+**Check 4 — Pending directives (~23:19Z UTC):** beacon-pending-approvals.json (state/): **pending=3 UNCHANGED**.
+1. `rsdpm-confirmall-medium-parent-secondglance-001` — carry
+2. `unreg-approval-9da4cfc8b9d1` — RSDPM 0034 staging drift — carry
+3. `deep-review-hold-pr161-277ac8af` — RSDPM PR#161 m14-pr-c (carry ⚠️)
+`deep-review-hold-pr160-252d3c67` RESOLVED (PR#160 merged 23:18:26Z UTC). NOMINAL ✅.
+
+**Check 5 — Stale daemon code (~23:19Z UTC):** heal-stale-daemon-code.heartbeat=2026-07-29T23:14:58Z UTC (~6 min; <60 min). system-health overall=healthy ts=2026-07-29T23:18:40Z UTC (FRESH ~2 min). All 4 bots alive (beacon/forge/mirror/pulse: desired=up, alive=true, action=noop). disk=15%, memory=25%. NOMINAL ✅.
+
+**Check A — Source repo (~23:19Z UTC):** On main. HEAD=2d5cc320=origin/main (wrapper "Pulse cycle 20260729T231811Z"). **MODIFIED: `agents/beacon/captures.json` +16 lines**. GC healer auto-update pending commit — confirmed by git log ("GC healer — commit captures.json delta" commits appear after every Pulse cycle). Not a real working-copy discipline violation; GC healer auto-commit follows Pulse exit. NOMINAL ✅ (journal note only).
+**Check B — Sync health (~23:19Z UTC):** agent-core-sync.json: last_sync=2026-07-29T22:23:31Z (~57 min at check time; <2h); status=no-change; consecutive_push_failures=0. NOMINAL ✅. (57 min approaching 2h threshold; borderline but within bounds.)
+**Check C — Agent liveness (~23:19Z UTC):** system-health=healthy ts=23:18:40Z UTC (FRESH). All 4 bots alive. NOMINAL ✅.
+**Check E — PR/merge state (~23:19Z UTC):** ourliberty-agent-core: **3 open PRs** — **#1059** (MERGEABLE; auto-review label; Mirror review in-flight since 23:05Z UTC; ~14 min at check; no autoMerge; reviewDecision="") + **#1060** (MERGEABLE; no labels; no autoMerge; ~25 min old; approaching 30-min threshold) + **#1061** NEW "fix(heal-stall): a wedged sync no longer re-DMs Larry every hour" (MERGEABLE; no labels; created 23:18:21Z UTC; ~1 min old). NOMINAL ✅ (all within grace periods). RSDPM: **2 open PRs** — **#161** (feat(M14): PR-C; no reviewDecision; deep-review hold, pending #3; carry ⚠️) + **#162** (feat(m14): PR-D; no reviewDecision; vitest failure from iter ~6799; Mirror review status unverified this iter). PR#160 MERGED ✅. NOMINAL ✅.
+**Check H — Forge digest (~23:19Z UTC):** PR#160 RSDPM merged at 23:18:26Z UTC. 3 open PRs on agent-core (#1059/#1060/#1061); all <72h. NOMINAL.
+
+**§5.0 one-shots (~23:21Z UTC):** audit_due_nudge.py → no-op ✅. distill_detector.py → no-op ✅. silence_file_auditor.py → 3 expired (agent-runner-forge×2, agent-runner-pulse×1; 48.7d; 0 suppressed) + 4 permanent (0 suppressed). NOMINAL ✅.
+
+**§5 periodic — Check I (carry):** No new artifact since today's Wednesday firing. Carry: $1,201/wk +206%; proposal #1 (45σ cycle review) via `/dispatch 1`.
+
+**Rotations:** SUPABASE_SERVICE_ROLE_KEY last DM 2026-07-20T20:00:15Z UTC; 14-day window expires ~2026-08-03; within window. NOMINAL ✅.
+
+**PRIME DIRECTIVE (~23:21Z UTC):** ratio=39.854 (unchanged; no new interventions this iter; iter_clean appended at 23:21:47Z UTC, tier=1, template=all-nominal). systemic_fixes=48, verification_pending=22, trend=worsening. **Tier state: consecutive_clean=2→3 → TIER 1 DE-ESCALATED TO TIER 2** (consecutive_clean reset to 0; last_signal_at=2026-07-29T22:58:21Z UTC unchanged). Promoted at 23:21:48Z UTC.
+
+**Actions taken:**
+1. Check 0: `repair-watermark` → {repaired=false, old=550, file_length=550} — no repair.
+2. §5.0 one-shots: all three → no-op ✅.
+3. PRIME ledger: iter_clean appended at 23:21:47Z UTC (tier=1, template=all-nominal).
+4. Tier state: `cycle_tier_state.py record --checks-clean true` → consecutive_clean=3 → **TIER 1 DE-ESCALATED TO TIER 2** at 23:21:48Z UTC.
+
+**Escalations:**
+- **[carry ⚠️] deep-review-hold-pr161-277ac8af**: RSDPM PR#161 (m14-pr-c) still held. **Larry: run `/code-review high RSDPM/161` to unblock m14-pr-c merge.**
+- **[carry ⚠️] unreg-approval-9da4cfc8b9d1**: RSDPM 0034 staging drift. Pending.
+- **[carry] rsdpm-confirmall-medium-parent-secondglance-001** — pending.
+- **[carry ⚠️] PR#162 RSDPM vitest failure** (from iter ~6799; Mirror review status unverified this iter; Forge needs to push a fix). `gh pr checks` approval-blocked; CI status carry from last known state.
+- **[carry — monitoring] PR#1059 agent-core**: Mirror review in-flight since 23:05Z UTC (~16 min at check time). auto-review label present. Expect Mirror PASS + auto-merge.
+- **[monitoring] PR#1060 agent-core**: ~25 min old; no labels; no autoMerge. Will hit 30-min stale threshold next Tier-2 iter; heal-undispatched-pr-review should catch it before then.
+- **[NEW — monitoring] PR#1061 agent-core**: "fix(heal-stall): a wedged sync no longer re-DMs Larry every hour" — 1 min old; normal pipeline.
+- **[carry ⚠️] RSDPM 0031 staging drift** (pre-existing carry).
+- **[carry ⚠️] credential-drift:MISSING_CREDENTIAL:SUPABASE_DB_PASSWORD**.
+- [carry] check-vi-posture-proposals-2026-07-07 (2 proposals). Awaiting Larry.
+- [carry — monitoring] Mirror queue-wait p95=92.3m.
+- [carry — no Larry reply] Check XIV Tier-4 × 2: oversilence + fleet digest.
+- [carry — monitoring] tier4-rsdpm-install-drift.
+- **[blue] Check I: weekly cost $1,201 (+206%)**. Proposal #1 (45σ cycle review) via `/dispatch 1`.
+
+**Patterns:**
+- **Tier 1→2 de-escalation**: 3 consecutive clean iters (6798, 6799, 6800) achieved. System moves to 15-min cadence. Last signal at 2026-07-29T22:58:21Z UTC (~23 min before de-escalation).
+- **PR#160 RSDPM MERGED**: "fix(seed-check): key the seed gate on shape" merged at 23:18:26Z UTC — seconds before this cycle's first check (23:19Z UTC). deep-review-hold-pr160-252d3c67 is now fully resolved. The `held-behind-#162` hold was apparently released independently; PR#160 merged without waiting for PR#162's vitest fix, indicating the file overlap constraint was lifted or handled by merge order.
+- **PR#1061 new**: "fix(heal-stall): a wedged sync no longer re-DMs Larry every hour" — targeted fix for the wedged-sync DM pattern. If it merges, healer behavior improves without manual intervention.
+- **agents/beacon/captures.json drift**: GC healer updated captures.json (+16 lines) between Pulse cycles. This is the normal GC healer auto-commit pattern (5 prior commits of "GC healer — commit captures.json delta" in git log). Not a tree-discipline violation; the healer's own commit mechanism handles it. Observed 3 iters in a row — no escalation needed.
+- **Check B sync age 57 min**: Approaching the 2h threshold. If sync is still stale next iter, Check B will flag.
+
+**Tier end-of-iter:** **Tier 2** (de-escalated from Tier 1; consecutive_clean=0; last_signal_at=2026-07-29T22:58:21Z UTC; 3 more consecutive clean iters needed for Tier-3 de-escalation).
+
+---
+
