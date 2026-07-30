@@ -251,6 +251,63 @@ class PlanTest(unittest.TestCase):
         self.assertEqual(by_id['cap-b'], 'handed_off')
 
 
+# ---------- delegation_died copy (delegate-died-surface-001) ----------
+
+
+class DelegationDiedNarrationTest(unittest.TestCase):
+    """The `delegation_died` line is the 'still needs you' surface for a
+    delegation whose delegate task terminally failed with no plan and no PR.
+    Two variants, split on the wall-clock-timeout signal: a timeout invites
+    splitting the job; a plain failure just flags that it needs Larry's eyes."""
+
+    def test_timeout_copy_invites_splitting(self):
+        text = h._narration_text('delegation_died', None, timed_out=True)
+        self.assertTrue(text)
+        low = text.lower()
+        self.assertIn('split', low)
+        # Never claims a plan/PR came back, and never says it never started.
+        self.assertNotIn('never started', low)
+
+    def test_non_timeout_copy_flags_needs_you(self):
+        text = h._narration_text('delegation_died', None, timed_out=False)
+        self.assertTrue(text)
+        self.assertNotIn('split', text.lower())
+        self.assertIn('needs your eyes', text.lower())
+
+    def test_timeout_and_non_timeout_copy_differ(self):
+        self.assertNotEqual(
+            h._narration_text('delegation_died', None, timed_out=True),
+            h._narration_text('delegation_died', None, timed_out=False))
+
+    def test_plan_narrates_a_died_timeout_delegation(self):
+        # End-to-end through the planner: a died-timeout scan result must reach
+        # `delegation_died` with the timeout copy, keyed by the delegate task.
+        with mock.patch.object(
+            da, 'scan_delegate_died_origins',
+            return_value={DELEGATE_ID: {'timed_out': True}},
+        ):
+            posts = h.plan_delegate_narrations(
+                [_cap()], build_events_by_origin={},
+                open_delegate_approvals={}, native_build_events=None,
+                dispatched_by_origin={})
+        self.assertEqual(len(posts), 1)
+        self.assertEqual(posts[0]['phase'], 'delegation_died')
+        self.assertIn('split', posts[0]['text'].lower())
+
+    def test_plan_died_yields_to_open_approval(self):
+        # A re-delegation parked on Larry is waiting on him, not dead.
+        with mock.patch.object(
+            da, 'scan_delegate_died_origins',
+            return_value={DELEGATE_ID: {'timed_out': True}},
+        ):
+            posts = h.plan_delegate_narrations(
+                [_cap()], build_events_by_origin={},
+                open_delegate_approvals={DELEGATE_ID: {'id': 'a'}},
+                native_build_events=None, dispatched_by_origin={})
+        self.assertEqual(len(posts), 1)
+        self.assertEqual(posts[0]['phase'], 'waiting_approval')
+
+
 # ---------- deterministic event_id ----------
 
 

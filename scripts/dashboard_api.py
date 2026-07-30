@@ -43,7 +43,7 @@ import tempfile
 import time
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Iterable, Optional, Union
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, Response, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -5303,6 +5303,94 @@ def _best_spawned_trail(
     return best[1], best[2]
 
 
+def scan_delegate_died_origins(
+    origin_task_ids: Iterable[str],
+    agents_root: Optional[Path] = None,
+) -> dict[str, dict[str, Any]]:
+    """For each `delegate-<cid>` origin task id, inspect Beacon's outbox archive
+    for its MOST-RECENT result envelope and return an entry ONLY when that
+    envelope is a terminal-failure NO-OUTCOME shape — the delegation DIED:
+
+      * a non-success exit (`exit_code` present and != 0 — the incident shape is
+        exit_code == -1 from agent_runner's timeout/spawn-failure return), AND
+      * no APPROVAL_REQUEST marker in the result text (nothing was handed to the
+        team — a valid marker means Beacon produced an outcome, not a death), AND
+      * no PR url anywhere (a PR means real work shipped).
+
+    Maps `origin_task_id -> {'timed_out': bool}`, where `timed_out` is True when
+    the failure was a wall-clock timeout ('TIMEOUT after Ns' text or an explicit
+    `timed_out` flag) — the signal the surfaced copy uses to hint the job may be
+    too big to run as one delegation.
+
+    This is the read the board/narrator lacked: it is the terminal outbox
+    envelope for the `delegate-<cid>` task that PROVES the delegation died and
+    carries WHY. Positive-evidence only — a died delegation is surfaced solely
+    from a matching terminal envelope, NEVER inferred from absence, so a
+    never-delegated or in-flight card can never be mislabeled. Fail-safe: any
+    read/parse error yields no entry for that origin (never a false death)."""
+    wanted = {t for t in origin_task_ids if isinstance(t, str) and t}
+    if not wanted:
+        return {}
+    root = agents_root or _agents_root()
+    archive = root / 'outboxes' / 'beacon' / '.archive'
+    if not archive.is_dir():
+        return {}
+    # Most-recent result envelope per origin task id.
+    latest_by_tid: dict[str, tuple[float, dict[str, Any]]] = {}
+    try:
+        for f in archive.iterdir():
+            if not f.is_file() or not f.name.endswith('.json') or f.name.startswith('.'):
+                continue
+            stem = f.name[:-len('.json')]
+            # Drop a trailing `.<n>` re-run suffix: `<task_id>.json` / `<task_id>.N.json`.
+            if '.' in stem:
+                base, _, tail = stem.rpartition('.')
+                if tail.isdigit():
+                    stem = base
+            if stem not in wanted:
+                continue
+            mt = _safe_mtime(f)
+            if mt is None:
+                continue
+            try:
+                payload = json.loads(f.read_text())
+            except (json.JSONDecodeError, OSError):
+                continue
+            if not isinstance(payload, dict):
+                continue
+            prev = latest_by_tid.get(stem)
+            if prev is None or mt > prev[0]:
+                latest_by_tid[stem] = (mt, payload)
+    except OSError:
+        return {}
+
+    died: dict[str, dict[str, Any]] = {}
+    for tid, (_mt, payload) in latest_by_tid.items():
+        exit_code = payload.get('exit_code')
+        if exit_code is None or exit_code == 0:
+            continue  # success or in-flight/no-terminal-exit — not a death
+        result_text = str(payload.get('result') or '')
+        if 'APPROVAL_REQUEST' in result_text:
+            continue  # a proposal was handed to the team — an outcome, not a death
+        if _pr_url_from_outbox(payload) or 'github.com/' in result_text:
+            continue  # real work shipped — not a death
+        died[tid] = {'timed_out': _outbox_envelope_timed_out(payload)}
+    return died
+
+
+def _outbox_envelope_timed_out(payload: dict[str, Any]) -> bool:
+    """True when a terminal delegate envelope is a wall-clock timeout (the run
+    reached the ceiling), via the explicit `timed_out` flag or the
+    'TIMEOUT after Ns' result/error text agent_runner emits."""
+    if payload.get('timed_out') is True:
+        return True
+    for key in ('result', 'error'):
+        v = payload.get(key)
+        if isinstance(v, str) and 'timeout after' in v.lower():
+            return True
+    return False
+
+
 def _delegation_trail_field(
     cap: dict[str, Any],
     build_events_by_origin: Optional[dict[str, list[dict[str, Any]]]],
@@ -5312,6 +5400,7 @@ def _delegation_trail_field(
     dispatched_by_origin: Optional[dict[str, str]] = None,
     declined_origins: Optional[set[str]] = None,
     now: Optional[datetime] = None,
+    died_by_origin: Optional[dict[str, dict[str, Any]]] = None,
 ) -> dict[str, Any]:
     """Surface a card's spawned-build review trail — `delegation_build_phase`
     (handed_off | building | in_review | review_passed | merged | stalled |
@@ -5397,8 +5486,19 @@ def _delegation_trail_field(
     # stamp, so a missing receipt doesn't PROVE nothing ran for those.
     _has_receipt = bool((dispatched_by_origin or {}).get(_delegate_tid))
     _declined = _delegate_tid in (declined_origins or set())
+    _died = _delegate_tid in (died_by_origin or {})
     if delegated and not has_open_approval:
-        if _declined:
+        if _died:
+            # The delegate task's terminal outbox envelope PROVES the delegation
+            # died (timeout/spawn-failure) with no approval and no PR — hard
+            # evidence that outranks the receipt/grace guesswork below. Kept
+            # strictly UNDER `has_open_approval`: a re-delegation now parked on
+            # Larry is "waiting on your approval", not dead. A real build event
+            # still wins (the `phase is None` gate at the end), so this is only
+            # the floor for a delegation that produced nothing at all.
+            fallback = {'delegation_build_phase': 'delegation_died',
+                        'delegation_pr_url': None}
+        elif _declined:
             # Ahead of receipt AND grace: a rejection concludes the delegation,
             # so "give it another 15 minutes" is as wrong as "go nudge it".
             fallback = {'delegation_build_phase': 'declined',
@@ -5423,7 +5523,7 @@ def _delegation_trail_field(
     # receipt of a SUPERSEDED round. Without this guard, approve → build → reject
     # renders "Building" off the old build for a delegation Larry just rejected —
     # the same stale-round bug the netting fix closes, one line further down.
-    if (delegated and not has_open_approval and not _declined
+    if (delegated and not has_open_approval and not _declined and not _died
             and _has_forge_build_started(
                 (native_build_events or {}).get(_delegate_tid))):
         fallback = {'delegation_build_phase': 'building',
@@ -5485,11 +5585,12 @@ def resolve_delegation_narrative_phase(
     native_build_events: Optional[dict[str, list[dict[str, Any]]]] = None,
     dispatched_by_origin: Optional[dict[str, str]] = None,
     declined_origins: Optional[set[str]] = None,
+    died_by_origin: Optional[dict[str, dict[str, Any]]] = None,
 ) -> dict[str, Any]:
     """The ONE narrative-phase resolver the thread narrator and the dashboard
     both read from — `{narrative_phase, narrative_pr_url}` over
     {handed_off, waiting_approval, building, in_review, review_passed, merged,
-    closed_failed, stalled, declined, None}.
+    closed_failed, delegation_died, stalled, declined, None}.
 
     Built by overlaying the GC healer's already-persisted terminal stamps
     (`spawned.outcome`, `shipped_note`/`shipped_pr_url`, `failure_signaled`) and
@@ -5499,12 +5600,24 @@ def resolve_delegation_narrative_phase(
 
       1. merge-stamped        → `merged`  (honest: a real merge signal only)
       2. outcome closed + failure_signaled → `closed_failed`
-      3. trail review_passed / in_review / building → that phase
-      4. has_open_approval    → `waiting_approval`
-      5. trail handed_off     → `handed_off`
-      6. trail stalled        → `stalled`
-      7. trail declined       → `declined`
-      8. else                 → None (nothing to narrate yet)
+      3. trail delegation_died → `delegation_died` (+ `narrative_died_timed_out`)
+      4. trail review_passed / in_review / building → that phase
+      5. has_open_approval    → `waiting_approval`
+      6. trail handed_off     → `handed_off`
+      7. trail stalled        → `stalled`
+      8. trail declined       → `declined`
+      9. else                 → None (nothing to narrate yet)
+
+    `delegation_died` (delegate-died-surface-001) is the phase for a delegated
+    card whose delegate task terminally failed (timeout/spawn-failure) with no
+    PR and no open approval — surfaced as a distinct 'still needs you' state,
+    NOT blended with handed_off/stalled/parked. It carries an extra
+    `narrative_died_timed_out` bool: when the failure was a wall-clock timeout,
+    the surfaced copy hints the job may be too big to run as one delegation and
+    invites splitting. It sits BELOW the merge/closed_failed terminal stamps and
+    below `has_open_approval` (a re-delegation parked on Larry is waiting on him,
+    not dead) but ABOVE the receipt-driven handed_off/stalled guesswork, because
+    the terminal envelope is hard evidence where those are inference.
 
     `declined_origins` (`_delegate_approval_scan`'s second half) is threaded for
     the same reason `dispatched_by_origin` is: this resolver is the ONE place the
@@ -5534,6 +5647,7 @@ def resolve_delegation_narrative_phase(
         native_build_events=native_build_events,
         dispatched_by_origin=dispatched_by_origin,
         declined_origins=declined_origins,
+        died_by_origin=died_by_origin,
     )
     trail_phase = trail.get('delegation_build_phase')
     trail_pr_url = trail.get('delegation_pr_url')
@@ -5551,6 +5665,17 @@ def resolve_delegation_narrative_phase(
         return {
             'narrative_phase': 'closed_failed',
             'narrative_pr_url': trail_pr_url,
+        }
+    if trail_phase == 'delegation_died':
+        _delegate_tid = (
+            spawned.get('task_id') if isinstance(spawned, dict)
+            and spawned.get('kind') == 'delegate' else None
+        )
+        _died = (died_by_origin or {}).get(_delegate_tid) or {}
+        return {
+            'narrative_phase': 'delegation_died',
+            'narrative_pr_url': None,
+            'narrative_died_timed_out': bool(_died.get('timed_out')),
         }
     if trail_phase in ('review_passed', 'in_review', 'building'):
         return {'narrative_phase': trail_phase, 'narrative_pr_url': trail_pr_url}
@@ -5670,6 +5795,7 @@ def _parked_from_captures(
     native_build_events: Optional[dict[str, list[dict[str, Any]]]] = None,
     dispatched_by_origin: Optional[dict[str, str]] = None,
     declined_origins: Optional[set[str]] = None,
+    died_by_origin: Optional[dict[str, dict[str, Any]]] = None,
 ) -> list[dict[str, Any]]:
     """Build the `parked[]` array (§ 3.3) from captures.json. Only state=='parked'
     captures; `aging` is the GC healer's persisted flag (Phase 1 — never
@@ -5712,7 +5838,8 @@ def _parked_from_captures(
             has_open_approval=_needs_you.get('delegation_needs_you') is not None,
             native_build_events=native_build_events,
             dispatched_by_origin=dispatched_by_origin,
-            declined_origins=declined_origins, now=now))
+            declined_origins=declined_origins, now=now,
+            died_by_origin=died_by_origin))
         out.append(entry)
     return out
 
@@ -6111,6 +6238,7 @@ def _build_derived_response(
     native_build_events: Optional[dict[str, list[dict[str, Any]]]] = None,
     dispatched_by_origin: Optional[dict[str, str]] = None,
     declined_origins: Optional[set[str]] = None,
+    died_by_origin: Optional[dict[str, dict[str, Any]]] = None,
 ) -> dict[str, Any]:
     """Pure derive: build the full /api/missions/derived response (pre-filter).
 
@@ -6209,7 +6337,7 @@ def _build_derived_response(
     parked = _parked_from_captures(
         captures, now, events_by_task_id, open_delegate_approvals,
         build_events_by_origin, pr_state_by_url, native_build_events,
-        dispatched_by_origin, declined_origins)
+        dispatched_by_origin, declined_origins, died_by_origin)
     return {
         'schema_version': 1,
         'missions': missions,
@@ -6402,6 +6530,13 @@ def _handle_missions_derived(
         if _fid not in seen:
             seen.add(_fid)
             fetch_ids.append(_fid)
+    # delegate-died-surface-001: which delegated cards have a TERMINAL-FAILURE
+    # outbox envelope (timeout/spawn-failure, no marker, no PR) for their
+    # `delegate-<cid>` task — the delegation died with nothing handed off. Read
+    # from Beacon's outbox archive; fail-safe {} so a scan error never invents a
+    # death. Feeds the `delegation_died` narrative phase (a distinct 'still needs
+    # you' state), keeping a died delegation off the reassuring handed_off floor.
+    _died_by_origin = scan_delegate_died_origins(parked_spawned_ids)
     # Slice 2b + approval-card-build-trail Phase 2: the spawned builds' review
     # trail — chain_events keyed by payload.origin_task_id back to each parked
     # card. Two origin families, both read-side: the delegate ref
@@ -6475,6 +6610,7 @@ def _handle_missions_derived(
         native_build_events=native_build_events,
         dispatched_by_origin=_dispatched_by_origin,
         declined_origins=_declined_origins,
+        died_by_origin=_died_by_origin,
     )
     response = _apply_derived_filters(
         response, repo=repo, task_id=task_id, now=now,

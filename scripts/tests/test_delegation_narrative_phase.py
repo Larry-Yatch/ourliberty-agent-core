@@ -194,5 +194,153 @@ class ClosedFailedTest(unittest.TestCase):
         self.assertNotEqual(got['narrative_phase'], 'closed_failed')
 
 
+class DelegationDiedTest(unittest.TestCase):
+    """delegate-died-surface-001: a delegated card whose delegate task
+    terminally failed (timeout/spawn-failure) with no PR and no open approval
+    resolves the distinct `delegation_died` phase — hard evidence from the
+    terminal envelope, surfaced as 'still needs you', NOT blended into
+    stalled/handed_off. Precedence: below merge/closed_failed stamps and below
+    has_open_approval, above the receipt/grace guesswork, and yielding to any
+    real build event."""
+
+    def test_died_resolves_delegation_died(self):
+        got = _resolve(_cap(), {}, died_by_origin={DELEGATE_ID: {'timed_out': False}})
+        self.assertEqual(got['narrative_phase'], 'delegation_died')
+        self.assertIsNone(got['narrative_pr_url'])
+        self.assertFalse(got['narrative_died_timed_out'])
+
+    def test_died_timed_out_flag_surfaces(self):
+        got = _resolve(_cap(), {}, died_by_origin={DELEGATE_ID: {'timed_out': True}})
+        self.assertEqual(got['narrative_phase'], 'delegation_died')
+        self.assertTrue(got['narrative_died_timed_out'])
+
+    def test_died_beats_stalled_no_receipt(self):
+        # Same past-grace/no-receipt card that would otherwise read `stalled`
+        # (see PhasePrecedenceTest.test_no_receipt_is_stalled) — the terminal
+        # envelope outranks the guess.
+        got = _resolve(_cap(), {}, died_by_origin={DELEGATE_ID: {'timed_out': False}})
+        self.assertEqual(got['narrative_phase'], 'delegation_died')
+
+    def test_waiting_approval_wins_over_died(self):
+        # A re-delegation now parked on Larry is waiting on HIM, not dead.
+        got = _resolve(_cap(), {}, has_open_approval=True,
+                       died_by_origin={DELEGATE_ID: {'timed_out': True}})
+        self.assertEqual(got['narrative_phase'], 'waiting_approval')
+
+    def test_real_build_event_wins_over_died(self):
+        # If something actually ran and reached review, the trail says so — the
+        # died floor only applies when the delegation produced nothing at all.
+        got = _resolve(_cap(), {DELEGATE_ID: [_ev('review_request')]},
+                       died_by_origin={DELEGATE_ID: {'timed_out': True}})
+        self.assertEqual(got['narrative_phase'], 'in_review')
+
+    def test_merge_stamp_wins_over_died(self):
+        cap = _cap(spawned={'kind': 'delegate', 'task_id': DELEGATE_ID,
+                            'outcome': 'merged'})
+        got = _resolve(cap, {}, died_by_origin={DELEGATE_ID: {'timed_out': True}})
+        self.assertEqual(got['narrative_phase'], 'merged')
+
+    def test_closed_failed_wins_over_died(self):
+        cap = _cap(
+            spawned={'kind': 'delegate', 'task_id': DELEGATE_ID,
+                     'outcome': 'closed'},
+            failure_signaled={'reason': 'closed without merge', 'at': 'x'})
+        got = _resolve(cap, {}, died_by_origin={DELEGATE_ID: {'timed_out': True}})
+        self.assertEqual(got['narrative_phase'], 'closed_failed')
+
+    def test_died_defaults_off(self):
+        # Omitting the map keeps the pre-fix answer — no caller changes meaning
+        # by accident.
+        self.assertEqual(_resolve(_cap(), {})['narrative_phase'], 'stalled')
+
+
+class ScanDelegateDiedOriginsTest(unittest.TestCase):
+    """The filesystem read that PROVES a delegation died: it inspects Beacon's
+    outbox archive for the delegate task's most-recent terminal envelope.
+    Positive-evidence only — a death is surfaced solely from a matching
+    terminal-failure NO-OUTCOME envelope, never inferred from absence."""
+
+    def setUp(self):
+        import tempfile
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.archive = self.root / 'outboxes' / 'beacon' / '.archive'
+        self.archive.mkdir(parents=True)
+        self.addCleanup(self._tmp.cleanup)
+
+    def _seed(self, name, payload):
+        import json
+        (self.archive / name).write_text(json.dumps(payload))
+
+    def _scan(self, ids):
+        return da.scan_delegate_died_origins(ids, agents_root=self.root)
+
+    def test_timeout_envelope_is_a_death(self):
+        self._seed(f'{DELEGATE_ID}.json',
+                   {'exit_code': -1, 'result': 'TIMEOUT after 600s',
+                    'duration_sec': 600.0})
+        got = self._scan([DELEGATE_ID])
+        self.assertIn(DELEGATE_ID, got)
+        self.assertTrue(got[DELEGATE_ID]['timed_out'])
+
+    def test_timed_out_flag_counts_as_death(self):
+        self._seed(f'{DELEGATE_ID}.json',
+                   {'exit_code': -1, 'result': 'stopped', 'timed_out': True})
+        got = self._scan([DELEGATE_ID])
+        self.assertTrue(got[DELEGATE_ID]['timed_out'])
+
+    def test_non_timeout_failure_is_death_not_timed_out(self):
+        self._seed(f'{DELEGATE_ID}.json',
+                   {'exit_code': 1, 'result': 'crashed'})
+        got = self._scan([DELEGATE_ID])
+        self.assertIn(DELEGATE_ID, got)
+        self.assertFalse(got[DELEGATE_ID]['timed_out'])
+
+    def test_success_is_not_a_death(self):
+        self._seed(f'{DELEGATE_ID}.json',
+                   {'exit_code': 0, 'result': 'done'})
+        self.assertEqual(self._scan([DELEGATE_ID]), {})
+
+    def test_approval_request_is_an_outcome_not_death(self):
+        # A handed-off proposal is an outcome, never a death — even at exit -1.
+        self._seed(f'{DELEGATE_ID}.json',
+                   {'exit_code': -1,
+                    'result': 'APPROVAL_REQUEST\ntimeout after 600s'})
+        self.assertEqual(self._scan([DELEGATE_ID]), {})
+
+    def test_pr_url_is_shipped_not_death(self):
+        self._seed(f'{DELEGATE_ID}.json',
+                   {'exit_code': -1,
+                    'result': 'PR opened: https://github.com/o/r/pull/9'})
+        self.assertEqual(self._scan([DELEGATE_ID]), {})
+
+    def test_most_recent_envelope_wins(self):
+        import os, time
+        old = self.archive / f'{DELEGATE_ID}.1.json'
+        new = self.archive / f'{DELEGATE_ID}.2.json'
+        import json
+        old.write_text(json.dumps({'exit_code': -1, 'result': 'TIMEOUT after 600s'}))
+        new.write_text(json.dumps({'exit_code': 0, 'result': 'done'}))
+        # Force `new` to be strictly newer regardless of write granularity.
+        past = time.time() - 100
+        os.utime(old, (past, past))
+        self.assertEqual(self._scan([DELEGATE_ID]), {})
+
+    def test_unwanted_ids_ignored(self):
+        self._seed(f'{DELEGATE_ID}.json',
+                   {'exit_code': -1, 'result': 'TIMEOUT after 600s'})
+        self.assertEqual(self._scan(['delegate-someone-else-zz99']), {})
+
+    def test_missing_archive_is_empty(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            self.assertEqual(
+                da.scan_delegate_died_origins([DELEGATE_ID], agents_root=Path(d)),
+                {})
+
+    def test_empty_ids_short_circuits(self):
+        self.assertEqual(self._scan([]), {})
+
+
 if __name__ == '__main__':
     unittest.main()

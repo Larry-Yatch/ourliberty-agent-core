@@ -2932,6 +2932,32 @@ def _dead_letter_marker_error_to_dispatcher(
     _maybe_dm_larry(data, synthetic_decision)
 
 
+def _envelope_is_timeout(envelope: dict[str, Any]) -> bool:
+    """True when a terminal result envelope represents a wall-clock TIMEOUT —
+    the worker ran to the ceiling — as opposed to a worker that never spawned.
+
+    A timeout is the OPPOSITE of a spawn-failure: it ran for the full window.
+    The spawn-failure classifiers below must never treat it as 'never started'.
+    A genuine 600s run was one string away from that misclassification: it has
+    exit_code == -1, and before agent_runner recorded the real elapsed runtime
+    its duration_sec was null — satisfying two of the three spawn-failure
+    predicates, saved only by the 'all retries exhausted' text it happens not to
+    carry (`delegate-died-surface-001`). This is the defense-in-depth guard that
+    makes the invariant structural rather than incidental: consult the explicit
+    `timed_out` flag if present, else the 'TIMEOUT after Ns' result/error text
+    agent_runner emits. Any parse issue → False (never assume a timeout)."""
+    try:
+        if envelope.get('timed_out') is True:
+            return True
+        for key in ('result', 'error'):
+            v = envelope.get(key)
+            if isinstance(v, str) and 'timeout after' in v.lower():
+                return True
+    except Exception:  # noqa: BLE001 — a guard must never raise into a classifier
+        return False
+    return False
+
+
 def _prior_build_was_spawn_failure(task_id: str) -> bool:
     """Return True only on a DEFINITIVE terminal build-phase spawn-failure.
 
@@ -2988,6 +3014,10 @@ def _prior_build_was_spawn_failure(task_id: str) -> bool:
         _, latest = max(candidates, key=lambda item: item[0])
 
         if latest.get('exit_code') != -1:
+            return False
+        # A wall-clock timeout RAN to the wall — the opposite of a never-spawned
+        # worker. Never classify it as spawn-failure (delegate-died-surface-001).
+        if _envelope_is_timeout(latest):
             return False
         # A PR (top-level field OR a `PR opened:`/`PR updated:` line in the
         # result text) means a build actually ran — never override.
@@ -3096,8 +3126,10 @@ def _prior_dispatch_was_definitive_non_run(task_id: str) -> bool:
             str(latest.get('result') or ''),
         )
 
-        # Shape 1 — definitive spawn-failure (worker never ran).
-        if latest.get('exit_code') == -1:
+        # Shape 1 — definitive spawn-failure (worker never ran). A wall-clock
+        # timeout is excluded up front: it ran to the wall, so it is never a
+        # never-spawned worker (delegate-died-surface-001).
+        if latest.get('exit_code') == -1 and not _envelope_is_timeout(latest):
             duration = latest.get('duration_sec')
             duration_ok = duration is None
             if duration is not None:

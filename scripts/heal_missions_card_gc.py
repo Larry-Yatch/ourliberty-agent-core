@@ -1794,10 +1794,23 @@ _NARRATION_ID_NAMESPACE = 'delegate-thread-narrator'
 _NARRATION_MAX_PER_TICK = 40
 
 
-def _narration_text(phase: str, pr_url: Optional[str]) -> str:
+def _narration_text(
+    phase: str, pr_url: Optional[str], *, timed_out: bool = False,
+) -> str:
     """One team-voice line per narrative phase, describing WHAT HAPPENED.
     `review_passed` / `merged` carry the PR link; `merged` degrades to a PR-less
-    phrasing when the merge stamp carried no URL (a no-PR linked-work merge)."""
+    phrasing when the merge stamp carried no URL (a no-PR linked-work merge).
+    `delegation_died` splits on `timed_out`: a wall-clock timeout hints the job
+    may be too big for one delegation and invites splitting (delegate-died-
+    surface-001); other terminal failures just flag that it needs Larry's eyes."""
+    if phase == 'delegation_died':
+        if timed_out:
+            return ("This one ran out of time before it could finish — nothing "
+                    "was handed back (no plan, no PR). It may be too big to do "
+                    "in a single delegation; consider splitting it into smaller "
+                    "pieces and re-delegating those.")
+        return ("This delegation ended without handing anything back — no plan "
+                "and no PR came through. It still needs your eyes.")
     if phase == 'handed_off':
         return "Picked this up — we're scoping the work now."
     if phase == 'waiting_approval':
@@ -1896,6 +1909,18 @@ def plan_delegate_narrations(
     SAME card at the SAME phase re-plans the SAME event_id every tick, and only
     the FIRST emit lands (later ones ignore_duplicates as no-ops)."""
     import dashboard_api as dash  # noqa: PLC0415 — lazy: heavy module, read-only use
+    # delegate-died-surface-001: terminal-failure envelopes for the delegate
+    # tasks, so a died delegation resolves `delegation_died` here too (the ONE
+    # resolver serves board AND narrator). Fail-safe {} — never invent a death.
+    _origin_tids = [
+        s.get('task_id')
+        for cap in captures
+        if isinstance(cap, dict)
+        and isinstance((s := cap.get('spawned')), dict)
+        and s.get('kind') == 'delegate'
+        and isinstance(s.get('task_id'), str)
+    ]
+    died_by_origin = dash.scan_delegate_died_origins(_origin_tids)
     posts: list[dict[str, Any]] = []
     for cap in captures:
         if not isinstance(cap, dict):
@@ -1917,6 +1942,7 @@ def plan_delegate_narrations(
             native_build_events=native_build_events,
             dispatched_by_origin=dispatched_by_origin,
             declined_origins=declined_origins,
+            died_by_origin=died_by_origin,
         )
         phase = resolved.get('narrative_phase')
         if not phase:
@@ -1935,7 +1961,9 @@ def plan_delegate_narrations(
         # resolver), so the withhold moved to `_narration_text`, which returns ''
         # for it — the disqualifier IS the phase, so it belongs with the wording.
         # Re-adding a guard here would be dead code that reads as live.
-        text = _narration_text(phase, resolved.get('narrative_pr_url'))
+        text = _narration_text(
+            phase, resolved.get('narrative_pr_url'),
+            timed_out=bool(resolved.get('narrative_died_timed_out')))
         if not text:
             continue
         posts.append({

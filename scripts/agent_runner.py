@@ -1771,7 +1771,16 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                 # already carries timed_out=True so the review escalates clean.
                 if timed_out_session:
                     guard.release(agent_id)
-                    return False, f'TIMEOUT after {effective_timeout}s', None
+                    # Report the REAL elapsed runtime, not None. A run that hit
+                    # the wall ran for the full window; the third element becomes
+                    # the outbox envelope's duration_sec, and a null there makes a
+                    # 10-minute timeout indistinguishable from a never-spawned
+                    # worker to the spawn-failure classifiers (outbox_notifier
+                    # `_prior_build_was_spawn_failure` /
+                    # `_prior_dispatch_was_definitive_non_run`, which read
+                    # exit -1 + ~0 duration as 'never started').
+                    return (False, f'TIMEOUT after {effective_timeout}s',
+                            round(time.time() - _meta_t0, 2))
 
                 # Build a result-like object for downstream compatibility
                 class _Result:

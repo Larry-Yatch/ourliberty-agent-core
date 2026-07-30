@@ -2791,6 +2791,74 @@ class BuildDedupSpawnFailureOverrideTest(unittest.TestCase):
         )
         self.assertTrue(on._prior_build_was_spawn_failure('good-fail'))
 
+    # ---- delegate-died-surface-001: timeout != spawn-failure -------------
+
+    def _timeout_result(self, task_id, *, duration=600.0,
+                        text='TIMEOUT after 600s', timed_out=False):
+        # The wall-clock-timeout artifact: agent_runner returns exit -1 with a
+        # 'TIMEOUT after Ns' result. The invariant is that a run that reached the
+        # wall is NEVER classified as a worker that never spawned.
+        body = {
+            'task_id': task_id,
+            'agent': 'forge',
+            'source': 'beacon',
+            'phase': 'build',
+            'exit_code': -1,
+            'result': text,
+            'error': None,
+            'duration_sec': duration,
+            'pr_url': None,
+            'completed_at': '2026-07-30T16:30:22.620537+00:00',
+        }
+        if timed_out:
+            body['timed_out'] = True
+        return body
+
+    def test_timeout_is_not_a_build_spawn_failure(self):
+        # A 600s timeout ran to the wall — real duration now recorded, so the
+        # duration>=2 guard already excludes it.
+        self._seed_outbox_result(
+            'timed-out', self._timeout_result('timed-out'))
+        self.assertFalse(on._prior_build_was_spawn_failure('timed-out'))
+
+    def test_timeout_not_spawn_failure_even_with_null_duration(self):
+        # Defense-in-depth: even if duration_sec is null (older envelope shape),
+        # the explicit timeout signal keeps it out of the spawn-failure class.
+        self._seed_outbox_result(
+            'timed-out-null',
+            self._timeout_result('timed-out-null', duration=None))
+        self.assertFalse(on._prior_build_was_spawn_failure('timed-out-null'))
+
+    def test_timeout_not_spawn_failure_even_if_retries_text_present(self):
+        # The one-string-away case: a timeout whose text ALSO carried the
+        # 'all retries exhausted' phrase (+ null duration) must still be excluded
+        # — the timeout guard fires before the retries-text predicate.
+        self._seed_outbox_result(
+            'timed-out-retries',
+            self._timeout_result(
+                'timed-out-retries', duration=None,
+                text='TIMEOUT after 600s (all retries exhausted)'))
+        self.assertFalse(on._prior_build_was_spawn_failure('timed-out-retries'))
+
+    def test_timeout_via_timed_out_flag_is_not_spawn_failure(self):
+        # A generic result text but an explicit timed_out flag + null duration.
+        self._seed_outbox_result(
+            'timed-out-flag',
+            self._timeout_result(
+                'timed-out-flag', duration=None,
+                text='All retries exhausted', timed_out=True))
+        self.assertFalse(on._prior_build_was_spawn_failure('timed-out-flag'))
+
+    def test_dispatch_non_run_excludes_timeout(self):
+        # The sibling classifier (_prior_dispatch_was_definitive_non_run) also
+        # excludes a timeout from its spawn-failure Shape 1.
+        timeout = self._timeout_result('to-dispatch', duration=None)
+        timeout['phase'] = 'preflight'  # this classifier isn't build-only
+        timeout['result'] = 'TIMEOUT after 600s (all retries exhausted)'
+        self._seed_outbox_result('to-dispatch', timeout)
+        self.assertFalse(
+            on._prior_dispatch_was_definitive_non_run('to-dispatch'))
+
 
 class PhantomBuildTerminalGuardTest(unittest.TestCase):
     """phantom-build-phase terminal guard (cap-phantom-build-phase-after-marker-
