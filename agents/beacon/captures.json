@@ -2458,17 +2458,17 @@
       "last_touched": "2026-07-30T01:08:13.118432+00:00",
       "promoted_to": null,
       "briefing": {
-        "what": "Some items that land in your decision list can't actually be acted on \u2014 neither the yes nor the no button does anything, they can't be dismissed, and they keep coming back demanding your attention.",
-        "why": "These dead-end items clutter the very list you rely on to make quick calls, wasting your time and burying the decisions that genuinely need you.",
-        "suggest": "Worth fixing so items that don't offer a real choice never reach your decision list \u2014 but move deliberately and have a second set of eyes check it, since a clumsy filter could hide a decision you actually needed to see."
+        "what": "Some items landing in your \"needs your decision\" list can't actually be acted on \u2014 neither answer button does anything, and they never clear themselves out, so they just pile up as clutter.",
+        "why": "It wastes your time: you keep seeing the same dead-end items round after round, and real decisions get buried under things that were never actually decisions.",
+        "suggest": "Worth doing, but carefully \u2014 send items that don't offer a real choice to a separate triage list instead of your decision list, and test the filter closely so it never accidentally hides something you genuinely need to weigh in on."
       },
       "risk": "careful",
       "recommended_action": "delegate",
       "briefing_provenance": {
         "by": "beacon",
         "model": "claude-opus-4-8",
-        "at": "2026-07-30T01:15:34.216788+00:00",
-        "from_state": "parked"
+        "at": "2026-07-30T02:46:20.035187+00:00",
+        "from_state": "dropped"
       },
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     },
