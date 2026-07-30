@@ -102,9 +102,18 @@ class BeaconBotResolveLogDirTest(unittest.TestCase):
     def test_default_is_home_agents_logs_when_env_unset(self):
         with mock.patch.dict(os.environ, {}, clear=False):
             bot = self._import_bot_with_env(override_value=None)
+            # Same derivation as the agent_runner case above: the unset-
+            # override default is <agents root>/logs, where the agents root
+            # honors OURLIBERTY_AGENTS_ROOT (the _bootstrap sandbox sets it;
+            # production leaves it unset, so this is still ~/agents/logs —
+            # the historical path this family exists to pin).
+            expected_root = Path(
+                os.environ.get('OURLIBERTY_AGENTS_ROOT')
+                or Path.home() / 'agents'
+            )
             self.assertEqual(
                 bot.resolve_log_dir(),
-                Path.home() / 'agents' / 'logs',
+                expected_root / 'logs',
             )
 
     def test_override_is_used_when_env_set(self):

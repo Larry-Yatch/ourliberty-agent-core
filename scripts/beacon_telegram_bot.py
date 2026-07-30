@@ -118,7 +118,13 @@ def resolve_log_dir() -> Path:
     preserving the historical path.
     """
     override = os.environ.get("OURLIBERTY_LOG_DIR")
-    return Path(override) if override else Path.home() / "agents" / "logs"
+    if override:
+        return Path(override)
+    # Fall back to <agents root>/logs, honoring OURLIBERTY_AGENTS_ROOT like
+    # STATE_DIR below — a bare Path.home() here diverges from every reader
+    # that locates this log via AGENTS_ROOT/logs under a per-tier HOME swap.
+    root = os.environ.get("OURLIBERTY_AGENTS_ROOT")
+    return (Path(root) if root else Path.home() / "agents") / "logs"
 
 
 LOG_DIR = resolve_log_dir()
