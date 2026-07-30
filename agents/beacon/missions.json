@@ -16603,7 +16603,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-30T16:50:06.471147+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-30T16:47:51.104688+00:00"
+      "orphan_last_activity_ts": "2026-07-30T16:47:51.104688+00:00",
+      "briefing": {
+        "what": "A piece of work your team kicked off on its own that hasn't been tied to any project or goal yet.",
+        "why": "Effort is being spent without a clear business purpose behind it, so it could be time well spent or time wasted.",
+        "suggest": "Take a quick look to confirm it's worth pursuing and attach it to a real goal before letting it continue \u2014 hold off on greenlighting more until you do."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-30T16:56:17.821785+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-delegate-cap-a-delegation-that-dies-looks-exactly-like-one-no-2cbe",
@@ -16620,7 +16634,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-30T16:50:06.471147+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-30T16:47:38.836984+00:00"
+      "orphan_last_activity_ts": "2026-07-30T16:47:38.836984+00:00",
+      "briefing": {
+        "what": "Some work your team kicked off to make sure a handed-off task that quietly fails doesn't look identical to one that's still running.",
+        "why": "When a stalled job and a working one are indistinguishable, problems sit unnoticed and things you're counting on silently don't get done.",
+        "suggest": "Worth finishing, but have someone confirm the goal and where it fits before investing more time, since it isn't yet tied to a clear project."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-30T16:56:17.821785+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
