@@ -15802,7 +15802,11 @@
         "at": "2026-07-29T23:35:10.468995+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-30T02:15:00.977627+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-delegate-cap-thirteen-writers-do-unlocked-read-modify-write-o-4b31",
@@ -16023,7 +16027,11 @@
         "at": "2026-07-30T01:05:34.512811+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-30T02:15:00.977627+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-delegate-cap-closed-pr-step-wedged-forever-by-headless-dispat-37d6",
@@ -16182,7 +16190,11 @@
         "at": "2026-07-30T01:15:34.216788+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-30T02:15:00.977627+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-pr-ourliberty-agent-core-1062",
@@ -16213,7 +16225,11 @@
         "at": "2026-07-30T01:35:40.541993+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-30T02:15:00.977627+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-deep-review-hold-pr1063-3bf08587",
@@ -16275,7 +16291,79 @@
         "at": "2026-07-30T01:45:41.392140+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-30T02:15:00.977627+00:00",
+      "retired_reason": "orphan-terminal"
+    },
+    {
+      "id": "proposed-mirror-review-pr-RSDPM-166-aedfb509",
+      "name": "Mirror Review PR RSDPM 166 Aedfb509",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `mirror-review-pr-RSDPM-166-aedfb509`. Last activity 2026-07-30T02:11:23.63912+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "mirror-review-pr-RSDPM-166-aedfb509"
+      ],
+      "repo": null,
+      "created": "2026-07-30",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-30T02:15:00.977627+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-30T02:11:23.63912+00:00"
+    },
+    {
+      "id": "proposed-pr-RSDPM-166",
+      "name": "PR RSDPM 166",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pr-RSDPM-166`. Last activity 2026-07-30T02:11:20.822825+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pr-RSDPM-166"
+      ],
+      "repo": null,
+      "created": "2026-07-30",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-30T02:15:00.977627+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-30T02:11:20.822825+00:00"
+    },
+    {
+      "id": "proposed-deep-review-hold-pr1064-cc193879",
+      "name": "Deep Review Hold Pr1064 Cc193879",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `deep-review-hold-pr1064-cc193879`. Last activity 2026-07-30T02:08:53.935456+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "deep-review-hold-pr1064-cc193879"
+      ],
+      "repo": null,
+      "created": "2026-07-30",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-30T02:15:00.977627+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-30T02:08:53.935456+00:00"
+    },
+    {
+      "id": "proposed-gh-unavailable",
+      "name": "GH Unavailable",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `gh-unavailable`. Last activity 2026-07-30T02:04:49.961932+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "gh-unavailable"
+      ],
+      "repo": null,
+      "created": "2026-07-30",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-30T02:15:00.977627+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-30T02:04:49.961932+00:00"
     }
   ]
 }
