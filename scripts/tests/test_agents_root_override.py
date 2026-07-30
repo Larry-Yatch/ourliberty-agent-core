@@ -639,7 +639,7 @@ class TestGuardScanner(unittest.TestCase):
         # are pervasive in docstring prose across scripts/ and cannot
         # discriminate a payload from documentation.
         self.assert_quiet(
-            '"""State lives in ~/agents/state/ (see ~/agents/logs/)."""\n'
+            '"""State lives under ~/agents (see ~/agents/logs/)."""\n'
             "x = 1\n")
 
 
