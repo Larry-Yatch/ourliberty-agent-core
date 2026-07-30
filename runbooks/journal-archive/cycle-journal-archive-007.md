@@ -14131,3 +14131,90 @@ ourliberty-dashboard: 0 open PRs (not checked this iter; carry RSDPM 0 open).
 
 ---
 
+## Iteration ~6848 — 2026-07-30T03:50Z UTC (Larry /cycle chat, Tier 2→1 ESCALATION, consecutive_clean=0; Check 0: 3 new alerts (watermark 587→591); Check 4: pending=2 NEW; merge-verb-backend-001 RESOLVED→PR#1067; PR#1066 opened; PR#1065 unrouted 66 min)
+
+**Health:** ⚠️ Signal — 3 new alerts above watermark + pending=2 (new). Tier 2 → Tier 1 reset.
+
+**VERIFY-BEFORE-REASSERT (from iter ~6847 at ~03:29Z UTC):**
+- **"system-health=healthy ts=2026-07-30T03:21:59Z UTC"**: CONFIRMED ✅ → ts=2026-07-30T03:42:04Z UTC (fresh ~8 min). All 4 bots alive. [carry ✅]
+- **"heal-stale-daemon-code.heartbeat"**: CONFIRMED ✅ → 2026-07-30T03:37:03Z UTC (fresh ~13 min; <60 min). [carry ✅]
+- **"alerts watermark=587=file_length=587"**: CHANGED → file_length=591 now (3 external new + 1 pulse-self = 4 lines added; watermark advanced to 591). [3 new alerts — see Check 0]
+- **"pending=0"**: CHANGED → pending=2 (NEW). suite-guardian-graduation-stage-1 + unreg-approval-01519bf927ed. [⚠️ see Check 4]
+- **"HEAD=a5e8ab70=origin/main"**: CHANGED ✅ → e45a16bc (two chore(missions) commits landed since last Pulse cycle: bc0ec864 "autoregister healer" + e45a16bc "GC healer"). Working tree clean. origin/main=HEAD. [carry ✅]
+- **"PR#1065 ~47 min old new commits, no review"**: CONFIRMED CHANGED → PR#1065 now 66 min old, still reviewDecision="" (unrouted by-design — no routing label; by-design per auto-memory). [carry — watching]
+- **"merge-verb-backend-001 build ~37 min in-flight"**: RESOLVED ✅ → outbox-notifier.log [2026-07-29 21:35:23 MDT] = 03:35:23Z UTC: "review-request dispatched mirror <- beacon (task=merge-verb-backend-001, pr=PR#1067)". Forge completed build in ~42 min; PR#1067 opened; Mirror review dispatched. [carry CLOSED ✅]
+- **NEW since last iter:** PR#1066 (fix/retire-supabase-db-password-registry-entry, opened ~03:36Z, Mirror dispatched at 03:40:12Z) — appeared without a Pulse carry (Forge opened while Pulse was between cycles).
+- G-rule carries (unchanged): forge-marker-taskid-suffix-increment; medic-draft-status-false-positive; check-i-force-bypass-dm-route; beacon-pending-approvals-path-bug; deep-review-hold-approved-loop-post-merge-001; pending-auto-merge-exhausted-for-merged-pr (monitoring). VPs: pulse-cycle-check0-helper-override, auto-merge-conflict-route-hold, direction-ask-rsdpm-no-autolabel-review-gap-001.
+
+**Check 0 — Alert triage (~03:50Z UTC):** repair-watermark → {repaired=false, old=587, file=589}. Three new alerts above watermark 587 (file grew to 591 by end of iter):
+- **Line 588 — suite-guardian-graduation-stage-1** (kind=approval_request, source=suite-guardian, chat_id=0): Suite Guardian earned Stage 1 graduation (0 flip-flops, 19 completed runs). → **Tier 2** (approval_request; needs Larry sign-off via Approvals tab). DM dropped by Telegram bot (chat_id=0 invalid; bot log: idx=587 has invalid/unauthorized chat_id=0; dropping). Supplemental escalation sent via larry_alerts.py (line 591). [see Check 4, Escalations]
+- **Line 589 — heal-pipeline-stall:pipeline-stall:unrouted-pr:PR#1065** (tier=SOON, needs_larry=true): PR#1065 opened 64 min ago, no review-request dispatch in routing-events.jsonl. Medic confirms: "Auto-route is label-gated; fix/* branches without routing label skip auto-dispatch by design. Expected skip, not system fault." → **Tier 3** (known by-design pattern per auto-memory project_unrouted_pr_is_by_design.md). DM delivered at idx=588 to Larry's Telegram (03:47:06Z UTC). Suppress; journal note only.
+- **Line 590 — medic notification:medic-diagnosis** for unrouted-pr:PR#1065: → **Tier 3** (known pattern per alert-translations.json). DM delivered at idx=589 (03:47:06Z UTC). Suppress; journal note only.
+- Watermark advanced to 590 → then 591 (self-escalation). ✅
+
+**Check 1 — Log noise (~03:50Z UTC):** New outbox-notifier.log entries since iter ~6847:
+- [2026-07-29 21:35:23 MDT] = 03:35:23Z UTC: review-request dispatched mirror ← beacon (task=merge-verb-backend-001, pr=PR#1067). **Positive — merge-verb-backend-001 build resolved.**
+- [2026-07-29 21:35:24 MDT]: notified beacon ← forge (forge-result, depth=1, notify-merge-verb-backend-001.json). ✅
+- [2026-07-29 21:40:12 MDT] = 03:40:12Z UTC: review-request dispatched mirror ← beacon (task=pr-ourliberty-agent-core-1066, pr=PR#1066). ✅
+No new WARN entries above threshold. All previous WARNs (AUTO_MERGE_HELD_DEEP_REVIEW, AUTO_MERGE_PENDING_EXHAUSTED) predated iter ~6845 and remain triaged. NOMINAL ✅
+
+**Check 2 — Telegram sweep (~03:50Z UTC):** Last deliveries: idx=588 (heal-pipeline-stall, 03:47:06Z UTC) + idx=589 (medic-diagnosis, 03:47:06Z UTC). idx=587 was suite-guardian approval_request dropped (chat_id=0). Larry's last message: "why is 167 sitting?" at 01:44:39Z UTC (carry; handled). No new Larry messages. No orphan directives. NOMINAL ✅ (noting idx=587 drop)
+
+**Check 3 — Pipeline stall (~03:50Z UTC):** heal_pipeline_stall.py --dry-run → **DRY-RUN: 0 stalls detected** ✅ (FORGE_NO_PR_SKIP ×10; all PRs exist/merged; unrouted_open_pr:1065 suppressed by cooldown). NOMINAL ✅
+
+**Check 4 — Pending directives (~03:50Z UTC):** beacon-pending-approvals.json: **pending=2** (NEW — was 0 prior iter).
+1. **suite-guardian-graduation-stage-1**: target_agent=forge, created=2026-07-30T03:40:11Z UTC. Suite Guardian earned Stage 1 (0 flip-flops, 19 completed runs). Approve → Forge opens config-only PR. No Telegram DM (chat_id=0 dropped). Supplemental escalation sent.
+2. **unreg-approval-01519bf927ed**: target_agent=beacon, created=2026-07-30T03:45:49Z UTC. "Promoted from a missed marker; could not be parsed into two options — needs triage." Needs Larry triage in Approvals tab.
+**→ ask-then-do: both need Larry attention in the Approvals tab.** ⚠️
+
+**Check 5 — Stale daemon code (~03:50Z UTC):** heal-stale-daemon-code.heartbeat=2026-07-30T03:37:03Z UTC (fresh ~13 min; <60 min). system-health overall=healthy ts=2026-07-30T03:42:04Z UTC (fresh ~8 min). All 4 bots alive (beacon/forge/mirror/pulse: desired=up, alive=True, action=noop). NOMINAL ✅
+
+**Check A — Source repo (~03:50Z UTC):** On main. Working tree clean. HEAD=e45a16bc=origin/main. Two new commits since last Pulse cycle (7f639240): bc0ec864 "chore(missions): autoregister healer — reconcile proposed lane" + e45a16bc "chore(missions): GC healer — commit missions.json delta". Both from mission-management workflow — no Pulse concern. NOMINAL ✅
+**Check B — Sync health (~03:50Z UTC):** last_sync=2026-07-30T03:19:53Z UTC (~30 min; <2h); status=no-change. NOMINAL ✅
+**Check C — Agent liveness (~03:50Z UTC):** system-health=healthy ts=2026-07-30T03:42:04Z UTC (fresh). All 4 bots alive. NOMINAL ✅
+**Check E — PR/merge state (~03:50Z UTC):** ourliberty-agent-core: **3 open PRs**:
+- **#1065** `test(guard): harden agents-root override scanner` — branch fix/agents-root-guard-hardening; 66 min old; MERGEABLE; reviewDecision="" (unrouted by-design; no routing label; Mirror queue-wait p95=1065.6m; by-design). [watching]
+- **#1066** `fix(credentials): retire the SUPABASE_DB_PASSWORD registry entry` — branch fix/retire-supabase-db-password-registry-entry; 13 min old; MERGEABLE; reviewDecision="". Mirror review dispatched 03:40:12Z UTC. Normal. [watching]
+- **#1067** `feat(approvals): backend 'merge it' operator verb` — branch forge/merge-verb-backend-001; 11 min old; MERGEABLE; reviewDecision="". Mirror review dispatched 03:35:23Z UTC. Normal. [watching]
+NOMINAL ✅ (no auto-merge trigger; all PRs have reviewDecision="")
+**Check H — Forge digest (~03:50Z UTC):** merge-verb-backend-001 RESOLVED ✅ (PR#1067; Mirror dispatched). PR#1066 opened + Mirror dispatched. PR#1065 watching (unrouted). No new Forge inbox envelopes visible. NOMINAL ✅
+
+**§5.0 one-shots (~03:50Z UTC):** audit_due_nudge → no-op ✅. distill_detector → no-op ✅. silence_file_auditor → 5 files (1 expired 0-suppressed, 4 permanent 0-suppressed); no FIRED ✅. NOMINAL ✅
+
+**§5 periodic — Check I (carry):** Most recent: check-i-2026-07-29.json. Next firing: TODAY (Wed 2026-07-30) at ~14:13 UTC (timer not yet fired). Carry: $1,201/wk +206%; proposal #1 (45σ cycle review) via `/dispatch 1`.
+**§5 periodic — Check III (carry):** Most recent: check-iii-2026-07-26.json. Next: Sun 2026-08-03. NOMINAL ✅
+
+**Credential rotation (~03:50Z UTC):** SUPABASE_SERVICE_ROLE_KEY: last DM 2026-07-20T20:00:15Z UTC; 14d dedup expires ~2026-08-03; due=2026-08-22 (23d). Within dedup window — no DM. SUPABASE_DB_PASSWORD: MISSING_CREDENTIAL; PR#1066 (retire from registry) opened and sent to Mirror — this carry may resolve on merge. NOMINAL (KEY) / TRACKING RESOLUTION (PASSWORD via PR#1066).
+
+**PRIME DIRECTIVE accounting:** 1 intervention row appended (check0-new-alerts-triaged). Ratio=39.75 (interventions≈1911, systemic_fixes=48, verification_pending=23, trend=worsening). **TIER: Tier 2 → Tier 1 RESET** (Check 0 new alerts + Check 4 pending=2 new; consecutive_clean=0; last_signal_at=2026-07-30T03:50:15Z UTC).
+
+**Patterns:**
+- **suite-guardian approval_request DM dropped (chat_id=0) [1/3 G-rule candidate — watching]**: suite-guardian-graduation-stage-1 alert had chat_id=0; Telegram bot dropped it (idx=587). Pulse sent supplemental escalation via larry_alerts. If approval_request chat_id=0 drops recur from suite-guardian, dispatch Beacon to fix suite-guardian's chat_id sourcing. 1/3 now.
+- **merge-verb-backend-001 CLOSED ✅**: Build completed in ~42 min (within normal range). PR#1067 opened, Mirror dispatched. Prior escalation-pending carry resolved without escalation needed. 
+- **PR#1065 unrouted [66+ min, watching]**: By-design (no routing label). Same pattern as prior iters. Larry can add `claude-review` label or `dispatch mirror review pr=PR#1065` via Beacon if review is wanted.
+- **PR#1066 retire-supabase-db-password [new ✅]**: Forge opened this PR proactively — likely resolves the MISSING_CREDENTIAL:SUPABASE_DB_PASSWORD carry on merge.
+- **beacon-result-as-tier4 [G-rule candidate 1/3 — tracking]**: No new intent=beacon-result alerts this iter. Still 1/3. Watching.
+- G-rule carries (unchanged): forge-marker-taskid-suffix-increment; medic-draft-status-false-positive; check-i-force-bypass-dm-route; beacon-pending-approvals-path-bug; deep-review-hold-approved-loop-post-merge-001; pending-auto-merge-exhausted-for-merged-pr (monitoring). VPs: pulse-cycle-check0-helper-override, auto-merge-conflict-route-hold, direction-ask-rsdpm-no-autolabel-review-gap-001.
+
+**Actions taken:**
+1. Check 0: repair-watermark → {repaired=false, old=587, file=589}. ✅
+2. Check 0: Triaged 3 new alerts (lines 588-590). Watermark advanced to 590. ✅
+3. Check 0: Supplemental escalation written via larry_alerts.py (line 591) for pending-approvals:suite-guardian+unreg. Watermark advanced to 591. ✅
+4. PRIME DIRECTIVE: intervention row appended (check0-new-alerts-triaged). ✅
+5. Tier state: record --checks-clean false → Tier 2→1 RESET (consecutive_clean=0; last_signal_at=2026-07-30T03:50:15Z UTC). ✅
+
+**Escalations:**
+- **[yellow] pending=2 in Approvals tab**: (1) suite-guardian-graduation-stage-1: approve to open Stage 1 config PR via Forge. No Telegram DM fired (chat_id=0 dropped); supplemental DM sent via pulse escalation. (2) unreg-approval-01519bf927ed: promoted missed marker, needs triage. Both visible in Approvals tab.
+- **[carry ⚠️] RSDPM staging drift (0035, 0036, 0037)**: Awaiting Larry ssh investigation.
+- **[carry ⚠️] credential-drift:MISSING_CREDENTIAL:SUPABASE_DB_PASSWORD**: PR#1066 opened to retire from registry — monitoring for merge+resolution.
+- [carry] check-vi-posture-proposals-2026-07-07 (2 proposals). Awaiting Larry.
+- [carry — monitoring] Mirror queue-wait p95=1065.6m. Gauge cooldown restarted (new delivery idx=585 at 02:41:31Z UTC). Larry decision if queue stays saturated.
+- [carry — no Larry reply] Check XIV Tier-4 × 2: oversilence + fleet digest.
+- [carry — monitoring] tier4-rsdpm-install-drift.
+- [carry — monitoring] forge-wip-redispatch EXHAUSTED (rsdpm-pr155).
+- **[blue] Check I: weekly cost $1,201 (+206%)**. Proposal #1 via `/dispatch 1`.
+
+**Tier end-of-iter:** **Tier 1** (reset from Tier 2; consecutive_clean=0; last_signal_at=2026-07-30T03:50:15Z UTC; next run at 5-min cadence).
+
+---
+
