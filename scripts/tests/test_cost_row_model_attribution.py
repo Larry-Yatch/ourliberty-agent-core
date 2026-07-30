@@ -39,6 +39,26 @@ non-object ``modelUsage`` value aborting the jq program, which silently dropped
 cost_usd and all four token counts along with the model. A model-only
 assertion cannot see that.
 
+WHAT COUNTS AS A TEST HERE
+--------------------------
+Every test method in this module must be one that a broken selector, a broken
+field lookup, or a lost caller can turn RED. Three kinds of check deliberately
+do NOT get a method of their own, because a check that is green no matter what
+production does reads as evidence while carrying none:
+
+* no-regression pins (the unparseable-capture skip) live as a case IN the
+  matrix, so the contract is still asserted but inside a test that a real
+  defect fails;
+* per-wrapper plumbing that predates the change (medic's pool-selected
+  ``account``) is asserted on every matrix row via ``ACCOUNT`` rather than in a
+  standalone pin;
+* self-checks over this module's own case list run as a PRECONDITION of the
+  matrix test (``_assert_matrix_is_discriminating``).
+
+The one exception is ``MissingLibDegradesGracefullyTest``, whose hazard is
+created by the extraction itself and can only be killed by a mutation of the
+fix; its docstring says so rather than letting a reader assume otherwise.
+
 Run::
 
     python3 -m unittest scripts.tests.test_cost_row_model_attribution
@@ -70,8 +90,6 @@ _HAS_JQ = shutil.which('jq') is not None
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 _SCRIPTS = _REPO_ROOT / 'scripts'
-_LIB_COST = _SCRIPTS / '_lib_cost_capture.sh'
-_RUN_CYCLE = _SCRIPTS / 'run_cycle.sh'
 
 # The model BOTH wrappers pass to `claude --model` (their WORK_MODEL), and
 # therefore the $wm the selector falls back to.
@@ -110,19 +128,46 @@ def _envelope(model_usage, *, is_error=False):
 
 
 class Case:
-    """One (envelope, expected model, wrapper exit code) row of the matrix."""
+    """One (stub output, expected model, wrapper exit code) row of the matrix.
+
+    ``expect_row=False`` cases carry a raw stub body instead of an envelope and
+    assert the NEGATIVE contract (no row, a named log line, an unchanged exit
+    code). They live in the same list on purpose: a no-regression pin standing
+    alone as its own test method is green before and after any fix, so it reads
+    as evidence while carrying none. Folded into the matrix it still guards the
+    contract, and the test it lives in is one a broken selector turns red.
+    """
 
     def __init__(self, name, model_usage, expected_model, *,
-                 exit_code=0, is_error=False, why=''):
+                 exit_code=0, is_error=False, why='',
+                 raw_stub=None, expect_log=None):
         self.name = name
-        self.envelope = _envelope(model_usage, is_error=is_error)
+        self.expect_row = raw_stub is None
+        self.raw_stub = raw_stub
+        self.envelope = (_envelope(model_usage, is_error=is_error)
+                         if self.expect_row else None)
         self.expected_model = expected_model
         self.exit_code = exit_code
+        self.expect_log = expect_log
         self.why = why
 
     @property
     def success(self):
         return self.exit_code == 0
+
+
+_STUB_TMPL = """#!/usr/bin/env bash
+cat <<'CLAUDE_STUB_JSON'
+{body}
+CLAUDE_STUB_JSON
+exit {exit_code}
+"""
+
+# Not JSON at all — the `2>&1` plain-text wall the wrappers can capture.
+_PLAIN_TEXT_STUB = """#!/usr/bin/env bash
+echo 'Claude Code exited: rate limit reached. Not JSON at all.'
+exit 0
+"""
 
 
 _CASES = [
@@ -240,10 +285,22 @@ _CASES = [
          why='nothing burned and the dispatched model is absent -> there is no '
              'evidence to attribute, so fall back to what we dispatched '
              'rather than to whoever happens to be listed'),
+
+    # --- NOT an envelope: the negative half of the property ----------------
+    # No-regression pin, deliberately inside the matrix rather than standing as
+    # its own test (see the Case docstring). Hardening the selector must not
+    # weaken the outer `if COST_LINE=$(jq ...)` guard: a capture that is not
+    # JSON at all still skips the row, logs, and leaves the exit code alone —
+    # the contract test_run_medic_timeout also relies on.
+    Case('unparseable_plain_text', None, None,
+         raw_stub=_PLAIN_TEXT_STUB, exit_code=0,
+         expect_log='cost-capture: jq parse failed; skipping',
+         why='a plain-text wall must skip, not append a garbage row'),
 ]
 
 # Names the matrix MUST keep. Deleting one of these silently removes the only
-# case able to discriminate its rule, so pin them (see StructuralAntiDriftTest).
+# case able to discriminate its rule, so the matrix checks its own membership
+# before running (_assert_matrix_is_discriminating).
 _REQUIRED_CASE_NAMES = {
     'magnitude_foreign_first', 'magnitude_foreign_second',
     'tie_zero_order_a', 'tie_zero_order_b',
@@ -251,20 +308,35 @@ _REQUIRED_CASE_NAMES = {
     'rename_higher_first', 'rename_higher_second',
     'type_confusion', 'degenerate_number_value',
     'work_model_named_but_outproduced', 'single_zero_output_foreign',
-    'failure_work_model_zero_output',
+    'failure_work_model_zero_output', 'unparseable_plain_text',
 }
 
-_STUB_TMPL = """#!/usr/bin/env bash
-cat <<'CLAUDE_STUB_JSON'
-{body}
-CLAUDE_STUB_JSON
-exit {exit_code}
-"""
 
-_PLAIN_TEXT_STUB = """#!/usr/bin/env bash
-echo 'Claude Code exited: rate limit reached. Not JSON at all.'
-exit 0
-"""
+def _assert_matrix_is_discriminating(t):
+    """Self-check on the matrix, run INSIDE each half before the cases.
+
+    This is scaffolding integrity, not evidence: no change to the production
+    scripts can turn it red, so it is deliberately NOT a test method of its own
+    — a green-no-matter-what test method reads as evidence while carrying none.
+    As a precondition of the test that DOES carry the evidence, it still fails
+    loudly the moment someone deletes a discriminating case or one key order.
+    """
+    names = [c.name for c in _CASES]
+    t.assertEqual(len(names), len(set(names)), f'duplicate case names: {names}')
+    missing = _REQUIRED_CASE_NAMES - set(names)
+    t.assertFalse(missing, f'discriminating cases deleted: {sorted(missing)}')
+    # Both key orders must exist for every ordering-sensitive pair — a case in
+    # only one order cannot tell "highest output wins" from "last key wins".
+    for stem in ('magnitude_foreign', 'tie_zero_order',
+                 'tie_positive_order', 'rename_higher'):
+        pair = sorted(n for n in names if n.startswith(stem))
+        t.assertEqual(len(pair), 2,
+                      f'{stem} must appear in BOTH key orders: {pair}')
+    # Both wrappers must be registered: the run_medic.sh half is the whole
+    # point of the extraction, and a matrix that quietly dropped it would still
+    # look busy.
+    t.assertEqual({CycleCostRowMatrixTest.SOURCE, MedicCostRowMatrixTest.SOURCE},
+                  {'run_cycle.sh', 'run_medic.sh'})
 
 
 class _CostRowMatrixMixin:
@@ -276,6 +348,9 @@ class _CostRowMatrixMixin:
     TASK_TYPE = None
     TASK_ID_PREFIX = None
     SOURCE = None
+    # The account the wrapper's own tier plumbing must stamp, when the harness
+    # pins one. None => assert only that SOME account was stamped.
+    ACCOUNT = None
 
     # --- plumbing the concrete classes must provide ---------------------
     def _install_claude(self, body: str):
@@ -301,9 +376,15 @@ class _CostRowMatrixMixin:
         if costs.exists():
             costs.unlink()
 
+    @staticmethod
+    def _stdout(result):
+        out = result.stdout
+        return out.decode() if isinstance(out, bytes) else (out or '')
+
     def _run_case(self, case: Case):
-        self._install_claude(_STUB_TMPL.format(
-            body=json.dumps(case.envelope), exit_code=case.exit_code))
+        body = case.raw_stub if case.raw_stub is not None else _STUB_TMPL.format(
+            body=json.dumps(case.envelope), exit_code=case.exit_code)
+        self._install_claude(body)
         self._reset_costs()
         return self._invoke()
 
@@ -319,7 +400,12 @@ class _CostRowMatrixMixin:
         self.assertEqual(row['cache_creation'], 84000)
         self.assertEqual(row['duration_sec'], 306)
         self.assertIs(row['success'], case.success)
+        # Account attribution moved into the lib with the row; this is where
+        # the extraction would show up if it had homogenised the two callers'
+        # tier plumbing (medic stamps the POOL-SELECTED tier).
         self.assertTrue(row['account'], 'account must always be stamped')
+        if self.ACCOUNT is not None:
+            self.assertEqual(row['account'], self.ACCOUNT)
         # Per-wrapper identity.
         self.assertEqual(row['agent'], self.AGENT)
         self.assertEqual(row['task_type'], self.TASK_TYPE)
@@ -329,15 +415,28 @@ class _CostRowMatrixMixin:
 
     # --- the matrix ------------------------------------------------------
     def test_cost_row_matrix(self):
+        _assert_matrix_is_discriminating(self)
         observed = []
         for case in _CASES:
             with self.subTest(case=case.name):
-                self._run_case(case)
+                result = self._run_case(case)
                 rows = self._read_rows()
-                self.assertEqual(
-                    len(rows), 1,
-                    f'{case.name}: expected exactly one appended row, got {rows}')
-                self._assert_whole_row(rows[0], case)
+                if case.expect_row:
+                    self.assertEqual(
+                        len(rows), 1,
+                        f'{case.name}: expected exactly one appended row, '
+                        f'got {rows}')
+                    self._assert_whole_row(rows[0], case)
+                else:
+                    self.assertEqual(
+                        rows, [],
+                        f'{case.name}: unparseable output must append no row')
+                    self.assertIn(case.expect_log, self._stdout(result),
+                                  f'{case.name}: the skip must be logged')
+                    self.assertEqual(
+                        result.returncode, case.exit_code,
+                        f'{case.name}: a best-effort cost skip must not change '
+                        f'the exit code')
                 observed.append(case.name)
         # Anti-vacuity: a harness regression that stops invoking this wrapper
         # (or skips cases) must fail loudly rather than pass empty. `source`
@@ -345,23 +444,6 @@ class _CostRowMatrixMixin:
         # wrapper and not from the other half of the matrix.
         self.assertEqual(len(observed), len(_CASES))
         self.assertEqual(set(observed), {c.name for c in _CASES})
-
-    def test_unparseable_output_skips_without_writing(self):
-        """A plain-text wall must skip the row and leave the exit code alone.
-
-        Pins that hardening the selector did NOT weaken the outer jq guard —
-        the same contract test_run_medic_timeout relies on.
-        """
-        self._install_claude(_PLAIN_TEXT_STUB)
-        self._reset_costs()
-        result = self._invoke()
-        self.assertEqual(self._read_rows(), [],
-                         'unparseable output must append no row')
-        self.assertIn('cost-capture: jq parse failed; skipping',
-                      result.stdout.decode() if isinstance(result.stdout, bytes)
-                      else result.stdout)
-        self.assertEqual(result.returncode, 0,
-                         'a best-effort cost skip must not change the exit code')
 
 
 @unittest.skipUnless(_HAS_JQ, 'jq required for the cost-record parse')
@@ -399,6 +481,11 @@ class MedicCostRowMatrixTest(_CostRowMatrixMixin, _MedicTierPoolBase):
     TASK_TYPE = 'medic-escalate'
     TASK_ID_PREFIX = 'medic-'
     SOURCE = 'run_medic.sh'
+    # The tier the stubbed pool selects below. Asserted on EVERY row rather
+    # than in a pin of its own: medic's account plumbing is what the lib
+    # extraction was most likely to homogenise, and the check is only worth
+    # anything on the same rows whose model the matrix is discriminating.
+    ACCOUNT = 'tier3'
 
     def setUp(self):
         super().setUp()
@@ -417,13 +504,6 @@ class MedicCostRowMatrixTest(_CostRowMatrixMixin, _MedicTierPoolBase):
     def _invoke(self):
         return self._run()
 
-    def test_account_comes_from_the_pool_selected_tier(self):
-        """Medic's own account plumbing survived the lib extraction."""
-        self._run_case(_CASES[0])
-        rows = self._read_rows()
-        self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0]['account'], 'tier3')
-
 
 @unittest.skipUnless(_HAS_JQ, 'jq required for the cost-record parse')
 class MissingLibDegradesGracefullyTest(_RunCycleTestBase):
@@ -432,10 +512,34 @@ class MissingLibDegradesGracefullyTest(_RunCycleTestBase):
     The lib is sourced under `set -e`. An unguarded `source` of a missing file
     would kill the whole /cycle (or medic tick) — far worse than the
     best-effort cost row the lib exists to write.
+
+    EVIDENCE THIS TEST CAN AND CANNOT CARRY, stated so nobody over-reads it:
+    the hazard is created by the extraction itself, so no pre-extraction tree
+    exists in which the lib is present but its source unguarded. These two
+    tests therefore carry no evidence for the five review findings — they are
+    killed by a mutation OF THE FIX (drop the `[ -f "$_COST_LIB" ]` guard, or
+    the `command -v capture_cost_row` check, and both go red on the wrapper you
+    mutated), which is the only mutation that can reach them. Kept because the
+    failure they guard is a dead /cycle, not a dropped row.
     """
 
+    def _lib_copy(self):
+        """The harness's copy of the lib — asserted present, then removed.
+
+        assertTrue rather than a bare unlink(): against a tree without the lib
+        this must read as "the single definition is missing", not as a
+        FileNotFoundError that looks like a broken test.
+        """
+        lib = self.scripts_dir / '_lib_cost_capture.sh'
+        self.assertTrue(
+            lib.exists(),
+            'the single cost-row definition (scripts/_lib_cost_capture.sh) is '
+            'not in the wrapper directory — nothing to remove, so this test '
+            'cannot say anything about the guarded source')
+        return lib
+
     def test_cycle_completes_without_the_lib(self):
-        (self.scripts_dir / '_lib_cost_capture.sh').unlink()
+        self._lib_copy().unlink()
         stub = self.stub_bin / 'claude'
         stub.write_text(_STUB_TMPL.format(
             body=json.dumps(_envelope({WORK_MODEL: {'outputTokens': 3841}})),
@@ -460,7 +564,7 @@ class MissingLibDegradesGracefullyTest(_RunCycleTestBase):
         (whose copy of the lib we remove first).
         """
         lib_less = self.scripts_dir
-        (lib_less / '_lib_cost_capture.sh').unlink()
+        self._lib_copy().unlink()
         shutil.copy2(_RUN_MEDIC, lib_less / 'run_medic.sh')
         # run_medic.sh chdirs into ${HOME}/agent-core/agents/medic under set -e.
         (self.repo_dir / 'agents' / 'medic').mkdir(parents=True, exist_ok=True)
@@ -567,42 +671,22 @@ class StructuralAntiDriftTest(unittest.TestCase):
             self.assertNotIn('${HOME}/agent-core/scripts/_lib_cost_capture.sh',
                              text, f'{name} must not resolve the lib via $HOME')
 
-    def test_lib_does_not_absorb_the_auth_export_or_the_spawn(self):
-        """The lib must stay OUT of the auth-guard's inference-spawn surface.
-
-        test_claude_durable_auth_guard scans every scripts/*.sh with
-        ``\\bclaude\\s+(?:--print|-p)\\b`` and requires each hit to carry the
-        durable-token bridge, cross-checked against a pinned _EXPECTED_SURFACE.
-        If the lib matched that regex it would be a new, unpinned member of the
-        surface; if the token export moved in here, the wrappers would lose
-        their bridge marker. Neither may happen — not even in a comment.
-        """
-        lib = _LIB_COST.read_text()
-        self.assertNotIn('CLAUDE_CODE_OAUTH_TOKEN', lib)
-        self.assertIsNone(re.search(r'\bclaude\s+(?:--print|-p)\b', lib),
-                          'the lib now matches the auth guard spawn regex')
-        for name, text in self._wrapper_sources().items():
-            self.assertRegex(text, r'\bclaude\s+(?:--print|-p)\b',
-                             f'{name} must keep its own spawn')
-            self.assertIn('CLAUDE_CODE_OAUTH_TOKEN', text,
-                          f'{name} must keep its own token bridge')
-
-    def test_matrix_keeps_its_discriminating_cases(self):
-        names = {c.name for c in _CASES}
-        missing = _REQUIRED_CASE_NAMES - names
-        self.assertFalse(missing, f'discriminating cases deleted: {missing}')
-        # Both key orders must exist for every ordering-sensitive pair.
-        for stem in ('magnitude_foreign', 'tie_zero_order',
-                     'tie_positive_order', 'rename_higher'):
-            pair = [n for n in names if n.startswith(stem)]
-            self.assertEqual(len(pair), 2,
-                             f'{stem} must appear in BOTH key orders: {pair}')
-
-    def test_the_two_wrappers_are_both_exercised(self):
-        """Anti-vacuity on the matrix itself: both halves must be registered."""
-        sources = {CycleCostRowMatrixTest.SOURCE, MedicCostRowMatrixTest.SOURCE}
-        self.assertEqual(sources, {'run_cycle.sh', 'run_medic.sh'})
-        self.assertTrue(_RUN_CYCLE.exists() and _RUN_MEDIC.exists())
+    # DELIBERATELY NOT HERE — three checks that used to live in this class:
+    #
+    #   * "the lib must not absorb the OAuth export or the `claude --print`
+    #     spawn". Already enforced repo-wide by
+    #     scripts/tests/test_claude_durable_auth_guard.py, which scans every
+    #     scripts/*.sh for the spawn regex, cross-checks the hits against a
+    #     pinned _EXPECTED_SURFACE, and requires each spawning file to carry
+    #     the durable-token bridge. A spawn appearing in the lib is an unpinned
+    #     surface member there; the export leaving a wrapper strips that
+    #     wrapper's bridge marker there. Restating it here added a second copy
+    #     of a guard — the exact habit these findings are about.
+    #   * "the matrix keeps its discriminating cases" and "both wrappers are
+    #     exercised": self-checks over this module's own _CASES list, which no
+    #     production change can turn red. They now run as a precondition of the
+    #     matrix test itself (_assert_matrix_is_discriminating), where they
+    #     guard the same thing without posing as evidence.
 
 
 if __name__ == '__main__':

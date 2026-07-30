@@ -64,6 +64,13 @@ _LIB_PULSE = _REPO_ROOT / 'scripts' / '_lib_pulse_runtime.sh'
 # OWN directory. The source is guarded, so a missing lib degrades to a logged
 # skip rather than aborting — but then no cost row is written and every
 # cost-row assertion in this harness's subclasses goes vacuous. Copy it.
+#
+# OPTIONAL BY DESIGN: copied only when present. This harness is also the
+# fidelity harness for bisect/mutation runs against trees that predate the lib,
+# and an unconditional copy2 of a missing file raises FileNotFoundError in
+# setUp — which ERRORS every test in every subclass and erases the per-test
+# signal those runs exist to produce. A missing lib must show up as the
+# cost-row assertion it breaks, not as a setUp explosion.
 _LIB_COST = _REPO_ROOT / 'scripts' / '_lib_cost_capture.sh'
 
 
@@ -99,8 +106,10 @@ class _RunCycleTestBase(unittest.TestCase):
         (runbooks_dir / 'cycle-journal.md').write_text('')
         (runbooks_dir / 'cycle-actions.jsonl').write_text('')
         # Copy real production scripts under test + their deps.
-        for src in (_RUN_CYCLE, _LIB_PUSH, _LIB_PULSE, _LIB_COST):
+        for src in (_RUN_CYCLE, _LIB_PUSH, _LIB_PULSE):
             shutil.copy2(src, self.scripts_dir / src.name)
+        if _LIB_COST.exists():  # optional — see the _LIB_COST comment above
+            shutil.copy2(_LIB_COST, self.scripts_dir / _LIB_COST.name)
         # larry_alerts.py + its sibling-module deps (single source of truth).
         copy_larry_alerts_cli(self.scripts_dir)
         os.chmod(self.scripts_dir / 'run_cycle.sh', 0o755)
