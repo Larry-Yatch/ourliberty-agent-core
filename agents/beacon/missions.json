@@ -16747,7 +16747,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-30T19:51:20.523600+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-30T19:50:15.149853+00:00"
+      "orphan_last_activity_ts": "2026-07-30T19:50:15.149853+00:00",
+      "briefing": {
+        "what": "Your team started building a way to make sure the approvals you're asked to sign off on are based on fresh, up-to-date information rather than stale data.",
+        "why": "Approving decisions on outdated numbers can lead to bad calls, so this protects the quality of the choices you make every day.",
+        "suggest": "This looks worthwhile, but since it's early and not yet tied to a clear goal, have the team confirm the specific problem it solves before investing more time."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-30T19:57:17.881193+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-delegate-cap-promoted-larry-alert-cards-1060-skips-them-and-n-7629",
@@ -16764,7 +16778,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-30T19:51:20.523600+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-30T19:50:10.139854+00:00"
+      "orphan_last_activity_ts": "2026-07-30T19:50:10.139854+00:00",
+      "briefing": {
+        "what": "The team started work on making sure your priority alerts always reach you, after noticing some were being skipped.",
+        "why": "If important alerts get dropped, you could miss things that need your attention \u2014 the whole point of the alert system is that you can trust it.",
+        "suggest": "Worth letting them finish and confirm it's solid, but check in on the details before it's called done since it's still early and loosely defined."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-30T19:57:17.881193+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
