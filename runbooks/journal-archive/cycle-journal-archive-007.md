@@ -10608,3 +10608,81 @@ RSDPM: **0 open PRs** ✅ — PR#157 MERGED (approved by Larry post-iter ~6789; 
 
 ---
 
+## Iteration ~6791 — 2026-07-29T22:09Z UTC (Larry /cycle chat, Tier 1, consecutive_clean=0→0; SIGNAL — Check 0: 1 new alert (rsdpm-applymigrations staging drift Tier-4, bot already delivered idx=535, unreg-approval-9da4cfc8b9d1 in Approvals); Check 4: pending 2→3; PR#1053 auto-review label added; all other mandatory checks NOMINAL)
+
+**Health:** ⚠️ Signal — Check 0: 1 new alert (rsdpm-applymigrations, severity=critical, 0034_workspace_id_on_record_tables.sql applied but staging still drifts; bot already delivered at 21:59:19Z UTC; heal-unregistered-approval promoted to unreg-approval-9da4cfc8b9d1 in Approvals tab at 22:00:52Z UTC). Check 4: pending 2→3 (new unreg-approval-9da4cfc8b9d1). PR#1053 positive change: `auto-review` label added (updatedAt=22:01:17Z). All other mandatory + additive checks NOMINAL. Carries: PR#1058 OPEN (stall-checker cooldown still active), PR#1053 deep-review-hold still pending, RSDPM 0 open PRs ✅.
+
+**VERIFY-BEFORE-REASSERT (from iter ~6790 at ~22:00Z UTC):**
+- **"system-health=healthy ts=2026-07-29T21:57:17Z UTC"**: CONFIRMED ✅ — ts=2026-07-29T22:02:19Z UTC (VERY FRESH ~7 min). [carry ✅]
+- **"heal-stale-daemon-code.heartbeat 21:54:17Z UTC"**: CONFIRMED ✅ — heartbeat=2026-07-29T21:54:17Z UTC (~15 min; <60 min). [carry ✅]
+- **"alerts watermark=535 file_length=535"**: CHANGED ⚠️ — {repaired=false, old_watermark=535, file_length=536}. 1 new alert (line 536: rsdpm-applymigrations staging drift). [SIGNAL — triaged below]
+- **"pending=2 UNCHANGED"**: CHANGED ⚠️ — pending=3; new: `unreg-approval-9da4cfc8b9d1` (RSDPM staging drift, created 22:00:52Z UTC by heal-unregistered-approval). [SIGNAL ⚠️]
+- **"PR#1058 OPEN (stall-checker cooldown still active)"**: CONFIRMED ⚠️ — MERGEABLE; updatedAt=20:32:19Z UNCHANGED; stall-checker cooldown still suppressing red_mirror_status:1058. [carry ⚠️]
+- **"PR#1053 AUTO_MERGE_HELD_DEEP_REVIEW"**: CHANGED (positive) ✅ — MERGEABLE; labels=['auto-review'] ADDED; updatedAt=22:01:17Z (was 19:56:01Z). deep-review-hold-pr1053-c9c56f09 still pending. [positive carry ⚠️]
+- **"RSDPM 0 open PRs ✅"**: CONFIRMED ✅ — RSDPM still 0 open PRs. [carry ✅]
+- **"HEAD=3df75ae2=origin/main"**: CHANGED ✅ — HEAD=3e18cce5=origin/main (wrapper "chore(missions): GC healer — commit captures.json delta" + Pulse cycle commits; in sync). [carry ✅]
+- G-rule carries: ourliberty-health-untracked-files-tier4-noise-001 [2/3] — no new ourliberty-health occurrence this iter; stays at 2/3. All other G-rule carries unchanged (rsdpm-rehearseprs 1/3, pulse-source-alert 1/3, forge-marker-taskid-suffix-increment 2/3, medic-draft-status-false-positive 2/3, check-i-force-bypass-dm-route 2/3, beacon-pending-approvals-path-bug 2/3, outbox-notifier-review-escalate-delivery-confirm-tier4-001 1/3. VPs: pulse-cycle-check0-helper-override, auto-merge-conflict-route-hold, forge-wip-redispatch-digest-tier4-001, outbox-notifier-notification-intent-reject-tier4-001, forge-wip-redispatch-exhausted-genuine-no-pr-001): CARRY unchanged.
+
+**Check 0 — Alert triage (~22:03Z UTC):** `repair-watermark`: {repaired=false, old_watermark=535, file_length=536} — 1 new alert.
+- **Alert line 536** (rsdpm-applymigrations at 21:58:36Z UTC): `source=rsdpm-applymigrations, severity=critical, subject="RSDPM: migrations applied but staging still drifts", needs_larry=true` — helper: **Tier 4** (novel, no registry/translation match, route=escalate) → tier-reset. Bot already delivered as idx=535 at 21:59:19Z UTC. `heal-unregistered-approval` already promoted to `unreg-approval-9da4cfc8b9d1` in Approvals tab at 22:00:52Z UTC. Duplicate DM SUPPRESSED. File involved: 0034_workspace_id_on_record_tables.sql, commit ef7f6185.
+- Watermark advanced 535→536. SIGNAL ⚠️ (Tier-4; tier-reset)
+
+**Check 1 — Log noise (~22:05Z UTC):** outbox-notifier.log: last entry [2026-07-29 15:56:18] MDT = 21:56:18Z UTC (AUTO_MERGE_WORKTREE_TEARDOWN for m14-pr-b/PR#157). No new entries. No WARN/ERROR in visible tail (50 lines). NOMINAL ✅
+
+**Check 2 — Telegram sweep (~22:05Z UTC):** beacon_telegram_bot.log: last entry `[2026-07-29T15:59:19-0600]` = 21:59:19Z UTC — idx=535 (rsdpm-applymigrations; already triaged in Check 0). No new Larry directives since iter ~6790. NOMINAL ✅
+
+**Check 3 — Pipeline stall (~22:04Z UTC):** heal_pipeline_stall.py --dry-run: FORGE_NO_PR_SKIP ×6 (pr-RSDPM-142 MERGED; fix-escalated-pr-headchange-backoff-001=#1042; m14-pr-a=#156 RSDPM; m14-pr-b=#157 RSDPM; pulse-write-journal-cleanup-001=#1057; check0-tier4-guard-001=#1058); `suppressed (cooldown): red_mirror_status:Larry-Yatch/ourliberty-agent-core:1058:a85bf31f26cc`. **DRY-RUN: 0 stalls detected. NOMINAL ✅**
+
+**Check 4 — Pending directives (~22:05Z UTC):** beacon-pending-approvals.json (state/): **pending=3 (was 2) — SIGNAL**.
+1. `rsdpm-confirmall-medium-parent-secondglance-001` — carry
+2. `deep-review-hold-pr1053-c9c56f09` — PR#1053 deep-review hold (carry)
+3. `unreg-approval-9da4cfc8b9d1` (NEW) — RSDPM staging drift (0034_workspace_id_on_record_tables.sql); created 22:00:52Z UTC by heal-unregistered-approval; chat_id=7998341473; plan="Decision needs your direction"; bare_approvable=false (needs triage in chat)
+SIGNAL ⚠️ (pending count increased 2→3)
+
+**Check 5 — Stale daemon code (~22:03Z UTC):** heal-stale-daemon-code.heartbeat=2026-07-29T21:54:17Z UTC (~15 min; <60 min). system-health overall=healthy ts=2026-07-29T22:02:19Z UTC (VERY FRESH ~7 min). All 4 bots alive (beacon/forge/mirror/pulse: desired=up, alive=true, action=noop). disk=15%, memory=25%. NOMINAL ✅
+
+**Check A — Source repo (~22:04Z UTC):** On main. HEAD=3e18cce5=origin/main (origin/main..HEAD empty; in sync). Untracked: alert_522_tmp.json, triage_alert_522.py (carry). NOMINAL ✅
+**Check B — Sync health (~22:05Z UTC):** last_sync=2026-07-29T21:23:30Z (~46 min; <2h); status=no-change; consecutive_push_failures=0. NOMINAL ✅
+**Check C — Agent liveness (~22:03Z UTC):** system-health overall=healthy ts=2026-07-29T22:02:19Z UTC (VERY FRESH). All 4 bots alive. NOMINAL ✅
+**Check E — PR/merge state (~22:05Z UTC):** ourliberty-agent-core: **2 open PRs (UNCHANGED count)**:
+- **#1058** "feat(pulse): Check 0 guard" (MERGEABLE; updatedAt=20:32:19Z UNCHANGED; no autoMerge; stall-checker cooldown active) ⚠️
+- **#1053** "fix(preflight): fresh spec in sync window" (MERGEABLE; labels=['auto-review'] ADDED; updatedAt=22:01:17Z [was 19:56:01Z]; deep-review-hold-pr1053-c9c56f09 still pending) ⚠️+ positive
+RSDPM: **0 open PRs** ✅ (carry from iter ~6790 confirmed)
+
+**§5.0 one-shots (~22:06Z UTC):** audit_due_nudge.py → no-op ✅. distill_detector.py → no-op ✅. silence_file_auditor.py → 3 expired (agent-runner-forge×2, agent-runner-pulse×1; 48.7d) + 4 permanent (0 suppressed); informational only. NOMINAL ✅
+
+**PRIME DIRECTIVE (~22:07Z UTC):** ratio=39.917, trend=worsening (systemic_fixes=48, verification_pending=24). Intervention row appended (tier=1, template=rsdpm-0034-staging-drift-tier4-check4-pending3-pr1053-auto-review-label). Tier state: consecutive_clean=0; last_signal_at=2026-07-29T22:07:21Z UTC. **Tier 1 stays.**
+
+**Actions taken:**
+1. Check 0: `repair-watermark` → {repaired=false, old=535, file_length=536} — 1 new alert found.
+2. Check 0: Alert line 536 (rsdpm-applymigrations staging drift) triaged Tier 4 → tier-reset; duplicate DM suppressed (bot already delivered idx=535 at 21:59:19Z UTC; unreg-approval-9da4cfc8b9d1 already in Approvals tab).
+3. Check 0: `set-watermark --line 536` → watermark advanced to 536.
+4. §5.0 one-shots: all three → no-op ✅.
+5. PRIME ledger: intervention appended at 2026-07-29T22:07:21Z UTC (tier=1, template=rsdpm-0034-staging-drift-tier4-check4-pending3-pr1053-auto-review-label).
+6. Tier state: `cycle_tier_state.py record --checks-clean false` → consecutive_clean=0; last_signal_at=2026-07-29T22:07:21Z UTC.
+
+**Escalations:** No new DMs sent this iter (bot already delivered rsdpm-applymigrations alert at 21:59:19Z UTC; unreg-approval-9da4cfc8b9d1 already surfaced in Approvals tab).
+- **[yellow] RSDPM staging drift (NEW — 0034)**: 0034_workspace_id_on_record_tables.sql applied but staging still drifts. This is the 2nd rsdpm-applymigrations failure today (1st: idx=512 at 17:20:32Z UTC "apply-on-merge FAILED — a merged migration is not live"). unreg-approval-9da4cfc8b9d1 in Approvals tab — Approve/Reject both route to Beacon. Immediate debug: `journalctl -u ourliberty-rsdpm-applymigrations -n 60 --no-pager`, then query schema_migration_log for 0034.
+- [carry from prior iters]:
+  - **[yellow] PR#1058 stall-checker cooldown active**: unreg-approval-de9cda4efdbd was APPROVED (iter ~6790) but PR still open. Will continue to carry until cooldown expires and pipeline acts.
+  - **[yellow] PR#1053 deep-review-hold**: deep-review-hold-pr1053-c9c56f09 still pending. auto-review label now on PR. `/code-review high` on PR#1053, then `scripts/merge_reviewed_pr.sh 1053`.
+  - **[carry ⚠️] RSDPM 0031 staging drift** (pre-existing carry).
+  - **[carry ⚠️] credential-drift:MISSING_CREDENTIAL:SUPABASE_DB_PASSWORD**.
+  - [carry] check-vi-posture-proposals-2026-07-07 (2 proposals). Awaiting Larry.
+  - [carry — monitoring] Mirror queue-wait p95=92.3m.
+  - [carry — no Larry reply] Check XIV Tier-4 × 2: oversilence + fleet digest.
+  - [carry — monitoring] tier4-rsdpm-install-drift.
+  - **[carry] `rsdpm-confirmall-medium-parent-secondglance-001`** — still pending.
+  - **[blue] Check I: weekly cost $1,201 (+206%)**. Proposal #1 (45σ cycle review) via `/dispatch 1`.
+
+**Patterns:**
+- **RSDPM migration drift is recurring today**: 2 rsdpm-applymigrations failures in one day (17:20Z and 21:58Z UTC). First was "apply-on-merge FAILED"; second is "applied but staging still drifts". Different failure modes but same healer, same pipeline. Worth watching — if 0034 drift is not resolved after Larry's triage, this becomes a G-rule candidate (multiple staging drift occurrences in one release cycle).
+- **PR#1053 auto-review label added** (positive): label='auto-review' added at ~22:01Z UTC. The deep-review hold is still the blocker, but once Larry approves, outbox-notifier should auto-merge cleanly.
+- **PR#1058 post-approval stall**: unreg-approval-de9cda4efdbd was APPROVED in iter ~6790 (~21:55Z UTC) but PR#1058 still hasn't merged. The stall-checker cooldown for red_mirror_status:1058 is actively suppressing re-escalation. This means the pipeline hasn't picked up the approval yet, or is waiting for the cooldown to clear before re-engaging Mirror. Monitor next iter.
+- **ourliberty-health-untracked-files-tier4-noise-001 [G-rule 2/3]**: No new ourliberty-health occurrence this iter. G-rule stays at 2/3. Next fire → 3/3 → dispatch to Beacon.
+- G-rule carries unchanged.
+
+**Tier end-of-iter:** **Tier 1** (consecutive_clean=0; last_signal_at=2026-07-29T22:07:21Z UTC; signal: Check 0 Tier-4 rsdpm-applymigrations + Check 4 pending 2→3; Tier 1 stays).
+
+---
+
