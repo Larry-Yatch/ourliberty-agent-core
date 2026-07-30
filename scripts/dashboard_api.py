@@ -379,8 +379,17 @@ LARRY_ACTION_VALID_ACTIONS: frozenset[str] = frozenset({
     # reused, never bypassing its conflict / regression safety gates). It is
     # gated in TWO places: the `merge_target` stamp (a non-passed item is never
     # stamped, so the button never appears) AND the server-side re-verify below
-    # (a merge on a non-passed / already-merged / closed PR is refused). Valid
-    # only on an approval_request / escalation carrying a `merge_target`.
+    # (a merge on a non-passed / already-merged / closed PR, or one whose head
+    # has DRIFTED off the reviewed commit, is refused). Valid only on an
+    # approval_request / escalation carrying a `merge_target`.
+    #
+    # The click IS the deep-review sign-off (Larry, 2026-07-30) — the same
+    # authority this card's APPROVE already carries. So the handler stamps
+    # `deep-review-passed` at the re-confirmed head before driving the merge
+    # (`_stamp_deep_review_signoff`), which is what lets the merge CLEAR the
+    # deep-review gate instead of re-entering it. It is a sign-off, not a
+    # bypass: every other gate still runs, and the head-drift refusal means the
+    # sign-off can only ever apply to the commit the operator was shown.
     'merge',
 })
 
@@ -10643,6 +10652,117 @@ def _review_pass_on_record(
     return False
 
 
+def _verify_merge_head(
+    repo_coords: str, pr_number: int, stamped_head: Optional[str],
+) -> str:
+    """Return the PR's LIVE head SHA, or raise unless it still equals the head
+    the card was stamped at.
+
+    merge-verb-backend-001 (deep-review-signoff hardening). The card's
+    `merge_target.head_sha` is the commit Mirror PASS'd and the operator is
+    looking at. The `deep-review-passed` label has NO head binding of its own
+    (`_mark_deep_review_stamped`'s docstring says so), so without this check a
+    card raised at head A would publish whatever head the branch has drifted to
+    — code no one reviewed, and a merge cannot be undone. The notifier's APPROVE
+    path refuses the same drift for the same reason
+    (`_reconcile_deep_review_hold_approvals`: "a commit landing in that window
+    would otherwise be stamped + merged at a head that was never deep-reviewed
+    nor approved"); the merge verb is the second door onto that merge and gets
+    the same lock.
+
+    Fail-closed on BOTH unknowns: a stamp with no head, and an unresolvable live
+    head, are refusals — we cannot prove the operator is authorizing the commit
+    they were shown."""
+    import outbox_notifier
+    if not stamped_head:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                'refused: this card carries no head_sha, so the commit it was '
+                'raised for cannot be confirmed; no merge fired.'
+            ),
+        )
+    live_head = outbox_notifier._gh_pr_head_sha(repo_coords, pr_number)
+    if not live_head:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=(
+                'could not resolve the PR head from GitHub; not firing a merge '
+                'against an unverifiable commit. Retry — the card is untouched.'
+            ),
+        )
+    if live_head != stamped_head:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                f'refused: this PR advanced from {stamped_head[:8]} to '
+                f'{live_head[:8]} since the card was raised, so the reviewed '
+                f'commit is not the one that would merge. No merge fired — '
+                f'Mirror re-reviews the new head and raises a fresh card.'
+            ),
+        )
+    return live_head
+
+
+def _stamp_deep_review_signoff(coord: dict[str, Any]) -> None:
+    """Record the operator's merge click AS the deep-review sign-off, then let
+    the gated machinery merge. Raises HTTPException if the sign-off can't be
+    recorded.
+
+    merge-verb-backend-001 (deep-review-signoff). The ONLY producer that stamps
+    `merge_target` is `_surface_deep_review_hold_approval` — a card that exists
+    precisely BECAUSE `_deep_review_required()` held the PR. So a merge verb that
+    only re-entered `_attempt_auto_merge_with_gates` would re-hit that same gate
+    and return `held_deep_review` forever: the button would never merge anything.
+    Larry's decision (2026-07-30): the click IS the sign-off, exactly as it
+    already is on this card's APPROVE. So do what the APPROVE path does at
+    `_reconcile_deep_review_hold_approvals` — stamp the label, remember the head
+    we stamped it for, dual-write the SHA-bound status — and only then drive the
+    merge, which now passes the deep-review gate on its own terms rather than
+    bypassing it. Every OTHER gate (serializer, mergeable, freshness, L4) still
+    runs untouched.
+
+    The head is re-confirmed here, immediately before the label lands, so the
+    stamp can never attach to a commit that moved after `_verify_merge_release`.
+
+    Fail-closed: `_apply_deep_review_pass_label` returns False when the stamp
+    can't be CONFIRMED, and we refuse rather than drive a merge that would just
+    re-hold (the #980 'stamped but never merges' class). The status dual-write
+    mirrors the approve path's NON-blocking treatment: the label is what drives
+    the gate in this slice, and the checked helper raises its own repair alert."""
+    import outbox_notifier
+    repo_coords = coord['repo_coords']
+    pr_number = coord['pr_number']
+    head_sha = _verify_merge_head(repo_coords, pr_number, coord.get('head_sha'))
+    label_present = outbox_notifier._apply_deep_review_pass_label(
+        repo_coords, pr_number, coord['pr_url'], coord['task_id'],
+    )
+    if not label_present:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=(
+                'could not record the deep-review sign-off on the PR (the '
+                '`deep-review-passed` stamp did not land), so no merge fired — '
+                'it would only be held again. Retry; the card is untouched.'
+            ),
+        )
+    # Remember the head this stamp belongs to, so a later push revokes exactly
+    # OUR stamp instead of inheriting a stale pass (same note as the approve
+    # path). Best-effort: the merge is already authorized at this point.
+    try:
+        outbox_notifier._mark_deep_review_stamped(
+            repo_coords, pr_number, head_sha,
+        )
+        outbox_notifier._post_deep_review_pass_status(
+            repo_coords, pr_number, coord['pr_url'], head_sha,
+        )
+    except Exception:  # noqa: BLE001 — never fail an authorized merge on a note
+        logger.exception(
+            'deep-review sign-off side-notes failed for %s#%s (label IS '
+            'applied; continuing to the merge)', repo_coords, pr_number,
+        )
+
+
 def _verify_merge_release(
     source: dict[str, Any], supabase_client: Any,
 ) -> dict[str, Any]:
@@ -10728,6 +10848,14 @@ def _verify_merge_release(
                 'against an unverifiable PR. Retry — the card is untouched.'
             ),
         )
+    # Head-drift refusal: the reviewed commit must still BE the head that would
+    # merge. Runs here (pre-claim) so the drift 409 leaves the card intact, and
+    # again in `_stamp_deep_review_signoff` right before the label lands.
+    stamped_head = target.get('head_sha')
+    live_head = _verify_merge_head(
+        repo_coords, pr_number,
+        stamped_head if isinstance(stamped_head, str) else None,
+    )
     summary = ''
     payload = source.get('payload')
     if isinstance(payload, dict):
@@ -10737,6 +10865,7 @@ def _verify_merge_release(
         'repo_coords': repo_coords,
         'pr_number': pr_number,
         'task_id': stamped_task_id,
+        'head_sha': live_head,
         'summary': summary,
     }
 
@@ -10995,12 +11124,21 @@ def _handle_larry_action(
             # release path below is intentionally not exercised for it.
             reconcile_detail = _reconcile_medic_silence(medic_fp, action)
         elif is_merge:
-            # merge-verb-backend-001: publish through the SAME gated machinery
-            # the auto-merger uses (reuse, not a fork). It NEVER bypasses a
-            # safety gate — a conflicting/regressing tree comes back as a
-            # held_* outcome (a returned dict, handled below), not a
-            # force-merge. A raise here releases the claim + propagates, so the
-            # card stays actionable exactly like any other side-effect error.
+            # merge-verb-backend-001: the click IS the deep-review sign-off
+            # (Larry, 2026-07-30), so record it the way the notifier's APPROVE
+            # path does — stamp `deep-review-passed` at the RE-CONFIRMED head —
+            # BEFORE driving the merge. Without this the merge re-enters the
+            # very gate that raised this card and returns `held_deep_review`
+            # every time (the button would never merge anything). Raises if the
+            # head drifted or the stamp can't be confirmed.
+            _stamp_deep_review_signoff(merge_coord)
+            # Then publish through the SAME gated machinery the auto-merger uses
+            # (reuse, not a fork). The deep-review gate now passes on its own
+            # terms; every OTHER safety gate still applies — a
+            # conflicting/regressing tree comes back as a held_* outcome (a
+            # returned dict, handled below), not a force-merge. A raise here
+            # releases the claim + propagates, so the card stays actionable
+            # exactly like any other side-effect error.
             merge_result = _execute_gated_merge(merge_coord)
         elif envelope_candidate is not None:
             _atomic_write_envelope(envelope_candidate, envelope_payload)

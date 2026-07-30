@@ -152,9 +152,11 @@ def _source(event_type='approval_request', merge_target=FULL_MERGE_TARGET,
 # ---------- pure-helper tests: the server-side re-verify ----------
 
 class VerifyMergeReleaseTest(unittest.TestCase):
-    def _verify(self, source, review_pass=True, state='OPEN'):
+    def _verify(self, source, review_pass=True, state='OPEN', live_head=HEAD_SHA):
         client = _FakeMergeClient(dict(source), review_pass=review_pass)
-        with mock.patch.object(on, '_gh_pr_state', return_value=state):
+        with mock.patch.object(on, '_gh_pr_state', return_value=state), \
+                mock.patch.object(
+                    on, '_gh_pr_head_sha', return_value=live_head):
             return da._verify_merge_release(source, client)
 
     def test_happy_path_returns_the_resolved_coordinate(self):
@@ -242,9 +244,17 @@ class MergeHandlerTest(unittest.TestCase):
         self.tmp = Path(tempfile.mkdtemp(prefix='dash-merge-'))
         (self.tmp / 'inboxes' / 'beacon').mkdir(parents=True, exist_ok=True)
 
-    def _handle(self, source, merge_result, review_pass=True, state='OPEN'):
+    def _handle(self, source, merge_result, review_pass=True, state='OPEN',
+                live_head=HEAD_SHA, label_lands=True):
         client = _FakeMergeClient(source, review_pass=review_pass)
         with mock.patch.object(on, '_gh_pr_state', return_value=state), \
+                mock.patch.object(
+                    on, '_gh_pr_head_sha', return_value=live_head), \
+                mock.patch.object(
+                    on, '_apply_deep_review_pass_label',
+                    return_value=label_lands), \
+                mock.patch.object(on, '_mark_deep_review_stamped'), \
+                mock.patch.object(on, '_post_deep_review_pass_status'), \
                 mock.patch.object(
                     on, '_attempt_auto_merge_with_gates',
                     return_value=merge_result) as merge_fn, \
@@ -300,6 +310,8 @@ class MergeHandlerTest(unittest.TestCase):
         client = _FakeMergeClient(src, review_pass=False)
         with mock.patch.object(on, '_gh_pr_state', return_value='OPEN'), \
                 mock.patch.object(
+                    on, '_gh_pr_head_sha', return_value=HEAD_SHA), \
+                mock.patch.object(
                     on, '_attempt_auto_merge_with_gates') as merge_fn:
             with self.assertRaises(HTTPException) as ctx:
                 da._handle_larry_action(
@@ -330,6 +342,230 @@ class MergeHandlerTest(unittest.TestCase):
         self._handle(_source(), {'merge_outcome': 'merged', 'merge_reason': ''})
         written = list((self.tmp / 'inboxes' / 'beacon').iterdir())
         self.assertEqual(written, [])
+
+
+# ---------- head-drift refusal (deep-review-signoff hardening) ----------
+
+OTHER_HEAD = 'b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0'
+
+
+class MergeHeadDriftTest(unittest.TestCase):
+    """The `deep-review-passed` label has NO head binding of its own, so the
+    verb MUST refuse when the branch has moved off the reviewed commit —
+    otherwise a card raised at head A publishes head B, code nobody reviewed,
+    with no undo. The notifier's APPROVE path refuses the same drift."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix='dash-drift-'))
+        (self.tmp / 'inboxes' / 'beacon').mkdir(parents=True, exist_ok=True)
+
+    def _run(self, live_head):
+        src = _source()
+        client = _FakeMergeClient(src)
+        with mock.patch.object(on, '_gh_pr_state', return_value='OPEN'), \
+                mock.patch.object(
+                    on, '_gh_pr_head_sha', return_value=live_head), \
+                mock.patch.object(
+                    on, '_apply_deep_review_pass_label') as label_fn, \
+                mock.patch.object(
+                    on, '_attempt_auto_merge_with_gates') as merge_fn:
+            with self.assertRaises(HTTPException) as ctx:
+                da._handle_larry_action(
+                    source_event_id=src['event_id'], action='merge',
+                    comment=None, actor='larry@sealteamleaders.com',
+                    agents_root=self.tmp, supabase_client=client,
+                )
+        return ctx.exception, client, label_fn, merge_fn
+
+    def test_drifted_head_is_409_and_never_stamps_or_merges(self):
+        exc, client, label_fn, merge_fn = self._run(OTHER_HEAD)
+        self.assertEqual(exc.status_code, 409)
+        self.assertIn('advanced from', exc.detail)
+        # The sign-off must NOT be recorded and no merge may fire...
+        label_fn.assert_not_called()
+        merge_fn.assert_not_called()
+        # ...and the refusal precedes the claim, so the card is intact.
+        self.assertIsNone(client.source_row['read_at'])
+
+    def test_unresolvable_head_is_502_and_never_merges(self):
+        exc, _, label_fn, merge_fn = self._run(None)
+        self.assertEqual(exc.status_code, 502)
+        label_fn.assert_not_called()
+        merge_fn.assert_not_called()
+
+    def test_stamp_without_head_sha_is_409(self):
+        # A merge_target with no head_sha cannot prove WHICH commit was
+        # reviewed, so it is refused rather than merged on faith.
+        src = _source(merge_target={'task_id': TASK_ID, 'pr_url': PR_URL,
+                                    'target_repo': 'ourliberty-agent-core'})
+        client = _FakeMergeClient(src)
+        with mock.patch.object(on, '_gh_pr_state', return_value='OPEN'), \
+                mock.patch.object(
+                    on, '_gh_pr_head_sha', return_value=HEAD_SHA), \
+                mock.patch.object(
+                    on, '_attempt_auto_merge_with_gates') as merge_fn:
+            with self.assertRaises(HTTPException) as ctx:
+                da._handle_larry_action(
+                    source_event_id=src['event_id'], action='merge',
+                    comment=None, actor='larry@sealteamleaders.com',
+                    agents_root=self.tmp, supabase_client=client,
+                )
+        self.assertEqual(ctx.exception.status_code, 409)
+        merge_fn.assert_not_called()
+
+
+# ---------- the click IS the deep-review sign-off ----------
+
+class DeepReviewSignoffTest(unittest.TestCase):
+    """Larry's decision (2026-07-30): the merge click carries the same
+    deep-review authority this card's APPROVE already does. So the handler
+    stamps `deep-review-passed` at the re-confirmed head BEFORE driving the
+    merge — that is what lets the merge CLEAR the deep-review gate rather than
+    re-enter it."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix='dash-signoff-'))
+        (self.tmp / 'inboxes' / 'beacon').mkdir(parents=True, exist_ok=True)
+
+    def test_signoff_is_stamped_at_the_confirmed_head_before_the_merge(self):
+        src = _source()
+        client = _FakeMergeClient(src)
+        order = []
+        with mock.patch.object(on, '_gh_pr_state', return_value='OPEN'), \
+                mock.patch.object(
+                    on, '_gh_pr_head_sha', return_value=HEAD_SHA), \
+                mock.patch.object(
+                    on, '_apply_deep_review_pass_label',
+                    side_effect=lambda *a: order.append('label') or True
+                ) as label_fn, \
+                mock.patch.object(
+                    on, '_mark_deep_review_stamped') as mark_fn, \
+                mock.patch.object(on, '_post_deep_review_pass_status'), \
+                mock.patch.object(
+                    on, '_attempt_auto_merge_with_gates',
+                    side_effect=lambda *a, **k: order.append('merge') or {
+                        'merge_outcome': 'merged', 'merge_reason': 'squashed'},
+                ), \
+                mock.patch.object(dr, 'resolve_decision'):
+            res = da._handle_larry_action(
+                source_event_id=src['event_id'], action='merge', comment=None,
+                actor='larry@sealteamleaders.com', agents_root=self.tmp,
+                supabase_client=client,
+            )
+        self.assertEqual(res['merge_outcome'], 'merged')
+        # Sign-off first, merge second — the ordering IS the fix.
+        self.assertEqual(order, ['label', 'merge'])
+        label_fn.assert_called_once_with(
+            REPO_COORDS, PR_NUMBER, PR_URL, TASK_ID)
+        # The stamp is bound to the head we re-confirmed, so a later push can
+        # revoke exactly OUR stamp instead of inheriting a stale pass.
+        mark_fn.assert_called_once_with(REPO_COORDS, PR_NUMBER, HEAD_SHA)
+
+    def test_unconfirmed_stamp_refuses_rather_than_merging_into_a_re_hold(self):
+        # _apply_deep_review_pass_label returns False when the label can't be
+        # CONFIRMED. Driving the merge anyway would just return
+        # held_deep_review (the #980 'stamped but never merges' class), so
+        # refuse — and release the claim so the card stays actionable.
+        src = _source()
+        client = _FakeMergeClient(src)
+        with mock.patch.object(on, '_gh_pr_state', return_value='OPEN'), \
+                mock.patch.object(
+                    on, '_gh_pr_head_sha', return_value=HEAD_SHA), \
+                mock.patch.object(
+                    on, '_apply_deep_review_pass_label', return_value=False), \
+                mock.patch.object(
+                    on, '_attempt_auto_merge_with_gates') as merge_fn:
+            with self.assertRaises(HTTPException) as ctx:
+                da._handle_larry_action(
+                    source_event_id=src['event_id'], action='merge',
+                    comment=None, actor='larry@sealteamleaders.com',
+                    agents_root=self.tmp, supabase_client=client,
+                )
+        self.assertEqual(ctx.exception.status_code, 502)
+        merge_fn.assert_not_called()
+        # Claim released — the operator can retry once the stamp lands.
+        self.assertIsNone(client.source_row['read_at'])
+
+
+class MergeClearsTheRealDeepReviewGateTest(unittest.TestCase):
+    """REGRESSION GUARD. Every other handler test mocks
+    `_attempt_auto_merge_with_gates` — and that function IS the deep-review
+    gate, so mocking it cannot tell a working verb from an inert one. Here the
+    gate runs FOR REAL against a critical-path PR (only the gh seam beneath it
+    is mocked). Without the sign-off stamp the verb returns `held_deep_review`
+    forever; with it, the merge actually fires."""
+
+    CRITICAL_FILE = 'scripts/outbox_notifier.py'
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix='dash-realgate-'))
+        (self.tmp / 'inboxes' / 'beacon').mkdir(parents=True, exist_ok=True)
+
+    def _run(self, *, sign_off: bool):
+        """Drive the real gate. `sign_off=False` simulates the pre-fix verb
+        (no stamp) to prove the guard actually discriminates."""
+        src = _source()
+        client = _FakeMergeClient(src)
+        labels: list[str] = []
+        fired: dict[str, Any] = {}
+
+        def _apply_label(repo, pr_number, pr_url, task_id):
+            if sign_off:
+                labels.append('deep-review-passed')
+            return True
+
+        def _merge(pr_url, task_id):
+            fired['pr'] = pr_url
+            return {'merge_outcome': 'merged', 'merge_reason': 'squashed'}
+
+        with mock.patch.object(on, '_gh_pr_state', return_value='OPEN'), \
+                mock.patch.object(
+                    on, '_gh_pr_head_sha', return_value=HEAD_SHA), \
+                mock.patch.object(
+                    on, '_gh_pr_changed_files',
+                    return_value=[self.CRITICAL_FILE]), \
+                mock.patch.object(
+                    on, '_gh_pr_labels', side_effect=lambda *a: list(labels)), \
+                mock.patch.object(
+                    on, '_apply_deep_review_pass_label',
+                    side_effect=_apply_label), \
+                mock.patch.object(on, '_mark_deep_review_stamped'), \
+                mock.patch.object(on, '_post_deep_review_pass_status'), \
+                mock.patch.object(on, '_find_overlap_blocker',
+                                  return_value=None), \
+                mock.patch.object(on, '_gh_pr_mergeable_status',
+                                  return_value='mergeable'), \
+                mock.patch.object(on, '_l4_guardian_scope_gate',
+                                  return_value=None), \
+                mock.patch.object(on, '_auto_merge_pr', side_effect=_merge), \
+                mock.patch.object(on, '_dm_larry_deep_review_hold'), \
+                mock.patch.object(on, '_record_deep_review_held',
+                                  return_value=False), \
+                mock.patch.object(on, '_queue_remove_pr'), \
+                mock.patch.object(on, '_signal_sequence_step_merged'), \
+                mock.patch.object(on, '_teardown_worktrees_for_task'), \
+                mock.patch.object(
+                    on, '_reconcile_no_session_decision_on_merge'), \
+                mock.patch.object(dr, 'resolve_decision'):
+            res = da._handle_larry_action(
+                source_event_id=src['event_id'], action='merge', comment=None,
+                actor='larry@sealteamleaders.com', agents_root=self.tmp,
+                supabase_client=client,
+            )
+        return res, bool(fired)
+
+    def test_the_verb_actually_merges_a_deep_review_held_pr(self):
+        res, fired = self._run(sign_off=True)
+        self.assertEqual(res['merge_outcome'], 'merged')
+        self.assertTrue(fired, 'the merge never reached _auto_merge_pr')
+
+    def test_without_the_signoff_the_gate_re_holds_and_nothing_merges(self):
+        # The counterfactual: this is exactly what the verb did before the fix.
+        # If this ever starts passing as 'merged', the guard above has gone
+        # blind and the sign-off is no longer what clears the gate.
+        res, fired = self._run(sign_off=False)
+        self.assertEqual(res['merge_outcome'], 'held_deep_review')
+        self.assertFalse(fired)
 
 
 # ---------- wiring guards ----------
