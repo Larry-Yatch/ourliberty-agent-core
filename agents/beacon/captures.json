@@ -2339,7 +2339,7 @@
       "id": "cap-thirteen-writers-do-unlocked-read-modify-write-o-4b31",
       "title": "Thirteen writers do unlocked read-modify-write on build-sequence files",
       "note": "STANDING HAZARD, broader than the #1052 arc that surfaced it. Build-sequence JSON files under ~/agents/blackboard/build-sequences/ are read-modify-written by THIRTEEN separate scripts, none of which takes a lock: beacon_approval_handler, build_sequence_advancer, build_sequence_kickoff, dashboard_api, heal_completed_sequence_mission_reconcile, heal_forge_wip_only_redispatch, heal_pipeline_stall, launch_dedup_gc, launch_queue_drain, outbox_notifier, pr_terminal_fanout, sequence_shortcut_helpers, system_state_log. Each reads the whole file, mutates a field or appends an audit entry, and atomically replaces it. Atomic replace makes each WRITE safe; it does nothing about the read-modify-write WINDOW, so when two of these overlap the later write silently discards the earlier one. Demonstrated concretely for the heal_pipeline_stall + outbox_notifier pair: an audit entry written by one vanishes entirely when the other replaces the file from a snapshot read moments earlier. The consequence is not cosmetic. These audit entries are a CONTROL CHANNEL, not just a log. dag-preflight-sync-lag-detected is what arms heal_pipeline_stall Check 12; dag-preflight-revision-routed is what arms Check 9; dag-preflight-pass-kickoff is what proves a preflight round closed. Losing one to a lost update disarms the backstop that watches a stalled build, which returns the system to the exact silent-stall failure #1052 was written to end. Also at risk: step status transitions and current_steps, i.e. two writers could disagree about which step is live. THE FIX: migrate all thirteen writers to atomic_io.locked_update, which is the repo's established advisory-lock helper and is already used for ledgers. Its docstring is explicit that the guarantee holds ONLY if EVERY writer of a path goes through it, so all writers of a given file must be migrated TOGETHER. That is why this is a project and not a patch, and why a partial migration is worse than none in one specific sense: it protects one pair while reading like a closed hole. locked_update is fail-open by design (runs unserialized rather than wedging when the lock cannot be taken), so the migration cannot deadlock a daemon. SCOPE ESTIMATE: 13 call-site migrations, most of which are a with-block around an existing read/mutate/write; the real work is finding EVERY write path in each file (several scripts write sequence files from more than one function) and a test that proves interleaved writers no longer lose an entry. PRIORITY: not urgent. The window is sub-millisecond per write and the pair-specific trigger needs a sync-lag incident, which agent-core #1053 made much rarer. But it is a standing correctness hazard on shared state that will outlive the sync-lag arc, and the cost only grows as more writers are added. Filed after #1061 deliberately excluded it rather than half-fixing it. Evidence and the lost-update demonstration are in the review comments on agent-core PR #1053 and in PR #1061's description.",
-      "state": "parked",
+      "state": "review_close",
       "label": null,
       "origin": {
         "source": "desktop-chat",
@@ -2353,7 +2353,8 @@
       "spawned": {
         "kind": "delegate",
         "task_id": "delegate-cap-thirteen-writers-do-unlocked-read-modify-write-o-4b31",
-        "stamped_at": "2026-07-29T23:25:00.993192+00:00"
+        "stamped_at": "2026-07-29T23:25:00.993192+00:00",
+        "outcome": "merged"
       },
       "briefing": {
         "what": "A shared set of coordination files gets updated by many different parts of the system at once, and once in a while one update silently overwrites another \u2014 sometimes erasing the safety alarms that are supposed to catch stalled work.",
@@ -2368,7 +2369,10 @@
         "at": "2026-07-29T23:24:59.187492+00:00",
         "from_state": "parked"
       },
-      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
+      "closed_by": "heal_missions_card_gc:terminal-backstop",
+      "shipped_note": "shipped (linked work merged)",
+      "awaiting_ack": true
     },
     {
       "id": "cap-drift-gate-is-blind-to-columns-added-by-do-block-fba9",
@@ -2404,7 +2408,7 @@
       "id": "cap-closed-pr-step-wedged-forever-by-headless-dispat-37d6",
       "title": "Closed-PR step wedged forever by headless dispatch dedup (3rd of class)",
       "note": "Once a Forge build step completes and its PR is later CLOSED, that step_id can never be dispatched again -- silently, while the sequence keeps reporting the step as healthy `dispatched`.\n\nDEFECT: scripts/outbox_notifier.py, headless-approval-request path (~13193-13232). The guard is EXISTENCE-only: if `<task_id>.json` is in inboxes/forge/, .archive/ or .invalid/, it skips the write. The 2026-06-11 override (`_prior_dispatch_was_definitive_non_run`, mirroring PR #403) fires ONLY on a definitive non-run (spawn failure / identity reject, no PR). A run that COMPLETED, made a PR, and whose PR was later closed is uncovered -- and that is normal (spec revised mid-build, step must be rebuilt). Only recovery is a human moving the archive file aside.\n\nEVIDENCE (2026-07-28, seq rsdpm-m14-001 step m14-pr-a, after RSDPM #152 was deliberately closed): notifier logged \"already dispatched for task m14-pr-a (archive or .invalid present); skipping duplicate write\" on two consecutive advancer dispatches. Forge inbox empty, nothing claimed, no worktree. Hand-fixed TWICE -- ~/agents/inboxes/forge/.archive/m14-pr-a.json.superseded-pr152-closed (18:50) and .superseded-225434 (22:54); dispatch worked immediately after each mv. 6 such skips in 7 days, 4 of them this incident.\n\n3RD OF CLASS: _review_request_already_dispatched missed re-pushes -> head-aware in PR #539. PIPELINE_BACKOFF recency leg claimed ownership nothing held -> PR #1043. This one.\n\nNOT a one-file fix -- both obvious discriminators are wrong-shaped:\n(1) Reading PR closed/merged state puts a network read in the dispatch hot path; gh quota flake is a known family here, so it trades a rare silent wedge for a commoner one.\n(2) A generation counter is right, BUT deriving N by counting archived files REGRESSES crash-recovery -- the archive is exactly the state the guard distrusts. Replay the outbox event after a crash, it counts 1 archived attempt, dispatches attempt 2 = double-dispatch. The generation must be CARRIED in Beacon's APPROVAL_REQUEST marker and used verbatim: same marker -> same filename -> existence check still protects; genuine rebuild -> new generation -> dispatches. Touches scripts/beacon_approval_handler.py too. Live precedent: resume-<task>-r<N>.json, revision-<task>-<n>.json.\n\n2ND DEFECT (skip invisible outside the log; dashboard showed a healthy step ~1h) cannot be built as \"advancer verifies the Forge task file after dispatching\" -- _dispatch_step (scripts/build_sequence_advancer.py:793) writes BEACON's inbox, not Forge's, so its `err is None` is honest about its own hop; between advancer and Forge sit a Beacon LLM turn and a notifier tick. Splits in two: (a) notifier DMs on skip -- only actor that knows a dispatch produced nothing, and the part that cost the hour; (b) deadline reconciler for steps sitting `dispatched` with no Forge activity, which catches EVERY skip reason.\n\nSHAPE: one PR, three pieces -- generation-in-marker (notifier + beacon handler), loud skip with DM, deadline reconciler.\n\nTIMING: deferred 2026-07-29 on purpose. Nothing blocked (M14 a/b merged, c/d in review, e pending) and the trigger is a step REBUILD, not a spec revision -- revisions use the revision-<n> path, which already carries a counter and does not wedge. Do it after M14 lands.\n\nGATES: outbox_notifier.py is on the deep-review fileset -> holds for /code-review high, expected. Route at creation (claude/* or auto-review) or it sits forever. Suite: python3 -m unittest, scripts/tests/, needs py3.12 (3.9 cannot import the tree); test_outbox_notifier ~589 tests must stay green. Mutation-verify BOTH directions, show the test failing first -- existence gates are false-clean generators. Verify on droplet (larry@134.209.44.80): ~/agents/inboxes/forge/, .archive/, journalctl -u ourliberty-outbox-notifier.service.",
-      "state": "parked",
+      "state": "done",
       "label": null,
       "origin": {
         "source": "desktop-chat",
@@ -2431,8 +2435,12 @@
       "spawned": {
         "kind": "delegate",
         "task_id": "delegate-cap-closed-pr-step-wedged-forever-by-headless-dispat-37d6",
-        "stamped_at": "2026-07-30T00:48:41.785148+00:00"
-      }
+        "stamped_at": "2026-07-30T00:48:41.785148+00:00",
+        "outcome": "merged"
+      },
+      "closed_by": "heal_missions_card_gc:terminal-backstop",
+      "shipped_note": "shipped (linked work merged)",
+      "closed_at": "2026-07-30T02:26:16.355441+00:00"
     },
     {
       "id": "cap-larry-alert-promotions-1060-leaves-them-out-of-s-aaf0",
@@ -2490,6 +2498,36 @@
         "by": "beacon",
         "model": "claude-opus-4-8",
         "at": "2026-07-30T01:25:40.906446+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+    },
+    {
+      "id": "cap-four-card-types-one-missing-verb-no-button-says-71d1",
+      "title": "Four card types, one missing verb: no button says 'the work is fine, merge it'",
+      "note": "PATTERN, not a one-off. Every PR that reached a decision card on 2026-07-29/30 was finished by a human typing 'gh pr merge': RSDPM #157, #160, #161, #165, #166 \u2014 five in about five hours \u2014 plus agent-core #1058 earlier the same day, which sat 34 min owned by nobody after Approve did nothing at all. Measured from the written record; note that GitHub's merged_by is useless as evidence here because the automation merges with Larry's token, so EVERY merge reads 'Larry-Yatch' whether a human or a healer did it.\n\nFOUR CARD TYPES, FOUR DIFFERENT BROKEN APPROVES, ONE ROOT CAUSE:\n1. Session-less mirror-review escalate (mirror-review-*): Approve dispatches a fresh Forge revision against code that is already correct. RSDPM #166 (2026-07-30) \u2014 Mirror escalated a legitimate SCOPE question (the PR deliberately did not do its brief, with evidence the brief's premise was false); Approve would have sent Forge to make the exact change the PR argues causes false DRIFT. Also agent-core #884, RSDPM #111.\n2. Deep-review hold (deep-review-hold-*): Approve posts the token and never merges, re-posting every 60s forever. RSDPM #157, #160, #161, #165 all needed a manual merge after stamping. See cap-deep-review-hold-approve-posts-the-token-but-nev-2d25.\n3. Promoted/orphaned (unreg-approval-*): Approve is a total no-op \u2014 no dispatch, no merge, no error. agent-core #1058. agent-core PR #1060 fixes only this one variant and is still OPEN.\n4. Larry-alert promotions: #1060 leaves them out of scope and NEITHER button works. See cap-larry-alert-promotions-1060-leaves-them-out-of-s-aaf0.\nAnd on all four, Reject archives the card, dispatches nothing, and strands the PR permanently \u2014 review dispatch is head-blind once a task concludes, so nothing ever picks it up (RSDPM #59).\n\nTHE ROOT CAUSE: every card offers only 'go change the code' (approve) or 'abandon it' (reject). The most common true answer \u2014 'this is reviewed and correct, finish it' \u2014 has no button, so it always falls to a human. The four captures above are four symptoms of that one gap, and patching them individually means four fixes and four chances to get it wrong.\n\nPROPOSED: one new action verb, e.g. 'ship', that merges the PR as it stands and then clears the card. Spans two repos: ourliberty-dashboard (app/api/approvals/action/route.ts ACTIONS currently allows only approve|reject|comment|mark_done \u2014 add the verb and the button in app/approvals/components/) and ourliberty-agent-core (droplet-side handler does the merge + card retire). It works on all four card types because all four already sit on a PR that has been reviewed \u2014 that precondition is what makes a one-click merge safe here, and it is also why the verb must NOT be offered on cards that carry no reviewed PR.\n\nRELATED CAPTURES THIS SUBSUMES: cap-deep-review-hold-approve-posts-the-token-but-nev-2d25, cap-larry-alert-promotions-1060-leaves-them-out-of-s-aaf0, cap-approvals-tab-let-a-card-carry-its-own-falsifier-8bb3, cap-heal-unregistered-approval-mints-permanent-cards-b921. Close or fold those if this is built.\n\nCAUTION: this button is a real merge, one click, no undo. Gate it on the card carrying a resolvable PR coordinate AND a completed review, and fail closed (show nothing) when either is missing, rather than rendering a button that might merge the wrong head.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "main",
+        "captured_at": "2026-07-30T02:24:01.964848+00:00"
+      },
+      "last_touched": "2026-07-30T02:24:01.964848+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "Right now your review screen lets you send work back for changes or throw it away, but there's no simple 'this looks good, publish it' button \u2014 so you or your team end up finishing the job by hand every time.",
+        "why": "In one recent five-hour stretch, six pieces of finished, already-checked work stalled waiting for a person to manually push them out the door \u2014 that's time lost and good work left sitting unfinished for no reason.",
+        "suggest": "Add the missing 'ship it' button, but only on items that have already passed review \u2014 and if we build it, hold to that rule strictly, since this button publishes instantly with no take-backs."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-30T02:26:16.355441+00:00",
         "from_state": "parked"
       },
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
