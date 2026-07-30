@@ -2364,6 +2364,36 @@
         "from_state": "parked"
       },
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+    },
+    {
+      "id": "cap-drift-gate-is-blind-to-columns-added-by-do-block-fba9",
+      "title": "Drift gate is blind to columns added by DO-block dynamic SQL",
+      "note": "The staging contract gate (ops/verify-staging-contract.mts) derives expected structure by reading migration files as TEXT: CREATE TABLE, CREATE VIEW, ALTER TABLE ADD/DROP COLUMN. Anything a migration builds at runtime is invisible to it.\n\nMEASURED 2026-07-29: the parser claims only 7 columns across 26 tables -- profiles.briefing_enabled, missions.{requested_by,requested_by_label}, suggested_updates.{requested_by,requested_by_label}, provenance_links.projected_quote, workspace_members.is_org_owner. That is all of them.\n\nConcretely missing: all ELEVEN workspace_id columns from 0034_workspace_id_on_record_tables.sql, because 0034 adds them in a DO block via EXECUTE format('ALTER TABLE public.%I ADD COLUMN IF NOT EXISTS workspace_id uuid REFERENCES public.workspaces(id)', t) at lines 83-86. Had 0034 half-applied -- some tables stamped, others not -- this gate would have reported clean. Nothing is broken today: all 11 columns verified live on staging.\n\nThis is the 'existence gates are false-clean generators' family: the gate cannot see what it never claimed.\n\nCHECK FIRST, do not duplicate: ops/verify-staging-applied.sql (the second gate added in RSDPM #129) reads pg catalogs via the Management API and may already cover some of these. Wasted work otherwise.\n\nDIRECTION TO EVALUATE, not a decided design: teaching the regex parser to interpret dynamic SQL is fragile and the file's own doc comment argues against guessing. Better candidates are (a) an explicit manifest of the DO-block table list that both the migration and the checker read, or (b) accepting that dynamically-created objects belong to the catalog-reading gate rather than the PostgREST one.\n\nRELATED, latent not live: the parser also ignores ALTER TABLE ... RENAME COLUMN / RENAME TO, which would leave it expecting the old name forever -- the same false-red class as PR #164. Verified zero renames in the migration set today.\n\nCONTEXT: PR #164 (fix/drift-parser-honors-drops) fixed the adjacent bug -- the parser read ADD COLUMN and never DROP COLUMN, so 0033's deliberate drop of profiles.is_org_owner produced a permanent false DRIFT that paged twice via apply-on-merge. That PR deliberately did NOT widen into this gap. Read its body for the measured evidence.\n\nPRIORITY: low. A gap in a safety net, not a live failure. Worth closing before relying on that net for customer data.\n\nROUTING: open on fix/* or spec/* with NO label per the PR review gate. It changes a checker that decides whether Larry gets paged, so it wants /code-review high.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "RSDPM",
+        "branch": "HEAD",
+        "captured_at": "2026-07-30T00:29:23.949824+00:00"
+      },
+      "last_touched": "2026-07-30T00:29:23.949824+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "One of our automated safety checks that's supposed to confirm our customer database is set up correctly has a blind spot \u2014 it can't see certain parts of the setup, so it could say everything's fine when it isn't.",
+        "why": "Right now everything is actually fine, but we're planning to rely on this check to protect customer data, and a safety net with a hole in it could let a real problem slip through unnoticed.",
+        "suggest": "Worth fixing before we lean on this check for customer data, but it's not urgent and there's no fire today \u2014 let's first confirm a second existing check doesn't already cover it, then close the gap carefully rather than rushing."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-30T00:35:27.604975+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     }
   ]
 }
