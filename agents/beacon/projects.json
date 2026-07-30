@@ -1213,6 +1213,66 @@
         "kind": "mission",
         "mission_id": "dashboard-decline-does-not-clear-the-approval-backend"
       }
+    },
+    {
+      "id": "merge-verb-operator-action",
+      "title": "Operator 'Merge It' Verb",
+      "north_star_ref": null,
+      "repo": "ourliberty-agent-core",
+      "state": "active",
+      "phases": [
+        {
+          "id": "merge-verb-operator-action",
+          "title": "Operator 'Merge It' Verb",
+          "desired_end_state": "Fourth operator verb ('the work is fine, merge it') for the review/approvals surface. Lets an operator publish a reviewed-but-stuck PR with one click instead of a hand-merge. Backend half (merge-verb-backend-001): a `merge` action in dashboard_api._handle_larry_action that re-verifies server-side (Mirror REVIEW_PASS on record + PR open+unmerged) and publishes through the SAME gated auto-merge machinery, plus a `merge_target` stamp on review-passed/open/held approval cards. Gated in TWO places (stamp condition AND server re-verify); available ONLY on review-passed items; no undo. Frontend button/PendingCard is a follow-up dashboard PR.",
+          "lifecycle_state": "done",
+          "order": 0,
+          "spec_ref": null,
+          "sequence_ref": null,
+          "created_at": "2026-07-30T18:16:44.520509+00:00",
+          "updated_at": "2026-07-30T18:16:44.438835+00:00",
+          "brainstorm": {
+            "is_ai_draft": true,
+            "draft": {
+              "end_state": "When this phase is done, an operator looking at the review and approvals surface can publish a PR that has already passed review but is stuck, using a single 'merge it' action instead of dropping to a hand-merge. The action means 'the work is fine, merge it.' The backend accepts this action only for items that have genuinely passed review and are still open and unmerged, re-checks that on the server before doing anything, and then publishes through the existing gated auto-merge path. Review-passed, open, held approval cards carry a stamp that marks them eligible for this action. The frontend button is explicitly a later, separate piece of work; this phase is the backend half.",
+              "why_now": "Operators today have three verbs on the review/approvals surface and no clean way to say 'this is reviewed and fine, just publish it.' When a reviewed PR gets stuck, the only option is a manual merge outside the surface, which is slower and sidesteps the normal gated machinery. Adding a fourth verb closes that gap so a reviewed-but-stuck PR can be published in one click. Note: the specific trigger or volume of stuck PRs driving the timing isn't stated in the facts \u2014 worth confirming what's forcing this now.",
+              "scope": "IN: a new 'merge' action in the dashboard action handler that (a) re-verifies server-side that the item has a passing review on record and that the PR is still open and unmerged, and (b) publishes it through the same gated auto-merge machinery already in use; plus a stamp on review-passed, open, held approval cards marking them eligible. The action is gated in two independent places \u2014 the condition that adds the stamp, and the server-side re-verification at action time \u2014 and is offered only on review-passed items. OUT: the frontend button and card treatment, which are a follow-up dashboard change; any undo or unmerge capability; extending the verb to items that have not passed review.",
+              "constraints_reuse": "This is assembly, not greenfield. The new action must publish through the SAME gated auto-merge machinery that already exists rather than introducing a second merge path, and it must slot into the existing dashboard action handler alongside the current operator verbs. The eligibility stamp rides on the existing review-passed/open/held approval cards. What must not break: the other three existing operator verbs and their behavior; the existing review-pass and approval-card data; and the guarantee that nothing publishes unless it has genuinely passed review and is still open and unmerged.",
+              "options_decision": "Fork 1 \u2014 how strict to make the two gates: (a) require both a valid review-pass on record AND open+unmerged at action time, rejecting otherwise (safer, may occasionally refuse a borderline-but-fine item), versus (b) a looser single check (fewer refusals, weaker safety). Recommendation: keep both gates as described. Fork 2 \u2014 behavior when server re-verification fails (e.g., review-pass missing or PR already merged/closed): (a) refuse quietly and leave the card, versus (b) refuse and surface a clear reason to the operator. Recommendation: refuse and surface a clear reason so the operator understands why. Fork 3 \u2014 irreversibility: ship with no undo (matches the stated design; simplest and consistent with a gated publish) versus building an undo path (more work, larger surface). Recommendation: no undo, as specified.",
+              "risks_guardrails": "Risk: publishing something that hasn't truly passed review. Guardrail: the action is offered only on review-passed items and the server independently re-verifies a review-pass on record before acting. Risk: publishing a PR that has since been merged, closed, or changed. Guardrail: server-side re-check that the PR is open and unmerged at action time, not just when the card was rendered. Risk: a stale or spoofed card triggering a merge. Guardrail: two independent gates \u2014 the stamp condition and the server re-verification \u2014 so the client card alone cannot cause a publish. Risk: no undo means a wrong click is final. Guardrail: restrict eligibility tightly to review-passed/open/held items and rely on the double gate; if the team wants a softer landing, that is a decision for the operator.",
+              "done_gate": "Done means: the dashboard action handler accepts a 'merge' action; when given a review-passed, still-open, still-unmerged item it re-verifies both conditions server-side and publishes through the existing gated auto-merge path; when either condition fails it refuses and does not publish; and review-passed/open/held approval cards carry the eligibility stamp while non-review-passed items do not. Tests should cover: the happy path (review-passed + open + unmerged publishes), refusal when the review-pass is absent, refusal when the PR is already merged or closed, that the stamp appears only on review-passed/open/held cards, and that the three existing operator verbs are unaffected.",
+              "breakdown": "Step 1: add the eligibility stamp to review-passed/open/held approval cards, with the stamp condition as the first gate. Step 2: add the 'merge' action to the dashboard action handler, including server-side re-verification of both the review-pass-on-record and PR-open+unmerged conditions as the second gate. Step 3: wire the verified action into the existing gated auto-merge machinery so publishing reuses that path. Step 4: define refusal behavior when re-verification fails. Step 5: cover all of the above with tests (happy path, both refusal cases, stamp visibility, no regression to existing verbs). The frontend button/card is a separate follow-up phase and is not part of this breakdown."
+            },
+            "decisions": [
+              "Confirm what's forcing this now \u2014 is there a real backlog of reviewed-but-stuck PRs, or is this pre-emptive?",
+              "Ship with no undo/unmerge, as designed \u2014 accept that a merge click is final?",
+              "When server re-verification fails, refuse silently or surface a clear reason to the operator?",
+              "Keep both gates strict (review-pass on record AND open+unmerged), even if it occasionally refuses a borderline item?"
+            ],
+            "decisions_overflow": false,
+            "handoff": {
+              "spec_target_path": "agents/beacon/specs/merge-verb-operator-action.md",
+              "target_repo": "ourliberty-agent-core",
+              "north_star_ref": null,
+              "prior_closeout_summary": null,
+              "directive": "Work with Larry to finalize this brainstorm and author the spec at agents/beacon/specs/merge-verb-operator-action.md in ourliberty-agent-core; he will mark it Ready to spec."
+            }
+          },
+          "brainstorm_provenance": {
+            "by": "beacon",
+            "model": "claude-opus-4-8",
+            "at": "2026-07-30T18:16:44.520509+00:00",
+            "from_state": "brainstorm"
+          }
+        }
+      ],
+      "one_off": true,
+      "created_at": "2026-07-30T18:16:44.520509+00:00",
+      "updated_at": "2026-07-30T18:16:44.520509+00:00",
+      "promoted_from": {
+        "kind": "mission",
+        "mission_id": "merge-verb-operator-action"
+      }
     }
   ]
 }
