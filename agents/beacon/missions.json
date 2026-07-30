@@ -16602,7 +16602,11 @@
         "at": "2026-07-30T16:56:17.821785+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-30T19:36:16.579377+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-delegate-cap-a-delegation-that-dies-looks-exactly-like-one-no-2cbe",
@@ -16696,6 +16700,23 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-deep-review-hold-pr1068-b6cbae9e",
+      "name": "Deep Review Hold Pr1068 B6cbae9e",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `deep-review-hold-pr1068-b6cbae9e`. Last activity 2026-07-30T19:28:35.796578+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "deep-review-hold-pr1068-b6cbae9e"
+      ],
+      "repo": null,
+      "created": "2026-07-30",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-30T19:36:16.579377+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-30T19:28:35.796578+00:00"
     }
   ]
 }
