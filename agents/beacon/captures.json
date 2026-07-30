@@ -2234,7 +2234,12 @@
         "at": "2026-07-29T19:42:51.285731+00:00",
         "from_state": "parked"
       },
-      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
+      "spawned": {
+        "kind": "delegate",
+        "task_id": "delegate-cap-approvals-tab-let-a-card-carry-its-own-falsifier-8bb3",
+        "stamped_at": "2026-07-30T01:06:37.207585+00:00"
+      }
     },
     {
       "id": "cap-heal-unregistered-approval-mints-permanent-cards-b921",
@@ -2428,6 +2433,36 @@
         "task_id": "delegate-cap-closed-pr-step-wedged-forever-by-headless-dispat-37d6",
         "stamped_at": "2026-07-30T00:48:41.785148+00:00"
       }
+    },
+    {
+      "id": "cap-larry-alert-promotions-1060-leaves-them-out-of-s-aaf0",
+      "title": "Larry-alert promotions: #1060 leaves them out of scope, and now NEITHER button works on them",
+      "note": "SUPERSEDES cap-heal-unregistered-approval-mints-permanent-cards-b921 \u2014 drop that one; #1060 overtook half of it and this is the re-scoped residue.\n\nWHAT #1060 ALREADY FIXES (do NOT rebuild): fix/promoted-approve-executes, three deterministic legs \u2014 the promoter stamps promoted_source + a fail-closed recheck_target; Approve on a coordinate-carrying card dispatches a real Mirror re-review; heal_stale_escalation_recheck widened so those cards retire on MERGED/CLOSED/superseded. It closes the 21:55Z incident where Approve wrote a ledger row, cleared the card, and executed nothing.\n\nTHE RESIDUE IS NAMED IN #1060's OWN BODY, verbatim: 'Larry-alert promotions never carry a coordinate and stay out of scope.'\n\nThat is EXACTLY the class that reached Larry on 2026-07-29 \u2014 every one of them a promoted larry-alert, not a for-Larry mirror-review: unreg-approval-9061de515dce (unrouted PR#1049), -3283b7a9b651 (unrouted PR#1053), -cfd444ed29ee (RSDPM migration 0033, false 8 min before Larry saw it), and -67747fb0837e (the unrouted nag for PR#1060 ITSELF \u2014 the pattern nagging about its own cure).\n\nAFTER #1060 THIS CLASS IS STRICTLY WORSE IN ONE WAY. Both exits are now dead ends:\n  - Approve 400s before the read_at claim (correct \u2014 no silent clear), so the card stays visible and unactionable.\n  - Reject is still a paid Beacon no-op session (#1060 residue, RSDPM #59 class).\n  - The recheck ladder is coordinate-gated, so these never auto-retire either.\nA card that cannot be approved, cannot be rejected usefully, cannot retire, and says in its own summary 'could not be parsed into two options \u2014 needs triage' is pure tab debt. Three of the four sat through 6 reminder rounds.\n\nBUILD (pick in preflight):\n(a) Do not promote a larry-alert the promoter cannot parse into two real options. A card that cannot state its own choices is TRIAGE, not a decision \u2014 route it to a triage lane, never the Approvals tab.\n(b) If it IS promoted, the card must inherit the source alert's dedup/cooldown identity so it retires when the alert does. Today the alert de-dups and cools down; the card it spawned outlives it forever.\n(c) CHEAPEST THREAD FIRST: bare_approvable=False is ALREADY stamped on every one of these (heal_unregistered_approval.py:717/889/1210) and is read ONLY by beacon_approval_handler.py:634, purely to stop a bare Telegram 'approve' hitting the wrong card. The record ALREADY KNOWS these are not binary decisions. Nothing acts on it. Promote that flag from a routing-safety detail to a triage signal and most of this closes.\n\nDO NOT 'fix the detector' that raises the underlying alert. Verified: heal_pipeline_stall.check_unrouted_open_prs / heal-unrouted-owner-pr-nudge-001 works as designed \u2014 it exists to catch 'a clean unrouted PR the owner forgot to label' and is deliberately nudge-only, preserving Larry's 2026-07-11 label opt-in (PR_UNROUTED_MIN_AGE_MIN=60). It cannot tell 'forgot' from 'deliberately holding for /code-review high' because nothing records that intent. The alert is not the bug; the PROMOTION is.\n\nADJACENT: cap-approvals-tab-let-a-card-carry-its-own-falsifier-8bb3 covers cards whose PREMISE goes stale. This covers cards that were never answerable. Same symptom, different defect \u2014 whoever takes one should read the other.\n\nREVIEW: needed. It changes what reaches the Approvals tab, and a wrong filter drops a real decision while looking exactly like a working tab.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "main",
+        "captured_at": "2026-07-30T01:08:13.118432+00:00"
+      },
+      "last_touched": "2026-07-30T01:08:13.118432+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "Some items that land in your decision list can't actually be acted on \u2014 neither the yes nor the no button does anything, they can't be dismissed, and they keep coming back demanding your attention.",
+        "why": "These dead-end items clutter the very list you rely on to make quick calls, wasting your time and burying the decisions that genuinely need you.",
+        "suggest": "Worth fixing so items that don't offer a real choice never reach your decision list \u2014 but move deliberately and have a second set of eyes check it, since a clumsy filter could hide a decision you actually needed to see."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-30T01:15:34.216788+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     }
   ]
 }
