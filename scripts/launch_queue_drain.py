@@ -66,6 +66,7 @@ import larry_alerts  # noqa: E402
 import launch_dedup_guard  # noqa: E402 — pure-filesystem duplicate-work guard
 import routing_validator  # noqa: E402
 import safe_write_inbox  # noqa: E402
+import sequence_shortcut_helpers as ssh  # noqa: E402 — shared build-sequence RMW lock
 
 logger = logging.getLogger('launch_queue_drain')
 
@@ -495,112 +496,118 @@ def _drain_one(path: Path, sequences_dir: Path, now: datetime, result: DrainResu
     seq_id = entry.get('seq_id') or f'launch-{phase_id}'
     seq_path = sequences_dir / f'{seq_id}.json'
 
-    # --- idempotency: deterministic seq-file existence is the backstop ---
-    if seq_path.exists():
-        status = _read_existing_status(seq_path)
-        if status == 'pending':
-            # Authored, but the Mirror dispatch may not have completed (crash
-            # between the two writes). Re-dispatch to the SAME inbox filename
-            # (overwrite, not a duplicate); the build still fires only once.
-            try:
-                dispatch_mirror_preflight(seq_id)
-            except Exception as e:  # noqa: BLE001 — leave for next-tick retry
-                logger.warning(
-                    'seq %s pending re-dispatch failed (%s); leaving queue file',
-                    seq_id, e,
-                )
-                result.dispatch_failed.append(phase_id)
+    # Serialize the existence-check → author → write span for this seq file so
+    # two concurrent drains of the same phase can't both see "not exists" and
+    # both author (lost update / double dispatch). The existence read MUST be
+    # inside the lock with the write. Fail-open: a degraded lock still runs the
+    # body (matches the shared build-sequence RMW contract).
+    with ssh.locked_sequence_update(seq_path):
+        # --- idempotency: deterministic seq-file existence is the backstop ---
+        if seq_path.exists():
+            status = _read_existing_status(seq_path)
+            if status == 'pending':
+                # Authored, but the Mirror dispatch may not have completed (crash
+                # between the two writes). Re-dispatch to the SAME inbox filename
+                # (overwrite, not a duplicate); the build still fires only once.
+                try:
+                    dispatch_mirror_preflight(seq_id)
+                except Exception as e:  # noqa: BLE001 — leave for next-tick retry
+                    logger.warning(
+                        'seq %s pending re-dispatch failed (%s); leaving queue file',
+                        seq_id, e,
+                    )
+                    result.dispatch_failed.append(phase_id)
+                    return
+                _remove_queue_file(path)
+                result.redispatched.append(phase_id)
                 return
+            # Any non-pending status → already launched / in-flight. Do NOT
+            # re-author and do NOT dispatch a second build; just clear the queue.
             _remove_queue_file(path)
-            result.redispatched.append(phase_id)
+            result.already_launched.append(phase_id)
             return
-        # Any non-pending status → already launched / in-flight. Do NOT
-        # re-author and do NOT dispatch a second build; just clear the queue.
+
+        # --- repo sanity: never author a sequence Forge can't build ---
+        # The dashboard launch endpoint already validates/repairs target_repo, so
+        # this is belt-and-suspenders for a legacy / hand-written queue file. An
+        # invalid repo (e.g. a working-dir name like `ol-work` that rode in from a
+        # capture origin) is dead-lettered rather than authored into an unbuildable
+        # sequence that would sit `dispatched` forever (the 2026-06-19 wedge).
+        # valid_repos empty (config unreadable) → skip the check (fail open).
+        repo = str(entry.get('repo') or _DEFAULT_BUILD_REPO)
+        valid_repos = _valid_repos()
+        if valid_repos and repo not in valid_repos:
+            _dead_letter(
+                path,
+                f'target_repo {repo!r} is not a buildable repo '
+                f'(config/agent-models.json repo_paths: {sorted(valid_repos)})',
+            )
+            result.dead_lettered.append(path.name)
+            return
+
+        # --- duplicate-work guard: do not author a launch whose deliverables are
+        # already in flight elsewhere (the 2026-06-20 cross-identity redundant-build
+        # incident). A matching deliverable claim → reversibly hold + alert; an
+        # in-flight spec overlap → advisory alert + proceed. Fail-open: a guard
+        # error or a clean verdict authors normally.
+        verdict = _evaluate_dedup(entry, sequences_dir, now)
+        if verdict is not None and verdict.has_signal:
+            if verdict.action == 'skip_duplicate':
+                held = _dedup_hold(path, verdict.reason)
+                _alert_duplicate_launch(phase_id, verdict, held)
+                # Only count it deduped when the file was actually parked. If the
+                # hold MOVE failed, the queue file is still in place: leave it for
+                # next-tick re-evaluation (don't author a duplicate, don't over-
+                # count) — the alert above said so honestly.
+                if held is not None:
+                    result.deduped.append(phase_id)
+                return
+            # 'proceed' with a signal (in-flight spec overlap) → advisory only.
+            _alert_duplicate_launch(phase_id, verdict, None)
+
+        # --- new launch: author → validate → write → dispatch Mirror ---
+        try:
+            seq = build_sequence(entry, now=now)
+        except UnknownRepoError as e:
+            # Author-time repo rejection: the entry names a non-allowed build repo
+            # (no alias resolves it). Dead-letter the request + alert Larry naming
+            # the phase + bad repo, rather than authoring a doomed sequence that
+            # RoutingDenies at dispatch and strands the build.
+            _dead_letter(path, f'non-allowed target_repo {e.repo!r}: {e}')
+            _alert_unknown_repo(phase_id, e.repo, e.allowed)
+            result.dead_lettered.append(path.name)
+            return
+        validation = build_sequence_validator.validate_dag(seq)
+        if not validation.valid:
+            _dead_letter(path, f'authored sequence failed validate_dag: {validation.errors}')
+            result.dead_lettered.append(path.name)
+            return
+
+        try:
+            _atomic_write_json(seq_path, seq)
+        except OSError as e:
+            logger.warning(
+                'could not write sequence file %s (%s); leaving queue file for retry',
+                seq_path.name, e,
+            )
+            result.dispatch_failed.append(phase_id)
+            return
+
+        try:
+            dispatch_mirror_preflight(seq_id)
+        except Exception as e:  # noqa: BLE001
+            # The sequence file is written (status pending); leave the queue file
+            # so the next tick re-dispatches via the pending branch above.
+            logger.warning(
+                'Mirror preflight dispatch for %s failed (%s); sequence written '
+                '(pending), leaving queue file for next-tick re-dispatch',
+                seq_id, e,
+            )
+            result.dispatch_failed.append(phase_id)
+            return
+
         _remove_queue_file(path)
-        result.already_launched.append(phase_id)
-        return
-
-    # --- repo sanity: never author a sequence Forge can't build ---
-    # The dashboard launch endpoint already validates/repairs target_repo, so
-    # this is belt-and-suspenders for a legacy / hand-written queue file. An
-    # invalid repo (e.g. a working-dir name like `ol-work` that rode in from a
-    # capture origin) is dead-lettered rather than authored into an unbuildable
-    # sequence that would sit `dispatched` forever (the 2026-06-19 wedge).
-    # valid_repos empty (config unreadable) → skip the check (fail open).
-    repo = str(entry.get('repo') or _DEFAULT_BUILD_REPO)
-    valid_repos = _valid_repos()
-    if valid_repos and repo not in valid_repos:
-        _dead_letter(
-            path,
-            f'target_repo {repo!r} is not a buildable repo '
-            f'(config/agent-models.json repo_paths: {sorted(valid_repos)})',
-        )
-        result.dead_lettered.append(path.name)
-        return
-
-    # --- duplicate-work guard: do not author a launch whose deliverables are
-    # already in flight elsewhere (the 2026-06-20 cross-identity redundant-build
-    # incident). A matching deliverable claim → reversibly hold + alert; an
-    # in-flight spec overlap → advisory alert + proceed. Fail-open: a guard
-    # error or a clean verdict authors normally.
-    verdict = _evaluate_dedup(entry, sequences_dir, now)
-    if verdict is not None and verdict.has_signal:
-        if verdict.action == 'skip_duplicate':
-            held = _dedup_hold(path, verdict.reason)
-            _alert_duplicate_launch(phase_id, verdict, held)
-            # Only count it deduped when the file was actually parked. If the
-            # hold MOVE failed, the queue file is still in place: leave it for
-            # next-tick re-evaluation (don't author a duplicate, don't over-
-            # count) — the alert above said so honestly.
-            if held is not None:
-                result.deduped.append(phase_id)
-            return
-        # 'proceed' with a signal (in-flight spec overlap) → advisory only.
-        _alert_duplicate_launch(phase_id, verdict, None)
-
-    # --- new launch: author → validate → write → dispatch Mirror ---
-    try:
-        seq = build_sequence(entry, now=now)
-    except UnknownRepoError as e:
-        # Author-time repo rejection: the entry names a non-allowed build repo
-        # (no alias resolves it). Dead-letter the request + alert Larry naming
-        # the phase + bad repo, rather than authoring a doomed sequence that
-        # RoutingDenies at dispatch and strands the build.
-        _dead_letter(path, f'non-allowed target_repo {e.repo!r}: {e}')
-        _alert_unknown_repo(phase_id, e.repo, e.allowed)
-        result.dead_lettered.append(path.name)
-        return
-    validation = build_sequence_validator.validate_dag(seq)
-    if not validation.valid:
-        _dead_letter(path, f'authored sequence failed validate_dag: {validation.errors}')
-        result.dead_lettered.append(path.name)
-        return
-
-    try:
-        _atomic_write_json(seq_path, seq)
-    except OSError as e:
-        logger.warning(
-            'could not write sequence file %s (%s); leaving queue file for retry',
-            seq_path.name, e,
-        )
-        result.dispatch_failed.append(phase_id)
-        return
-
-    try:
-        dispatch_mirror_preflight(seq_id)
-    except Exception as e:  # noqa: BLE001
-        # The sequence file is written (status pending); leave the queue file
-        # so the next tick re-dispatches via the pending branch above.
-        logger.warning(
-            'Mirror preflight dispatch for %s failed (%s); sequence written '
-            '(pending), leaving queue file for next-tick re-dispatch',
-            seq_id, e,
-        )
-        result.dispatch_failed.append(phase_id)
-        return
-
-    _remove_queue_file(path)
-    result.launched.append(phase_id)
+        result.launched.append(phase_id)
 
 
 def drain_once(
