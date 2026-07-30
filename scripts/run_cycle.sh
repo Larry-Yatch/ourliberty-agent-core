@@ -36,21 +36,46 @@ source "${HOME}/agent-core/scripts/_lib_push_with_rebase.sh"
 # can't drift between the two committers.
 # shellcheck source=_lib_pulse_runtime.sh
 source "${HOME}/agent-core/scripts/_lib_pulse_runtime.sh"
-# Single definition of the costs.jsonl row + the model selector, shared with
-# run_medic.sh (they carried byte-identical hand-copies until 2026-07-30).
-# Resolved RELATIVE TO THIS SCRIPT, not $HOME, so it is found wherever the
-# wrapper is invoked from. GUARDED: under `set -e` an unguarded `source` of a
-# missing file aborts the entire cycle — strictly worse than the best-effort
-# cost row it would protect. A missing lib degrades to a logged skip below.
-_COST_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_lib_cost_capture.sh"
-if [ -f "$_COST_LIB" ]; then
-    # shellcheck source=_lib_cost_capture.sh
-    source "$_COST_LIB"
-fi
 
 log() {
     echo "[$(date '+%Y-%m-%dT%H:%M:%S%z')] run_cycle: $*" | tee -a "$LOG_FILE"
 }
+
+# Single definition of the costs.jsonl row + the model selector, shared with
+# run_medic.sh (they carried byte-identical hand-copies until 2026-07-30).
+# Resolved RELATIVE TO THIS SCRIPT, not $HOME, so it is found wherever the
+# wrapper is invoked from.
+#
+# GUARDED IN BOTH DIRECTIONS: under `set -e` an unguarded `source` aborts the
+# entire cycle — strictly worse than the best-effort cost row it protects — and
+# `[ -f ]` alone only covers ABSENCE. A file that exists but cannot be loaded
+# kills the tick just as dead, so:
+#   * `[ -r ]` covers mode/ownership drift (a mode-000 lib);
+#   * `bash -n` covers a PARSE error, which `source X || …` does NOT survive
+#     (bash still exits 2 through the `||`);
+#   * `|| _COST_LIB_STATE=unloadable` covers the remaining direction, a RUNTIME
+#     failure inside the lib (errexit is suspended inside a `||` list).
+# The state is tri-valued so the cost block below names the ACTUAL reason
+# rather than reporting every failure as "lib missing" — a log that asserts the
+# wrong cause is the same honesty defect the cost row's rc surface exists to
+# close. Deliberately placed BELOW `log()` (so an unloadable lib reaches
+# cycle.log, not just the journal) and ABOVE the lock write (so a failure here
+# still cannot leave a stale lock behind).
+#
+# A malformed lib must not reach the droplet in the first place:
+# scripts/tests/test_shell_scripts_parse.py runs `bash -n` over every
+# scripts/**/*.sh, so this guard is the second line, not the only one.
+_COST_LIB="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/_lib_cost_capture.sh"
+_COST_LIB_STATE=absent
+if [ -f "$_COST_LIB" ]; then
+    if [ -r "$_COST_LIB" ] && "${BASH:-bash}" -n "$_COST_LIB" 2>/dev/null; then
+        # shellcheck source=_lib_cost_capture.sh
+        _COST_LIB_STATE=loaded
+        source "$_COST_LIB" || _COST_LIB_STATE=unloadable
+    else
+        _COST_LIB_STATE=unloadable
+    fi
+fi
 
 # --- concurrency guard ---
 if [ -f "$LOCK_FILE" ]; then
@@ -243,16 +268,30 @@ log "reaped any leftover agents/pulse/write_journal_*.py helper scripts"
 # passed to `claude --model` above.
 COSTS_FILE="${HOME}/agents/blackboard/costs.jsonl"
 mkdir -p "$(dirname "$COSTS_FILE")"
-if command -v capture_cost_row >/dev/null 2>&1; then
+#
+# Every rc the lib can return gets its OWN arm. The catch-all must not assert a
+# cause: it used to say "jq missing or empty output", which would mislabel an
+# append that failed, a bad-arity call and an unbuildable row alike — the same
+# class of lie as reporting a lost row as appended.
+if [ "$_COST_LIB_STATE" = loaded ] && command -v capture_cost_row >/dev/null 2>&1; then
     COST_RC=0
     capture_cost_row \
         "$CYCLE_OUT" "pulse" "cycle" "cycle-" "$CYCLE_OK" \
         "$DISPATCH_TIER" "run_cycle.sh" "$WORK_MODEL" "$COSTS_FILE" || COST_RC=$?
     case "$COST_RC" in
         0)  log "cost record appended to $COSTS_FILE" ;;
+        10) log "cost-capture: jq missing or empty output; skipping" ;;
         20) log "cost-capture: jq parse failed; skipping" ;;
-        *)  log "cost-capture: jq missing or empty output; skipping" ;;
+        30) log "cost-capture: called with bad arguments; no row written" ;;
+        40) log "cost-capture: no cost row could be built from $CYCLE_OUT; no row written" ;;
+        41) log "cost-capture: refused a multi-row build from $CYCLE_OUT; no row written" ;;
+        50) log "cost-capture: append to $COSTS_FILE FAILED (row LOST); the tick continues" ;;
+        *)  log "cost-capture: failed (rc=$COST_RC); no row written" ;;
     esac
+elif [ "$_COST_LIB_STATE" = unloadable ]; then
+    log "cost-capture: lib present but could not be loaded ($_COST_LIB); skipping"
+elif [ "$_COST_LIB_STATE" = loaded ]; then
+    log "cost-capture: lib loaded but defines no capture_cost_row ($_COST_LIB); skipping"
 else
     log "cost-capture: lib missing; skipping"
 fi
