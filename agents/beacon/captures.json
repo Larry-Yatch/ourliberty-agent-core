@@ -2463,6 +2463,36 @@
         "from_state": "parked"
       },
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+    },
+    {
+      "id": "cap-deep-review-hold-approve-posts-the-token-but-nev-2d25",
+      "title": "Deep-review-hold Approve posts the token but never merges, and re-posts every 60s forever",
+      "note": "Larry approved the deep-review-hold card for RSDPM #161 at ~19:05 MDT on 2026-07-29. The approval handler fired correctly, and kept firing forever without merging.\n\nOBSERVED (outbox-notifier journal):\n  19:05:42  deep-review-hold APPROVED -> posted deep-review success status on pr=.../161 sha=d4827b88f8cc\n  19:06:44  (identical)\n  19:07:45  (identical)\n  19:08:46  (identical)\nOne line per reconcile tick, indefinitely. It never merged, never cleared the card, and emitted NO AUTO_MERGE log line on any of those ticks.\n\nState at the time: mirror-review SUCCESS, deep-review-passed label present, mergeable=MERGEABLE, all CI green, no blocker. A direct gh pr merge --squash then merged it instantly as e3e4b22c, which proves no real gate was blocking it.\n\nWHY THIS IS THE TOP-SEVERITY CLASS: this is the THIRD distinct Approve-no-op site in one evening. (1) #1058, a promoted unreg-approval card that cleared with no dispatch. (2) The class #1060 is currently fixing. (3) This one, the deep-review-hold path. Larry has ONE durable decision surface and pressing it does nothing. Worse, this variant is loud in the log and still invisible in outcome, so it can burn indefinitely.\n\nWHERE: scripts/outbox_notifier.py, the deep-review-hold approval handler around lines 10059-10112. The code already INTENDS to drive the merge: it stamps the label, posts the SHA-bound status, then gates the drive on\n  drive_key = (repo, pr_number, head_sha or empty-string)\n  first_drive = drive_key not in _deep_review_merge_driven\n  if first_drive or _do_state_recheck: merge_result = _attempt_auto_merge_with_gates(...)\n\nHYPOTHESIS TO CHECK FIRST, NOT A CONCLUSION: _deep_review_merge_driven is a module-level in-memory set. If that key was already present from an earlier tick, first_drive is False and the merge drive only re-fires on the throttled _do_state_recheck cadence, while the status POST above it is NOT throttled. That would produce exactly the observed signature: status every 60s, merge never. VERIFY by instrumenting whether _attempt_auto_merge_with_gates is entered at all on an approved tick. Do not assume it ran and returned a non-merged outcome, because every non-merged outcome logs and nothing was logged.\n\nREGRESSION TEST MUST TEST THE GATE, NOT A RESTATEMENT OF IT: drive the real approval handler against an approved card and assert the PR actually reaches merged. Prove the test FAILS against todays code. Asserting that _attempt_auto_merge_with_gates was called is NOT sufficient - by inspection it was reachable and the PR still did not merge.\n\nSECOND DEFECT, FIX IT TOO: an approved card that cannot be actioned must either clear or escalate to Larry. It must never re-post the same status every 60s forever. Silent-but-noisy repetition is the reason this went unnoticed until a human watched the log.\n\nCONTEXT: found while merging RSDPM #161 (M14 PR-C). Main had 0036 without 0035 for ~55 minutes because #162 merged out of order, which made the confirm queue reject every newly created bundle. #161 was the fix and this bug is what delayed it. Related memory: session-less-review-escalate-approve-mismatch, deep-review-passed-handoff-stamp, test-the-gate-not-your-restatement-of-it.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "main",
+        "captured_at": "2026-07-30T01:19:49.662472+00:00"
+      },
+      "last_touched": "2026-07-30T01:19:49.662472+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "The Approve button on a held item posts a success notice but silently fails to actually finish the job, then keeps re-posting that same false notice every minute indefinitely.",
+        "why": "Your single approval button is the one lever you have to move work forward, and right now pressing it looks like it worked while nothing happens \u2014 this is the third case of that same broken pattern tonight, so approvals you think you've given may be quietly stalling.",
+        "suggest": "Have the team fix this carefully and prove the fix with a real end-to-end test before trusting it, and make sure any approval that can't complete either clears itself or comes back to you instead of looping in silence."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-30T01:25:40.906446+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     }
   ]
 }
