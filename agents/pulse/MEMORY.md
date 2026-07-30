@@ -8,7 +8,7 @@
 
 ## system-health.json correct path is ~/agents/blackboard/system-health.json (learned 2026-07-28, iter ~6618)
 
-**Rule:** The system health file is `~/agents/blackboard/system-health.json` (NOT `agent-core-system-health.json`). Schema: `{"timestamp": "<ISO 8601>", "overall": "healthy|degraded", "checks": {...}, "bots": {...}}` — key is `"timestamp"` not `"ts"`. The file has full bot liveness (beacon/forge/mirror/pulse: desired, alive, unit, action). `agent-core-system-health.json` does NOT exist. The correct path for Check C bot liveness is `system-health.json`.
+**Rule:** The system health file is `~/agents/blackboard/system-health.json` (NOT `agent-core-system-health.json`). Schema: `{"timestamp": "<ISO 8601>", "overall": "healthy|degraded", "checks": {...}}` — key is `"timestamp"` not `"ts"`. **No top-level `bots` key.** Bot liveness is nested at `checks.bots.bots` — a dict keyed by agent name (beacon/forge/mirror/pulse) with fields `desired`, `alive`, `unit`, `action`. Access: `d["checks"]["bots"]["bots"]`. `agent-core-system-health.json` does NOT exist. The correct path for Check C bot liveness is `system-health.json`. (Schema corrected iter ~6847 — prior description listed top-level `bots` key which does not exist.)
 
 ---
 
