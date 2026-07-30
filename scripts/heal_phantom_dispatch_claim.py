@@ -66,23 +66,28 @@ _BACKTICK_RE = re.compile(r'`([a-z0-9][a-z0-9-]*[a-z0-9])`')
 
 
 def agents_root() -> Path:
-    override = os.environ.get('OURLIBERTY_AGENTS_ROOT')
-    return Path(override) if override else Path.home() / 'agents'
+    # One variable name per env var (not a shared `override`): the agents-root
+    # guard trusts a name only when EVERY binding of it in the file is that
+    # same read, and a name meaning three different vars is the shape that
+    # produced the beacon log-dir bug (#1062).
+    agents_override = os.environ.get('OURLIBERTY_AGENTS_ROOT')
+    return Path(agents_override) if agents_override else Path.home() / 'agents'
 
 
 def log_dir() -> Path:
     # Match beacon_telegram_bot.resolve_log_dir(): OURLIBERTY_LOG_DIR wins, else
     # <agents_root>/logs. Tests set OURLIBERTY_LOG_DIR to a temp dir so they
     # never read the live log.
-    override = os.environ.get('OURLIBERTY_LOG_DIR')
-    return Path(override) if override else agents_root() / 'logs'
+    log_override = os.environ.get('OURLIBERTY_LOG_DIR')
+    return Path(log_override) if log_override else agents_root() / 'logs'
 
 
 def worktrees_root() -> Path:
     # Production worktrees live under ~/agent-worktrees (NOT under agents_root),
     # so this needs its own override rather than riding on OURLIBERTY_AGENTS_ROOT.
-    override = os.environ.get('OURLIBERTY_WORKTREES_ROOT')
-    return Path(override) if override else Path.home() / 'agent-worktrees'
+    worktrees_override = os.environ.get('OURLIBERTY_WORKTREES_ROOT')
+    return (Path(worktrees_override) if worktrees_override
+            else Path.home() / 'agent-worktrees')
 
 
 def blackboard() -> Path:
