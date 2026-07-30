@@ -329,12 +329,25 @@ def branch_is_behind_base(repo: str, base_ref: str, head_sha: str) -> bool:
 # -------------------- card scanning --------------------
 
 def candidate_cards() -> list[dict[str, Any]]:
-    """Pending session-less Mirror decision cards carrying a full PR coordinate.
+    """Pending session-less Mirror decision cards carrying a PR coordinate.
 
     The coordinate comes from `recheck_target`, the same structured field the
     Approvals tab's third action uses. A card without one cannot be acted on
     (we would be guessing the PR), so it is skipped rather than parsed out of
     the prose summary.
+
+    `head_sha` is required only for FULL-ladder cards, whose rules 2/3 compare
+    against it. Promoted cards run rule 1 alone, which needs nothing but the
+    repo and PR number — and requiring a head there stranded them (review
+    round 2): a promoted coordinate may legitimately omit `head_sha` when the
+    promote-time probe failed, and rule 1 is the ONLY thing that retires a
+    promoted card once its PR merges. Verified there is no other path —
+    `heal_unregistered_approval.reconcile_retire` finds no `#N` in the
+    `mirror-review:<task>` ledger subject so it never gh-probes,
+    `heal_stale_approvals`' coordinate expiry requires the `mirror-review-pr-`
+    wrapper, and `outbox_notifier._reconcile_no_session_decision_on_merge`
+    matches `mirror-review-*` only. So a headless promoted card would sit on
+    the tab forever after its PR merged.
     """
     try:
         pending = approval.load_state().get('pending', [])
@@ -354,7 +367,14 @@ def candidate_cards() -> list[dict[str, Any]]:
             continue
         pr_url = target.get('pr_url')
         head_sha = target.get('head_sha')
-        if not (isinstance(pr_url, str) and isinstance(head_sha, str)):
+        if not isinstance(pr_url, str):
+            continue
+        if not isinstance(head_sha, str) or not head_sha:
+            head_sha = None
+        full_ladder = _full_ladder_card(card_id)
+        if full_ladder and head_sha is None:
+            # Rules 2/3 compare against the card's head; without one there is
+            # nothing to compare and the full ladder cannot run.
             continue
         coord = parse_pr_url(pr_url)
         if coord is None:
@@ -366,7 +386,7 @@ def candidate_cards() -> list[dict[str, Any]]:
             'pr_number': pr_number,
             'head_sha': head_sha,
             'pr_url': pr_url,
-            'full_ladder': _full_ladder_card(card_id),
+            'full_ladder': full_ladder,
         })
     return out
 
@@ -420,7 +440,7 @@ def evaluate(card: dict[str, Any], ledger: dict[str, Any], dry_run: bool,
              budget: list[int]) -> str:
     """Apply the ladder to one card. Returns an outcome tag for the summary."""
     repo, pr_number = card['repo'], card['pr_number']
-    card_id, card_head = card['card_id'], card['head_sha']
+    card_id, card_head = card['card_id'], card.get('head_sha')
 
     pr = probe_pr(repo, pr_number)
     if pr is None:
@@ -443,6 +463,13 @@ def evaluate(card: dict[str, Any], ledger: dict[str, Any], dry_run: bool,
     # (in either direction). One pure predicate, one source of truth.
     if not _full_ladder_card(card_id):
         return 'left-pending-promoted-card'
+
+    # Belt-and-braces: candidate_cards guarantees a head on full-ladder cards,
+    # so this is unreachable from the healer's own scan. A hand-built card dict
+    # must degrade to "uncertain, leave it" rather than crash the tick or, far
+    # worse, compare a live head against None and retire as superseded.
+    if not isinstance(card_head, str) or not card_head:
+        return 'left-pending-no-card-head'
 
     # Rule 2 — the card describes a head that is no longer the PR's.
     live_head = pr.get('headRefOid')

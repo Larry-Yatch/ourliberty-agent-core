@@ -236,6 +236,29 @@ class CandidateCardsTest(_IsolatedAgentsRoot):
                          f'{hua.PROMOTED_TASK_PREFIX}-')
         self.assertIn(h.PROMOTED_CARD_PREFIX, h.CARD_ID_PREFIXES)
 
+    def test_includes_a_headless_promoted_card(self):
+        """Review round 2 defect: requiring head_sha kept headless promoted
+        cards out of the ladder, and rule 1 is the ONLY thing that retires a
+        promoted card when its PR merges (reconcile_retire never gh-probes for
+        these — no '#N' in the ledger subject; heal_stale_approvals needs the
+        mirror-review-pr- wrapper; the notifier's merge reconciler matches
+        mirror-review-* only). So such a card ghosted on the tab forever."""
+        card = _card(card_id='unreg-approval-abc123')
+        del card['dispatch_payload']['recheck_target']['head_sha']
+        with self._with_pending([card]):
+            got = h.candidate_cards()
+        self.assertEqual(len(got), 1)
+        self.assertIsNone(got[0]['head_sha'])
+        self.assertFalse(got[0]['full_ladder'])
+
+    def test_still_requires_a_head_on_full_ladder_cards(self):
+        # Rules 2/3 compare against the card's head; without one there is
+        # nothing to compare, so a mirror-review card stays out of scope.
+        card = _card()
+        del card['dispatch_payload']['recheck_target']['head_sha']
+        with self._with_pending([card]):
+            self.assertEqual(h.candidate_cards(), [])
+
     def test_ignores_promoted_cards_without_a_coordinate(self):
         """A larry-alert promotion (or a pre-fix promoted card) carries no
         recheck_target — out of scope, exactly like a coordinate-less
@@ -386,6 +409,37 @@ class PromotedCardLadderDepthTest(_LadderBase):
         self.assertEqual(tag, 'left-pending-promoted-card')
         self.assertEqual(self.updated, [])
         self.assertEqual(self.retired, [])
+
+    def test_rule_one_retires_a_HEADLESS_promoted_card(self):
+        # The whole point of admitting headless promoted cards: merge/close is
+        # the only retirement they will ever get, and it needs no head.
+        for state, tag in (('MERGED', 'retired-merged'),
+                           ('CLOSED', 'retired-closed')):
+            with self.subTest(state=state):
+                self.retired.clear()
+                card = {
+                    'card_id': self.PROMOTED, 'repo': 'Larry-Yatch/RSDPM',
+                    'pr_number': 111, 'head_sha': None, 'pr_url': 'u',
+                    'full_ladder': False,
+                }
+                with patch.object(h, 'probe_pr',
+                                  return_value=_open_pr(state=state)):
+                    self.assertEqual(
+                        h.evaluate(card, {'actioned': {}}, False, [3]), tag)
+                self.assertEqual(len(self.retired), 1)
+
+    def test_a_full_ladder_card_with_no_head_is_left_alone(self):
+        # Unreachable from candidate_cards, but a hand-built dict must not
+        # crash the tick or compare a live head against None and retire.
+        card = {
+            'card_id': 'mirror-review-pr-RSDPM-111', 'repo': 'Larry-Yatch/RSDPM',
+            'pr_number': 111, 'head_sha': None, 'pr_url': 'u',
+        }
+        with patch.object(h, 'probe_pr', return_value=_open_pr()):
+            tag = h.evaluate(card, {'actioned': {}}, False, [3])
+        self.assertEqual(tag, 'left-pending-no-card-head')
+        self.assertEqual(self.retired, [])
+        self.assertEqual(self.updated, [])
 
     def test_rule_one_still_retires_a_promoted_card(self):
         # A terminal PR genuinely moots the decision — safe for every class,

@@ -427,6 +427,20 @@ class ApprovedEscalationModeTest(unittest.TestCase):
                     hua.parse_pr_url(url), da._parse_recheck_pr_url(url),
                     f'PR-URL grammars disagree on {url!r}')
 
+    def test_id_prefix_matches_the_promoter_constant(self):
+        """Second cross-module literal, same drift hazard as the marker: if the
+        promoter renames its task-id prefix, _is_promoted_stranded_escalation
+        returns False for every real card and Approve silently reverts to the
+        generic Beacon envelope — the #1058 no-op restored, tests still green
+        because they hard-code the id."""
+        import heal_unregistered_approval as hua
+        self.assertEqual(da.PROMOTED_STRANDED_ESCALATION_ID_PREFIX,
+                         f'{hua.PROMOTED_TASK_PREFIX}-')
+        # ... and a real promoted task_id actually carries it.
+        self.assertTrue(
+            hua.derive_task_id(hua.forlarry_dedup_key('mirror-review:t'))
+            .startswith(da.PROMOTED_STRANDED_ESCALATION_ID_PREFIX))
+
     def test_marker_string_matches_the_promoter_constant(self):
         # dashboard_api keys the routing on a literal (importing the healer
         # into the API process is undesirable); this pins the two against

@@ -116,6 +116,10 @@ FORLARRY_LEDGER_PREFIX = 'forlarry:'
 # act — no merge rights, recommendation stranded in a null-chat outbox).
 PROMOTED_SOURCE_FORLARRY = 'for-larry-mirror-review'
 
+# The agent a promoted card's Approve dispatches its re-review to. Named once
+# so the allowlist check and the coordinate it validates cannot disagree.
+MIRROR_AGENT = 'mirror'
+
 # Per-tick cap on archived Beacon outboxes parsed during marker recovery, so an
 # unpruned outbox archive can't make the scan unbounded. Only in-window files
 # are eligible, newest-first; recovery is a best-effort enrichment, so a deeper
@@ -1227,21 +1231,47 @@ def dispatchable_target_repo(owner_repo: str) -> Optional[str]:
     against the real predicate rather than re-deriving the name is deliberate:
     a second copy of the allowlist rule here is exactly how this defect
     survived its first round of tests.
+
+    Review round 2 defect: asking the gate is not enough, because THIS gate
+    fails OPEN. `check_target_repo` returns ok=True when the agent has no
+    configured `allowed_repos` (`routing_validator.py`'s "fails open ...
+    preserving back-compat for non-worktree agents"), and
+    `_load_models_config` collapses an unreadable/malformed agent-models.json
+    to `{}` — which it then CACHES for the process lifetime. In that state
+    `canonical_repo` also returns the name unchanged (nothing to match
+    against), so a bare `if not ok` accepted the raw slug and silently
+    reproduced the round-1 black-hole for the whole tick. `ok=True` means
+    "allowed" OR "I have no allowlist to check against"; those are opposite
+    conclusions (cf. [[existence-gates-are-false-clean-generators]]). So the
+    allowlist must be non-empty — POSITIVE evidence that the gate could
+    actually answer — before its verdict counts.
     """
     if not owner_repo:
         return None
     try:
         import routing_validator as rv  # local: keeps config IO off import
+        allowed = rv.allowed_repos_for(MIRROR_AGENT)
         canonical = rv.canonical_repo(owner_repo)
-        ok, reason = rv.check_target_repo('mirror', canonical)
     except Exception as e:  # noqa: BLE001 — unresolvable ⇒ no stamp (fail closed)
         log(f'target_repo canonicalization failed for {owner_repo!r}: '
             f'{type(e).__name__}: {e}', 'WARN')
         return None
+    if not allowed:
+        # The gate cannot answer, so its "yes" is meaningless. Fail closed.
+        log(f'no allowed_repos configured for {MIRROR_AGENT} (agent-models.json '
+            f'missing or malformed?) — cannot confirm {owner_repo!r} is '
+            f'dispatchable; not stamping a coordinate', 'WARN')
+        return None
+    try:
+        ok, reason = rv.check_target_repo(MIRROR_AGENT, canonical)
+    except Exception as e:  # noqa: BLE001
+        log(f'target_repo check failed for {canonical!r}: '
+            f'{type(e).__name__}: {e}', 'WARN')
+        return None
     if not ok:
         log(f'target_repo {canonical!r} (from {owner_repo!r}) would be denied '
-            f'at Mirror\'s inbox: {reason}; not stamping a coordinate that '
-            f'cannot dispatch', 'WARN')
+            f'at {MIRROR_AGENT}\'s inbox: {reason}; not stamping a coordinate '
+            f'that cannot dispatch', 'WARN')
         return None
     return canonical
 

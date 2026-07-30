@@ -1471,6 +1471,31 @@ class BuildPromotedRecheckTargetTest(unittest.TestCase):
         ok, reason = rv.check_target_repo('mirror', repo)
         self.assertTrue(ok, reason)
 
+    def test_unloadable_repo_config_fails_the_stamp_closed(self):
+        """Review round 2 defect: check_target_repo FAILS OPEN — it returns
+        ok=True when the agent has no configured allowed_repos, which is what
+        an unreadable/malformed agent-models.json produces (_load_models_config
+        collapses any error to {} and caches it). canonical_repo also returns
+        the name unchanged with nothing to match against, so trusting `ok`
+        alone re-stamped the raw owner/repo slug and silently reproduced the
+        round-1 black-hole for the whole tick."""
+        import routing_validator as rv
+        saved = rv._MODELS_CACHE.get('config')
+        rv._MODELS_CACHE['config'] = {}          # simulate the failed load
+        try:
+            # The gate itself still says "fine" — that is the trap.
+            self.assertEqual(
+                rv.check_target_repo('mirror', 'Larry-Yatch/x'), (True, None))
+            self.assertIsNone(
+                h.build_promoted_recheck_target(FORLARRY_DECISION_RECORD))
+            self.assertIsNone(
+                h.dispatchable_target_repo('Larry-Yatch/ourliberty-agent-core'))
+        finally:
+            if saved is None:
+                rv._MODELS_CACHE.pop('config', None)
+            else:
+                rv._MODELS_CACHE['config'] = saved
+
     def test_repo_outside_mirrors_allowlist_fails_the_stamp_closed(self):
         """A PR in a repo Mirror may not target must not get a coordinate:
         stamping one would promise an Approve that the inbox then discards."""
