@@ -15996,7 +15996,11 @@
         "at": "2026-07-30T00:45:28.494433+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-30T02:30:14.252893+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-closed-pr-dedup-wedge-fix-001",
@@ -16357,7 +16361,11 @@
         "at": "2026-07-30T02:16:17.117310+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-30T02:30:14.252893+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-deep-review-hold-pr1064-cc193879",
@@ -16420,6 +16428,23 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-deep-review-hold-pr1060-c9eb3c85",
+      "name": "Deep Review Hold Pr1060 C9eb3c85",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `deep-review-hold-pr1060-c9eb3c85`. Last activity 2026-07-30T02:20:28.127778+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "deep-review-hold-pr1060-c9eb3c85"
+      ],
+      "repo": null,
+      "created": "2026-07-30",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-30T02:30:14.252893+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-30T02:20:28.127778+00:00"
     }
   ]
 }
