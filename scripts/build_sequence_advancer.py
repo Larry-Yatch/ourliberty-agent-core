@@ -746,6 +746,25 @@ def _build_step_envelope(
     task_type = step.get('task_type', 'feature-development')
     dispatch_text = step.get('dispatch_text', '')
     spec_doc = seq.get('spec_doc', '')
+    # Dispatch generation (closed-pr-dedup-wedge-fix-001). `apply_retry` bumps
+    # `step.dispatch_generation` on every rebuild; carry it forward so Beacon
+    # echoes it in the APPROVAL_REQUEST marker and the notifier folds it into the
+    # Forge inbox filename (`<task_id>-g<N>.json`), letting the rebuild past the
+    # existence-only dedup that would otherwise wedge it. Absent / 1 == the first
+    # dispatch, which keeps the bare `<task_id>.json` name (no behavior change).
+    dispatch_generation = step.get('dispatch_generation')
+    if not isinstance(dispatch_generation, int) or dispatch_generation < 1:
+        dispatch_generation = 1
+    generation_clause = (
+        (
+            f'generation=`{dispatch_generation}` (this is a REBUILD — the step '
+            f'was retried; set a `generation` field to `{dispatch_generation}` '
+            f'in the marker VERBATIM so the rebuild lands under a fresh Forge '
+            f'inbox filename and is not skipped by the existence-only dedup), '
+        )
+        if dispatch_generation >= 2
+        else ''
+    )
 
     prompt = (
         f'GOAL: synthesize one standard APPROVAL_REQUEST marker for Forge '
@@ -770,8 +789,8 @@ def _build_step_envelope(
         f'~/agent-core/scripts/marker.py render beacon approval_request` '
         f'with target_agent=forge, prompt set to the DISPATCH_TEXT above '
         f'verbatim, task_id=`{step_id}`, target_repo=`{target_repo}`, '
-        f'task_type=`{task_type}`, phase=preflight. Trust policy handles '
-        f'auto-approve / require-Larry per existing rules.\n\n'
+        f'task_type=`{task_type}`, {generation_clause}phase=preflight. Trust '
+        f'policy handles auto-approve / require-Larry per existing rules.\n\n'
         f'After Forge\'s PR auto-merges (D3.5 5d) the chain_events row + '
         f'`gh pr view` will agree, the advancer\'s belt-and-suspenders '
         f'gate will pass, and the next step (or sequence-complete DM) '
@@ -779,7 +798,7 @@ def _build_step_envelope(
         f'Preflight: this is a marker-synthesis task — emit the marker, '
         f'nothing else.'
     )
-    return {
+    envelope = {
         'task_id': f'seq-{seq_id}-step-{step_id}',
         'source': 'orchestrator',
         'prompt': prompt,
@@ -788,6 +807,11 @@ def _build_step_envelope(
         'phase': 'preflight',
         'reply_chat_id': None,
     }
+    # Only stamp the generation on rebuilds (>= 2); a first dispatch leaves it
+    # absent so the whole downstream chain keeps its byte-identical legacy shape.
+    if dispatch_generation >= 2:
+        envelope['dispatch_generation'] = dispatch_generation
+    return envelope
 
 
 def _dispatch_step(seq: dict[str, Any], step: dict[str, Any]) -> Optional[str]:

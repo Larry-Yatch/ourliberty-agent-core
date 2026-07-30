@@ -12467,6 +12467,133 @@ class BeaconHeadlessApprovalRequestTest(unittest.TestCase):
         self.assertEqual(len(list(live_dir.glob(f'{task_id}.json'))), 1)
         self.assertNotIn('HEADLESS_DEDUP_OVERRIDE', on.LOG_FILE.read_text())
 
+    # ---------------- generation-in-marker (closed-pr-dedup-wedge-fix-001) ----------------
+    #
+    # A COMPLETED prior attempt whose PR was later CLOSED archives `<task_id>.json`
+    # but is NOT a definitive non-run (it has a PR), so the 2026-06-11 override
+    # does NOT fire — the existence gate would silently wedge the rebuild forever.
+    # The generation carried in Beacon's marker gives the rebuild a NEW filename.
+
+    def test_generation_rebuild_writes_gN_filename_past_archive(self):
+        # THE wedge fix: prior bare `<task_id>.json` is archived (its PR closed),
+        # and the rebuild's marker carries generation 2. The dispatch must NOT be
+        # skipped — it lands under `<task_id>-g2.json`. (Fails pre-fix: the bare
+        # filename collides with the archive and the write is skipped.)
+        task_id = 'm14-pr-a'
+        self._seed_inbox_archive(task_id)  # bare `<task_id>.json` in .archive
+        self._seed_outbox_result(task_id, self._completed_result(task_id))
+        body = self._headless_outbox(
+            marker_text=self._marker(task_id=task_id, generation=2),
+        )
+        f = self._write_outbox('beacon', 'larry-rebuild.json', body)
+        status = on.process_outbox(f)
+        self.assertEqual(status, 'headless-approval-dispatched')
+        live = on.INBOXES_ROOT / 'forge'
+        self.assertTrue((live / f'{task_id}-g2.json').exists())
+        # The bare name is NOT written — the rebuild is a distinct generation.
+        self.assertFalse((live / f'{task_id}.json').exists())
+        written = json.loads((live / f'{task_id}-g2.json').read_text())
+        self.assertEqual(written['dispatch_generation'], 2)
+
+    def test_generation_replay_same_gen_still_dedups(self):
+        # Invariant i: the SAME marker replayed after a crash carries the SAME
+        # generation -> the SAME `-g2` filename -> the existence gate on the
+        # archived `-g2` file still prevents a double-dispatch.
+        task_id = 'm14-pr-a'
+        d = on.INBOXES_ROOT / 'forge' / '.archive'
+        d.mkdir(parents=True, exist_ok=True)
+        (d / f'{task_id}-g2.json').write_text('{}')
+        body = self._headless_outbox(
+            marker_text=self._marker(task_id=task_id, generation=2),
+        )
+        f = self._write_outbox('beacon', 'larry-replay.json', body)
+        on.process_outbox(f)
+        # No fresh live write — the `-g2` archive dedups the replay.
+        self.assertFalse((on.INBOXES_ROOT / 'forge' / f'{task_id}-g2.json').exists())
+
+    def test_generation_absent_uses_bare_filename(self):
+        # Invariant iii: a marker WITHOUT a generation writes the byte-identical
+        # legacy `<task_id>.json` name (no `-g` suffix anywhere).
+        task_id = 'plain-task-001'
+        body = self._headless_outbox(marker_text=self._marker(task_id=task_id))
+        f = self._write_outbox('beacon', 'larry-nogen.json', body)
+        on.process_outbox(f)
+        live = on.INBOXES_ROOT / 'forge'
+        written = [p.name for p in live.glob('*.json')]
+        self.assertEqual(written, [f'{task_id}.json'])
+
+    # ---------------- Piece 2: loud skip signal ----------------
+
+    def _for_larry_records(self, signal_file):
+        import for_larry_signal as fls
+        return fls.load_records(signal_file)
+
+    def test_wedge_skip_signals_larry_on_stale_archive(self):
+        # Rebuild whose generation was NOT carried (Beacon dropped the field):
+        # the bare filename re-hits an OLD archived completed attempt, the write
+        # is skipped, and NOTHING is queued. The notifier — the only actor that
+        # knows the dispatch produced nothing — must surface it loudly.
+        task_id = 'm14-pr-a'
+        self._seed_inbox_archive(task_id)
+        archived = on.INBOXES_ROOT / 'forge' / '.archive' / f'{task_id}.json'
+        old = time.time() - 3600  # 1h old → past the crash-replay window
+        os.utime(archived, (old, old))
+        self._seed_outbox_result(task_id, self._completed_result(task_id))
+        signal_file = self._root / 'blackboard' / 'for-larry-escalations.json'
+        body = self._headless_outbox(marker_text=self._marker(task_id=task_id))
+        f = self._write_outbox('beacon', 'larry-wedge.json', body)
+        with mock.patch.dict(
+            os.environ,
+            {'OURLIBERTY_FOR_LARRY_SIGNAL_FILE': str(signal_file)},
+        ):
+            on.process_outbox(f)
+        recs = self._for_larry_records(signal_file)
+        key = f'{on._DISPATCH_WEDGE_SKIP_KEY_PREFIX}{task_id}'
+        self.assertIn(key, recs)
+        self.assertFalse(recs[key]['resolved'])
+        self.assertEqual(recs[key]['task_id'], task_id)
+        self.assertIn('DISPATCH_WEDGE_SKIP', on.LOG_FILE.read_text())
+
+    def test_benign_replay_no_signal_on_fresh_archive(self):
+        # A same-marker crash-replay collides with a SECONDS-old archive — the
+        # existence gate is doing exactly its job. Stay silent (no for-Larry).
+        task_id = 'm14-pr-a'
+        self._seed_inbox_archive(task_id)  # fresh mtime (just written)
+        self._seed_outbox_result(task_id, self._completed_result(task_id))
+        signal_file = self._root / 'blackboard' / 'for-larry-escalations.json'
+        body = self._headless_outbox(marker_text=self._marker(task_id=task_id))
+        f = self._write_outbox('beacon', 'larry-benign.json', body)
+        with mock.patch.dict(
+            os.environ,
+            {'OURLIBERTY_FOR_LARRY_SIGNAL_FILE': str(signal_file)},
+        ):
+            on.process_outbox(f)
+        key = f'{on._DISPATCH_WEDGE_SKIP_KEY_PREFIX}{task_id}'
+        self.assertNotIn(key, self._for_larry_records(signal_file))
+
+    def test_wedge_signal_self_clears_on_real_dispatch(self):
+        # Once a real dispatch lands (the generation carry works on the next
+        # tick), the prior wedge signal self-clears (decision d).
+        task_id = 'm14-pr-a'
+        signal_file = self._root / 'blackboard' / 'for-larry-escalations.json'
+        import for_larry_signal as fls
+        with mock.patch.dict(
+            os.environ,
+            {'OURLIBERTY_FOR_LARRY_SIGNAL_FILE': str(signal_file)},
+        ):
+            fls.upsert_record(
+                f'{on._DISPATCH_WEDGE_SKIP_KEY_PREFIX}{task_id}',
+                {'id': task_id, 'task_id': task_id, 'headline': 'stuck'},
+            )
+            body = self._headless_outbox(
+                marker_text=self._marker(task_id=task_id, generation=2),
+            )
+            f = self._write_outbox('beacon', 'larry-cleared.json', body)
+            on.process_outbox(f)
+            recs = fls.load_records(signal_file)
+        key = f'{on._DISPATCH_WEDGE_SKIP_KEY_PREFIX}{task_id}'
+        self.assertTrue(recs[key]['resolved'])
+
     def test_non_run_helper_defensive(self):
         # Missing archive dir -> False.
         self.assertFalse(on._prior_dispatch_was_definitive_non_run('no-such'))

@@ -4527,6 +4527,26 @@ class TestStalledActiveStep(_TempAgentsRootMixin, unittest.TestCase):
         self.assertEqual(len(alerts), 1)
         self.assertIn('40 min', alerts[0]['message'])
 
+    def test_closed_pr_dedup_wedge_caught_by_reconciler(self) -> None:
+        # Piece 3 (closed-pr-dedup-wedge-fix-001): the deadline-reconciler net.
+        # A rebuilt step (dispatch_generation bumped by apply_retry) whose
+        # re-dispatch was SILENTLY skipped by Forge's existence-only dedup —
+        # cleared pr_url, no new Forge session_start, sitting `dispatched`. Even
+        # if Pieces 1/2 both failed to prevent/surface it, this net catches the
+        # wedge because there is no build activity past the deadline. Regression
+        # lock: removing the check would let this closed-PR rebuild wedge silently
+        # forever.
+        step = self._step('rebuilt-step', dispatched_min_ago=45)
+        step['dispatch_generation'] = 2  # rebuild → bumped generation
+        self._write_seq('seq', steps=[step])
+        with patch.object(self.hps, '_get_chain_events_for_task',
+                          return_value=[]):  # no Forge session_start (skipped)
+            alerts = self.hps.check_stalled_active_step({})
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(alerts[0]['subject'],
+                         'stalled-active-step:seq:rebuilt-step')
+        self.assertIn('rebuilt-step', alerts[0]['message'])
+
 
 class TestCheckRedMirrorStatusNoArtifact(_TempAgentsRootMixin, unittest.TestCase):
     """mirror-review-visibility Contract E (spec §8 / §10-E). The backstop for

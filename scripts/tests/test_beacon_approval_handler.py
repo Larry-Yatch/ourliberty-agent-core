@@ -605,6 +605,31 @@ class DispatchApprovedTest(unittest.TestCase):
             data = json.load(f)
         self.assertNotIn('origin_task_id', data)
 
+    def test_dispatch_filename_bare_without_generation(self):
+        # closed-pr-dedup-wedge-fix-001 invariant iii: a payload without a
+        # generation keeps the byte-identical legacy `<task_id>.json` filename.
+        entry = {
+            'id': 'no-gen-chat',
+            'target_agent': 'forge',
+            'dispatch_payload': _good_payload(task_id='chat-task-001'),
+        }
+        dest = ah.dispatch_approved(entry)
+        self.assertEqual(dest.name, 'chat-task-001.json')
+
+    def test_dispatch_filename_honors_generation_for_rebuild(self):
+        # A rebuild dispatched through the chat-mode path with generation 2 must
+        # land under `<task_id>-g2.json` so Forge's existence-only dedup does not
+        # silently skip it.
+        entry = {
+            'id': 'gen-chat',
+            'target_agent': 'forge',
+            'dispatch_payload': _good_payload(
+                task_id='chat-task-001', generation=2,
+            ),
+        }
+        dest = ah.dispatch_approved(entry)
+        self.assertEqual(dest.name, 'chat-task-001-g2.json')
+
     def test_dispatch_to_invalid_route_raises(self):
         # forge is target — fine. But what if payload says mirror?
         # Pulse->forge would be wrong source — let's test pulse->forge denial.

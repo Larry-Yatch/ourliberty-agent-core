@@ -127,6 +127,34 @@ class SafeWriteInboxTest(unittest.TestCase):
         self.assertTrue(dest.name.endswith('.json'))
         self.assertIn('--h', dest.name)
 
+    def test_generation_inbox_name_bare_for_first_generation(self):
+        # closed-pr-dedup-wedge-fix-001 invariant iii: generation 1 / None /
+        # non-int / < 2 MUST map to the bare `<task_id>.json` — byte-identical
+        # to the legacy `canonical_inbox_name(f'{task_id}.json')` so all
+        # existing crash-recovery + dedup behavior is unchanged.
+        legacy = swi.canonical_inbox_name('m14-pr-a.json')
+        for gen in (None, 1, 0, -3, 'nonsense', 1.9):
+            self.assertEqual(
+                swi.generation_inbox_name('m14-pr-a', gen), legacy,
+                f'generation={gen!r} must keep the bare filename',
+            )
+
+    def test_generation_inbox_name_suffixes_rebuild_generations(self):
+        # A genuine rebuild (generation >= 2) lands under a NEW filename so it is
+        # not blocked by the archived prior attempt (invariant ii).
+        self.assertEqual(
+            swi.generation_inbox_name('m14-pr-a', 2), 'm14-pr-a-g2.json',
+        )
+        self.assertEqual(
+            swi.generation_inbox_name('m14-pr-a', 5), 'm14-pr-a-g5.json',
+        )
+        # Distinct generations -> distinct names -> the existence gate keys on
+        # the right attempt (replay-safe, invariant i).
+        self.assertNotEqual(
+            swi.generation_inbox_name('m14-pr-a', 2),
+            swi.generation_inbox_name('m14-pr-a', 3),
+        )
+
     def test_audit_log_written(self):
         swi.safe_write_inbox('forge', _good_task(), 'beacon', 'task-audit.json')
         self.assertTrue(swi.ROUTING_EVENTS_LOG.exists())
