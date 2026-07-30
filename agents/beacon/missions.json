@@ -16461,35 +16461,17 @@
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
-      "id": "proposed-merge-verb-backend-001",
-      "name": "Merge Verb Backend 001",
-      "phase": "proposed",
-      "brief": "Auto-proposed from orphan task `merge-verb-backend-001`. Last activity 2026-07-30T02:41:04.879828+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "id": "merge-verb-operator-action",
+      "name": "Operator 'Merge It' Verb",
+      "phase": "drafting",
+      "brief": "Fourth operator verb ('the work is fine, merge it') for the review/approvals surface. Lets an operator publish a reviewed-but-stuck PR with one click instead of a hand-merge. Backend half (merge-verb-backend-001): a `merge` action in dashboard_api._handle_larry_action that re-verifies server-side (Mirror REVIEW_PASS on record + PR open+unmerged) and publishes through the SAME gated auto-merge machinery, plus a `merge_target` stamp on review-passed/open/held approval cards. Gated in TWO places (stamp condition AND server re-verify); available ONLY on review-passed items; no undo. Frontend button/PendingCard is a follow-up dashboard PR.",
       "spec_docs": [],
       "task_ids": [
         "merge-verb-backend-001"
       ],
-      "repo": null,
+      "repo": "ourliberty-agent-core",
       "created": "2026-07-30",
-      "deferred_reason": null,
-      "proposed_by": "heal_orphan_autoregister",
-      "proposed_at": "2026-07-30T02:45:16.225290+00:00",
-      "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-30T02:41:04.879828+00:00",
-      "briefing": {
-        "what": "This builds the behind-the-scenes plumbing for a one-click \"this looks good, ship it\" button so you can approve finished work without any manual steps.",
-        "why": "It removes a bottleneck where completed work waits on you, letting the team move faster while still keeping your final sign-off in place.",
-        "suggest": "Give it the go-ahead, but confirm the safeguards only let you approve work that has already passed review before it goes live."
-      },
-      "risk": "medium",
-      "recommended_action": "delegate",
-      "briefing_provenance": {
-        "by": "beacon",
-        "model": "claude-opus-4-8",
-        "at": "2026-07-30T02:46:20.035187+00:00",
-        "from_state": "proposed"
-      },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "deferred_reason": null
     },
     {
       "id": "proposed-delegate-cap-four-card-types-one-missing-verb-no-button-says-71d1",

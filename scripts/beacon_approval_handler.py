@@ -1051,6 +1051,18 @@ def build_approval_request_chain_event(
     recheck_target = payload.get('recheck_target')
     if isinstance(recheck_target, dict) and recheck_target:
         chain_payload['recheck_target'] = recheck_target
+    # merge-verb-backend-001: forward the structured PR coordinate that gates the
+    # FOURTH operator verb ("merge it"). Stamped ONLY by producers that have
+    # confirmed the PR PASSED review and is still open + unmerged (today
+    # `outbox_notifier._surface_deep_review_hold_approval`), so its presence is
+    # the dashboard's capability gate for rendering the merge button — a card
+    # without it never shows the verb. Shape mirrors recheck_target
+    # {pr_url, target_repo, task_id, head_sha}. The dashboard STILL re-verifies
+    # server-side before any merge fires (this stamp is a gate, not proof).
+    # Absent on every other producer, so their payloads stay byte-identical.
+    merge_target = payload.get('merge_target')
+    if isinstance(merge_target, dict) and merge_target:
+        chain_payload['merge_target'] = merge_target
     # Promoted-card marker (heal_unregistered_approval, agent-core #1058 fix):
     # lets the dashboard tell a promoted stranded Mirror escalation apart from
     # every other approval_request, so Approve can execute mechanically (with a
