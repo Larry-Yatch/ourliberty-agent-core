@@ -10114,3 +10114,80 @@ SIGNAL ⚠️ (PR#1058 Mirror FAILURE + approval stalled; PR#1053 held; PR#157 p
 
 ---
 
+## Iteration ~6784 — 2026-07-29T21:21Z UTC (Larry /cycle chat, Tier 1, consecutive_clean=0; SIGNAL — Check 3: stall-checker NOW detecting red_mirror_status PR#1058 (DRY-RUN recover-then-alert); PR#1053/PR#157 carries; PR#1057 MERGED ✅; 0 new alerts; all mandatory checks NOMINAL)
+
+**Health:** ⚠️ Signal — all mandatory checks NOMINAL; 0 new alerts; key new finding: **Check 3 stall-checker now detecting `red_mirror_status:Larry-Yatch/ourliberty-agent-core:1058` — DRY-RUN `recover-then-alert` would fire (prior iters: 0 stalls detected; now: 1 alert would fire)**. PR#1057 confirmed MERGED at 19:37:06Z (pulse-write-journal-cleanup-001: gitignore + run_cycle cleanup). Carries unchanged: PR#1053 deep-review hold; RSDPM PR#157 pending not resolved.
+
+**VERIFY-BEFORE-REASSERT (from iter ~6783 at ~21:14Z UTC):**
+- **"system-health=healthy ts=2026-07-29T21:10:41Z UTC"**: CONFIRMED ✅ — ts=2026-07-29T21:15:49Z UTC (fresh ~6 min at write). [carry ✅]
+- **"heal-stale-daemon-code.heartbeat 21:03:50Z UTC"**: CONFIRMED ✅ — heartbeat=2026-07-29T21:14:00Z UTC (~7 min at write; <60 min). [carry ✅]
+- **"alerts watermark=533 file_length=533"**: CONFIRMED ✅ — watermark=533, file_length=533, 0 new alerts. [carry ✅ NOMINAL]
+- **"pending=3 UNCHANGED"**: CONFIRMED pending=3 UNCHANGED (rsdpm-confirmall-medium-parent-secondglance-001; deep-review-hold-pr157-db391ec4; deep-review-hold-pr1053-c9c56f09). [carry ✅]
+- **"PR#1058 approved+OPEN awaiting merge exec"**: ESCALATED ⚠️ — updatedAt=20:32:19Z UNCHANGED; MERGEABLE; now stall-checker detecting `red_mirror_status:1058` DRY-RUN would recover-then-alert (cooldown expired; new vs prior iters). [carry escalating ⚠️]
+- **"PR#1053 AUTO_MERGE_HELD_DEEP_REVIEW"**: CONFIRMED carry ⚠️ — updatedAt=19:56:01Z UNCHANGED; MERGEABLE; no labels. [carry ⚠️]
+- **"RSDPM PR#157 deep-review-passed; pending not self-resolved"**: CONFIRMED carry ⚠️ — PR#157 OPEN, MERGEABLE, labels=['deep-review-passed'], updatedAt=21:06:12Z UNCHANGED; deep-review-hold-pr157-db391ec4 still in pending. [carry ⚠️]
+- **"HEAD=f750b6a5=origin/main"**: CHANGED ✅ — HEAD=a9e4d548=origin/main (wrapper "Pulse cycle 20260729T211713Z"). In sync. [carry ✅]
+- **"PR#1057 not yet in view"**: RESOLVED NEW ✅ — pipeline stall output reveals pulse-write-journal-cleanup-001 task with PR#1057 MERGED at 2026-07-29T19:37:06Z ("chore: silence pulse write_journal temp-file alert (gitignore + run_cycle cleanup)"). MERGED. Note: untracked files (alert_522_tmp.json, triage_alert_522.py) still visible in `git status` — gitignore may not cover these paths exactly. Monitoring.
+- Remaining G-rule carries (rsdpm-rehearseprs 1/3, pulse-source-alert 1/3, forge-marker-taskid-suffix-increment 2/3, medic-draft-status-false-positive 2/3, check-i-force-bypass-dm-route 2/3, beacon-pending-approvals-path-bug 2/3, outbox-notifier-review-escalate-delivery-confirm-tier4-001 1/3, ourliberty-health-untracked-files-tier4-noise-001 1/3. VPs: pulse-cycle-check0-helper-override, auto-merge-conflict-route-hold, forge-wip-redispatch-digest-tier4-001, outbox-notifier-notification-intent-reject-tier4-001, forge-wip-redispatch-exhausted-genuine-no-pr-001): CARRY unchanged.
+
+**Check 0 — Alert triage (~21:19Z UTC):** `repair-watermark`: {repaired=false, old_watermark=533, file_length=533} — 0 new alerts. NOMINAL ✅
+
+**Check 1 — Log noise (~21:19Z UTC):** outbox-notifier.log: last entry 14:46:12 MDT (20:46:12Z UTC) — no new entries since iter ~6783. NOMINAL ✅
+
+**Check 2 — Telegram sweep (~21:19Z UTC):** beacon_telegram_bot.log: last entry `[2026-07-29T14:43:39-0600]`=20:43:39Z UTC — alert idx=532 (ourliberty-health untracked; carry). No new Larry directives. NOMINAL ✅
+
+**Check 3 — Pipeline stall (~21:18Z UTC):** heal_pipeline_stall.py --dry-run: FORGE_NO_PR_SKIP ×7 (MERGED: RSDPM #146/147/142; pr_exists: fix-escalated-pr-headchange-backoff-001=#1042; m14-pr-a=#156 RSDPM; m14-pr-b=#157 RSDPM; **pulse-write-journal-cleanup-001=#1057 MERGED [new]**); MIRROR_PASS_UNMERGED_SKIP task=m14-pr-b reason=held_deep_review. **DRY-RUN: 1 alert(s) would fire — `recover-then-alert: red_mirror_status:Larry-Yatch/ourliberty-agent-core:1058:a85bf31f26cc`. No writes performed.** SIGNAL ⚠️ (PR#1058 Mirror FAILURE cooldown expired; stall-checker now active)
+
+**Check 4 — Pending directives (~21:19Z UTC):** beacon-pending-approvals.json (state/): **pending=3 UNCHANGED**. Composition:
+1. `rsdpm-confirmall-medium-parent-secondglance-001` — carry
+2. `deep-review-hold-pr157-db391ec4` — RSDPM PR#157 held (carry)
+3. `deep-review-hold-pr1053-c9c56f09` — PR#1053 deep-review hold (carry)
+NOMINAL ✅ (count unchanged)
+
+**Check 5 — Stale daemon code (~21:19Z UTC):** heal-stale-daemon-code.heartbeat=2026-07-29T21:14:00Z UTC (~7 min at write; <60 min). system-health overall=healthy ts=2026-07-29T21:15:49Z UTC (FRESH). All 4 bots (beacon/forge/mirror/pulse): desired=up, alive=true, action=noop. NOMINAL ✅
+
+**Check A — Source repo (~21:19Z UTC):** On main. HEAD=a9e4d548=origin/main (in sync). Untracked: alert_522_tmp.json, triage_alert_522.py (PR#1057 merged but files still appear untracked — gitignore may not cover exact paths; monitoring). NOMINAL ✅
+**Check B — Sync health (~21:19Z UTC):** last_sync=2026-07-29T20:23:19Z (~58 min; <2h threshold); status=no-change; consecutive_push_failures=0. NOMINAL ✅
+**Check C — Agent liveness (~21:19Z UTC):** system-health overall=healthy ts=2026-07-29T21:15:49Z UTC (FRESH). All 4 bots alive. NOMINAL ✅
+**Check E — PR/merge state (~21:19Z UTC):** ourliberty-agent-core: **2 open PRs (UNCHANGED)**:
+- **#1058** "feat(pulse): Check 0 guard" (MERGEABLE; no labels; no reviewDecision; updatedAt=20:32:19Z UNCHANGED; Mirror status=FAILURE review_escalate; approved via dashboard check0-tier4-guard-001; stall-checker NOW detecting red_mirror_status — merge execution still pending) ⚠️
+- **#1053** "fix(preflight): fresh spec in sync window" (MERGEABLE; no labels; updatedAt=19:56:01Z UNCHANGED; AUTO_MERGE_HELD_DEEP_REVIEW) ⚠️
+RSDPM: **1 open PR** — #157 (MERGEABLE, labels=['deep-review-passed'], updatedAt=21:06:12Z UNCHANGED; pending not resolved) ⚠️
+SIGNAL ⚠️ (PR#1058 stall-checker triggered; PR#1053 held; PR#157 pending carry)
+
+**§5.0 one-shots (~21:19Z UTC):** audit_due_nudge.py → no-op ✅. distill_detector.py → no-op ✅. silence_file_auditor.py → 3 expired (agent-runner-forge×2, agent-runner-pulse×1; 48.6d) + 4 permanent (0 suppressed); informational only. NOMINAL ✅
+
+**PRIME DIRECTIVE (~21:21Z UTC):** ratio=39.18, trend=worsening (systemic_fixes=49, verification_pending=24). intervention row appended (tier=1, template=pr1058-red-mirror-stall-pr1053-pr157-carry-no-new-alerts). Tier state: consecutive_clean reset to 0; last_signal_at=2026-07-29T21:21:06Z UTC. **Tier 1 stays.**
+
+**Actions taken:**
+1. Check 0: `repair-watermark` → {repaired=false, old=533, file_length=533} — no repair needed.
+2. Check 0: 0 new alerts. Watermark unchanged at 533.
+3. §5.0 one-shots: all three → no-op ✅.
+4. PRIME ledger: intervention appended at 2026-07-29T21:19:24Z UTC (tier=1, template=pr1058-red-mirror-stall-pr1053-pr157-carry-no-new-alerts).
+5. Tier state: `cycle_tier_state.py record --checks-clean false` → Tier 1 stays; consecutive_clean=0; last_signal_at=2026-07-29T21:21:06Z UTC.
+
+**Escalations:**
+- **[yellow] PR#1058 stall-checker now active — merge exec needed**: heal_pipeline_stall.py --dry-run now outputs `would recover-then-alert: red_mirror_status:1058`. The Mirror FAILURE cooldown has expired. PR is APPROVED (check0-tier4-guard-001 history=approved) and MERGEABLE. Path: `gh pr merge 1058 --admin --squash`. Each additional iter without merge will allow the stall-checker to fire live alerts.
+- **[yellow] PR#1053 deep-review-hold — action needed [carry]**: deep-review-hold-pr1053-c9c56f09 in pending. Action: `/code-review high` on PR#1053, then `scripts/merge_reviewed_pr.sh 1053`.
+- **[yellow] RSDPM PR#157 deep-review-passed; pending not self-resolved [carry]**: `scripts/merge_reviewed_pr.sh 157` when ready.
+- [carry ⚠️] RSDPM 0031 staging drift: apply 0031_schema_migration_log.sql in Supabase rsdpm-staging SQL editor.
+- **[carry ⚠️] credential-drift:MISSING_CREDENTIAL:SUPABASE_DB_PASSWORD**: Install per docs/runbooks/rotate-supabase-db-password.md OR retire from config/token-rotation-schedule.json.
+- [carry] check-vi-posture-proposals-2026-07-07 (2 proposals). Awaiting Larry.
+- [carry — monitoring] Mirror queue-wait p95=92.3m.
+- [carry — no Larry reply] Check XIV Tier-4 × 2: oversilence + fleet digest. Awaiting Larry.
+- [carry — monitoring] tier4-rsdpm-install-drift. Awaiting Larry triage.
+- [carry] `rsdpm-confirmall-medium-parent-secondglance-001`.
+- **[blue] Check I: weekly cost $1,201 (+206%)**. Proposal #1 (45σ cycle review) via `/dispatch 1`.
+- **[blue] PR#1057 merged (pulse-write-journal-cleanup-001) — verify gitignore**: untracked files still visible in `git status` post-merge; the gitignore pattern may not cover `agents/pulse/alert_522_tmp.json` + `agents/pulse/triage_alert_522.py` exactly. Monitor: if ourliberty-health fires again for these untracked files, the fix is incomplete and a follow-up gitignore fix is needed.
+- **[blue] ourliberty-health-untracked-files-tier4-noise-001 [1/3]**: recurring pattern tracking; dispatch at 3/3.
+
+**Patterns:**
+- **PR#1058 stall progression [significant]**: Check 3 now detecting `red_mirror_status:1058` as a stall event (prior 4 iters: 0 stalls). This means the automatic stall-recovery path will fire live alerts on next non-dry-run cycle. The merge execution is the blocker. Either `gh pr merge 1058 --admin --squash` directly (approved; Larry has authority to override Mirror FAILURE) or re-run a fresh Mirror review via `/code-review high`. Every iter without action means stall-checker fires a live alert.
+- **RSDPM PR#157 approved+pending pattern [carry, unchanged]**: PR#157 MERGEABLE, deep-review-passed, pending deep-review-hold-pr157-db391ec4 still open. Path: `scripts/merge_reviewed_pr.sh 157`.
+- **ourliberty-health-untracked-files-tier4-noise-001 [G-rule 1/3]**: no new occurrence this iter (0 new alerts); carry tracking. PR#1057 was supposed to address this — verify gitignore coverage.
+- G-rule carries unchanged (rsdpm-rehearseprs 1/3, pulse-source-alert 1/3, forge-marker-taskid-suffix-increment 2/3, medic-draft-status-false-positive 2/3, check-i-force-bypass-dm-route 2/3, beacon-pending-approvals-path-bug 2/3, outbox-notifier-review-escalate-delivery-confirm-tier4-001 1/3. VPs: pulse-cycle-check0-helper-override, auto-merge-conflict-route-hold, forge-wip-redispatch-digest-tier4-001, outbox-notifier-notification-intent-reject-tier4-001, forge-wip-redispatch-exhausted-genuine-no-pr-001).
+
+**Tier end-of-iter:** **Tier 1** (signals: Check 3 stall detected PR#1058; PR#1053/PR#157 carries; consecutive_clean=0; last_signal_at=2026-07-29T21:21:06Z UTC; Tier 1 cadence per cycle-prompt.md § 2).
+
+---
+
