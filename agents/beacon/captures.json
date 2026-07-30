@@ -2536,6 +2536,155 @@
         "task_id": "delegate-cap-four-card-types-one-missing-verb-no-button-says-71d1",
         "stamped_at": "2026-07-30T02:30:10.487234+00:00"
       }
+    },
+    {
+      "id": "cap-approvals-freshness-1-3-add-an-optional-freshnes-582f",
+      "title": "Approvals freshness 1/3: add an optional freshness_probe field to an approval card",
+      "note": "SLICE 1 of 3. Deliberately small: the parent capture (cap-approvals-tab-let-a-card-carry-its-own-falsifier-8bb3) was too big to SCOPE and its Beacon delegation was killed at the 600s wall (exit_code -1, 'TIMEOUT after 600s') having produced nothing. Same disease as [[big-pr-defeats-review]], one layer up. Slices 2 and 3 depend on this one; build this alone.\n\nPROBLEM: approval cards go stale because nothing re-checks their premise. Today's only clearing signals answer 'did Beacon already resolve this?' (task_id in history, not pending) or 'did a PR for this task_id merge/close?' (task_terminal_state -> MERGED/CLOSED). A card whose premise is a fact about live state \u2014 a DB row, a file's contents, a code behavior \u2014 probes UNKNOWN, and UNKNOWN means keep forever. On 2026-07-29, 6 of 8 cards on the tab did not need a human.\n\nTHIS SLICE \u2014 SCHEMA + EVALUATOR ONLY. No wiring into any healer, no UI.\n1. Optional 'freshness_probe' on an approval's dispatch_payload: a deterministic, machine-checkable predicate whose FALSITY means the ask is moot.\n2. Kinds to support: pr_state (reuse task_terminal_state), file_contains / file_lacks (git show at origin/main, repo+ref+path), json_path (a config key), sql (read-only). Leave 'shell' OUT of this slice.\n3. A pure evaluate(probe) -> TRUE | FALSE | INDETERMINATE function, unit-tested, called by NOTHING yet.\n\nLOAD-BEARING SEMANTICS (the whole point \u2014 get these in the tests):\n  TRUE => premise still holds => keep the card.\n  FALSE => premise dead => the card is moot.\n  ERROR / timeout / unparseable / unknown kind => INDETERMINATE, which callers MUST treat as KEEP.\nFail toward the human, never toward the convenient answer. Same rule as the Check 0 guard shipped in #1058: an INDETERMINATE that reads as 'resolved' is how a live decision gets silently dropped.\n\nWORKED EXAMPLES to test against (both real, both from 2026-07-29):\n  - rsdpm-confirmall-medium-parent-secondglance-001 cited app/queue/verdict.ts + CONFIRM_ALL_TIERS + bulkCovered. A file_contains probe over that file at origin/main would have flipped FALSE when RSDPM #151 (3d66718) made coverage ancestor-closed, 2h18m after the card was filed.\n  - unreg-approval-cfd444ed29ee ('migration 0033 not live') cited schema_migration_log and gave the exact query. A sql probe would have flipped FALSE 8 minutes BEFORE Larry ever saw the card.\nAuthors already write the evidence down. Converting a cited fact into a probe is near-free at filing time and impossible afterward.\n\nOUT OF SCOPE (slices 2/3): evaluating on the heal_stale_approvals tick; the premise_stale demotion state; probing at birth; the 'unverified' badge for cards with no probe; retrofitting existing producers.\n\nREVIEW: not needed for this slice \u2014 it is a pure function plus a schema, wired to nothing. Slice 2 is where it starts deciding what leaves Larry's queue, and THAT needs /code-review high.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "main",
+        "captured_at": "2026-07-30T16:29:27.181938+00:00"
+      },
+      "last_touched": "2026-07-30T16:29:27.181938+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "A small first step toward letting approval requests carry a built-in self-check that can tell when they've already been resolved and no longer need your attention.",
+        "why": "On a recent day, 6 of 8 items waiting on you didn't actually need you \u2014 this is the groundwork to stop wasting your time on decisions that already answered themselves.",
+        "suggest": "Approve this narrow first piece on its own, since it changes nothing you'll see yet and simply lays a careful foundation we can prove out before it ever touches your queue."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-30T16:36:16.248516+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+    },
+    {
+      "id": "cap-approvals-freshness-2-3-evaluate-the-probe-on-th-9902",
+      "title": "Approvals freshness 2/3: evaluate the probe on the 10-min tick and DEMOTE, never auto-clear",
+      "note": "SLICE 2 of 3. DEPENDS ON cap-approvals-freshness-1-3-add-an-optional-freshnes-582f (the freshness_probe schema + pure evaluator). Do not start until that has landed.\n\nTHIS SLICE: wire the evaluator into the healer that already ticks, and give a dead-premise card somewhere to go that is NOT deletion.\n\nWHERE: scripts/heal_stale_approvals.py already runs OnCalendar=*:0/10 and already has the discipline this needs \u2014 backup-first, reversible (read_at -> NULL), idempotent, conservative on missing state. Add a probe leg beside the existing signals. Do NOT build a new healer.\n\nBEHAVIOR:\n  - probe TRUE or INDETERMINATE => keep, untouched. (INDETERMINATE includes error/timeout/unparseable \u2014 slice 1 guarantees this.)\n  - probe FALSE => DEMOTE the card to a 'premise_stale' state carrying the probe's output as evidence, e.g. 'filed 2026-07-28 23:37 because Confirm-all's parent closure ignored parent tier; as of now bulkCovered is ancestor-closed \u2014 RSDPM #151, 3d66718'. Larry one-taps dismiss.\n  - NEVER auto-clear on a probe result. Auto-clear stays reserved for the exact probes already trusted \u2014 reconcile_terminal_approvals' PR-coordinate class, which retires on MERGED/CLOSED after TERMINAL_APPROVAL_GRACE_HOURS=2.\n\nWHY DEMOTE AND NOT CLEAR: clearing a LIVE decision is far worse than showing a stale one. The human keeps the irreversible verb. A probe is evidence, not a verdict.\n\nALSO IN THIS SLICE \u2014 the anti-false-clean requirement, non-negotiable: a card with NO probe must render as visibly UNVERIFIED, never as silently fresh. Most cards will have no probe for a long time (see slice 3's scoping note). A freshness check that covers a third of the queue while the tab reads as fully checked is [[existence-gates-are-false-clean-generators]] \u2014 the exact class that let 6 of 8 cards reach Larry on 2026-07-29.\n\nDO NOT put the verification subagent on a timer. dashboard_api.py:11173+ (/api/larry/cleanup-review) already has one, and its fail-safe posture is already correct (_cleanup_review_verify_uncertain returns {} on ANY failure = keep every uncertain row). It is TEMPTING to schedule it because it handles exactly the no-probe cases. Don't: that is an LLM deciding 'still true?' on every card every tick \u2014 unbounded cost, and its failure mode is silently clearing a live decision. agents/beacon/specs/approvals-queue-rework.md deliberately keeps it behind a button and writes 'NEVER clears an item it cannot confirm resolved.'\n\nOUT OF SCOPE: probing at birth (slice 3); retrofitting producers to author probes.\n\nREVIEW: /code-review high REQUIRED. This decides what disappears from Larry's decision queue, and a wrong filter drops a real decision while looking exactly like a working tab.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "main",
+        "captured_at": "2026-07-30T16:29:47.947413+00:00"
+      },
+      "last_touched": "2026-07-30T16:29:47.947413+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "An upgrade to your decision list that flags likely-outdated items as stale instead of removing them, and clearly marks any item that hasn't been double-checked as unverified.",
+        "why": "It keeps real decisions from silently disappearing off your list while making sure you can tell at a glance what's been verified and what hasn't \u2014 so nothing important slips past you.",
+        "suggest": "Worth doing, but go slowly and check the work thoroughly before it touches your list, since a mistake here could quietly hide a decision you actually needed to make."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-30T16:36:16.248516+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+    },
+    {
+      "id": "cap-approvals-freshness-3-3-run-the-same-probe-at-bi-2616",
+      "title": "Approvals freshness 3/3: run the same probe at BIRTH, before the card ever reaches Larry",
+      "note": "SLICE 3 of 3. DEPENDS ON cap-approvals-freshness-1-3-add-an-optional-freshnes-582f (schema + evaluator). Independent of slice 2 \u2014 can land before or after it.\n\nTHE CASE FOR THIS SLICE, in one fact: unreg-approval-cfd444ed29ee told Larry 'RSDPM migration 0033 is not live'. The migration was applied at 17:22Z with --allow-destructive; the card was promoted at 17:30Z. It was FALSE EIGHT MINUTES BEFORE HE EVER SAW IT. No timer can fix that \u2014 only a check before the card is shown. A second card (rsdpm-confirmall-...-001) aged into staleness 2h18m after filing, and a third (m14-pr-a) 10h after. So birth-checking and tick-checking each catch a different half; this is the cheaper half and it reuses slice 1 wholesale.\n\nTHIS SLICE: call evaluate(probe) ONCE at card-creation time. If it returns FALSE, do not create the card \u2014 log it with the probe evidence instead. TRUE or INDETERMINATE => create normally (fail toward the human, always).\n\nWHERE \u2014 start narrow, this is the scoping trap that killed the parent capture: ~10 modules emit APPROVAL_REQUEST markers (beacon_approval_handler, beacon_telegram_bot, build_sequence_advancer, build_sequence_kickoff, dashboard_api, dispatch_validator, drain_board_to_beacon, heal_pipeline_stall, heal_unregistered_approval, larry_alerts) and Beacon authors some as free LLM text parsed by extract_approval_request. DO NOT try to cover all of them. Land the birth check in ONE producer first \u2014 heal_unregistered_approval is the right pick: it minted 4 of the 8 cards on Larry's tab on 2026-07-29 and 3 of them were stale or unanswerable. Widen only after that one is proven.\n\nCONSEQUENCE TO DESIGN FOR: a probe is only as good as its author. The birth check must never be the reason a REAL decision is withheld \u2014 so the FALSE branch logs loudly (what was suppressed, which probe, what it returned) rather than dropping silently. A suppressed-card log nobody can read is the same false-clean this whole arc is about.\n\nOUT OF SCOPE: the tick evaluation and premise_stale demotion (slice 2); retrofitting probes onto existing producers beyond the one chosen.\n\nREVIEW: /code-review high REQUIRED. It decides what NEVER reaches Larry, which is strictly more dangerous than slice 2 \u2014 a card wrongly suppressed at birth leaves no artifact on the tab to notice.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "main",
+        "captured_at": "2026-07-30T16:30:08.187732+00:00"
+      },
+      "last_touched": "2026-07-30T16:30:08.187732+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "A quality check that verifies an approval request is still true at the moment it's created, so a request that's already outdated never lands on your desk.",
+        "why": "One recent request told you something was 'not live' when it had actually been done eight minutes earlier \u2014 you're being asked to weigh in on decisions that are already stale before you see them.",
+        "suggest": "Worth doing, but start small: apply it to just the one source that produced most of last week's bad requests, and make sure anything it hides is clearly logged so a real decision is never quietly dropped."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-30T16:36:16.248516+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+    },
+    {
+      "id": "cap-a-delegation-that-dies-looks-exactly-like-one-no-2cbe",
+      "title": "A delegation that dies looks exactly like one nobody started \u2014 no retry, no surface",
+      "note": "INCIDENT (2026-07-29/30, found only because Larry asked me to go look): he delegated capture cap-approvals-tab-...-8bb3 from the Missions tab. POST /delegate returned 200. Beacon spawned at 01:07:45Z, ran the full window, and was killed at the 600s wall (scripts/beacon_telegram_bot.py CLAUDE_TIMEOUT_SEC=600). Its outbox envelope reads exit_code=-1, result='TIMEOUT after 600s', duration_sec=None. No APPROVAL_REQUEST was ever emitted, so no card was ever created. The capture is still state=parked, promoted_to=None \u2014 BYTE-IDENTICAL ON THE BOARD TO A CARD NOBODY EVER DELEGATED. One Telegram alert fired at 01:21:54Z and that was the entire signal.\n\nIT WAS NOT AN OUTLIER \u2014 IT WAS THE TREND HITTING THE WALL. Delegation durations that night: 4b31 186s -> PR #1063; d5d1 251s -> PR #159 merged; fd54 336s -> PR #1058 merged; 71d1 536s -> dispatched; 8bb3 KILLED at 600s. 71d1 survived by 64 seconds. The wall is real and close.\n\nTHREE DISTINCT GAPS \u2014 a preflight should scope which are worth closing:\n\n1. NOTHING RETRIES. No healer re-drives a failed delegation; no requeue; no backoff. Verified by grep across scripts/heal_*.py. The work is simply gone.\n\n2. NOTHING SURFACES IT. heal_missions_card_gc:1230 states the design intent \u2014 'a delegate that never opened a PR probes UNKNOWN and MUST surface as still-open, never silently close.' It does stay open. But 'open' RENDERS AS parked, which is the same pixel as never-touched. dashboard_api already carries delegated_at / approval_id on the delegate response (dashboard_api.py:1028, 1256, 8064 'delegated_at stays honest') \u2014 the data to distinguish the two states EXISTS and the board does not use it. Cheapest thread.\n\n3. duration_sec=None ON A 600s TIMEOUT IS A LIE WAITING TO BE BELIEVED. outbox_notifier's definitive-non-run classifier (~:3043, :3100) recognizes 'spawn-failure' as exit_code==-1 AND duration None-or-under-2s AND an 'all retries exhausted' signal. A timeout satisfies the first TWO. Today it is saved only by the third predicate (our text says 'TIMEOUT after 600s', not 'retries exhausted') \u2014 so a task that ran ten full minutes is one string away from being classified as a worker that never spawned. Record the real elapsed time.\n\nDO NOT just raise the timeout. 600s is a reasonable ceiling; the parent capture was genuinely too big to scope (it is being split into 3 slices: ...582f, ...9902, ...2616). Raising the wall hides the size problem instead of surfacing it. If anything, the right move is the opposite \u2014 tell the operator a delegation died and why, so an oversized card gets split rather than silently retried into the same wall.\n\nREVIEW: needed if it changes retry or dispatch behavior \u2014 a retry loop on a 10-minute agent spawn is real money, and 'it silently did nothing' is the failure class this whole capture is about.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "main",
+        "captured_at": "2026-07-30T16:30:35.576888+00:00"
+      },
+      "last_touched": "2026-07-30T16:30:35.576888+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "When you hand off a job that turns out to be too big, it can quietly die partway through and leave no trace \u2014 on your board it looks identical to a job nobody ever started.",
+        "why": "It means real work you asked for can vanish silently, and you'd only find out by accident \u2014 as we just did \u2014 instead of being told it needs your attention.",
+        "suggest": "Make the board clearly flag a died job as 'still needs you' rather than blending it in, and have it tell you when something was too big so you can split it \u2014 a small, low-stakes change worth doing after a quick scoping check."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-30T16:36:16.248516+00:00",
+        "from_state": "parked"
+      }
+    },
+    {
+      "id": "cap-promoted-larry-alert-cards-1060-skips-them-and-n-7629",
+      "title": "Promoted larry-alert cards: #1060 skips them, and neither Approve nor Reject works",
+      "note": "REPLACES cap-larry-alert-promotions-1060-leaves-them-out-of-s-aaf0 (dropped 2026-07-30, no reason recorded \u2014 believed accidental; adjacent card, similar name). ALSO SUPERSEDES cap-heal-unregistered-approval-mints-permanent-cards-b921 \u2014 drop that one, it predates #1060 and half its content is now obsolete.\n\nWHAT #1060 ALREADY FIXES (merged 85732bec, 02:29Z \u2014 do NOT rebuild): three deterministic legs \u2014 the promoter stamps promoted_source + a fail-closed recheck_target; Approve on a coordinate-carrying card dispatches a real Mirror re-review; heal_stale_escalation_recheck widened so those cards retire on MERGED/CLOSED/superseded. It closes the 21:55Z incident where Approve wrote a ledger row, cleared the card, and executed nothing.\n\nTHE RESIDUE IS NAMED IN #1060's OWN BODY, verbatim: 'Larry-alert promotions never carry a coordinate and stay out of scope.'\n\nThat is EXACTLY the class that reached Larry on 2026-07-29 \u2014 every one a promoted larry-alert, not a for-Larry mirror-review: unreg-approval-9061de515dce (unrouted PR#1049), -3283b7a9b651 (unrouted PR#1053), -cfd444ed29ee (RSDPM migration 0033 \u2014 false 8 min before he saw it), -67747fb0837e (the unrouted nag for PR#1060 ITSELF), and -953eb339a46c (same nag, PR#1062). Five in one day.\n\nAFTER #1060 THIS CLASS HAS NO WORKING EXIT:\n  - Approve 400s before the read_at claim (correct \u2014 no silent clear), so the card stays visible and unactionable.\n  - Reject: #1060 lists it as unchanged residue (paid Beacon no-op, RSDPM #59 class). NOTE: observed 2026-07-30 01:05Z, a dashboard SOFT reject on -67747fb0837e resolved cleanly with 'no Mirror review dispatched, no in-flight work aborted' \u2014 so a soft-reject path may already work. Preflight should establish which reject path the tab actually invokes before assuming cost.\n  - The recheck ladder is coordinate-gated, so these never auto-retire.\nA card that says in its own summary 'could not be parsed into two options \u2014 needs triage' and has no working verb is pure tab debt. Three of the four sat through 6 reminder rounds.\n\nBUILD (pick in preflight):\n(a) Do not promote a larry-alert the promoter cannot parse into two real options. A card that cannot state its own choices is TRIAGE, not a decision \u2014 route it somewhere that is not the Approvals tab.\n(b) If promoted, inherit the source alert's dedup/cooldown identity so the card retires when the alert does. Today the alert de-dups and cools down; the card it spawned outlives it forever.\n(c) CHEAPEST THREAD: bare_approvable=False is ALREADY stamped on every one (heal_unregistered_approval.py:717/889/1210) and read ONLY by beacon_approval_handler.py:634, purely to stop a bare Telegram 'approve' hitting the wrong card. The record ALREADY KNOWS these are not binary decisions. Nothing acts on it.\n\nDO NOT 'fix the detector'. heal_pipeline_stall.check_unrouted_open_prs / heal-unrouted-owner-pr-nudge-001 works as designed: it exists to catch 'a clean unrouted PR the owner forgot to label', deliberately nudge-only, preserving Larry's 2026-07-11 label opt-in (PR_UNROUTED_MIN_AGE_MIN=60). It cannot tell 'forgot' from 'deliberately holding for /code-review high' because nothing records that intent. The alert is not the bug; the PROMOTION is.\n\nADJACENT: the freshness slices (...582f / ...9902 / ...2616) cover cards whose PREMISE goes stale. This covers cards that were never answerable.\n\nREVIEW: needed \u2014 it changes what reaches the Approvals tab, and a wrong filter drops a real decision while looking exactly like a working tab.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "main",
+        "captured_at": "2026-07-30T16:33:42.104079+00:00"
+      },
+      "last_touched": "2026-07-30T16:33:42.104079+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "Some alert cards land in your approval list that you can't actually act on \u2014 pressing Approve or Reject does nothing, so they just sit there.",
+        "why": "You got five of these in a single day and most lingered through six reminder rounds, cluttering your list and burying the real decisions that need you.",
+        "suggest": "Worth fixing, but move carefully \u2014 first confirm exactly how the buttons behave today, then keep these unanswerable items out of your list rather than risking a change that hides a real decision."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-30T16:36:16.248516+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     }
   ]
 }
