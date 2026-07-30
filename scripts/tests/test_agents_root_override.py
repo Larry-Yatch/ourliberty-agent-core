@@ -114,8 +114,14 @@ coverage the code does not have.
     if a cheap poison is ever added it must be added the same way — a
     flag, not a model.
   * bare ~/agents token in prose — pervasive in docstrings across
-    scripts/, so it cannot discriminate a payload from documentation.
-    Tilde spellings are caught only where a call wrapper names them.
+    scripts/ (259 occurrences), so it cannot discriminate a payload from
+    documentation. Tilde spellings are caught where a call wrapper names
+    them (``expanduser('~/agents')``) and in the one shell spelling that
+    cannot be prose: an UNQUOTED tilde welded to an ``=`` or ``:``
+    (``LOG=~/agents/logs``), which is an executable assignment. A quoted
+    ``"~/agents"`` does not tilde-expand in shell, so it is not a home
+    path and stays quiet; ``AGENTS_ROOT = ~/agents`` with spaces, and
+    ``echo tier1 > ~/agents/rotation.disabled``, are prose and stay quiet.
 """
 try:  # engage the test sandbox before any production import reads env/paths
     from . import _bootstrap  # noqa: F401
@@ -214,12 +220,22 @@ _TEXT_HOME = (
 
 # Bare fallback spelled inside a string literal (a python -c payload, a
 # shell command) or a raw shell script: neither can be parsed as Python, so
-# match the text. A bare `~/agents` token is deliberately NOT matched — it
-# is pervasive in docstring prose, so it cannot discriminate a payload from
-# documentation; tilde spellings are caught only where a call wrapper names
-# them (expanduser('~/agents')). Every alternative is TERMINATED at a path-
-# segment boundary so sibling directories ($HOME/agents-archive,
-# expanduser('~/agents-old')) — different trees entirely — do not match.
+# match the text. A bare `~/agents` TOKEN is deliberately NOT matched — it
+# is pervasive in docstring prose (259 hits across scripts/*.py), so it
+# cannot discriminate a payload from documentation; tilde spellings are
+# caught where a call wrapper names them (expanduser('~/agents')) and in
+# the one shell spelling that cannot be prose: an UNQUOTED tilde sitting
+# immediately after `=` or `:` (`LOG=~/agents/logs`, `PATH=$PATH:~/agents`),
+# which is an executable assignment, not a sentence. Requiring the tilde to
+# touch the `=` is what keeps prose out — `AGENTS_ROOT = ~/agents` in a
+# docstring, and `echo tier1 > ~/agents/rotation.disabled`, both stay quiet
+# (measured: zero `=~/agents` occurrences in the tree today, so this costs
+# nothing live). A QUOTED "~/agents" is not a home path in shell at all —
+# there is no tilde expansion inside quotes — so it must stay quiet too,
+# and the lookbehind gives that for free. Every alternative is TERMINATED
+# at a path-segment boundary so sibling directories ($HOME/agents-archive,
+# expanduser('~/agents-old'), LOG=~/agents-archive) — different trees
+# entirely — do not match.
 TEXT_BARE = re.compile(
     _TEXT_HOME + r"/\s*" + _TEXT_SEGMENT
     + r"|expanduser\(\s*['\"]~/agents(?=['\"/])"
@@ -230,6 +246,8 @@ TEXT_BARE = re.compile(
     # "${HOME}"/agents) is the same path. The shell spellings already
     # accept a sub-path via the segment-boundary terminator.
     + r"|\$HOME['\"]?/agents(?![\w.-])|\$\{HOME\}['\"]?/agents(?![\w.-])"
+    # the executable tilde: unquoted, welded to an `=` or `:`.
+    + r"|(?<=[=:])~/agents(?![\w.-])"
 )
 
 # The ONLY in-string guard the text channel recognizes: the shell
@@ -946,7 +964,9 @@ HOW TO CLEAR THIS (pick the first one that fits):
     guard the shell way, which the scanner recognizes:
         "${OURLIBERTY_AGENTS_ROOT:-$HOME/agents}"
     Keep the closing brace ON THE SAME LINE -- an unterminated expansion
-    waives nothing, on purpose.
+    waives nothing, on purpose. `LOG=~/agents/logs` is the tilde spelling
+    of the same bare path (unquoted, welded to the `=`, so the shell
+    really does expand it) and takes the same fix.
 
  4. The bare REAL-home path is deliberate (the test jail's RO-bind
     targets and tripwire must point at the real tree, never the sandbox).
@@ -1198,9 +1218,13 @@ DECLARED_BLIND_SPOTS = (
     ),
     (
         "bare ~/agents token in prose",
-        '"""State lives under ~/agents (see ~/agents/logs/)."""\n'
+        '"""State lives under ~/agents (see ~/agents/logs/).\n\n'
+        "Rollback lever: echo tier1 > ~/agents/rotation.disabled\n"
+        'The default is AGENTS_ROOT = ~/agents when nothing is pinned.\n'
+        '"""\n'
         "x = 1\n",
-        "Pervasive in docstrings; cannot discriminate payload from prose.",
+        "Pervasive in docstrings; cannot discriminate payload from prose."
+        " The executable spelling (unquoted `=~/agents`) IS caught.",
     ),
 )
 
@@ -1490,11 +1514,20 @@ class TestGuardScanner(unittest.TestCase):
             - len(UNCOVERED_COMBINATIONS),
         )
 
-    def test_property_sibling_segments_stay_quiet(self):
-        """Widening the segment to sub-paths must not have swallowed
-        sibling trees, nor an absolute '/agents' (a pathlib reset)."""
+    def test_property_segment_boundary_discriminates(self):
+        """The widening is a DISCRIMINATION, so it is asserted as one: over
+        the same home x composition grid, a sub-path segment must flag and
+        every sibling tree — plus an absolute '/agents', which is a pathlib
+        reset rather than a home fallback — must stay quiet. Asserting only
+        the quiet half would pass against a scanner that sees nothing at
+        all, which is exactly the false clean this widening closes."""
         for home in HOME_SPELLINGS:
             for cname, build in COMPOSITIONS:
+                covered = "p = %s\n" % build(home, "agents/state")
+                self.assertEqual(
+                    len(find_bare_agents_roots(covered)), 1,
+                    f"{(home, cname, 'agents/state')}: {covered.strip()}",
+                )
                 for seg in NEGATIVE_SEGMENTS:
                     src = "p = %s\n" % build(home, seg)
                     self.assertEqual(
@@ -1502,20 +1535,29 @@ class TestGuardScanner(unittest.TestCase):
                         f"{(home, cname, seg)}: {src.strip()}",
                     )
 
-    def test_property_reversed_operand_order_stays_quiet(self):
-        """Only home-FIRST orderings produce a home-rooted path. A
-        symmetric implementation that flagged both would be an over-reach,
-        so the reversed twin of every asymmetric operator is pinned."""
-        for src in (
-            "p = '/agents' + str(Path.home())\n",
-            "p = os.path.join('agents', Path.home())\n",
-            "p = Path('agents', Path.home())\n",
-            "p = Path.home() % '%s/agents'\n",
-            "p = 'agents' / Path.home()\n",
-            "p = Path('agents') / Path.home()\n",
-            "p = f'/agents{Path.home()}'\n",
+    def test_property_operand_order_discriminates(self):
+        """Only home-FIRST orderings produce a home-rooted path. Each
+        asymmetric operator is asserted as a PAIR — the home-first form
+        flags, the reversed twin does not — so neither a scanner that sees
+        neither nor a symmetric one that flags both can pass."""
+        for flags, quiet in (
+            ("p = str(Path.home()) + '/agents'\n",
+             "p = '/agents' + str(Path.home())\n"),
+            ("p = os.path.join(Path.home(), 'agents')\n",
+             "p = os.path.join('agents', Path.home())\n"),
+            ("p = Path(Path.home(), 'agents')\n",
+             "p = Path('agents', Path.home())\n"),
+            ("p = '%s/agents' % Path.home()\n",
+             "p = Path.home() % '%s/agents'\n"),
+            ("p = Path.home() / 'agents'\n",
+             "p = 'agents' / Path.home()\n"),
+            ("p = Path.home() / 'agents'\n",
+             "p = Path('agents') / Path.home()\n"),
+            ("p = f'{Path.home()}/agents'\n",
+             "p = f'/agents{Path.home()}'\n"),
         ):
-            self.assertEqual(find_bare_agents_roots(src), [], src)
+            self.assertEqual(len(find_bare_agents_roots(flags)), 1, flags)
+            self.assertEqual(find_bare_agents_roots(quiet), [], quiet)
 
     def test_property_home_spellings_are_all_recognized(self):
         """`_is_home_base` must accept every member of the shared set — the
@@ -1525,36 +1567,58 @@ class TestGuardScanner(unittest.TestCase):
             src = "p = %s / 'agents'\n" % home
             self.assertEqual(len(find_bare_agents_roots(src)), 1, src)
 
-    def test_property_non_home_bases_stay_quiet(self):
-        """The load-bearing negatives are the TIER1_HOME ones: that is the
-        REAL account home, and agent_runner.py:1507 spells the override pin
-        itself as `Path(active_tier.TIER1_HOME) / 'agents'`. A suffix match
-        on names ENDING in HOME would flag the fix with its own guard."""
-        for src in (
-            "p = Path(os.environ['XDG_DATA_HOME']) / 'agents'\n",
-            "p = Path(os.environ.get('OURLIBERTY_TIER2_HOME')) / 'agents'\n",
-            "p = active_tier.TIER1_HOME / 'agents'\n",
-            "p = Path(active_tier.TIER1_HOME) / 'agents'\n",
-            "p = cfg.HOMEPAGE / 'agents'\n",
-            "p = Path.home / 'agents'\n",
-            "p = os.path.join(repo_dir, 'agents')\n",
-            "p = os.path.join(TIER1_HOME, '.config', 'gh')\n",
-            "p = Path(base_dir, 'agents')\n",
+    def test_property_home_base_discriminates(self):
+        """Each non-home base is asserted against the home TWIN it differs
+        from by one token, so the pair fails both ways: a scanner blind to
+        the env-HOME spellings fails the flagging half, and a suffix match
+        on names ENDING in HOME fails the quiet half. The load-bearing
+        negatives are the TIER1_HOME ones: that is the REAL account home,
+        and agent_runner.py:1507 spells the override pin itself as
+        `Path(active_tier.TIER1_HOME) / 'agents'` — a suffix match would
+        flag the fix with its own guard."""
+        for quiet, flags in (
+            ("p = Path(os.environ['XDG_DATA_HOME']) / 'agents'\n",
+             "p = Path(os.environ['HOME']) / 'agents'\n"),
+            ("p = Path(os.environ.get('OURLIBERTY_TIER2_HOME')) / 'agents'\n",
+             "p = Path(os.environ.get('HOME')) / 'agents'\n"),
+            ("p = active_tier.TIER1_HOME / 'agents'\n",
+             "p = Path(os.environ.get('HOME', '/home/larry')) / 'agents'\n"),
+            ("p = Path(active_tier.TIER1_HOME) / 'agents'\n",
+             "p = Path(os.path.expanduser('~')) / 'agents'\n"),
+            ("p = cfg.HOMEPAGE / 'agents'\n",
+             "p = cfg.HOME / 'agents'\n"),
+            ("p = Path.home / 'agents'\n",
+             "p = Path.home().resolve() / 'agents'\n"),
+            ("p = os.path.join(repo_dir, 'agents')\n",
+             "p = os.path.join(os.environ['HOME'], 'agents')\n"),
+            ("p = os.path.join(TIER1_HOME, '.config', 'gh')\n",
+             "p = os.path.join(Path('~').expanduser(), 'agents')\n"),
+            ("p = Path(base_dir, 'agents')\n",
+             "p = Path(Path.home(), 'agents')\n"),
         ):
-            self.assertEqual(find_bare_agents_roots(src), [], src)
+            self.assertEqual(find_bare_agents_roots(quiet), [], quiet)
+            self.assertEqual(len(find_bare_agents_roots(flags)), 1, flags)
 
-    def test_property_guarded_compositions_stay_quiet(self):
+    def test_property_guard_climbs_over_every_composition(self):
         """Widening detection must not outrun `_guard_verdict`'s parent
-        climb: every composition wrapped in the blessed idiom is quiet."""
+        climb. Asserted as a pair per composition: the bare form flags and
+        the SAME form wrapped in the blessed idiom is quiet — the quiet
+        half alone would also pass against a scanner that never saw the
+        composition in the first place."""
         for home in HOME_SPELLINGS:
             for cname, build in COMPOSITIONS:
-                src = (
+                composed = build(home, "agents/state")
+                bare = "p = %s\n" % composed
+                guarded = (
                     "p = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT')"
-                    " or %s)\n" % build(home, "agents/state")
+                    " or %s)\n" % composed
                 )
                 self.assertEqual(
-                    find_bare_agents_roots(src), [], f"{(home, cname)}: {src}"
-                )
+                    len(find_bare_agents_roots(bare)), 1,
+                    f"{(home, cname)}: {bare}")
+                self.assertEqual(
+                    find_bare_agents_roots(guarded), [],
+                    f"{(home, cname)}: {guarded}")
 
     def test_multi_segment_does_not_double_count(self):
         # The two-segment spelling already flagged on the INNER Div; after
@@ -1713,17 +1777,43 @@ class TestGuardScanner(unittest.TestCase):
             self.assertIn(needle, offenders[0])
 
     def test_dead_fallback_premise_is_true_at_runtime(self):
-        # The rule is not arbitrary; prove its premise by execution rather
-        # than asserting it in a comment.
-        self.assertTrue(bool(Path("")))
-        self.assertTrue(bool(Path(".")))
+        """The rule is not arbitrary: prove its premise BY EXECUTION, and
+        in the same breath assert the scanner acts on that premise. The
+        runtime half alone proves nothing about this guard — it is true of
+        every Python — so each truthiness fact is paired with the binding
+        shape it condemns."""
         self.assertEqual(Path(""), Path("."))
-        self.assertTrue(bool(str(None)))
+        for label, value, binding in (
+            ("Path('')", Path(""),
+             "Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', ''))"),
+            ("Path('.')", Path("."),
+             "Path(os.environ.get('OURLIBERTY_AGENTS_ROOT'))"),
+            ("str(None)", str(None),
+             "str(os.environ.get('OURLIBERTY_AGENTS_ROOT'))"),
+        ):
+            self.assertTrue(bool(value), label)
+            src = (
+                "def f():\n"
+                f"    root = {binding}\n"
+                "    return root if root else Path.home() / 'agents'\n"
+            )
+            offenders = find_bare_agents_roots(src)
+            self.assertEqual(len(offenders), 1, (label, offenders))
+            self.assertIn("always truthy", offenders[0], label)
 
-    def test_allows_unwrapped_binding_with_wrapped_use(self):
-        # The LIVE idiom, and the B-then-A twin of the rule above: the
-        # wrapper sits in the true-branch, not on the binding, so the guard
-        # can still be falsy. Must stay quiet.
+    def test_wrapper_position_decides_the_verdict(self):
+        """The rule is not 'wrappers are opaque' — that would break the
+        live idiom. It is 'a wrapper on the BINDING kills the truthiness
+        guard'. So the two positions are asserted together: wrapper on the
+        binding FLAGS, wrapper on the use (the shape ~25 live sites spell)
+        stays QUIET."""
+        self.assertIn(
+            "always truthy",
+            find_bare_agents_roots(
+                "def f():\n"
+                "    root = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT'))\n"
+                "    return root if root else Path.home() / 'agents'\n")[0],
+        )
         self.assert_quiet(
             "def f():\n"
             "    root = os.environ.get('OURLIBERTY_AGENTS_ROOT')\n"
@@ -1852,30 +1942,45 @@ class TestGuardScanner(unittest.TestCase):
         self.assertEqual(len(offenders), 1, offenders)
         self.assertIn("star import", offenders[0])
 
-    def test_star_import_leaves_the_inline_env_default_quiet(self):
-        # Not a poison bypass: an inline env-get default has no name to lie
-        # about, and it is the exit the poisoned offender message points at.
+    def test_star_import_poison_spares_only_the_inline_env_default(self):
+        """The poison must reach the NAME path and stop at the inline one.
+        Both halves in one test: in the same star-importing file, a
+        name-guarded fallback FLAGS while an inline env-get default stays
+        quiet. The inline form has no name to lie about, and it is the exit
+        (remediation 1) the poisoned offender message points at."""
+        star = "from settings import *\n"
+        offenders = find_bare_agents_roots(
+            star
+            + "root = os.environ.get('OURLIBERTY_AGENTS_ROOT')\n"
+            "p = Path(root) if root else Path.home() / 'agents'\n")
+        self.assertEqual(len(offenders), 1, offenders)
+        self.assertIn("star import", offenders[0])
         self.assert_quiet(
-            "from settings import *\n"
-            "p = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT',"
+            star
+            + "p = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT',"
             " str(Path.home() / 'agents')))\n")
 
     def test_star_import_case_runs_and_resolves_a_wrong_path(self):
         """Runtime truth: unlike the pinned scope-free limits, this code
         does NOT NameError — it resolves under the swapped HOME with the
         override set. That is what makes it a defect rather than a declared
-        blind spot."""
+        blind spot. The SAME source is fed to the scanner here, so the test
+        proves the guard catches the thing it just watched go wrong."""
+        victim = (
+            "import os\n"
+            "from pathlib import Path\n"
+            "root = os.environ.get('OURLIBERTY_AGENTS_ROOT')\n"
+            "from settings import *\n"
+            "resolved = Path(root) if root else Path.home() / 'agents'\n"
+            "print(resolved)\n"
+        )
+        offenders = find_bare_agents_roots(victim, filename="victim.py")
+        self.assertEqual(len(offenders), 1, offenders)
+        self.assertIn("star import", offenders[0])
         with tempfile.TemporaryDirectory() as tmp:
             tmp = Path(tmp)
             (tmp / "settings.py").write_text("root = ''\n")
-            (tmp / "victim.py").write_text(
-                "import os\n"
-                "from pathlib import Path\n"
-                "root = os.environ.get('OURLIBERTY_AGENTS_ROOT')\n"
-                "from settings import *\n"
-                "resolved = Path(root) if root else Path.home() / 'agents'\n"
-                "print(resolved)\n"
-            )
+            (tmp / "victim.py").write_text(victim)
             env = dict(os.environ)
             env["OURLIBERTY_AGENTS_ROOT"] = "/tmp/ol-real-agents"
             env["HOME"] = str(tmp / "bogus-tier2")
@@ -1955,11 +2060,29 @@ class TestGuardScanner(unittest.TestCase):
         )
         self.assertEqual(len(find_bare_agents_roots(laundered)), 1)
 
-    def test_allows_both_shell_default_operators(self):
+    def test_both_shell_default_operators_waive_only_when_closed(self):
+        """Both operators SHELL_DEFAULT accepts must waive — and both must
+        stop waiving when the brace is missing. Pinning only the quiet half
+        would pass against the fail-OPEN branch this replaced."""
         for op in (":-", ":="):
-            self.assert_quiet(
+            closed = (
                 "cmd = 'ROOT=\"${OURLIBERTY_AGENTS_ROOT%s$HOME/agents}\"'\n"
                 % op)
+            unterminated = (
+                "cmd = 'ROOT=\"${OURLIBERTY_AGENTS_ROOT%s$HOME/agents\"'\n"
+                % op)
+            self.assert_quiet(closed)
+            self.assertEqual(
+                len(find_bare_agents_roots(unterminated)), 1, unterminated)
+            # ...and the raw .sh channel answers identically.
+            self.assertEqual(
+                find_bare_agents_roots_in_text(
+                    'ROOT="${OURLIBERTY_AGENTS_ROOT%s$HOME/agents}"\n' % op),
+                [], op)
+            self.assertEqual(
+                len(find_bare_agents_roots_in_text(
+                    'ROOT="${OURLIBERTY_AGENTS_ROOT%s$HOME/agents"\n' % op)),
+                1, op)
 
     # -- the .sh channel -----------------------------------------------------
 
@@ -2009,6 +2132,54 @@ class TestGuardScanner(unittest.TestCase):
                 find_bare_agents_roots("cmd = %r\n" % quiet), [], quiet)
             self.assertEqual(
                 find_bare_agents_roots_in_text(quiet + "\n"), [], quiet)
+
+    def test_property_executable_tilde_assignment_flags_prose_does_not(self):
+        """`LOG=~/agents/logs` in a .sh runner is a real tier-2 wrong-home
+        write, and the '~/agents in prose' blind spot does NOT cover it: an
+        executable assignment is not a sentence. The discriminator is that
+        the tilde must be UNQUOTED and welded to an `=` or `:` — in shell
+        there is no tilde expansion inside quotes, so `"~/agents"` is a
+        directory literally named `~` and is not a home path at all.
+
+        Both halves are asserted over the same shapes, because a matcher
+        loose enough to catch the payload would light up 259 docstrings."""
+        for payload in (
+            "LOG=~/agents/logs",
+            "STATE=~/agents",
+            # NB: deeper prod sub-trees (~/agents/blackboard/, ~/agents/
+            # state/) are banned literals in scripts/tests by the
+            # production-path leak gate, so the depth case uses a leaf the
+            # gate allows. The segment rule is depth-blind either way.
+            "FLAG=~/agents/rotation.disabled",
+            "PATH=$PATH:~/agents/bin",
+            "python3 script.py --root=~/agents/state",
+        ):
+            self.assertEqual(
+                len(find_bare_agents_roots_in_text(payload + "\n")), 1,
+                payload)
+            # ...and the channels agree: same payload, same verdict.
+            self.assertEqual(
+                len(find_bare_agents_roots("cmd = %r\n" % payload)), 1,
+                payload)
+        for quiet in (
+            # quoted: no tilde expansion in shell, so not a home path
+            'LOG="~/agents/logs"',
+            "LOG='~/agents/logs'",
+            # sibling tree
+            "LOG=~/agents-archive",
+            "LOG=~/agents_old",
+            # prose spellings, which is why the token alone cannot match
+            "# tail -f ~/agents/logs/pulse.log",
+            'echo "Tail log: tail -f ~/agents/logs/x.log"',
+            "# rollback: echo tier1 > ~/agents/rotation.disabled",
+            "# the default is AGENTS_ROOT = ~/agents",
+            # and the guarded spelling stays guarded
+            'LOG="${OURLIBERTY_AGENTS_ROOT:-~/agents}/logs"',
+        ):
+            self.assertEqual(
+                find_bare_agents_roots_in_text(quiet + "\n"), [], quiet)
+            self.assertEqual(
+                find_bare_agents_roots("cmd = %r\n" % quiet), [], quiet)
 
     # -- waiver mechanics ----------------------------------------------------
 
@@ -2363,11 +2534,25 @@ class TestGuardScanner(unittest.TestCase):
             "import fallback_config as root\n"
             "p = Path(root) if root else Path.home() / 'agents'\n")
 
-    def test_flags_from_import_rebind(self):
-        self.assert_flags(
-            "root = os.environ.get('OURLIBERTY_AGENTS_ROOT')\n"
-            "from settings import root\n"
-            "p = Path(root) if root else Path.home() / 'agents'\n")
+    def test_import_rebind_spellings_agree(self):
+        """Three ways to rebind a trusted name through an import. The named
+        two already flagged; the STAR spelling was the bypass, because
+        `_collect_bindings` filed it under the unusable key '*' and the
+        Store/Del sweep sees no Name node for it. Asserting the three
+        together is the point — a per-spelling fixture set is complete only
+        by luck."""
+        read = "root = os.environ.get('OURLIBERTY_AGENTS_ROOT')\n"
+        use = "p = Path(root) if root else Path.home() / 'agents'\n"
+        for rebind in (
+            "import fallback_config as root\n",
+            "from settings import root\n",
+            "from settings import *\n",
+        ):
+            src = read + rebind + use
+            self.assertEqual(len(find_bare_agents_roots(src)), 1, src)
+        self.assertIn(
+            "star import",
+            find_bare_agents_roots(read + "from settings import *\n" + use)[0])
 
     def test_flags_lambda_param_shadow(self):
         # The lambda spelling of the parameter attack: the name guarding
