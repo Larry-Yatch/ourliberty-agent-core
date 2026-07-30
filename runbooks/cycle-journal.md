@@ -4,6 +4,83 @@
 
 ---
 
+## Iteration ~6877 — 2026-07-30T16:27Z UTC (Larry /cycle chat, Tier 3, consecutive_clean=20→21; Check 0: 1 new alert (doorbell Tier-3 silence → watermark 563→564); ALL checks NOMINAL; pending=3 [carry]; PR#1067 deep-review hold [carry]; PR#1065 unrouted by-design [carry])
+
+**Health:** ✅ Nominal — all checks clean.
+
+**VERIFY-BEFORE-REASSERT (from iter ~6876 at ~15:57Z UTC):**
+- **"system-health=healthy ts=2026-07-30T15:52:17Z UTC"**: CONFIRMED ✅ → ts=2026-07-30T16:23:02Z UTC (fresh ~4 min). All 4 bots alive. [carry ✅]
+- **"heal-stale-daemon-code.heartbeat=2026-07-30T15:55:23Z UTC"**: CONFIRMED ✅ → 2026-07-30T16:16:16Z UTC (fresh ~11 min; <60 min). [carry ✅]
+- **"alerts watermark=563=file_length=563"**: CHANGED → file_length=564; 1 new alert (doorbell 16:13:19Z UTC, Tier-3 silence). Watermark advanced to 564. [triaged ✅]
+- **"pending=3 (same 3 items, no change)"**: CONFIRMED → still pending=3. Same 3 items. [carry ✅]
+- **"HEAD=247deb5e=origin/main"**: CHANGED ✅ → 532c182f (Pulse cycle 20260730T155836Z — iter ~6876 auto-commit). Up to date with origin/main. Working tree clean. [carry ✅]
+- **"PR#1067 deep-review hold [carry — awaiting Larry]"**: CONFIRMED → PR#1067 still open, MERGEABLE, reviewDecision="". deep-review-hold-pr1067-8d2651ce still pending. [carry ✅]
+- **"PR#1065 unrouted by-design"**: CONFIRMED → PR#1065 still open, MERGEABLE, reviewDecision="" (unrouted by-design). [carry — watching]
+- G-rule carries (unchanged): forge-marker-taskid-suffix-increment; medic-draft-status-false-positive; check-i-force-bypass-dm-route; beacon-pending-approvals-path-bug; deep-review-hold-approved-loop-post-merge-001; pending-auto-merge-exhausted-for-merged-pr (monitoring). VPs: pulse-cycle-check0-helper-override, auto-merge-conflict-route-hold, direction-ask-rsdpm-no-autolabel-review-gap-001.
+
+**Check 0 — Alert triage (~16:27Z UTC):** repair-watermark → {repaired=false, old=563, file_length=564} — 1 new alert. New alert: doorbell at ts=2026-07-30T16:13:19Z UTC (source=doorbell, intent=doorbell; matches bot idx=563 delivered [2026-07-30T10:13:38-0600]=16:13:38Z UTC). Triage helper → Tier 3 silence (known-pattern match, route=digest). Watermark advanced to 564. NOMINAL ✅
+
+**Check 1 — Log noise (~16:27Z UTC):** outbox-notifier.log — most recent entry [2026-07-29 21:58:50 MDT] = 03:58:50Z UTC (deep-review-hold surfaced for PR#1067 — same as prior iters). Log quiet since 03:58:50Z UTC (~12.5h clean). 0 new WARNs. NOMINAL ✅
+
+**Check 2 — Telegram sweep (~16:27Z UTC):** Most recent delivery: idx=563 at [2026-07-30T10:13:38-0600] = 16:13:38Z UTC (doorbell — NEW vs iter ~6876 which had idx=562). No new Larry messages. NOMINAL ✅
+
+**Check 3 — Pipeline stall (~16:27Z UTC):** heal_pipeline_stall.py --dry-run → **DRY-RUN: 0 stalls detected** ✅ (FORGE_NO_PR_SKIP ×12+; MIRROR_PASS_UNMERGED_SKIP: merge-verb-backend-001 held_deep_review intentional; cooldown suppressed unrouted_open_pr:1065). NOMINAL ✅
+
+**Check 4 — Pending directives (~16:27Z UTC):** beacon-pending-approvals.json (state/): **pending=3** (CARRY — same 3 items as iter ~6876; no new items, none resolved):
+1. **suite-guardian-graduation-stage-1** (created=03:40:11Z UTC): chat_id=0 (DM drop known). Awaiting Larry. [CARRY]
+2. **unreg-approval-01519bf927ed** (created=03:45:49Z UTC): DM delivered idx=590. 6h reminder sent 09:50Z UTC. Awaiting Larry. [CARRY]
+3. **deep-review-hold-pr1067-8d2651ce** (created=03:58:50Z UTC): DM delivered idx=591 at 04:02:15Z UTC. 6h reminder sent 10:00Z UTC. Awaiting Larry. [CARRY]
+No new escalation needed (all DMs already delivered; 6h reminders auto-sent). Journal carry only. NOMINAL (carry) ✅
+
+**Check 5 — Stale daemon code (~16:27Z UTC):** heal-stale-daemon-code.heartbeat=2026-07-30T16:16:16Z UTC (fresh ~11 min; <60 min). system-health overall=healthy ts=2026-07-30T16:23:02Z UTC (fresh ~4 min). All 4 bots alive (beacon/forge/mirror/pulse: desired=up, alive=True, action=noop). NOMINAL ✅
+
+**Check A — Source repo (~16:27Z UTC):** On main. Working tree clean. HEAD=532c182f=origin/main (Pulse cycle 20260730T155836Z). NOMINAL ✅
+**Check B — Sync health (~16:27Z UTC):** last_sync=2026-07-30T16:20:45Z (~6 min; <2h); status=no-change; consecutive_push_failures=0. NOMINAL ✅
+**Check C — Agent liveness (~16:27Z UTC):** system-health=healthy ts=2026-07-30T16:23:02Z UTC (fresh ~4 min). All 4 bots alive. NOMINAL ✅
+**Check E — PR/merge state (~16:27Z UTC):** ourliberty-agent-core: **2 open PRs**:
+- **#1067** `feat(approvals): backend 'merge it' operator verb` — MERGEABLE; reviewDecision="". AUTO_MERGE_HELD (deep-review-hold-pr1067-8d2651ce pending). [carry — awaiting Larry /code-review high]
+- **#1065** `test(guard): harden agents-root override scanner` — MERGEABLE; reviewDecision="" (unrouted by-design). [carry — watching]
+NOMINAL ✅ (no always-fix trigger; deep-review hold intentional; PR#1065 unrouted by-design)
+**Check H — Forge digest (~16:27Z UTC):** 2 open Forge PRs in ourliberty-agent-core (both carry, <72h). 0 merged in last 4h. NOMINAL ✅
+
+**§5.0 one-shots (~16:27Z UTC):** audit_due_nudge → no committed audit baseline; no-op ✅. distill_detector → no un-distilled audits; no-op ✅. silence_file_auditor → 7 files (3 expired 0-suppressed, 4 permanent 0-suppressed); no FIRED ✅. NOMINAL ✅
+
+**§5 periodic — Check I (carry):** Most recent: check-i-2026-07-29.json. Next firing: Fri 2026-07-31 at ~14:13 UTC (tomorrow). Carry: $1,201/wk +206%; proposal #1 (45σ cycle review) via `/dispatch 1`.
+**§5 periodic — Check III (carry):** Most recent: check-iii-2026-07-26.json. Next: Sun 2026-08-03. NOMINAL ✅
+
+**Credential rotation (~16:27Z UTC):** SUPABASE_SERVICE_ROLE_KEY: last DM 2026-07-20T20:00:15Z UTC; 14d dedup expires ~2026-08-03; due=2026-08-22 (23d). Within dedup window — no DM. SUPABASE_DB_PASSWORD: RESOLVED ✅ (PR#1066 merged 2026-07-30T03:52:09Z UTC). NOMINAL ✅
+
+**PRIME DIRECTIVE accounting:** No new intervention or systemic_fix this iter. iter_clean row appended. Ratio=39.46 (interventions≈1894, systemic_fixes=48, verification_pending=23, trend=worsening). **TIER: Tier 3** (consecutive_clean=20→21; floor tier — stays Tier 3; last_signal_at=2026-07-30T04:03:48Z UTC).
+
+**Patterns:**
+- **pending=3 [carry — awaiting Larry]**: (1) suite-guardian Stage 1 (chat_id=0 DM drop known); (2) unreg triage (DM idx=590; 6h reminder auto-sent 09:50Z UTC); (3) deep-review-hold-pr1067 (DM idx=591; 6h reminder auto-sent 10:00Z UTC). All 3 in Approvals tab. No change from iter ~6876.
+- **PR#1067 deep-review hold [carry — awaiting Larry]**: Mirror PASS, AUTO_MERGE_HELD. Awaiting `/code-review high` + `scripts/merge_reviewed_pr.sh 1067`.
+- **PR#1065 unrouted [carry — watching]**: unrouted by-design; no routing label.
+- G-rule carries (unchanged): forge-marker-taskid-suffix-increment; medic-draft-status-false-positive; check-i-force-bypass-dm-route; beacon-pending-approvals-path-bug; deep-review-hold-approved-loop-post-merge-001; pending-auto-merge-exhausted-for-merged-pr (monitoring). VPs: pulse-cycle-check0-helper-override, auto-merge-conflict-route-hold, direction-ask-rsdpm-no-autolabel-review-gap-001.
+
+**Actions taken:**
+1. Check 0: repair-watermark → {repaired=false, old=563, file_length=564} — 1 new alert found. ✅
+2. Check 0: triage doorbell alert (ts=2026-07-30T16:13:19Z UTC) → Tier-3 silence (known-pattern). ✅
+3. Check 0: set-watermark --line 564. ✅
+4. §5.0 one-shots: audit_due_nudge, distill_detector, silence_file_auditor → all no-op/no-FIRED. ✅
+5. PRIME DIRECTIVE: iter_clean row appended via cycle_prime_ledger.py. ✅
+6. Tier state: `cycle_tier_state.py record --checks-clean true` → Tier 3; consecutive_clean=21; last_signal_at=2026-07-30T04:03:48Z UTC. ✅
+
+**Escalations:**
+- **[carry ⚠️ — awaiting Larry]** pending=3 in Approvals tab: (1) suite-guardian-graduation-stage-1 (chat_id=0, may need Larry to check dashboard); (2) unreg-approval-01519bf927ed (DM idx=590; 6h reminder auto-sent 09:50Z UTC); (3) deep-review-hold-pr1067-8d2651ce (DM idx=591; 6h reminder auto-sent 10:00Z UTC). No new DM needed.
+- **[carry ⚠️] PR#1067 deep-review-hold**: Run `/code-review high` on PR#1067 (feat(approvals): backend 'merge it' operator verb), then `scripts/merge_reviewed_pr.sh 1067`.
+- **[carry ⚠️] RSDPM staging drift (0035, 0036, 0037)**: Awaiting Larry ssh investigation.
+- [carry] check-vi-posture-proposals-2026-07-07 (2 proposals). Awaiting Larry.
+- [carry — monitoring] Mirror queue-wait p95=1065.6m. Larry decision if queue stays saturated.
+- [carry — no Larry reply] Check XIV Tier-4 × 2: oversilence + fleet digest.
+- [carry — monitoring] tier4-rsdpm-install-drift.
+- [carry — monitoring] forge-wip-redispatch EXHAUSTED (rsdpm-pr155).
+- **[blue] Check I: weekly cost $1,201 (+206%)**. Proposal #1 via `/dispatch 1`.
+
+**Tier end-of-iter:** **Tier 3** (consecutive_clean=21; floor tier; last_signal_at=2026-07-30T04:03:48Z UTC; next run at 30-min cadence).
+
+---
+
 ## Iteration ~6876 — 2026-07-30T15:57Z UTC (Larry /cycle chat, Tier 3, consecutive_clean=19→20; Check 0: 0 new alerts (watermark=563=file_length=563); ALL checks NOMINAL; pending=3 [carry]; PR#1067 deep-review hold [carry]; PR#1065 unrouted by-design [carry])
 
 **Health:** ✅ Nominal — all checks clean.
@@ -3094,104 +3171,6 @@ SIGNAL ⚠️ (PR#163 142min; queue: #167 blocked behind it)
 - **[blue] Check I: weekly cost $1,201 (+206%)**. Proposal #1 (45σ cycle review) via `/dispatch 1`.
 
 **Tier end-of-iter:** **Tier 1** (signals: Check 4 pending=5 + merge_held_deep_review PR#1064 + Check 0 Tier-4 credential-drift; consecutive_clean=0; last_signal_at=2026-07-30T02:12:47Z UTC).
-
----
-
-## Iteration ~6837 — 2026-07-30T02:01Z UTC (Larry /cycle chat, Tier 1, consecutive_clean=0; SIGNAL: GitHub GraphQL rate-limit burst (43/5000, 3 hits, resets 02:05Z UTC) — Check 3 skipped, outbox-notifier in backoff, PR#1064 auto-merge skipped; Beacon bot restarted at 01:55:46Z UTC (self-recovered); Check 0: 2 Tier-3 silences (PR#166 unrouted known-pattern); CARRIES: PR#1063 Mirror re-review in flight, PR#163 RSDPM 132min bottleneck)
-
-**Health:** ⚠️ Signal — Check 1: GitHub GraphQL rate-limit burst (43/5000 remaining, 3 hits at 01:57Z/01:58Z/02:00Z UTC; resets 02:05:05Z UTC). Impact: heal_pipeline_stall.py SKIPPED (budget<500), outbox-notifier in rate-limit backoff (#3 at 02:00Z), PR#1064 auto-merge skipped (reason=pr-not-found; rate-limit backoff active), RSDPM PR check unavailable. Self-resolving at 02:05Z UTC. Check 3: SKIPPED (same root cause). POSITIVES: all 5 mandatory non-GraphQL checks nominal; pending=0; PR#1063 Mirror re-review in flight; Check 0 both new alerts Tier-3 silenced.
-
-**VERIFY-BEFORE-REASSERT (from iter ~6836 at ~01:52Z UTC):**
-- **"system-health=healthy ts=01:45:50Z UTC"**: CONFIRMED ✅ → ts=2026-07-30T02:00:57Z UTC (fresh <1 min at check time). All 4 bots desired=up alive=true action=noop. [carry ✅]
-- **"heal-stale-daemon-code.heartbeat"**: CONFIRMED ✅ → 2026-07-30T01:55:44Z UTC (~5 min at check time; <60 min). [carry ✅]
-- **"alerts watermark=569=file_length=569"**: CHANGED — file_length=571; 2 new alerts (lines 570-571). Both Tier-3 silenced (PR#166 unrouted known-pattern). Watermark advanced to 571. [NOMINAL ✅]
-- **"pending=0"**: CONFIRMED ✅ → pending=0. [carry ✅]
-- **"PR#1064 Mirror review in flight (dispatched 01:31:12Z UTC)"**: CONFIRMED → labels=[auto-review]; mergeable=UNKNOWN; Mirror review still in flight. Rate-limit prevented auto-merge check (PR#1064 auto-merge skipped at 01:58:16Z UTC). ⚠️ rate-limit impact; self-resolving
-- **"PR#1063 deep-review gate reset + Mirror re-dispatched at 01:50:39Z UTC"**: CONFIRMED → labels=[held-behind-#1064]; MERGEABLE; Mirror re-review in flight (~10min at this iter). [monitoring ✅]
-- **"PR#1060 auto-review + held-behind-#1063"**: CONFIRMED ✅ → age=~181min; MERGEABLE; labels=[auto-review, held-behind-#1063]. [carry ✅]
-- **"HEAD=origin/main=fcf8c60d"**: CHANGED ✅ → HEAD=origin/main=247d630a (Pulse cycle 20260730T015524Z). [carry ✅]
-- **"PR#163 RSDPM ~127 min bottleneck (10th carry)"**: CARRY ⚠️ → GraphQL rate-limit prevented fresh query; estimated ~132min based on +5min elapsed. No labels; cooldown. [11th carry ⚠️ BOTTLENECK — rate-limit prevented re-verify]
-- **"PR#164/165/166/167 RSDPM"**: CARRY — rate-limit prevented re-verify. Last known: PR#164 (Mirror PASSED, held-#166), PR#165 (Mirror review in flight since 01:45Z), PR#166 (no labels, 63min+), PR#167 (held-#163). [carry — unverified this iter due to rate-limit]
-- **"deep-review-hold-approved-loop G-rule 2/3"**: CONFIRMED stopped → loop self-stopped at 01:50:25Z UTC (new commit cleared hold). G-rule 2/3 still stands. [carry ✅]
-- **"direction-ask-rsdpm-no-autolabel-review-gap-001 (verification_pending)"**: CARRY → in Beacon .archive/ (processed). [VP carry]
-- **"rsdpm-0037-staging-drift Tier-4 [carry]"**: CARRY — awaiting Larry. [carry]
-- Other G-rule carries (2/3 unchanged): forge-marker-taskid-suffix-increment; medic-draft-status-false-positive; check-i-force-bypass-dm-route; beacon-pending-approvals-path-bug. VPs: pulse-cycle-check0-helper-override, auto-merge-conflict-route-hold.
-
-**Check 0 — Alert triage (~01:57Z UTC):** `repair-watermark` → `{"repaired": false, "old_watermark": 569, "file_length": 571}` — no rotation gap. `get-watermark` → 569. **2 new alerts** (lines 570-571):
-- **Line 570** — ts=01:51:10Z UTC, source=heal-pipeline-stall, subject=pipeline-stall:unrouted-pr:PR#166, severity=warning. `triage-alert` → **Tier 3** (known-pattern: pipeline-stall:unrouted-pr). Silence ✅
-- **Line 571** — ts=01:52:56Z UTC, source=medic, intent=medic-diagnosis, about PR#166 unrouted (same root). `triage-alert` → **Tier 3** (known-pattern: medic-diagnosis). Silence ✅
-`set-watermark --line 571` ✅. NOMINAL ✅ (no tier-reset from Tier-3 silences)
-
-**Check 1 — Cumulative log-noise scan (~01:58Z UTC):** 9 WARNs in last hour in outbox-notifier.log. Dominant patterns:
-- `gh rate-limit hit` — 3 occurrences (01:57:10Z, 01:58:00Z, 02:00:02Z UTC). Burst >5/h.
-- `AUTO_MERGE task=closed-pr-dedup-wedge-fix-001 outcome=skipped reason=pr-not-found` — 1 occurrence (01:58:16Z).
-- `MIRROR_REVIEW_STATUS task=closed-pr-dedup-wedge-fix-001 skipped reason=no-head-sha` — 1 occurrence (01:58:16Z).
-- `AUTO_MERGE_HELD_DEEP_REVIEW` (PR#1063) — 1 occurrence (01:17Z, from prior iter boundary).
-- `deep-review-hold HEAD mismatch` (PR#1063) — 1 occurrence (01:50:25Z, already noted in ~6836).
-Root cause: single GitHub GraphQL rate-limit exhaustion. All rate-limit-induced WARNs collapse to one root cause. NOT dispatching to Beacon (self-resolves at 02:05Z UTC; no pattern yet for 3/3 dispatch). SIGNAL ⚠️ (rate-limit burst >5/h, self-resolving)
-
-**Check 2 — Telegram sweep (~01:58Z UTC):** Last bot delivery: `[2026-07-29T19:55:47-0600]` = 01:55:47Z UTC (idx=570, medic-diagnosis). Larry's last message: "why is 167 sitting?" at `[2026-07-29T19:44:39-0600]` = 01:44:39Z UTC. Beacon replied at 01:45:50Z UTC — handled. No new Larry messages. No orphan directives. Beacon bot restarted at 01:55:46Z UTC (01:55:47Z first delivery after restart — self-recovered in <1s). NOMINAL ✅ with note (Beacon restart noted, not escalated — auto-recovered)
-
-**Check 3 — Pipeline stall (~01:56Z UTC):** heal_pipeline_stall.py --dry-run → `skipping: GraphQL budget low (graphql 43/5000, resets 2026-07-30T02:05:05+00:00), min=500`. SKIPPED due to rate-limit. Healer state file: `stalls=0` (from last valid scan; scanned_at missing). Carrying last known: PR#166 RSDPM stall alert had fired (Tier-3 silenced this iter). Rate limit resets 02:05Z UTC; next iter's Check 3 should run normally. SIGNAL ⚠️ (Check 3 incomplete this iter — rate-limit induced)
-
-**Check 4 — Pending directives (~01:57Z UTC):** beacon-pending-approvals.json (state/): **pending=0**. NOMINAL ✅
-
-**Check 5 — Stale daemon code (~01:55Z UTC):** heal-stale-daemon-code.heartbeat=2026-07-30T01:55:44Z UTC (~5 min; <60 min). system-health overall=healthy ts=2026-07-30T02:00:57Z UTC (fresh <1 min). NOMINAL ✅
-
-**Check A — Source repo (~01:56Z UTC):** On main. Working tree clean. HEAD=origin/main=247d630a (in sync). NOMINAL ✅
-**Check B — Sync health (~01:57Z UTC):** last_sync=2026-07-30T01:23:59Z UTC (~37 min; <2h); status=no-change; push_fails=0. NOMINAL ✅
-**Check C — Agent liveness (~01:57Z UTC):** system-health=healthy ts=02:00:57Z UTC (fresh <1 min). All 4 bots alive (beacon/forge/mirror/pulse desired=up alive=true action=noop). Note: Beacon restarted at 01:55:46Z UTC — system-health confirms alive post-restart. NOMINAL ✅
-**Check E — PR/merge state (~01:57Z UTC):** ourliberty-agent-core: **3 open PRs**:
-- **#1064** fix: closed-PR dispatch wedge via generation-in-marker + loud skip + deadline reconciler (age=~26 min; labels=[auto-review]; mergeable=UNKNOWN). Mirror review in flight since 01:31:12Z UTC (~26 min). **Auto-merge skipped at 01:58:16Z UTC** (rate-limit backoff — `pr-not-found`; self-resolves at 02:05Z UTC). MONITORING ✅
-- **#1063** fix: serialize build-sequence RMW through atomic_io.locked_update (age=~77 min; labels=[held-behind-#1064]; MERGEABLE). Mirror re-dispatched at 01:50:39Z UTC (~10 min in review). MONITORING ✅
-- **#1060** fix(approvals): auto-review + held-behind-#1063 (age=~181 min; MERGEABLE). MONITORING ✅
-SIGNAL ⚠️ (PR#1064 auto-merge skipped due to rate-limit; self-resolving at 02:05Z UTC)
-
-**Check H — Forge digest (~01:58Z UTC):** RSDPM PR query FAILED (GraphQL rate-limit). Carrying iter ~6836 state + elapsed estimate:
-- **PR#167** fix(seed-check): auto-review + held-behind-#163 (~68 min; MERGEABLE). CARRY ✅
-- **PR#166** fix(drift-gate): no labels (~73 min+; MERGEABLE). Stall alert fired (Tier-3 silenced). CARRY ⚠️
-- **PR#165** fix(sec): auto-review (~117 min+; MERGEABLE). Mirror review in flight since 01:45:13Z UTC (~15 min). CARRY — monitoring ✅
-- **PR#164** fix(drift-gate): auto-review + held-behind-#166 (~122 min+; MERGEABLE; Mirror PASSED). CARRY ✅
-- **PR#163** fix(leak-harness): no labels (~132 min+; MERGEABLE; stall-checker cooldown). ⚠️ BOTTLENECK 11th carry
-0 open forge/ branch PRs on agent-core. CARRY (rate-limit prevented re-verify). SIGNAL ⚠️ (PR#163 ~132min bottleneck; queue stacking; carry — unverified due to rate-limit)
-
-**§5.0 one-shots (~01:57Z UTC):** audit_due_nudge → no-op ✅. distill_detector → no-op ✅. silence_file_auditor → 5 files (1 expired 0-suppressed, 4 permanent 0-suppressed) ✅. NOMINAL ✅
-
-**§5 periodic — Check I (carry):** Most recent: check-i-2026-07-29.json. Next: Fri 2026-08-01. Carry: $1,201/wk +206%; proposal #1 (45σ cycle review) via `/dispatch 1`.
-**§5 periodic — Check III (carry):** Most recent: check-iii-2026-07-26.json. Next: Sun 2026-08-03. NOMINAL ✅
-
-**Credential rotation (~01:57Z UTC):** SUPABASE_SERVICE_ROLE_KEY: last DM 2026-07-20T20:00:15Z UTC; 14d dedup window expires ~2026-08-03; due=2026-08-22 (23d). Within dedup window — no DM. SUPABASE_DB_PASSWORD: MISSING_CREDENTIAL (carry). NOMINAL ✅
-
-**PRIME DIRECTIVE accounting:** intervention appended (tier=1, template=check1-gh-graphql-rate-limit-burst-check3-skipped-check-e-pr1064-automerge-skipped, ts=2026-07-30T02:01:12Z UTC). ratio≈39.75 (systemic_fixes=48, verification_pending=23, trend=worsening). **TIER: Tier 1 (signals: Check 1 rate-limit burst >5/h + Check 3 SKIPPED + Check E PR#1064 auto-merge skipped; consecutive_clean=0; last_signal_at=2026-07-30T02:01:13Z UTC).**
-
-**Patterns:**
-- **GitHub GraphQL rate-limit exhaustion [SIGNAL ⚠️ — self-resolving at 02:05Z UTC]**: API exhausted to 43/5000 remaining during the 01:52-02:05Z UTC window. Three services impacted simultaneously: (1) heal_pipeline_stall.py SKIPPED (budget check caught it early), (2) outbox-notifier entered backoff (3 rate-limit hits; backed off 228s), (3) PR#1064 auto-merge check skipped. Rate resets 02:05:05Z UTC; all services should resume normally on next polling cycle. No escalation needed. Note for G-rule tracking: this is a recurring pattern (prior hit 2026-07-10 at 16:43-16:48 MDT). If rate-limit exhaustion becomes a regular occurrence (3/3), dispatch a Beacon direction-ask about rate-limit budget management.
-- **Beacon bot restarted at 01:55:46Z UTC [nominal — self-recovered]**: Auto-restarted (watchdog or systemd unit recovery). system-health shows alive=true within 11 seconds. No missing deliveries noted (idx=570 delivered at 01:55:47Z post-restart). Pattern: 0/3 for a rate-limit-triggered restart G-rule; single occurrence, watching.
-- **PR#1064 auto-merge pipeline disrupted by rate-limit [MONITORING]**: outbox-notifier's PR#1064 auto-merge attempt at 01:58Z UTC returned `reason=pr-not-found` (rate-limit backoff masking the PR). Not a real "PR not found" — the PR exists. Will self-correct when rate limit resets at 02:05Z and notifier's next polling pass runs.
-- **PR#163 RSDPM bottleneck [~132 min, 11th carry]**: Same pattern as prior iters. Rate-limit prevented re-verify. direction-ask-rsdpm-no-autolabel-review-gap-001 in Beacon .archive/ — systemic fix in motion. Once PR#163 clears (Mirror review or Larry manual route), #164/#167 will auto-merge cascade.
-- Other G-rule carries (2/3 unchanged): forge-marker-taskid-suffix-increment; medic-draft-status-false-positive; check-i-force-bypass-dm-route; beacon-pending-approvals-path-bug; deep-review-hold-approved-loop-post-merge-001. VPs: pulse-cycle-check0-helper-override, auto-merge-conflict-route-hold, direction-ask-rsdpm-no-autolabel-review-gap-001.
-
-**Actions taken:**
-1. Check 0: `repair-watermark` → {repaired=false, old=569, file=571} — no rotation gap. ✅
-2. Check 0: `triage-alert` line 570 (heal-pipeline-stall:PR#166 unrouted) → Tier 3 silence. ✅
-3. Check 0: `triage-alert` line 571 (medic-diagnosis:PR#166 unrouted) → Tier 3 silence. ✅
-4. Check 0: `set-watermark --line 571` → confirmed 571. ✅
-5. §5.0 one-shots: all three → no-op ✅.
-6. PRIME ledger: intervention appended at 2026-07-30T02:01:12Z UTC (tier=1, template=check1-gh-graphql-rate-limit-burst-check3-skipped-check-e-pr1064-automerge-skipped).
-7. Tier state: `cycle_tier_state.py record --checks-clean false` → Tier 1; consecutive_clean=0; last_signal_at=2026-07-30T02:01:13Z UTC.
-
-**Escalations:**
-- **[yellow — monitoring] GitHub GraphQL rate-limit active**: 3 hits in 01:57-02:00Z UTC window. Resets 02:05Z UTC. Impact: Check 3 skipped, PR#1064 auto-merge delayed, RSDPM PR check unavailable. Self-resolving — no action needed from Larry. Journal only.
-- **[carry ⚠️] RSDPM staging drift (0035, 0036, 0037)**: Awaiting Larry ssh investigation. Carry.
-- **[carry ⚠️] credential-drift:MISSING_CREDENTIAL:SUPABASE_DB_PASSWORD**: Install per runbook OR retire. Carry.
-- [carry] check-vi-posture-proposals-2026-07-07 (2 proposals). Awaiting Larry.
-- [carry — monitoring] Mirror queue-wait p95=92.3m.
-- [carry — no Larry reply] Check XIV Tier-4 × 2: oversilence + fleet digest.
-- [carry — monitoring] tier4-rsdpm-install-drift.
-- [carry — monitoring] forge-wip-redispatch EXHAUSTED (rsdpm-pr155).
-- **[blue] Check I: weekly cost $1,201 (+206%)**. Proposal #1 (45σ cycle review) via `/dispatch 1`.
-
-**Tier end-of-iter:** **Tier 1** (signals: Check 1 rate-limit burst + Check 3 skipped + Check E PR#1064 auto-merge skipped; consecutive_clean=0; last_signal_at=2026-07-30T02:01:13Z UTC).
 
 ---
 
