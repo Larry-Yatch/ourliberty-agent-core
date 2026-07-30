@@ -16261,7 +16261,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-30T01:45:00.147296+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-30T01:33:52.692063+00:00"
+      "orphan_last_activity_ts": "2026-07-30T01:33:52.692063+00:00",
+      "briefing": {
+        "what": "A piece of work the team started on its own that isn't yet attached to any project, and it has already passed an internal quality check.",
+        "why": "Loose work that isn't tied to a goal can quietly consume time and ship changes nobody explicitly asked for, so it's worth a quick look before it goes further.",
+        "suggest": "Take a moment to confirm this fits a real priority and, if it does, fold it into a named project before approving it to move forward."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-30T01:45:41.392140+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
