@@ -16106,7 +16106,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-30T01:14:44.990164+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-30T01:07:44.956564+00:00"
+      "orphan_last_activity_ts": "2026-07-30T01:07:44.956564+00:00",
+      "briefing": {
+        "what": "A new piece of work your team began exploring on its own that hasn't been assigned to a specific project or goal yet.",
+        "why": "Unplanned side efforts can quietly absorb your team's time and pull focus away from the priorities you actually care about.",
+        "suggest": "Take a quick look and decide whether this belongs on the roadmap or should be paused until it earns a clear purpose."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-30T01:15:34.216788+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-larry-reject-e0d5ca1b372a8ebebe488d5b36870c673ded8296",
@@ -16123,7 +16137,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-30T01:14:44.990164+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-30T01:06:03.547878+00:00"
+      "orphan_last_activity_ts": "2026-07-30T01:06:03.547878+00:00",
+      "briefing": {
+        "what": "The team kicked off a piece of work that hasn't been connected to any active project or goal yet.",
+        "why": "Unassigned work can quietly consume time and attention without moving anything on your roadmap forward.",
+        "suggest": "Take a quick look before it goes further \u2014 either tie it to a real priority or set it aside so effort stays focused."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-30T01:15:34.216788+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-pr-RSDPM-167",
@@ -16140,7 +16168,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-30T01:14:44.990164+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-30T01:02:51.983364+00:00"
+      "orphan_last_activity_ts": "2026-07-30T01:02:51.983364+00:00",
+      "briefing": {
+        "what": "A piece of work your team picked up and finished, but it isn't attached to any active initiative yet.",
+        "why": "Completed work sitting outside your priorities ties up people's time and can quietly drift from what the business actually needs right now.",
+        "suggest": "Before it goes further, take a moment to confirm this fits a current priority \u2014 if it does, wave it through; if not, pause it and redirect the effort."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-30T01:15:34.216788+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
