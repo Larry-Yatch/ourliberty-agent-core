@@ -94,7 +94,7 @@ BEACON_DIR = Path.home() / "agent-core" / "agents" / "beacon"
 # __file__-relative path. The pinned fallback keeps the 1M context window
 # Beacon chat depends on for long spec sessions.
 _MODELS_CONFIG_PATH = _SCRIPT_DIR.parent / "config" / "agent-models.json"
-_DEFAULT_TELEGRAM_MODEL = "claude-opus-4-8[1m]"
+_DEFAULT_TELEGRAM_MODEL = "claude-opus-5[1m]"
 
 
 def _beacon_telegram_model() -> str:
