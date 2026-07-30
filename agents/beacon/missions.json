@@ -16312,7 +16312,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-30T02:15:00.977627+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-30T02:11:23.63912+00:00"
+      "orphan_last_activity_ts": "2026-07-30T02:11:23.63912+00:00",
+      "briefing": {
+        "what": "Your team completed a piece of quality-control work and is asking for your sign-off before it goes live.",
+        "why": "It's finished and waiting, but it isn't yet attached to any active initiative, so approving it keeps good work from stalling while confirming it fits your priorities.",
+        "suggest": "Take a quick look at what it delivers and, if it lines up with your current goals, approve it\u2014otherwise ask where it fits before giving the green light."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-30T02:16:17.117310+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-pr-RSDPM-166",
@@ -16329,7 +16343,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-30T02:15:00.977627+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-30T02:11:20.822825+00:00"
+      "orphan_last_activity_ts": "2026-07-30T02:11:20.822825+00:00",
+      "briefing": {
+        "what": "A piece of work the team picked up on its own that hasn't been tied to any active project or goal yet.",
+        "why": "Effort is going into something with no clear business owner or purpose, and it's now stuck waiting on a review that got flagged for a closer look.",
+        "suggest": "Before it goes any further, have someone confirm what this is meant to accomplish and whether it's worth finishing right now."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-30T02:16:17.117310+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-deep-review-hold-pr1064-cc193879",
@@ -16346,7 +16374,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-30T02:15:00.977627+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-30T02:08:53.935456+00:00"
+      "orphan_last_activity_ts": "2026-07-30T02:08:53.935456+00:00",
+      "briefing": {
+        "what": "A piece of work the team began on their own that isn't attached to any active project yet, and it's now waiting for your sign-off to move forward.",
+        "why": "Unassigned work that stalls waiting for approval ties up the team's time without clearly advancing anything you've prioritized.",
+        "suggest": "Take a quick look before approving \u2014 since it's not linked to a current priority, confirm it's worth the team's time rather than waving it through."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-30T02:16:17.117310+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-gh-unavailable",
@@ -16363,7 +16405,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-30T02:15:00.977627+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-30T02:04:49.961932+00:00"
+      "orphan_last_activity_ts": "2026-07-30T02:04:49.961932+00:00",
+      "briefing": {
+        "what": "GitHub, the outside service the team relies on to store and coordinate its work, has been reported as unavailable several times.",
+        "why": "When it's down, the team can't reliably save or hand off work, which slows everything and risks small gaps going unnoticed.",
+        "suggest": "Confirm whether it's still down before committing resources, and if it's an outside outage simply wait it out while keeping an eye on repeat alerts."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-30T02:16:17.117310+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
