@@ -16809,7 +16809,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-30T20:06:20.047927+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-30T19:52:58.064952+00:00"
+      "orphan_last_activity_ts": "2026-07-30T19:52:58.064952+00:00",
+      "briefing": {
+        "what": "The team has begun building a way to automatically check whether an approval request is still current before it gets acted on.",
+        "why": "It reduces the chance of stale or outdated approvals slipping through, protecting the quality of decisions the system makes on your behalf.",
+        "suggest": "Let this first groundwork step proceed, but keep an eye on it since it isn't yet part of a defined initiative."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-30T20:07:20.066347+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
