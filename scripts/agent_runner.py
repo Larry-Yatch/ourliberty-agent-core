@@ -1771,6 +1771,25 @@ def run_claude(agent_id, prompt, working_dir=None, system_prompt=None,
                 # already carries timed_out=True so the review escalates clean.
                 if timed_out_session:
                     guard.release(agent_id)
+                    # Report the REAL elapsed runtime, not None. A run that hit
+                    # the wall ran for the full window, and a null duration_sec
+                    # makes a 10-minute timeout indistinguishable from a
+                    # never-spawned worker to the spawn-failure classifiers
+                    # (outbox_notifier `_prior_build_was_spawn_failure` /
+                    # `_prior_dispatch_was_definitive_non_run`, which read
+                    # exit -1 + ~0 duration as 'never started').
+                    # It goes on out_meta, NOT the return tuple: the envelope's
+                    # `duration_sec` is `meta.get('duration_sec')`
+                    # (inbox_watcher._build_outbox), while the third element is
+                    # `new_session_id` and is written to `claude_session_id` —
+                    # a str|None field that downstream slices, globs into a
+                    # session-log path, and propagates as a `--resume` id.
+                    if out_meta is not None:
+                        out_meta['duration_sec'] = round(
+                            time.time() - _meta_t0, 2)
+                        out_meta['started_at'] = _meta_started_at
+                        out_meta['completed_at'] = datetime.now(
+                            timezone.utc).isoformat()
                     return False, f'TIMEOUT after {effective_timeout}s', None
 
                 # Build a result-like object for downstream compatibility
