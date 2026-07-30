@@ -30,22 +30,28 @@ subordinate to a genuine read of the override —
 
 A bare fallback assigned directly, or guarded only by a variable that is
 never bound from the env read, is an offender — whatever anything is named.
-Binding-trust is strict about WHERE and HOW OFTEN the name is bound,
-because the check is flow-insensitive: EVERY binding of the name in the
-enclosing scope must contain the env read (one rebind from anywhere else —
-or a live wrong-var binding beside a dead-branch env read — voids the
-trust), and nested function definitions are opaque (a function-local
-binding cannot bless a module-level use, nor a nested def its outer
-function).
+Binding-trust is strict about WHERE and HOW the name is bound, because the
+check is flow-insensitive: at least one binding in the enclosing scope must
+contain the env read; every other binding must contain the read too or
+derive from the name itself (`root = root.rstrip('/') if root else None`,
+`root += ...` — normalization keeps the trust); a binding through any form
+whose value cannot be inspected — a parameter, a `for`/`with ... as`/
+`except ... as` target, tuple unpacking, `import ... as`, a match capture —
+voids the trust outright (`def f(root)` beside a dead env read is the
+parameter spelling of the rebind attack). Nested function definitions,
+lambdas and class bodies are separate namespaces and count for nothing in
+the enclosing scope, in either direction.
 
 Bare fallbacks embedded in string literals (python -c payloads, shell
 command strings) are scanned textually, since the code that runs in a
 spawned child is exactly where the HOME swap bites; f-string constant
-fragments are joined before matching so a guard split across fragments is
-seen. WAIVER: a string passes only when it contains a READ spelling of the
-override (getenv(/environ.get(/environ[ with the quoted var) — merely
-NAMING the var (an export line, prose) proves nothing about the fallback
-beside it. Deliberately OUT OF SCOPE for the text channel: a bare
+fragments are joined before matching (interpolations become opaque
+placeholders) so a guard split across fragments of one line is seen.
+WAIVER: a LINE of a string passes only when that same line contains a READ
+spelling of the override (getenv(/environ.get(/environ[ with the quoted
+var) — merely NAMING the var (an export line, prose) proves nothing, and a
+read on one line of a payload says nothing about a bare fallback on
+another. Deliberately OUT OF SCOPE for the text channel: a bare
 ``~/agents`` token (pervasive in docstring prose, so it cannot
 discriminate payloads from documentation) and home-alias spellings (see
 the ALLOWED_FILES note) — those rely on the AST channel or the allowlist.
@@ -93,12 +99,14 @@ ALLOWED_FILES = {"test_isolation_guard.py"}
 # bare `~/agents` token is deliberately NOT matched — it is pervasive in
 # docstring prose, so it cannot discriminate a payload from documentation;
 # tilde spellings are caught only where a call wrapper names them
-# (expanduser('~/agents')).
+# (expanduser('~/agents')). Every alternative is TERMINATED at a path-
+# segment boundary so sibling directories ($HOME/agents-archive,
+# expanduser('~/agents-old')) — different trees entirely — do not match.
 TEXT_BARE = re.compile(
     r"(?:Path\.home\(\)|(?<!\w)HOME)\s*/\s*['\"]agents['\"]"
-    r"|expanduser\(\s*['\"]~/agents"
+    r"|expanduser\(\s*['\"]~/agents(?=['\"/])"
     r"|\bhome\(\)\s*\.\s*joinpath\(\s*['\"]agents['\"]"
-    r"|\$HOME/agents|\$\{HOME\}/agents"
+    r"|\$HOME/agents(?![\w.-])|\$\{HOME\}/agents(?![\w.-])"
 )
 
 # A string is presumed guarded only when it contains a READ spelling of the
@@ -199,54 +207,129 @@ def _is_env_read(node):
 
 
 def _enclosing_scope(node, parents):
+    # ClassDef is a scope boundary too: a class body is its own namespace,
+    # so a class-level expression must be judged against class-level
+    # bindings, never leak trust to/from module level.
     n = parents.get(node)
     while n is not None and not isinstance(
-        n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Module)
+        n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Module)
     ):
         n = parents.get(n)
     return n
 
 
 def _scope_walk(scope):
-    """Walk `scope` WITHOUT descending into nested function definitions:
-    their local bindings are invisible to the enclosing scope, and trusting
-    them blessed cross-scope (a function-local `root = <env read>` cleared
-    an unrelated module-level `root`, and a nested def cleared its outer
-    function)."""
+    """Walk `scope` WITHOUT descending into nested namespaces: function
+    definitions, lambdas and class bodies bind names invisible to the
+    enclosing scope, and trusting them blessed cross-scope (a function-
+    local `root = <env read>` cleared an unrelated module-level `root`;
+    a class attribute could do the same in either direction)."""
     stack = list(ast.iter_child_nodes(scope))
     while stack:
         node = stack.pop()
         yield node
-        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        if not isinstance(
+            node,
+            (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef),
+        ):
             stack.extend(ast.iter_child_nodes(node))
 
 
-def _binds_env_read(name, scope):
-    """True if `name` is bound from an expression containing a genuine env
-    read of the override in `scope` (the standard two-line idiom:
-    `root = os.environ.get(ENV_VAR)` then `... if root else ...`).
+def _target_names(target):
+    """Names bound by an assignment-style target, including tuple/list
+    unpacking and starred targets (attribute/subscript targets bind no
+    name)."""
+    if isinstance(target, ast.Name):
+        yield target.id
+    elif isinstance(target, (ast.Tuple, ast.List)):
+        for elt in target.elts:
+            yield from _target_names(elt)
+    elif isinstance(target, ast.Starred):
+        yield from _target_names(target.value)
 
-    The check is flow-insensitive — it cannot see WHICH binding reaches the
-    fallback — so it compensates by being strict about the binding set:
-    EVERY binding of the name in the scope must contain the read. One
-    rebind from anywhere else (`root = args.root` after the read), or a
-    live wrong-var binding beside a dead `if False:` env read, voids the
-    trust. Nested defs are excluded from the walk (see _scope_walk)."""
+
+def _binds_env_read(name, scope):
+    """True if `name` is bound from a genuine env read of the override in
+    `scope` (the standard two-line idiom: `root = os.environ.get(ENV_VAR)`
+    then `... if root else ...`).
+
+    The check is flow-insensitive — it cannot see WHICH binding reaches
+    the fallback — so it compensates by accounting for the WHOLE binding
+    set, in every binding form:
+
+      * at least one inspectable binding must contain the env read;
+      * every other inspectable binding must contain the read too, or
+        derive from the name itself (`root = root.rstrip('/') if root
+        else None`, `root += ...` — normalizing a read keeps its trust);
+      * a binding through any form whose value cannot be inspected — a
+        parameter, a `for`/`with ... as`/`except ... as` target, tuple
+        unpacking, `import ... as`, a match capture — voids the trust
+        outright: `def f(root)` beside a dead `if False:` env read is
+        the parameter spelling of the rebind attack;
+      * nested defs, lambdas and class bodies are other scopes and count
+        for nothing here (see _scope_walk)."""
     if scope is None:
         return False
-    bound_values = []
+    if isinstance(scope, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        a = scope.args
+        params = [*a.posonlyargs, *a.args, *a.kwonlyargs, a.vararg, a.kwarg]
+        if any(p is not None and p.arg == name for p in params):
+            return False
+
+    def _has_read(expr):
+        return any(_is_env_read(n) for n in ast.walk(expr))
+
+    def _derives(expr):
+        return any(
+            isinstance(n, ast.Name) and n.id == name for n in ast.walk(expr)
+        )
+
+    events = []  # (contains_read, derives_from_name) per inspectable binding
     for sub in _scope_walk(scope):
-        value = None
         if isinstance(sub, ast.Assign):
-            if any(isinstance(t, ast.Name) and t.id == name for t in sub.targets):
-                value = sub.value
+            for t in sub.targets:
+                if isinstance(t, ast.Name):
+                    if t.id == name:
+                        events.append((_has_read(sub.value), _derives(sub.value)))
+                elif name in _target_names(t):
+                    return False  # unpacking: value not attributable
         elif isinstance(sub, (ast.AnnAssign, ast.NamedExpr)):
+            if (
+                isinstance(sub.target, ast.Name)
+                and sub.target.id == name
+                and sub.value is not None
+            ):
+                events.append((_has_read(sub.value), _derives(sub.value)))
+        elif isinstance(sub, ast.AugAssign):
             if isinstance(sub.target, ast.Name) and sub.target.id == name:
-                value = sub.value
-        if value is not None:
-            bound_values.append(value)
-    return bool(bound_values) and all(
-        any(_is_env_read(n) for n in ast.walk(v)) for v in bound_values
+                # x += v is x = x + v: it derives from itself.
+                events.append((_has_read(sub.value), True))
+        elif isinstance(sub, (ast.For, ast.AsyncFor)):
+            if name in _target_names(sub.target):
+                return False
+        elif isinstance(sub, (ast.With, ast.AsyncWith)):
+            for item in sub.items:
+                if item.optional_vars and name in _target_names(
+                    item.optional_vars
+                ):
+                    return False
+        elif isinstance(sub, ast.ExceptHandler):
+            if sub.name == name:
+                return False
+        elif isinstance(sub, (ast.Import, ast.ImportFrom)):
+            for alias in sub.names:
+                if (alias.asname or alias.name.split(".")[0]) == name:
+                    return False
+        elif isinstance(sub, (ast.MatchAs, ast.MatchStar)):
+            if sub.name == name:
+                return False
+        elif isinstance(sub, ast.MatchMapping):
+            if sub.rest == name:
+                return False
+    return (
+        bool(events)
+        and any(read for read, _ in events)
+        and all(read or derived for read, derived in events)
     )
 
 
@@ -297,11 +380,15 @@ def find_bare_agents_roots(source, filename="<source>"):
     offenders = []
 
     def _flag_text(node, text):
-        if TEXT_BARE.search(text) and not TEXT_READ.search(text):
-            offenders.append(
-                f"{filename}:{node.lineno}: [in string] "
-                + " ".join(text.split())[:80]
-            )
+        # Per LINE, not per string: the waiver must sit on the same line
+        # as the fallback it waives, or one read anywhere in a long
+        # payload would silence every unrelated bare fallback in it.
+        for line in text.splitlines():
+            if TEXT_BARE.search(line) and not TEXT_READ.search(line):
+                offenders.append(
+                    f"{filename}:{node.lineno}: [in string] "
+                    + " ".join(line.split())[:80]
+                )
 
     for node in ast.walk(tree):
         if _is_agents_fallback(node) and not _is_guarded(node, parents):
@@ -315,10 +402,13 @@ def find_bare_agents_roots(source, filename="<source>"):
             # fragment from the fallback. Join the constant fragments
             # before matching — scanned per-fragment, the waiver could
             # never see the read, leaving a guarded payload no exit but
-            # ALLOWED_FILES.
+            # ALLOWED_FILES. Each interpolation becomes an opaque
+            # placeholder, so fragments cannot create false adjacency.
             _flag_text(node, "".join(
-                v.value for v in node.values
+                v.value
                 if isinstance(v, ast.Constant) and isinstance(v.value, str)
+                else "\x00"
+                for v in node.values
             ))
         elif (
             isinstance(node, ast.Constant)
@@ -332,6 +422,10 @@ def find_bare_agents_roots(source, filename="<source>"):
 class TestAgentsRootOverride(unittest.TestCase):
     def test_no_bare_agents_root_without_override(self):
         offenders = []
+        # Non-recursive BY DESIGN: scripts/tests/ holds this guard's own
+        # attack fixtures (and the subprocess payloads in
+        # test_log_dir_resolution.py), which would self-flag if the glob
+        # were ever widened.
         for py in sorted(SCRIPTS.glob("*.py")):
             if py.name in ALLOWED_FILES:
                 continue
@@ -499,6 +593,63 @@ class TestGuardScanner(unittest.TestCase):
             "        return root\n"
             "    return Path(root) if root else Path.home() / 'agents'\n")
 
+    def test_flags_param_binding_with_dead_env_read(self):
+        # The parameter spelling of the rebind attack: a parameter is a
+        # binding whose value cannot be inspected, so it voids the trust
+        # a dead-branch env read would otherwise earn.
+        self.assert_flags(
+            "def f(root):\n"
+            "    if False:\n"
+            "        root = os.environ.get('OURLIBERTY_AGENTS_ROOT')\n"
+            "    return Path(root) if root else Path.home() / 'agents'\n")
+
+    def test_flags_loop_target_rebind(self):
+        self.assert_flags(
+            "def f(items):\n"
+            "    root = os.environ.get('OURLIBERTY_AGENTS_ROOT')\n"
+            "    for root in items:\n"
+            "        pass\n"
+            "    return Path(root) if root else Path.home() / 'agents'\n")
+
+    def test_flags_tuple_unpack_rebind(self):
+        self.assert_flags(
+            "def f(pair):\n"
+            "    root = os.environ.get('OURLIBERTY_AGENTS_ROOT')\n"
+            "    root, other = pair\n"
+            "    return Path(root) if root else Path.home() / 'agents'\n")
+
+    def test_flags_with_as_rebind(self):
+        self.assert_flags(
+            "def f(cm):\n"
+            "    root = os.environ.get('OURLIBERTY_AGENTS_ROOT')\n"
+            "    with cm as root:\n"
+            "        pass\n"
+            "    return Path(root) if root else Path.home() / 'agents'\n")
+
+    def test_flags_except_as_rebind(self):
+        self.assert_flags(
+            "def f():\n"
+            "    root = os.environ.get('OURLIBERTY_AGENTS_ROOT')\n"
+            "    try:\n"
+            "        pass\n"
+            "    except KeyError as root:\n"
+            "        pass\n"
+            "    return Path(root) if root else Path.home() / 'agents'\n")
+
+    def test_flags_import_as_rebind(self):
+        self.assert_flags(
+            "root = os.environ.get('OURLIBERTY_AGENTS_ROOT')\n"
+            "import fallback_config as root\n"
+            "p = Path(root) if root else Path.home() / 'agents'\n")
+
+    def test_flags_class_body_env_read_does_not_bless_module(self):
+        # A class body is its own namespace: `Cfg.root` is not the
+        # module-level `root` guarding the fallback.
+        self.assert_flags(
+            "class Cfg:\n"
+            "    root = os.environ.get('OURLIBERTY_AGENTS_ROOT')\n"
+            "p = Path(root) if root else Path.home() / 'agents'\n")
+
     def test_flags_string_mentioning_var_without_reading_it(self):
         # The round-1 waiver blessed any string that NAMED the var. Setting
         # it is not reading it — the payload's fallback is still bare.
@@ -528,6 +679,16 @@ class TestGuardScanner(unittest.TestCase):
         self.assert_flags(
             "cmd = \"python3 -c 'from pathlib import Path; "
             "print(Path.home().joinpath(\\\"agents\\\"))'\"\n")
+
+    def test_flags_unrelated_bare_line_in_multiline_payload(self):
+        # A read on ONE line of a payload must not silence a bare fallback
+        # on ANOTHER — the waiver is per line, or joining f-string
+        # fragments would have made one read whole-string.
+        self.assert_flags(
+            'script = """\n'
+            "state = os.environ.get('OURLIBERTY_AGENTS_ROOT') or '/x'\n"
+            "logs = Path.home() / 'agents' / 'logs'\n"
+            '"""\n')
 
     def test_flags_docstring_spelling_the_fallback(self):
         # Pin the string-channel contract for prose: a docstring is a
@@ -633,6 +794,43 @@ class TestGuardScanner(unittest.TestCase):
         self.assert_quiet(
             "REAL_HOME = Path.home()\n"
             "REAL_AGENTS = REAL_HOME / 'agents'\n")
+
+    def test_allows_normalize_after_env_read(self):
+        # A rebind that DERIVES from the read (normalization) keeps the
+        # trust — flagging it would leave correct code no exit but
+        # ALLOWED_FILES.
+        self.assert_quiet(
+            "def f():\n"
+            "    root = os.environ.get('OURLIBERTY_AGENTS_ROOT')\n"
+            "    root = root.rstrip('/') if root else None\n"
+            "    return Path(root) if root else Path.home() / 'agents'\n")
+
+    def test_allows_augmented_self_derivation(self):
+        # x += v is x = x + v: it starts from the read value.
+        self.assert_quiet(
+            "def f():\n"
+            "    root = os.environ.get('OURLIBERTY_AGENTS_ROOT')\n"
+            "    root += '/sub'\n"
+            "    return Path(root) if root else Path.home() / 'agents'\n")
+
+    def test_allows_module_trust_despite_unrelated_class_attr(self):
+        # The mirror image of the class-body flag test: a class attribute
+        # named `root` is not a module-level rebind and must not void a
+        # correct module-level binding.
+        self.assert_quiet(
+            "root = os.environ.get('OURLIBERTY_AGENTS_ROOT')\n"
+            "class Cfg:\n"
+            "    root = 'unrelated-class-attr'\n"
+            "p = Path(root) if root else Path.home() / 'agents'\n")
+
+    def test_allows_shell_sibling_directory(self):
+        # $HOME/agents-archive is a different tree entirely.
+        self.assert_quiet('cmd = "ls $HOME/agents-archive"\n')
+
+    def test_allows_expanduser_sibling_directory(self):
+        self.assert_quiet(
+            "cmd = \"python3 -c 'print(os.path.expanduser("
+            "\\\"~/agents-old\\\"))'\"\n")
 
     def test_allows_tilde_agents_in_docstring_prose(self):
         # Bare ~/agents tokens are OUT OF SCOPE for the text channel: they
