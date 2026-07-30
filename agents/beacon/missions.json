@@ -16572,7 +16572,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-30T04:00:17.306699+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-30T03:58:50.287941+00:00"
+      "orphan_last_activity_ts": "2026-07-30T03:58:50.287941+00:00",
+      "briefing": {
+        "what": "A piece of work the team kicked off on its own that isn't attached to any active project, and it's now waiting for your go-ahead.",
+        "why": "Loose work with no home can quietly eat time and pull focus away from what you've actually prioritized, so it's worth a quick look before it grows.",
+        "suggest": "Take a moment to confirm this fits your current priorities before approving it \u2014 if it doesn't clearly connect to something you care about right now, hold off."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-30T04:07:06.518084+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
