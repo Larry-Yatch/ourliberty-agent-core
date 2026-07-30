@@ -438,6 +438,41 @@ class ApplyRetryTests(_HelpersHarness):
         self.assertFalse(result.applied)
         self.assertTrue(result.error)
 
+    def test_retry_bumps_dispatch_generation(self):
+        # closed-pr-dedup-wedge-fix-001: a retry is the canonical REBUILD
+        # trigger. It must bump the step's dispatch_generation so the rebuild
+        # lands under a NEW Forge inbox filename instead of wedging on the
+        # archived prior attempt. First retry: absent -> 2. Second retry: 2 -> 3.
+        seq = _make_sequence(
+            seq_id='rt-gen',
+            status='paused',
+            steps=[
+                _make_step('a', deps=[], status='failed',
+                           dispatched_at='2026-05-27T02:00:00Z',
+                           pr_url='https://example.com/pr/2'),
+            ],
+            current_steps=['a'],
+        )
+        self._write_sequence(seq)
+        ssh.apply_retry('rt-gen', 'a')
+        step = next(s for s in self._read_sequence('rt-gen')['steps']
+                    if s['step_id'] == 'a')
+        self.assertEqual(step['dispatch_generation'], 2)
+        self.assertEqual(
+            self._read_sequence('rt-gen')['audit_log'][-1]['dispatch_generation'],
+            2,
+        )
+        # Fail it again, retry again -> generation increments monotonically.
+        seq2 = self._read_sequence('rt-gen')
+        for s in seq2['steps']:
+            if s['step_id'] == 'a':
+                s['status'] = 'failed'
+        self._write_sequence(seq2)
+        ssh.apply_retry('rt-gen', 'a')
+        step2 = next(s for s in self._read_sequence('rt-gen')['steps']
+                     if s['step_id'] == 'a')
+        self.assertEqual(step2['dispatch_generation'], 3)
+
 
 # ============================================================================
 # skip

@@ -2993,6 +2993,15 @@ def check_stalled_active_step(state: dict) -> list[dict]:
     'pending'` sequences, so a step-level stall inside an `active` sequence was
     invisible. This is the standing healer that ends that silence.
 
+    Also the deadline-reconciler net for the closed-PR-dedup wedge
+    (closed-pr-dedup-wedge-fix-001, Piece 3): when a rebuilt step's re-dispatch
+    is silently skipped by Forge's existence-only dedup, no Forge `session_start`
+    chain_event appears, so `_resolve_build_anchor` falls back to `dispatched_at`
+    and this check fires once the step has sat `dispatched` past the deadline —
+    catching the wedge regardless of WHY the dispatch produced nothing. Piece 1
+    (generation-in-marker) prevents the wedge and Piece 2 (loud skip signal)
+    surfaces it at skip time; this is the general safety net behind both.
+
     A step is STALLED iff, in an `active` sequence:
       * step status == 'dispatched', AND
       * the step has NO `pr_url` (a step carrying a pr_url is in review — that

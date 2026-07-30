@@ -234,6 +234,41 @@ class _AdvancerHarness(unittest.TestCase):
         self.bsa._gh_list_merged_prs = lambda repo, logger=None: []
 
 
+class TestStepEnvelopeGeneration(_AdvancerHarness):
+    """closed-pr-dedup-wedge-fix-001: the step's dispatch_generation must flow
+    through the envelope + the Beacon instruction so Beacon echoes it in the
+    APPROVAL_REQUEST marker and the notifier gives the rebuild a fresh filename."""
+
+    def test_first_dispatch_omits_generation(self):
+        seq = _make_sequence(steps=[_make_step('s1')])
+        step = seq['steps'][0]
+        env = self.bsa._build_step_envelope(seq, step)
+        # No generation on a first dispatch — the whole chain keeps its legacy
+        # byte-identical shape (bare `<task_id>.json`).
+        self.assertNotIn('dispatch_generation', env)
+        self.assertNotIn('generation=', env['prompt'])
+
+    def test_generation_1_is_treated_as_first_dispatch(self):
+        seq = _make_sequence(steps=[_make_step('s1')])
+        step = seq['steps'][0]
+        step['dispatch_generation'] = 1
+        env = self.bsa._build_step_envelope(seq, step)
+        self.assertNotIn('dispatch_generation', env)
+        self.assertNotIn('generation=', env['prompt'])
+
+    def test_rebuild_generation_carried_into_envelope_and_prompt(self):
+        seq = _make_sequence(steps=[_make_step('s1')])
+        step = seq['steps'][0]
+        step['dispatch_generation'] = 2
+        env = self.bsa._build_step_envelope(seq, step)
+        # Carried on the envelope for downstream observability...
+        self.assertEqual(env['dispatch_generation'], 2)
+        # ...and, crucially, the instruction tells Beacon to put `generation`
+        # in the marker VERBATIM so the notifier honors it.
+        self.assertIn('generation=`2`', env['prompt'])
+        self.assertIn('generation', env['prompt'])
+
+
 class TestActivationGate(_AdvancerHarness):
     def test_disabled_is_noop(self):
         os.environ['OURLIBERTY_BUILD_SEQUENCE_ADVANCER_ENABLED'] = 'false'

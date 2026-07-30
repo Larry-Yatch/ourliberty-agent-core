@@ -3119,6 +3119,80 @@ def _prior_dispatch_was_definitive_non_run(task_id: str) -> bool:
         return False
 
 
+# A same-marker crash-replay re-processes the SAME Beacon outbox within one
+# notifier restart, so the archived Forge task it collides with is seconds old.
+# A genuine wedge re-hits a MUCH older archived attempt. This window separates
+# the benign replay (silent — the existence gate is doing its job) from the
+# wedge (loud — the dispatch produced nothing yet the sequence looks healthy).
+_DISPATCH_SKIP_REPLAY_WINDOW_SEC = 300
+_DISPATCH_WEDGE_SKIP_KEY_PREFIX = 'dispatch-wedge-skip:'
+
+
+def _signal_wedged_dispatch_skip(
+    task_id: str, archived_path: Path, data: dict[str, Any],
+) -> None:
+    """Piece 2 (closed-pr-dedup-wedge-fix-001): the notifier is the ONLY actor
+    that knows a headless dispatch was SKIPPED and therefore produced nothing —
+    the advancer's own hop wrote Beacon's inbox (its `err is None` is honest only
+    about that hop), and between it and Forge sit a Beacon LLM turn and this
+    notifier tick. When the existence gate skips because an archived `<task_id>`
+    artifact is present AND it is NOT a benign same-marker crash-replay (i.e. the
+    archived attempt is older than the recovery window — the signature of a
+    rebuild whose generation was not carried), surface it LOUDLY. This is the
+    hour-of-invisible-stall the incident cost.
+
+    Best-effort + dedup-by-key (re-upsert overwrites, self-clears on the next
+    real dispatch via the existing marker-observed resolve path). A signal
+    failure must never block notify routing."""
+    try:
+        age = time.time() - archived_path.stat().st_mtime
+    except OSError:
+        age = None
+    if age is not None and age <= _DISPATCH_SKIP_REPLAY_WINDOW_SEC:
+        # Benign crash-replay of the same marker — the existence gate is doing
+        # exactly its job (preventing a double-dispatch). Stay quiet.
+        return
+    try:
+        for_larry_signal.upsert_record(
+            f'{_DISPATCH_WEDGE_SKIP_KEY_PREFIX}{task_id}',
+            {
+                'id': str(task_id),
+                'task_id': task_id,
+                'headline': f'Forge dispatch for `{task_id}` was silently skipped',
+                'context': (
+                    'The headless-approval dispatch was skipped because an '
+                    'archived prior attempt still exists, but it wrote NO new '
+                    'Forge task — nothing is queued, claimed, or building. If '
+                    'this is a rebuild (the prior PR was closed) the step is '
+                    'wedged at a healthy-looking `dispatched` and will not '
+                    'self-recover.'
+                ),
+                'suggested_action': (
+                    f'Inspect ~/agents/inboxes/forge/.archive/{archived_path.name}. '
+                    f'If a rebuild is intended, the dispatch generation was not '
+                    f'carried through the marker; `mv` the archived file aside '
+                    f'to unblock, or `retry` the step so a fresh generation is '
+                    f'stamped.'
+                ),
+                'repo': data.get('target_repo'),
+                'severity': 'warning',
+                'needs_larry': True,
+                'source_kind': 'dispatch-wedge-skip',
+            },
+        )
+        log(
+            f'DISPATCH_WEDGE_SKIP task={task_id} — existence-gate skip produced '
+            f'no Forge task (archive={archived_path.name}); signalled Larry',
+            'WARN',
+        )
+    except Exception as e:  # noqa: BLE001 — durable signal is best-effort
+        log(
+            f'dispatch-wedge-skip for-larry signal failed for {task_id}: '
+            f'{type(e).__name__}: {e}',
+            'WARN',
+        )
+
+
 def _notify_beacon_phantom_build_suppressed(
     data: dict[str, Any], branch: str, pr_state: str,
 ) -> None:
@@ -13162,6 +13236,14 @@ def _handle_beacon_headless_approval_request(
         'phase': 'preflight',
         'dispatched_by': 'outbox-notifier',
     }
+    # Dispatch generation (closed-pr-dedup-wedge-fix-001). Honored VERBATIM from
+    # the marker — NEVER derived by reading PR state or counting archived files.
+    # A rebuilt step (its prior PR closed) carries a bumped generation so the
+    # existence-only dedup below keys on a NEW filename instead of wedging on the
+    # archived prior attempt. Absent / 1 keeps the bare `<task_id>.json` name.
+    marker_generation = payload.get('generation')
+    if isinstance(marker_generation, int) and marker_generation >= 2:
+        forge_base['dispatch_generation'] = marker_generation
     # Propagate envelope/marker fields the way chat-mode does — marker
     # values win when both are present (Beacon's marker is the spec).
     target_repo = payload.get('target_repo') or data.get('target_repo')
@@ -13193,7 +13275,9 @@ def _handle_beacon_headless_approval_request(
     # _dispatch_build_phase. Guards against re-processing the same outbox
     # if the notifier crashes between dispatch and archive.
     forge_inbox = safe_write_inbox.INBOXES_ROOT / 'forge'
-    filename = safe_write_inbox.canonical_inbox_name(f'{marker_task_id}.json')
+    filename = safe_write_inbox.generation_inbox_name(
+        marker_task_id, payload.get('generation'),
+    )
     # A task currently in the LIVE inbox is queued/in-flight — always skip,
     # never override (don't double-dispatch a running preflight).
     live = forge_inbox / filename
@@ -13224,6 +13308,12 @@ def _handle_beacon_headless_approval_request(
                     f'identity-reject, no PR); allowing re-dispatch'
                 )
                 break
+            # Piece 2: an existence-gate skip means THIS dispatch produced no
+            # new Forge task. Surface it loudly unless it is a benign same-marker
+            # crash-replay (recent archive). With the generation carry (Piece 1)
+            # a genuine rebuild lands under a new filename and never reaches this
+            # branch, so an OLD archive re-hit here is the wedge signature.
+            _signal_wedged_dispatch_skip(marker_task_id, candidate, data)
             log(
                 f'headless-approval-request already dispatched for task '
                 f'{marker_task_id} (archive or .invalid present); '
@@ -13251,6 +13341,14 @@ def _handle_beacon_headless_approval_request(
         )
         return None
 
+    # A real dispatch landed — clear any prior wedge-skip signal for this task
+    # (self-clear, decision d). No-op when none exists.
+    try:
+        for_larry_signal.resolve_record(
+            f'{_DISPATCH_WEDGE_SKIP_KEY_PREFIX}{marker_task_id}'
+        )
+    except Exception:  # noqa: BLE001 — best-effort self-clear
+        pass
     log(
         f'headless-approval-request dispatched forge <- beacon '
         f'(task={marker_task_id}, file={dest.name})'

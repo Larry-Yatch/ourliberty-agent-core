@@ -131,6 +131,38 @@ def canonical_inbox_name(filename: str) -> str:
     return _truncate_filename(sanitize_component(filename))[0]
 
 
+def generation_inbox_name(task_id: str, generation: Any = None) -> str:
+    """Canonical inbox filename for a Forge dispatch, honoring an explicit
+    dispatch generation (closed-pr-dedup-wedge-fix-001).
+
+    The dedup on the Forge-dispatch hop is EXISTENCE-only: a `<task_id>.json`
+    still present in the inbox (live / .archive / .invalid) skips the write. That
+    silently wedges a legitimate REBUILD — a step whose PR was later closed and
+    must be built again keeps hitting the archived artifact of its prior attempt.
+    The fix carries an EXPLICIT generation through the dispatch chain and folds it
+    into the filename so a rebuild lands under a NEW name:
+
+      * generation 1 / None / non-int / < 2 → bare ``<task_id>.json`` — BYTE
+        IDENTICAL to the legacy name, so all existing crash-recovery + dedup
+        behavior is unchanged (invariant iii).
+      * generation N >= 2 → ``<task_id>-gN.json`` — a distinct name, so a genuine
+        rebuild is not blocked by the archived prior attempt (invariant ii), while
+        the SAME marker replayed after a crash carries the SAME generation → the
+        SAME name → the existing existence check still prevents a double-dispatch
+        (invariant i).
+
+    The suffix must be an EXPLICIT carried value, never derived by counting
+    archived files (that would double-dispatch on crash-replay). Filename shape
+    mirrors the live ``resume-<task>-r<N>`` / ``revision-<task>-<n>`` precedents.
+    """
+    try:
+        gen = int(generation)
+    except (TypeError, ValueError):
+        gen = 1
+    stem = f'{task_id}-g{gen}' if gen >= 2 else f'{task_id}'
+    return canonical_inbox_name(f'{stem}.json')
+
+
 def _truncate_filename(filename: str) -> tuple[str, bool]:
     """Return (safe_filename, was_truncated).
 

@@ -797,6 +797,18 @@ def apply_retry(
             sequence_path=path,
         )
 
+    # Bump the step's dispatch generation (closed-pr-dedup-wedge-fix-001). A
+    # retry is the canonical REBUILD trigger — the prior attempt may have opened
+    # a PR that was then closed, so its `<task_id>.json` is archived in Forge's
+    # inbox and the existence-only dedup would silently skip the re-dispatch.
+    # Carrying an EXPLICIT, monotonically-increasing generation forward makes the
+    # rebuild land under a NEW inbox filename (`<task_id>-g<N>.json`) instead of
+    # wedging. Absent field == generation 1 (the first, never-retried dispatch,
+    # which keeps the bare filename); each retry increments it.
+    prior_gen = step.get('dispatch_generation')
+    if not isinstance(prior_gen, int) or prior_gen < 1:
+        prior_gen = 1
+    step['dispatch_generation'] = prior_gen + 1
     step['status'] = 'pending'
     step['dispatched_at'] = None
     step['pr_url'] = None
@@ -811,6 +823,7 @@ def apply_retry(
         'event': 'step-retried',
         'step_id': step_id,
         'actor': actor,
+        'dispatch_generation': step['dispatch_generation'],
     })
     write_err = _atomic_write(path, seq)
     if write_err is not None:

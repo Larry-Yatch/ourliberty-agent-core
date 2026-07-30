@@ -1217,8 +1217,14 @@ def dispatch_approved(entry: dict[str, Any]) -> Path:
         task_dict['max_replans'] = (
             entry.get('_max_replans') or DEFAULT_MAX_REPLANS
         )
-    # Filename — use task_id stem.
-    filename = f'{payload["task_id"]}.json'
+    # Filename — task_id stem, honoring an explicit dispatch generation
+    # (closed-pr-dedup-wedge-fix-001). Generation 1 / absent keeps the bare
+    # `<task_id>.json` (byte-identical to the legacy name); a bumped generation
+    # on a rebuild lands under `<task_id>-g<N>.json` so the Forge-side
+    # existence-only dedup does not silently skip it.
+    filename = safe_write_inbox.generation_inbox_name(
+        payload['task_id'], payload.get('generation'),
+    )
     return safe_write_inbox.safe_write_inbox(
         target_agent=target,
         task_dict=task_dict,
