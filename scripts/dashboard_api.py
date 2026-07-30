@@ -10653,6 +10653,33 @@ def _handle_larry_action(
             ),
         )
 
+    # `mark_done` is the ALERTS' dismiss affordance (spec § 8.2). On an
+    # approval_request it is a silent no-op wearing an approval's name: the
+    # side-effect block below skips the envelope builder entirely for
+    # mark_done, so the routing matrix that already rejects this pair
+    # ("action='mark_done' not valid for approval_request") never runs — and
+    # the fan-out then records outcome='approved' having dispatched nothing.
+    # That is the agent-core #1058 shape (card clears, nothing happens) on the
+    # very card class #1058 was about, and because decision_outcome_ledger
+    # feeds the govern loop's autonomy-widening learning, a dismissal would be
+    # learned as an approval. Fail it pre-claim, exactly like the alert-rating
+    # guard above, so the card survives intact.
+    #
+    # Scoped to approval_request ONLY, deliberately. clarify_request's matrix
+    # accepts just `comment`, so rejecting mark_done there would leave that
+    # card with no dismissal route at all — trading a silent no-op for a
+    # stranded card is not an improvement. approval_request has three real
+    # exits (approve / reject / recheck), so removing this one strands nothing.
+    if action == 'mark_done' and source.get('event_type') == 'approval_request':
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "action='mark_done' is not valid on an approval_request — it "
+                'would clear the decision and record it as approved without '
+                'dispatching anything. Use approve, reject, or recheck.'
+            ),
+        )
+
     # Already-acted-on lock: read_at IS NOT NULL blocks every action
     # except mark_done (which is idempotent against the read state). This is a
     # cheap fast-fail; the AUTHORITATIVE mutex is the atomic compare-and-set

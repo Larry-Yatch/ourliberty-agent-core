@@ -358,6 +358,17 @@ class ApprovedEscalationModeTest(unittest.TestCase):
                     payload=dict(self.PROMOTED_PAYLOAD), comment=None,
                     task_id='pr-RSDPM-59', mode='approved_escalation')
 
+    def test_the_routing_matrix_has_always_rejected_mark_done_here(self):
+        """The builder rejects mark_done on an approval_request — but the
+        handler skipped the builder for that verb, so this check never ran.
+        The end-to-end guard is pinned in
+        test_dashboard_api_larry_action.MarkDoneOnDecisionTest."""
+        with self.assertRaises(HTTPException) as ctx:
+            da._build_envelope_for_action(
+                source=self._source(self.PROMOTED_PAYLOAD), action='mark_done',
+                comment=None, actor='larry')
+        self.assertEqual(ctx.exception.status_code, 400)
+
     def test_identity_predicate_requires_both_prefix_and_marker(self):
         promoted = self._source(self.PROMOTED_PAYLOAD)
         self.assertTrue(da._is_promoted_stranded_escalation(

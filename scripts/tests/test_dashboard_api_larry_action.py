@@ -1175,5 +1175,81 @@ class AlertRatingTest(_LarryActionBase):
         self.assertEqual(r.status_code, 200, r.text)
 
 
+class MarkDoneOnDecisionTest(_LarryActionBase):
+    """`mark_done` must not silently resolve a DECISION row (round 3, #1060).
+
+    The side-effect block skips the envelope builder entirely for mark_done, so
+    the routing matrix that already rejects ('approval_request', 'mark_done')
+    was never consulted: the card cleared, no envelope was written, and the
+    cross-store fan-out recorded the decision as 'approved'. That is the
+    agent-core #1058 shape — card gone, nothing dispatched — reachable on the
+    exact card class #1058 was about, and since decision_outcome_ledger feeds
+    the govern loop's autonomy-widening learning, a dismissal would be learned
+    as an approval.
+    """
+
+    def test_mark_done_on_an_approval_request_is_rejected_pre_claim(self):
+        self._seed(
+            event_id='ev-approval-md',
+            task_id='unreg-approval-de9cda4efdbd',
+            event_type='approval_request',
+            payload={'promoted_source': 'for-larry-mirror-review',
+                     'prompt': 'healer narration'},
+            read_at=None,
+        )
+        r = self.c.post(
+            '/api/larry/action',
+            headers=AUTH,
+            json={'source_event_id': 'ev-approval-md', 'action': 'mark_done'},
+        )
+        self.assertEqual(r.status_code, 400, r.text)
+        self.assertIn('not valid on an approval_request', r.json()['detail'])
+        # Pre-claim: no read_at flip, no audit row, no envelope anywhere — the
+        # card is fully intact and the operator can still approve/reject it.
+        self.assertEqual(
+            [c for c in self.client_stub.calls if c['op'] in ('update', 'upsert')],
+            [])
+        for agent in ('beacon', 'forge', 'mirror', 'pulse'):
+            self.assertEqual(list((self.tmp / 'inboxes' / agent).iterdir()), [])
+
+    def test_mark_done_still_works_on_an_alert(self):
+        # The verb's real purpose is untouched.
+        self._seed(
+            event_id='ev-alert-md', task_id='t', event_type='larry_alert',
+            payload={'message': 'disk low'}, read_at=None,
+        )
+        r = self.c.post(
+            '/api/larry/action', headers=AUTH,
+            json={'source_event_id': 'ev-alert-md', 'action': 'mark_done'},
+        )
+        self.assertEqual(r.status_code, 200, r.text)
+
+    def test_mark_done_still_works_on_an_escalation(self):
+        self._seed(
+            event_id='ev-esc-md', task_id='t', event_type='escalation',
+            payload={'message': 'needs you'}, read_at=None,
+        )
+        r = self.c.post(
+            '/api/larry/action', headers=AUTH,
+            json={'source_event_id': 'ev-esc-md', 'action': 'mark_done'},
+        )
+        self.assertEqual(r.status_code, 200, r.text)
+
+    def test_clarify_request_keeps_mark_done_as_its_only_dismissal(self):
+        # Scoping matters: clarify_request's matrix accepts only `comment`, so
+        # rejecting mark_done there would leave the card with NO way to clear —
+        # trading a silent no-op for a stranded card.
+        self._seed(
+            event_id='ev-clarify-md', task_id='t', event_type='clarify_request',
+            payload={'asking_agent': 'forge', 'question': 'which?'},
+            read_at=None,
+        )
+        r = self.c.post(
+            '/api/larry/action', headers=AUTH,
+            json={'source_event_id': 'ev-clarify-md', 'action': 'mark_done'},
+        )
+        self.assertEqual(r.status_code, 200, r.text)
+
+
 if __name__ == '__main__':
     unittest.main()
