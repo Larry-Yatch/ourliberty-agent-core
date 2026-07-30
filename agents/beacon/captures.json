@@ -2245,7 +2245,7 @@
       "id": "cap-heal-unregistered-approval-mints-permanent-cards-b921",
       "title": "heal_unregistered_approval mints permanent cards from transient, self-declared-unparseable nudges",
       "note": "PROBLEM: a recurring ALERT becomes a permanent Approvals-tab card with no resolution path. 4 of the 8 cards on Larry's tab on 2026-07-29 came from this one path, and three of them say it in their own summary: 'Decision needs your direction (promoted from a missed marker; could not be parsed into two options \u2014 needs triage).' The promoter is admitting it does not know what the decision IS, and mints a binary approve/reject card anyway. Both exits then route back to Beacon 'to formalize this into a proper binary approval_request' \u2014 i.e. the card's own resolution is to become a different card.\n\nDO NOT 'FIX THE DETECTOR'. Verified: the underlying alert is working exactly as designed. heal_pipeline_stall.check_unrouted_open_prs / heal-unrouted-owner-pr-nudge-001 exists specifically to catch 'a clean unrouted PR the owner forgot to label' and is deliberately 'nudge-only, preserving Larry 2026-07-11 label opt-in' (PR_UNROUTED_MIN_AGE_MIN=60). It cannot tell 'Larry forgot' from 'Larry is deliberately holding this for /code-review high' because NOTHING RECORDS THAT INTENT. Teaching it to would need either a new hold marker Larry has to set (new toil) or inferring intent \u2014 the exact thing the nudge is built not to do. The alert is not the bug; the PROMOTION is.\n\nWHAT TO BUILD (pick in preflight):\n(a) Do not promote an alert the promoter cannot parse into two real options. A card that cannot state its own choices is triage, not a decision \u2014 route it to a triage lane, not the Approvals tab.\n(b) If it IS promoted, the card must inherit the source alert's dedup/cooldown identity so it RETIRES WITH THE ALERT instead of outliving it. Today the alert de-dups and cools down; the card it spawned does not, so a transient nudge becomes permanent.\n\nNOTE: 'bare_approvable: False' is already stamped on every one of these (heal_unregistered_approval.py:717/889/1210), but it only gates a BARE 'approve' in Telegram routing (beacon_approval_handler.py:634) \u2014 it is a routing-safety flag, NOT a triage signal. The information that these are not real binary decisions is ALREADY IN THE RECORD and nothing acts on it. That is the cheapest thread to pull.\n\nRELATED: cap-approvals-tab-let-a-card-carry-its-own-falsifier-8bb3 covers the other half \u2014 cards whose PREMISE goes stale. This capture covers cards that were never answerable to begin with. Different defects, same symptom (a tab that accumulates items that do not need a human).\n\nREVIEW: needed if it changes what reaches the Approvals tab \u2014 a wrong filter silently drops a real decision, which fails looking exactly like success.",
-      "state": "parked",
+      "state": "dropped",
       "label": null,
       "origin": {
         "source": "desktop-chat",
@@ -2257,17 +2257,17 @@
       "last_touched": "2026-07-29T19:42:40.259181+00:00",
       "promoted_to": null,
       "briefing": {
-        "what": "Your approvals list is being filled with items that aren't actually decisions \u2014 they're flagged questions the system admits it can't even phrase, yet it still puts them in front of you asking for a yes/no.",
-        "why": "Half the items waiting for you right now come from this one glitch, so your decision queue looks busy with things you can't act on \u2014 burying the choices that genuinely need you and costing you time and trust in the list.",
-        "suggest": "Have these unanswerable items sent to a holding area instead of your approvals list, and make any that do slip through expire on their own; it's a low-risk cleanup, but worth a careful check so we never accidentally hide a real decision."
+        "what": "Some automatic reminders that the system itself admits it can't turn into a real yes-or-no question are landing on your approvals list as permanent items you can never check off.",
+        "why": "Half the items waiting for you right now come from this one glitch, so your decision list looks busy with things that don't actually need you \u2014 burying the ones that do.",
+        "suggest": "Keep these unanswerable reminders off your list and let them expire on their own like the alerts that spawned them; it's a clean, low-stakes cleanup worth greenlighting when you have a moment."
       },
       "risk": "safe",
       "recommended_action": "delegate",
       "briefing_provenance": {
         "by": "beacon",
         "model": "claude-opus-4-8",
-        "at": "2026-07-29T19:42:51.285731+00:00",
-        "from_state": "parked"
+        "at": "2026-07-30T19:37:06.411989+00:00",
+        "from_state": "dropped"
       },
       "spawned": {
         "kind": "delegate",
@@ -2635,7 +2635,7 @@
       "id": "cap-a-delegation-that-dies-looks-exactly-like-one-no-2cbe",
       "title": "A delegation that dies looks exactly like one nobody started \u2014 no retry, no surface",
       "note": "INCIDENT (2026-07-29/30, found only because Larry asked me to go look): he delegated capture cap-approvals-tab-...-8bb3 from the Missions tab. POST /delegate returned 200. Beacon spawned at 01:07:45Z, ran the full window, and was killed at the 600s wall (scripts/beacon_telegram_bot.py CLAUDE_TIMEOUT_SEC=600). Its outbox envelope reads exit_code=-1, result='TIMEOUT after 600s', duration_sec=None. No APPROVAL_REQUEST was ever emitted, so no card was ever created. The capture is still state=parked, promoted_to=None \u2014 BYTE-IDENTICAL ON THE BOARD TO A CARD NOBODY EVER DELEGATED. One Telegram alert fired at 01:21:54Z and that was the entire signal.\n\nIT WAS NOT AN OUTLIER \u2014 IT WAS THE TREND HITTING THE WALL. Delegation durations that night: 4b31 186s -> PR #1063; d5d1 251s -> PR #159 merged; fd54 336s -> PR #1058 merged; 71d1 536s -> dispatched; 8bb3 KILLED at 600s. 71d1 survived by 64 seconds. The wall is real and close.\n\nTHREE DISTINCT GAPS \u2014 a preflight should scope which are worth closing:\n\n1. NOTHING RETRIES. No healer re-drives a failed delegation; no requeue; no backoff. Verified by grep across scripts/heal_*.py. The work is simply gone.\n\n2. NOTHING SURFACES IT. heal_missions_card_gc:1230 states the design intent \u2014 'a delegate that never opened a PR probes UNKNOWN and MUST surface as still-open, never silently close.' It does stay open. But 'open' RENDERS AS parked, which is the same pixel as never-touched. dashboard_api already carries delegated_at / approval_id on the delegate response (dashboard_api.py:1028, 1256, 8064 'delegated_at stays honest') \u2014 the data to distinguish the two states EXISTS and the board does not use it. Cheapest thread.\n\n3. duration_sec=None ON A 600s TIMEOUT IS A LIE WAITING TO BE BELIEVED. outbox_notifier's definitive-non-run classifier (~:3043, :3100) recognizes 'spawn-failure' as exit_code==-1 AND duration None-or-under-2s AND an 'all retries exhausted' signal. A timeout satisfies the first TWO. Today it is saved only by the third predicate (our text says 'TIMEOUT after 600s', not 'retries exhausted') \u2014 so a task that ran ten full minutes is one string away from being classified as a worker that never spawned. Record the real elapsed time.\n\nDO NOT just raise the timeout. 600s is a reasonable ceiling; the parent capture was genuinely too big to scope (it is being split into 3 slices: ...582f, ...9902, ...2616). Raising the wall hides the size problem instead of surfacing it. If anything, the right move is the opposite \u2014 tell the operator a delegation died and why, so an oversized card gets split rather than silently retried into the same wall.\n\nREVIEW: needed if it changes retry or dispatch behavior \u2014 a retry loop on a 10-minute agent spawn is real money, and 'it silently did nothing' is the failure class this whole capture is about.",
-      "state": "parked",
+      "state": "done",
       "label": null,
       "origin": {
         "source": "desktop-chat",
@@ -2662,8 +2662,12 @@
       "spawned": {
         "kind": "delegate",
         "task_id": "delegate-cap-a-delegation-that-dies-looks-exactly-like-one-no-2cbe",
-        "stamped_at": "2026-07-30T16:42:10.825037+00:00"
-      }
+        "stamped_at": "2026-07-30T16:42:10.825037+00:00",
+        "outcome": "merged"
+      },
+      "closed_by": "heal_missions_card_gc:terminal-backstop",
+      "shipped_note": "shipped (linked work merged)",
+      "closed_at": "2026-07-30T19:37:06.411989+00:00"
     },
     {
       "id": "cap-promoted-larry-alert-cards-1060-skips-them-and-n-7629",
