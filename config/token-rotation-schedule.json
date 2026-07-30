@@ -328,23 +328,6 @@
       "notes": "prefix sbp_ (NOT eyJ); generated at https://supabase.com/dashboard/account/tokens; fallback if lapsed is Larry's Mac CLI."
     },
     {
-      "name": "SUPABASE_DB_PASSWORD",
-      "storage_location": "env_file:/home/larry/credentials/.env.larry",
-      "credential_type": "password",
-      "purpose": "Supabase project database password for `supabase link` + direct psql connections from the droplet; installed 2026-05-26 during droplet CLI setup",
-      "rotation_type": "revocation_only",
-      "cadence_days": null,
-      "created_at": "2026-05-26",
-      "last_rotated_at": "2026-05-26",
-      "next_rotation_due": null,
-      "calendar_event_url": null,
-      "runbook_path": "docs/runbooks/rotate-supabase-db-password.md",
-      "severity_if_lapsed": "high",
-      "owner_role": "larry",
-      "scopes": ["full-account"],
-      "notes": "rotate ONLY if compromised; rotation breaks all connections — requires re-running supabase link after. Also stored in 1Password — keep both copies in sync."
-    },
-    {
       "name": "OL_DB_RO_URL",
       "storage_location": "env_file:/home/larry/credentials/.env.larry",
       "credential_type": "connection_string",
