@@ -816,6 +816,14 @@ class LibStateDegradesGracefullyTest(_RunCycleTestBase):
                     log_file.unlink()
                 env = os.environ.copy()
                 env['HOME'] = str(self.home)
+                # This harness sandboxes by SWAPPING HOME, but os.environ.copy()
+                # inherits conftest's OURLIBERTY_AGENTS_ROOT (the outer sandbox
+                # root), and run_medic.sh now resolves THAT ahead of $HOME. Pin
+                # it to the sandboxed HOME so the swap stays authoritative and
+                # the wrapper's log/costs land where this test reads them —
+                # exactly what _RunCycleTestBase._run_cycle does for the cycle
+                # wrapper. See [[home-swap-tier-hazards]].
+                env['OURLIBERTY_AGENTS_ROOT'] = str(self.home / 'agents')
                 env['PATH'] = f'{self.stub_bin}:{env["PATH"]}'
                 result = subprocess.run(
                     ['bash', str(self.scripts_dir / 'run_medic.sh'), str(batch)],
