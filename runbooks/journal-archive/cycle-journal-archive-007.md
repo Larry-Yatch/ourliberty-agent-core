@@ -18144,3 +18144,82 @@ NOMINAL ✅
 
 ---
 
+## Iteration ~6898 — 2026-07-31T01:55Z UTC (Larry /cycle chat, Tier 1, consecutive_clean=0→1; Check 0: 1 new alert [approval_request lost-marker-render-emission-net-001, Tier-3 silence, watermark 596→597]; pending=6 [UP 1 — new: lost-marker-render-emission-net-001]; dashboard PRs #153+#154 NEW; Check A RECOVERED clean; ALL checks NOMINAL; Check I fires TODAY Fri 2026-07-31 at ~14:13 UTC)
+
+**Health:** ✅ Nominal — all checks clean. Tier 1 (consecutive_clean=0→1; last_signal_at=2026-07-31T01:50:19Z UTC).
+
+**VERIFY-BEFORE-REASSERT (from iter ~6897 at ~01:50Z UTC):**
+- **"system-health=healthy ts=2026-07-31T01:43:12Z UTC"**: CONFIRMED ✅ → ts=2026-07-31T01:48:12Z UTC (fresh ~7 min). All 4 bots alive (beacon/forge/mirror/pulse: desired=up, alive=True, action=noop). [carry ✅]
+- **"heal-stale-daemon-code.heartbeat=2026-07-31T01:40:19Z UTC"**: CONFIRMED ✅ → 2026-07-31T01:50:19Z UTC (fresh ~5 min; <60 min). [carry ✅]
+- **"alerts watermark=596, file_length=596"**: UPDATED → file_length=597; 1 new alert (line 597: approval_request for lost-marker-render-emission-net-001, Tier-3 silence, watermark advanced 596→597). [carry UPDATED ✅]
+- **"pending=5 [aeb2166ae07e resolved]"**: UPDATED → pending=6. New item: lost-marker-render-emission-net-001 (created=2026-07-31T01:48:01Z UTC; approval for marker render-side safety-net feature). [carry UPDATED ⚠️]
+- **"HEAD=2909e290; origin/main=872e47e8 (behind by 1)"**: UPDATED → HEAD=8856ebf9 ("Pulse cycle 20260731T015200Z"). Working tree clean. Up to date with origin/main. [carry ✅ RECOVERED]
+- **"PR#1071/#1070/#1065/dashboard#152 [unrouted by-design]"**: UPDATED → agent-core: #1071/#1070/#1065 same (3 PRs). dashboard: #152/#153/#154 — #153 (restore-cleanup-button) + #154 (retire-legacy-pending-lane) are NEW this iter. All MERGEABLE, no labels, unrouted by-design. [carry UPDATED]
+- **"Check I fires TODAY Fri 2026-07-31 at ~14:13 UTC"**: CONFIRMED ✅ → ~12.3h from now (~01:55Z UTC). Most recent artifact check-i-2026-07-29.json. [carry]
+- **"Tier-4 alert line 589 (delegate-session-ended — 1st occurrence)"**: MONITORING → watermark=597=file_length=597; no new occurrence. [carry]
+- G-rule carries (unchanged): forge-marker-taskid-suffix-increment; medic-draft-status-false-positive; check-i-force-bypass-dm-route; beacon-pending-approvals-path-bug; deep-review-hold-approved-loop-post-merge-001; pending-auto-merge-exhausted-for-merged-pr (monitoring). VPs: pulse-cycle-check0-helper-override, auto-merge-conflict-route-hold, direction-ask-rsdpm-no-autolabel-review-gap-001.
+
+**Check 0 — Alert triage (~01:55Z UTC):** repair-watermark → `{"repaired": false, "old_watermark": 596, "file_length": 597}` — no rotation gap. 1 new alert (line 597): source=outbox-notifier, kind=approval_request, approval_id=lost-marker-render-emission-net-001, ts=2026-07-31T01:48:01Z UTC ("Add a render-side safety net: a marker rendered via marker.py but never emitted gets flagged so a paid-for decision can't silently vanish before it reaches Larry"). Helper triage → Tier 3 (known-pattern approval_request match in alert-translations.json; route=digest). Resolved. Watermark advanced 596→597. NOMINAL ✅
+
+**Check 1 — Log noise (~01:55Z UTC):** outbox-notifier.log — last entry [2026-07-30 19:48:01 MDT] = 01:48:01Z UTC: "beacon pulse-auto-dispatch APPROVAL_REQUEST queued for force_ask: task=delegate-cap-rendering-a-marker-is-not-emitting-it-the-helper-713c" (INFO). All entries INFO. No new systemic WARNs. NOMINAL ✅
+
+**Check 2 — Telegram sweep (~01:55Z UTC):** Last delivery: idx=595 (intent=review-pass, re-delivered at [2026-07-30T19:47:47-0600] = 01:47:47Z UTC; reminder for unreg-approval-d197998196c6 sent at same time). No new Larry directives. NOMINAL ✅
+
+**Check 3 — Pipeline stall (~01:55Z UTC):** heal_pipeline_stall.py --dry-run → DRY-RUN: 0 alert(s) would fire. FORGE_NO_PR_SKIP ×3 (m14-pr-e/#168, merge-verb-backend/#1067, delegate-died-surface/#1068). Cooldown-suppressed: #1071/#1070/#1065/dashboard#152/RSDPM#169. NOMINAL ✅
+
+**Check 4 — Pending directives (~01:55Z UTC):** beacon-pending-approvals.json (state/): **pending=6** (UP from 5 — new: lost-marker-render-emission-net-001):
+1. **suite-guardian-graduation-stage-1** (created=03:40:11Z UTC): chat_id=0 (DM drop known). [CARRY]
+2. **unreg-approval-01519bf927ed** (created=03:45:49Z UTC): chat_id=7998341473. [CARRY]
+3. **unreg-approval-d197998196c6** (created=19:45:39Z UTC; 6h reminder sent 01:47:47Z UTC): chat_id=7998341473. [CARRY]
+4. **unreg-approval-20a308659cf8** (created=20:00:44Z UTC): chat_id=7998341473. [CARRY]
+5. **unreg-approval-1c6dbd24407b** (created=20:30:12Z UTC): chat_id=7998341473. [CARRY]
+6. **lost-marker-render-emission-net-001** (created=2026-07-31T01:48:01Z UTC): chat_id=7998341473. [NEW — awaiting Larry approve/reject]
+NOMINAL ✅
+
+**Check 5 — Stale daemon code (~01:55Z UTC):** heal-stale-daemon-code.heartbeat=2026-07-31T01:50:19Z UTC (fresh ~5 min; <60 min). system-health overall=healthy ts=2026-07-31T01:48:12Z UTC (fresh ~7 min). All 4 bots alive (beacon/forge/mirror/pulse: desired=up, alive=True, action=noop). NOMINAL ✅
+
+**Check A — Source repo (~01:55Z UTC):** On main. Working tree clean. HEAD=8856ebf9 ("Pulse cycle 20260731T015200Z") = origin/main. **RECOVERED** from last iter's behind+dirty state — wrapper committed cycle and sync.sh pulled PR#1072. NOMINAL ✅
+**Check B — Sync health (~01:55Z UTC):** last_sync=2026-07-31T01:30:00Z UTC (~25 min; <2h threshold); status=no-change; consecutive_push_failures=0. NOMINAL ✅
+**Check C — Agent liveness (~01:55Z UTC):** system-health=healthy (fresh ~7 min). All 4 bots alive. NOMINAL ✅
+**Check E — PR/merge state (~01:55Z UTC):** ourliberty-agent-core: **3 open PRs** (unchanged): #1071 (bind-drift-skip-timer-units, MERGEABLE, ~8.6h), #1070 (opus-5-beacon-forge-narrator, MERGEABLE, ~7.5h), #1065 (agents-root-guard-hardening, MERGEABLE, ~23.3h) — all no labels, cooldown-suppressed, unrouted by-design. ourliberty-dashboard: **3 open PRs** (was 1): #152 (merge-it-button, ~cooldown), **#153 (restore-cleanup-button, MERGEABLE, NEW)**, **#154 (retire-legacy-pending-lane, MERGEABLE, NEW)** — all Larry-authored feat/chore branches, no labels, unrouted by-design. stall checker not yet alerting on #153/#154. NOMINAL ✅
+**Check H — Forge digest (~01:55Z UTC):** No open Forge pipeline PRs (head:forge/ = empty). Pipeline idle. NOMINAL ✅
+
+**§5.0 one-shots (~01:55Z UTC):** audit_due_nudge → no committed audit baseline; no-op ✅. distill_detector → no un-distilled audits; no-op ✅. silence_file_auditor → 7 files (3 expired 0-suppressed, 4 permanent 0-suppressed); no FIRED ✅. NOMINAL ✅
+
+**§5 periodic — Check I (TODAY):** Today is Fri 2026-07-31 (~01:55 UTC). Check I fires at ~14:13 UTC (~12.3h from now) via systemd timer. Most recent artifact: check-i-2026-07-29.json. Carry: $1,201/wk +206%; proposal #1 (45σ cycle review) via `/dispatch 1`.
+**§5 periodic — Check III (carry):** Most recent: check-iii-2026-07-26.json. Next: Sun 2026-08-03. NOMINAL ✅
+
+**Credential rotation (~01:55Z UTC):** SUPABASE_SERVICE_ROLE_KEY: last DM 2026-07-20T20:00:15Z UTC; 14d dedup expires ~2026-08-03T20:00Z UTC (~3.1d remaining). Within dedup window — no DM. NOMINAL ✅
+
+**PRIME DIRECTIVE accounting:** No new intervention this iter. iter_clean row appended (tier=1, kind=iter_clean, ts=2026-07-31T01:55:20Z UTC). Ratio=worsening (interventions≈1890, systemic_fixes=48). **TIER: Tier 1** (consecutive_clean=0→1; any signal resets to Tier 1).
+
+**Patterns:**
+- **Check A fully recovered** ✅: back to clean + up-to-date (HEAD=8856ebf9=origin/main). Wrapper committed cycle + sync.sh pulled PR#1072 as expected. No action needed.
+- **Dashboard PR #153 + #154 NEW**: feat/restore-cleanup-button + chore/retire-legacy-pending-lane appeared this iter. Larry-authored, no labels, no stall alerts yet (within initial detection window). Unrouted by-design per memory. Monitoring.
+- **lost-marker-render-emission-net-001 pending approval** (created=01:48Z UTC): Feature to add render-side safety net for markers rendered via marker.py but never emitted. Awaiting Larry approve/reject in Approvals tab. DM queued at 01:47:47Z UTC.
+- **Check I fires TODAY at ~14:13 UTC**: New cost artifact expected. Carry: $1,201/wk +206%, proposal #1 via `/dispatch 1`.
+- **pending=6 (up from 5)**: 5 carry unreg-approvals + 1 new feature approval. Trend: new work coming in faster than prior items clearing.
+- G-rule carries (unchanged): forge-marker-taskid-suffix-increment; medic-draft-status-false-positive; check-i-force-bypass-dm-route; beacon-pending-approvals-path-bug; deep-review-hold-approved-loop-post-merge-001; pending-auto-merge-exhausted-for-merged-pr (monitoring). VPs: pulse-cycle-check0-helper-override, auto-merge-conflict-route-hold, direction-ask-rsdpm-no-autolabel-review-gap-001.
+
+**Actions taken:**
+1. Check 0: repair-watermark → {repaired=false, old=596, file_length=597} — no rotation gap. ✅
+2. Check 0: alert line 597 (kind=approval_request, lost-marker-render-emission-net-001) triaged Tier-3 via helper (known-pattern); resolved. Watermark advanced 596→597. ✅
+3. §5.0 one-shots: audit_due_nudge, distill_detector, silence_file_auditor → all no-op/no-FIRED. ✅
+4. PRIME DIRECTIVE: iter_clean row appended via cycle_prime_ledger.py (tier=1, kind=iter_clean). ✅
+5. Tier state: cycle_tier_state.py record --checks-clean true → Tier 1; consecutive_clean=1. ✅
+
+**Escalations:**
+- **[carry ⚠️ — awaiting Larry]** pending=6 in Approvals tab (up from 5 — new: lost-marker-render-emission-net-001): (1) suite-guardian-graduation-stage-1 (chat_id=0); (2) unreg-approval-01519bf927ed; (3) unreg-approval-d197998196c6 (6h reminder sent); (4) unreg-approval-20a308659cf8; (5) unreg-approval-1c6dbd24407b; (6) lost-marker-render-emission-net-001 [NEW — render-side marker safety net, awaiting approve/reject].
+- **[carry ⚠️] RSDPM staging drift (0035, 0036, 0037)**: Awaiting Larry ssh investigation.
+- [carry] check-vi-posture-proposals-2026-07-07 (2 proposals). Awaiting Larry.
+- [carry — monitoring] Mirror queue-wait p95=1065.6m. Larry decision if queue stays saturated.
+- [carry — no Larry reply] Check XIV Tier-4 × 2: oversilence + fleet digest.
+- [carry — monitoring] tier4-rsdpm-install-drift.
+- [carry — monitoring] forge-wip-redispatch EXHAUSTED (rsdpm-pr155).
+- **[blue] Check I: weekly cost $1,201 (+206%)**. Proposal #1 via `/dispatch 1`. Fires TODAY Fri 2026-07-31 at ~14:13 UTC.
+- [FYI] PR#1071/#1070/#1065/dashboard#152/#153/#154: Larry-authored / unrouted by-design. Watching. #153+#154 new this iter.
+
+**Tier end-of-iter:** **Tier 1** (consecutive_clean=1; last_signal_at=2026-07-31T01:50:19Z UTC; 5-min cadence continues).
+
+---
+
