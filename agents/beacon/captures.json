@@ -2814,6 +2814,36 @@
         "task_id": "delegate-cap-the-approvals-tab-has-400-unread-rows-back-to-ma-85bc",
         "stamped_at": "2026-07-31T21:46:19.827378+00:00"
       }
+    },
+    {
+      "id": "cap-approvals-can-sit-in-beacon-s-queue-with-no-dash-00ec",
+      "title": "Approvals can sit in Beacon's queue with no dashboard row \u2014 the badge says 1, the tab shows 0",
+      "note": "SYMPTOM: an approval is written to Beacon's pending queue but never projected to Supabase chain_events. It is then NOT clickable anywhere on the dashboard and waits indefinitely; the only surface it reaches is Telegram. Sharpest tell: heal_unregistered_approval's 2026-07-31 15:31 tick logged 'doorbell counts 1 approval(s) + 1 escalation(s) = 2 needs-your-call' while the tab had ZERO unread approval_request rows. The badge was right; the list was empty.\n\nLIVE INSTANCE: suite-guardian-graduation-stage-1, filed 2026-07-30T03:40:11Z, still pending, ZERO chain_events rows of any type \u2014 42h unclickable. It is a real decision (graduate the Main-Suite Green Guardian out of shadow mode), not noise. Measured 2026-07-31: 1 of 1 pending approvals is in this state.\n\nMECHANISM, CONFIRMED BY REPRODUCING IT. An approval is registered by a PAIR of writes:\n  approval.add_pending(payload, chat_id)\n  approval.build_approval_request_chain_event(payload, ts) -> chain_event_emit.emit_event(**kwargs)\nOn 2026-07-31 I ran that pair by hand to recover a different lost approval. add_pending SUCCEEDED; emit_event returned FALSE, logging 'Supabase client unavailable (SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY unset or supabase-py missing); dropping event_type=approval_request'. The card was live in Beacon's queue and absent from the dashboard until I sourced /home/larry/credentials/.env.larry and re-emitted. So the failure is reachable and non-theoretical: ANY caller that ignores emit_event's return value leaves exactly this split. Whether that is what happened to the guardian card is UNPROVEN \u2014 it may be a different path.\n\nDO THIS FIRST \u2014 FREQUENCY IS NOT MEASURED. n=1 current. beacon-pending-approvals.json holds ~530 history entries and nobody has checked how many ever had a chain_events row. Measure the historical rate BEFORE designing. A single instance may be an infra blip during one restart, or a steady leak \u2014 those need different fixes, and this system has repeatedly burned effort building for unmeasured frequency.\n\nWHERE TO LOOK:\n- scripts/beacon_approval_handler.py \u2014 add_pending, build_approval_request_chain_event\n- scripts/chain_event_emit.py \u2014 emit_event, and EVERY caller's handling of a False return\n- ~10 modules emit approval markers; identify which path wrote the guardian card\n- scripts/heal_unregistered_approval.py recovers approvals with NO MARKER; check whether it also covers 'marker present, projection missing', which is a different hole\n\nHOW TO QUERY (three stores look alike; only one is the tab):\n  THE TAB: ssh larry@134.209.44.80, source /home/larry/credentials/.env.larry, then chain_events .select(...).is_('read_at','null')\n  Beacon's queue: ~/agents/state/beacon-pending-approvals.json \u2014 a DIFFERENT, smaller store\n  NOT /api/approvals/operator-queue \u2014 a ranked list in mode: shadow\n\nCOORDINATE: the chain_events retention work (400+ rows that never LEAVE the tab, back to 2026-05-27) is the inverse of this \u2014 rows that never ARRIVE. Same surface, opposite direction. A fix that clears the backlog while approvals silently fail to arrive produces a tab that looks perfect and hides decisions.\n\nREVIEW: needed for anything touching the write pair \u2014 a half-registered approval already fails looking exactly like success.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "main",
+        "captured_at": "2026-07-31T22:05:27.027955+00:00"
+      },
+      "last_touched": "2026-07-31T22:05:27.027955+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "Some approvals that need your sign-off show up as a notification count but have no clickable item on your dashboard, so they can sit unseen indefinitely.",
+        "why": "One real decision has already been stuck waiting for nearly two days with no way to act on it, and a badge that says 'you have items' next to an empty list quietly erodes trust that the dashboard shows everything.",
+        "suggest": "Before building any fix, have the team measure how often this has actually happened across our history, since a one-off glitch and a steady leak call for very different responses and we shouldn't over-build on a single case."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-31T22:12:03.913808+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     }
   ]
 }
