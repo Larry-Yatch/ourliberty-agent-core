@@ -2,10 +2,11 @@
   "_meta": {
     "owner": "chain-events-retention (approvals-queue-rework N2)",
     "tweak_via": "edit this file + commit; the retention job reads it on the next tick (no service reload needed)",
-    "rationale": "Retention window for chain_events bookkeeping rows (session_start/session_done and other plumbing types). These never get read_at set, so they grow the table unbounded (~3,200 rows on 2026-06-02). Default 14d is conservative; intended to become Pulse-Check self-optimizing per the Check III/VIII pattern (analyzer proposes a window, Larry approves, Forge writes this file) rather than hand-pinned long-term. DECISION event types (approval_request, clarify_request) are NEVER deletable — the job hard-excludes them regardless of what this list says.",
-    "last_retention_update": null
+    "rationale": "Retention window for chain_events bookkeeping rows (session_start/session_done and other plumbing types). These never get read_at set, so they grow the table unbounded (~3,200 rows on 2026-06-02). Intended to become Pulse-Check self-optimizing per the Check III/VIII pattern (analyzer proposes a window, Larry approves, Forge writes this file) rather than hand-pinned long-term. DECISION event types (approval_request, clarify_request) are NEVER deletable — the job hard-excludes them regardless of what this list says.",
+    "window_floor": "THE WINDOW IS NOT FREE TO SHRINK: it must be >= the longest lookback of any consumer of these types. pulse_check_xii.py reads chain_events over WINDOW_DAYS (28) + BASELINE_DAYS (28) = 56 days and derives the dispatch->merge lead-time clock and forge_redispatch_per_task from forge session_start rows. At the original 14d the deleted rows silently gutted that analysis: check-xii-2026-07-27.json reported lead-time p50 prior=insufficient_signal, forge_redispatch prior=null, and lead-time n=68 against merges_total=439 — while sources.chain_events read 'ok' the whole time, because the freshness gate checks reachability, not whether the window still has rows in it. Raised 14 -> 60 on 2026-07-31 (56 + 4 days of slack for the weekly timer's phase). scripts/tests/test_chain_events_retention.py::TestShippedConfigCoversReaderLookbacks pins this; before adding a type to the list below, grep its readers and take the max lookback. Known exclusions: auto_merge (build_sequence_advancer looks it up by task_id with NO lower time bound, and a parked sequence can be arbitrarily old) and clarify_response (it is heal_stale_approvals' resolution signal for clarify_request).",
+    "last_retention_update": "2026-07-31"
   },
-  "retention_days": 14,
+  "retention_days": 60,
   "bookkeeping_event_types": [
     "session_start",
     "session_done"

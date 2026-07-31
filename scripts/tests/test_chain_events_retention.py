@@ -283,5 +283,75 @@ class TestRunOnce(_Base):
         self.assertEqual(counts2['deleted'], 0)
 
 
+# -------------------- shipped config vs its readers --------------------
+
+class TestShippedConfigCoversReaderLookbacks(unittest.TestCase):
+    """The SHIPPED config's window must cover every consumer's lookback.
+
+    This asserts against config/chain-events-retention.json itself, not a
+    fixture — the defect it guards was a live config value, not a code path.
+    Found 2026-07-31: the window was 14 days while pulse_check_xii reads
+    chain_events over WINDOW_DAYS + BASELINE_DAYS = 56 days and derives the
+    dispatch->merge lead-time clock and forge_redispatch_per_task from forge
+    `session_start` rows. Retention had been deleting those since 2026-06-03,
+    so XII's baseline half could never populate — it reported
+    prior=insufficient_signal / null indefinitely while `sources.chain_events`
+    read "ok", because that gate checks reachability and not whether the
+    window it needs still has rows in it.
+
+    Deleting a row a reader still needs is silent by construction: the reader
+    sees an empty window, not an error. So the floor is pinned here.
+    """
+
+    def _shipped(self) -> dict:
+        cfg = Path(__file__).resolve().parents[2] / 'config' / 'chain-events-retention.json'
+        self.assertTrue(cfg.is_file(), f'shipped retention config missing: {cfg}')
+        return json.loads(cfg.read_text())
+
+    def test_window_covers_pulse_check_xii_lookback(self):
+        import importlib
+        xii = importlib.import_module('pulse_check_xii')
+        # Fail loudly if XII renames these — a silent skip would retire the guard.
+        for const in ('WINDOW_DAYS', 'BASELINE_DAYS'):
+            self.assertTrue(
+                hasattr(xii, const),
+                f'pulse_check_xii.{const} is gone — re-derive its chain_events '
+                f'lookback and update this guard rather than deleting it',
+            )
+        needed = xii.WINDOW_DAYS + xii.BASELINE_DAYS
+        days = self._shipped()['retention_days']
+        self.assertGreaterEqual(
+            days, needed,
+            f'retention_days={days} is SHORTER than pulse_check_xii\'s '
+            f'{needed}-day chain_events lookback ({xii.WINDOW_DAYS} trailing + '
+            f'{xii.BASELINE_DAYS} baseline). Retention would delete the '
+            f'session_start rows XII needs and its trend metrics would silently '
+            f'degrade to insufficient_signal.',
+        )
+
+    def test_excluded_types_stay_out_of_the_bookkeeping_list(self):
+        """`auto_merge` and `clarify_response` must never be retention candidates.
+
+        Neither is bounded by a window the way session_start is:
+        - build_sequence_advancer queries `auto_merge` by task_id with NO lower
+          time bound, and a parked sequence can be arbitrarily old.
+        - `clarify_response` is heal_stale_approvals' resolution signal for
+          clarify_request; deleting it removes the evidence that clears a
+          decision row.
+        """
+        listed = self._shipped()['bookkeeping_event_types']
+        for t in ('auto_merge', 'clarify_response'):
+            self.assertNotIn(
+                t, listed,
+                f'{t} is not window-bounded by its readers — see the config '
+                f'_meta.window_floor note before adding it',
+            )
+
+    def test_decision_types_never_listed(self):
+        listed = self._shipped()['bookkeeping_event_types']
+        for t in ('approval_request', 'clarify_request'):
+            self.assertNotIn(t, listed)
+
+
 if __name__ == '__main__':
     unittest.main()
