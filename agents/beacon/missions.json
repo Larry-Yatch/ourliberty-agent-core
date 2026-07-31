@@ -16999,6 +16999,23 @@
       "retired_by": "heal_orphan_autoregister",
       "retired_at": "2026-07-31T15:29:50.261876+00:00",
       "retired_reason": "orphan-terminal"
+    },
+    {
+      "id": "proposed-delegate-cap-the-approvals-tab-has-400-unread-rows-back-to-ma-85bc",
+      "name": "Delegate Cap The Approvals Tab Has 400 Unread Rows Back To Ma 85bc",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `delegate-cap-the-approvals-tab-has-400-unread-rows-back-to-ma-85bc`. Last activity 2026-07-31T21:46:22.753905+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "delegate-cap-the-approvals-tab-has-400-unread-rows-back-to-ma-85bc"
+      ],
+      "repo": null,
+      "created": "2026-07-31",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-31T21:48:48.616477+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-31T21:46:22.753905+00:00"
     }
   ]
 }
