@@ -16972,7 +16972,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-31T02:09:45.942912+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-31T02:03:34.762762+00:00"
+      "orphan_last_activity_ts": "2026-07-31T02:03:34.762762+00:00",
+      "briefing": {
+        "what": "A finished piece of work on your Ourliberty dashboard that the team wrapped up but hasn't linked to any active initiative.",
+        "why": "It's polished and passed its quality check, so it's ready to ship value to users \u2014 but with no project behind it, it risks sitting idle or duplicating other efforts.",
+        "suggest": "Take a quick look to confirm it fits current priorities before giving it the green light, since it's ready but its purpose isn't yet clear."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-31T02:11:00.368335+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
