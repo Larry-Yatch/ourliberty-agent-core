@@ -17108,7 +17108,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-31T22:33:54.592594+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-31T22:29:18.2537+00:00"
+      "orphan_last_activity_ts": "2026-07-31T22:29:18.2537+00:00",
+      "briefing": {
+        "what": "A safeguard that double-checks each pending approval to confirm it's still based on current facts before it ever reaches your desk.",
+        "why": "It stops you from wasting time on stale decisions and flags anything the system can't verify, so what you approve actually reflects reality.",
+        "suggest": "Worth doing, but review it once before it goes live to be sure nothing important gets quietly hidden or mislabeled."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-31T22:42:16.573755+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-suite-guardian-graduation-stage-1",
@@ -17125,7 +17139,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-31T22:33:54.592594+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-31T22:29:07.080754+00:00"
+      "orphan_last_activity_ts": "2026-07-31T22:29:07.080754+00:00",
+      "briefing": {
+        "what": "This is an early-stage effort to strengthen the automated safeguards that keep our systems reliable, not yet formally part of any active project.",
+        "why": "Getting these protections right early prevents outages and quality problems down the line, but the work is still loose and unassigned so it could drift or overlap with other priorities.",
+        "suggest": "Give it a quick green light to continue, but ask the team to tie it to a defined goal and owner before it grows further."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-31T22:42:16.573755+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-pr-ourliberty-agent-core-1076",
@@ -17142,7 +17170,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-31T22:33:54.592594+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-31T22:20:40.158088+00:00"
+      "orphan_last_activity_ts": "2026-07-31T22:20:40.158088+00:00",
+      "briefing": {
+        "what": "A piece of work your team started on their own that's now waiting for a yes-or-no before it can move forward.",
+        "why": "It's been sitting in line for a while, and until someone weighs in it stays stuck and the effort already spent goes nowhere.",
+        "suggest": "Have someone give it a quick look before waving it through, since it isn't yet tied to a clear goal \u2014 a short check now avoids a surprise later."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-31T22:42:16.573755+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
