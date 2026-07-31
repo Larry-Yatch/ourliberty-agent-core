@@ -120,6 +120,17 @@ PROMOTED_SOURCE_FORLARRY = 'for-larry-mirror-review'
 # so the allowlist check and the coordinate it validates cannot disagree.
 MIRROR_AGENT = 'mirror'
 
+# Summary literal for the needs-triage card shape (build_approval_payload's else
+# branch): a larry-alert whose suggested_action does NOT parse into two options,
+# so it is not a binary decision. Lifted into ONE constant referenced by BOTH the
+# creation path AND the retire matcher so the two can never drift. This class is
+# no longer promoted at the source (see evaluate()); the constant also lets the
+# retire pass identify already-promoted needs-triage cards to clear off the tab.
+NEEDS_TRIAGE_SUMMARY = (
+    'Decision needs your direction (promoted from a missed marker; '
+    'could not be parsed into two options — needs triage).'
+)
+
 # Per-tick cap on archived Beacon outboxes parsed during marker recovery, so an
 # unpruned outbox archive can't make the scan unbounded. Only in-window files
 # are eligible, newest-first; recovery is a best-effort enrichment, so a deeper
@@ -731,10 +742,7 @@ def build_approval_payload(
             'Beacon shapes + dispatches the chosen option.'
         )
     else:
-        summary = (
-            'Decision needs your direction (promoted from a missed marker; '
-            'could not be parsed into two options — needs triage).'
-        )
+        summary = NEEDS_TRIAGE_SUMMARY
         suggested_text = suggested if isinstance(suggested, str) else '(none)'
         prompt = (
             'This decision was raised as a larry-alert without an '
@@ -1033,6 +1041,7 @@ def evaluate(
     now: Optional[datetime] = None,
     resolution_check: Any = None,
     marker_lookup: Any = None,
+    skipped_needs_triage: Optional[list[dict[str, Any]]] = None,
 ) -> list[dict[str, Any]]:
     """Return the list of approval payloads to register this tick.
 
@@ -1054,6 +1063,15 @@ def evaluate(
     card is built from Beacon's real proposal (clean summary/target) instead of a
     lossy reconstruction from the alert. Defaults to a no-op so existing callers
     keep the alert-derived behavior.
+
+    NEEDS-TRIAGE PREVENTION: an alert-derived ask (no recovered marker) whose
+    `suggested_action` does NOT parse into two options is not a binary decision;
+    promoting it produced a card whose Approve/Reject fell to a generic Beacon
+    envelope (a paid no-op) and never auto-retired. Such asks are NOT promoted —
+    their identity is appended to `skipped_needs_triage` (when provided) so main()
+    can record it in the promoted ledger (not re-evaluated next tick) and a
+    SKIP_NEEDS_TRIAGE line names it. The BINARY alert-derived path and the
+    marker-backed path are unchanged; the source larry-alert is left untouched.
     """
     now = now or datetime.now(timezone.utc)
     window = heuristics['scan_window_hours']
@@ -1109,6 +1127,21 @@ def evaluate(
                 marker = None
             elif isinstance(m_id, str):
                 used_marker_ids.add(m_id)
+        # PREVENTION (needs-triage suppression): an alert-derived ask with no
+        # recovered marker whose suggested_action is not a binary decision must
+        # NOT reach the Approvals tab — record it as seen and skip. Keyed ONLY on
+        # (marker is None AND parse_binary_options is None) so a binary alert or a
+        # marker-backed promotion is never dropped.
+        if marker is None and parse_binary_options(
+                record.get('suggested_action')) is None:
+            log(f'SKIP_NEEDS_TRIAGE: {identity!r} (suggested_action is not a '
+                f'binary decision; not promoting to the Approvals tab)')
+            if skipped_needs_triage is not None:
+                skipped_needs_triage.append(
+                    {'identity': identity, 'task_id': task_id,
+                     'subject': subject})
+            seen_keys.add(identity)
+            continue
         if marker is not None:
             payload = build_approval_payload_from_marker(marker, record, identity)
         else:
@@ -1519,6 +1552,12 @@ def reconcile_retire(
     for key, value in promoted.items():
         if not isinstance(key, str):
             continue
+        # A needs-triage SKIP marker never promoted a card (prevention recorded
+        # it purely for cross-tick dedup); there is nothing on the tab to retire,
+        # so keep it as a dedup entry and never probe it for resolution.
+        if isinstance(value, dict) and value.get('skipped'):
+            remaining[key] = value
+            continue
         subject, task_id, promoted_at = _ledger_entry_fields(key, value)
         reason = resolution_signal(
             subject, state, alerts, heuristics,
@@ -1538,6 +1577,58 @@ def reconcile_retire(
         retired.append((task_id, reason))
         log(f'retire-on-resolution: {key!r} task={task_id} ({reason})')
     return retired, remaining
+
+
+def _is_needs_triage_card(entry: dict[str, Any]) -> bool:
+    """True iff a pending approval entry is a promoted NEEDS-TRIAGE card: the
+    healer's own `unreg-approval-*` id, a `dispatch_payload.summary` that is
+    EXACTLY `NEEDS_TRIAGE_SUMMARY`, and NEITHER a `promoted_source` NOR a
+    `recheck_target`. FAIL CLOSED — a binary direction-ask (different summary), a
+    for-larry-mirror-review card (#1060 class; carries `promoted_source` and/or
+    `recheck_target`), or anything bearing a `recheck_target` is NEVER matched."""
+    if not isinstance(entry, dict):
+        return False
+    task_id = entry.get('id')
+    if not (isinstance(task_id, str)
+            and task_id.startswith(PROMOTED_TASK_PREFIX + '-')):
+        return False
+    payload = entry.get('dispatch_payload')
+    if not isinstance(payload, dict):
+        return False
+    # Fail closed: never touch a promoted stranded-escalation (#1060) or any
+    # card that carries a recheck coordinate.
+    if payload.get('promoted_source') or payload.get('recheck_target'):
+        return False
+    return payload.get('summary') == NEEDS_TRIAGE_SUMMARY
+
+
+def retire_needs_triage_cards(
+    state: dict[str, Any],
+) -> list[tuple[str, str]]:
+    """Retire the live promoted NEEDS-TRIAGE cards off the Approvals tab.
+
+    These non-binary cards should never have reached the tab (their Approve/
+    Reject falls to a generic Beacon envelope that spends a paid session on a
+    no-op, and the #1060 recheck ladder is coordinate-gated so they never auto-
+    retire). Prevention (evaluate) stops NEW ones; this bounded, idempotent pass
+    clears the ones already promoted. Mutates `state` in place via
+    approval.resolve(state=state) (caller owns the commit) and returns the list
+    of `(task_id, reason)`. Idempotent: a card already moved to history is no
+    longer in `pending`, so a re-run matches nothing."""
+    retired: list[tuple[str, str]] = []
+    reason = 'needs-triage card is not an actionable binary decision'
+    for entry in list(state.get('pending', [])):
+        if not _is_needs_triage_card(entry):
+            continue
+        task_id = entry.get('id')
+        approval.resolve(
+            task_id, 'expired',
+            note=f'auto-retired by {HEALER_SOURCE}: {reason}',
+            state=state,
+        )
+        retired.append((task_id, reason))
+        log(f'RETIRE_NEEDS_TRIAGE: task={task_id} ({reason})')
+    return retired
 
 
 def _clear_retired_read_at(task_ids: list[str]) -> int:
@@ -1705,6 +1796,27 @@ def main() -> int:
         retired = []
     if retired:
         ledger_changed = True
+    # NEEDS-TRIAGE RETIREMENT: clear already-promoted non-binary cards off the
+    # tab (prevention below stops new ones). Runs on the same state snapshot; its
+    # retirements fold into the shared locked re-apply + read_at clear below.
+    try:
+        nt_retired = retire_needs_triage_cards(state)
+    except Exception as e:  # noqa: BLE001
+        log(f'needs-triage retire pass failed: {type(e).__name__}: {e}', 'ERROR')
+        nt_retired = []
+    if nt_retired:
+        # Drop the promoted-ledger entries for the retired cards so
+        # reconcile_retire stops probing a card that is now in history.
+        nt_ids = {tid for tid, _ in nt_retired}
+        trimmed = {
+            k: v for k, v in promoted.items()
+            if not (isinstance(v, dict) and v.get('task_id') in nt_ids)
+        }
+        if len(trimmed) != len(promoted):
+            promoted = trimmed
+            ledger_changed = True
+        retired = retired + nt_retired
+    if retired:
         # PR-E2 #48: the retire decisions above used slow gh probes against the
         # `state` snapshot WITHOUT the lock. Persist them under the shared lock by
         # re-loading FRESH state inside it and re-applying only the resolutions —
@@ -1739,11 +1851,16 @@ def main() -> int:
         return match_marker_for_record(record, recovered_markers)
 
     # --- SKIP-BEFORE-PROMOTE + PROMOTE (decisions 1 + 2) ---
+    # `skipped_needs_triage` collects the non-binary alert-derived asks the
+    # prevention gate suppressed; they are recorded in the promoted ledger below
+    # so the same identity is not re-evaluated (and re-logged) every tick.
+    skipped_needs_triage: list[dict[str, Any]] = []
     try:
         to_promote = evaluate(
             alerts, heuristics, state, promoted,
             resolution_check=_resolution_check,
             marker_lookup=_marker_lookup,
+            skipped_needs_triage=skipped_needs_triage,
         )
     except Exception as e:  # noqa: BLE001
         log(f'evaluate failed: {type(e).__name__}: {e}', 'ERROR')
@@ -1776,6 +1893,24 @@ def main() -> int:
         log(f'for-larry evaluate failed: {type(e).__name__}: {e}', 'ERROR')
         to_promote_for_larry = []
     to_promote = to_promote + to_promote_for_larry
+
+    # Record the suppressed needs-triage identities in the promoted ledger as
+    # SKIP markers so they are not re-evaluated (or re-logged) on the next tick.
+    # No card is created; the source larry-alert is untouched. reconcile_retire
+    # leaves `skipped` entries alone (there is nothing on the tab to retire).
+    if skipped_needs_triage:
+        promoted_at = datetime.now(timezone.utc).isoformat()
+        for skip in skipped_needs_triage:
+            identity = skip['identity']
+            if identity in promoted:
+                continue
+            promoted[identity] = {
+                'task_id': skip['task_id'],
+                'subject': skip['subject'],
+                'promoted_at': promoted_at,
+                'skipped': 'needs_triage',
+            }
+            ledger_changed = True
 
     if not to_promote:
         if ledger_changed:

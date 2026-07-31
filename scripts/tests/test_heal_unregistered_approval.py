@@ -431,6 +431,9 @@ class DashboardRoutingTest(unittest.TestCase):
 # -------------------- reconciler fixtures (skip / dedup / retire) -----------
 
 # An ask whose referenced PR is the resolution anchor. PR #294 was MERGED.
+# Binary suggested_action so the resolution-gate tests exercise a promotable
+# (non-needs-triage) decision — the resolution machinery is orthogonal to the
+# binary/needs-triage split, so the fixture must be a genuine binary ask.
 PR294_ALERT = {
     'ts': _ts(3),
     'source': 'pulse/beacon-result',
@@ -438,7 +441,7 @@ PR294_ALERT = {
     'route': 'escalate',
     'subject': 'PR #294 Mirror review gap — source=larry routing miss',
     'message': 'PR #294 Mirror review gap needs your call before I proceed.',
-    'suggested_action': 'Reply with how to close the mirror review gap',
+    'suggested_action': 'Choose rebuild-the-review or waive-the-gate',
 }
 
 # Two phrasings of ONE decision (the real 2026-06-04 deploy-notifier pair).
@@ -712,7 +715,7 @@ class SkipBeforePromoteTest(unittest.TestCase):
             'needs_larry': True,
             'subject': 'm3-pr2-re-dispatch-routing-gap',
             'message': 'The m3-pr2 re-dispatch never routed; see PR #25.',
-            'suggested_action': 'Reply with how to close the re-dispatch gap',
+            'suggested_action': 'Choose rebuild-the-dispatch or waive-it',
         }
         state = self._empty()
         check = self._check(state, [merged_body_alert], _gh_merged([25]))
@@ -734,7 +737,7 @@ class SkipBeforePromoteTest(unittest.TestCase):
             'needs_larry': True,
             'subject': 'm3-pr2-re-dispatch-routing-gap',
             'message': 'The m3-pr2 re-dispatch never routed; see PR #25.',
-            'suggested_action': 'Reply with how to close the re-dispatch gap',
+            'suggested_action': 'Choose rebuild-the-dispatch or waive-it',
         }
         state = self._empty()
         check = self._check(state, [merged_body_alert], lambda n: None)
@@ -810,25 +813,31 @@ class ReconcileRetireTest(unittest.TestCase):
 
 
 class UnroutedPrPromotionTest(unittest.TestCase):
-    """The needs_larry signal path end-to-end: an actionable alert with no
-    decision phrasing becomes exactly ONE Approvals-tab card that dedups on
-    re-fire and auto-retires when its PR resolves — reusing the SAME dedup/retire
-    machinery as the phrasing-based decision-asks."""
+    """The needs_larry unrouted-PR nudge is a NON-binary alert: since the
+    needs-triage fix it is NOT promoted to the Approvals tab (Approve/Reject on
+    it fell to a generic Beacon envelope — a paid no-op — and it never auto-
+    retired). The nudge alert itself is untouched and still visible in the alert
+    stream; only the promotion is suppressed."""
 
     def _empty(self):
         return {'pending': [], 'history': []}
 
-    def test_unrouted_pr_promoted_to_one_card(self):
+    def test_unrouted_pr_not_promoted(self):
+        # criterion 1: a non-binary alert-derived ask is not promoted; its
+        # identity is recorded in the skip sink so main() dedups it next tick.
+        sink = []
         out = h.evaluate([UNROUTED_PR_ALERT], DEFAULT_HEURISTICS,
-                         self._empty(), {}, now=NOW)
-        self.assertEqual(len(out), 1)
-        self.assertEqual(out[0]['target_agent'], 'beacon')
+                         self._empty(), {}, now=NOW, skipped_needs_triage=sink)
+        self.assertEqual(out, [])
+        self.assertEqual(
+            [s['identity'] for s in sink],
+            [h.decision_identity(UNROUTED_PR_ALERT)])
 
-    def test_refired_alert_not_duplicated(self):
-        # A second identical fire for PR #28 in the same tick -> one card.
+    def test_refired_alert_still_not_promoted(self):
+        # A second identical fire for PR #28 in the same tick -> still no card.
         out = h.evaluate([UNROUTED_PR_ALERT, dict(UNROUTED_PR_ALERT)],
                          DEFAULT_HEURISTICS, self._empty(), {}, now=NOW)
-        self.assertEqual(len(out), 1)
+        self.assertEqual(out, [])
 
     def test_already_registered_alert_not_duplicated(self):
         # An already-pending card for PR #28 -> the re-fire is skipped.
@@ -866,6 +875,142 @@ class UnroutedPrPromotionTest(unittest.TestCase):
         self.assertEqual([t for t, _ in retired], [task_id])
         self.assertEqual(remaining, {})
         self.assertEqual(state['pending'], [])
+
+
+class NeedsTriagePreventionTest(unittest.TestCase):
+    """The needs-triage suppression gate: a non-binary alert-derived ask is NOT
+    promoted (criterion 1); a binary ask IS (criterion 2); a marker-backed ask IS
+    even when its alert text is non-binary (criterion 3)."""
+
+    def _empty(self):
+        return {'pending': [], 'history': []}
+
+    def _non_binary(self):
+        # Approval-class (the 'Reply' prefix + 'needs your call' in the message)
+        # but NOT a binary decision: parse_binary_options returns None.
+        return dict(PR294_ALERT, suggested_action='Reply with how to close it')
+
+    def test_non_binary_alert_is_not_promoted(self):
+        sink = []
+        alert = self._non_binary()
+        out = h.evaluate([alert], DEFAULT_HEURISTICS, self._empty(), {},
+                         now=NOW, skipped_needs_triage=sink)
+        self.assertEqual(out, [])
+        self.assertEqual([s['identity'] for s in sink],
+                         [h.decision_identity(alert)])
+        self.assertEqual(sink[0]['task_id'],
+                         h.derive_task_id(h.decision_identity(alert)))
+
+    def test_suppression_works_without_a_sink(self):
+        out = h.evaluate([self._non_binary()], DEFAULT_HEURISTICS,
+                         self._empty(), {}, now=NOW)
+        self.assertEqual(out, [])
+
+    def test_binary_alert_still_promoted(self):
+        out = h.evaluate([DEPLOY_NOTIFIER_ALERT], DEFAULT_HEURISTICS,
+                         self._empty(), {}, now=NOW)
+        self.assertEqual(len(out), 1)
+        self.assertNotIn('needs triage', out[0]['summary'].lower())
+
+    def test_marker_backed_non_binary_alert_still_promoted(self):
+        # Even though the alert text is non-binary, a recovered Beacon marker
+        # backs a clean card — the gate keys on (marker is None AND non-binary).
+        alert = dict(PR412_STALL_ALERT, suggested_action='Reply mirror-review')
+        sink = []
+        out = h.evaluate([alert], DEFAULT_HEURISTICS, self._empty(), {},
+                         now=NOW, marker_lookup=lambda rec: PR412_MARKER,
+                         skipped_needs_triage=sink)
+        self.assertEqual(len(out), 1)
+        self.assertIn('recovered_marker', out[0])
+        self.assertEqual(sink, [])
+
+
+class RetireNeedsTriageTest(unittest.TestCase):
+    """criterion 5: the retire pass clears live needs-triage cards, is
+    idempotent, and NEVER touches a binary / mirror-review / recheck_target
+    card. It fails closed on promoted_source and recheck_target."""
+
+    def _card(self, task_id, *, summary=None, payload_extra=None):
+        payload = {
+            'task_id': task_id,
+            'summary': summary if summary is not None else h.NEEDS_TRIAGE_SUMMARY,
+            'target_agent': 'beacon',
+            'origin': h.HEALER_SOURCE,
+            'bare_approvable': False,
+        }
+        if payload_extra:
+            payload.update(payload_extra)
+        return {
+            'id': task_id, 'status': 'pending',
+            'plan_summary': payload['summary'],
+            'dispatch_payload': payload,
+        }
+
+    def test_needs_triage_card_is_retired(self):
+        tid = h.derive_task_id('ref:unrouted-pr')
+        state = {'pending': [self._card(tid)], 'history': []}
+        retired = h.retire_needs_triage_cards(state)
+        self.assertEqual([t for t, _ in retired], [tid])
+        self.assertEqual(state['pending'], [])
+        self.assertTrue(any(
+            e['id'] == tid and e['status'] == 'expired'
+            for e in state['history']))
+
+    def test_retire_is_idempotent(self):
+        tid = h.derive_task_id('ref:unrouted-pr')
+        state = {'pending': [self._card(tid)], 'history': []}
+        h.retire_needs_triage_cards(state)
+        retired2 = h.retire_needs_triage_cards(state)
+        self.assertEqual(retired2, [])
+
+    def test_binary_card_is_not_retired(self):
+        tid = h.derive_task_id('ref:binary')
+        binary_summary = ('Direction needed (promoted from a missed marker): '
+                          'Approve = ship; Reject = hold.')
+        state = {'pending': [self._card(tid, summary=binary_summary)],
+                 'history': []}
+        self.assertEqual(h.retire_needs_triage_cards(state), [])
+        self.assertEqual(len(state['pending']), 1)
+
+    def test_mirror_review_card_is_not_retired(self):
+        # Fail closed: even with a matching summary, a promoted_source card is
+        # the #1060 for-larry-mirror-review class and must never be retired.
+        tid = h.derive_task_id('ref:mirror')
+        state = {'pending': [self._card(
+            tid, payload_extra={'promoted_source': h.PROMOTED_SOURCE_FORLARRY})],
+            'history': []}
+        self.assertEqual(h.retire_needs_triage_cards(state), [])
+        self.assertEqual(len(state['pending']), 1)
+
+    def test_recheck_target_card_is_not_retired(self):
+        # Fail closed: a recheck_target-bearing card is never retired.
+        tid = h.derive_task_id('ref:recheck')
+        state = {'pending': [self._card(
+            tid, payload_extra={'recheck_target': {'pr_url': 'https://x/pull/1'}})],
+            'history': []}
+        self.assertEqual(h.retire_needs_triage_cards(state), [])
+        self.assertEqual(len(state['pending']), 1)
+
+    def test_foreign_id_card_is_not_retired(self):
+        # A card whose id is not the healer's unreg-approval-* prefix is ignored
+        # even if its summary matches.
+        state = {'pending': [self._card('mirror-review-pr9-001')], 'history': []}
+        self.assertEqual(h.retire_needs_triage_cards(state), [])
+        self.assertEqual(len(state['pending']), 1)
+
+
+class NeedsTriageSummaryConstantTest(unittest.TestCase):
+    """criterion 6: the needs-triage summary lives in exactly one module
+    constant, referenced by both the creation path and the retire matcher."""
+
+    def test_build_payload_uses_the_constant(self):
+        rec = {'route': 'escalate', 'subject': 'x',
+               'message': 'needs your call', 'suggested_action': 'Reply now'}
+        p = h.build_approval_payload(rec, 'x')
+        self.assertEqual(p['summary'], h.NEEDS_TRIAGE_SUMMARY)
+
+    def test_constant_reads_as_needs_triage(self):
+        self.assertIn('needs triage', h.NEEDS_TRIAGE_SUMMARY.lower())
 
 
 class IncidentalRefAnchorTest(unittest.TestCase):
@@ -1126,7 +1271,10 @@ PR412_STALL_ALERT = {
         'APPROVAL_REQUEST for mirror-review-pr412-001 but outbox-notifier did '
         'NOT create the Mirror task.'
     ),
-    'suggested_action': "Reply 'mirror-review 412' to Beacon to dispatch.",
+    # Binary so the marker-recovery FALLBACK path (no recovered marker) still
+    # produces an alert-derived card — the recovery machinery matches on the
+    # task_id/PR-ref in the message, independent of this suggested_action.
+    'suggested_action': 'Choose dispatch-the-review or defer-it',
 }
 
 # The real marker Beacon emitted, as it would be recovered from her outbox
