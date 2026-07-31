@@ -2708,6 +2708,65 @@
         "task_id": "delegate-cap-promoted-larry-alert-cards-1060-skips-them-and-n-7629",
         "stamped_at": "2026-07-30T19:43:39.379671+00:00"
       }
+    },
+    {
+      "id": "cap-an-agent-that-renders-a-marker-thinks-it-emitted-1ebd",
+      "title": "An agent that RENDERS a marker thinks it EMITTED it \u2014 the tool built to stop lost markers is how they get lost",
+      "note": "INCIDENT 2026-07-30/31. Larry delegated capture ...7629 (promoted larry-alert cards). Beacon ran 390s, exit 0, cost $1.17, did genuinely good scoping \u2014 and produced NO approval card. Found only because Larry asked twice.\n\nROOT CAUSE, verified in the session transcript (~/.claude/projects/-home-larry-agent-core-agents-beacon/1ff6de87-b065-438f-9250-5bf811491819.jsonl):\n  line 81  tool_use/Bash: python3 scripts/marker.py render beacon approval_request <<JSON ...\n  line 82  tool_result:   === APPROVAL_REQUEST === { ...well-formed payload... }\n  turns 12+13 (the ONLY assistant text): neither contains the marker.\n does exactly one thing per its own docstring \u2014 'Read JSON payload from stdin, PRINT MARKER TO STDOUT'. It is a formatter. It does not register, dispatch, or queue. Beacon saw the rendered block come back in a tool result and signed off with 'The dispatch marker is above; trust policy will either auto-fire it to Forge or surface it for your approval.' That sentence is true of the TRANSCRIPT and false of the RESPONSE. The scanner (extract_approval_request) reads the agent's assistant text; the stored result was 298 chars with no marker and no fence.\n\nTHE CONTROL PROVES IT. The sibling delegation the same evening (capture ...582f, freshness 1/3) has a 6135-char result with the === APPROVAL_REQUEST === block INLINE in Beacon's own text \u2014 and its card appeared normally. Same agent, same code path, same envelope schema. One pasted the marker into its answer; the other rendered it in a tool call.\n\nTHE IRONY IS THE POINT. marker.py's header says it exists so this cannot happen: 'Hand-typing is how PR #16 stalled for 7+ hours: Mirror emitted bare REVIEW_PASS with no delimiters, the parser missed it, the notifier dead-lettered silently. The render helper makes that failure shape impossible at the source.' Running the helper FEELS like emitting. Nothing checks. Applies to Forge and Mirror too \u2014 same CLI, same render subcommand.\n\nBUILD (pick in preflight):\n(a) DETECTION, cheapest and highest value: a delegation/session that exits 0 whose stored result contains NO marker, while its session transcript DOES contain a rendered marker in a tool_result, is a definite lost marker. Surface it \u2014 it is fully recoverable (see below).\n(b) Close the gap at the tool: either make  state loudly in its stdout that printing is NOT emitting and the block must be pasted into the reply, or add an  subcommand that actually registers, so 'I ran the tool' and 'it is registered' converge.\n(c) Consider validating at session end rather than trusting the agent's own account of what it did.\n\nRECOVERY PRECEDENT (worked, 2026-07-31): the payload was intact in the transcript and re-registered by hand \u2014 approval.add_pending(payload, chat_id) + approval.build_approval_request_chain_event(payload, ts) + chain_event_emit.emit_event(**kwargs). Task promoted-needs-triage-cards-off-approvals-tab-001 is now on the tab. NO re-scope was needed, saving $1.17 and 390s.\n\nTRAP HIT DURING THAT RECOVERY, worth its own guard: emit_event returns False and logs 'Supabase client unavailable ... dropping event_type=approval_request' when SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are unset in the calling shell. add_pending had already succeeded, so the card existed in Beacon's queue but NOT on the dashboard tab \u2014 a HALF-REGISTERED card, visible in one surface and invisible in the other. Source /home/larry/credentials/.env.larry first. A caller that ignores that False leaves exactly this split.\n\nREVIEW: needed if it changes marker handling or dispatch \u2014 the failure class here is a paid session that confidently produces nothing.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "main",
+        "captured_at": "2026-07-31T01:23:41.937394+00:00"
+      },
+      "last_touched": "2026-07-31T01:23:41.937394+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "A safety tool meant to guarantee your approval requests always reach you can quietly fail \u2014 a recent request was fully worked on, billed, and then vanished before it ever showed up for your sign-off.",
+        "why": "You're paying for work that produces nothing you can see, and you only catch it when you happen to ask twice \u2014 meaning decisions can silently stall while you assume they're waiting on you.",
+        "suggest": "Add a simple end-of-job check that flags any finished-but-empty request so it can be recovered instantly; it's a low-risk safeguard, so schedule it deliberately rather than rushing it out."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-31T01:30:18.500478+00:00",
+        "from_state": "parked"
+      }
+    },
+    {
+      "id": "cap-rendering-a-marker-is-not-emitting-it-the-helper-713c",
+      "title": "Rendering a marker is not emitting it \u2014 the helper built to stop lost markers is how one got lost",
+      "note": "REPLACES cap-an-agent-that-renders-a-marker-thinks-it-emitted-1ebd \u2014 that card's note is CORRUPTED (three tool-name spans eaten by shell backtick substitution at filing; it reads 'either make  state loudly'). Drop it, use this.\n\nINCIDENT 2026-07-30/31: Larry delegated capture ...7629. Beacon ran 390s, exit 0, cost 1.17 USD, did genuinely good scoping, and produced NO approval card. Found only because Larry asked twice.\n\nROOT CAUSE, verified in the session transcript (~/.claude/projects/-home-larry-agent-core-agents-beacon/1ff6de87-b065-438f-9250-5bf811491819.jsonl):\n  line 81  tool_use/Bash: python3 scripts/marker.py render beacon approval_request <<JSON\n  line 82  tool_result:   === APPROVAL_REQUEST === { well-formed payload }\n  turns 12 and 13, the ONLY assistant text in the session: neither contains the marker.\nmarker.py's render subcommand does exactly one thing per its own docstring: read JSON from stdin and PRINT THE MARKER TO STDOUT. It is a formatter \u2014 it does not register, dispatch or queue. Beacon saw the rendered block return as a tool result and signed off: 'The dispatch marker is above; trust policy will either auto-fire it to Forge or surface it for your approval.' True of the TRANSCRIPT, false of the RESPONSE. extract_approval_request scans assistant TEXT; the stored result was 298 chars, no marker, no fence.\n\nTHE CONTROL PROVES IT: the sibling delegation that evening (capture ...582f) has a 6135-char result with the marker INLINE in Beacon's own text, and its card appeared normally. Same agent, same path, same schema. One pasted the marker into its answer; the other rendered it in a tool call and believed that counted.\n\nTHE IRONY IS THE POINT. marker.py's header says it exists so this cannot happen: 'Hand-typing is how PR #16 stalled for 7+ hours: Mirror emitted bare REVIEW_PASS with no delimiters, the parser missed it, the notifier dead-lettered silently. The render helper makes that failure shape impossible at the source.' Running the helper FEELS like emitting. Nothing checks. Forge and Mirror use the same CLI and subcommand.\n\nBUILD (pick in preflight):\n(a) DETECTION, cheapest and best: a session exiting 0 whose stored result has NO marker while its transcript HAS a rendered marker in a tool_result is a definite lost marker. Surface it \u2014 fully recoverable.\n(b) Close it at the tool: have render say in its own stdout that printing is NOT emitting and the block must be pasted into the reply, or add an emit subcommand that registers, so 'I ran the tool' and 'it is registered' converge.\n(c) Validate at session end instead of trusting the agent's account of what it did.\n\nRECOVERY PRECEDENT (worked 2026-07-31): payload was intact in the transcript and re-registered by hand \u2014 approval.add_pending(payload, chat_id), then approval.build_approval_request_chain_event(payload, ts), then chain_event_emit.emit_event(**kwargs). Task promoted-needs-triage-cards-off-approvals-tab-001 is on the tab now. No re-scope; saved 1.17 USD and 390s.\n\nTRAP HIT IN THAT RECOVERY, worth its own guard: emit_event returns False logging 'Supabase client unavailable ... dropping event_type=approval_request' when SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are unset in the calling shell. add_pending had ALREADY succeeded \u2014 so the card existed in Beacon's queue but NOT on the dashboard: HALF-REGISTERED, visible in one surface, invisible in the other. Source /home/larry/credentials/.env.larry first; any caller ignoring that False leaves the split.\n\nREVIEW: needed if it changes marker handling or dispatch \u2014 the failure class is a paid session that confidently produces nothing.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "main",
+        "captured_at": "2026-07-31T01:25:21.530157+00:00"
+      },
+      "last_touched": "2026-07-31T01:25:21.530157+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "When you hand off a task, our assistant can finish the work, charge you for it, and still quietly fail to put the result in front of you for a decision \u2014 it happened once and we only caught it because you asked twice.",
+        "why": "You're paying for good work that can silently vanish before it ever reaches you, so decisions stall and money is spent with nothing to show for it unless you happen to double-check.",
+        "suggest": "Add a simple safety net that flags any finished-but-never-delivered task so nothing you paid for gets lost \u2014 worth doing, but let's confirm the approach before building, since a change here touches how every result reaches you."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-31T01:30:18.500478+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     }
   ]
 }
