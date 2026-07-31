@@ -17046,7 +17046,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-31T22:18:49.282008+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-31T22:17:20.403881+00:00"
+      "orphan_last_activity_ts": "2026-07-31T22:17:20.403881+00:00",
+      "briefing": {
+        "what": "Some items waiting for your approval show up in your phone messages but are missing from your dashboard's decide list, so the two don't agree.",
+        "why": "If your dashboard leaves out things that need your call, you could miss decisions and lose trust that the list is complete.",
+        "suggest": "Approve fixing this so both places always show the same items \u2014 but confirm it's working on a couple of real cases before relying on it."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-31T22:22:05.310458+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-delegate-cap-approvals-freshness-2-3-evaluate-the-probe-on-th-9902",
@@ -17063,7 +17077,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-31T22:18:49.282008+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-31T22:17:18.923904+00:00"
+      "orphan_last_activity_ts": "2026-07-31T22:17:18.923904+00:00",
+      "briefing": {
+        "what": "Someone on the team started looking into whether our approval checks are staying current, but it isn't attached to any active project yet.",
+        "why": "If approval checks quietly fall out of date, decisions could get made on stale information \u2014 so it's worth knowing whether this is real before it grows.",
+        "suggest": "Have the team confirm what prompted this and whether it ties to a real need before committing time \u2014 a quick check now, not a full investment."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-31T22:22:05.310458+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
