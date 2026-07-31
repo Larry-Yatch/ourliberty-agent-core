@@ -17289,7 +17289,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-31T23:03:57.777151+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-21T05:24:36.80822+00:00"
+      "orphan_last_activity_ts": "2026-07-21T05:24:36.80822+00:00",
+      "briefing": {
+        "what": "A member of your team started fixing a self-correcting process on their own, before it was attached to any active initiative.",
+        "why": "Unplanned work that isn't tied to a goal can quietly consume time and drift away from what actually matters to the business right now.",
+        "suggest": "Before letting this continue, take a moment to confirm it's worth doing now \u2014 either tie it to a current priority or set it aside until it is."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-31T23:12:18.516044+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-notifier-auto-retraction-slice2-001",
@@ -17350,7 +17364,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-31T23:03:57.777151+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-11T13:01:32.75808+00:00"
+      "orphan_last_activity_ts": "2026-07-11T13:01:32.75808+00:00",
+      "briefing": {
+        "what": "Your team has a permanent fix ready to stop a recurring resource drain and is waiting on your go-ahead to put it in place.",
+        "why": "Left unfixed, this keeps quietly costing you money and effort every time it flares up, so a durable solution ends the repeat problem for good.",
+        "suggest": "Give the go-ahead to proceed, but ask for a quick confirmation once it's in place so you know the fix held."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-31T23:12:18.516044+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-pr-fanout-arm-20260710T180958Z",
@@ -17367,7 +17395,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-31T23:03:57.777151+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-10T19:12:03.895255+00:00"
+      "orphan_last_activity_ts": "2026-07-10T19:12:03.895255+00:00",
+      "briefing": {
+        "what": "A new safety feature that automatically wraps up completed work has been running in a test-only mode, watching but not touching anything.",
+        "why": "For two days it made zero mistakes and never disagreed with how things were actually handled, so turning it on would save manual cleanup without adding real exposure.",
+        "suggest": "The evidence supports switching it on, but given it's the first live run, approve it while keeping an eye on the first day of real activity."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-31T23:12:18.516044+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-mirror-review-pr-ourliberty-agent-core-851",
@@ -17384,7 +17426,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-31T23:03:57.777151+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-08T04:33:54.839516+00:00"
+      "orphan_last_activity_ts": "2026-07-08T04:33:54.839516+00:00",
+      "briefing": {
+        "what": "A piece of work your team began on their own that isn't yet attached to any active project.",
+        "why": "Untracked work can quietly consume time and effort without a clear payoff, and it's currently waiting on your go-ahead.",
+        "suggest": "Take a quick look before approving to confirm it's worth pursuing now, or set it aside until it ties to a real priority."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-31T23:12:18.516044+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-merge-held-deep-review-escalate-route-001",
