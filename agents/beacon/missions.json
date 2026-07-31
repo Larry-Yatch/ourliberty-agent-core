@@ -16823,7 +16823,11 @@
         "at": "2026-07-30T20:07:20.066347+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-31T01:54:45.741091+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-pr-ourliberty-agent-core-1069",
@@ -16890,6 +16894,40 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-lost-marker-render-emission-net-001",
+      "name": "Lost Marker Render Emission Net 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `lost-marker-render-emission-net-001`. Last activity 2026-07-31T01:48:01.782884+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "lost-marker-render-emission-net-001"
+      ],
+      "repo": null,
+      "created": "2026-07-31",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-31T01:54:45.741091+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-31T01:48:01.782884+00:00"
+    },
+    {
+      "id": "proposed-delegate-cap-rendering-a-marker-is-not-emitting-it-the-helper-713c",
+      "name": "Delegate Cap Rendering A Marker Is Not Emitting It The Helper 713c",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `delegate-cap-rendering-a-marker-is-not-emitting-it-the-helper-713c`. Last activity 2026-07-31T01:47:57.244731+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "delegate-cap-rendering-a-marker-is-not-emitting-it-the-helper-713c"
+      ],
+      "repo": null,
+      "created": "2026-07-31",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-31T01:54:45.741091+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-31T01:47:57.244731+00:00"
     }
   ]
 }
