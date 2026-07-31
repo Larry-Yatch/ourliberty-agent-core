@@ -945,3 +945,28 @@ class HealerUnitPrivilegeLintTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class CoverageStateShapeTests(_IsolatedAgentsRoot):
+    """load_state must not default an ABSENT 'coverage' to [] — that would undo
+    the missing-vs-empty distinction coverage_delta depends on."""
+
+    def test_absent_coverage_stays_absent(self):
+        self.assertNotIn('coverage', h.load_state())
+
+    def test_empty_coverage_is_preserved_as_an_empty_baseline(self):
+        Path(h.STATE_FILE).parent.mkdir(parents=True, exist_ok=True)
+        Path(h.STATE_FILE).write_text('{"services": {}, "coverage": []}')
+        self.assertEqual(h.load_state()['coverage'], [])
+
+    def test_corrupt_coverage_is_dropped_not_emptied_and_never_raises(self):
+        Path(h.STATE_FILE).parent.mkdir(parents=True, exist_ok=True)
+        Path(h.STATE_FILE).write_text('{"services": {}, "coverage": 5,'
+                                      ' "coverage_departed": ["not-a-dict"]}')
+        state = h.load_state()
+        self.assertNotIn('coverage', state)
+        self.assertEqual(state['coverage_departed'], {})
+        # and the tick that reads it does not die
+        h.coverage_delta(state, {'a.service'}, {'a.service': 'Restart=always'})
+        self.assertTrue(any('coverage baseline' in ln
+                            for ln in Path(h.LOG_FILE).read_text().splitlines()))

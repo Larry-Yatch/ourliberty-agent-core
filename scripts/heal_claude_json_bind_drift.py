@@ -322,9 +322,21 @@ def load_state() -> dict:
         if not isinstance(data, dict):
             return {'services': {}}
         data.setdefault('services', {})
-        return data
     except (FileNotFoundError, json.JSONDecodeError, OSError):
         return {'services': {}}
+    # DO NOT default an ABSENT 'coverage' to []. coverage_delta reads a MISSING
+    # key as "no baseline recorded yet" and [] as "the baseline is empty", and
+    # those must stay distinguishable: defaulting absent -> [] makes a total
+    # collapse to zero monitored units read as a first run, on every tick,
+    # forever. A corrupt (non-list) value is DROPPED rather than emptied, so the
+    # next tick re-baselines honestly instead of silently claiming every unit
+    # just left — and so a hand-edited state file cannot make `set(...)` raise
+    # and kill the tick.
+    if 'coverage' in data and not isinstance(data['coverage'], list):
+        del data['coverage']
+    if not isinstance(data.get('coverage_departed'), dict):
+        data['coverage_departed'] = {}
+    return data
 
 
 def save_state(state: dict) -> None:
