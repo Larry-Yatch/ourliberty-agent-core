@@ -16854,7 +16854,28 @@
         "at": "2026-07-31T01:10:16.381985+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-31T01:24:15.937717+00:00",
+      "retired_reason": "orphan-terminal"
+    },
+    {
+      "id": "proposed-promoted-needs-triage-cards-off-approvals-tab-001",
+      "name": "Promoted Needs Triage Cards Off Approvals Tab 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `promoted-needs-triage-cards-off-approvals-tab-001`. Last activity 2026-07-31T01:22:50.689434+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "promoted-needs-triage-cards-off-approvals-tab-001"
+      ],
+      "repo": null,
+      "created": "2026-07-31",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-31T01:24:15.937717+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-31T01:22:50.689434+00:00"
     }
   ]
 }
