@@ -17205,7 +17205,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-31T22:48:57.789589+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-31T22:44:24.52357+00:00"
+      "orphan_last_activity_ts": "2026-07-31T22:44:24.52357+00:00",
+      "briefing": {
+        "what": "A new quality check that catches approval requests whose reason no longer applies and quietly sets them aside before they ever land on your approvals list.",
+        "why": "It keeps your approvals list clean and trustworthy, so the items you do see are all real decisions worth your time \u2014 and nothing gets tossed without a record.",
+        "suggest": "Let it move forward, but keep it limited to this one narrow case for now and check the set-aside log after a week to confirm it's only filtering out truly dead requests."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-31T22:52:16.840741+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-delegate-cap-approvals-freshness-3-3-run-the-same-probe-at-bi-2616",
@@ -17222,7 +17236,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-31T22:48:57.789589+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-31T22:41:57.673423+00:00"
+      "orphan_last_activity_ts": "2026-07-31T22:41:57.673423+00:00",
+      "briefing": {
+        "what": "The team began setting up a recurring check to confirm that spending-approval limits stay accurate and up to date over time.",
+        "why": "If those limits quietly drift or go stale, approvals could be made against wrong numbers \u2014 creating real financial and control risk.",
+        "suggest": "Worth finishing, but confirm the scope and who owns it before it goes further, so it doesn't run unattended without a clear purpose."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-31T22:52:16.840741+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
