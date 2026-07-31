@@ -2780,6 +2780,35 @@
       "closed_by": "heal_missions_card_gc:terminal-backstop",
       "shipped_note": "shipped (linked work merged)",
       "awaiting_ack": true
+    },
+    {
+      "id": "cap-the-approvals-tab-has-400-unread-rows-back-to-ma-85bc",
+      "title": "The Approvals tab has 400+ unread rows back to May \u2014 and 3 of its 4 event types have NO clearing path",
+      "note": "GROUND TRUTH measured 2026-07-31 against Supabase chain_events (read_at IS NULL), limit 400 \u2014 the real total is HIGHER, the query capped:\n  clarify_response  207\n  larry_alert       177\n  larry_action       16\n  approval_request    4\nOldest rows are 2026-05-27 \u2014 over two months. Several are TEST FIXTURES still sitting unread (task_ids t-mirror-retry, t-ok, t-19-revision, pr-url-unrewritable:t-mirror-bad-marker) alongside long-dead pipeline stalls.\n\nTHE MECHANISM: chain_events is APPEND-ONLY. A row leaves the tab only when read_at is set, and that only happens when Larry clicks. Nothing else clears it.\n\nTHE GAP: the two tools that DO clear rows \u2014 scripts/triage_decisions.py and scripts/heal_stale_approvals.py \u2014 only scan approval_request and clarify_request. So clarify_response, larry_alert and larry_action (400 of the 404 rows measured) have NO clearing path at all, and larry_alert fires constantly by design. Running triage_decisions today reports '4 pending, all LIVE' \u2014 true, and useless: it is blind to 99 percent of what is on the tab.\n\nCHECK THIS FIRST, do not assume: agents/beacon/specs/approvals-queue-rework.md defines N2 \u2014 Retention on chain_events ('archive/clear bookkeeping rows (session_start, session_done, marker/plumbing types) older than the retention window'). Establish whether N2 ever shipped, and if it did, why these three types are not covered. That answer decides whether this is a new build, a widening of an existing job, or a config change. Half a day of the 2026-07-30 session was spent solving problems that turned out to be already built \u2014 do the archaeology before designing.\n\nHOW TO QUERY IT (this cost several wrong turns to find \u2014 three different stores look like 'the tab' and only one is):\n  ssh larry@134.209.44.80, cd /home/larry/agent-core, source /home/larry/credentials/.env.larry, then supabase create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY) and\n  .table('chain_events').select('event_type,task_id,ts,agent').is_('read_at','null').order('ts').limit(N)\n  NOT ~/agents/state/beacon-pending-approvals.json \u2014 that is Beacon's own dispatch queue (5 entries), a DIFFERENT and much smaller thing. NOT /api/approvals/operator-queue \u2014 that is a ranked work list in shadow mode, not the tab. Confusing these three is the single easiest mistake here.\n\nDO NOT BULK-CLEAR ON DAY ONE. 177 of these are alerts spanning two months; establishing what is SAFELY clearable is the work, clearing is trivial afterward. Every existing clearing job in this system is backup-first and reversible (read_at back to NULL) \u2014 hold that bar. A one-time clear also needs a guard, or the tab refills.\n\nCONSEQUENCE FOR ADJACENT WORK: the three approvals-freshness slices (captures ...582f building now as PR #1072, ...9902, ...2616) were scoped around approval cards going stale. Approvals are 4 of 404 rows. Slice 1 is a standalone evaluator and is worth having regardless; slices 2 and 3 are HELD pending this measurement and may need re-aiming at the dominant types.\n\nREVIEW: needed for anything that clears rows \u2014 deleting a live decision looks exactly like a working tab, which is the failure class this whole arc is about.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "main",
+        "captured_at": "2026-07-31T21:31:13.838966+00:00"
+      },
+      "last_touched": "2026-07-31T21:31:13.838966+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "Your Approvals inbox has piled up to 400-plus unread items dating back to May, and most of them have no way to ever clear themselves out.",
+        "why": "An inbox that never empties buries the handful of items that actually need your decision, so real requests get lost in the noise.",
+        "suggest": "Let's first quietly confirm which of these are safe to clear versus still-live decisions before touching anything \u2014 no mass cleanup until we know what's what."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-31T21:32:00.691928+00:00",
+        "from_state": "parked"
+      }
     }
   ]
 }
