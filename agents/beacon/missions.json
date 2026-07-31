@@ -17251,6 +17251,184 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-dag-spec-doc-resolve-against-target-repo-001",
+      "name": "DAG Spec Doc Resolve Against Target Repo 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `dag-spec-doc-resolve-against-target-repo-001`. Last activity 2026-07-22T06:46:33.185533+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "dag-spec-doc-resolve-against-target-repo-001"
+      ],
+      "repo": null,
+      "created": "2026-07-31",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-31T23:03:57.777151+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-22T06:46:33.185533+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-31T23:03:57.777151+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#1007"
+    },
+    {
+      "id": "proposed-direction-ask-entrypoint-blind-heal-001",
+      "name": "Direction Ask Entrypoint Blind Heal 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `direction-ask-entrypoint-blind-heal-001`. Last activity 2026-07-21T05:24:36.80822+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "direction-ask-entrypoint-blind-heal-001"
+      ],
+      "repo": null,
+      "created": "2026-07-31",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-31T23:03:57.777151+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-21T05:24:36.80822+00:00"
+    },
+    {
+      "id": "proposed-notifier-auto-retraction-slice2-001",
+      "name": "Notifier Auto Retraction Slice2 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `notifier-auto-retraction-slice2-001`. Last activity 2026-07-11T22:53:20.010602+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "notifier-auto-retraction-slice2-001"
+      ],
+      "repo": null,
+      "created": "2026-07-31",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-31T23:03:57.777151+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-11T22:53:20.010602+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-31T23:03:57.777151+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#948"
+    },
+    {
+      "id": "proposed-notifier-auto-retraction-rollout-spec-001",
+      "name": "Notifier Auto Retraction Rollout Spec 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `notifier-auto-retraction-rollout-spec-001`. Last activity 2026-07-11T16:56:25.335442+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "notifier-auto-retraction-rollout-spec-001"
+      ],
+      "repo": null,
+      "created": "2026-07-31",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-31T23:03:57.777151+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-11T16:56:25.335442+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-31T23:03:57.777151+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#932"
+    },
+    {
+      "id": "proposed-gh-burn-phase2-durable-fix-authorize",
+      "name": "GH Burn Phase2 Durable Fix Authorize",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `gh-burn-phase2-durable-fix-authorize`. Last activity 2026-07-11T13:01:32.75808+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "gh-burn-phase2-durable-fix-authorize"
+      ],
+      "repo": null,
+      "created": "2026-07-31",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-31T23:03:57.777151+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-11T13:01:32.75808+00:00"
+    },
+    {
+      "id": "proposed-pr-fanout-arm-20260710T180958Z",
+      "name": "PR Fanout Arm 20260710T180958Z",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pr-fanout-arm-20260710T180958Z`. Last activity 2026-07-10T19:12:03.895255+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pr-fanout-arm-20260710T180958Z"
+      ],
+      "repo": null,
+      "created": "2026-07-31",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-31T23:03:57.777151+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-10T19:12:03.895255+00:00"
+    },
+    {
+      "id": "proposed-mirror-review-pr-ourliberty-agent-core-851",
+      "name": "Mirror Review PR Ourliberty Agent Core 851",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `mirror-review-pr-ourliberty-agent-core-851`. Last activity 2026-07-08T04:33:54.839516+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "mirror-review-pr-ourliberty-agent-core-851"
+      ],
+      "repo": null,
+      "created": "2026-07-31",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-31T23:03:57.777151+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-08T04:33:54.839516+00:00"
+    },
+    {
+      "id": "proposed-merge-held-deep-review-escalate-route-001",
+      "name": "Merge Held Deep Review Escalate Route 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `merge-held-deep-review-escalate-route-001`. Last activity 2026-07-07T22:33:47.998927+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "merge-held-deep-review-escalate-route-001"
+      ],
+      "repo": null,
+      "created": "2026-07-31",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-31T23:03:57.777151+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-07T22:33:47.998927+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-31T23:03:57.777151+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#843"
+    },
+    {
+      "id": "proposed-notifier-null-chat-escalation-reconcile-001",
+      "name": "Notifier Null Chat Escalation Reconcile 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `notifier-null-chat-escalation-reconcile-001`. Last activity 2026-07-02T05:53:12.93286+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "notifier-null-chat-escalation-reconcile-001"
+      ],
+      "repo": null,
+      "created": "2026-07-31",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-31T23:03:57.777151+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-02T05:53:12.93286+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-31T23:03:57.777151+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#812"
     }
   ]
 }
