@@ -3186,3 +3186,12 @@ NOMINAL ✅ (no always-fix; all Larry-authored/no labels/unrouted by-design)
 
 ---
 
+
+**Check I (2026-07-27):**
+
+- Ledger total: $1201.30; 419 anomaly(ies)
+- Retry overhead: $0.68 (0.1%)
+- Forge marker-discipline: 0 misses (retry-depth 0/0/0, 0% retry-2+), trend flat (+0 vs prior wk)
+- Mode: digest — 1 proposal(s):
+  1. [small] Review high-σ anomaly task `cycle-202607230601240000` — $2.16 task vs $0.87 baseline (45.2σ above)
+     Rationale: Ledger flagged this task at 45.2σ above baseline. Read the chain archive and propose either: a fast-path for the shape, a prompt-discipline fix, or a model downgrade if the depth wasn't warranted.
