@@ -2746,7 +2746,7 @@
       "id": "cap-rendering-a-marker-is-not-emitting-it-the-helper-713c",
       "title": "Rendering a marker is not emitting it \u2014 the helper built to stop lost markers is how one got lost",
       "note": "REPLACES cap-an-agent-that-renders-a-marker-thinks-it-emitted-1ebd \u2014 that card's note is CORRUPTED (three tool-name spans eaten by shell backtick substitution at filing; it reads 'either make  state loudly'). Drop it, use this.\n\nINCIDENT 2026-07-30/31: Larry delegated capture ...7629. Beacon ran 390s, exit 0, cost 1.17 USD, did genuinely good scoping, and produced NO approval card. Found only because Larry asked twice.\n\nROOT CAUSE, verified in the session transcript (~/.claude/projects/-home-larry-agent-core-agents-beacon/1ff6de87-b065-438f-9250-5bf811491819.jsonl):\n  line 81  tool_use/Bash: python3 scripts/marker.py render beacon approval_request <<JSON\n  line 82  tool_result:   === APPROVAL_REQUEST === { well-formed payload }\n  turns 12 and 13, the ONLY assistant text in the session: neither contains the marker.\nmarker.py's render subcommand does exactly one thing per its own docstring: read JSON from stdin and PRINT THE MARKER TO STDOUT. It is a formatter \u2014 it does not register, dispatch or queue. Beacon saw the rendered block return as a tool result and signed off: 'The dispatch marker is above; trust policy will either auto-fire it to Forge or surface it for your approval.' True of the TRANSCRIPT, false of the RESPONSE. extract_approval_request scans assistant TEXT; the stored result was 298 chars, no marker, no fence.\n\nTHE CONTROL PROVES IT: the sibling delegation that evening (capture ...582f) has a 6135-char result with the marker INLINE in Beacon's own text, and its card appeared normally. Same agent, same path, same schema. One pasted the marker into its answer; the other rendered it in a tool call and believed that counted.\n\nTHE IRONY IS THE POINT. marker.py's header says it exists so this cannot happen: 'Hand-typing is how PR #16 stalled for 7+ hours: Mirror emitted bare REVIEW_PASS with no delimiters, the parser missed it, the notifier dead-lettered silently. The render helper makes that failure shape impossible at the source.' Running the helper FEELS like emitting. Nothing checks. Forge and Mirror use the same CLI and subcommand.\n\nBUILD (pick in preflight):\n(a) DETECTION, cheapest and best: a session exiting 0 whose stored result has NO marker while its transcript HAS a rendered marker in a tool_result is a definite lost marker. Surface it \u2014 fully recoverable.\n(b) Close it at the tool: have render say in its own stdout that printing is NOT emitting and the block must be pasted into the reply, or add an emit subcommand that registers, so 'I ran the tool' and 'it is registered' converge.\n(c) Validate at session end instead of trusting the agent's account of what it did.\n\nRECOVERY PRECEDENT (worked 2026-07-31): payload was intact in the transcript and re-registered by hand \u2014 approval.add_pending(payload, chat_id), then approval.build_approval_request_chain_event(payload, ts), then chain_event_emit.emit_event(**kwargs). Task promoted-needs-triage-cards-off-approvals-tab-001 is on the tab now. No re-scope; saved 1.17 USD and 390s.\n\nTRAP HIT IN THAT RECOVERY, worth its own guard: emit_event returns False logging 'Supabase client unavailable ... dropping event_type=approval_request' when SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are unset in the calling shell. add_pending had ALREADY succeeded \u2014 so the card existed in Beacon's queue but NOT on the dashboard: HALF-REGISTERED, visible in one surface, invisible in the other. Source /home/larry/credentials/.env.larry first; any caller ignoring that False leaves the split.\n\nREVIEW: needed if it changes marker handling or dispatch \u2014 the failure class is a paid session that confidently produces nothing.",
-      "state": "parked",
+      "state": "review_close",
       "label": null,
       "origin": {
         "source": "desktop-chat",
@@ -2774,8 +2774,12 @@
       "spawned": {
         "kind": "delegate",
         "task_id": "delegate-cap-rendering-a-marker-is-not-emitting-it-the-helper-713c",
-        "stamped_at": "2026-07-31T01:42:31.517225+00:00"
-      }
+        "stamped_at": "2026-07-31T01:42:31.517225+00:00",
+        "outcome": "merged"
+      },
+      "closed_by": "heal_missions_card_gc:terminal-backstop",
+      "shipped_note": "shipped (linked work merged)",
+      "awaiting_ack": true
     }
   ]
 }
