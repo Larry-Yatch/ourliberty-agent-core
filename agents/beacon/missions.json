@@ -17015,7 +17015,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-31T21:48:48.616477+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-31T21:46:22.753905+00:00"
+      "orphan_last_activity_ts": "2026-07-31T21:46:22.753905+00:00",
+      "briefing": {
+        "what": "Your approvals inbox has piled up to 400 items waiting on a decision, and the team started work to hand that backlog off so it stops landing on your desk.",
+        "why": "A 400-item queue means real decisions are stalling and things you actually need to weigh in on are getting buried in the pile.",
+        "suggest": "Let this move forward, but ask for a quick check that anything truly needing your eyes still reaches you before the rest gets handed off."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-31T21:52:03.378559+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
