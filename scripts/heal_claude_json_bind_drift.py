@@ -41,26 +41,79 @@ version replaced the file. This healer COVERS every current and future
 claude-invoking persistent unit by discovering them dynamically from systemd,
 so the ``.claude.json`` carve-out on the units stays exactly as #470 left it.
 
-WHAT THIS DOES
---------------
-Each tick, for every ``ourliberty-*.service`` that is (a) a persistent unit
-(``Type`` in simple/notify/exec/idle), (b) currently ``active`` with a
-``MainPID``, and (c) carves ``/home/larry/.claude.json`` in its effective
-``ReadWritePaths``:
-  1. Enter its mount namespace (``sudo -n nsenter -m -t <MainPID>``) and probe
-     whether ``/home/larry/.claude.json`` can be opened ``O_RDWR``. A
-     read-only mount fails the open with ``EROFS`` (errno 30) even for root, so
-     this is the ground-truth signal — exactly the ``test -w`` probe used to
-     diagnose the incident, but enforced at open() so a root probe can't
-     falsely pass.
-  2. ``EROFS`` → the mount has dangled → ``sudo -n systemctl restart --no-block
-     <unit>``, settle, confirm via ``is-active`` AND re-probe the NEW MainPID's
-     namespace to verify the file is writable again, then DM the outcome.
+WHAT THIS DOES, EACH TICK
+-------------------------
+1. Classify every ``ourliberty-*.service`` (see CLASSIFICATION below) and probe
+   the ones that carry the carve-out and are active with a MainPID: enter the
+   mount namespace (``sudo -n nsenter -m -t <MainPID>``) and try to open
+   ``/home/larry/.claude.json`` ``O_RDWR``. A read-only mount fails the open
+   with ``EROFS`` (errno 30) even for root, so this is the ground-truth signal —
+   exactly the ``test -w`` probe used to diagnose the incident, but enforced at
+   open() so a root probe can't falsely pass.
+2. Repair (restart) the MONITORed units that probed EROFS: ``sudo -n systemctl
+   restart --no-block <unit>``, settle, confirm via ``is-active`` AND re-probe
+   the NEW MainPID's namespace to verify the file is writable again, then DM the
+   outcome.
+
+CLASSIFICATION: ``Restart=``, NOT ``TriggeredBy=``
+--------------------------------------------------
+A unit is EPHEMERAL (a run-to-completion job whose next activation gets a fresh
+namespace, so a dangle heals itself and a restart only SIGTERMs the live run)
+or a MONITORed daemon (long-running; a dangle persists until we rebind it).
+
+The first cut is ``Type`` (oneshot is never persistent). The second cut used to
+be ``TriggeredBy=*.timer`` — and that FAILED OPEN: ``TriggeredBy`` is a reverse
+dependency materialised only while the triggering ``.timer`` is LOADED in the
+manager, so ``systemctl disable --now``/``mask`` on the timer silently returned
+its service to the repair path (verified on the droplet: a disabled, unloaded
+timer reports ``TriggeredBy=`` empty while a loaded one populates it). And it
+failed CLOSED from the other side: attaching any companion ``.timer`` to a real
+daemon would have removed it from coverage permanently.
+
+We therefore ask the question systemd answers from the UNIT FILE, independent of
+manager link state: is this unit SUPERVISED?
+
+  ``Restart=`` in {always, on-failure, on-abnormal, on-success, on-watchdog,
+  on-abort}  → MONITOR (a daemon systemd keeps alive)
+  ``Restart=`` in {no, ''}                     → EPHEMERAL_JOB
+
+Measured across ``systemd/`` at the time of writing: the bots are
+``Restart=always``; inbox-watcher / outbox-notifier / spec-review-runner are
+``Restart=on-failure``; ``ourliberty-cycle`` — the unit that was killed mid-run
+and then false-paged on 2026-07-30 — is the sole ``Restart=no`` persistent
+unit. ``TriggeredBy`` is still read and logged as CORROBORATION, never as a
+verdict.
+
+The residual risk of this swap is the mirror image: a genuinely persistent
+daemon that simply omits ``Restart=`` would classify EPHEMERAL and leave
+coverage silently. Two detectors exist for exactly that, and they are not
+decoration:
+  - runtime: the per-tick ``coverage=`` line, which names the units currently in
+    coverage AND carries a standing ``departed=`` list for every unit that has
+    left it and not come back, plus a WARN on the transition (see
+    ``coverage_delta``);
+  - build time: a repo lint in the tests requiring every persistent carve-out
+    unit to declare ``Restart=`` or be listed in a KNOWN_EPHEMERAL allowlist.
+    KNOWN PROSPECTIVE GAP: that lint parses the unit FILE, so it skips a unit
+    file that omits ``Type=`` entirely (systemd defaults such a unit to
+    ``Type=simple``, which the runtime classifier does see). No unit in
+    ``systemd/`` omits ``Type=`` today; a future one that omitted BOTH ``Type=``
+    and ``Restart=`` would classify EPHEMERAL at runtime with the lint green.
+    The runtime ``departed=`` detector is what covers it in the meantime.
+
+Ephemeral units are still PROBED (detection and repair are separate concerns) —
+an in-flight ``/cycle`` whose mount dangled is recorded as ``ephemeral-dangled``
+in the journal and the tick line. It is deliberately NOT alerted and NOT
+restarted: a restart ends that run exactly as the EROFS does, the next fire
+rebinds in a fresh namespace, so a DM would be pure toil. The probe-only path
+is a SEPARATE FUNCTION with no route to ``guarded_restart`` — structural, not an
+``if`` one careless edit away from re-enabling the 2026-07-30 behaviour.
 
 WHAT THIS DOES NOT DO
 ---------------------
   - Touch ONESHOT (timer-driven) healer units: each tick spawns a fresh
     namespace that binds the current inode, so they cannot carry a stale mount.
+  - Restart an EPHEMERAL unit (see CLASSIFICATION) — ever.
   - Restart a unit on a non-EROFS probe error (sudo revoked, nsenter missing,
     file absent) — those are logged/escalated, never used to hammer a unit.
   - Retry within the per-unit restart cooldown — one restart attempt per unit
@@ -88,7 +141,7 @@ import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
+from typing import NamedTuple, Optional
 
 if str(Path(__file__).resolve().parent) not in sys.path:
     sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -111,6 +164,17 @@ CLAUDE_JSON_PATH = os.environ.get(
 # namespace survives across an external file replacement. oneshot units spawn a
 # fresh namespace each activation and therefore cannot carry a stale mount.
 PERSISTENT_TYPES = frozenset({'simple', 'notify', 'exec', 'idle', 'dbus'})
+
+# `Restart=` values that mean "systemd supervises this as a daemon" → MONITOR.
+SUPERVISED_RESTART_POLICIES = frozenset({
+    'always', 'on-failure', 'on-abnormal', 'on-success', 'on-watchdog',
+    'on-abort',
+})
+# `Restart=` values that mean "run to completion, then stay stopped" →
+# EPHEMERAL_JOB. '' is included per the classification contract; a MISSING
+# `Restart` property (systemctl could not be read) is SKIP_UNKNOWN instead, so
+# an unreadable unit is never silently descoped OR silently restarted.
+EPHEMERAL_RESTART_POLICIES = frozenset({'', 'no'})
 
 # Unit glob (NOT .timer — timers activate the underlying .service).
 UNIT_GLOB = 'ourliberty-*.service'
@@ -157,6 +221,42 @@ ESCALATION_COOLDOWN_SEC = 6 * 60 * 60
 _HEALTHY_ACTIVE_STATES = frozenset(
     {'active', 'activating', 'reloading', 'deactivating'}
 )
+
+# ---- unit classes ----
+CLASS_MONITOR = 'monitor'
+CLASS_EPHEMERAL = 'ephemeral-job'
+CLASS_SKIP_ONESHOT = 'skip-oneshot'
+CLASS_SKIP_UNKNOWN = 'skip-unknown'
+
+# ---- per-unit outcomes (every one of these is a distinct tick-line bucket;
+#      a unit leaving coverage must never be byte-identical to a unit that was
+#      never in scope) ----
+OUTCOME_SKIP_ONESHOT = 'skip-oneshot'
+OUTCOME_SKIP_EPHEMERAL = 'skip-ephemeral'
+OUTCOME_SKIP_INACTIVE = 'skip-inactive'
+OUTCOME_SKIP_NOCARVE = 'skip-nocarve'
+OUTCOME_SKIP_UNKNOWN = 'skip-unknown'
+OUTCOME_SKIP_NSGONE = 'skip-nsgone'
+OUTCOME_HEALTHY = 'healthy'
+OUTCOME_EPHEMERAL_DANGLED = 'ephemeral-dangled'
+OUTCOME_EPHEMERAL_PROBE_ERROR = 'ephemeral-probe-error'
+OUTCOME_PROBE_ERROR = 'probe-error'
+OUTCOME_REBOUND = 'rebound'
+OUTCOME_REPAIR_FAILED = 'repair-failed'
+OUTCOME_COOLDOWN_DANGLED = 'cooldown-dangled'
+OUTCOME_REPAIR_SKIPPED_PEER = 'repair-skipped-peer-active'
+
+OUTCOMES = (
+    OUTCOME_SKIP_ONESHOT, OUTCOME_SKIP_EPHEMERAL, OUTCOME_SKIP_INACTIVE,
+    OUTCOME_SKIP_NOCARVE, OUTCOME_SKIP_UNKNOWN, OUTCOME_SKIP_NSGONE,
+    OUTCOME_HEALTHY, OUTCOME_EPHEMERAL_DANGLED, OUTCOME_EPHEMERAL_PROBE_ERROR,
+    OUTCOME_PROBE_ERROR, OUTCOME_REBOUND, OUTCOME_REPAIR_FAILED,
+    OUTCOME_COOLDOWN_DANGLED, OUTCOME_REPAIR_SKIPPED_PEER,
+)
+
+# Sentinel returned by inspect_unit when a MONITORed unit needs the repair pass.
+# Never a tick-line bucket — the caller turns it into one.
+REPAIR_REQUESTED = '__repair-requested__'
 
 # Probe exit-code contract (see _PROBE_SNIPPET below).
 _PROBE_OK = 0       # opened O_RDWR cleanly → mount writable (healthy)
@@ -340,31 +440,71 @@ def carveout_present(read_write_paths: str) -> bool:
     return CLAUDE_JSON_PATH in (read_write_paths or '').split()
 
 
-def target_main_pid(unit: str) -> Optional[int]:
-    """Return the MainPID of `unit` iff it is a PERSISTENT, active claude-
-    carve-out unit we must monitor; otherwise None (skip).
+class UnitFacts(NamedTuple):
+    """One direct read of a unit's systemd facts.
 
-    Skips: oneshot units (fresh namespace each run), inactive units (nothing to
-    probe), and units that don't carve /home/larry/.claude.json (a replacement
-    can't dangle a mount they never had).
-    """
-    props = systemctl_show(
-        unit, ['Type', 'ActiveState', 'MainPID', 'ReadWritePaths'],
-    )
+    ``present`` False means `systemctl show` could not be read at all — the
+    caller must treat that as UNKNOWN, never as 'not in scope'. There is
+    deliberately no ActiveState filter here: the old ``target_main_pid``
+    accessor collapsed 'oneshot', 'inactive', 'no carve-out' and 'unreadable'
+    into one ``None``, so a unit that left coverage was byte-identical to a unit
+    that was never in scope. Every caller now sees the reason."""
+    unit: str
+    present: bool
+    type_: str
+    active_state: str
+    main_pid: Optional[int]
+    read_write_paths: str
+    restart_policy: Optional[str]
+    triggered_by: str
+
+
+_FACT_PROPS = ['Type', 'ActiveState', 'MainPID', 'ReadWritePaths',
+               'TriggeredBy', 'Restart']
+
+
+def unit_facts(unit: str) -> UnitFacts:
+    props = systemctl_show(unit, _FACT_PROPS)
     if not props:
-        return None
-    if props.get('Type', '') not in PERSISTENT_TYPES:
-        return None
-    if props.get('ActiveState', '') != 'active':
-        return None
-    if not carveout_present(props.get('ReadWritePaths', '')):
-        return None
-    raw_pid = props.get('MainPID', '0')
+        return UnitFacts(unit, False, '', 'unknown', None, '', None, '')
     try:
-        pid = int(raw_pid)
+        pid: Optional[int] = int(props.get('MainPID', '0'))
     except ValueError:
-        return None
-    return pid if pid > 0 else None
+        pid = None
+    if pid is not None and pid <= 0:
+        pid = None
+    return UnitFacts(
+        unit=unit,
+        present=True,
+        type_=props.get('Type', ''),
+        active_state=props.get('ActiveState', '') or 'unknown',
+        main_pid=pid,
+        read_write_paths=props.get('ReadWritePaths', ''),
+        restart_policy=props.get('Restart'),
+        triggered_by=props.get('TriggeredBy', ''),
+    )
+
+
+def classify_unit(facts: UnitFacts) -> tuple[str, str]:
+    """Return (class, human reason). See CLASSIFICATION in the module docstring.
+
+    Reads `Restart=` — a property of the UNIT FILE — rather than `TriggeredBy`,
+    a reverse dependency that only exists while the triggering .timer is loaded
+    in the manager. `TriggeredBy` is carried in the reason as corroboration."""
+    corroborate = f'; TriggeredBy={facts.triggered_by or "(none)"}'
+    if not facts.present:
+        return CLASS_SKIP_UNKNOWN, 'systemctl show unreadable (timeout/missing)'
+    if facts.type_ not in PERSISTENT_TYPES:
+        return CLASS_SKIP_ONESHOT, f'Type={facts.type_ or "(unset)"} is not persistent'
+    policy = facts.restart_policy
+    if policy is None:
+        return CLASS_SKIP_UNKNOWN, 'Restart= property unreadable'
+    policy = policy.strip()
+    if policy in SUPERVISED_RESTART_POLICIES:
+        return CLASS_MONITOR, f'Restart={policy}{corroborate}'
+    if policy in EPHEMERAL_RESTART_POLICIES:
+        return CLASS_EPHEMERAL, f'EPHEMERAL_JOB (Restart={policy or "(empty)"}){corroborate}'
+    return CLASS_SKIP_UNKNOWN, f'unrecognised Restart={policy!r}'
 
 
 # -------------------- in-namespace write probe --------------------
@@ -586,42 +726,69 @@ def dm_probe_blind(unit: str) -> bool:
         return False
 
 
-# -------------------- per-unit orchestration --------------------
+# -------------------- detection --------------------
 
-def check_unit(unit: str, state: dict, now: Optional[float] = None) -> str:
-    """Inspect one unit. Returns one of:
-       'skip'            — not a persistent/active/carve-out unit, OR the target
-                           namespace vanished mid-probe (benign race, no action).
-       'healthy'         — mount writable in namespace (no action).
-       'probe-error'     — couldn't probe (sudo/nsenter); escalation (6h-gated).
-       'rebound'         — dangle detected, restart succeeded + verified.
-       'repair-failed'   — dangle detected, restart failed; escalation.
-       'cooldown-dangled' — dangle but inside restart cooldown; escalation.
-       'repair-skipped-peer-active' — dangle detected, but a peer restarter
-                           already holds this unit's cordon lock; no action,
-                           no cooldown burned, re-checked next tick.
-    """
-    pid = target_main_pid(unit)
-    if pid is None:
-        return 'skip'
+def probe_ephemeral(unit: str, pid: int) -> str:
+    """Detection-only path for a run-to-completion unit.
 
-    outcome = probe_namespace_writable(pid)
-    if outcome == _PROBE_OK:
-        return 'healthy'
-    if outcome == _PROBE_GONE:
+    Separate function BY CONSTRUCTION: it has no reference to restart_guard or
+    restart_unit, so the ephemeral class cannot reach the repair path even by a
+    careless edit. That matters — an `if` guard is one line away from
+    re-enabling the 2026-07-30 behaviour (SIGTERM a live /cycle mid-run, then
+    page because `inactive` is its correct resting state).
+
+    A dangle here is recorded, never alerted: the run is already failing, a
+    restart would end it exactly as the EROFS does, and the next fire rebinds in
+    a fresh namespace."""
+    probe = probe_namespace_writable(pid)
+    if probe == _PROBE_OK:
+        return OUTCOME_HEALTHY
+    if probe == _PROBE_EROFS:
+        log(f'{unit}: EPHEMERAL DANGLE — {CLAUDE_JSON_PATH} is read-only inside '
+            f'the in-flight run (pid {pid}). NOT restarting: a restart would end '
+            f'this run exactly as the EROFS does, and the next activation gets a '
+            f'fresh namespace bound to the current inode. Recorded, not alerted.',
+            'WARN')
+        return OUTCOME_EPHEMERAL_DANGLED
+    if probe == _PROBE_GONE:
+        return OUTCOME_SKIP_NSGONE
+    return OUTCOME_EPHEMERAL_PROBE_ERROR
+
+
+def inspect_unit(unit: str, facts: UnitFacts, klass: str, state: dict,
+                 now: Optional[float] = None) -> str:
+    """Classify + probe one unit. Returns a tick-line outcome, or
+    REPAIR_REQUESTED when a MONITORed unit needs the repair pass. Never restarts
+    anything itself."""
+    if klass == CLASS_SKIP_UNKNOWN:
+        return OUTCOME_SKIP_UNKNOWN
+    if klass == CLASS_SKIP_ONESHOT:
+        return OUTCOME_SKIP_ONESHOT
+    if not carveout_present(facts.read_write_paths):
+        return OUTCOME_SKIP_NOCARVE
+    if facts.active_state != 'active' or facts.main_pid is None:
+        # Nothing to probe. For an ephemeral job this is its resting state.
+        return (OUTCOME_SKIP_EPHEMERAL if klass == CLASS_EPHEMERAL
+                else OUTCOME_SKIP_INACTIVE)
+    if klass == CLASS_EPHEMERAL:
+        return probe_ephemeral(unit, facts.main_pid)
+
+    probe = probe_namespace_writable(facts.main_pid)
+    if probe == _PROBE_OK:
+        return OUTCOME_HEALTHY
+    if probe == _PROBE_GONE:
         # Target's mount namespace vanished between MainPID enumeration and the
-        # probe (benign exit/reap race on a short-lived unit). Treat exactly like
-        # skip: no probe-blind DM, no escalation-cooldown state write — just
-        # re-probe next tick.
-        return 'skip'
-    if outcome == _PROBE_OTHER:
+        # probe (benign exit/reap race). No probe-blind DM, no escalation-
+        # cooldown state write — just re-probe next tick.
+        return OUTCOME_SKIP_NSGONE
+    if probe == _PROBE_OTHER:
         # Blind on this unit. Escalate at most once per ESCALATION window so a
         # persistent sudoers/nsenter breakage surfaces without spamming.
         if not in_alert_cooldown(state, unit, now=now):
             dm_probe_blind(unit)
             mark_alerted(state, unit, now=now)
             save_state(state)
-        return 'probe-error'
+        return OUTCOME_PROBE_ERROR
 
     # _PROBE_EROFS — the mount has dangled.
     if in_restart_cooldown(state, unit, now=now):
@@ -633,11 +800,22 @@ def check_unit(unit: str, state: dict, now: Optional[float] = None) -> str:
             save_state(state)
         log(f'{unit}: STILL DANGLED inside restart cooldown — suppressing '
             f'restart', 'WARN')
-        return 'cooldown-dangled'
+        return OUTCOME_COOLDOWN_DANGLED
+    return REPAIR_REQUESTED
 
-    # Attempt the repair — cordoned, so rebinding a unit that hosts Claude
-    # sessions doesn't SIGTERM one mid-review (PR 3). Pass-through for any unit
-    # that hosts no sessions, which is most of what UNIT_GLOB matches.
+
+# -------------------- repair --------------------
+
+def repair_unit(unit: str, facts: UnitFacts, state: dict,
+                now: Optional[float] = None) -> str:
+    """Restart a dangled MONITORed unit and verify the rebind.
+
+    Reached only via REPAIR_REQUESTED, which ``inspect_unit`` returns only for
+    CLASS_MONITOR. The ephemeral class has no path to this function at all."""
+    prior_pid = facts.main_pid
+    # Cordoned, so rebinding a unit that hosts Claude sessions doesn't SIGTERM
+    # one mid-review (PR 3). Pass-through for any unit that hosts no sessions,
+    # which is most of what UNIT_GLOB matches.
     guarded = restart_guard.guarded_restart(
         unit, 'claude-json-bind-drift', lambda: restart_unit(unit),
         ceiling_sec=AGENT_DRAIN_CEILING_SEC,
@@ -650,7 +828,7 @@ def check_unit(unit: str, state: dict, now: Optional[float] = None) -> str:
         # be free to repair this unit if the peer's restart didn't land.
         log(f'{unit}: repair skipped — a peer restarter holds the cordon lock; '
             f'its restart rebinds the mount too. Re-checking next tick.')
-        return 'repair-skipped-peer-active'
+        return OUTCOME_REPAIR_SKIPPED_PEER
 
     rc, detail = guarded.result
     mark_restarted(state, unit, now=now)
@@ -659,18 +837,99 @@ def check_unit(unit: str, state: dict, now: Optional[float] = None) -> str:
     if rc != 0:
         dm_repair_failed(unit, rc, detail)
         log(f'{unit}: REPAIR FAILED rc={rc} detail={detail[:160]!r}', 'WARN')
-        return 'repair-failed'
+        return OUTCOME_REPAIR_FAILED
 
     # Restart reported active. Re-probe the NEW MainPID's namespace to confirm
     # the file is actually writable again (the whole point of the repair).
-    new_pid = target_main_pid(unit)
+    fresh = unit_facts(unit)
+    new_pid = (fresh.main_pid
+               if fresh.present and fresh.active_state == 'active' else None)
     reverified = False
-    if new_pid is not None and new_pid != pid:
+    if new_pid is not None and new_pid != prior_pid:
         reverified = probe_namespace_writable(new_pid) == _PROBE_OK
     dm_repaired(unit, reverified)
-    log(f'{unit}: REBOUND — restarted (old pid {pid} → new pid {new_pid}); '
+    log(f'{unit}: REBOUND — restarted (old pid {prior_pid} → new pid {new_pid}); '
         f'reverified_writable={reverified}')
-    return 'rebound'
+    return OUTCOME_REBOUND
+
+
+# -------------------- single-unit convenience (tests / manual runs) --------------------
+
+def check_unit(unit: str, state: dict, now: Optional[float] = None) -> str:
+    """Inspect (and if needed repair) ONE unit. main() does not use this — it
+    runs detection for the whole fleet first and then repairs — but the per-unit
+    contract is identical.
+
+    Outcomes are the OUTCOMES tuple; every one of them is documented in
+    runbooks/claude-json-bind-drift.md (pinned by a test)."""
+    facts = unit_facts(unit)
+    klass, _reason = classify_unit(facts)
+    outcome = inspect_unit(unit, facts, klass, state, now=now)
+    if outcome == REPAIR_REQUESTED:
+        return repair_unit(unit, facts, state, now=now)
+    return outcome
+
+
+# -------------------- coverage observability --------------------
+
+def coverage_delta(state: dict, monitored: set[str],
+                   reasons: dict[str, str]) -> None:
+    """Journal (never DM) which units are in coverage and what changed.
+
+    Without this, a daemon LEAVING coverage is byte-identical to a healer that
+    was never in scope. Both directions are logged: an asymmetric detector would
+    make a newly-covered unit look like it had always been covered, which is how
+    a coverage gap gets blamed on the wrong deploy.
+
+    TWO THINGS IT DELIBERATELY DOES NOT DO, because a coverage detector that
+    does either of them is a blind spot wearing a detector's clothes:
+
+    1. It does not announce a departure ONCE and then read normal forever. A
+       transition WARN is an EVENT; a unit sitting OUTSIDE coverage is a STATE,
+       and the state is what matters to whoever reads a tick line three weeks
+       later. Departures are carried in ``state['coverage_departed']`` and
+       reprinted on the ``coverage=`` line of EVERY later tick until the unit
+       comes back or leaves systemd altogether.
+    2. It does not conflate "no baseline recorded yet" with "the baseline is
+       empty". Missing ``state['coverage']`` means the former, ``[]`` the
+       latter. Reading both as falsey is what made a TOTAL collapse to zero
+       monitored units — every unit unreadable at once, the loudest signal this
+       healer can produce — log the reassuring "coverage baseline recorded (0
+       monitored)" line instead, on every tick, forever."""
+    prior_raw = state.get('coverage')
+    departed: dict[str, str] = dict(state.get('coverage_departed') or {})
+    carried = set(departed)      # departures from EARLIER ticks
+    seen = set(reasons)          # every unit systemd listed this tick
+
+    if prior_raw is None:
+        log(f'coverage baseline recorded ({len(monitored)} monitored): '
+            f'{", ".join(sorted(monitored)) or "(none)"}')
+    else:
+        prior = set(prior_raw)
+        for unit in sorted(prior - monitored):
+            reason = reasons.get(unit, 'unit no longer present in systemd')
+            log(f'{unit} LEFT coverage: {reason}', 'WARN')
+            departed[unit] = reason
+        for unit in sorted(monitored - prior):
+            log(f'{unit} ENTERED coverage: {reasons.get(unit, "newly monitored")}')
+
+    # Came back — the ENTERED line above already said so, so drop it silently.
+    for unit in carried & monitored:
+        departed.pop(unit, None)
+    # Gone from systemd entirely (decommissioned/renamed). Retiring it from the
+    # standing list is a different event from it dropping out of coverage, so it
+    # is still said out loud once rather than just disappearing.
+    for unit in sorted(carried - seen):
+        log(f'{unit} left coverage earlier and is no longer present in systemd '
+            f'at all; retiring it from the departed list')
+        departed.pop(unit, None)
+
+    state['coverage'] = sorted(monitored)
+    state['coverage_departed'] = {u: departed[u] for u in sorted(departed)}
+    line = 'coverage=' + (','.join(sorted(monitored)) or '(none)')
+    if departed:
+        line += ' departed=' + ','.join(sorted(departed))
+    log(line)
 
 
 # -------------------- main --------------------
@@ -687,14 +946,37 @@ def main() -> int:
         return 0
 
     state = load_state()
-    counts = {
-        'skip': 0, 'healthy': 0, 'probe-error': 0,
-        'rebound': 0, 'repair-failed': 0, 'cooldown-dangled': 0,
-    }
-    for unit in units:
-        outcome = check_unit(unit, state)
+    counts: dict[str, int] = {k: 0 for k in OUTCOMES}
+
+    def bump(outcome: str) -> None:
         counts[outcome] = counts.get(outcome, 0) + 1
 
+    # 1. Classify + detect across the whole fleet (cheap and bounded). Detection
+    #    is separated from repair so the coverage picture is taken BEFORE any
+    #    restart perturbs it — a unit cannot appear to leave coverage because we
+    #    happened to be restarting it while we counted.
+    repairs: list[tuple[str, UnitFacts]] = []
+    monitored: set[str] = set()
+    reasons: dict[str, str] = {}
+    for unit in units:
+        facts = unit_facts(unit)
+        klass, reason = classify_unit(facts)
+        reasons[unit] = reason
+        if klass == CLASS_MONITOR and carveout_present(facts.read_write_paths):
+            monitored.add(unit)
+        outcome = inspect_unit(unit, facts, klass, state)
+        if outcome == REPAIR_REQUESTED:
+            repairs.append((unit, facts))
+            continue
+        bump(outcome)
+
+    coverage_delta(state, monitored, reasons)
+
+    # 2. Repair the MONITORed units that probed EROFS.
+    for unit, facts in repairs:
+        bump(repair_unit(unit, facts, state))
+
+    save_state(state)
     log('tick: ' + ' '.join(f'{k}={v}' for k, v in counts.items() if v))
     return 0
 
