@@ -17184,7 +17184,45 @@
         "at": "2026-07-31T22:42:16.573755+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-07-31T22:48:57.789589+00:00",
+      "retired_reason": "orphan-terminal"
+    },
+    {
+      "id": "proposed-approvals-freshness-3-birth-probe-001",
+      "name": "Approvals Freshness 3 Birth Probe 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `approvals-freshness-3-birth-probe-001`. Last activity 2026-07-31T22:44:24.52357+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "approvals-freshness-3-birth-probe-001"
+      ],
+      "repo": null,
+      "created": "2026-07-31",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-31T22:48:57.789589+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-31T22:44:24.52357+00:00"
+    },
+    {
+      "id": "proposed-delegate-cap-approvals-freshness-3-3-run-the-same-probe-at-bi-2616",
+      "name": "Delegate Cap Approvals Freshness 3 3 Run The Same Probe At Bi 2616",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `delegate-cap-approvals-freshness-3-3-run-the-same-probe-at-bi-2616`. Last activity 2026-07-31T22:41:57.673423+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "delegate-cap-approvals-freshness-3-3-run-the-same-probe-at-bi-2616"
+      ],
+      "repo": null,
+      "created": "2026-07-31",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-31T22:48:57.789589+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-31T22:41:57.673423+00:00"
     }
   ]
 }
