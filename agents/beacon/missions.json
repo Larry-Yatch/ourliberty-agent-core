@@ -17092,6 +17092,57 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-approvals-freshness-2-tick-probe-demote-001",
+      "name": "Approvals Freshness 2 Tick Probe Demote 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `approvals-freshness-2-tick-probe-demote-001`. Last activity 2026-07-31T22:29:18.2537+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "approvals-freshness-2-tick-probe-demote-001"
+      ],
+      "repo": null,
+      "created": "2026-07-31",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-31T22:33:54.592594+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-31T22:29:18.2537+00:00"
+    },
+    {
+      "id": "proposed-suite-guardian-graduation-stage-1",
+      "name": "Suite Guardian Graduation Stage 1",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `suite-guardian-graduation-stage-1`. Last activity 2026-07-31T22:29:07.080754+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "suite-guardian-graduation-stage-1"
+      ],
+      "repo": null,
+      "created": "2026-07-31",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-31T22:33:54.592594+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-31T22:29:07.080754+00:00"
+    },
+    {
+      "id": "proposed-pr-ourliberty-agent-core-1076",
+      "name": "PR Ourliberty Agent Core 1076",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pr-ourliberty-agent-core-1076`. Last activity 2026-07-31T22:20:40.158088+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pr-ourliberty-agent-core-1076"
+      ],
+      "repo": null,
+      "created": "2026-07-31",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-31T22:33:54.592594+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-31T22:20:40.158088+00:00"
     }
   ]
 }
