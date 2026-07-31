@@ -2545,7 +2545,7 @@
       "id": "cap-approvals-freshness-1-3-add-an-optional-freshnes-582f",
       "title": "Approvals freshness 1/3: add an optional freshness_probe field to an approval card",
       "note": "SLICE 1 of 3. Deliberately small: the parent capture (cap-approvals-tab-let-a-card-carry-its-own-falsifier-8bb3) was too big to SCOPE and its Beacon delegation was killed at the 600s wall (exit_code -1, 'TIMEOUT after 600s') having produced nothing. Same disease as [[big-pr-defeats-review]], one layer up. Slices 2 and 3 depend on this one; build this alone.\n\nPROBLEM: approval cards go stale because nothing re-checks their premise. Today's only clearing signals answer 'did Beacon already resolve this?' (task_id in history, not pending) or 'did a PR for this task_id merge/close?' (task_terminal_state -> MERGED/CLOSED). A card whose premise is a fact about live state \u2014 a DB row, a file's contents, a code behavior \u2014 probes UNKNOWN, and UNKNOWN means keep forever. On 2026-07-29, 6 of 8 cards on the tab did not need a human.\n\nTHIS SLICE \u2014 SCHEMA + EVALUATOR ONLY. No wiring into any healer, no UI.\n1. Optional 'freshness_probe' on an approval's dispatch_payload: a deterministic, machine-checkable predicate whose FALSITY means the ask is moot.\n2. Kinds to support: pr_state (reuse task_terminal_state), file_contains / file_lacks (git show at origin/main, repo+ref+path), json_path (a config key), sql (read-only). Leave 'shell' OUT of this slice.\n3. A pure evaluate(probe) -> TRUE | FALSE | INDETERMINATE function, unit-tested, called by NOTHING yet.\n\nLOAD-BEARING SEMANTICS (the whole point \u2014 get these in the tests):\n  TRUE => premise still holds => keep the card.\n  FALSE => premise dead => the card is moot.\n  ERROR / timeout / unparseable / unknown kind => INDETERMINATE, which callers MUST treat as KEEP.\nFail toward the human, never toward the convenient answer. Same rule as the Check 0 guard shipped in #1058: an INDETERMINATE that reads as 'resolved' is how a live decision gets silently dropped.\n\nWORKED EXAMPLES to test against (both real, both from 2026-07-29):\n  - rsdpm-confirmall-medium-parent-secondglance-001 cited app/queue/verdict.ts + CONFIRM_ALL_TIERS + bulkCovered. A file_contains probe over that file at origin/main would have flipped FALSE when RSDPM #151 (3d66718) made coverage ancestor-closed, 2h18m after the card was filed.\n  - unreg-approval-cfd444ed29ee ('migration 0033 not live') cited schema_migration_log and gave the exact query. A sql probe would have flipped FALSE 8 minutes BEFORE Larry ever saw the card.\nAuthors already write the evidence down. Converting a cited fact into a probe is near-free at filing time and impossible afterward.\n\nOUT OF SCOPE (slices 2/3): evaluating on the heal_stale_approvals tick; the premise_stale demotion state; probing at birth; the 'unverified' badge for cards with no probe; retrofitting existing producers.\n\nREVIEW: not needed for this slice \u2014 it is a pure function plus a schema, wired to nothing. Slice 2 is where it starts deciding what leaves Larry's queue, and THAT needs /code-review high.",
-      "state": "parked",
+      "state": "review_close",
       "label": null,
       "origin": {
         "source": "desktop-chat",
@@ -2573,8 +2573,12 @@
       "spawned": {
         "kind": "delegate",
         "task_id": "delegate-cap-approvals-freshness-1-3-add-an-optional-freshnes-582f",
-        "stamped_at": "2026-07-30T19:43:45.533340+00:00"
-      }
+        "stamped_at": "2026-07-30T19:43:45.533340+00:00",
+        "outcome": "merged"
+      },
+      "closed_by": "heal_missions_card_gc:terminal-backstop",
+      "shipped_note": "shipped (linked work merged)",
+      "awaiting_ack": true
     },
     {
       "id": "cap-approvals-freshness-2-3-evaluate-the-probe-on-th-9902",
@@ -2713,7 +2717,7 @@
       "id": "cap-an-agent-that-renders-a-marker-thinks-it-emitted-1ebd",
       "title": "An agent that RENDERS a marker thinks it EMITTED it \u2014 the tool built to stop lost markers is how they get lost",
       "note": "INCIDENT 2026-07-30/31. Larry delegated capture ...7629 (promoted larry-alert cards). Beacon ran 390s, exit 0, cost $1.17, did genuinely good scoping \u2014 and produced NO approval card. Found only because Larry asked twice.\n\nROOT CAUSE, verified in the session transcript (~/.claude/projects/-home-larry-agent-core-agents-beacon/1ff6de87-b065-438f-9250-5bf811491819.jsonl):\n  line 81  tool_use/Bash: python3 scripts/marker.py render beacon approval_request <<JSON ...\n  line 82  tool_result:   === APPROVAL_REQUEST === { ...well-formed payload... }\n  turns 12+13 (the ONLY assistant text): neither contains the marker.\n does exactly one thing per its own docstring \u2014 'Read JSON payload from stdin, PRINT MARKER TO STDOUT'. It is a formatter. It does not register, dispatch, or queue. Beacon saw the rendered block come back in a tool result and signed off with 'The dispatch marker is above; trust policy will either auto-fire it to Forge or surface it for your approval.' That sentence is true of the TRANSCRIPT and false of the RESPONSE. The scanner (extract_approval_request) reads the agent's assistant text; the stored result was 298 chars with no marker and no fence.\n\nTHE CONTROL PROVES IT. The sibling delegation the same evening (capture ...582f, freshness 1/3) has a 6135-char result with the === APPROVAL_REQUEST === block INLINE in Beacon's own text \u2014 and its card appeared normally. Same agent, same code path, same envelope schema. One pasted the marker into its answer; the other rendered it in a tool call.\n\nTHE IRONY IS THE POINT. marker.py's header says it exists so this cannot happen: 'Hand-typing is how PR #16 stalled for 7+ hours: Mirror emitted bare REVIEW_PASS with no delimiters, the parser missed it, the notifier dead-lettered silently. The render helper makes that failure shape impossible at the source.' Running the helper FEELS like emitting. Nothing checks. Applies to Forge and Mirror too \u2014 same CLI, same render subcommand.\n\nBUILD (pick in preflight):\n(a) DETECTION, cheapest and highest value: a delegation/session that exits 0 whose stored result contains NO marker, while its session transcript DOES contain a rendered marker in a tool_result, is a definite lost marker. Surface it \u2014 it is fully recoverable (see below).\n(b) Close the gap at the tool: either make  state loudly in its stdout that printing is NOT emitting and the block must be pasted into the reply, or add an  subcommand that actually registers, so 'I ran the tool' and 'it is registered' converge.\n(c) Consider validating at session end rather than trusting the agent's own account of what it did.\n\nRECOVERY PRECEDENT (worked, 2026-07-31): the payload was intact in the transcript and re-registered by hand \u2014 approval.add_pending(payload, chat_id) + approval.build_approval_request_chain_event(payload, ts) + chain_event_emit.emit_event(**kwargs). Task promoted-needs-triage-cards-off-approvals-tab-001 is now on the tab. NO re-scope was needed, saving $1.17 and 390s.\n\nTRAP HIT DURING THAT RECOVERY, worth its own guard: emit_event returns False and logs 'Supabase client unavailable ... dropping event_type=approval_request' when SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are unset in the calling shell. add_pending had already succeeded, so the card existed in Beacon's queue but NOT on the dashboard tab \u2014 a HALF-REGISTERED card, visible in one surface and invisible in the other. Source /home/larry/credentials/.env.larry first. A caller that ignores that False leaves exactly this split.\n\nREVIEW: needed if it changes marker handling or dispatch \u2014 the failure class here is a paid session that confidently produces nothing.",
-      "state": "parked",
+      "state": "dropped",
       "label": null,
       "origin": {
         "source": "desktop-chat",
@@ -2725,17 +2729,17 @@
       "last_touched": "2026-07-31T01:23:41.937394+00:00",
       "promoted_to": null,
       "briefing": {
-        "what": "A safety tool meant to guarantee your approval requests always reach you can quietly fail \u2014 a recent request was fully worked on, billed, and then vanished before it ever showed up for your sign-off.",
-        "why": "You're paying for work that produces nothing you can see, and you only catch it when you happen to ask twice \u2014 meaning decisions can silently stall while you assume they're waiting on you.",
-        "suggest": "Add a simple end-of-job check that flags any finished-but-empty request so it can be recovered instantly; it's a low-risk safeguard, so schedule it deliberately rather than rushing it out."
+        "what": "One of your assistants can do a full job, charge you for it, and honestly believe it delivered the result \u2014 while the handoff quietly never happens, so the finished work vanishes and only surfaces if you happen to ask twice.",
+        "why": "You're paying for work that silently disappears, and the only reason it was caught this time was luck \u2014 which means you can't trust that everything you've asked for actually reached you.",
+        "suggest": "Approve a small, low-stakes safeguard that automatically flags these vanished handoffs so nothing you paid for gets lost \u2014 the recovered work is already back in your queue, so this is about preventing the next one, not cleaning up a crisis."
       },
       "risk": "safe",
       "recommended_action": "delegate",
       "briefing_provenance": {
         "by": "beacon",
         "model": "claude-opus-4-8",
-        "at": "2026-07-31T01:30:18.500478+00:00",
-        "from_state": "parked"
+        "at": "2026-07-31T01:50:20.104516+00:00",
+        "from_state": "dropped"
       }
     },
     {
@@ -2766,7 +2770,12 @@
         "at": "2026-07-31T01:30:18.500478+00:00",
         "from_state": "parked"
       },
-      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
+      "spawned": {
+        "kind": "delegate",
+        "task_id": "delegate-cap-rendering-a-marker-is-not-emitting-it-the-helper-713c",
+        "stamped_at": "2026-07-31T01:42:31.517225+00:00"
+      }
     }
   ]
 }
