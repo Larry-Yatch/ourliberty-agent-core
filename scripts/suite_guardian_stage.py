@@ -384,7 +384,16 @@ def _emit_card(payload: dict[str, Any], *, chat_id: Optional[int]) -> Optional[d
     """Emit ONE approval card through the existing Beacon approval machinery
     (add_pending + larry_alerts render), deduped by task_id. Returns the pending
     entry, or None if a duplicate is already pending or deps are unavailable.
-    Never raises."""
+    Never raises.
+
+    NOTE (clean root fix, not yet done here): this path writes the entry to the
+    LOCAL store and DMs Larry but never emits an `approval_request` chain_event,
+    so the decide tab (fed only by chain_events) shows nothing — the Beacon=1 /
+    tab=0 gap. The general backstop is heal_unregistered_approval.py's
+    beacon-pending reconciliation, which mints the missing chain_event under this
+    entry's own id. The tidy root fix would be to emit that chain_event HERE at
+    registration (build_approval_request_chain_event + chain_event_emit.emit_event,
+    with a real chat_id — never `chat or 0`)."""
     try:
         import beacon_approval_handler as approval
         import larry_alerts as la
