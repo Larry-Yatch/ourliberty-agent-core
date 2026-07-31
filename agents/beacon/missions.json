@@ -16910,7 +16910,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-31T01:54:45.741091+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-31T01:48:01.782884+00:00"
+      "orphan_last_activity_ts": "2026-07-31T01:48:01.782884+00:00",
+      "briefing": {
+        "what": "A safety net that catches decisions the team prepared for you but that never actually reached your desk.",
+        "why": "Without it, a choice you've already paid to have worked up could quietly disappear before you ever see it, costing money and stalling calls that need you.",
+        "suggest": "Worth greenlighting, but ask for a quick check that it won't flag things that were handled fine before it goes live."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-31T02:00:58.120447+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-delegate-cap-rendering-a-marker-is-not-emitting-it-the-helper-713c",
@@ -16927,7 +16941,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-31T01:54:45.741091+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-31T01:47:57.244731+00:00"
+      "orphan_last_activity_ts": "2026-07-31T01:47:57.244731+00:00",
+      "briefing": {
+        "what": "The team started fixing an internal messaging feature that isn't sending its notifications the way it should.",
+        "why": "When these notifications quietly fail, work can stall or slip through the cracks without anyone noticing.",
+        "suggest": "Let the team finish and verify the fix, but hold off on wider rollout until it's confirmed working."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-31T02:00:58.120447+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
