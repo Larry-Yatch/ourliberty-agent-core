@@ -2643,7 +2643,12 @@
         "at": "2026-07-30T16:36:16.248516+00:00",
         "from_state": "parked"
       },
-      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
+      "spawned": {
+        "kind": "delegate",
+        "task_id": "delegate-cap-approvals-freshness-3-3-run-the-same-probe-at-bi-2616",
+        "stamped_at": "2026-07-31T22:32:00.060383+00:00"
+      }
     },
     {
       "id": "cap-a-delegation-that-dies-looks-exactly-like-one-no-2cbe",
