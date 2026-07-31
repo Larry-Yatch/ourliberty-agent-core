@@ -17030,6 +17030,40 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-reconcile-local-pending-approvals-to-decide-tab-001",
+      "name": "Reconcile Local Pending Approvals To Decide Tab 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `reconcile-local-pending-approvals-to-decide-tab-001`. Last activity 2026-07-31T22:17:20.403881+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "reconcile-local-pending-approvals-to-decide-tab-001"
+      ],
+      "repo": null,
+      "created": "2026-07-31",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-31T22:18:49.282008+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-31T22:17:20.403881+00:00"
+    },
+    {
+      "id": "proposed-delegate-cap-approvals-freshness-2-3-evaluate-the-probe-on-th-9902",
+      "name": "Delegate Cap Approvals Freshness 2 3 Evaluate The Probe On Th 9902",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `delegate-cap-approvals-freshness-2-3-evaluate-the-probe-on-th-9902`. Last activity 2026-07-31T22:17:18.923904+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "delegate-cap-approvals-freshness-2-3-evaluate-the-probe-on-th-9902"
+      ],
+      "repo": null,
+      "created": "2026-07-31",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-07-31T22:18:49.282008+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-31T22:17:18.923904+00:00"
     }
   ]
 }
