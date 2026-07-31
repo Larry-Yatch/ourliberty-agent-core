@@ -19,8 +19,10 @@ except ImportError:  # discover loads this module top-level (no package parent)
 
 import io
 import json
+import os
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -224,6 +226,110 @@ class AffixedForgeTaskIdWarning(unittest.TestCase):
         )
         self.assertEqual(rc, 0, err)
         self.assertNotIn('WARNING', err)
+
+
+class RenderLedger(unittest.TestCase):
+    """lost-marker-render-emission-net-001 Part A: a SUCCESSFUL beacon
+    approval_request render appends exactly one JSONL record to the render
+    ledger; a render VALIDATION failure writes none; a ledger-write failure
+    never fails the render. Ledger path is env-overridable for hermeticity."""
+
+    def setUp(self):
+        self._td = tempfile.TemporaryDirectory()
+        self.addCleanup(self._td.cleanup)
+        self.ledger = Path(self._td.name) / 'marker-render-ledger.jsonl'
+        patch = mock.patch.dict(os.environ, {
+            'OURLIBERTY_MARKER_RENDER_LEDGER': str(self.ledger),
+        })
+        patch.start()
+        self.addCleanup(patch.stop)
+
+    def _read_ledger(self) -> list[dict]:
+        if not self.ledger.exists():
+            return []
+        return [json.loads(ln) for ln in
+                self.ledger.read_text().splitlines() if ln.strip()]
+
+    def _approval_payload(self, **extra) -> dict:
+        payload = {
+            'task_id': 'ledger-abc-001',
+            'summary': 'ship the thing',
+            'target_agent': 'forge',
+            'prompt': 'do the work',
+        }
+        payload.update(extra)
+        return payload
+
+    def test_successful_render_writes_one_entry(self):
+        rc, out, err = _run_cli(
+            json.dumps(self._approval_payload()),
+            ['render', 'beacon', 'approval_request'],
+        )
+        self.assertEqual(rc, 0, err)
+        entries = self._read_ledger()
+        self.assertEqual(len(entries), 1)
+        rec = entries[0]
+        self.assertEqual(rec['task_id'], 'ledger-abc-001')
+        self.assertEqual(rec['agent'], 'beacon')
+        self.assertEqual(rec['marker_type'], 'approval_request')
+        self.assertEqual(rec['summary'], 'ship the thing')
+        self.assertIn('rendered_at', rec)
+        # rendered_at must be parseable ISO-8601.
+        from datetime import datetime
+        datetime.fromisoformat(rec['rendered_at'])
+
+    def test_phase_flag_is_recorded(self):
+        rc, out, err = _run_cli(
+            json.dumps(self._approval_payload()),
+            ['render', 'beacon', 'approval_request',
+             '--phase', 'routing-signal'],
+        )
+        self.assertEqual(rc, 0, err)
+        self.assertEqual(self._read_ledger()[0]['phase'], 'routing-signal')
+
+    def test_validation_failure_writes_no_entry(self):
+        # Missing 'summary' -> render validation error -> no ledger entry.
+        payload = {'task_id': 'x', 'target_agent': 'forge', 'prompt': 'y'}
+        rc, out, err = _run_cli(
+            json.dumps(payload), ['render', 'beacon', 'approval_request'],
+        )
+        self.assertNotEqual(rc, 0)
+        self.assertEqual(self._read_ledger(), [])
+
+    def test_missing_task_id_writes_no_entry(self):
+        # A payload with a summary/target/prompt but no task_id would fail
+        # render validation anyway; assert nothing is written even if a caller
+        # bypasses required fields — the ledger writer requires a task_id.
+        marker_cli._record_render_to_ledger(
+            'beacon', 'approval_request', {'summary': 's'})
+        self.assertEqual(self._read_ledger(), [])
+
+    def test_forge_render_writes_no_entry(self):
+        # Scope is beacon approval_request only. A Forge proceed render must
+        # not touch the ledger (its emission surface is the outbox).
+        rc, out, err = _run_cli(
+            json.dumps({'task_id': 't-1', 'preflight_summary': 'ok'}),
+            ['render', 'forge', 'proceed'],
+        )
+        self.assertEqual(rc, 0, err)
+        self.assertEqual(self._read_ledger(), [])
+
+    def test_ledger_write_failure_never_fails_render(self):
+        # Point the ledger at a path whose parent can't be created (a file used
+        # as a directory component) so the append raises; the render must still
+        # succeed and emit the block.
+        blocker = Path(self._td.name) / 'blocker'
+        blocker.write_text('i am a file, not a dir')
+        with mock.patch.dict(os.environ, {
+            'OURLIBERTY_MARKER_RENDER_LEDGER': str(blocker / 'nested' / 'l.jsonl'),
+        }):
+            rc, out, err = _run_cli(
+                json.dumps(self._approval_payload()),
+                ['render', 'beacon', 'approval_request'],
+            )
+        self.assertEqual(rc, 0, err)
+        self.assertIn('=== APPROVAL_REQUEST ===', out)
+        self.assertIn('render-ledger append failed', err)
 
 
 if __name__ == '__main__':

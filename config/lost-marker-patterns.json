@@ -1,0 +1,8 @@
+{
+  "_schema": {
+    "version": 1,
+    "purpose": "Numeric tuning for heal_lost_marker.py, the render-keyed lost-marker net (lost-marker-render-emission-net-001). Each render of a beacon approval_request marker is appended to ~/agents/blackboard/marker-render-ledger.jsonl by scripts/marker.py. This healer reconciles those entries against emission evidence. grace_minutes: an entry younger than this is inside normal render->paste->trust-policy-gate lag and is NOT yet eligible (must exceed marker-extraction + trust-policy latency so a healthy flow never false-alarms). scan_window_minutes: how far back the ledger is read each tick (bounds the read + ignores long-abandoned entries); dedup state makes repeats idempotent. Unlike config/phantom-dispatch-claim-patterns.json this file is best-effort: a missing/invalid file falls back to the defaults (15 / 1440) rather than blinding the net. See docs/phantom-dispatch-reconciliation-brief.md for the sibling net."
+  },
+  "grace_minutes": 15,
+  "scan_window_minutes": 1440
+}
