@@ -724,6 +724,66 @@ def _clear_dashboard_pending(approval_id: str) -> None:
         chain_event_emit.clear_approval_request(approval_id)  # import graph
 
 
+def demote(
+    approval_id: str,
+    evidence: str,
+    *,
+    state: Optional[dict[str, Any]] = None,
+) -> Optional[dict[str, Any]]:
+    """Mark a pending approval's premise DEAD in place, keeping the card visible.
+
+    The falsifiable-premise counterpart to :func:`resolve` (approvals-freshness
+    slice 2). Where ``resolve`` MOVES an entry to history AND clears the dashboard
+    row (the auto-CLEAR path), ``demote`` stamps a ``premise_stale`` marker on the
+    entry and leaves it exactly where it is in ``pending[]``:
+
+      * Nothing moves to ``history``.
+      * ``read_at`` is NEVER touched; ``_clear_dashboard_pending`` is NEVER called.
+
+    A probe verdict must never auto-clear a card — that would hide a decision that
+    looks exactly like a working tab. A demoted card stays one-tap dismissable
+    through the EXISTING approve / reject / mark-done resolution path (which is the
+    only thing that sets ``read_at``); there is no new dismiss verb.
+
+    The marker carries the probe's ``evidence`` string, the probe ``kind`` (read
+    from the entry's OWN ``dispatch_payload.freshness_probe`` — the caller passes
+    only the evidence), and a ``probed_at`` UTC timestamp. Idempotent: demoting an
+    already-``premise_stale`` entry REFRESHES ``evidence`` + ``probed_at`` but never
+    duplicates the marker (one dict, never a list) and never escalates to a
+    resolve/clear.
+
+    Returns the stamped entry, or ``None`` when no ``pending`` entry has this id
+    (a no-op — e.g. the card was resolved between the probe and the demote).
+    Mirrors ``resolve``'s injectable-``state`` transaction discipline: on the
+    ``state is None`` path it takes :func:`state_lock` and saves; when the caller
+    passes ``state`` it owns the transaction and the commit.
+    """
+    own = state is None
+    with _state_txn(own):
+        s = load_state() if own else state
+        matched = None
+        for entry in s.get('pending', []):
+            if entry.get('id') == approval_id:
+                matched = entry
+                break
+        if matched is None:
+            return None
+        payload = matched.get('dispatch_payload')
+        probe = payload.get('freshness_probe') if isinstance(payload, dict) else None
+        kind = probe.get('kind') if isinstance(probe, dict) else None
+        # In-place stamp. A single dict OVERWRITES any prior premise_stale marker
+        # (the idempotent refresh) rather than appending — one marker per entry,
+        # never a growing list, and never a status change / history move.
+        matched['premise_stale'] = {
+            'evidence': evidence,
+            'kind': kind,
+            'probed_at': _now_utc(),
+        }
+        if own:
+            save_state(s)
+        return matched
+
+
 def pop_paused_backlog(state: Optional[dict[str, Any]] = None) -> list[dict[str, Any]]:
     """Mark all paused-during-creation entries as no-longer-paused, return them.
 

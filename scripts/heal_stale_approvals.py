@@ -58,6 +58,7 @@ from typing import Any, Optional
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from supabase_chunk import chunked_clear, ChunkedClearError  # noqa: E402
 import beacon_approval_handler as approval  # noqa: E402
+import freshness_probe  # noqa: E402 — pure premise evaluator (slice 1, PR #1072)
 import task_terminal_state as tts  # noqa: E402 — shared terminal-state probe
 from decision_identity import canonical_decision_key  # noqa: E402
 
@@ -544,6 +545,123 @@ def reconcile_terminal_approvals(
     return counts
 
 
+# -------------------- stale-premise reconciliation (approvals-freshness slice 2) --
+
+def _probe_evidence(probe: dict[str, Any]) -> str:
+    """A short human-readable line describing the freshness_probe the tick found
+    FALSE — stamped onto the demoted card (`premise_stale.evidence`) so the tab
+    and Larry can see WHY it was demoted rather than silently cleared.
+
+    Pure + defensive: reads only via `.get()`, never raises, and degrades to the
+    kind alone for any kind whose falsified shape it doesn't spell out (e.g. `sql`,
+    which stays inert -> INDETERMINATE this slice and so can never reach here)."""
+    if not isinstance(probe, dict):
+        return 'freshness_probe premise FALSE'
+    kind = probe.get('kind') or 'unknown'
+    if kind in ('file_contains', 'file_lacks'):
+        rel = 'no longer present in' if kind == 'file_contains' else 'now present in'
+        return (f'{kind} premise FALSE: substring {probe.get("substring")!r} {rel} '
+                f'{probe.get("repo")}:{probe.get("path")}@{probe.get("ref") or "origin/main"}')
+    if kind == 'pr_state':
+        return (f'pr_state premise FALSE: work for task {probe.get("task_id")!r} '
+                f'reached a terminal state (expect={probe.get("expect", "open")})')
+    if kind == 'json_path':
+        return (f'json_path premise FALSE: {probe.get("key")!r} in '
+                f'{probe.get("path")!r} != expected {probe.get("expected")!r}')
+    return f'{kind} premise FALSE'
+
+
+def reconcile_stale_premises(
+    *,
+    beacon_state: Optional[dict[str, Any]] = None,
+    now: Optional[datetime] = None,
+    evaluate: Any = None,
+    dry_run: bool = False,
+) -> dict[str, int]:
+    """Slice 2: DEMOTE pending approvals whose recorded freshness_probe now reads
+    FALSE — the falsifiable premise the ask depends on has gone dead.
+
+    Sibling to `reconcile_terminal_approvals`: it iterates the SAME `pending[]`
+    store, but where the terminal-state leg RESOLVES a shipped card to history
+    (the auto-CLEAR path that self-clears the dashboard row), this leg DEMOTES a
+    dead-premise card IN PLACE via `approval.demote()`. The card stays visible in
+    `pending[]`, marked `premise_stale` with the probe's evidence, one-tap
+    dismissable through the normal approve/reject/mark-done path. This leg NEVER
+    sets read_at and NEVER calls resolve()/_clear on a probe verdict — auto-clear
+    stays reserved for the terminal-state leg's positively-terminal signal.
+
+    Only entries carrying `dispatch_payload.freshness_probe` are probed (an entry
+    with none is left untouched and surfaces as machine-`unverified` on the tab —
+    dashboard_api.compute_approval_verification). For each probed entry,
+    `freshness_probe.evaluate(probe)` returns one tri-state:
+        FALSE          -> demote() (premise dead, the ask is moot)
+        TRUE / INDET.  -> untouched. INDETERMINATE folds in every error / timeout /
+                          unparseable / unknown-kind / inert-sql path, so the leg
+                          fails toward the human — it can under-demote, never
+                          over-demote.
+
+    A stale local origin/main (the git kinds read origin/main via git show) fails
+    toward KEEP: an un-fetched ref shows the OLD content, so a still-present
+    substring keeps the card. This leg does NOT fetch — it reads whatever
+    origin/main the checkout already has — so it can UNDER-demote on a stale ref,
+    never OVER-demote. That is the intended, conservative direction.
+
+    `evaluate` is injectable for tests (default `freshness_probe.evaluate`, which
+    carries its own injectable executors + production defaults: pr_state via
+    task_terminal_state, file_contains/file_lacks via git_show at origin/main,
+    json_path via file read, sql inert). `beacon_state` / `now` are injectable
+    too, mirroring the sibling reconcilers. `--dry-run` reports intended demotions
+    without writing. Returns a counts dict."""
+    now = now or datetime.now(timezone.utc)
+    evaluate = evaluate or freshness_probe.evaluate
+    counts = {'pending': 0, 'probed': 0, 'demoted': 0, 'kept': 0}
+
+    state = beacon_state if beacon_state is not None else approval.load_state()
+    pending = state.get('pending', []) if isinstance(state, dict) else []
+    counts['pending'] = len(pending)
+
+    to_demote: list[tuple[str, str]] = []  # (approval_id, evidence)
+    for entry in pending:
+        if not isinstance(entry, dict):
+            continue
+        payload = entry.get('dispatch_payload')
+        probe = payload.get('freshness_probe') if isinstance(payload, dict) else None
+        if not isinstance(probe, dict) or not probe:
+            continue  # no probe -> nothing to check (reads 'unverified' on the tab)
+        approval_id = entry.get('id')
+        if not (isinstance(approval_id, str) and approval_id):
+            continue
+        counts['probed'] += 1
+        verdict = evaluate(probe)
+        if verdict == freshness_probe.FALSE:
+            to_demote.append((approval_id, _probe_evidence(probe)))
+        else:
+            # TRUE or INDETERMINATE — keep. Never demote on a non-FALSE verdict.
+            counts['kept'] += 1
+
+    for approval_id, evidence in to_demote:
+        if dry_run:
+            counts['demoted'] += 1
+            log(f'DRY-RUN would demote pending approval {approval_id} '
+                f'(premise FALSE: {evidence})')
+            continue
+        try:
+            demoted = approval.demote(approval_id, evidence)
+        except Exception as e:  # noqa: BLE001
+            log(f'premise-demote failed for {approval_id}: '
+                f'{type(e).__name__}: {e}', 'ERROR')
+            continue
+        if demoted is None:
+            # Gone from pending (concurrent resolve / prior tick). Not an error.
+            log(f'premise-demote: {approval_id} no longer pending ({evidence})')
+        counts['demoted'] += 1
+        log(f'demoted pending approval {approval_id} (premise FALSE: {evidence})')
+
+    log('stale-premise reconcile: ' + ('DRY-RUN ' if dry_run else '')
+        + ' '.join(f'{k}={v}' for k, v in counts.items()))
+    return counts
+
+
 # -------------------- resolved-in-supabase reconciliation (approval-sync §3.2) --
 
 def reconcile_resolved_in_supabase(
@@ -731,6 +849,17 @@ def main() -> int:
         reconcile_terminal_approvals(dry_run=args.dry_run)
     except Exception as e:  # noqa: BLE001
         log(f'terminal-approval reconcile FAILED: {type(e).__name__}: {e}', 'ERROR')
+        rc = 1
+
+    # Slice 2 — stale-premise reconcile. Like the terminal leg it needs only the
+    # local beacon-pending-approvals.json + git/gh (through freshness_probe's
+    # default executors) + a local demote write, so it runs BEFORE the Supabase
+    # connect and is guarded independently: a probe-leg failure never aborts the
+    # other reconcilers, and it NEVER auto-clears (demote is in-place).
+    try:
+        reconcile_stale_premises(dry_run=args.dry_run)
+    except Exception as e:  # noqa: BLE001
+        log(f'stale-premise reconcile FAILED: {type(e).__name__}: {e}', 'ERROR')
         rc = 1
 
     # The original Supabase-backed auto-clear (resolved decision rows on the
