@@ -354,7 +354,12 @@ class BindDriftIntegrationTests(_GuardFixture):
         self.addCleanup(os.close, fd)
 
         state = {'services': {}}
-        with mock.patch.object(bd, 'target_main_pid', return_value=123), \
+        facts = bd.UnitFacts(
+            unit=AGENT_UNIT, present=True, type_='simple', active_state='active',
+            main_pid=123, read_write_paths=f'/home/larry/.claude {bd.CLAUDE_JSON_PATH}',
+            restart_policy='on-failure', triggered_by='',
+        )
+        with mock.patch.object(bd, 'unit_facts', return_value=facts), \
                 mock.patch.object(bd, '_namespace_probeable', return_value=True), \
                 mock.patch.object(bd, 'probe_namespace_writable',
                                   return_value=bd._PROBE_EROFS), \
@@ -364,7 +369,7 @@ class BindDriftIntegrationTests(_GuardFixture):
                 mock.patch.object(bd, 'log'):
             outcome = bd.check_unit(AGENT_UNIT, state)
 
-        self.assertEqual(outcome, 'repair-skipped-peer-active')
+        self.assertEqual(outcome, bd.OUTCOME_REPAIR_SKIPPED_PEER)
         restart.assert_not_called()
         mark.assert_not_called()
 
