@@ -1513,6 +1513,270 @@ def evaluate_for_larry(
     return out
 
 
+# -------------------- beacon-pending-approvals scan (third source) ---------
+#
+# The decide tab is fed ONLY by `approval_request` chain_events. Beacon reports
+# pending approvals from the LOCAL store (beacon-pending-approvals.json). Some
+# approvals are written DIRECTLY into that store — via `add_pending` + a Telegram
+# DM — WITHOUT ever emitting an `approval_request` chain_event (concrete live
+# instance: `suite-guardian-graduation-stage-1`, registered by
+# suite_guardian_stage._emit_card, whose entry has chat_id=0 and no chain_event).
+# So it shows in Telegram (local store) but is absent from the decide tab
+# (chain_events) → the recurring Beacon=1 / tab=0 mismatch. The first two scan
+# sources above PROMOTE from alert feeds and CREATE a new pending entry; this
+# third source is different: the pending entry ALREADY EXISTS, so we only MINT the
+# MISSING chain_event — under the entry's OWN id, so the card shares identity with
+# the real pending entry (classify_approval sees it LIVE, resolving it reconciles
+# the count, and heal_stale_approvals retires it natively when Beacon resolves it).
+
+# Namespace prefix for beacon-pending dedup-ledger keys, so a minted local-store
+# card can never collide with a promoted larry-alert identity or a for-Larry key
+# in the shared state/heal-unregistered-approval-promoted.json ledger.
+BEACONPENDING_LEDGER_PREFIX = 'beaconpending:'
+
+# Source label stamped on the beacon-pending ledger entries (audit + so the
+# retire pass can tell them apart from the other two sources' entries).
+PROMOTED_SOURCE_BEACON_PENDING = 'beacon-pending-local'
+
+
+def open_approval_card_task_ids() -> Optional[set[str]]:
+    """Return the set of task_ids that currently have an OPEN (read_at IS NULL)
+    `approval_request` chain_event — i.e. the decisions already carded on the
+    decide tab. Reuses triage_decisions._fetch (the exact read the tab + the
+    cleanup/stale healers use) so 'what counts as an open card' stays
+    single-sourced.
+
+    None on ANY connect/query failure (or when no client is configured, e.g.
+    under test). The caller then fails CLOSED: it does NOT mint, because it
+    cannot rule out that a card already exists — better to leave the entry for
+    the next tick than risk a duplicate. An empty set (fetch succeeded, no open
+    approval_request rows) is a REAL answer and DOES allow minting."""
+    try:
+        client = chain_event_emit._get_client()
+    except Exception as e:  # noqa: BLE001 — a client build failure fails closed
+        log(f'beacon-pending: supabase client unavailable '
+            f'({type(e).__name__}: {e}); skipping mint this tick', 'WARN')
+        return None
+    if client is None:
+        return None
+    try:
+        import triage_decisions as td  # noqa: E402 — local: keeps import IO lazy
+        rows = td._fetch(client, event_type='approval_request')
+    except Exception as e:  # noqa: BLE001 — a query failure fails closed
+        log(f'beacon-pending: open-card fetch failed '
+            f'({type(e).__name__}: {e}); skipping mint this tick', 'WARN')
+        return None
+    ids: set[str] = set()
+    for row in rows or []:
+        tid = row.get('task_id') if isinstance(row, dict) else None
+        if isinstance(tid, str) and tid:
+            ids.add(tid)
+    return ids
+
+
+def _beacon_pending_entry_id(entry: dict[str, Any]) -> Optional[str]:
+    """The entry's stable identity — its `id`, else `decision_key`. None when
+    neither is a usable string (a malformed entry is skipped, never carded)."""
+    for key in ('id', 'decision_key'):
+        val = entry.get(key)
+        if isinstance(val, str) and val:
+            return val
+    return None
+
+
+def is_beacon_pending_decision(entry: Any) -> bool:
+    """True iff a local-store pending entry is a genuine Larry decision worth a
+    decide-tab card: it is a dict, status=='pending', has a usable id, AND
+    carries a dispatch_payload (dict) OR a non-empty plan_summary. Conservative
+    by construction — a status other than 'pending' (already resolved/expired) or
+    a contentless entry is never carded."""
+    if not isinstance(entry, dict):
+        return False
+    if entry.get('status') != 'pending':
+        return False
+    if _beacon_pending_entry_id(entry) is None:
+        return False
+    payload = entry.get('dispatch_payload')
+    has_payload = isinstance(payload, dict) and bool(payload)
+    has_summary = bool(str(entry.get('plan_summary') or '').strip())
+    return has_payload or has_summary
+
+
+def build_beacon_pending_card_payload(entry: dict[str, Any]) -> dict[str, Any]:
+    """Build the approval_request payload that mints the MISSING chain_event for a
+    directly-registered pending entry.
+
+    task_id == the entry's OWN id (NOT a derived unreg-approval-<hash>) so the
+    minted card shares identity with the real pending entry: classify_approval
+    sees it LIVE, a dashboard Approve/Reject resolves the same entry, and
+    heal_stale_approvals retires the card when Beacon moves the entry to history.
+    Carries the entry's plan_summary + dispatch_payload.prompt so the card is
+    self-explanatory. `_ledger_key`/`_subject` are transient helper keys the mint
+    path strips before emitting."""
+    entry_id = _beacon_pending_entry_id(entry)
+    payload = entry.get('dispatch_payload') or {}
+    if not isinstance(payload, dict):
+        payload = {}
+    plan_summary = str(entry.get('plan_summary') or '').strip()
+    target_agent = (
+        payload.get('target_agent')
+        or entry.get('target_agent')
+        or 'forge'
+    )
+    if target_agent not in KNOWN_TARGET_AGENTS:
+        target_agent = 'forge'
+    prompt = str(payload.get('prompt') or payload.get('summary') or '').strip()
+    # Ensure the card headline is self-explanatory even if the dispatch prompt was
+    # terse: lead with the plan_summary (extractHeadline reads the prompt).
+    if plan_summary and plan_summary not in prompt:
+        prompt = (plan_summary + ('\n\n' + prompt if prompt else '')).strip()
+    if not prompt:
+        prompt = f'Pending approval `{entry_id}` needs your decision.'
+    return {
+        'task_id': entry_id,
+        'target_agent': target_agent,
+        'prompt': prompt,
+        '_subject': entry_id,
+        '_ledger_key': BEACONPENDING_LEDGER_PREFIX + entry_id,
+    }
+
+
+def evaluate_beacon_pending(
+    pending_entries: list[dict[str, Any]],
+    open_card_task_ids: set[str],
+    promoted: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Return the payloads to MINT from the local pending store this tick. Pure —
+    no I/O. An entry is minted iff: it is a genuine decision, it is NOT already
+    carded (its id has no OPEN approval_request), and it is NOT already in the
+    ledger. A normally-registered approval (which DID emit its chain_event) has
+    its id in `open_card_task_ids`, so it is never double-carded."""
+    out: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for entry in pending_entries:
+        if not is_beacon_pending_decision(entry):
+            continue
+        entry_id = _beacon_pending_entry_id(entry)
+        ledger_key = BEACONPENDING_LEDGER_PREFIX + entry_id
+        if ledger_key in promoted or ledger_key in seen:
+            continue
+        if entry_id in open_card_task_ids:
+            continue
+        out.append(build_beacon_pending_card_payload(entry))
+        seen.add(ledger_key)
+    return out
+
+
+def mint_beacon_pending_card(
+    payload: dict[str, Any], chat_id: int, source_ts: Optional[str] = None,
+) -> bool:
+    """Emit the MISSING approval_request chain_event for a directly-registered
+    pending entry. Does NOT call add_pending (the entry already exists in the
+    local store); only the decide-tab chain_event is written, stamped with a REAL
+    reply_chat_id (never 0) so the card renders and the Approve DM has a
+    recipient. Returns True on a confirmed tab-feed upsert."""
+    p = dict(payload)
+    p.pop('_subject', None)
+    p.pop('_ledger_key', None)
+    kwargs = approval.build_approval_request_chain_event(
+        p, ts=source_ts, reply_chat_id=chat_id)
+    return chain_event_emit.emit_event(**kwargs)
+
+
+def reconcile_beacon_pending_mint(
+    state: dict[str, Any], promoted: dict[str, Any],
+) -> tuple[int, bool]:
+    """Mint the missing decide-tab card for every directly-registered pending
+    entry that has no open card. Mutates `promoted` in place (records each minted
+    card under its namespaced ledger key). Returns (minted_count, ledger_changed).
+
+    Fail-safe throughout: a fetch/connect failure fails CLOSED (skip this tick,
+    retry next); no resolvable chat skips the batch (never stamp chat_id=0); a
+    per-entry emit error or an unconfirmed tab write skips that entry and leaves
+    it for the next tick — a legit pending approval is never dropped."""
+    pending_entries = [
+        e for e in (state.get('pending') or []) if isinstance(e, dict)
+    ]
+    # Cheap short-circuit BEFORE the network fetch: is there any genuine, not-yet-
+    # ledgered decision at all? If not, skip the fetch entirely.
+    has_candidate = any(
+        is_beacon_pending_decision(e)
+        and (BEACONPENDING_LEDGER_PREFIX + _beacon_pending_entry_id(e))
+        not in promoted
+        for e in pending_entries
+    )
+    if not has_candidate:
+        return 0, False
+    open_ids = open_approval_card_task_ids()
+    if open_ids is None:
+        # Fail closed: we cannot confirm whether a card already exists.
+        return 0, False
+    to_mint = evaluate_beacon_pending(pending_entries, open_ids, promoted)
+    if not to_mint:
+        return 0, False
+    chat_id = _chat_id()
+    if chat_id is None:
+        log(f'beacon-pending: no chat resolvable '
+            f'(OURLIBERTY_APPROVAL_HEALER_CHAT_ID unset and '
+            f'TELEGRAM_ALLOWED_CHAT_IDS empty); skipping {len(to_mint)} '
+            f'mint(s) rather than stamp chat_id=0 cards', 'ERROR')
+        return 0, False
+    minted = 0
+    changed = False
+    for payload in to_mint:
+        ledger_key = payload.get('_ledger_key')
+        task_id = payload['task_id']
+        try:
+            ok = mint_beacon_pending_card(payload, chat_id)
+        except Exception as e:  # noqa: BLE001 — one bad entry never wedges the tick
+            log(f'beacon-pending: mint raised for {task_id}: '
+                f'{type(e).__name__}: {e}; leaving for next tick', 'WARN')
+            continue
+        if not ok:
+            log(f'beacon-pending: tab render NOT confirmed for {task_id} '
+                f'(chain_event upsert failed); leaving for next tick', 'WARN')
+            continue
+        promoted[ledger_key] = {
+            'task_id': task_id,
+            'subject': task_id,
+            'promoted_at': datetime.now(timezone.utc).isoformat(),
+            'source': PROMOTED_SOURCE_BEACON_PENDING,
+        }
+        minted += 1
+        changed = True
+        log(f'beacon-pending: minted approval_request card for {task_id} '
+            f'(tab-write=ok)')
+    return minted, changed
+
+
+def reconcile_beacon_pending_retire(
+    promoted: dict[str, Any], pending_ids: set[str],
+) -> tuple[list[str], dict[str, Any]]:
+    """Retire minted local-store cards whose entry has LEFT `pending` (Beacon
+    resolved it, it moved to history, or it was removed). Returns
+    (retired_task_ids, remaining_ledger). Pure — no I/O; the caller clears the
+    minted cards' read_at and persists the trimmed ledger.
+
+    We do NOT call approval.resolve on these task_ids: the entry is Beacon's, and
+    if it left `pending` it is already resolved/gone — the healer only clears the
+    minted card's read_at (idempotent with heal_stale_approvals) and drops the
+    ledger entry. A still-pending entry's card is NEVER retired."""
+    retired: list[str] = []
+    remaining: dict[str, Any] = {}
+    for key, value in promoted.items():
+        if not (isinstance(key, str)
+                and key.startswith(BEACONPENDING_LEDGER_PREFIX)):
+            remaining[key] = value
+            continue
+        _subject, task_id, _promoted_at = _ledger_entry_fields(key, value)
+        if task_id in pending_ids:
+            remaining[key] = value  # still live — keep the card + ledger entry
+            continue
+        retired.append(task_id)
+        log(f'beacon-pending retire: {key!r} task={task_id} (entry left pending)')
+    return retired, remaining
+
+
 # -------------------- retire-on-resolution (decision 3) --------------------
 
 def _ledger_entry_fields(key: str, value: Any) -> tuple[str, str, Optional[str]]:
@@ -1556,6 +1820,14 @@ def reconcile_retire(
         # it purely for cross-tick dedup); there is nothing on the tab to retire,
         # so keep it as a dedup entry and never probe it for resolution.
         if isinstance(value, dict) and value.get('skipped'):
+            remaining[key] = value
+            continue
+        # Beacon-pending (third-source) cards share the real pending entry's id
+        # and are retired by their OWN pass (reconcile_beacon_pending_retire),
+        # keyed on the entry leaving `pending` — NOT by the subject-based
+        # resolution_signal here, which would both mis-probe and wrongly
+        # approval.resolve() the shared entry. Leave them untouched.
+        if key.startswith(BEACONPENDING_LEDGER_PREFIX):
             remaining[key] = value
             continue
         subject, task_id, promoted_at = _ledger_entry_fields(key, value)
@@ -1834,6 +2106,29 @@ def main() -> int:
         _clear_retired_read_at([tid for tid, _ in retired])
         log(f'retired {len(retired)} resolved card(s) off the tab')
 
+    # --- BEACON-PENDING RETIRE (third source) ---
+    # A minted local-store card whose entry has LEFT `pending` (Beacon resolved
+    # it, it moved to history, or was removed) must clear off the tab. We do NOT
+    # approval.resolve() the shared entry (it is already gone from pending —
+    # Beacon owns that); we only clear the minted card's read_at (idempotent with
+    # heal_stale_approvals) and drop the ledger entry so it is not re-checked.
+    try:
+        pending_ids_now = {
+            _beacon_pending_entry_id(e)
+            for e in (state.get('pending') or [])
+            if isinstance(e, dict) and _beacon_pending_entry_id(e)
+        }
+        bp_retired, promoted = reconcile_beacon_pending_retire(
+            promoted, pending_ids_now)
+    except Exception as e:  # noqa: BLE001 — a bad ledger never wedges the tick
+        log(f'beacon-pending retire failed: {type(e).__name__}: {e}', 'ERROR')
+        bp_retired = []
+    if bp_retired:
+        ledger_changed = True
+        _clear_retired_read_at(bp_retired)
+        log(f'beacon-pending: retired {len(bp_retired)} minted card(s) off the '
+            f'tab')
+
     # Recover the real APPROVAL_REQUEST markers Beacon emitted (read once,
     # outside the promote loop) so a promoted card carries Beacon's actual
     # proposal instead of a needs-triage reconstruction. Best-effort: a failure
@@ -1894,6 +2189,23 @@ def main() -> int:
         to_promote_for_larry = []
     to_promote = to_promote + to_promote_for_larry
 
+    # --- THIRD SOURCE: beacon-pending-approvals local store ---
+    # Mint the MISSING approval_request chain_event for directly-registered
+    # pending entries that never emitted one (e.g. suite_guardian_stage._emit_card:
+    # add_pending + Telegram DM, no chain_event) so every genuinely-open local
+    # decision has a decide-tab card and the tab count matches what Beacon reports.
+    # Self-contained: its own open-card fetch + chat resolve + emit + ledger; it
+    # does NOT use add_pending (the entry already exists) and mints under the
+    # entry's OWN id. Runs BEFORE the `not to_promote` early-return so it fires
+    # even on a tick with no alert/for-larry promotions. Fail-safe — never raises.
+    try:
+        bp_minted, bp_changed = reconcile_beacon_pending_mint(state, promoted)
+    except Exception as e:  # noqa: BLE001 — a third-source fault never wedges tick
+        log(f'beacon-pending mint failed: {type(e).__name__}: {e}', 'ERROR')
+        bp_minted, bp_changed = 0, False
+    if bp_changed:
+        ledger_changed = True
+
     # Record the suppressed needs-triage identities in the promoted ledger as
     # SKIP markers so they are not re-evaluated (or re-logged) on the next tick.
     # No card is created; the source larry-alert is untouched. reconcile_retire
@@ -1916,10 +2228,12 @@ def main() -> int:
         if ledger_changed:
             save_promoted(promoted)
         _log_doorbell_reconcile(
-            promoted_count=0, repair_failures=0, retired=len(retired))
+            promoted_count=bp_minted, repair_failures=0,
+            retired=len(retired) + len(bp_retired))
         log(f'tick: scanned {len(alerts)} alert(s) + '
-            f'{len(for_larry_records)} for-larry record(s); nothing to promote; '
-            f'retired {len(retired)}')
+            f'{len(for_larry_records)} for-larry record(s); nothing to promote '
+            f'from feeds; beacon-pending minted {bp_minted}; '
+            f'retired {len(retired)} (+{len(bp_retired)} beacon-pending)')
         return 0
 
     # NULL-CHAT FALLBACK (defect 2): resolve a real recipient BEFORE registering
@@ -2085,10 +2399,13 @@ def main() -> int:
             ),
         )
     _log_doorbell_reconcile(
-        promoted_count=promoted_count, repair_failures=len(repair_failures),
-        retired=len(retired))
+        promoted_count=promoted_count + bp_minted,
+        repair_failures=len(repair_failures),
+        retired=len(retired) + len(bp_retired))
     log(f'done: promoted {promoted_count} direction-ask(s); '
-        f'retired {len(retired)}; repair-failures {len(repair_failures)}')
+        f'beacon-pending minted {bp_minted}; '
+        f'retired {len(retired)} (+{len(bp_retired)} beacon-pending); '
+        f'repair-failures {len(repair_failures)}')
     return 0
 
 

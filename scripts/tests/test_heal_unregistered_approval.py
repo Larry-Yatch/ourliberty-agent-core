@@ -2090,5 +2090,319 @@ class ReconcilerMainTest(unittest.TestCase):
         r['self_fail'].assert_not_called()
 
 
+# ===================================================================
+# THIRD SOURCE — beacon-pending-approvals local store
+# (reconcile-local-pending-approvals-to-decide-tab-001):
+# a directly-registered pending entry with NO approval_request chain_event
+# (the suite-guardian-graduation-stage-1 class: add_pending + Telegram DM, no
+# chain_event, chat_id=0) is missing from the decide tab. The healer mints the
+# MISSING chain_event under the entry's OWN id so the tab count matches Beacon.
+# ===================================================================
+
+# The real 2026-07-30 directly-registered entry: on disk with a full
+# dispatch_payload but no chain_event and chat_id=0.
+SUITE_GUARDIAN_PENDING_ENTRY = {
+    'id': 'suite-guardian-graduation-stage-1',
+    'decision_key': 'suite-guardian-graduation-stage-1',
+    'created_at': _ts(6),
+    'chat_id': 0,
+    'status': 'pending',
+    'plan_summary': (
+        'Main-Suite Green Guardian has earned graduation to Stage 1.\n\n'
+        'Approve to open a config-only PR flipping config/suite-guardian.json '
+        'to stage 1.'
+    ),
+    'target_agent': 'forge',
+    'dispatch_payload': {
+        'task_id': 'suite-guardian-graduation-stage-1',
+        'summary': 'Main-Suite Green Guardian has earned graduation to Stage 1.',
+        'target_agent': 'forge',
+        'target_repo': 'ourliberty-agent-core',
+        'task_type': 'doc-only',
+        'pr_title': 'chore(suite-guardian): graduate to autonomy stage 1',
+        'prompt': 'Open a config-only PR that raises the stage.',
+    },
+}
+
+
+class IsBeaconPendingDecisionTest(unittest.TestCase):
+    def test_directly_registered_entry_is_a_decision(self):
+        self.assertTrue(
+            h.is_beacon_pending_decision(SUITE_GUARDIAN_PENDING_ENTRY))
+
+    def test_plan_summary_only_still_qualifies(self):
+        entry = {'id': 'x', 'status': 'pending', 'plan_summary': 'decide this'}
+        self.assertTrue(h.is_beacon_pending_decision(entry))
+
+    def test_resolved_status_never_carded(self):
+        entry = dict(SUITE_GUARDIAN_PENDING_ENTRY, status='approved')
+        self.assertFalse(h.is_beacon_pending_decision(entry))
+
+    def test_contentless_entry_skipped(self):
+        entry = {'id': 'x', 'status': 'pending'}
+        self.assertFalse(h.is_beacon_pending_decision(entry))
+
+    def test_missing_id_skipped(self):
+        entry = {'status': 'pending', 'plan_summary': 'y'}
+        self.assertFalse(h.is_beacon_pending_decision(entry))
+
+    def test_non_dict_skipped(self):
+        self.assertFalse(h.is_beacon_pending_decision('not-a-dict'))
+
+
+class BuildBeaconPendingPayloadTest(unittest.TestCase):
+    def test_task_id_is_the_entry_own_id(self):
+        p = h.build_beacon_pending_card_payload(SUITE_GUARDIAN_PENDING_ENTRY)
+        # Mint under the entry's OWN id (NOT a derived unreg-approval-<hash>) so
+        # the card shares identity with the real pending entry.
+        self.assertEqual(p['task_id'], 'suite-guardian-graduation-stage-1')
+        self.assertFalse(p['task_id'].startswith(h.PROMOTED_TASK_PREFIX + '-'))
+
+    def test_prompt_carries_plan_summary(self):
+        p = h.build_beacon_pending_card_payload(SUITE_GUARDIAN_PENDING_ENTRY)
+        self.assertIn('earned graduation to Stage 1', p['prompt'])
+
+    def test_target_agent_from_dispatch_payload(self):
+        p = h.build_beacon_pending_card_payload(SUITE_GUARDIAN_PENDING_ENTRY)
+        self.assertEqual(p['target_agent'], 'forge')
+
+    def test_ledger_key_is_namespaced(self):
+        p = h.build_beacon_pending_card_payload(SUITE_GUARDIAN_PENDING_ENTRY)
+        self.assertEqual(
+            p['_ledger_key'],
+            h.BEACONPENDING_LEDGER_PREFIX + 'suite-guardian-graduation-stage-1')
+
+
+class EvaluateBeaconPendingTest(unittest.TestCase):
+    def test_uncarded_entry_is_minted(self):
+        out = h.evaluate_beacon_pending(
+            [SUITE_GUARDIAN_PENDING_ENTRY], open_card_task_ids=set(),
+            promoted={})
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0]['task_id'], 'suite-guardian-graduation-stage-1')
+
+    def test_entry_with_open_card_not_duplicated(self):
+        # A normally-registered approval DID emit its chain_event -> its id is in
+        # the open-card set -> never double-carded.
+        out = h.evaluate_beacon_pending(
+            [SUITE_GUARDIAN_PENDING_ENTRY],
+            open_card_task_ids={'suite-guardian-graduation-stage-1'},
+            promoted={})
+        self.assertEqual(out, [])
+
+    def test_entry_already_in_ledger_skipped(self):
+        key = h.BEACONPENDING_LEDGER_PREFIX + 'suite-guardian-graduation-stage-1'
+        out = h.evaluate_beacon_pending(
+            [SUITE_GUARDIAN_PENDING_ENTRY], open_card_task_ids=set(),
+            promoted={key: {'task_id': 'suite-guardian-graduation-stage-1'}})
+        self.assertEqual(out, [])
+
+
+class MintBeaconPendingCardTest(unittest.TestCase):
+    def test_emits_chain_event_with_real_chat_and_summary(self):
+        payload = h.build_beacon_pending_card_payload(
+            SUITE_GUARDIAN_PENDING_ENTRY)
+        captured = {}
+
+        def fake_emit(**kwargs):
+            captured.update(kwargs)
+            return True
+
+        with mock.patch.object(h.chain_event_emit, 'emit_event',
+                               side_effect=fake_emit):
+            ok = h.mint_beacon_pending_card(payload, chat_id=4242)
+
+        self.assertTrue(ok)
+        self.assertEqual(captured['event_type'], 'approval_request')
+        self.assertEqual(captured['task_id'], 'suite-guardian-graduation-stage-1')
+        # a REAL chat_id is threaded into the card (never 0)
+        self.assertEqual(captured['payload'].get('reply_chat_id'), 4242)
+        self.assertIn('earned graduation to Stage 1', captured['payload']['prompt'])
+
+    def test_helper_keys_stripped_before_emit(self):
+        payload = h.build_beacon_pending_card_payload(
+            SUITE_GUARDIAN_PENDING_ENTRY)
+        seen = {}
+
+        def fake_emit(**kwargs):
+            seen.update(kwargs)
+            return True
+
+        with mock.patch.object(h.chain_event_emit, 'emit_event',
+                               side_effect=fake_emit):
+            h.mint_beacon_pending_card(payload, chat_id=4242)
+        # transient helper keys never leak into the chain_event payload
+        self.assertNotIn('_ledger_key', seen['payload'])
+        self.assertNotIn('_subject', seen['payload'])
+
+
+class ReconcileBeaconPendingRetireTest(unittest.TestCase):
+    def test_entry_gone_from_pending_is_retired(self):
+        key = h.BEACONPENDING_LEDGER_PREFIX + 'suite-guardian-graduation-stage-1'
+        promoted = {key: {'task_id': 'suite-guardian-graduation-stage-1',
+                          'source': h.PROMOTED_SOURCE_BEACON_PENDING}}
+        retired, remaining = h.reconcile_beacon_pending_retire(
+            promoted, pending_ids=set())
+        self.assertEqual(retired, ['suite-guardian-graduation-stage-1'])
+        self.assertNotIn(key, remaining)
+
+    def test_still_pending_entry_is_kept(self):
+        key = h.BEACONPENDING_LEDGER_PREFIX + 'suite-guardian-graduation-stage-1'
+        promoted = {key: {'task_id': 'suite-guardian-graduation-stage-1'}}
+        retired, remaining = h.reconcile_beacon_pending_retire(
+            promoted, pending_ids={'suite-guardian-graduation-stage-1'})
+        self.assertEqual(retired, [])
+        self.assertIn(key, remaining)
+
+    def test_non_beaconpending_keys_untouched(self):
+        promoted = {'ref:5': _ts(0), 'forlarry:x': {'task_id': 'y'}}
+        retired, remaining = h.reconcile_beacon_pending_retire(
+            promoted, pending_ids=set())
+        self.assertEqual(retired, [])
+        self.assertEqual(remaining, promoted)
+
+
+class BeaconPendingMainIntegrationTest(unittest.TestCase):
+    """The third source, end-to-end through main(): the five spec cases."""
+
+    def _drive_main(self, *, pending_entries, open_ids, promoted=None,
+                    chat_id=4242, emit=True):
+        import contextlib
+        add_pending = mock.MagicMock(
+            side_effect=lambda p, **kw: {'id': p['task_id']})
+        save_promoted = mock.MagicMock()
+        clear_read_at = mock.MagicMock(return_value=0)
+        emit_event = mock.MagicMock(
+            side_effect=emit if callable(emit) else (lambda **kw: emit))
+        state = {'pending': list(pending_entries), 'history': []}
+        with mock.patch.object(h, 'kill_switch',
+                               return_value=Path('/nonexistent/kill-switch')), \
+             mock.patch.object(h, 'heartbeat'), \
+             mock.patch.object(h, 'log'), \
+             mock.patch.object(h, 'load_heuristics',
+                               return_value=DEFAULT_HEURISTICS), \
+             mock.patch.object(h, 'read_alerts', return_value=[]), \
+             mock.patch.object(h, 'read_for_larry_records', return_value=[]), \
+             mock.patch.object(h, 'load_beacon_outbox_markers',
+                               return_value=[]), \
+             mock.patch.object(h, 'load_promoted',
+                               return_value=promoted or {}), \
+             mock.patch.object(h, 'save_promoted', new=save_promoted), \
+             mock.patch.object(h, 'reconcile_retire',
+                               side_effect=lambda led, *a, **k: ([], led)), \
+             mock.patch.object(h, 'open_approval_card_task_ids',
+                               return_value=open_ids), \
+             mock.patch.object(h, '_clear_retired_read_at', new=clear_read_at), \
+             mock.patch.object(h, '_chat_id', return_value=chat_id), \
+             mock.patch.object(h, 'doorbell_counts', return_value=(0, 0)), \
+             mock.patch.object(h.chain_event_emit, 'emit_event',
+                               new=emit_event), \
+             mock.patch.object(approval, 'state_lock',
+                               return_value=contextlib.nullcontext()), \
+             mock.patch.object(approval, 'save_state'), \
+             mock.patch.object(approval, 'add_pending', new=add_pending), \
+             mock.patch.object(approval, 'load_state', return_value=state):
+            rc = h.main()
+        return {
+            'rc': rc, 'add_pending': add_pending,
+            'save_promoted': save_promoted, 'emit_event': emit_event,
+            'clear_read_at': clear_read_at,
+        }
+
+    # --- case 1: directly-registered entry, no card -> mint ONE ---
+    def test_uncarded_entry_mints_one_card_with_real_chat(self):
+        r = self._drive_main(
+            pending_entries=[SUITE_GUARDIAN_PENDING_ENTRY], open_ids=set())
+        self.assertEqual(r['rc'], 0)
+        # exactly one chain_event minted, under the entry's own id
+        self.assertEqual(r['emit_event'].call_count, 1)
+        kwargs = r['emit_event'].call_args.kwargs
+        self.assertEqual(kwargs['event_type'], 'approval_request')
+        self.assertEqual(kwargs['task_id'], 'suite-guardian-graduation-stage-1')
+        self.assertEqual(kwargs['payload'].get('reply_chat_id'), 4242)
+        # NEVER a new pending entry (it already exists)
+        r['add_pending'].assert_not_called()
+        # recorded under the namespaced ledger key
+        ledger = r['save_promoted'].call_args[0][0]
+        self.assertIn(
+            h.BEACONPENDING_LEDGER_PREFIX + 'suite-guardian-graduation-stage-1',
+            ledger)
+
+    # --- case 2: entry already has an open card -> NO duplicate ---
+    def test_entry_with_open_card_not_duplicated(self):
+        r = self._drive_main(
+            pending_entries=[SUITE_GUARDIAN_PENDING_ENTRY],
+            open_ids={'suite-guardian-graduation-stage-1'})
+        self.assertEqual(r['rc'], 0)
+        r['emit_event'].assert_not_called()
+        r['add_pending'].assert_not_called()
+
+    # --- case 3: entry moved to resolved/history -> minted card retired ---
+    def test_resolved_entry_retires_minted_card(self):
+        key = h.BEACONPENDING_LEDGER_PREFIX + 'suite-guardian-graduation-stage-1'
+        # entry no longer in pending (Beacon resolved it), ledger still has it
+        r = self._drive_main(
+            pending_entries=[], open_ids=set(),
+            promoted={key: {'task_id': 'suite-guardian-graduation-stage-1',
+                            'source': h.PROMOTED_SOURCE_BEACON_PENDING}})
+        self.assertEqual(r['rc'], 0)
+        # the minted card's read_at is cleared (card leaves the tab)
+        r['clear_read_at'].assert_called_once_with(
+            ['suite-guardian-graduation-stage-1'])
+        # ledger no longer carries the retired key
+        ledger = r['save_promoted'].call_args[0][0]
+        self.assertNotIn(key, ledger)
+        r['emit_event'].assert_not_called()
+
+    # --- case 4: re-run, still pending + already carded -> no second card ---
+    def test_rerun_already_carded_no_second_mint(self):
+        key = h.BEACONPENDING_LEDGER_PREFIX + 'suite-guardian-graduation-stage-1'
+        r = self._drive_main(
+            pending_entries=[SUITE_GUARDIAN_PENDING_ENTRY], open_ids=set(),
+            promoted={key: {'task_id': 'suite-guardian-graduation-stage-1',
+                            'source': h.PROMOTED_SOURCE_BEACON_PENDING}})
+        self.assertEqual(r['rc'], 0)
+        r['emit_event'].assert_not_called()
+
+    # --- case 5a: malformed entry -> skipped, no raise ---
+    def test_malformed_entry_skipped_without_raising(self):
+        r = self._drive_main(
+            pending_entries=['not-a-dict', {'status': 'pending'}],
+            open_ids=set())
+        self.assertEqual(r['rc'], 0)
+        r['emit_event'].assert_not_called()
+
+    # --- case 5b: emit error -> skipped, no raise, entry left for next tick ---
+    def test_emit_error_skipped_without_raising(self):
+        def boom(**kwargs):
+            raise RuntimeError('supabase down')
+
+        r = self._drive_main(
+            pending_entries=[SUITE_GUARDIAN_PENDING_ENTRY], open_ids=set(),
+            emit=boom)
+        self.assertEqual(r['rc'], 0)
+        # nothing recorded in the ledger for an unemitted card
+        ledger = r['save_promoted'].call_args[0][0] \
+            if r['save_promoted'].called else {}
+        self.assertNotIn(
+            h.BEACONPENDING_LEDGER_PREFIX + 'suite-guardian-graduation-stage-1',
+            ledger)
+
+    # --- fail-closed: open-card set unavailable -> no mint this tick ---
+    def test_open_card_fetch_unavailable_fails_closed(self):
+        r = self._drive_main(
+            pending_entries=[SUITE_GUARDIAN_PENDING_ENTRY], open_ids=None)
+        self.assertEqual(r['rc'], 0)
+        r['emit_event'].assert_not_called()
+
+    # --- null chat -> skip mint rather than stamp chat_id=0 ---
+    def test_no_chat_skips_mint(self):
+        r = self._drive_main(
+            pending_entries=[SUITE_GUARDIAN_PENDING_ENTRY], open_ids=set(),
+            chat_id=None)
+        self.assertEqual(r['rc'], 0)
+        r['emit_event'].assert_not_called()
+
+
 if __name__ == '__main__':
     unittest.main()
