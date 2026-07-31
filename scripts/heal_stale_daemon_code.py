@@ -778,6 +778,16 @@ def _restart_unit_now(unit: str) -> tuple[int, str]:
         # is a genuine failure independent of drain timing; report it.
         return result.returncode, (result.stderr or '').strip()
 
+    # KNOWN AND DELIBERATELY NOT FIXED HERE (see the module docstring of
+    # heal_claude_json_bind_drift): this verify concludes from `is-active`
+    # alone, which reads 'active' for the OLD process too, so a restart that
+    # was never enqueued can read as a success. That healer carries
+    # InvocationID/MainPID identity evidence for exactly this reason. It is not
+    # ported here because THIS healer's detector (script mtime vs unit
+    # active-since) still fires on a non-active unit: a misread costs one
+    # wasted tick, not permanent blindness. Do not "harmonise" without
+    # re-deriving that difference.
+    #
     # Brief settle, then verify the unit is (becoming) active. This is what
     # makes a slow-draining restart report success instead of a false
     # failure: systemd completes the restart in the background.

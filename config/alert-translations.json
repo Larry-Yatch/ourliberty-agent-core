@@ -253,20 +253,44 @@
     "rebound": {
       "severity": "INFO",
       "tier": "FYI",
-      "plain_language_summary": "A Telegram bot's claude config file mount had gone read-only (the file was atomically replaced on the host after the unit started, so the bot was failing with `[claude exit 1]` and looked offline). The healer restarted the unit to re-bind the current file and confirmed it is writable again. No action needed — a routine self-heal surfaced for the record only.",
+      "plain_language_summary": "A Telegram bot's claude config file mount had gone read-only (the file was atomically replaced on the host after the unit started, so the bot was failing with `[claude exit 1]` and looked offline). The healer restarted the unit to re-bind the current file, then CONFIRMED the fix: the unit is active under a new systemd invocation and a fresh probe inside that new mount namespace opened the file for writing. This subject is now only emitted with that positive evidence — an unconfirmed or failed repair goes to `still-dangled`, `repair-did-not-land` or `repair-not-enqueued` instead. No action needed.",
       "recommended_action": "None — the bot was restarted and re-verified writable. Self-healed; details appear in the daily digest. Runbook: runbooks/claude-json-bind-drift.md."
     },
     "repair-failed": {
       "severity": "URGENT",
       "tier": "NOW",
-      "plain_language_summary": "A Telegram bot's claude config file mount went read-only (EROFS) and the healer tried to fix it by restarting the unit, but the restart did NOT bring the bot back. The bot is likely still offline or replying with `[claude exit 1]`, and there is no automatic retry.",
-      "recommended_action": "Restart the unit by hand (`sudo systemctl restart <unit>`) and check `journalctl -u <unit> -n 50` for why it failed to come up. Runbook: runbooks/claude-json-bind-drift.md."
+      "plain_language_summary": "A Telegram bot's claude config file mount went read-only (EROFS) and the healer tried to restart the unit, but systemd REFUSED the restart command outright — no restart job was ever created, so nothing will retry it. The bot is still offline or replying with `[claude exit 1]`. This subject is reserved for an up-front rejection (e.g. the unit does not exist, or sudo/systemctl is missing); a restart that simply has not finished yet does NOT come here.",
+      "recommended_action": "Restart the unit by hand (`sudo systemctl restart <unit>`) and check `journalctl -u <unit> -n 50` for why systemd refused. Runbook: runbooks/claude-json-bind-drift.md."
+    },
+    "repair-did-not-land": {
+      "severity": "URGENT",
+      "tier": "NOW",
+      "plain_language_summary": "The healer restarted a bot to fix a read-only claude config mount, and five minutes later the unit is still not running. The DM says which of the two ways it failed: either no new systemd invocation ever appeared (the stop half ran, the start half did not), or a new invocation DID appear and then died (it came back and did not stay up — typically a crash loop or an exhausted StartLimitBurst). Either way the bot is down and nothing is retrying it.",
+      "recommended_action": "Read the DM for which of the two it was, then `journalctl -u <unit> -n 80` and `systemctl status <unit>` (common causes: an ExecStart failure, a failed dependency, or an exhausted StartLimitBurst), then `sudo systemctl restart <unit>`. Runbook: runbooks/claude-json-bind-drift.md."
+    },
+    "verify-unreadable": {
+      "severity": "URGENT",
+      "tier": "NOW",
+      "plain_language_summary": "The healer restarted a bot to fix a read-only claude config mount and then could not read systemd AT ALL for the next five minutes, so it cannot say whether its own repair worked. This is NOT a report that the bot is down — the bot may be running perfectly. What is broken is the healer's read path (`systemctl show` timing out, or systemctl missing), and while it stays broken this healer can neither detect nor repair a dangled mount on any unit.",
+      "recommended_action": "Check systemd itself first — `systemctl is-system-running`, then `systemctl status <unit>` to find out what actually happened to the bot. Investigate dbus/systemd responsiveness, not the unit's ExecStart. Runbook: runbooks/claude-json-bind-drift.md."
+    },
+    "repair-not-enqueued": {
+      "severity": "URGENT",
+      "tier": "NOW",
+      "plain_language_summary": "The healer tried to restart a bot with a read-only claude config mount, but the restart COMMAND ITSELF hung and no systemd job appeared — the bot is still running its original, broken process. This points at the healer's own privilege/IPC path (`sudo -n` rejected or hanging, or systemd/dbus unresponsive), NOT at the bot's config: the carve-out is fine and nothing is replacing the file.",
+      "recommended_action": "Check `systemctl is-system-running`, the droplet sudoers NOPASSWD contract, and dbus. The healer retries every 2 minutes on its own (no cooldown was burned, because nothing was restarted). Runbook: runbooks/claude-json-bind-drift.md."
+    },
+    "repair-deferred": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "plain_language_summary": "A bot's claude config mount is read-only and the healer has run out of its per-tick time budget repairing OTHER units first, three ticks in a row — this one is being starved. It is still broken (claude in that unit is failing with `[claude exit 1]`). The healer defers rather than shortening a live agent drain, because shortening one would kill a paid Claude session mid-run.",
+      "recommended_action": "Repair it by hand (`sudo systemctl restart <unit>`), then look at why so many units are dangling at once — a single atomic replacement of /home/larry/.claude.json breaks every carve-out unit in the same tick. Runbook: runbooks/claude-json-bind-drift.md."
     },
     "still-dangled": {
       "severity": "URGENT",
       "tier": "NOW",
-      "plain_language_summary": "A bot's claude config file mount went read-only again within minutes of an automatic restart — the auto-repair fired recently and the problem came right back, so the healer stopped restarting to avoid a loop. This points at a structural problem: the read-write carve-out may have been removed from the unit file, or something is replacing the config file every few minutes.",
-      "recommended_action": "Confirm the carve-out is still present (`systemctl cat <unit> | grep ReadWritePaths`), then restart by hand (`sudo systemctl restart <unit>`) and investigate what is replacing the file. Runbook: runbooks/claude-json-bind-drift.md."
+      "plain_language_summary": "A bot's claude config file mount is PROVEN still read-only after an automatic restart — either the freshly-restarted process probed read-only straight away, or the mount went read-only again within minutes of the repair. The healer has NOT given up: it keeps retrying the restart every 15 minutes for as long as the mount stays dangled, and it is this MESSAGE that is rate-limited (at most once every 6 hours per unit), so the retries carry on quietly in between. Restarting is not fixing it, which points at something structural: the read-write carve-out may have been removed from the unit file, or something is replacing the config file every few minutes.",
+      "recommended_action": "A hand restart will not stick while the cause is live, so find the cause: confirm the carve-out is still present (`systemctl cat <unit> | grep ReadWritePaths`), then work out what keeps replacing the file. Runbook: runbooks/claude-json-bind-drift.md."
     },
     "probe-blind": {
       "severity": "WARNING",

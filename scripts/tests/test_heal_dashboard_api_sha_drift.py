@@ -19,6 +19,7 @@ try:  # engage the test sandbox before any production import reads env/paths
 except ImportError:  # discover loads this module top-level (no package parent)
     import _bootstrap  # noqa: F401
 
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -480,6 +481,53 @@ class ConfidenceSeverityLockTest(_Base):
         self.assertEqual(len(healed), 1)
         self.assertEqual(healed[0]['severity'], 'warning')
         self.assertEqual(healed[0]['route'], 'digest')
+
+
+class RestartVerifyPendingJobTests(unittest.TestCase):
+    """`restart --no-block` only ENQUEUES the job. An unhealthy is-active read
+    taken while our own start job is still queued (typically behind an `After=`
+    ordering dependency that is still draining) is IN PROGRESS, not a failure —
+    concluding failure there is what false-paged ~90s-drain units. Same
+    discriminator as heal_stale_daemon_code; the set-wide invariant lives in
+    scripts/tests/test_restart_verify_invariants.py."""
+
+    def setUp(self):
+        super().setUp()
+        p = mock.patch.object(h.time, 'sleep', lambda *_: None)
+        p.start()
+        self.addCleanup(p.stop)
+        p = mock.patch.object(h, 'log', lambda *a, **k: None)
+        p.start()
+        self.addCleanup(p.stop)
+        # Restart shellout + daemon-reload always succeed.
+        p = mock.patch.object(
+            h.subprocess, 'run',
+            return_value=subprocess.CompletedProcess([], 0, '', ''))
+        p.start()
+        self.addCleanup(p.stop)
+
+    def test_unhealthy_state_with_a_pending_job_is_in_progress_success(self):
+        with mock.patch.object(h, '_unit_active_state', return_value='inactive'), \
+             mock.patch.object(h, '_unit_pending_job', return_value='17 start'):
+            self.assertEqual(h.restart_unit('ourliberty-dashboard-api.service'),
+                             (0, ''))
+
+    def test_unhealthy_state_with_no_pending_job_is_still_a_failure(self):
+        with mock.patch.object(h, '_unit_active_state', return_value='failed'), \
+             mock.patch.object(h, '_unit_pending_job', return_value=''):
+            rc, detail = h.restart_unit('ourliberty-dashboard-api.service')
+        self.assertEqual(rc, -1)
+        self.assertIn('failed', detail)
+
+    def test_pending_job_probe_fails_safe_to_empty(self):
+        for exc in (subprocess.TimeoutExpired('systemctl', 10), FileNotFoundError()):
+            with self.subTest(exc=type(exc).__name__):
+                with mock.patch.object(h.subprocess, 'run', side_effect=exc):
+                    self.assertEqual(h._unit_pending_job('u.service'), '')
+        with mock.patch.object(
+                h.subprocess, 'run',
+                return_value=subprocess.CompletedProcess([], 0, 'Nope=1\n', '')):
+            self.assertEqual(h._unit_pending_job('u.service'), '')
 
 
 if __name__ == '__main__':

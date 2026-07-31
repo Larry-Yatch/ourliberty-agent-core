@@ -12,17 +12,41 @@ EnvironmentFile=/home/larry/credentials/.env.larry
 Environment="HOME=/home/larry"
 Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/heal_claude_json_bind_drift.py
-# Probes are fast (one open()/close() per persistent unit); a tick that has to
-# restart several dangled units costs ~RESTART_SETTLE_S each, so allow headroom.
+# SIZED FOR THE WHOLE FLEET, NOT ONE UNIT. A single atomic replacement of
+# /home/larry/.claude.json dangles EVERY persistent carve-out unit in the same
+# tick, so the budget is:
 #
-# 1200s covers heal_claude_json_bind_drift.AGENT_DRAIN_CEILING_SEC (900) plus
-# that per-unit restart overhead. Rebinding a unit that hosts Claude sessions now
-# cordons it and waits for the live session to finish (PR 3), and that drain can
-# run to the ceiling. Raised from 120s, which is the #1000 bug: systemd SIGTERMs
-# the healer mid-drain, Python's `finally` does not run on SIGTERM, so the
-# restart silently never happens — it fails safe and does nothing.
-# test_restart_guard.CallerCeilingBudgetTests pins this against the ceiling.
-TimeoutStartSec=1200
+#   (N_carveout_daemons - 1) x PEER_REPAIR_BUDGET_S   (pre-flight re-confirm +
+#                                                      restart shellout +
+#                                                      VERIFY_WINDOW_S + capped
+#                                                      systemctl shows + the
+#                                                      confirming nsenter probe)
+#   + AGENT_DRAIN_CEILING_SEC (900)                   (the one agent-hosting
+#                                                      unit that cordons and
+#                                                      drains a live session)
+#   + that unit's own restart overhead
+#
+# which is 1600s for today's seven units — hence 2100. The old comment here said
+# "~RESTART_SETTLE_S each" (3s) and modelled a single repaired unit; that was off
+# by an order of magnitude in the exact scenario the healer exists for.
+# Undersizing this is the #1000 bug: systemd SIGTERMs the healer mid-loop,
+# Python's `finally` does not run on SIGTERM, and the units it had not reached
+# yet are silently never repaired with no alert.
+#
+# WHY 2100 AND NOT 1800. 1800 covered the pre-pre-flight cost (1425s) with ~195s
+# of one-tick margin. reconfirm_before_restart added PREFLIGHT_BUDGET_S (25s) per
+# repaired unit — 175s across the fleet — which at 1800 leaves TICK_BUDGET_S -
+# fleet_cost = 20s. Detection alone (one `systemctl show` per ~108
+# ourliberty-*.service unit) exceeds 20s at any plausible latency, so 1800 would
+# not have SIGTERMed anything: it would quietly have deferred the agent-hosting
+# unit to the next tick on exactly the tick a fleet-wide dangle happens, which is
+# the property this whole budget exists to hold. 2100 restores 290s of margin.
+#
+# heal_claude_json_bind_drift.HEALER_TIMEOUT_START_SEC mirrors this value and
+# derives TICK_BUDGET_S (90% of it) from it, so the healer stops STARTING
+# repairs before systemd stops it; test_restart_guard.CallerCeilingBudgetTests
+# pins the two together and recomputes N from systemd/*.service.
+TimeoutStartSec=2100
 Nice=10
 # NOTE: deliberately NO ProtectHome/NoNewPrivileges hardening block. This healer
 # must `sudo -n nsenter -m -t <pid>` into other units' mount namespaces (needs

@@ -53,7 +53,32 @@ carve-out, already replacement-safe); `~/.claude.json` is only non-secret cache
 
 ## What the healer does (every 2 min)
 
-### 1. Classify + probe every `ourliberty-*.service`
+Each tick runs three phases **in this order**.
+
+### 1. Reconcile outstanding restarts (`reconcile_pending`)
+Every restart the healer issues writes a **pending-verification entry** to the
+state file **before** the restart command is sent (so a SIGTERM mid-restart
+still leaves something reconcilable — Python's `finally` does not run on
+SIGTERM). A restart that has not demonstrably landed inside the tick stays in
+that ledger and is resolved on a later tick:
+
+| what the unit looks like now | outcome |
+| --- | --- |
+| `active` + **new `InvocationID`** + new-namespace probe **OK** | `rebound` (digest DM) |
+| `active` + new `InvocationID` + new-namespace probe **EROFS** | `still-dangled` (escalate) |
+| `active` + new `InvocationID` but the re-probe never concluded, grace spent | `verify-inconclusive` — no DM, unit returns to the ordinary probe path |
+| still not started **300 s** (`RESTART_LANDING_GRACE_S`) after the restart | `repair-did-not-land` (escalate). The DM distinguishes **no new invocation** (the start half never ran) from **a new invocation that died** (it came back and did not stay up) — do not collapse them, they send you to different halves of the journal |
+| `systemctl show` **unreadable** for that whole 300 s | `verify-unreadable` (escalate) — its OWN subject. A failed read is not absence: the unit may be fine and the healer blind, so this must never be reported as "the bot is down" |
+| unit no longer exists in systemd | `pending-gc` — dropped, INFO log, no DM |
+| none of the above yet | `awaiting-verify` — keep waiting |
+
+Reconciliation **owns** a unit's narrative until its entry closes: a unit with an
+open entry is skipped by phase 2/3 (`awaiting-verify`), so one repair can never
+produce two DMs. It reads the unit's systemd facts **directly** — there is no
+"only if `ActiveState == active`" filter, which is what previously made a restart
+that settled `failed` invisible to every later tick.
+
+### 2. Classify + probe every `ourliberty-*.service`
 
 Classification asks **`Restart=`**, a property of the unit file:
 
@@ -98,35 +123,54 @@ that run exactly as the EROFS does, and the next fire rebinds anyway, so paging
 would be pure toil; but "we chose not to act" and "we could not see" are
 different things, and this is the difference.
 
-**Coverage is observable.** Each tick logs a `coverage=<units>` line, plus a WARN
-naming any unit that LEFT coverage and why (`ourliberty-x.service LEFT coverage:
-EPHEMERAL_JOB (Restart=no)`) and an INFO for any unit that entered it. A
-departure is a transition **event**; sitting outside coverage is a **state**, so
-the `coverage=` line also carries a standing `departed=<units>` list on **every**
-later tick until the unit comes back or leaves systemd altogether. (`state['coverage']`
-missing means "no baseline yet"; `[]` means "the baseline is empty" — reading
-both as absent is what let a total collapse to zero monitored units print a
-reassuring "baseline recorded" line forever.) That is the runtime detector for
-the one new way to be silently descoped — a genuinely persistent daemon that
-omits `Restart=`.
+**Coverage is observable.** Each tick logs a `coverage=<units>` line, plus a
+**WARN naming any unit that LEFT coverage and why** (`ourliberty-x.service LEFT
+coverage: EPHEMERAL_JOB (Restart=no)`) and an INFO for any unit that entered it.
+A departure is a transition **event**; sitting outside coverage is a **state**,
+so the `coverage=` line also carries a standing `departed=<units>` list on
+**every** later tick until the unit comes back or leaves systemd altogether.
+(`state['coverage']` missing means "no baseline yet"; `[]` means "the baseline is
+empty" — reading both as absent is what let a total collapse to zero monitored
+units print a reassuring "baseline recorded" line forever.) That is the runtime
+detector for the one new way to be silently descoped: a genuinely persistent
+daemon that omits `Restart=`.
 
 The build-time half is a repo lint in
-`scripts/tests/test_heal_claude_json_bind_drift.py` requiring every persistent
-carve-out unit to declare `Restart=` or sit in a `KNOWN_EPHEMERAL_UNITS`
-allowlist. **Known prospective gap:** that lint reads the unit *file*, so it
-skips a unit that omits `Type=` entirely even though systemd defaults such a unit
-to `Type=simple` and the runtime classifier does see it. No unit in `systemd/`
-omits `Type=` today; the runtime `departed=` list is what covers it meanwhile.
+`scripts/tests/test_heal_claude_json_bind_drift.py`. **Known prospective gap:**
+that lint reads the unit *file*, so it skips a unit that omits `Type=` entirely
+even though systemd defaults such a unit to `Type=simple` and the runtime
+classifier does see it. No unit in `systemd/` omits `Type=` today; the runtime
+`departed=` list is what covers it meanwhile.
 
-### 2. Repair the dangled MONITOR units
+### 3. Repair the dangled MONITOR units — ordered and budgeted
 
-`sudo -n systemctl restart --no-block <unit>`, settle, verify `is-active`, then
-**re-probe the new MainPID** to confirm the file is writable again. DM the
-outcome (routine self-heal → digest; failure → escalate). Restarts run behind
-`restart_guard`'s cordon-and-drain so rebinding a unit that hosts Claude sessions
-doesn't SIGTERM one mid-review; if a peer restarter already holds the cordon lock
-the repair is skipped (`repair-skipped-peer-active`), no cooldown is burned, and
-the next tick re-evaluates.
+`sudo -n systemctl restart --no-block <unit>`, then gather **evidence**. The
+verdict is never a wall-clock guess:
+
+| verdict | evidence | what happens |
+| --- | --- | --- |
+| **LANDED** | `InvocationID` **changed** (or `MainPID` changed, when the invocation was unreadable) **and** a started state | re-probe the NEW MainPID → `rebound` / `still-dangled` / `awaiting-verify` |
+| **IN_PROGRESS** | a confirmed pending `Job=`; or `deactivating`/`activating`/`reloading`; or identity unreadable | `restart-in-progress` — **no DM**, obligation left in the ledger for phase 1 of a later tick |
+| **NOT_ENQUEUED** | identity **unchanged**, no pending job, and the restart shellout itself hung | `repair-not-enqueued` (escalate). No cooldown burned — nothing was restarted, so the next tick retries |
+| **REJECTED** | the restart command was refused up front (rc ≠ 0, or sudo/systemctl missing) | `repair-failed` (escalate). This is the **only** path to that subject |
+
+The `Job=` probe is what keeps the `After=`-ordered peers off the pager:
+`ourliberty-outbox-notifier` and `ourliberty-spec-review-runner` are both
+ordered `After=ourliberty-inbox-watcher.service`, whose claude loop takes ~90 s
+to SIGTERM-drain, so they read `inactive` **with a job enqueued** for a minute or
+more. That is in progress, not failure. (Same discriminator as
+`heal_stale_daemon_code`; a repo-wide lint,
+`scripts/tests/test_restart_verify_invariants.py`, requires it of every
+`restart --no-block` verifier.)
+
+Repairs run **cheap pass-through peers first, the drain-paying
+`ourliberty-inbox-watcher.service` last**, and only while the remaining tick
+budget (`TICK_BUDGET_S`, 90 % of the unit's `TimeoutStartSec`) covers the repair
+**in full**. A repair that does not fit is `deferred` to the next tick — the
+drain ceiling is never shortened to make one fit, because a shortened ceiling
+force-restarts a live Claude session early. Deferral is silent the first couple
+of times and then escalates (`repair-deferred`) so chronic starvation is not
+invisible.
 
 ### Tick-line outcomes
 `journalctl -u ourliberty-heal-claude-json-bind-drift` prints one `tick: …` line
@@ -134,23 +178,48 @@ per run with a **distinct counter per reason** (a daemon leaving coverage must
 never be byte-identical to a healer that was never in scope):
 
 `skip-oneshot` · `skip-ephemeral` · `skip-inactive` · `skip-nocarve` ·
-`skip-unknown` · `skip-nsgone` · `healthy` · `ephemeral-dangled` ·
-`ephemeral-probe-error` · `probe-error` · `rebound` · `repair-failed` ·
-`cooldown-dangled` · `repair-skipped-peer-active`
+`skip-unknown` · `skip-nsgone` · `healthy` · `healed-by-peer` · `ephemeral-dangled` ·
+`ephemeral-probe-error` · `probe-error` · `awaiting-verify` ·
+`verify-inconclusive` · `restart-in-progress` · `rebound` · `still-dangled` ·
+`repair-failed` · `repair-not-enqueued` · `repair-did-not-land` ·
+`verify-unreadable` · `cooldown-dangled` · `repair-skipped-peer-active` · `deferred` · `pending-gc`
+
+`deferred=N` is printed even when zero.
 
 ### Alert subjects
-`rebound:` (digest — a routine self-heal) · `still-dangled:` · `repair-failed:` ·
-`probe-blind:`. All are translated in `config/alert-translations.json`.
+`rebound:` (digest — the only healed=True record, and only with a confirmed
+new-namespace probe) · `still-dangled:` · `repair-failed:` ·
+`repair-not-enqueued:` · `repair-did-not-land:` · `verify-unreadable:` ·
+`repair-deferred:` · `probe-blind:`. All are translated in
+`config/alert-translations.json`.
 
 ### Guardrails
 - **Kill-switch:** `~/agents/healers.disabled` disables detection AND repair.
 - **Per-unit restart cooldown:** 15 min — one repair attempt per unit per window.
-  Still-dangled inside the cooldown → escalate (structural problem), don't loop.
-- **Ephemeral units are never restarted** — by construction, not by a guard: the
-  probe-only path holds no reference to `restart_guard` or `restart_unit`.
+  It RATE-LIMITS repair, it does not stop it: a mount that stays dangled is
+  retried every 15 min indefinitely, because the mount is a live outage and a
+  later restart may win. What is capped is the *telling* — every arm that can
+  prove a dangle goes through `escalate_still_dangled`, which gates the DM on
+  the 6 h `ESCALATION_COOLDOWN_SEC`. The `still-dangled` DM must therefore never
+  claim the healer "stopped restarting"; it says it keeps retrying and that the
+  message is what is rate-limited.
+- **Pre-flight re-confirm:** detection runs across the whole fleet *before* the
+  ordered repair pass and the agent-hosting unit is repaired LAST, so evidence
+  can be minutes old by the time a restart fires. `reconfirm_before_restart`
+  re-reads the unit first and, only if a peer restarted it since detection
+  (new `InvocationID` → new namespace), re-probes before restarting again →
+  `healed-by-peer`. An unchanged invocation is still dangled by construction, so
+  that case pays no probe.
+  A restart that was never enqueued does **not** burn it.
 - **Probe never writes:** `O_RDWR` only, immediately closed — content + mtime intact.
 - **`sudo -n`:** a revoked NOPASSWD contract fails fast and DMs `probe-blind`,
   never wedges.
+- **No second lock.** Peer restarters (systemd's own `Restart=`, watchdog,
+  heal_stale_daemon_code, medic) can restart these units concurrently;
+  `restart_guard` serialises only `ourliberty-inbox-watcher.service`. That is
+  handled with **evidence, not exclusion**: any new invocation counts as a
+  landing (the mount is rebound either way) and the log says causation is
+  unproven rather than claiming it.
 
 ## Deploy
 Hands-off. On merge + sync, `sync_agent_core.sh` fires `heal_systemd_install_drift.py`,
@@ -163,6 +232,11 @@ systemctl list-timers ourliberty-heal-claude-json-bind-drift.timer
 journalctl -u ourliberty-heal-claude-json-bind-drift -n 40   # look for `tick: …`
 cat ~/agents/logs/heal-claude-json-bind-drift.log
 ```
+The `tick:` line now carries **per-reason** skip counters and always ends with
+`deferred=N` (see "Tick-line outcomes" above), so the old single `skip=98`
+bucket is gone — that is the intended change, not a regression. The `coverage=`
+line on the line above names the units currently monitored; a `LEFT coverage:`
+WARN is the signal that a daemon dropped out of scope and why.
 
 ## Manual fallback (if the healer is disabled/blind)
 This is exactly what the healer automates:

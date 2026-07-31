@@ -335,18 +335,61 @@ def _unit_active_state(unit: str = UNIT) -> str:
         return 'unknown'
 
 
+def _unit_pending_job(unit: str = UNIT) -> str:
+    """Return the unit's enqueued systemd job id, or '' if none.
+
+    `systemctl show <unit> --property=Job` prints `Job=` (empty) for a settled
+    unit and `Job=<id> <...>` while a job is enqueued and waiting — typically
+    held behind an `After=` ordering dependency that is still draining. Without
+    this, an unhealthy is-active read taken while our own restart job is still
+    QUEUED is indistinguishable from a restart that genuinely failed, and the
+    healer pages for a unit that is active moments later.
+
+    Ported from heal_stale_daemon_code._unit_pending_job (which has had it since
+    the ~90s After=-drain false pages) so the three `restart --no-block`
+    verifiers share one contract; scripts/tests/test_restart_verify_invariants.py
+    is the repo-wide lint that keeps a fourth copy from shipping without it.
+
+    Returns '' on empty / timeout / missing binary, so only a CONFIRMED pending
+    job counts as in-progress and an unreadable probe can never manufacture a
+    false in-progress verdict that suppresses a real failure.
+    """
+    try:
+        result = subprocess.run(
+            ['systemctl', 'show', unit, '--property=Job'],
+            capture_output=True, text=True, timeout=10,
+        )
+        line = (result.stdout or '').strip()
+        if line.startswith('Job='):
+            return line[len('Job='):].strip()
+        return ''
+    except (OSError, subprocess.SubprocessError):
+        return ''
+
+
 def restart_unit(unit: str = UNIT) -> tuple[int, str]:
     """`sudo -n systemctl restart --no-block <unit>`, verify via is-active.
 
     Contract (same as heal_stale_daemon_code.auto_restart_unit):
-      - (0, '')      restart enqueued and the unit is active/activating.
+      - (0, '')      restart enqueued and the unit is active/activating, OR the
+                     restart job is still enqueued (an `After=`-ordered start
+                     that has not run yet is in progress, not a failure).
       - (rc, stderr) the restart job was rejected up front (genuine failure).
-      - (-1, detail) enqueued but not active/activating after the settle.
+      - (-1, detail) enqueued, not active/activating after the settle, AND no
+                     pending job — a real failure to come back.
 
     A `sudo -n systemctl daemon-reload` is prepended (parity with
     heal_stale_daemon_code) so the restart picks up any unit-file edit that
     landed since systemd last parsed it; a failed reload is a WARN, never a
     blocker (a stale-but-running daemon beats a stopped one).
+
+    KNOWN AND DELIBERATELY NOT FIXED HERE (see heal_claude_json_bind_drift's
+    module docstring): the verify concludes from `is-active` alone, which reads
+    'active' for the OLD process too, so a restart that was never enqueued can
+    read as success. That healer carries InvocationID/MainPID identity evidence
+    for exactly this. It is not ported here because THIS healer's detector (the
+    deployed sha reported by the running process) still fires on a non-active
+    unit — a misread costs a wasted tick, not permanent blindness.
     """
     try:
         reload_result = subprocess.run(
@@ -385,9 +428,19 @@ def restart_unit(unit: str = UNIT) -> tuple[int, str]:
     state = _unit_active_state(unit)
     if state in _HEALTHY_ACTIVE_STATES:
         return 0, ''
+    # Unhealthy after both settles — but before declaring failure, ask systemd
+    # whether our restart job is still ENQUEUED. A non-empty `Job=` means the
+    # start half has not run yet (typically held behind an `After=` dependency
+    # that is still draining), so this is a slow start, not a failure to page on.
+    job = _unit_pending_job(unit)
+    if job:
+        log(f'RESTART_QUEUED_PENDING_ORDERING: {unit} is {state!r} after '
+            f'{2 * RESTART_SETTLE_S}s but systemd still has restart job {job!r} '
+            f'enqueued — treating as in-progress success', 'INFO')
+        return 0, ''
     return -1, (
         f'restart issued but unit is {state!r} after {2 * RESTART_SETTLE_S}s '
-        f'(expected active/activating)'
+        f'with no pending systemd job (expected active/activating)'
     )
 
 

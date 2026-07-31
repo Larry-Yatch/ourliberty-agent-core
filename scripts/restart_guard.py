@@ -62,7 +62,7 @@ Every caller's ceiling must therefore fit inside ITS OWN outer time budget:
   ----------------------------  --------------------------------  -------
   heal_stale_daemon_code        TimeoutStartSec=3900 (#1000)       3600 force
   heal_systemd_install_drift    TimeoutStartSec 60 -> 3900         3600 force
-  heal_claude_json_bind_drift   TimeoutStartSec 120 -> 1200        900  force
+  heal_claude_json_bind_drift   TimeoutStartSec 120 -> 2100        900  force
   medic_actions                 CLAUDE_TIMEOUT=10m in run_medic.sh 120  refuse
 
 Medic is the one that must NOT copy the 3600s ceiling. It runs inside a

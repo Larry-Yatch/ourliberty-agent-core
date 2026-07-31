@@ -241,17 +241,63 @@ class CallerCeilingBudgetTests(unittest.TestCase):
                 return int(line.split('=', 1)[1].strip())
         self.fail(f'TimeoutStartSec not found in {unit_name}')
 
-    def test_bind_drift_unit_timeout_covers_its_ceiling(self):
+    def _carveout_daemon_units(self) -> list[str]:
+        """Every persistent unit in systemd/ that carves the claude config.
+
+        Computed by SCANNING the repo, not hardcoded, so adding an eighth
+        carve-out daemon moves the assertion automatically instead of silently
+        invalidating it."""
+        import heal_claude_json_bind_drift as bd
+        units = []
+        for svc in sorted((_REPO_ROOT / 'systemd').glob('ourliberty-*.service')):
+            text = svc.read_text()
+            type_ = ''
+            carves = False
+            for line in text.splitlines():
+                s = line.strip()
+                if s.startswith('Type='):
+                    type_ = s.split('=', 1)[1].strip()
+                elif s.startswith('ReadWritePaths='):
+                    carves = carves or bd.CLAUDE_JSON_PATH in s.split('=', 1)[1].split()
+            if carves and type_ in bd.PERSISTENT_TYPES:
+                units.append(svc.name)
+        return units
+
+    def test_bind_drift_unit_timeout_covers_the_WHOLE_FLEET_not_one_unit(self):
+        """MULTI-UNIT, deliberately. This is the only caller in this class that
+        loops over many units in a single invocation: one atomic replacement of
+        /home/larry/.claude.json dangles EVERY carve-out unit in the same tick,
+        so a budget sized for one repaired unit is not a budget at all. The
+        siblings below restart exactly one unit per invocation and correctly
+        keep the single-unit form — do not "harmonise" them into this shape."""
         import heal_claude_json_bind_drift as bd
         timeout = self._timeout_start_sec(
             'ourliberty-heal-claude-json-bind-drift.service')
-        needed = (bd.AGENT_DRAIN_CEILING_SEC + bd.RESTART_TIMEOUT_S
-                  + bd.RESTART_SETTLE_S)
+        fleet = self._carveout_daemon_units()
+        self.assertGreater(
+            len(fleet), 1,
+            'the fleet scan degenerated to <=1 unit — the multi-unit invariant '
+            'would be silently equivalent to the old single-unit one')
+        # One unit pays the cordon-and-drain ceiling; the rest are pass-throughs.
+        needed = ((len(fleet) - 1) * bd.PEER_REPAIR_BUDGET_S
+                  + bd.AGENT_DRAIN_CEILING_SEC + bd.RESTART_TIMEOUT_S
+                  + bd.VERIFY_WINDOW_S)
         self.assertGreaterEqual(
             timeout, needed,
-            f'TimeoutStartSec={timeout}s < {needed}s needed for a full-ceiling '
-            f'drain plus the restart: systemd kills the healer mid-drain and '
-            f'the repair silently never happens (#1000)')
+            f'TimeoutStartSec={timeout}s < {needed}s needed to repair all '
+            f'{len(fleet)} dangled carve-out units in one tick ({fleet}): '
+            f'systemd SIGTERMs the healer mid-loop, Python\'s `finally` does '
+            f'not run on SIGTERM, and the units it had not reached are silently '
+            f'never repaired with no alert (#1000)')
+
+    def test_bind_drift_module_and_unit_agree_on_the_timeout(self):
+        import heal_claude_json_bind_drift as bd
+        timeout = self._timeout_start_sec(
+            'ourliberty-heal-claude-json-bind-drift.service')
+        self.assertEqual(bd.HEALER_TIMEOUT_START_SEC, timeout)
+        self.assertLess(bd.TICK_BUDGET_S, timeout,
+                        'the healer must stop STARTING repairs before systemd '
+                        'stops the healer')
 
     def test_install_drift_unit_timeout_covers_its_ceiling(self):
         import heal_systemd_install_drift as idr
@@ -353,25 +399,28 @@ class BindDriftIntegrationTests(_GuardFixture):
         fcntl.flock(fd, fcntl.LOCK_EX)
         self.addCleanup(os.close, fd)
 
-        state = {'services': {}}
+        state = bd.load_state()
         facts = bd.UnitFacts(
-            unit=AGENT_UNIT, present=True, type_='simple', active_state='active',
-            main_pid=123, read_write_paths=f'/home/larry/.claude {bd.CLAUDE_JSON_PATH}',
-            restart_policy='on-failure', triggered_by='',
-        )
+            unit=AGENT_UNIT, present=True, type_='simple',
+            active_state='active', main_pid=123,
+            read_write_paths=bd.CLAUDE_JSON_PATH, restart_policy='on-failure',
+            triggered_by='', invocation_id='inv-old')
         with mock.patch.object(bd, 'unit_facts', return_value=facts), \
                 mock.patch.object(bd, '_namespace_probeable', return_value=True), \
                 mock.patch.object(bd, 'probe_namespace_writable',
                                   return_value=bd._PROBE_EROFS), \
-                mock.patch.object(bd, 'restart_unit') as restart, \
+                mock.patch.object(bd, 'restart_and_verify') as restart, \
                 mock.patch.object(bd, 'mark_restarted') as mark, \
                 mock.patch.object(bd, 'save_state'), \
                 mock.patch.object(bd, 'log'):
             outcome = bd.check_unit(AGENT_UNIT, state)
 
-        self.assertEqual(outcome, bd.OUTCOME_REPAIR_SKIPPED_PEER)
+        self.assertEqual(outcome, 'repair-skipped-peer-active')
         restart.assert_not_called()
         mark.assert_not_called()
+        # …and no pending-verification obligation is left behind: nothing was
+        # restarted, so a later grace-expiry must not page repair-did-not-land.
+        self.assertIsNone(bd.pending_entry(state, AGENT_UNIT))
 
 
 try:  # reuse the proven medic isolation (env redirect + registry ownership)
