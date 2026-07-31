@@ -16875,7 +16875,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-07-31T01:24:15.937717+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-31T01:22:50.689434+00:00"
+      "orphan_last_activity_ts": "2026-07-31T01:22:50.689434+00:00",
+      "briefing": {
+        "what": "The team moved 'needs triage' items into their own spot so they stop cluttering your approvals list.",
+        "why": "A cleaner approvals list means you spend less time sorting through things and can act faster on what actually needs your sign-off.",
+        "suggest": "Take a quick look to confirm the new layout works for you before giving it the green light."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-07-31T01:30:18.500478+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
