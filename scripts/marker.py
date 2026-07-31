@@ -39,8 +39,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import sys
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 
@@ -119,6 +122,72 @@ def _warn_if_affixed_forge_task_id(agent: str, payload: dict[str, Any]) -> None:
         )
 
 
+# -------------------- render ledger (lost-marker net, Part A) --------------------
+#
+# lost-marker-render-emission-net-001. A SUCCESSFUL render of a beacon
+# approval_request marker carrying a task_id appends a best-effort JSONL record
+# to the render ledger. heal_lost_marker.py later reconciles each entry against
+# emission evidence: if a marker was rendered here but never pasted (so never
+# dispatched and never DMed to Larry) it silently vanishes today — that is the
+# 2026-06-03/04 lost-marker incident. The ledger is the deterministic RENDER
+# signal that net keys off, complementing the two prose-keyed nets
+# (heal_phantom_dispatch_claim + the authoritative-dispatch prose guard) which
+# are blind when there is no prose to detect.
+#
+# BEST-EFFORT: the render's job is producing the block; the ledger is telemetry.
+# A ledger-write failure must NEVER fail the render — it is wrapped and logged to
+# stderr only. Path is env-overridable (OURLIBERTY_MARKER_RENDER_LEDGER wins,
+# else <OURLIBERTY_AGENTS_ROOT or ~/agents>/blackboard/marker-render-ledger.jsonl)
+# mirroring heal_phantom_dispatch_claim's OURLIBERTY_AGENTS_ROOT pattern so
+# hermetic tests never touch the live ledger.
+
+
+def _agents_root() -> Path:
+    override = os.environ.get('OURLIBERTY_AGENTS_ROOT')
+    return Path(override) if override else Path.home() / 'agents'
+
+
+def render_ledger_path() -> Path:
+    override = os.environ.get('OURLIBERTY_MARKER_RENDER_LEDGER')
+    if override:
+        return Path(override)
+    return _agents_root() / 'blackboard' / 'marker-render-ledger.jsonl'
+
+
+def _record_render_to_ledger(agent: str, marker_type: str,
+                             payload: dict[str, Any]) -> None:
+    """Append one JSONL record for a successful beacon approval_request render.
+
+    Scoped to beacon approval_request only (Forge/Mirror emit via the outbox,
+    netted elsewhere). A record is written only when a `task_id` is present —
+    without it the reconciler has nothing to key on. Never raises: any failure
+    is swallowed after a stderr note, so the render always succeeds.
+    """
+    try:
+        if agent != 'beacon' or marker_type != 'approval_request':
+            return
+        task_id = payload.get('task_id')
+        if not isinstance(task_id, str) or not task_id:
+            return
+        record = {
+            'task_id': task_id,
+            'agent': agent,
+            'marker_type': marker_type,
+            'rendered_at': datetime.now(timezone.utc).isoformat(),
+            'summary': payload.get('summary', ''),
+            'phase': payload.get('phase'),
+        }
+        path = render_ledger_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, 'a', encoding='utf-8') as fh:
+            fh.write(json.dumps(record, ensure_ascii=False) + '\n')
+    except Exception as e:  # noqa: BLE001 — telemetry must never fail the render
+        sys.stderr.write(
+            f'marker.py: WARNING: render-ledger append failed '
+            f'({type(e).__name__}: {e}); render itself is unaffected.\n'
+        )
+
+
 def cmd_render(args: argparse.Namespace) -> int:
     """render <agent> <type>: print canonical marker block to stdout."""
     handler = _resolve_handler(args.agent)
@@ -140,10 +209,14 @@ def cmd_render(args: argparse.Namespace) -> int:
             return 1
         payload['phase'] = args.phase
     try:
-        sys.stdout.write(handler.render_marker(args.type, **payload))
+        rendered = handler.render_marker(args.type, **payload)
     except ValueError as e:
+        # A render VALIDATION failure writes NO ledger entry — the marker was
+        # never produced, so there is nothing to reconcile.
         sys.stderr.write(f'marker.py render: {e}\n')
         return 1
+    sys.stdout.write(rendered)
+    _record_render_to_ledger(args.agent, args.type, payload)
     return 0
 
 

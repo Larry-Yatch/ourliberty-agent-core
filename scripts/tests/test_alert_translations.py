@@ -128,6 +128,7 @@ _OUT_OF_V1_SCOPE_SUBJECTS = {
     ('build-sequence-advancer', None),
     ('heal-build-sequence-advancer-heartbeat', None),
     ('heal-phantom-dispatch-claim', None),
+    ('heal-lost-marker', None),
     ('heal-resume-paused-on-tier1', None),
 }
 

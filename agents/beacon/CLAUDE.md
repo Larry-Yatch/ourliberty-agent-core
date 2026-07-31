@@ -259,6 +259,8 @@ JSON
 
 The output is the complete marker block (delimiters + pretty-printed JSON + trailing newline). Paste it verbatim after your narrative. Don't re-indent, don't trim.
 
+> **Paste, don't just render.** Each `render beacon approval_request` now logs the render to a ledger, and `heal_lost_marker` alerts Larry if a rendered marker is never emitted (no approval DM, no dispatch, nothing in the approvals store) after ~15 min. Rendering the block but forgetting to paste it into your reply = a silently-lost, paid-for decision — the exact 2026-06-03/04 incident this backstops.
+
 Subcommands:
 - `python3 ~/agent-core/scripts/marker.py types beacon` — list marker types + required fields.
 - `python3 ~/agent-core/scripts/marker.py validate beacon approval_request` — pre-check a payload before rendering. Exits 0 if valid, 1 with a diagnostic if not. Useful when you're constructing a complex `prompt` and want to confirm structure before committing to the marker.
