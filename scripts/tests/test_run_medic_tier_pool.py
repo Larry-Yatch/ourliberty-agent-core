@@ -107,6 +107,17 @@ class _MedicTierPoolBase(unittest.TestCase):
     def _run(self):
         env = os.environ.copy()
         env['HOME'] = str(self.fake_home)
+        # This harness sandboxes by SWAPPING HOME, and `_read_cost_rows`
+        # reads back from `self.fake_home/agents/blackboard/`. run_medic.sh
+        # now resolves its state through `${OURLIBERTY_AGENTS_ROOT:-
+        # $HOME/agents}` (so a tier-2 HOME swap cannot blind it), and
+        # `os.environ.copy()` inherits the sandbox's OURLIBERTY_AGENTS_ROOT
+        # — which would send the writer to the outer sandbox root while the
+        # reader looked under the swapped HOME. Pin the root to the
+        # sandboxed HOME so the HOME swap stays authoritative, the same
+        # one-line pin `_RunCycleTestBase._run_cycle` and
+        # `_runtime_script_test_support.redirect_agents_root` already make.
+        env['OURLIBERTY_AGENTS_ROOT'] = str(self.fake_home / 'agents')
         env['PATH'] = f'{self.fake_bin}:{env.get("PATH", "")}'
         return subprocess.run(
             ['bash', str(_RUN_MEDIC), str(self.batch_path)],

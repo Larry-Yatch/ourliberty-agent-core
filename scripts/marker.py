@@ -143,14 +143,17 @@ def _warn_if_affixed_forge_task_id(agent: str, payload: dict[str, Any]) -> None:
 
 
 def _agents_root() -> Path:
-    override = os.environ.get('OURLIBERTY_AGENTS_ROOT')
-    return Path(override) if override else Path.home() / 'agents'
+    # One variable name per env var (not a shared `override`): the agents-root
+    # guard trusts a name only when EVERY binding of it in the file is that
+    # same read, and this file also reads OURLIBERTY_MARKER_RENDER_LEDGER.
+    agents_override = os.environ.get('OURLIBERTY_AGENTS_ROOT')
+    return Path(agents_override) if agents_override else Path.home() / 'agents'
 
 
 def render_ledger_path() -> Path:
-    override = os.environ.get('OURLIBERTY_MARKER_RENDER_LEDGER')
-    if override:
-        return Path(override)
+    ledger_override = os.environ.get('OURLIBERTY_MARKER_RENDER_LEDGER')
+    if ledger_override:
+        return Path(ledger_override)
     return _agents_root() / 'blackboard' / 'marker-render-ledger.jsonl'
 
 

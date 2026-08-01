@@ -2,20 +2,31 @@
 """Test family D — production-default verification for resolve_log_dir().
 
 Locks the invariant that when OURLIBERTY_LOG_DIR is UNSET, both production
-modules' resolve_log_dir() returns the canonical ~/agents/logs/ path. The
+modules' resolve_log_dir() falls back to <agents root>/logs — and, in
+production (no overrides at all), to the canonical ~/agents/logs/. The
 whole test-isolation discipline (PR #137 + this PR) depends on the env-var
 override being a no-op in production — if the default ever silently drifts
 to a different path (e.g., /home/larry/agent-core/logs/), the live
 beacon_telegram_bot.log relocates and operators lose their trail.
 
-Why this test is critical: the brief that authored this PR proposed the
-WRONG default path. Without this regression test, a future refactor that
+Two layers, because the in-process tests CANNOT execute the production
+fallback: the _bootstrap sandbox pins OURLIBERTY_AGENTS_ROOT for the whole
+process, so in-process the unset-OURLIBERTY_LOG_DIR default can only be
+asserted as DERIVED (resolve_log_dir() == <agents root>/logs). That pins
+the wiring but not the fallback literal — mutating 'agents' to
+'agent-core' in a module's agents-root fallback moves AGENTS_ROOT and the
+expectation in lockstep, so those tests still pass. The subprocess test
+(ProductionFallbackExecutesTest) closes that hole: it scrubs BOTH override
+vars and executes the real fallback branch against a throwaway HOME.
+
+Why this family is critical: the brief that authored this PR proposed the
+WRONG default path. Without these regression tests, a future refactor that
 re-introduces a hardcoded default could quietly move the production log
 file without anyone noticing.
 
-These tests must explicitly delete OURLIBERTY_LOG_DIR via monkeypatch.delenv
-to undo the conftest autouse fixture — otherwise they'd test the test-time
-override instead of the production default.
+The in-process tests must explicitly delete OURLIBERTY_LOG_DIR via
+monkeypatch.delenv to undo the conftest autouse fixture — otherwise they'd
+test the test-time override instead of the production default.
 
 Run:
     cd ~/agent-core && python3 -m unittest \\
@@ -31,6 +42,7 @@ except ImportError:  # discover loads this module top-level (no package parent)
 import importlib
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -44,12 +56,14 @@ if str(_REPO_SCRIPTS) not in sys.path:
 
 
 class AgentRunnerResolveLogDirTest(unittest.TestCase):
-    """agent_runner.resolve_log_dir() — env var unset → ~/agents/logs/."""
+    """agent_runner.resolve_log_dir() — env var unset → <agents root>/logs
+    (derived; the fallback LITERAL is executed only by
+    ProductionFallbackExecutesTest below)."""
 
     def setUp(self):
         self.ar = importlib.import_module('agent_runner')
 
-    def test_default_is_home_agents_logs_when_env_unset(self):
+    def test_default_derives_from_agents_root_when_env_unset(self):
         with mock.patch.dict(os.environ, {}, clear=False):
             os.environ.pop('OURLIBERTY_LOG_DIR', None)
             # The unset-override default derives from the module's AGENTS_ROOT
@@ -80,7 +94,7 @@ class AgentRunnerResolveLogDirTest(unittest.TestCase):
 
 
 class BeaconBotResolveLogDirTest(unittest.TestCase):
-    """beacon_telegram_bot.resolve_log_dir() — same invariant.
+    """beacon_telegram_bot.resolve_log_dir() — same derived invariant.
 
     beacon_telegram_bot validates TOKEN/ALLOWED at RUN (in main()), not import, so it
     imports cleanly now; we still supply placeholders so the module's env-derived
@@ -99,14 +113,15 @@ class BeaconBotResolveLogDirTest(unittest.TestCase):
             del sys.modules['beacon_telegram_bot']
         return importlib.import_module('beacon_telegram_bot')
 
-    def test_default_is_home_agents_logs_when_env_unset(self):
+    def test_default_derives_from_agents_root_when_env_unset(self):
         with mock.patch.dict(os.environ, {}, clear=False):
             bot = self._import_bot_with_env(override_value=None)
             # Same derivation as the agent_runner case above: the unset-
             # override default is <agents root>/logs, where the agents root
             # honors OURLIBERTY_AGENTS_ROOT (the _bootstrap sandbox sets it;
             # production leaves it unset, so this is still ~/agents/logs —
-            # the historical path this family exists to pin).
+            # the historical path this family exists to pin; the literal
+            # fallback is executed by ProductionFallbackExecutesTest).
             expected_root = Path(
                 os.environ.get('OURLIBERTY_AGENTS_ROOT')
                 or Path.home() / 'agents'
@@ -120,6 +135,50 @@ class BeaconBotResolveLogDirTest(unittest.TestCase):
         with mock.patch.dict(os.environ, {}, clear=False):
             bot = self._import_bot_with_env(override_value='/tmp/p/q')
             self.assertEqual(bot.resolve_log_dir(), Path('/tmp/p/q'))
+
+
+class ProductionFallbackExecutesTest(unittest.TestCase):
+    """Execute the REAL unset-env fallback branch, in a subprocess whose
+    env carries neither OURLIBERTY_LOG_DIR nor OURLIBERTY_AGENTS_ROOT (the
+    in-process tests can't: the _bootstrap sandbox pins the agents root
+    for the whole process). This is the only test in the family that would
+    catch the fallback literal itself drifting — e.g. 'agents' →
+    'agent-core' relocating the live log dir — because every in-process
+    assertion derives its expectation from the same AGENTS_ROOT the
+    mutation would move. HOME points at a throwaway tmp dir so the
+    modules' import-time mkdir lands there, never in the real tree."""
+
+    def test_unset_env_fallback_is_home_agents_logs(self):
+        code = (
+            "import sys\n"
+            "from pathlib import Path\n"
+            "sys.path.insert(0, sys.argv[1])\n"
+            "import agent_runner, beacon_telegram_bot\n"
+            "expected = Path.home() / 'agents' / 'logs'\n"
+            "got_ar = agent_runner.resolve_log_dir()\n"
+            "got_bot = beacon_telegram_bot.resolve_log_dir()\n"
+            "assert got_ar == expected, f'agent_runner: {got_ar}'\n"
+            "assert got_bot == expected, f'beacon_telegram_bot: {got_bot}'\n"
+        )
+        tmp_home = tempfile.mkdtemp(prefix='ol-fallback-home-')
+        self.addCleanup(shutil.rmtree, tmp_home, ignore_errors=True)
+        env = {
+            'HOME': tmp_home,
+            'PATH': os.environ.get('PATH', '/usr/bin:/bin'),
+            # beacon validates these at RUN (main()), not import; the
+            # placeholders keep its env-derived constants on test values.
+            'TELEGRAM_BOT_TOKEN_BEACON': 'TEST_TOKEN',
+            'TELEGRAM_ALLOWED_CHAT_IDS': '12345',
+        }
+        proc = subprocess.run(
+            [sys.executable, '-c', code, str(_REPO_SCRIPTS)],
+            env=env, capture_output=True, text=True, timeout=120,
+        )
+        self.assertEqual(
+            proc.returncode, 0,
+            'fallback probe failed:\n'
+            f'stdout: {proc.stdout}\nstderr: {proc.stderr}',
+        )
 
 
 class LogWriteHitsOverrideDirTest(unittest.TestCase):

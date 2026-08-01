@@ -114,17 +114,19 @@ def resolve_log_dir() -> Path:
     OURLIBERTY_LOG_DIR override exists so test runs do not leak sentinel
     strings (TIER_ONE_MARKER, '401 Unauthorized', etc.) into the live
     beacon_telegram_bot.log when a test imports this module and triggers
-    log() via mocked subprocess flows. Production keeps the env var unset,
-    preserving the historical path.
+    log() via mocked subprocess flows.
+
+    When OURLIBERTY_LOG_DIR is unset, falls back to <agents root>/logs
+    where the agents root honors OURLIBERTY_AGENTS_ROOT (same spelling as
+    STATE_DIR below) — a bare Path.home() here would diverge from every
+    reader that locates this log via AGENTS_ROOT/logs under a per-tier
+    HOME swap. Production keeps both env vars unset, preserving the
+    historical ~/agents/logs path.
     """
     override = os.environ.get("OURLIBERTY_LOG_DIR")
     if override:
         return Path(override)
-    # Fall back to <agents root>/logs, honoring OURLIBERTY_AGENTS_ROOT like
-    # STATE_DIR below — a bare Path.home() here diverges from every reader
-    # that locates this log via AGENTS_ROOT/logs under a per-tier HOME swap.
-    root = os.environ.get("OURLIBERTY_AGENTS_ROOT")
-    return (Path(root) if root else Path.home() / "agents") / "logs"
+    return Path(os.environ.get("OURLIBERTY_AGENTS_ROOT") or Path.home() / "agents") / "logs"
 
 
 LOG_DIR = resolve_log_dir()

@@ -14,12 +14,12 @@ set -e
 
 REPO_DIR="${HOME}/agent-core"
 RANK_PY="${REPO_DIR}/scripts/mission_rank.py"
-LOCK_DIR="${HOME}/agents/state"
+LOCK_DIR="${OURLIBERTY_AGENTS_ROOT:-$HOME/agents}/state"
 LOCK_FILE="${LOCK_DIR}/.mission-rank.lock"
 LOCK_MAX_AGE_SEC=$((135 * 60))
-LOG_DIR="${HOME}/agents/logs"
+LOG_DIR="${OURLIBERTY_AGENTS_ROOT:-$HOME/agents}/logs"
 LOG_FILE="${LOG_DIR}/mission-rank.log"
-HALT_FLAG="${HOME}/agents/blackboard/EMERGENCY_HALT"
+HALT_FLAG="${OURLIBERTY_AGENTS_ROOT:-$HOME/agents}/blackboard/EMERGENCY_HALT"
 
 mkdir -p "$LOCK_DIR" "$LOG_DIR"
 

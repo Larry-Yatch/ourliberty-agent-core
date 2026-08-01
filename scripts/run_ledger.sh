@@ -11,12 +11,12 @@ set -e
 
 REPO_DIR="${HOME}/agent-core"
 LEDGER_PY="${REPO_DIR}/scripts/ledger_weekly.py"
-LOCK_DIR="${HOME}/agents/state"
+LOCK_DIR="${OURLIBERTY_AGENTS_ROOT:-$HOME/agents}/state"
 LOCK_FILE="${LOCK_DIR}/.ledger.lock"
 LOCK_MAX_AGE_SEC=$((30 * 60))
-LOG_DIR="${HOME}/agents/logs"
+LOG_DIR="${OURLIBERTY_AGENTS_ROOT:-$HOME/agents}/logs"
 LOG_FILE="${LOG_DIR}/ledger.log"
-HALT_FLAG="${HOME}/agents/blackboard/EMERGENCY_HALT"
+HALT_FLAG="${OURLIBERTY_AGENTS_ROOT:-$HOME/agents}/blackboard/EMERGENCY_HALT"
 
 # shellcheck source=_lib_push_with_rebase.sh
 source "${REPO_DIR}/scripts/_lib_push_with_rebase.sh"
