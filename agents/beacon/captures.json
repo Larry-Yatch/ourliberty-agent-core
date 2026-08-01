@@ -2888,6 +2888,66 @@
         "from_state": "parked"
       },
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+    },
+    {
+      "id": "cap-approvals-freshness-2a-render-the-unverified-bad-4abb",
+      "title": "Approvals freshness 2a \u2014 render the Unverified badge, absent means unverified (ship alone, first)",
+      "note": "SLICE 2a of the approvals-freshness arc \u2014 the half that was CUT from PR #1079. SHIP THIS ALONE AND FIRST. It has no backend dependency and must not wait on one.\n\nWHY IT WAS CUT: #1079 shipped a dashboard_api.compute_approval_verification() whose output never reached a card \u2014 it was merged into _open_delegate_approvals' dict and discarded one hop later by _delegation_needs_you_field, which rebuilds a hard-coded {approval_id, created_at}. Verified by running it at the PR head; repo-wide the key appeared nowhere else. But the deeper reason it could not have worked ANYWHERE in agent-core: the Approvals tab reads chain_events STRAIGHT FROM SUPABASE in this repo (lib/needs-you-queries.ts) and never goes through the droplet, so no droplet-side projection over the local beacon-pending-approvals.json can light this badge. That file's own Contract F comment says the same thing about latest_team_message_id / blocked_on_you.\n\nTHE REQUIREMENT (from the parent capture, quoted, marked non-negotiable): \"a card with NO probe must render as visibly UNVERIFIED, never as silently fresh. Most cards will have no probe for a long time. A freshness check that covers a third of the queue while the tab reads as fully checked is [[existence-gates-are-false-clean-generators]] \u2014 the exact class that let 6 of 8 cards reach Larry on 2026-07-29.\"\n\nBUILD \u2014 renderer only, in app/approvals/components/:\n1. Read `verification` off the card (payload field or column, per slice 2b \u2014 see OUT OF SCOPE). Render three states: absent/unknown -> \"Unverified\"; 'stale' -> demoted-card treatment + the evidence string; 'verified' -> checked.\n2. ABSENT MUST DEFAULT TO 'unverified'. This is the whole load-bearing property. Do NOT default to verified, do NOT hide the badge when the field is missing, and do NOT wait for the backend to start writing it.\n3. DECAY: treat a 'verified' whose probed_at is older than ~30 min (three healer ticks) as 'unverified'. Without this, \"verified\" means only \"a probe is attached\", so a dead healer leaves the whole tab reading green forever \u2014 the same false-clean bug pointed the other way. This is the cheapest guard in the arc; do not skip it.\n\nWHY FIRST, AND WHY IT IS SAFE ALONE: today ZERO cards carry a probe. A renderer that defaults to Unverified therefore tells the exact truth about the current queue on day one, and delivers the non-negotiable requirement before a single probe exists. It cannot regress: a field that never arrives leaves every card honestly labeled. Shipping the backend first (what #1079 attempted) produces a field nobody reads \u2014 which is precisely what happened.\n\nOUT OF SCOPE: writing the field. That is slice 2b in ourliberty-agent-core (stamp the positive states onto the card's Supabase row from the demote path). 2b decides whether the field arrives as a dedicated column or inside payload \u2014 build the reader tolerant of both, or coordinate the shape before 2b lands.\n\nREVIEW: not required \u2014 pure rendering, no write path, and its failure mode is a card labeled Unverified when it could have said more. That is the safe direction by construction.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-dashboard",
+        "branch": "main",
+        "captured_at": "2026-08-01T01:39:44.539769+00:00"
+      },
+      "last_touched": "2026-08-01T01:39:44.539769+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "A small change to the approvals screen so that any item we haven't actually double-checked is clearly labeled 'Unverified' instead of quietly looking fine.",
+        "why": "Right now nothing has been checked yet, but the screen can make items look trustworthy anyway \u2014 the same blind spot that recently let several unchecked items reach you looking clean.",
+        "suggest": "Go ahead and turn this on now on its own; it's a low-stakes, honesty-first display fix that tells the truth about every item from day one, though it's worth a quick look once it's live."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-08-01T01:43:08.206519+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "cap-approvals-freshness-2b-stamp-the-verification-st-9d7c",
+      "title": "Approvals freshness 2b \u2014 stamp the verification state onto the card's Supabase row from the demote path",
+      "note": "SLICE 2b of the approvals-freshness arc \u2014 the write half CUT from PR #1079. DEPENDS ON #1079 (demote + tick probe leg, merged); pairs with the dashboard renderer slice 2a, which ships FIRST and independently.\n\nTHE CONSTRAINT THAT DEFINES THIS SLICE: the Approvals tab reads chain_events STRAIGHT FROM SUPABASE in the dashboard frontend (ourliberty-dashboard lib/needs-you-queries.ts). It does NOT go through the droplet. The freshness state lives in a droplet file (beacon-pending-approvals.json). So the state must be WRITTEN TO SUPABASE \u2014 no in-repo projection can ever surface it. #1079's Part C tried to project it in dashboard_api and was dead on arrival for exactly this reason. Do not repeat that: verify the read path before wiring a field.\n\nThe one precedent that does NOT apply: latest_team_message_id / blocked_on_you had the same shape and were solved by RECOMPUTING them in the frontend from card_message chain_events. That works only because the source data was already in Supabase. Freshness state is not \u2014 there is nothing to derive from.\n\nBUILD \u2014 in the demote path (heal_stale_approvals.reconcile_stale_premises / beacon_approval_handler.demote):\n1. Stamp the verification state onto the card's approval_request chain_event row. Model it EXACTLY on chain_event_emit.clear_approval_request: one keyed PostgREST UPDATE filtered .eq('event_type','approval_request').eq('task_id',<id>).is_('read_at','null'), best-effort, swallows every failure, never blocks the local write.\n2. Write ONLY the positive states: 'stale' + evidence on FALSE; 'verified' + probed_at on TRUE. Write NOTHING for INDETERMINATE or a no-probe card \u2014 absence is the honest default and 2a reads absent as 'unverified'.\n3. probed_at is REQUIRED on 'verified' \u2014 2a decays a stale-dated 'verified' back to Unverified, which is what stops a dead healer leaving the tab reading green.\n\nTHE JOIN IS ALREADY GUARANTEED: add_pending sets entry['id'] = payload['task_id'], and PR #1077 (merged 2026-07-31) mints missing decide-tab cards under the pending entry's OWN id. So chain_events.task_id == the pending entry id by construction. Proven twice in-tree: triage_decisions.build_beacon_signals and clear_approval_request.\n\nRETRY IS FREE \u2014 BUILD NONE: reconcile_stale_premises re-demotes every matching entry on every 10-min tick (idempotent, verified in #1079), so a failed stamp retries next tick at no cost.\n\nOPEN DECISION \u2014 where the field lives:\n(a) a dedicated column (verification / verification_evidence / verified_at), like read_at and actor (migration 0006 precedent). Cleanest, PostgREST updates it directly, needs a migration. RECOMMENDED.\n(b) inside the payload JSON. No migration, but PostgREST cannot patch a JSON subfield, so read-modify-write. Safe only because this healer is the sole writer \u2014 a sharper edge for no real saving.\nSettle this WITH the 2a author before either lands, so reader and writer agree on the shape.\n\nREVIEW: /code-review high REQUIRED. This writes to the store feeding Larry's decision queue, and a wrong filter or mis-keyed update can mark a LIVE card stale \u2014 which fails looking exactly like a working tab. Watch the read_at IS NULL guard (a resolved card must never be restamped) and the task_id match (a near-miss key silently stamps the wrong card).",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ol-wt-dr1079",
+        "branch": "HEAD",
+        "captured_at": "2026-08-01T01:40:13.313449+00:00"
+      },
+      "last_touched": "2026-08-01T01:40:13.313449+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "A small addition that writes the 'still valid vs. gone stale' status of each pending approval into the place your Approvals list actually reads from, so the list can show it.",
+        "why": "Right now the queue can show an item as ready to approve when it's actually stale \u2014 this makes your decision list trustworthy so you're never green-lighting something dead.",
+        "suggest": "Worth doing, but move carefully: it writes directly into your live decision queue, so line it up with the display piece first and give it a close review before it goes out."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-08-01T01:43:08.206519+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     }
   ]
 }
