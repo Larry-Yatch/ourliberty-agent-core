@@ -289,6 +289,16 @@ _LOOP_BOUNDS_CACHE: dict[str, Any] = {}
 _DEFAULT_DEEP_REVIEW_PATHS: tuple[str, ...] = (
     # agent-core — the factory's own decision/merge/alert machinery.
     'scripts/beacon_approval_handler.py',
+    # The approval-card BIRTH GATE: heal_unregistered_approval.py decides whether
+    # a stranded direction-ask ever becomes a card that reaches Larry AT ALL. Its
+    # paired handler beacon_approval_handler.py (above) governs a card that already
+    # EXISTS — the birth gate is strictly more dangerous, because a card wrongly
+    # suppressed at birth leaves NO card, NO artifact, NO alert to notice: the
+    # 'fails looking like success' case this fileset exists to catch. Omitting it
+    # from this in-code fallback would silently NOT hold the birth-gate file under
+    # a degraded/malformed config, reintroducing the exact gap. Two forge/* PRs
+    # (#1080, #1077) auto-merged unreviewed on 2026-08-01 because it was absent.
+    'scripts/heal_unregistered_approval.py',
     'scripts/decision_*.py',
     'scripts/resolve*.py',
     'scripts/for_larry_*.py',
