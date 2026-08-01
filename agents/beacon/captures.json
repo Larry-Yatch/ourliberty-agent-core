@@ -2854,6 +2854,36 @@
         "from_state": "parked"
       },
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+    },
+    {
+      "id": "cap-re-land-the-two-real-fixes-from-the-closed-bind-a17b",
+      "title": "Re-land the two real fixes from the closed bind-drift restart-verification rewrite (PR #1071)",
+      "note": "PR #1071 was CLOSED 2026-07-31 without merging \u2014 an 860-line rewrite of heal_claude_json_bind_drift.py's restart verification that produced ~50 review findings over four rounds and never converged. Its incident half shipped separately as #1075 (classify by Restart=, never restart an ephemeral job). Full branch preserved at tag parked/2026-07-31/pr1071-restart-verify-rewrite (head 45336354) \u2014 read it for the detailed reasoning, do NOT rebase and revive it.\n\nTwo REAL bugs it fixed are still live on main. Re-land each as its own small PR written fresh against main, not cherry-picked:\n\nFIX 1 \u2014 a restart is concluded successful from is-active alone. is-active reads 'active' for the OLD, still-dangled process that was never stopped, so a restart that was never enqueued (hung sudo/dbus) is reported as a successful repair, burns the 15-min cooldown, and DMs Larry an auto-repair that did not happen. The fix: require a CHANGED InvocationID (or MainPID when the invocation was unreadable pre-restart) AND a started state before concluding LANDED. See verify_verdict + _identity_changed on the tag.\n\nFIX 2 \u2014 the verify window is shorter than the real After=-ordered start latency, so ourliberty-outbox-notifier and ourliberty-spec-review-runner still emit URGENT/NOW repair-failed: false pages. Both are ordered After=ourliberty-inbox-watcher, whose Claude loop takes ~90s to SIGTERM-drain, so their start jobs sit queued past the deadline and read 'inactive'. The fix that works without a wall-clock guess is the sibling healer's discriminator: consult systemctl show --property=Job, already used by heal_stale_daemon_code.py. A pending job means IN_PROGRESS, never a failure verdict.\n\nNeither is urgent \u2014 both predate the 2026-07-30 incident by months and are annoying-not-damaging. Sequence them independently; they do not depend on each other.\n\nTen unfixed review findings against the closed rewrite are recorded in the PR's own review comments and in ~/.claude/skills/review-loop/harvest/2026-07-30/ \u2014 relevant only if someone revives the branch, which is explicitly not the plan.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "main",
+        "captured_at": "2026-08-01T00:58:51.450779+00:00"
+      },
+      "last_touched": "2026-08-01T00:58:51.450779+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "Two small, long-standing glitches in our self-repair system: sometimes it tells you a problem was fixed when it actually wasn't, and other times it fires off urgent alarms for repairs that are really still in progress.",
+        "why": "Both quietly erode your trust in the automated monitoring \u2014 a false all-clear can hide a real outage, and false alarms train everyone to ignore the pings that matter.",
+        "suggest": "Worth fixing, but not a fire \u2014 take them on one at a time and carefully, since the repair machinery is delicate and a sloppy fix here could cause more noise than it removes."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-08-01T01:02:57.410829+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     }
   ]
 }
