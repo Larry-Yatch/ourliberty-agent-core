@@ -25513,3 +25513,79 @@ SIGNAL ⚠️ (Check 4 pending=2 active)
 
 ---
 
+## Iteration ~6958 — 2026-08-01T02:55Z UTC (Larry /cycle chat, Tier 1 [consecutive_clean=0]; Check 0: 2 new alerts [watermark 651→653]; PR#1070 MERGED ✅ by Larry (85d23134) — unreviewed-merge:1070 Tier-4 escalate; PR#1081 ESCALATE carry ~96 min; deep-review-hold-pr169-dd372150 RESOLVED ✅; TIER 1)
+
+**Health:** ⚠️ Signal — Check 0: Tier-4 alert unreviewed-merge:1070 (PR#1070 merged by Larry without Mirror REVIEW_PASS). Check 4: pending=1 effective active (PR#1081 Mirror ESCALATE ~96 min). Tier-reset (consecutive_clean=0; last_signal_at=2026-08-01T02:55:28Z UTC; 5-min cadence).
+
+**VERIFY-BEFORE-REASSERT (from iter ~6957 at ~02:43Z UTC 2026-08-01):**
+- **"Tier 1 (consecutive_clean=0)"**: CONFIRMED → tier.json: tier=1, consecutive_clean=0. [carry ✅ CONFIRMED]
+- **"pending=2 active (PR#1081 ESCALATE ~88min + PR#1070 ESCALATE ~7min)"**: UPDATED → **pending=1 effective active**: PR#1081 ESCALATE (carry, now ~96 min) only. PR#1070 MERGED by Larry at ~02:50Z UTC; `mirror-review-pr-ourliberty-agent-core-1070-7c2c3a81` pending entry now **STALE** (will auto-resolve on next outbox-notifier scan). [carry ✅ UPDATED → PR#1070 MERGED]
+- **"deep-review-hold-pr169-dd372150 STALE"**: UPDATED → **RESOLVED ✅** — outbox-notifier log at 20:43:59/20:44:00 MDT (02:43:59/02:44:00Z UTC): "deep-review-held entry cleared for Larry-Yatch/RSDPM#169 (PR no longer OPEN)"; "deep-review-hold-pr169-dd372150 resolved approved". Entry fully cleared. [carry ✅ UPDATED → RESOLVED]
+- **"HEAD=acb47868=origin/main, CLEAN"**: UPDATED → HEAD=**85d23134**=origin/main (new: `feat(models): move beacon + forge + narrator to claude-opus-5 (#1070)` — PR#1070 MERGED). Tree: only agents/beacon/captures.json dirty (healer-managed, nominal). [carry ✅ UPDATED — HEAD advanced]
+- **"2 open agent-core PRs (#1081, #1070)"**: UPDATED → **1 open PR** (#1081 only). PR#1070 MERGED. [carry ✅ UPDATED → 1 open]
+- **"watermark=651"**: UPDATED → 2 new alerts (lines 652-653): unreviewed-merge:1070 (Tier-4) + dashboard-api-sha-drift-healed (Tier-3 silenced). Watermark advanced 651→653. [carry ✅ UPDATED]
+- G-rule carries (unchanged): forge-marker-taskid-suffix-increment; medic-draft-status-false-positive; check-i-force-bypass-dm-route; beacon-pending-approvals-path-bug; deep-review-hold-approved-loop-post-merge-001. VPs: pulse-cycle-check0-helper-override, auto-merge-conflict-route-hold, direction-ask-rsdpm-no-autolabel-review-gap-001.
+
+**Check 0 — Alert triage (~02:54Z UTC):** repair-watermark → {repaired=false, old_watermark=651, file_length=653}. 2 new alerts (lines 652-653):
+1. **line 652** — source=heal-unreviewed-merge-detector, subject=unreviewed-merge:1070, ts=2026-08-01T02:50:05Z UTC, severity=critical, route=escalate → helper: **Tier-4** (rationale: "known never-silence pattern in alert-translations.json: translated but surfaced, not muted"; decision=ask; status=triaged-tier-4). ⚠️ SIGNAL — tier-reset. Outbox-notifier delivery: route=escalate → will DM Larry on next bot scan.
+2. **line 653** — source=heal-dashboard-api-sha-drift, subject=dashboard-api-sha-drift-healed, ts=2026-08-01T02:50:47Z UTC, severity=warning, route=digest → helper: **Tier-3** (known-pattern silence; status=resolved). ✅ NOMINAL — silenced.
+Watermark advanced 651→653. **Triage: 1 Tier-4 (escalate) + 1 Tier-3 (silenced).** ⚠️ TIER-RESET
+
+**Check 1 — Log noise (~02:51Z UTC):** outbox-notifier.log new entries since iter ~6957 (20:43 MDT onward):
+- [20:43:59 MDT=02:43:59Z UTC]: deep-review-held entry cleared for Larry-Yatch/RSDPM#169 (PR no longer OPEN). ✅
+- [20:44:00 MDT]: deep-review-hold approval=deep-review-hold-pr169-dd372150 resolved approved. ✅ POSITIVE
+No error spam above 5/h threshold. NOMINAL ✅
+
+**Check 2 — Telegram sweep (~02:51Z UTC):** Last bot delivery: notification idx=650 at [2026-07-31T20:32:07-0600]=02:32:07Z UTC (review-pass for approvals-freshness-2a-unverified-badge-001). Larry's last message at [2026-07-31T18:41:44-0600]=00:41:44Z UTC (~2.2h). unreviewed-merge:1070 alert (line 652, route=escalate) will surface on next bot delivery scan. NOMINAL ✅ (delivery pending)
+
+**Check 3 — Pipeline stall (~02:51Z UTC):** heal_pipeline_stall.py --dry-run → no stalls detected. FORGE_NO_PR_SKIP ×5 (lost-marker-render-emission-net-001 PR#1074, reconcile-local-pending-approvals-to-decide-tab-001 PR#1077, suite-guardian-graduation-stage-1 PR#1078, approvals-freshness-2-tick-probe-demote-001 PR#1079, approvals-freshness-3-birth-probe-001 PR#1080). NOMINAL ✅
+
+**Check 4 — Pending directives (~02:51Z UTC):** state/beacon-pending-approvals.json: pending=2 in file, effective active=1:
+- id=mirror-review-pr-ourliberty-agent-core-1081-e45ff49e, created 2026-08-01T01:18:12Z UTC (~96 min). Mirror REVISION confidence=low → ESCALATE. **Larry action: decide on PR#1081 via Telegram approval flow.**
+- id=mirror-review-pr-ourliberty-agent-core-1070-7c2c3a81 → **STALE** (PR#1070 MERGED by Larry at ~02:50Z UTC). Will auto-resolve on next outbox-notifier scan.
+- Classification: **ask-then-do** (1 active). **→ TIER-RESET** ⚠️ (combined with Check 0 Tier-4)
+
+**Check 5 — Stale daemon code (~02:51Z UTC):** heal-stale-daemon-code.heartbeat=2026-08-01T02:43:11Z UTC (~12 min old; <60 min). system-health=healthy ts=2026-08-01T02:49:43Z UTC. All 4 bots alive=True. NOMINAL ✅
+
+**Check A — Source repo (~02:51Z UTC):** On main. HEAD=85d23134=origin/main (PR#1070 merged — `feat(models): move beacon + forge + narrator to claude-opus-5`). Tree: only agents/beacon/captures.json dirty (healer-managed, nominal-by-design). NOMINAL ✅
+**Check B — Sync health (~02:51Z UTC):** last_sync=2026-08-01T02:03:27Z (~51 min; <2h threshold); status=success; consecutive_push_failures=0. NOMINAL ✅
+**Check C — Agent liveness (~02:51Z UTC):** system-health=healthy ts=2026-08-01T02:49:43Z UTC. All 4 bots alive (beacon/forge/mirror/pulse). NOMINAL ✅
+**Check E — PR/merge state (~02:51Z UTC):** ourliberty-agent-core: **1 open PR**:
+- **#1081** `fix(suite-guardian): wire L10 regression detection + downgrade` — MERGEABLE, no labels. Mirror REVISION → ESCALATE. approval_request=mirror-review-pr-ourliberty-agent-core-1081-e45ff49e (~96 min pending). [Larry action: decide]
+RSDPM: **0 open PRs** — PR#169 MERGED ✅ (confirmed prior iter). NOMINAL for RSDPM.
+Recently merged since last iter: **PR#1070** `feat(models): move beacon + forge + narrator to claude-opus-5` — merged by Larry at ~02:50Z UTC. HEAD now 85d23134.
+SIGNAL ⚠️ (PR#1081 pending)
+
+**§5.0 one-shots (~02:55Z UTC):** audit_due_nudge → no-op ✅. distill_detector → no-op ✅. silence_file_auditor → 7 files (3 expired @50.9d + 4 permanent/0-suppressed); no FIRED ✅. NOMINAL ✅
+**§5 periodic — Check I (carry):** Today=Saturday (off-day, timer won't fire). Most recent artifact: check-i-2026-07-31.json. Carry: $1,201/wk (+206%); proposal #1 [small] `cycle-202607230601240000` 45.2σ. `/dispatch 1` to act. NOMINAL ✅
+**§5 periodic — Check III (carry):** Most recent: check-iii-2026-07-26.json. Next: Sun 2026-08-03 (~1.1d). NOMINAL ✅
+**Credential rotation (~02:55Z UTC):** SUPABASE_SERVICE_ROLE_KEY: last DM 2026-07-20T20:00:15Z UTC; 14d dedup expires ~2026-08-03T20:00Z (~1.9d remaining). Within dedup window — no DM. NOMINAL ✅
+
+**PRIME DIRECTIVE accounting:** Signal iter (Check 0 Tier-4 + Check 4 pending=1 active). 1 intervention row appended at 02:55:26Z UTC (tier=1, kind=intervention, template=pr1070-unreviewed-merge-new-pr1081-escalate-carry). Ratio=40.383 (trend: worsening, carry). **TIER RESET: 1** (consecutive_clean=0; last_signal_at=2026-08-01T02:55:28Z UTC; 5-min cadence).
+
+**Patterns:**
+- **[POSITIVE ✅] PR#1070 MERGED** — `feat(models): move beacon + forge + narrator to claude-opus-5` (HEAD=85d23134). Larry merged at ~02:50Z UTC after Mirror ESCALATE (review_escalate sha=7c2c3a81). Model name updates shipped: beacon, forge, narrator now on claude-opus-5. dashboard-api auto-restarted by heal-dashboard-api-sha-drift healer (Tier-3 silenced). ✅
+- **[POSITIVE ✅] deep-review-hold-pr169-dd372150 RESOLVED** — RSDPM PR#169 no longer OPEN; held entry auto-cleared by outbox-notifier at 02:44Z UTC. 3 pending entries from last iter → now 1 effective active.
+- **[NEW ⚠️] unreviewed-merge:1070** — heal-unreviewed-merge-detector fired at 02:50:05Z UTC. PR#1070 merged by Larry-Yatch without Mirror REVIEW_PASS evidence. Tier-4 (never-silence pattern). route=escalate → outbox-notifier will DM Larry on next bot scan. Same class as PR#1065 unreviewed-merge carry. No revert needed (model-string-only change, Larry-intentional).
+- **[carry ⚠️] PR#1081 Mirror ESCALATE** — ~96 min pending Larry decision (created 01:18Z UTC). No change. Carry.
+- G-rule carries (unchanged): forge-marker-taskid-suffix-increment; medic-draft-status-false-positive; check-i-force-bypass-dm-route; beacon-pending-approvals-path-bug; deep-review-hold-approved-loop-post-merge-001. VPs: pulse-cycle-check0-helper-override, auto-merge-conflict-route-hold, direction-ask-rsdpm-no-autolabel-review-gap-001.
+
+**Actions taken:**
+1. Check 0: repair-watermark → no-op (651 ≤ 653). ✅
+2. Check 0: triage alert 652 (unreviewed-merge:1070) → Tier-4; alert 653 (dashboard-api-sha-drift-healed) → Tier-3 silenced. Watermark advanced 651→653. ✅
+3. §5.0: audit_due_nudge no-op, distill_detector no-op, silence_file_auditor no-op. ✅
+4. PRIME DIRECTIVE: 1 intervention row appended at 02:55:26Z UTC (tier=1, kind=intervention, template=pr1070-unreviewed-merge-new-pr1081-escalate-carry). ✅
+5. Tier state: `cycle_tier_state.py record --checks-clean false` → **TIER 1** (consecutive_clean=0; last_signal_at=2026-08-01T02:55:28Z UTC). ✅
+
+**Escalations:** No new Pulse DMs this iter (unreviewed-merge:1070 delivered via route=escalate through outbox-notifier's bot delivery on next scan). Carries:
+- **[⚠️ — outbox-notifier delivery pending]** unreviewed-merge:1070: PR#1070 merged by Larry without Mirror REVIEW_PASS. Alert at larry-alerts.jsonl:652, route=escalate, Tier-4.
+- **[⚠️ — Beacon sweep pending]** PR#1081 ESCALATE: Mirror REVISION confidence=low. Larry: decide via Telegram approval flow (~96 min pending).
+- **[carry ⚠️]** RSDPM staging drift (0035, 0036, 0037): Awaiting Larry ssh investigation.
+- **[carry — Larry notified]** PR#1065 unreviewed-merge: Larry already DM'd (idx=628, idx=643); no new action.
+- [carry] check-vi-posture-proposals-2026-07-07. [carry] Mirror queue-wait p95=1065.6m. [carry] Check XIV Tier-4 ×2. [carry] tier4-rsdpm-install-drift. [carry] forge-wip-redispatch EXHAUSTED (rsdpm-pr155).
+- **[blue] Check I carry**: proposal #1 (45σ anomaly `cycle-202607230601240000`); `/dispatch 1` to act.
+
+**Tier end-of-iter:** **Tier 1** (consecutive_clean=0; last_signal_at=2026-08-01T02:55:28Z UTC; 5-min cadence).
+
+---
+
