@@ -71,6 +71,23 @@ healer pattern.
    - Emit a heartbeat each run; on its own failure emit a larry-alert. (It is itself now covered by
      the pulse-check/daemon liveness watchers.)
 
+3b. PARITY (the checker, added 2026-08-01). **INVARIANT: every item awaiting Larry appears on the
+   decide tab and clears when resolved. Enforcement:** `heal_unregistered_approval` promotes +
+   retires; `scripts/heal_approvals_surface_drift.py` asserts parity and alerts on persistent
+   divergence. Decision 3 is a reconciler with no checker, which is one regression away from silent —
+   a promoter whose predicate is re-narrowed, or a new direct-register flow nobody wired in, looks
+   identical to a working one (on 2026-08-01 `pipeline-stall:unrouted-pr:PR#1084` and
+   `suite-guardian-graduation-stage-1` both missed the tab, unnoticed until Larry saw the counts
+   disagree). The sentinel is OBSERVE-ONLY — it never promotes, retires or writes to any approval
+   store or to chain_events, so a bug in it can only ever mis-alert, never corrupt the tab. It derives
+   set A (pending[] `status=pending`, open for-Larry records, `route=escalate`+`needs_larry` alerts,
+   minus resolved / `premise_stale`) INDEPENDENTLY of decision 3's predicate — reusing
+   `is_approval_class` would make the check circular — and compares it against set B (open
+   `approval_request` chain_events) in both directions, joined on
+   `decision_identity.canonical_decision_key`. Actionable-only: a divergence must persist 3
+   consecutive ticks (in-flight promote/retire is churn, not drift) and alerts at most ONCE per item,
+   with the ledger entry cleared on reconcile so a later recurrence alerts again.
+
 4. NO DOUBLE-REGISTRATION. If Beacon already emitted a proper `approval_request` for an ask
    (decision 2 path), reconciliation MUST NOT duplicate it — match on dedup_identity / subject so the
    first-class path and the net never collide.
