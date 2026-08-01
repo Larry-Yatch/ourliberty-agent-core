@@ -37,6 +37,7 @@ import subprocess
 import time
 import unittest
 from pathlib import Path
+from unittest import mock
 from typing import Optional
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -132,6 +133,55 @@ def _wait_until_reaped(pid: int, needle: str, timeout_s: float = 10.0) -> bool:
         if time.monotonic() >= deadline:
             return False
         time.sleep(0.02)
+
+
+def _spawn_sleeper(case: unittest.TestCase, seconds: int) -> subprocess.Popen:
+    """Spawn `sleep <seconds>` and return it only once it IS that process.
+
+    Between `Popen` returning and the child completing `execve`, Linux reports
+    an EMPTY `/proc/<pid>/cmdline` for a live pid. `_wait_until_reaped` reads an
+    empty command line as "pid recycled, this one is NOT ours" and returns True
+    on its FIRST poll — so a test that spawns a sleeper and immediately asserts
+    NOT-reaped fails for a reason that has nothing to do with the helper.
+
+    Measured on the droplet, otherwise idle: time-to-exec is p50 0.10ms / p95
+    1.24ms / max 3.16ms, and the first read lands inside that window in 1 of 60
+    spawns from a fresh interpreter (this test's own shape) and 66 of 200 when
+    spawns run back-to-back — the shape a full suite puts on the spawn path.
+
+    EVIDENCE, stated honestly. This is the only mechanism found that produces
+    the 2026-07-31 droplet failure (this `assertFalse`, during a full-suite run
+    at PR #1079's head, passing 3/3 in isolation at that head and at base main),
+    and it is real on this box — but it was NOT reproduced end-to-end: 100
+    loaded runs of the test and 40 loaded 4-way-concurrent runs of this whole
+    file, on the unfixed code, all passed.
+    So it is a proven-possible cause at a rate below what those runs could
+    catch, not a proven-actual one. Two things follow: the gate is worth having
+    because it removes the mechanism for free, and the assertion below carries
+    a diagnostic message so a recurrence names its own cause instead of costing
+    another investigation.
+
+    Note that raising `timeout_s` cannot fix this class — the wrong answer is
+    returned before the deadline is ever consulted — and that the same race
+    makes the recycled-pid test pass VACUOUSLY, True for the empty-cmdline
+    reason instead of the mismatch it means to prove.
+
+    Gating on exec having completed makes the assertion that follows about the
+    helper's logic and nothing else."""
+    p = subprocess.Popen(['sleep', str(seconds)])
+    case.addCleanup(p.wait)
+    case.addCleanup(p.kill)
+    needle = f'sleep {seconds}'
+    deadline = time.monotonic() + 10.0
+    while needle not in _proc_cmdline(p.pid):
+        if not _pid_alive(p.pid):
+            raise AssertionError(f'sleeper {p.pid} died before it exec\'d {needle!r}')
+        if time.monotonic() >= deadline:
+            raise AssertionError(
+                f'sleeper {p.pid} never exec\'d {needle!r} '
+                f'(command line: {_proc_cmdline(p.pid)!r})')
+        time.sleep(0.005)
+    return p
 
 
 class RunReviewStepPassthroughTest(unittest.TestCase):
@@ -274,9 +324,9 @@ class WaitUntilReapedTest(unittest.TestCase):
         # THE dangerous case. A live pid whose command line is not ours means our
         # process died and the pid was reused. Reporting it alive would be a false
         # failure AND would send the caller's cleanup SIGKILL at a stranger.
-        p = subprocess.Popen(['sleep', '30'])
-        self.addCleanup(p.wait)
-        self.addCleanup(p.kill)
+        # Gated on exec: an un-exec'd sleeper reads as an empty command line and
+        # would pass this for the wrong reason (see `_spawn_sleeper`).
+        p = _spawn_sleeper(self, 30)
         # Same live pid, but we are looking for a different command.
         self.assertTrue(_wait_until_reaped(p.pid, 'sleep 40', timeout_s=5.0))
         # ...and it is genuinely still running: we reported "reaped" without
@@ -286,10 +336,42 @@ class WaitUntilReapedTest(unittest.TestCase):
     def test_live_matching_process_is_not_reaped(self):
         # The assertion the timeout tests actually rely on must still be able to
         # FAIL — a helper that always returns True would make them vacuous.
-        p = subprocess.Popen(['sleep', '30'])
-        self.addCleanup(p.wait)
-        self.addCleanup(p.kill)
-        self.assertFalse(_wait_until_reaped(p.pid, 'sleep 30', timeout_s=0.5))
+        p = _spawn_sleeper(self, 30)
+        # 0.5s stays deliberately short: once exec is confirmed, a live
+        # `sleep 30` cannot stop being alive or stop matching, so the helper is
+        # forced to burn the whole deadline and answer False. Load changes how
+        # long that costs, never the answer — so a longer deadline would buy no
+        # robustness, only a slower suite.
+        reaped = _wait_until_reaped(p.pid, 'sleep 30', timeout_s=0.5)
+        # The message is the point if this ever fires again: `alive=True` with an
+        # empty command line means the exec race got past the gate, while
+        # `alive=False` means something outside this test killed our sleeper —
+        # a different bug entirely, and one no timeout tuning would touch.
+        self.assertFalse(
+            reaped,
+            f'live sleeper {p.pid} reported reaped: '
+            f'alive={_pid_alive(p.pid)} cmdline={_proc_cmdline(p.pid)!r}')
+
+    def test_spawn_sleeper_absorbs_the_exec_window(self):
+        # Pins the fix rather than the symptom: the exec gate must SWALLOW empty
+        # command lines, not merely get lucky about them. The window is forced
+        # here instead of waited for — the first three reads come back empty,
+        # exactly as a mid-`execve` child does — because a race that shows up in
+        # ~2% of real spawns cannot be pinned by running the real thing once.
+        # Without the gate, `_wait_until_reaped` answers True on poll one and
+        # the assertion below inverts; that is the flake, on demand.
+        real = _proc_cmdline
+        calls = []
+
+        def racy(pid):
+            calls.append(pid)
+            return '' if len(calls) <= 3 else real(pid)
+
+        with mock.patch.dict(globals(), {'_proc_cmdline': racy}):
+            p = _spawn_sleeper(self, 30)
+            self.assertGreater(
+                len(calls), 3, 'gate returned while the command line still read empty')
+            self.assertFalse(_wait_until_reaped(p.pid, 'sleep 30', timeout_s=0.2))
 
     def test_cmdline_of_dead_pid_is_empty_not_an_exception(self):
         p = subprocess.Popen(['sleep', '0'])
