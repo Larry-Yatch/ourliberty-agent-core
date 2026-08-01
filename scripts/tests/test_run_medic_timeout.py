@@ -133,6 +133,18 @@ class TimeoutKillsAndReleasesLockTest(unittest.TestCase):
     def _run(self, timeout_str: str) -> subprocess.CompletedProcess:
         env = os.environ.copy()
         env['HOME'] = str(self.fake_home)
+        # This harness sandboxes by SWAPPING HOME, but os.environ.copy()
+        # inherits _bootstrap's OURLIBERTY_AGENTS_ROOT (the outer sandbox
+        # root), and run_medic.sh resolves THAT ahead of $HOME. Unpinned, the
+        # wrapper writes its lock and log outside self.fake_home and the log
+        # assertion below fails — while the LOCK assertion passes VACUOUSLY,
+        # since a lock that was never written to this path is trivially
+        # absent. That is the dangerous half: the test's actual safety claim
+        # (the EXIT trap released the lock) would become unfalsifiable, so the
+        # fix is to pin the root, never to relax the assertion.
+        # Matches _RunCycleTestBase._run_cycle and the medic lib-state
+        # harness. See [[home-swap-tier-hazards]].
+        env['OURLIBERTY_AGENTS_ROOT'] = str(self.fake_home / 'agents')
         # Prepend the fake-bin dir so `claude` resolves to the stub. Keep
         # the system PATH so bash, timeout, date, stat, tee, cat are found.
         env['PATH'] = f'{self.fake_bin}:{env.get("PATH", "")}'

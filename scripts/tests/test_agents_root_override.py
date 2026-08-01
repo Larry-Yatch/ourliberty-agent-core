@@ -122,6 +122,23 @@ coverage the code does not have.
     ``"~/agents"`` does not tilde-expand in shell, so it is not a home
     path and stays quiet; ``AGENTS_ROOT = ~/agents`` with spaces, and
     ``echo tier1 > ~/agents/rotation.disabled``, are prose and stay quiet.
+  * executable tilde not welded to = or : — the consequence of the entry
+    above, stated in its own right because it is the one that costs
+    something: ``cd ~/agents`` and ``mkdir -p ~/agents/state`` in a .sh
+    runner really do expand, and stay quiet. The welded form is the only
+    tilde spelling that cannot also be prose, so widening past it
+    re-floods the offender list with docstrings.
+  * literal override text in a non-expanding context — the waiver reads
+    TEXT, not expansion. Inside a QUOTED heredoc (``<<'PYEOF'``) or a
+    Python string literal, ``${OURLIBERTY_AGENTS_ROOT:-$HOME/agents}``
+    never expands, yet it still waives the line. Seeing this needs
+    cross-line heredoc state the line-based channel does not carry. It is
+    bounded by LOUDNESS rather than by the scanner: the unexpanded text
+    is a nonsense relative path that fails immediately, not the silent
+    wrong-home write this guard exists to prevent.
+  * non-literal agents segment — every composition branch requires the
+    ``'agents'`` segment to be a literal, so ``seg = 'agents'; Path.home()
+    / seg`` is quiet. Same alias reasoning as the entries above.
 """
 try:  # engage the test sandbox before any production import reads env/paths
     from . import _bootstrap  # noqa: F401
@@ -260,12 +277,44 @@ TEXT_BARE = re.compile(
 SHELL_DEFAULT = re.compile(r"\$\{" + re.escape(ENV_VAR) + r":[-=]")
 
 
+def _expansion_close(line, open_end):
+    """Index of the `}` that closes the `${` opened just before `open_end`,
+    or -1 if this line never closes it.
+
+    Brace-MATCHED, not first-brace. `line.find("}", ...)` answers "is there a
+    closing brace anywhere later", which is a different question: any
+    unrelated expansion further along the line (a `${PATH}`, a `${HOME}`)
+    supplies a brace that closes nothing, and the caller then hands out a
+    waiver for an opener that was never terminated. That silently restored
+    the exact fail-OPEN branch _inside_shell_default's docstring claims to
+    have removed — a scanner-wide posture reversal delivered by a one-token
+    difference.
+
+    Only `${` opens a level. A bare `{` does not: it is brace expansion or
+    an awk/jq body, and counting it would make legitimate lines unclosable.
+    """
+    depth = 1
+    i, n = open_end, len(line)
+    while i < n:
+        if line.startswith("${", i):
+            depth += 1
+            i += 2
+        elif line[i] == "}":
+            depth -= 1
+            if depth == 0:
+                return i
+            i += 1
+        else:
+            i += 1
+    return -1
+
+
 def _inside_shell_default(line, pos):
     """Is the match at `pos` inside a CLOSED `${OURLIBERTY_AGENTS_ROOT:-...}`
     expansion on THIS line?
 
-    FAIL-CLOSED. The waiver applies only when an opener before `pos` has a
-    closing brace later on the same line, at or after `pos`. A missing
+    FAIL-CLOSED. The waiver applies only when an opener before `pos` has its
+    OWN matching close later on the same line, at or after `pos`. A missing
     closing brace waives NOTHING — it used to waive the whole rest of the
     line, which is a fail-OPEN branch inside a scanner whose entire posture
     is fail-closed. The case is not hypothetical: f-string interpolations
@@ -276,11 +325,15 @@ def _inside_shell_default(line, pos):
     The loop CONTINUES past an unterminated opener rather than returning,
     so a line carrying a typo'd opener AND a well-formed one still gets the
     legitimate waiver.
+
+    KNOWN AND DECLARED: this asks whether the TEXT is a well-formed
+    expansion, not whether the shell will ever EXPAND it. See
+    DECLARED_BLIND_SPOTS "literal override text in a non-expanding context".
     """
     for m in SHELL_DEFAULT.finditer(line):
         if m.start() > pos:
             break
-        close = line.find("}", m.end())
+        close = _expansion_close(line, m.end())
         if close != -1 and close > pos:
             return True
     return False
@@ -293,6 +346,25 @@ def _inside_shell_default(line, pos):
 
 _ModuleImport = collections.namedtuple("_ModuleImport", "module")
 _FromImport = collections.namedtuple("_FromImport", "module original")
+
+# Match-statement capture nodes (PEP 634) exist only on py>=3.10, but the guard
+# has to survive the interpreter it is INVOKED on, not the one the suite pins.
+# `/usr/bin/python3` is 3.9 on this Mac, and a bare `ast.MatchAs` lookup there
+# raises AttributeError out of the binding sweep — which makes the guard report
+# ITSELF as broken across ~124 of its own tests. That is indistinguishable from
+# a real regression in the thing being guarded, and it is the worst failure
+# shape this file can have: it converts "your paths are wrong" into noise.
+#
+# Resolved once, defensively, instead of at every isinstance() call. Nothing is
+# lost on 3.9: a `match` statement is a SyntaxError there, so these nodes can
+# never appear in a tree that parsed. Compare the PEP 695 skipIf below — this
+# file already degrades by version rather than crashing.
+_MATCH_CAPTURE = tuple(
+    node for node in (getattr(ast, name, None)
+                      for name in ("MatchAs", "MatchStar"))
+    if node is not None
+)
+_MATCH_MAPPING = getattr(ast, "MatchMapping", None)
 
 
 def _collect_bindings(tree):
@@ -374,9 +446,10 @@ def _collect_bindings(tree):
         elif isinstance(node, (ast.Global, ast.Nonlocal)):
             for name in node.names:
                 record(name, None)
-        elif isinstance(node, (ast.MatchAs, ast.MatchStar)) and node.name:
+        elif _MATCH_CAPTURE and isinstance(node, _MATCH_CAPTURE) and node.name:
             record(node.name, None)
-        elif isinstance(node, ast.MatchMapping) and node.rest:
+        elif (_MATCH_MAPPING is not None
+                and isinstance(node, _MATCH_MAPPING) and node.rest):
             record(node.rest, None)
     return bindings, star_import
 
@@ -1226,6 +1299,41 @@ DECLARED_BLIND_SPOTS = (
         "Pervasive in docstrings; cannot discriminate payload from prose."
         " The executable spelling (unquoted `=~/agents`) IS caught.",
     ),
+    (
+        "executable tilde not welded to = or :",
+        "cmd = 'cd ~/agents && ls'\n",
+        "The .sh channel inherits the tilde-is-prose compromise above, so"
+        " `cd ~/agents` and `mkdir -p ~/agents/state` are quiet even though"
+        " the shell really does expand them. Narrowing to the welded form"
+        " (`LOG=~/agents`) is what keeps the docstring/prose fixtures out of"
+        " the offender list; widening to every `~/agents` re-floods it."
+        " Bounded in practice: these spell a path but rarely WRITE tier-2"
+        " state, and the `${...}` form is what review asks for.",
+    ),
+    (
+        "literal override text in a non-expanding context",
+        "payload = '''python3 - <<'PYEOF'\n"
+        "p = \"${OURLIBERTY_AGENTS_ROOT:-$HOME/agents}/state\"\nPYEOF'''\n",
+        "_inside_shell_default asks whether the TEXT is a well-formed"
+        " expansion, not whether the shell will EXPAND it — inside a QUOTED"
+        " heredoc or a plain Python string literal nothing expands, so the"
+        " spelling remediation #3 tells you to paste waives the check while"
+        " doing nothing at runtime. Fixing it needs cross-line heredoc state"
+        " the line-based text channel does not carry. Bounded by loudness:"
+        " the unexpanded text is a nonsense relative path that fails at"
+        " once, NOT the silent wrong-home write this guard exists for."
+        " kick_govern_loop_assessor.sh shows the correct pattern — resolve"
+        " in the shell, export, and read the env inside the payload.",
+    ),
+    (
+        "non-literal agents segment",
+        "seg = 'agents'\np = Path.home() / seg\n",
+        "Every composition branch requires the agents segment to be a"
+        " literal ast.Constant, so a variable, f-string or concatenation"
+        " producing it is quiet. Same alias reason as the entries above:"
+        " tracking it means the value model that produced three rounds of"
+        " bypasses. Absent from scripts/*.py today.",
+    ),
 )
 
 
@@ -1472,6 +1580,56 @@ class TestAgentsRootOverride(unittest.TestCase):
                 (bogus_home / "agents").exists(),
                 "the runner still built state under the swapped HOME",
             )
+
+    def test_repaired_shell_runner_falls_back_to_home_when_unset(self):
+        """The OTHER arm of `${OURLIBERTY_AGENTS_ROOT:-$HOME/agents}`.
+
+        Every wrapper harness in the suite PINS the override (it has to —
+        _bootstrap exports a sandbox root that would otherwise win over the
+        swapped HOME). The consequence is that the default arm — the only
+        arm the systemd-invoked runners ever take in production — had zero
+        executable coverage: nothing ran a repaired runner with the variable
+        UNSET. A repair that spelled the expansion `${OURLIBERTY_AGENTS_ROOT}`
+        with no default would pass every other test in this file and resolve
+        to `/blackboard` on the droplet.
+
+        Same runner and same halt-flag signal as the override test above, so
+        the two are a matched pair: that one proves the override WINS, this
+        one proves $HOME still ANSWERS when there is no override.
+        """
+        script = SCRIPTS / "run_ledger.sh"
+        self.assertTrue(script.exists(), script)
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp = Path(tmp)
+            home = tmp / "home"
+            (home / "agents" / "blackboard").mkdir(parents=True)
+            (home / "agents" / "blackboard" / "EMERGENCY_HALT").write_text(
+                "halt\n"
+            )
+            helper_dir = home / "agent-core" / "scripts"
+            helper_dir.mkdir(parents=True)
+            (helper_dir / "_lib_push_with_rebase.sh").write_text(
+                (SCRIPTS / "_lib_push_with_rebase.sh").read_text(
+                    encoding="utf-8"
+                ),
+                encoding="utf-8",
+            )
+            env = dict(os.environ)
+            env["HOME"] = str(home)
+            # REMOVED, not blanked — this is the whole point of the test.
+            env.pop(ENV_VAR, None)
+            proc = subprocess.run(
+                ["bash", str(script)],
+                env=env, capture_output=True, text=True, timeout=120,
+            )
+            self.assertIn(
+                "EMERGENCY_HALT present",
+                proc.stdout + proc.stderr,
+                "with no override set, the runner must resolve the agents "
+                f"root from $HOME.\nrc={proc.returncode}\n"
+                f"stdout={proc.stdout}\nstderr={proc.stderr}",
+            )
+            self.assertEqual(proc.returncode, 0, proc.stderr)
 
 
 class TestGuardScanner(unittest.TestCase):
@@ -2083,6 +2241,37 @@ class TestGuardScanner(unittest.TestCase):
                 len(find_bare_agents_roots_in_text(
                     'ROOT="${OURLIBERTY_AGENTS_ROOT%s$HOME/agents"\n' % op)),
                 1, op)
+
+    def test_an_unrelated_later_expansion_does_not_close_the_opener(self):
+        """A `}` belonging to some OTHER expansion is not this opener's close.
+
+        The unterminated-opener case above is only fail-closed while the line
+        has no later brace at all. Real lines are not that tidy: an export
+        that also mentions ${PATH}, a log line that also mentions ${HOME}.
+        Under first-brace matching those all hand back the waiver, so the
+        fail-closed posture held only for the tidiest possible counterexample
+        — which is the one a test author naturally writes.
+        """
+        for tail in ('${PATH}', '${HOME}', '${OURLIBERTY_LOG_DIR}'):
+            line = ('ROOT="${OURLIBERTY_AGENTS_ROOT:-$HOME/agents" ; '
+                    'echo "%s"\n' % tail)
+            self.assertEqual(
+                len(find_bare_agents_roots_in_text(line)), 1,
+                f'unterminated opener waived by an unrelated {tail}: {line}')
+            # The .py string channel must give the same answer.
+            self.assertEqual(
+                len(find_bare_agents_roots('cmd = %r\n' % line)), 1, line)
+
+    def test_a_nested_expansion_inside_the_default_still_waives(self):
+        """The other direction: brace MATCHING must not break the legitimate
+        nested spelling, where the fallback itself is an expansion."""
+        for src in (
+            'ROOT="${OURLIBERTY_AGENTS_ROOT:-${HOME}/agents}"\n',
+            'ROOT="${OURLIBERTY_AGENTS_ROOT:-${HOME}/agents}/state" ;'
+            ' echo "${PATH}"\n',
+        ):
+            self.assertEqual(
+                find_bare_agents_roots_in_text(src), [], src)
 
     # -- the .sh channel -----------------------------------------------------
 

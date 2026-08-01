@@ -23,9 +23,16 @@ set -euo pipefail
 REPO_DIR="${HOME}/agent-core"
 STATE_FILE="${OURLIBERTY_AGENTS_ROOT:-$HOME/agents}/state/govern-loop-kickoff.json"
 
+# STATE_FILE arrives as argv[1], NOT interpolated into the Python source.
+# It is now env-derived (OURLIBERTY_AGENTS_ROOT), and a root containing a
+# single quote used to close the string literal early: the interpreter died
+# with a SyntaxError, `2>/dev/null` ate it, the non-zero exit read as "not
+# kicked", and the script re-dispatched a build it had already dispatched.
+# A quoting bug that turns an idempotency check into a silent NO is exactly
+# the failure this precheck exists to prevent.
 if [ "${1:-}" != "--force" ] && [ -f "$STATE_FILE" ] \
-    && python3 -c "import json,sys; sys.exit(0 if json.load(open('$STATE_FILE')).get('kicked') else 1)" 2>/dev/null; then
-    echo "Already kicked ($(python3 -c "import json; print(json.load(open('$STATE_FILE')).get('kicked'))")). Use --force to re-dispatch." >&2
+    && python3 -c "import json,sys; sys.exit(0 if json.load(open(sys.argv[1])).get('kicked') else 1)" "$STATE_FILE" 2>/dev/null; then
+    echo "Already kicked ($(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('kicked'))" "$STATE_FILE")). Use --force to re-dispatch." >&2
     exit 0
 fi
 
