@@ -1219,7 +1219,7 @@
       "title": "Operator 'Merge It' Verb",
       "north_star_ref": null,
       "repo": "ourliberty-agent-core",
-      "state": "active",
+      "state": "retired",
       "phases": [
         {
           "id": "merge-verb-operator-action",
@@ -1268,10 +1268,17 @@
       ],
       "one_off": true,
       "created_at": "2026-07-30T18:16:44.520509+00:00",
-      "updated_at": "2026-07-30T18:16:44.520509+00:00",
+      "updated_at": "2026-08-01T18:16:57.943863+00:00",
       "promoted_from": {
         "kind": "mission",
         "mission_id": "merge-verb-operator-action"
+      },
+      "gc": {
+        "prior_state": "active",
+        "retired_at": "2026-08-01T18:16:57.943863+00:00",
+        "retired_by": "projects-store-gc",
+        "done_at": "2026-07-30T18:16:44.438835+00:00",
+        "window_sec": 172800
       }
     }
   ]
