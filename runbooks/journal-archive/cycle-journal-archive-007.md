@@ -23691,3 +23691,84 @@ NOMINAL ✅
 
 ---
 
+## Iteration ~6937 — 2026-08-01T00:10Z UTC (Larry /cycle chat, Tier 1 [consecutive_clean=1→2]; Check 0: 1 new alert [Tier-3 silenced: dispatch-branch-cleanup digest]; watermark 619→620; PR#1080 NEW [approvals-freshness-3-birth-probe-001, CONFLICTING ~2min]; PR#1079 Mirror review in-flight ~14min; 6 open PRs; all mandatory+additive checks NOMINAL; sync ~9min <2h; CLEAN ITER; TIER 1)
+
+**Health:** ✅ Nominal — clean iter; Tier 1 consecutive_clean=1→2.
+
+**VERIFY-BEFORE-REASSERT (from iter ~6936 at ~00:07Z UTC 2026-08-01):**
+- **"Tier 1 consecutive_clean=0→1"**: UPDATED → consecutive_clean=1 confirmed at iter start; **clean iter, consecutive_clean=1→2** (still Tier 1). [carry ✅ UPDATED]
+- **"pending=0 CLEARED"**: CONFIRMED → state/beacon-pending-approvals.json pending=0. [carry ✅ CONFIRMED]
+- **"HEAD=ad8c4a28=origin/main"**: UPDATED → HEAD=4ee0f8ff ("Pulse cycle 20260801T000859Z")=origin/main. Wrapper committed post-iter-~6936. [carry ✅ UPDATED]
+- **"5 open PRs (#1079 ~11min, #1075 ~2.0h, #1071 ~29.8h, #1070 ~29.6h, #1065 ~45.4h)"**: UPDATED → 6 open PRs: **#1080 NEW** (approvals-freshness-3-birth-probe-001, created 00:08:04Z UTC, CONFLICTING, ~2min); **#1079 ~14min** (MERGEABLE, Mirror review in-flight); **#1075 ~2.1h**; **#1071 ~29.9h CONFLICTING**; **#1070 ~29.7h**; **#1065 ~45.5h**. [carry ✅ UPDATED]
+- **"watermark=619"**: UPDATED → 1 new alert (line 620, dispatch-branch-cleanup Tier-3 silenced); watermark 619→620. [carry ✅ UPDATED]
+- **"PR#1079 ~11min, Mirror review in-flight"**: CONFIRMED → #1079 still OPEN, MERGEABLE, Mirror review in-flight (~14 min; Mirror dispatched 23:56:47Z UTC). [carry ✅ CONFIRMED — monitoring]
+- **"pipeline-stall:unrouted-pr-stranded Tier-4 (PR#1065+PR#169)"**: CONFIRMED carry — cooldown-suppressed in dry-run; no new Tier-4. [carry ✅ CONFIRMED]
+- G-rule carries (unchanged): forge-marker-taskid-suffix-increment; medic-draft-status-false-positive; check-i-force-bypass-dm-route; beacon-pending-approvals-path-bug; deep-review-hold-approved-loop-post-merge-001. VPs: pulse-cycle-check0-helper-override, auto-merge-conflict-route-hold, direction-ask-rsdpm-no-autolabel-review-gap-001.
+
+**Check 0 — Alert triage (~00:10Z UTC):** repair-watermark → {repaired=false, old_watermark=619, file_length=620} — 1 new alert.
+- **Line 620** (ts=00:08:46Z, source=dispatch-branch-cleanup, subject=summary, route=digest, tier=FYI, tier_source=translation): Helper → **Tier 3** (known-pattern, alert-translations.json). route=digest; DM skipped. Context: 1 stale dispatch branch pruned automatically. Silence → resolved. ✅
+Watermark advanced 619→620. **Triage: 1 alert; 1 Tier-3 silenced.** NOMINAL ✅
+
+**Check 1 — Log noise (~00:10Z UTC):** outbox-notifier.log last entry [2026-07-31 18:02:54 MDT]=00:02:54Z UTC (deep-review-hold-pr1078-308c0021 resolved approved; ~7 min). No WARNs/ERRORs. watchdog: system-health.json ts=2026-08-01T00:08:10Z UTC (~2 min). NOMINAL ✅
+
+**Check 2 — Telegram sweep (~00:10Z UTC):** Bot log last delivery idx=618 at [2026-07-31T17:47:42-0600]=23:47:42Z UTC (~23 min). Larry's last message [2026-07-31T16:14:33-0600]=22:14:33Z UTC (approvals tab discussion; no new Pulse directives). NOMINAL ✅
+
+**Check 3 — Pipeline stall (~00:10Z UTC):** heal_pipeline_stall.py --dry-run → DRY-RUN: 0 alert(s) would fire. FORGE_NO_PR_SKIP ×3 (#1072/#1073/#1074 MERGED). Cooldown-suppressed: unrouted #1075; stranded #1071/#1070/#1065; RSDPM#169. NOMINAL ✅
+
+**Check 4 — Pending directives (~00:10Z UTC):** state/beacon-pending-approvals.json: **pending=0**. CONFIRMED. NOMINAL ✅
+
+**Check 5 — Stale daemon code (~00:10Z UTC):** heal-stale-daemon-code.heartbeat=2026-08-01T00:02:40Z UTC (~7 min; <60 min). system-health overall=healthy ts=2026-08-01T00:08:10Z UTC (~2 min). NOMINAL ✅
+
+**Check A — Source repo (~00:10Z UTC):** On main. Working tree clean. HEAD=4ee0f8ff ("Pulse cycle 20260801T000859Z")=origin/main (0 behind, 0 ahead). NOMINAL ✅
+**Check B — Sync health (~00:10Z UTC):** last_sync=2026-08-01T00:01:26Z UTC (~9 min; <2h threshold); status=success; consecutive_push_failures=0. NOMINAL ✅
+**Check C — Agent liveness (~00:10Z UTC):** system-health=healthy ts=00:08:10Z UTC (~2 min). All bots alive (beacon/forge/mirror/pulse). NOMINAL ✅
+**Check E — PR/merge state (~00:10Z UTC):** ourliberty-agent-core: 6 open PRs:
+- **#1080** `feat: evaluate freshness_probe at card birth in heal_unregistered_approval (approvals-freshness 3/3)` — forge/approvals-freshness-3-birth-probe-001, created 00:08:04Z UTC, ~2min open. **CONFLICTING**. No labels. [NEW — likely conflicts with #1079 not yet merged; notifier not yet dispatched Mirror review; monitoring]
+- **#1079** `feat(approvals): slice 2 — tick probe leg demotes stale premises, never auto-clears; no-probe cards flagged unverified` — forge/approvals-freshness-2-tick-probe-demote-001, created 23:56:10Z UTC, ~14min open. MERGEABLE. Mirror review in-flight (~14 min, dispatched 23:56:47Z UTC). [on auto-review path; monitoring]
+- **#1075** `fix(bind-drift): classify units by Restart=, never restart an ephemeral job` — fix/bind-drift-unit-classification, ~2.1h open. MERGEABLE. No labels. unrouted-pr by-design (fix/* branch). [CARRY]
+- **#1071** `fix(bind-drift): evidence-based restart verdicts, pending ledger, honest pages` — fix/bind-drift-skip-timer-units, ~29.9h open. **CONFLICTING**. Cooldown active. Waiting on #1075. [CARRY]
+- **#1070** `feat(models): move beacon + forge + narrator to claude-opus-5` — fix/opus-5-beacon-forge-narrator, ~29.7h open. MERGEABLE. No labels. [CARRY — Larry action]
+- **#1065** `test(guard): harden agents-root override scanner (round-2 findings)` — fix/agents-root-guard-hardening, ~45.5h open. MERGEABLE. No labels. 72h escalation at 2026-08-02T02:39Z UTC (~26.2h remaining). [CARRY]
+NOMINAL ✅
+**Check H — Forge activity (~00:10Z UTC):** 2 open forge/* PRs: #1080 (~2min, CONFLICTING, notifier not yet dispatched Mirror review), #1079 (~14min, Mirror review in-flight). Both new/recent. NOMINAL ✅
+
+**§5.0 one-shots (~00:11Z UTC):** audit_due_nudge → no-op ✅. distill_detector → no-op ✅. silence_file_auditor → 7 files (3 expired @50.8d [transcript-not-persisted tier1/tier2/tier1 for forge/forge/pulse; 0-suppressed each] + 4 permanent/0-suppressed); no FIRED ✅. NOMINAL ✅
+
+**§5 periodic — Check I (carry):** Today=Saturday (off-day; firing days Mon/Wed/Fri/Sun). Most recent artifact check-i-2026-07-31.json. Carry: $1,201/wk (+206%); 1 proposal [small] `cycle-202607230601240000` 45.2σ. `/dispatch 1` to act. NOMINAL ✅
+**§5 periodic — Check III (carry):** Most recent: check-iii-2026-07-26.json. Next: Sun 2026-08-03. NOMINAL ✅
+
+**Credential rotation (~00:11Z UTC):** SUPABASE_SERVICE_ROLE_KEY: due ~2026-08-22 (~21d); last DM 2026-07-20T20:00:15Z UTC; 14d dedup expires ~2026-08-03T20:00Z UTC (~2.8d remaining). Within dedup window — no DM. NOMINAL ✅
+
+**PRIME DIRECTIVE accounting:** Clean iter. iter_clean row appended at 00:12:26Z UTC (tier=1, kind=iter_clean, template=nominal-clean). Ratio=40.0 (trend=worsening; 1880+ interventions / 47 systemic_fixes). **TIER: Tier 1** (consecutive_clean=1→2; last_signal_at=2026-08-01T00:00:38Z UTC; 5-min cadence; need 1 more clean iter at Tier 1 to de-escalate to Tier 2).
+
+**Patterns:**
+- **[new] PR#1080 opened (approvals-freshness 3/3)** at 00:08:04Z UTC — CONFLICTING immediately because #1079 (slice 2) is still open. This is expected stacked-PR behavior; will resolve once #1079 merges and Forge rebases #1080. Not a system health issue.
+- **[positive] dispatch-branch-cleanup Tier-3 silenced** — stale branch pruned automatically; no action needed.
+- **[carry] PR#1079 ~14min, Mirror review in-flight**: forge/approvals-freshness-2-tick-probe-demote-001. On auto-merge path. Monitoring.
+- **[carry] PR#1075 ~2.1h, unrouted by-design**: fix/* branch. Monitoring.
+- **[carry] PR#1071 ~29.9h open, CONFLICTING**: Waiting on #1075. Cooldown active.
+- **[carry] PR#1070 ~29.7h open**: No auto-review label. Larry action.
+- **[carry] PR#1065 ~45.5h open**: 72h escalation at 2026-08-02T02:39Z UTC (~26.2h remaining).
+- G-rule carries (unchanged): forge-marker-taskid-suffix-increment; medic-draft-status-false-positive; check-i-force-bypass-dm-route; beacon-pending-approvals-path-bug; deep-review-hold-approved-loop-post-merge-001. VPs: pulse-cycle-check0-helper-override, auto-merge-conflict-route-hold, direction-ask-rsdpm-no-autolabel-review-gap-001.
+
+**Actions taken:**
+1. Check 0: repair-watermark → no-op (old_watermark=619, file_length=620). ✅
+2. Check 0: triage-alert ×1 (line 620): Tier-3 silenced (dispatch-branch-cleanup). Watermark advanced 619→620. ✅
+3. §5.0: audit_due_nudge no-op, distill_detector no-op, silence_file_auditor no-op. ✅
+4. PRIME DIRECTIVE: iter_clean row appended (tier=1, kind=iter_clean, template=nominal-clean). ✅
+5. Tier state: `cycle_tier_state.py record --checks-clean true` → consecutive_clean=1→2 (still Tier 1). ✅
+
+**Escalations:** No new escalations this iter. Carries:
+- **[carry ⚠️ — bot DM'd idx=604/605]** PR#1065+PR#169: unrouted-pr-stranded. Add `auto-review` labels to clear. For RSDPM#169: `dispatch mirror review pr=https://github.com/Larry-Yatch/RSDPM/pull/169`.
+- **[carry ⚠️ — bot DM'd idx=601]** PR#1071: ~29.9h open, CONFLICTING. Waiting on #1075 merge.
+- **[carry ⚠️ — bot DM'd idx=596]** PR#1070: ~29.7h open, no auto-review label. Add label or: `dispatch mirror review pr=https://github.com/Larry-Yatch/ourliberty-agent-core/pull/1070`.
+- **[carry ⚠️ — awaiting Larry]** PR#1065 (~45.5h): 72h escalation at 2026-08-02T02:39Z UTC (~26.2h remaining).
+- **[carry ⚠️ — bot DM'd idx=593]** RSDPM PR#169: ~1d+ open, no auto-review label.
+- **[carry ⚠️] RSDPM staging drift (0035, 0036, 0037)**: Awaiting Larry ssh investigation.
+- [carry] check-vi-posture-proposals-2026-07-07. [carry] Mirror queue-wait p95=1065.6m. [carry] Check XIV Tier-4 ×2. [carry] tier4-rsdpm-install-drift. [carry] forge-wip-redispatch EXHAUSTED (rsdpm-pr155).
+- **[blue] Check I carry**: proposal #1 (45σ anomaly `cycle-202607230601240000`); `/dispatch 1` to act.
+
+**Tier end-of-iter:** **Tier 1** (consecutive_clean=2; last_signal_at=2026-08-01T00:00:38Z UTC; 5-min cadence; need 1 more clean iter at Tier 1 to de-escalate to Tier 2).
+
+---
+
