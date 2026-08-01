@@ -27249,3 +27249,86 @@ NOMINAL ✅ (no 30-min auto-merge threshold breaches beyond intentional holds)
 
 ---
 
+## Iteration ~6982 — 2026-08-01T06:11Z UTC (Larry /cycle chat, Tier 1 [consecutive_clean=0]; Check 0: 1 new alert [pulse-triage self-report, Tier-4, journal-note only — no DM]; Check 4: pending=2 [PR#1083 + PR#156, carries unchanged]; all other checks nominal; TIER 1)
+
+**Health:** ⚠️ Signal — Check 4: pending=2 (both carries — `deep-review-hold-pr1083-01212dbd` + `deep-review-hold-pr156-6f9053bd`, unchanged). Check 0: 1 Tier-4 alert (pulse-triage self-report from iter ~6981, journal-note only). Tier-reset (consecutive_clean=0; last_signal_at=2026-08-01T06:11:31Z UTC; 5-min cadence).
+
+**VERIFY-BEFORE-REASSERT (from iter ~6981 at 06:05Z UTC 2026-08-01):**
+- **"Tier 1 (consecutive_clean=0)"**: CONFIRMED → tier.json: tier=1, consecutive_clean=0. [carry ✅]
+- **"pending=2 [deep-review-hold-pr1083 + deep-review-hold-pr156]"**: CONFIRMED → beacon-pending-approvals.json: pending=2, both status=pending (unchanged). [carry ✅ CONFIRMED]
+- **"PR#1083 AUTO_MERGE_HELD_DEEP_REVIEW"**: CONFIRMED — state=OPEN, MERGEABLE, no labels, age=~2h58m. [carry ✅ time updated]
+- **"PR#156 AUTO_MERGE_HELD_DEEP_REVIEW"**: CONFIRMED — dashboard state=OPEN, MERGEABLE, no labels, age=~2h21m. [carry ✅ time updated]
+- **"PR#1081 ~5h41m no-label"**: UPDATED → ~5h47m. Unrouted-by-design (fix/* branch). 72h escalate = 2026-08-04T00:24Z UTC (~17.5h remaining). [carry ✅ time updated]
+- **"watermark=657"**: UPDATED → file_length=658 (1 new alert at line 658 — pulse-triage self-report). [carry UPDATED — new alert triaged]
+- **"gate-ceiling-fix-monitor Tier-4 DM'd Larry"**: CONFIRMED — bot log idx=656 delivered at 06:04:57Z UTC. Original escalation live. [carry ✅ confirmed]
+- **"heal-stale-daemon-code.heartbeat NOMINAL"**: CONFIRMED → heartbeat=2026-08-01T06:03:28Z UTC (~8 min at scan time; <60 min). NOMINAL ✅ [carry ✅]
+- G-rule carries (unchanged): forge-marker-taskid-suffix-increment; medic-draft-status-false-positive; check-i-force-bypass-dm-route; beacon-pending-approvals-path-bug; deep-review-hold-approved-loop-post-merge-001. VPs: pulse-cycle-check0-helper-override, auto-merge-conflict-route-hold, direction-ask-rsdpm-no-autolabel-review-gap-001.
+
+**Check 0 — Alert triage (~06:09Z UTC):** repair-watermark → {repaired=false, old=657, file_length=658}. watermark=657 < file_length=658 → 1 new alert (line 658).
+- **Alert:** `source=pulse-triage`, ts=2026-08-01T06:05:00Z UTC, subject="regression-gate inner-kills: REGRESSED (Tier-4 novel — needs triage)". This is Pulse's own self-report from iter ~6981 documenting its triage of the gate-ceiling-fix-monitor alert.
+- triage-alert → **Tier 4** (novel: no registry template, no translation match). guard-tier4 → `{authoritative_tier: 4, accepted: true, same_iter_call: true}`. Genuine Tier-4 per helper.
+- Disposition: **journal-note only, no DM.** Analogous to `kind=approval_request` (MEMORY.md rule): Pulse self-report documents prior action, NOT a new action item for Larry. Gate-ceiling-fix-monitor Tier-4 already DM'd to Larry at idx=656 (bot log 06:04:57Z UTC). A second DM would be pure noise. Watermark advanced to 658.
+- [NEW ⚠️ 1/3] G-rule `pulse-triage-self-report-should-be-tier3-001`: `source=pulse-triage` alerts in larry-alerts.jsonl are Pulse's own triage-documentation writes, not new action items. Should be Tier 3 (silenced) in alert-translations.json. Dispatch to Beacon at 3/3.
+- **Triage: 1 alert — 1 Tier-4 (pulse-triage self-report, journal-note only).** SIGNAL → TIER-RESET ⚠️ (per Tier-4 semantics)
+
+**Check 1 — Log noise (~06:09Z UTC):** outbox-notifier.log — most recent entry: `[2026-07-31 21:54:57]` (03:54:57Z UTC; ~2h14m ago) — deep-review-hold surfaced for dashboard PR#156. No new entries since iter ~6981. No error spam above 5/h threshold. NOMINAL ✅
+
+**Check 2 — Telegram sweep (~06:09Z UTC):** beacon_telegram_bot.log — most recent: idx=656 at 06:04:57Z UTC (alert: source=gate-ceiling-fix-monitor delivered). No new deliveries since. No new Larry directives. NOMINAL ✅
+
+**Check 3 — Pipeline stall (~06:09Z UTC):** heal_pipeline_stall.py --dry-run → no stalls detected. FORGE_NO_PR_SKIP ×6 (#1074, #1077, #1078, #1079, #1080, deep-review-fileset/pr#1083) + FORGE_NO_PR_SKIP #1075-MERGED + FORGE_NO_PR_SKIP approvals-freshness-2a-unverified-badge-001 (pr=#155) + MIRROR_PASS_UNMERGED_SKIP for `deep-review-fileset-heal-unregistered-approval-001` (reason=held_deep_review) + MIRROR_PASS_UNMERGED_SKIP for `approvals-freshness-2b-verification-column-001` (reason=held_deep_review). NOMINAL ✅
+
+**Check 4 — Pending directives (~06:09Z UTC):** state/beacon-pending-approvals.json: **pending=2** (unchanged):
+1. **deep-review-hold-pr1083-01212dbd** created=2026-08-01T03:39:51Z UTC, chat_id=7998341473, status=pending. Larry DM'd idx=654 at 03:43:43Z UTC (~2h27m ago). PR#1083 (`chore(guardrails): hold approval birth-gate`) Mirror PASS, AUTO_MERGE_HELD_DEEP_REVIEW (touches outbox_notifier.py — critical-path). **`ask-then-do` — awaiting Larry.** → TIER-RESET ⚠️
+2. **deep-review-hold-pr156-6f9053bd** created=2026-08-01T03:54:57Z UTC, chat_id=7998341473, status=pending. Larry DM'd idx=655 at 03:58:52Z UTC (~2h10m ago). dashboard PR#156 (`feat(chain-events): add nullable verification jsonb column`) Mirror PASS, AUTO_MERGE_HELD_DEEP_REVIEW (critical-path). **`ask-then-do` — awaiting Larry.** → TIER-RESET ⚠️
+SIGNAL ⚠️
+
+**Check 5 — Stale daemon code (~06:09Z UTC):** heal-stale-daemon-code.heartbeat=2026-08-01T06:03:28Z UTC (~6 min; <60 min threshold). NOMINAL ✅
+
+**Check A — Source repo (~06:09Z UTC):** On main. Tree CLEAN. HEAD=8acd8e4a ("Pulse cycle 20260801T060750Z") = origin/main. NOMINAL ✅
+**Check B — Sync health (~06:09Z UTC):** last_sync=2026-08-01T06:01:44Z UTC (~10 min; <2h threshold). status=no-change. consecutive_push_failures=0. NOMINAL ✅
+**Check C — Agent liveness (~06:09Z UTC):** system-health=healthy ts=06:04:58Z UTC (~4 min). All bots alive (beacon/forge/mirror/pulse: noop). NOMINAL ✅
+**Check E — PR/merge state (~06:09Z UTC):** ourliberty-agent-core: **2 open PRs**:
+- **#1083** `chore(guardrails): hold approval birth-gate` — created 03:13:39Z UTC (~2h58m), no labels, MERGEABLE. AUTO_MERGE_HELD_DEEP_REVIEW (intentional). `deep-review-hold-pr1083-01212dbd` pending. [monitoring — awaiting Larry APPROVE tap or `/code-review high` + `scripts/merge_reviewed_pr.sh 1083`]
+- **#1081** `fix(suite-guardian): wire L10 regression detection + downgrade` — created 00:24:18Z UTC (~5h47m), no labels, MERGEABLE. Unrouted-by-design (fix/* branch). 72h escalate = 2026-08-04T00:24Z UTC (~17.5h remaining). [monitoring]
+ourliberty-dashboard: **1 open PR**:
+- **#156** `feat(chain-events): add nullable verification jsonb column` — created 03:51:21Z UTC (~2h21m), no labels, MERGEABLE. Mirror PASS ✅; AUTO_MERGE_HELD_DEEP_REVIEW (critical-path). `deep-review-hold-pr156-6f9053bd` pending. Larry DM'd idx=655 at 03:58:52Z UTC. [monitoring — awaiting Larry APPROVE tap or `/code-review high` + `scripts/merge_reviewed_pr.sh 156`]
+NOMINAL ✅ (no 30-min auto-merge threshold breaches beyond intentional holds)
+
+**§5.0 one-shots (~06:11Z UTC):** audit_due_nudge → no-op ✅. distill_detector → no-op ✅. silence_file_auditor → 7 files (3 expired @51.0d + 4 permanent/0-suppressed); no FIRED ✅. NOMINAL ✅
+**§5 periodic — Check I (carry):** Today=Saturday UTC (off-day). Most recent artifact: check-i-2026-07-31.json (~20h+). $1,201/wk (+206%); proposal #1 [small] `cycle-202607230601240000` 45.2σ. `/dispatch 1` to act. NOMINAL ✅
+**§5 periodic — Check III (carry):** Most recent: check-iii-2026-07-26.json. Next: Sun 2026-08-03 (~1.3d). NOMINAL ✅
+**Credential rotation (~06:11Z UTC):** SUPABASE_SERVICE_ROLE_KEY: last DM 2026-07-20T20:00:15Z UTC; 14d dedup expires ~2026-08-03T20:00Z UTC (~1.8d remaining). Within dedup window — no DM. NOMINAL ✅
+
+**PRIME DIRECTIVE accounting:** Signal iter (Check 4: pending=2 — carries unchanged; Check 0: 1 Tier-4 pulse-triage self-report, journal-note only). 2 intervention rows appended at 06:11Z UTC (tier=1): `pending-approval-deep-review-hold:pr1083-pr156-carry-unchanged-iter6982` + `check0-tier4-self-report-pulse-triage-journal-note-only:pulse-triage-...carry-iter6982`. ratio=40.89 (trend: worsening). **TIER: Tier 1** (consecutive_clean=0; last_signal_at=2026-08-01T06:11:31Z UTC; 5-min cadence).
+
+**Patterns:**
+- **[NEW ⚠️ 1/3] pulse-triage-self-report-should-be-tier3-001** — `source=pulse-triage` writes in larry-alerts.jsonl are Pulse's own triage documentation (analogous to `kind=approval_request` delivery confirmations). Should be Tier 3 (silenced) in alert-translations.json. Dispatch to Beacon at 3/3.
+- **[monitoring ⚠️] gate-ceiling-fix-monitor** — regression-gate 300s inner-cap kills REGRESSED post-#796 (inner_kills=12 on #1070, #1065, #1081). Tier-4. Larry DM'd at idx=656 (06:04:57Z UTC). Awaiting triage call. G-rule: `regression-gate-inner-kills-regressed-001` [1/3 from iter ~6981].
+- **[monitoring ⚠️] PR#1083 AUTO_MERGE_HELD_DEEP_REVIEW** — carry unchanged. Larry DM'd idx=654 at 03:43Z UTC (~2h27m ago). Awaiting APPROVE tap or `/code-review high` + `scripts/merge_reviewed_pr.sh 1083`.
+- **[monitoring ⚠️] dashboard PR#156 AUTO_MERGE_HELD_DEEP_REVIEW** — carry unchanged. Larry DM'd idx=655 at 03:58Z UTC (~2h10m ago). Awaiting APPROVE tap or `/code-review high` + `scripts/merge_reviewed_pr.sh 156`.
+- **[carry ⚠️ monitoring] PR#1081 no-label** — ~5h47m, no labels. Unrouted-by-design. Escalate threshold 72h = 2026-08-04T00:24Z UTC.
+- **[carry — Larry already notified]** Unreviewed merges #1065 + #1070: no further Pulse action.
+- G-rule carries (unchanged): forge-marker-taskid-suffix-increment; medic-draft-status-false-positive; check-i-force-bypass-dm-route; beacon-pending-approvals-path-bug; deep-review-hold-approved-loop-post-merge-001. VPs: pulse-cycle-check0-helper-override, auto-merge-conflict-route-hold, direction-ask-rsdpm-no-autolabel-review-gap-001.
+
+**Actions taken:**
+1. Check 0: repair-watermark → no-op (repaired=false, old=657, file_length=658). ✅
+2. Check 0: triage-alert (pulse-triage-2026-08-01T06:05:00Z) → Tier 4. guard-tier4 → accepted=true. Journal-note only; no DM (self-report artifact). ✅
+3. Check 0: watermark advanced to 658. ✅
+4. §5.0: audit_due_nudge, distill_detector, silence_file_auditor → all no-op/no-FIRED. ✅
+5. PRIME DIRECTIVE: 2 intervention rows appended at 06:11Z UTC. ✅
+6. Tier state: `cycle_tier_state.py record --checks-clean false` → Tier 1; consecutive_clean=0; last_signal_at=2026-08-01T06:11:31Z UTC. ✅
+
+**Escalations:** No new Pulse DMs this iter. Carries:
+- **[⚠️ — Larry DM'd idx=654 at 03:43Z UTC]** deep-review-hold-pr1083-01212dbd: PR#1083 needs APPROVE tap (Telegram) or `/code-review high` + `scripts/merge_reviewed_pr.sh 1083`.
+- **[⚠️ — Larry DM'd idx=655 at 03:58Z UTC]** deep-review-hold-pr156-6f9053bd: dashboard PR#156 needs APPROVE tap or `/code-review high` + `scripts/merge_reviewed_pr.sh 156`.
+- **[⚠️ — Larry DM'd idx=656 at 06:04Z UTC]** gate-ceiling-fix-monitor: regression-gate inner-kills REGRESSED post-#796. Awaiting triage.
+- **[carry ⚠️ — monitoring]** PR#1081: ~5h47m old, no auto-review label. Escalate if unlabeled at 72h = 2026-08-04T00:24Z UTC.
+- **[carry — Larry already notified]** Unreviewed merges #1065 (idx=628/643) + #1070 (idx=651/652): no further Pulse action.
+- [carry] RSDPM staging drift (0035, 0036, 0037): Awaiting Larry ssh investigation.
+- [carry] check-vi-posture-proposals-2026-07-07. [carry] Mirror queue-wait p95=1065.6m. [carry] Check XIV Tier-4 ×2. [carry] tier4-rsdpm-install-drift. [carry] forge-wip-redispatch EXHAUSTED (rsdpm-pr155).
+- **[blue] Check I carry**: proposal #1 (45σ anomaly `cycle-202607230601240000`); `/dispatch 1` to act.
+
+**Tier end-of-iter:** **Tier 1** (consecutive_clean=0; last_signal_at=2026-08-01T06:11:31Z UTC; 5-min cadence).
+
+---
+
