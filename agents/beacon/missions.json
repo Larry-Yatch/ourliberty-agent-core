@@ -17158,7 +17158,12 @@
         "at": "2026-07-31T22:42:16.573755+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-08-01T00:04:30.224908+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#1078"
     },
     {
       "id": "proposed-pr-ourliberty-agent-core-1076",
