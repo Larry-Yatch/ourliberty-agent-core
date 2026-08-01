@@ -6,6 +6,12 @@
 
 ---
 
+## G-rule pulse-triage-self-report-should-be-tier3-001 — 1/3 (new, iter ~6982)
+
+**Rule:** `source=pulse-triage` writes in larry-alerts.jsonl are Pulse's own triage-documentation artifacts (Pulse writes these after DM'ing Larry about a Tier-4 alert). They are NOT new action items — exactly analogous to `kind=approval_request` delivery confirmations. Current behavior: helper returns Tier 4 (novel, no translation), which triggers a journal-note only (no second DM). The correct permanent fix: add `source=pulse-triage` as a Tier-3 entry in `config/alert-translations.json`. First occurrence: iter ~6982 (2026-08-01). Dispatch to Beacon at 3/3.
+
+---
+
 ## system-health.json correct path is ~/agents/blackboard/system-health.json (learned 2026-07-28, iter ~6618)
 
 **Rule:** The system health file is `~/agents/blackboard/system-health.json` (NOT `agent-core-system-health.json`). Schema: `{"timestamp": "<ISO 8601>", "overall": "healthy|degraded", "checks": {...}}` — key is `"timestamp"` not `"ts"`. **No top-level `bots` key.** Bot liveness is nested at `checks.bots.bots` — a dict keyed by agent name (beacon/forge/mirror/pulse) with fields `desired`, `alive`, `unit`, `action`. Access: `d["checks"]["bots"]["bots"]`. `agent-core-system-health.json` does NOT exist. The correct path for Check C bot liveness is `system-health.json`. (Schema corrected iter ~6847 — prior description listed top-level `bots` key which does not exist.)
