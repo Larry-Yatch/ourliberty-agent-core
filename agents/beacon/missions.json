@@ -17586,7 +17586,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-08-01T03:50:14.857299+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-08-01T03:49:37.875734+00:00"
+      "orphan_last_activity_ts": "2026-08-01T03:49:37.875734+00:00",
+      "briefing": {
+        "what": "A piece of work the team started on its own to add a check that confirms approval information is current, not stale.",
+        "why": "If approvals are shown as up to date when they aren't, decisions get made on old information, which is the kind of mistake that's costly and hard to spot after the fact.",
+        "suggest": "Worth letting it finish, but ask for a short written summary of what it changes before it goes live, since it isn't attached to any of your current priorities."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-01T03:53:18.100187+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
