@@ -2404,5 +2404,235 @@ class BeaconPendingMainIntegrationTest(unittest.TestCase):
         r['emit_event'].assert_not_called()
 
 
+# ===================================================================
+# Birth-time freshness gate (approvals-freshness-3-birth-probe-001):
+# a card whose carried freshness_probe is already FALSE at mint time is
+# SUPPRESSED (and logged); every other outcome promotes exactly as today.
+# ===================================================================
+
+_FP = h.freshness_probe  # the slice-1 evaluator module, imported by the healer
+
+
+def _card(task_id='unreg-approval-x', probe=None, **extra):
+    """A minimal promote-batch payload, optionally carrying a freshness_probe."""
+    p = {
+        'task_id': task_id,
+        'summary': 'Direction needed: migration 0033 is not live yet.',
+        'promoted_from_alert': 'subject:migration-0033',
+    }
+    p.update(extra)
+    if probe is not None:
+        p['freshness_probe'] = probe
+    return p
+
+
+class ExtractFreshnessProbeTest(unittest.TestCase):
+    def test_top_level_probe(self):
+        probe = {'kind': 'pr_state', 'task_id': 't'}
+        self.assertEqual(
+            h.extract_freshness_probe({'freshness_probe': probe}), probe)
+
+    def test_nested_dispatch_payload_probe(self):
+        probe = {'kind': 'json_path', 'path': '/x', 'key': 'a', 'expected': 1}
+        rec = {'dispatch_payload': {'freshness_probe': probe}}
+        self.assertEqual(h.extract_freshness_probe(rec), probe)
+
+    def test_non_dict_probe_is_absent(self):
+        self.assertIsNone(
+            h.extract_freshness_probe({'freshness_probe': 'not-a-dict'}))
+
+    def test_no_probe_is_none(self):
+        self.assertIsNone(h.extract_freshness_probe({'summary': 'x'}))
+
+    def test_non_dict_source_skipped(self):
+        self.assertIsNone(h.extract_freshness_probe(None, 'str', 42))
+
+    def test_first_source_in_order_wins(self):
+        a = {'kind': 'sql', 'query': 'select 1'}
+        b = {'kind': 'pr_state', 'task_id': 't'}
+        self.assertEqual(
+            h.extract_freshness_probe(
+                {'freshness_probe': a}, {'freshness_probe': b}),
+            a)
+
+
+class ApplyBirthFreshnessGateTest(unittest.TestCase):
+    """The heart of slice 3: only an explicit FALSE suppresses; everything else
+    promotes, and each suppression emits ONE structured, greppable line."""
+
+    def test_false_suppresses_and_logs(self):
+        card = _card(probe={'kind': 'pr_state', 'task_id': 't'})
+        with mock.patch.object(h, 'log') as mock_log:
+            kept, suppressed = h.apply_birth_freshness_gate(
+                [card], evaluator=lambda p: _FP.FALSE)
+        self.assertEqual(kept, [])
+        self.assertEqual(suppressed, [card])
+        # Never-silently-drop: exactly one structured suppression line carrying
+        # the task id, probe kind, the FALSE verdict, and the card summary.
+        supp_lines = [c.args[0] for c in mock_log.call_args_list
+                      if c.args and 'BIRTH_FRESHNESS_SUPPRESS' in c.args[0]]
+        self.assertEqual(len(supp_lines), 1)
+        line = supp_lines[0]
+        self.assertIn(card['task_id'], line)
+        self.assertIn('pr_state', line)
+        self.assertIn('verdict=FALSE', line)
+        self.assertIn('migration 0033', line)
+
+    def test_true_promotes(self):
+        card = _card(probe={'kind': 'pr_state', 'task_id': 't'})
+        kept, suppressed = h.apply_birth_freshness_gate(
+            [card], evaluator=lambda p: _FP.TRUE)
+        self.assertEqual(kept, [card])
+        self.assertEqual(suppressed, [])
+
+    def test_indeterminate_promotes(self):
+        card = _card(probe={'kind': 'pr_state', 'task_id': 't'})
+        kept, suppressed = h.apply_birth_freshness_gate(
+            [card], evaluator=lambda p: _FP.INDETERMINATE)
+        self.assertEqual(kept, [card])
+        self.assertEqual(suppressed, [])
+
+    def test_no_probe_promotes_unchanged(self):
+        card = _card(probe=None)
+        # A raising evaluator proves it is NEVER called for a probe-less card.
+        def _boom(_p):
+            raise AssertionError('evaluator must not run without a probe')
+        kept, suppressed = h.apply_birth_freshness_gate(
+            [card], evaluator=_boom)
+        self.assertEqual(kept, [card])
+        self.assertEqual(suppressed, [])
+
+    def test_evaluator_raises_promotes(self):
+        card = _card(probe={'kind': 'sql', 'query': 'select 1'})
+        def _raise(_p):
+            raise RuntimeError('db exploded')
+        with mock.patch.object(h, 'log') as mock_log:
+            kept, suppressed = h.apply_birth_freshness_gate(
+                [card], evaluator=_raise)
+        self.assertEqual(kept, [card])   # fail toward the human -> promote
+        self.assertEqual(suppressed, [])
+        self.assertTrue(any(
+            c.args and 'BIRTH_FRESHNESS_ERROR' in c.args[0]
+            for c in mock_log.call_args_list))
+
+    def test_unexpected_verdict_promotes_failsafe(self):
+        card = _card(probe={'kind': 'pr_state', 'task_id': 't'})
+        kept, suppressed = h.apply_birth_freshness_gate(
+            [card], evaluator=lambda p: 'WEIRD')
+        self.assertEqual(kept, [card])
+        self.assertEqual(suppressed, [])
+
+    def test_mixed_batch_partitions(self):
+        false_card = _card(task_id='unreg-approval-false',
+                           probe={'kind': 'pr_state', 'task_id': 'a'})
+        keep_card = _card(task_id='unreg-approval-keep',
+                          probe={'kind': 'pr_state', 'task_id': 'b'})
+        no_probe = _card(task_id='unreg-approval-none')
+        verdicts = {'a': _FP.FALSE, 'b': _FP.TRUE}
+        kept, suppressed = h.apply_birth_freshness_gate(
+            [false_card, keep_card, no_probe],
+            evaluator=lambda p: verdicts[p['task_id']])
+        self.assertEqual(suppressed, [false_card])
+        self.assertEqual(kept, [keep_card, no_probe])
+
+    def test_default_evaluator_is_freshness_probe_evaluate(self):
+        # No injected evaluator: an unknown/malformed probe collapses to
+        # INDETERMINATE inside the real evaluate() -> the card promotes.
+        card = _card(probe={'kind': 'nonexistent-kind'})
+        kept, suppressed = h.apply_birth_freshness_gate([card])
+        self.assertEqual(kept, [card])
+        self.assertEqual(suppressed, [])
+
+
+class BuilderCarriesFreshnessProbeTest(unittest.TestCase):
+    """Each promote-payload builder propagates a source freshness_probe onto the
+    payload so it rides into dispatch_payload and the birth gate can honor it."""
+
+    def test_alert_payload_carries_probe(self):
+        probe = {'kind': 'file_lacks', 'repo': '/r', 'path': 'p', 'substring': 's'}
+        rec = {'subject': 'sub', 'message': 'm',
+               'suggested_action': 'Choose ship or hold', 'freshness_probe': probe}
+        payload = h.build_approval_payload(rec, 'sub')
+        self.assertEqual(payload.get('freshness_probe'), probe)
+
+    def test_alert_payload_without_probe_unchanged(self):
+        rec = {'subject': 'sub', 'message': 'm',
+               'suggested_action': 'Choose ship or hold'}
+        payload = h.build_approval_payload(rec, 'sub')
+        self.assertNotIn('freshness_probe', payload)
+
+    def test_marker_payload_carries_probe_from_marker(self):
+        probe = {'kind': 'pr_state', 'task_id': 't'}
+        marker = {'task_id': 't', 'summary': 's', 'target_agent': 'beacon',
+                  'freshness_probe': probe}
+        payload = h.build_approval_payload_from_marker(
+            marker, {'subject': 'sub'}, 'sub')
+        self.assertEqual(payload.get('freshness_probe'), probe)
+
+    def test_for_larry_payload_carries_probe(self):
+        probe = {'kind': 'json_path', 'path': '/c', 'key': 'k', 'expected': 1}
+        rec = dict(FORLARRY_DECISION_RECORD, freshness_probe=probe)
+        key = h.forlarry_dedup_key(rec['id'])
+        payload = h.build_for_larry_approval_payload(rec, key)
+        self.assertEqual(payload.get('freshness_probe'), probe)
+
+
+class BirthGateMainIntegrationTest(unittest.TestCase):
+    """End-to-end through main(): a stranded for-Larry card whose probe is FALSE
+    is NOT promoted; one whose probe is TRUE promotes exactly as today."""
+
+    def _drive(self, *, records, verdict):
+        import contextlib
+        add_pending = mock.MagicMock(
+            side_effect=lambda p, **kw: {'id': p['task_id']})
+        save_promoted = mock.MagicMock()
+        with mock.patch.object(h, 'kill_switch',
+                               return_value=Path('/nonexistent/kill-switch')), \
+             mock.patch.object(h, 'heartbeat'), \
+             mock.patch.object(h, 'log'), \
+             mock.patch.object(h, 'load_heuristics',
+                               return_value=FORLARRY_HEURISTICS), \
+             mock.patch.object(h, 'read_alerts', return_value=[]), \
+             mock.patch.object(h, 'read_for_larry_records',
+                               return_value=records), \
+             mock.patch.object(h, 'load_beacon_outbox_markers',
+                               return_value=[]), \
+             mock.patch.object(h, 'load_promoted', return_value={}), \
+             mock.patch.object(h, 'save_promoted', new=save_promoted), \
+             mock.patch.object(h, 'reconcile_retire',
+                               side_effect=lambda led, *a, **k: ([], led)), \
+             mock.patch.object(h, '_chat_id', return_value=4242), \
+             mock.patch.object(h, 'doorbell_counts', return_value=(0, 0)), \
+             mock.patch.object(h, '_emit_self_failure'), \
+             mock.patch('for_larry_escalations.clear', return_value=True), \
+             mock.patch.object(h, 'emit_approval_event', return_value=True), \
+             mock.patch.object(h.freshness_probe, 'evaluate',
+                               return_value=verdict), \
+             mock.patch.object(approval, 'state_lock',
+                               return_value=contextlib.nullcontext()), \
+             mock.patch.object(approval, 'save_state'), \
+             mock.patch.object(approval, 'add_pending', new=add_pending), \
+             mock.patch.object(approval, 'load_state',
+                               side_effect=[{'pending': [], 'history': []},
+                                            {'pending': [], 'history': []}]):
+            rc = h.main()
+        return {'rc': rc, 'add_pending': add_pending,
+                'save_promoted': save_promoted}
+
+    def test_false_probe_card_not_promoted(self):
+        rec = dict(FORLARRY_DECISION_RECORD,
+                   freshness_probe={'kind': 'pr_state', 'task_id': 't'})
+        r = self._drive(records=[rec], verdict=_FP.FALSE)
+        self.assertEqual(r['rc'], 0)
+        r['add_pending'].assert_not_called()   # suppressed at birth
+
+    def test_true_probe_card_promoted(self):
+        rec = dict(FORLARRY_DECISION_RECORD,
+                   freshness_probe={'kind': 'pr_state', 'task_id': 't'})
+        r = self._drive(records=[rec], verdict=_FP.TRUE)
+        self.assertEqual(r['rc'], 0)
+        r['add_pending'].assert_called_once()  # promotes exactly as today
+
+
 if __name__ == '__main__':
     unittest.main()
