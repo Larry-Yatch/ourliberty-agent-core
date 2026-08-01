@@ -2619,7 +2619,7 @@
       "id": "cap-approvals-freshness-3-3-run-the-same-probe-at-bi-2616",
       "title": "Approvals freshness 3/3: run the same probe at BIRTH, before the card ever reaches Larry",
       "note": "SLICE 3 of 3. DEPENDS ON cap-approvals-freshness-1-3-add-an-optional-freshnes-582f (schema + evaluator). Independent of slice 2 \u2014 can land before or after it.\n\nTHE CASE FOR THIS SLICE, in one fact: unreg-approval-cfd444ed29ee told Larry 'RSDPM migration 0033 is not live'. The migration was applied at 17:22Z with --allow-destructive; the card was promoted at 17:30Z. It was FALSE EIGHT MINUTES BEFORE HE EVER SAW IT. No timer can fix that \u2014 only a check before the card is shown. A second card (rsdpm-confirmall-...-001) aged into staleness 2h18m after filing, and a third (m14-pr-a) 10h after. So birth-checking and tick-checking each catch a different half; this is the cheaper half and it reuses slice 1 wholesale.\n\nTHIS SLICE: call evaluate(probe) ONCE at card-creation time. If it returns FALSE, do not create the card \u2014 log it with the probe evidence instead. TRUE or INDETERMINATE => create normally (fail toward the human, always).\n\nWHERE \u2014 start narrow, this is the scoping trap that killed the parent capture: ~10 modules emit APPROVAL_REQUEST markers (beacon_approval_handler, beacon_telegram_bot, build_sequence_advancer, build_sequence_kickoff, dashboard_api, dispatch_validator, drain_board_to_beacon, heal_pipeline_stall, heal_unregistered_approval, larry_alerts) and Beacon authors some as free LLM text parsed by extract_approval_request. DO NOT try to cover all of them. Land the birth check in ONE producer first \u2014 heal_unregistered_approval is the right pick: it minted 4 of the 8 cards on Larry's tab on 2026-07-29 and 3 of them were stale or unanswerable. Widen only after that one is proven.\n\nCONSEQUENCE TO DESIGN FOR: a probe is only as good as its author. The birth check must never be the reason a REAL decision is withheld \u2014 so the FALSE branch logs loudly (what was suppressed, which probe, what it returned) rather than dropping silently. A suppressed-card log nobody can read is the same false-clean this whole arc is about.\n\nOUT OF SCOPE: the tick evaluation and premise_stale demotion (slice 2); retrofitting probes onto existing producers beyond the one chosen.\n\nREVIEW: /code-review high REQUIRED. It decides what NEVER reaches Larry, which is strictly more dangerous than slice 2 \u2014 a card wrongly suppressed at birth leaves no artifact on the tab to notice.",
-      "state": "parked",
+      "state": "review_close",
       "label": null,
       "origin": {
         "source": "desktop-chat",
@@ -2647,8 +2647,12 @@
       "spawned": {
         "kind": "delegate",
         "task_id": "delegate-cap-approvals-freshness-3-3-run-the-same-probe-at-bi-2616",
-        "stamped_at": "2026-07-31T22:32:00.060383+00:00"
-      }
+        "stamped_at": "2026-07-31T22:32:00.060383+00:00",
+        "outcome": "merged"
+      },
+      "closed_by": "heal_missions_card_gc:terminal-backstop",
+      "shipped_note": "shipped (linked work merged)",
+      "awaiting_ack": true
     },
     {
       "id": "cap-a-delegation-that-dies-looks-exactly-like-one-no-2cbe",
