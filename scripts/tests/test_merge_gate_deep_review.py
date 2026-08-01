@@ -515,13 +515,20 @@ class ShippedFilesetTest(_GateTestBase):
     """
 
     # A deliberate THIRD copy of the fileset (config, code default, here).
-    # Its only job is to fail when an entry LEAVES: the `_comment_*` rationale
-    # keys exist because these entries read as noise to anyone who does not
-    # know what they cost to earn, and the realistic loss is someone pruning
-    # one from both live copies at once. Removing an entry is allowed — it just
-    # has to be deliberate enough to edit this pin, which puts it in the diff a
-    # human reads. Entries may be ADDED without touching this (subset check),
-    # since the coverage loop picks them up automatically.
+    # Its only job is to fail when membership CHANGES: the `_comment_*`
+    # rationale keys exist because these entries read as noise to anyone who
+    # does not know what they cost to earn, and the realistic loss is someone
+    # pruning one from both live copies at once. Adding or removing an entry is
+    # allowed — it just has to be deliberate enough to edit this pin, which
+    # puts the change in the diff a human reads.
+    #
+    # Exact equality, not a subset: a subset check would let this pin DECAY.
+    # A future entry would gain coverage from the loop below but never get
+    # pinned, so it could be pruned silently later — which is precisely how
+    # `scripts/heal_unregistered_approval.py` (added by PR #1083, the newest
+    # entry at the time) sat unprotected. The newest entries are the ones most
+    # likely to be mistaken for noise, so they are the ones that most need the
+    # pin. The extra edit is one line, in the same commit as the other two.
     PINNED_FILESET = frozenset({
         'scripts/beacon_approval_handler.py',
         'scripts/heal_unregistered_approval.py',
@@ -597,13 +604,19 @@ class ShippedFilesetTest(_GateTestBase):
         deletion; `test_shipped_config_and_code_default_agree` only catches
         ONE-SIDED drift. This is the assertion that survives a prune of both.
         """
-        missing = sorted(self.PINNED_FILESET - set(self._shipped_paths()))
+        shipped = set(self._shipped_paths())
+        removed = sorted(self.PINNED_FILESET - shipped)
+        added = sorted(shipped - self.PINNED_FILESET)
         self.assertEqual(
-            missing, [],
-            f'{missing} left config/deep-review-paths.json. Each entry there '
-            f'holds a file whose failure mode is quiet in the MERGE direction '
-            f'(see the _comment_* keys). If the removal is intended, remove it '
-            f'from PINNED_FILESET in the same commit — deliberately.',
+            (removed, added), ([], []),
+            f'config/deep-review-paths.json membership moved — '
+            f'removed={removed} added={added}. Each entry holds a file whose '
+            f'failure mode is quiet in the MERGE direction (see the _comment_* '
+            f'keys), so membership changes deliberately or not at all: mirror '
+            f'the change into PINNED_FILESET in this same commit. A removal '
+            f'that belongs in the diff a human reads is the whole point; an '
+            f'addition must be pinned too, or it is the next entry to be '
+            f'pruned silently.',
         )
 
     def test_shipped_config_does_not_hold_ordinary_files(self):
