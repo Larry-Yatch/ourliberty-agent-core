@@ -59,12 +59,18 @@ Classification asks **`Restart=`**, a property of the unit file:
 
 - `Restart=always | on-failure | on-abnormal | on-success | on-watchdog | on-abort`
   → **MONITOR** (a daemon systemd keeps alive; its mount can dangle for hours).
-- `Restart=no` (or empty) → **EPHEMERAL_JOB** — a run-to-completion job. Its next
+- `Restart=no` → **EPHEMERAL_JOB** — a run-to-completion job. Its next
   activation gets a fresh namespace bound to the current inode, so a dangle heals
   itself; restarting one only SIGTERMs the live run. `ourliberty-cycle` is the
   only one in scope today, and it is exactly what was killed mid-`/cycle` on
   2026-07-30 and then false-paged for being `inactive` (its correct resting
   state).
+- `Restart=` **absent or empty** → `skip-unknown`, NOT ephemeral. systemd
+  normalises an omitted `Restart=` to `no` and never reports it empty, so empty
+  means the property dump was malformed — the same bad-read treatment as
+  `ReadWritePaths=` below. If you are debugging an incident and a real daemon is
+  sitting in `skip-unknown`, suspect a truncated `systemctl show`, not a
+  classification decision: the healer is refusing to descope it on a bad read.
 - `Type` not in simple/notify/exec/idle/dbus/**forking** → `skip-oneshot`.
   `forking` counts as persistent: a double-forking daemon lives exactly as long
   as a `simple` one and its `MainPID` holds the same pinned bind-mount.

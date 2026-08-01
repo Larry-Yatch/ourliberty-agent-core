@@ -75,7 +75,14 @@ manager link state: is this unit SUPERVISED?
 
   ``Restart=`` in {always, on-failure, on-abnormal, on-success, on-watchdog,
   on-abort}  → MONITOR (a daemon systemd keeps alive)
-  ``Restart=`` in {no, ''}                     → EPHEMERAL_JOB
+  ``Restart=`` == 'no'                         → EPHEMERAL_JOB
+  ``Restart=`` ABSENT or EMPTY                 → SKIP_UNKNOWN
+
+systemd normalises an omitted ``Restart=`` to ``no`` and never reports it empty,
+so an EMPTY value is not a declared policy — it is a malformed or truncated
+property dump, and descoping a live daemon on the strength of a bad read is the
+silent descope this classifier exists to prevent. ``Type=`` and
+``ReadWritePaths=`` resolve a bad read the same way.
 
 Measured across ``systemd/`` at the time of writing: the bots are
 ``Restart=always``; inbox-watcher / outbox-notifier / spec-review-runner are
@@ -543,10 +550,16 @@ def classify_unit(facts: UnitFacts) -> tuple[str, str]:
     if policy is None:
         return CLASS_SKIP_UNKNOWN, 'Restart= property unreadable'
     policy = policy.strip()
+    if not policy:
+        # Explicit, and mirroring the empty-`Type=` branch above: EMPTY is a bad
+        # read, not a declared policy. Falling through to 'unrecognised' would
+        # reach the right class by the wrong reason, and the tick line an
+        # operator reads would blame the unit's config for a truncated dump.
+        return CLASS_SKIP_UNKNOWN, 'Restart= property empty'
     if policy in SUPERVISED_RESTART_POLICIES:
         return CLASS_MONITOR, f'Restart={policy}{corroborate}'
     if policy in EPHEMERAL_RESTART_POLICIES:
-        return CLASS_EPHEMERAL, f'EPHEMERAL_JOB (Restart={policy or "(empty)"}){corroborate}'
+        return CLASS_EPHEMERAL, f'EPHEMERAL_JOB (Restart={policy}){corroborate}'
     return CLASS_SKIP_UNKNOWN, f'unrecognised Restart={policy!r}'
 
 
