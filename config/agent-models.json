@@ -10,20 +10,20 @@
     "beacon": {
       "name": "Beacon",
       "role": "Strategy / Architect",
-      "telegram_model": "claude-opus-4-8[1m]",
-      "inbox_model": "claude-opus-4-8",
+      "telegram_model": "claude-opus-5[1m]",
+      "inbox_model": "claude-opus-5",
       "fallback_model": "claude-sonnet-4-6",
-      "note": "Opus everywhere — spec authoring is judgment-heavy and the spec is the contract. Don't economize. PILOT 2026-05-30: first agent on claude-opus-4-8 (see _history). fallback stays sonnet for graceful degradation."
+      "note": "Opus everywhere — spec authoring is judgment-heavy and the spec is the contract. Don't economize. PILOT 2026-05-30: first agent on claude-opus-4-8 (see _history). Moved to claude-opus-5 2026-07-30 (same $5/$25 tier, same tokenizer family — no token-shape change). telegram_model keeps the [1m] suffix so this change moves ONLY the model, not the context window. fallback stays sonnet for graceful degradation."
     },
     "forge": {
       "name": "Forge",
       "role": "Engineering / Builder",
       "telegram_model": "claude-sonnet-4-6",
-      "inbox_model": "claude-opus-4-8",
+      "inbox_model": "claude-opus-5",
       "fallback_model": "claude-sonnet-4-6",
       "worktree_enabled": true,
       "allowed_repos": ["ourliberty-agent-core", "ourliberty-dashboard", "ourliberty-graph", "RSDPM"],
-      "note": "Sonnet for chat / routine implementation. Opus for hard tasks (architecture, debugging, security review). Forge can self-escalate to Opus mid-task by setting model in the inbox handshake. worktree_enabled: dispatches go into /tmp/wt-forge-<task_id>/ via worktree_manager; allowed_repos gates target_repo on inbox writes."
+      "note": "Sonnet for chat / routine implementation. Opus for hard tasks (architecture, debugging, security review). Moved claude-opus-4-8 -> claude-opus-5 2026-07-30 (same price tier, stronger on long-horizon agentic coding). Forge can self-escalate to Opus mid-task by setting model in the inbox handshake. worktree_enabled: dispatches go into /tmp/wt-forge-<task_id>/ via worktree_manager; allowed_repos gates target_repo on inbox writes."
     },
     "mirror": {
       "name": "Mirror",
@@ -34,7 +34,7 @@
       "worktree_enabled": true,
       "review_slots": 2,
       "allowed_repos": ["ourliberty-agent-core", "ourliberty-dashboard", "ourliberty-graph", "RSDPM"],
-      "note": "Opus for actual reviews. Sonnet acceptable for chat / status queries. worktree_enabled: review dispatches go into a per-task worktree (~/agent-worktrees/wt-mirror-<task_id>/) so Mirror can gh pr checkout the branch and run tests against the PR. allowed_repos gates target_repo on inbox writes (same shape as Forge). review_slots=2 (mirror-two-slot-review-spec §4 PR3): spawns two concurrent review watcher threads consuming the one mirror inbox; the slot plumbing landed inert in PR1/PR2. Rollback = set to 1 (or delete the key) + restart the watcher (spec §6.4)."
+      "note": "HELD ON claude-opus-4-8 2026-07-30 while beacon/forge moved to claude-opus-5 — deliberate, not an oversight. Newer models follow instructions more literally, and a review lens carrying 'only report high-severity' / 'be conservative' language sees measured RECALL DROP on the swap: the bugs are still found, then filtered out below the stated bar. Mirror is the last gate before main, so its lens (in this repo — see [[mirror-migration-review-lens-lives-in-agent-core]]) must be read for severity-filter language BEFORE the model moves. Opus for actual reviews. Sonnet acceptable for chat / status queries. worktree_enabled: review dispatches go into a per-task worktree (~/agent-worktrees/wt-mirror-<task_id>/) so Mirror can gh pr checkout the branch and run tests against the PR. allowed_repos gates target_repo on inbox writes (same shape as Forge). review_slots=2 (mirror-two-slot-review-spec §4 PR3): spawns two concurrent review watcher threads consuming the one mirror inbox; the slot plumbing landed inert in PR1/PR2. Rollback = set to 1 (or delete the key) + restart the watcher (spec §6.4)."
     },
     "pulse": {
       "name": "Pulse",
@@ -229,6 +229,11 @@
       "date": "2026-06-26",
       "change": "mirror-marker-self-validate-gate-001: add loop_bounds.mirror_marker_self_validate_retries=2. Caps a new SAME-PROCESS verdict-marker self-validation re-prompt loop in inbox_watcher.process_task that detects a malformed/missing Mirror verdict marker (phase=review, run_claude success) via mirror_review_handler.parse_mirror_marker and re-invokes run_claude under --resume with a terse correction BEFORE the outbox is written. Kills the slow cross-process round-trip that fired (via outbox_notifier._notify_mirror_marker_error) on Mirror's first review within ~10-25 min of a mirror-bot restart (G-rule mirror-malformed-verdict-post-restart-001, 3/3: PR #728/#729, #728 retry, #731). The gate is a fast inner loop in FRONT of the existing slow outer net, never a replacement — on exhaust the best-effort outbox is written and outbox_notifier's marker-error path still fires. Default 2; 0 disables. No daemon-behavior change for non-mirror / non-review tasks or run_claude failures.",
       "author": "Forge (via Beacon D3 dispatch)"
+    },
+    {
+      "date": "2026-07-30",
+      "change": "Opus 5 partial roll-forward (beacon + forge + missions-narrator). beacon.telegram_model claude-opus-4-8[1m] -> claude-opus-5[1m]; beacon.inbox_model + forge.inbox_model claude-opus-4-8 -> claude-opus-5; scripts/missions_narrator.py NARRATOR_MODEL and scripts/beacon_telegram_bot.py _DEFAULT_TELEGRAM_MODEL likewise. Rationale: claude-opus-5 is the same $5/$25 price tier as 4.8 AND the same tokenizer family, so neither imputed cost nor token shape moves — on OAuth Max, where the binding constraint is the rolling 5h quota, this is a free quality upgrade. Availability CONFIRMED by probe before merge: claude-opus-5 and claude-opus-5[1m] both served on tier1 AND tier3 (the {tier1,tier3} primary pool) 2026-07-30. [1m] retained on telegram_model so this change moves ONLY the model, never the context window. DELIBERATELY EXCLUDED: (1) mirror — newer models honor 'only report high-severity' review instructions more literally, which measurably depresses recall; its lens must be audited for severity-filter language first (see mirror.note). (2) default.inbox_model, pulse/aide.fallback_model, scout/compass.inbox_model — out of scope; pulse+aide use Opus only as a degradation fallback and scout/compass are status=planned, so none of them is on a live path. Roll back = flip the five values to claude-opus-4-8 and restart. RESTART REQUIRED: inbox_watcher.load_models() runs once at daemon startup, routing_validator caches in-process, and beacon_telegram_bot reads telegram_model at call time but was launched with the old constant — restart ourliberty-inbox-watcher + ourliberty-beacon-telegram-bot, or the config change is inert (the 2026-06-13 stale-config incident class). NOTE: measurement of this change depends on the costs.jsonl model-attribution fix (fix/cost-model-attribution) — before that fix the model label for pulse/medic rows was always claude-haiku-4-5 regardless of the model that ran.",
+      "author": "Claude (via Larry's session)"
     },
     {
       "date": "2026-07-19",

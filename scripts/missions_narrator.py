@@ -86,8 +86,11 @@ from test_isolation_guard import refuse_under_test  # noqa: E402
 
 # Beacon is the single voice (decision #5). Opus for the briefing authoring —
 # the meaning layer is the operator's whole read of the card, worth the better
-# model (the spec's provenance example pins claude-opus-4-8).
-NARRATOR_MODEL = 'claude-opus-4-8'
+# model (the spec's provenance example pins claude-opus-4-8). Moved to
+# claude-opus-5 2026-07-30: same $5/$25 tier and same tokenizer family, so
+# neither cost nor token shape moves — this is a straight quality upgrade on
+# the copy Larry actually reads.
+NARRATOR_MODEL = 'claude-opus-5'
 NARRATOR_BY = 'beacon'
 CLAUDE_TIMEOUT_SEC = 180
 
