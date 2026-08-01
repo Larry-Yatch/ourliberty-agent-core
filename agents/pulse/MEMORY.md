@@ -156,9 +156,11 @@
 
 ---
 
-## §5.0 script paths — ground-truth (confirmed iter ~2183, corrected iter ~6767)
+## §5.0 script paths — ground-truth (confirmed iter ~2183, corrected iter ~6767, path-error caught iter ~7122)
 
-**Rule:** All three §5.0 one-shots live in `scripts/`. Always invoke: `python3 scripts/audit_due_nudge.py`, `python3 scripts/distill_detector.py`, `python3 scripts/silence_file_auditor.py`. The third one-shot is `silence_file_auditor.py` (NOT `audit_cadence_signal.py`, NOT `review/distill/silence_file_auditor.py` — both wrong). `review/distill/` does not contain the third one-shot. Prior iters using `review/distill/silence_file_auditor.py` got "No such file or directory" (iter ~6767 caught this).
+**Rule:** The three §5.0 one-shots live in `scripts/`. Always invoke: `python3 scripts/audit_due_nudge.py`, `python3 scripts/distill_detector.py`, `python3 scripts/silence_file_auditor.py`. The third one-shot is `silence_file_auditor.py` (NOT `review/distill/silence_file_auditor.py` — wrong).
+
+**`audit_cadence_signal.py` is NOT a §5.0 one-shot** — it is a SEPARATE deferred script that lives at `review/distill/audit_cadence_signal.py` (NOT `scripts/`). cycle-prompt.md § 5.0 references it at `~/agent-core/review/distill/audit_cadence_signal.py`. If probing for it, always use that full path. Iters ~7119–7121 checked `scripts/audit_cadence_signal.py` (wrong), got NOT-FOUND ×3, dispatched a false dead-ref cleanup to Beacon. Beacon vetoed it (2026-08-01). **Verify-before-reassert: a NOT-FOUND count on this script must re-check the path in cycle-prompt.md before incrementing the counter, never just carry forward.**
 
 ---
 
