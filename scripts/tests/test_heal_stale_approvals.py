@@ -575,13 +575,24 @@ _FC_PROBE = {
 
 
 class TestReconcileStalePremises(_TerminalBase):
-    """The six load-bearing semantics of the probe leg:
+    """The load-bearing semantics of the probe leg:
       FALSE -> demote in place (still pending, read_at untouched, no history);
       TRUE / INDETERMINATE -> untouched;
-      no freshness_probe -> not probed (surfaces 'unverified' on the tab);
+      no freshness_probe -> not probed;
       NEVER auto-clear on a probe verdict (resolve/_clear never called);
       idempotent second tick (no history, no clear, no escalation);
+      a demote that finds the entry gone is NOT counted as a demotion;
       --dry-run writes nothing."""
+
+    def _patch_approval(self, name, fn):
+        """Monkeypatch an attribute on the SHARED beacon_approval_handler module
+        and restore it at teardown. `_TerminalBase.setUp` reloads the module, so
+        an unrestored stub happens to be cleaned up before the next test in this
+        file — but only by accident of class ordering. Restoring explicitly keeps
+        a raising stub from ever escaping into a suite-wide run."""
+        original = getattr(self.approval, name)
+        self.addCleanup(setattr, self.approval, name, original)
+        setattr(self.approval, name, fn)
 
     def _guard_no_autoclear(self):
         """Make resolve() / _clear_dashboard_pending() fail the test if the probe
@@ -591,8 +602,8 @@ class TestReconcileStalePremises(_TerminalBase):
 
         def _boom_clear(*a, **k):
             raise AssertionError('probe leg must NEVER call _clear_dashboard_pending()')
-        self.approval.resolve = _boom_resolve
-        self.approval._clear_dashboard_pending = _boom_clear
+        self._patch_approval('resolve', _boom_resolve)
+        self._patch_approval('_clear_dashboard_pending', _boom_clear)
 
     def test_false_demotes_in_place(self):
         self._guard_no_autoclear()
@@ -646,6 +657,21 @@ class TestReconcileStalePremises(_TerminalBase):
             raise AssertionError('evaluate() must not run on a probe-less entry')
         counts = self.mod.reconcile_stale_premises(now=NOW, evaluate=_eval)
         self.assertEqual(counts, {'pending': 1, 'probed': 0, 'demoted': 0, 'kept': 0})
+        self.assertNotIn('premise_stale', self._load()['pending'][0])
+
+    def test_vanished_entry_is_not_counted_as_demoted(self):
+        """The lost race: the entry is resolved between the probe read and the
+        demote write, so demote() returns None. That is NOT a demotion — counting
+        it would inflate `demoted` and emit a log line claiming a card was marked
+        stale when nothing was written, which is the same false-clean shape this
+        leg exists to prevent."""
+        self._guard_no_autoclear()
+        self._write_state([_probe_entry('zz-fixture-dead', OLD_TS, _FC_PROBE)])
+        self._patch_approval('demote', lambda *a, **k: None)
+        counts = self.mod.reconcile_stale_premises(
+            now=NOW, evaluate=lambda _p: fp.FALSE)
+        self.assertEqual(counts['probed'], 1)
+        self.assertEqual(counts['demoted'], 0)   # NOT 1 — nothing was written
         self.assertNotIn('premise_stale', self._load()['pending'][0])
 
     def test_idempotent_second_tick(self):

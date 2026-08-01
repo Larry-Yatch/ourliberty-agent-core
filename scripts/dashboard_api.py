@@ -4971,42 +4971,6 @@ def _parked_spawned_task_ids(captures: list[dict[str, Any]]) -> list[str]:
     return out
 
 
-def compute_approval_verification(entry: dict[str, Any]) -> dict[str, Any]:
-    """Machine-computed anti-false-clean verification tri-state for one Approvals
-    tab decision card, derived from its `beacon-pending-approvals.json` entry
-    (approvals-freshness slice 2, Part C).
-
-    This is the IN-REPO enforcement of the anti-false-clean requirement: the tab
-    can never read as fully-checked while a large share of it is unprobed. Most
-    cards carry NO `freshness_probe` today (and will for a long time), so those
-    MUST surface as machine-flagged `unverified` rather than silently fresh.
-
-      premise_stale marker present            -> 'stale'      (+ evidence)
-      no freshness_probe on the entry         -> 'unverified'
-      freshness_probe present and not stale   -> 'verified'
-
-    The pixel-level badge / demoted-section rendering lives in the SEPARATE
-    dashboard frontend repo and is a thin follow-up; this function is the field it
-    reads. Pure + defensive: reads only via `.get()`, never raises. Returns a dict
-    to merge onto the served card — always a `verification` key, plus
-    `verification_evidence` when the card is `stale` (for the demoted-card
-    rendering)."""
-    if not isinstance(entry, dict):
-        return {'verification': 'unverified'}
-    marker = entry.get('premise_stale')
-    if isinstance(marker, dict):
-        out: dict[str, Any] = {'verification': 'stale'}
-        evidence = marker.get('evidence')
-        if isinstance(evidence, str) and evidence:
-            out['verification_evidence'] = evidence
-        return out
-    payload = entry.get('dispatch_payload')
-    probe = payload.get('freshness_probe') if isinstance(payload, dict) else None
-    if isinstance(probe, dict) and probe:
-        return {'verification': 'verified'}
-    return {'verification': 'unverified'}
-
-
 def _open_delegate_approvals(
     origin_task_ids: list[str],
     agents_root: Optional[Path] = None,
@@ -5041,13 +5005,9 @@ def _open_delegate_approvals(
         if not isinstance(origin, str) or origin not in wanted:
             continue
         # First pending per origin wins (a re-delegate collapses onto one).
-        # Carry the machine-computed verification tri-state (+ evidence when
-        # stale) so a delegated card can render the anti-false-clean badge / the
-        # demoted-card treatment; the frontend badge is the thin follow-up.
         out.setdefault(origin, {
             'approval_id': entry.get('id'),
             'created_at': entry.get('created_at'),
-            **compute_approval_verification(entry),
         })
     return out
 

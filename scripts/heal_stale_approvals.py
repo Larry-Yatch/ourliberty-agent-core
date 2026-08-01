@@ -590,9 +590,14 @@ def reconcile_stale_premises(
     sets read_at and NEVER calls resolve()/_clear on a probe verdict — auto-clear
     stays reserved for the terminal-state leg's positively-terminal signal.
 
-    Only entries carrying `dispatch_payload.freshness_probe` are probed (an entry
-    with none is left untouched and surfaces as machine-`unverified` on the tab —
-    dashboard_api.compute_approval_verification). For each probed entry,
+    Only entries carrying `dispatch_payload.freshness_probe` are probed; an entry
+    with none is left untouched. NOTE: the anti-false-clean `unverified` BADGE is
+    NOT in this slice. The Approvals tab reads `chain_events` straight from
+    Supabase in the dashboard frontend (`lib/needs-you-queries.ts`) — it does not
+    read this local store — so no in-repo projection can light that badge. It
+    lands as its own slice: the renderer defaults ABSENT -> 'unverified' (so the
+    tab tells the truth before any probe exists), and the demote path stamps the
+    positive states onto the card's Supabase row. For each probed entry,
     `freshness_probe.evaluate(probe)` returns one tri-state:
         FALSE          -> demote() (premise dead, the ask is moot)
         TRUE / INDET.  -> untouched. INDETERMINATE folds in every error / timeout /
@@ -652,8 +657,13 @@ def reconcile_stale_premises(
                 f'{type(e).__name__}: {e}', 'ERROR')
             continue
         if demoted is None:
-            # Gone from pending (concurrent resolve / prior tick). Not an error.
+            # Gone from pending (concurrent resolve / prior tick). Not an error —
+            # but not a demotion either. Falling through would BOTH inflate
+            # `demoted` and log a write that never happened: a log claiming a
+            # card was marked stale when it wasn't is the same false-clean shape
+            # this whole leg exists to prevent.
             log(f'premise-demote: {approval_id} no longer pending ({evidence})')
+            continue
         counts['demoted'] += 1
         log(f'demoted pending approval {approval_id} (premise FALSE: {evidence})')
 
