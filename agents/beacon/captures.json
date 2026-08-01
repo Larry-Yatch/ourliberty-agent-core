@@ -3020,6 +3020,75 @@
         "at": "2026-08-01T02:43:11.422699+00:00",
         "from_state": "parked"
       },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
+      "spawned": {
+        "kind": "delegate",
+        "task_id": "delegate-cap-approvals-freshness-2b-stamp-verification-onto-t-d9a4",
+        "stamped_at": "2026-08-01T02:50:04.875848+00:00"
+      }
+    },
+    {
+      "id": "cap-deep-review-fileset-gap-heal-unregistered-approv-eb17",
+      "title": "Deep-review fileset gap \u2014 heal_unregistered_approval.py is the card BIRTH GATE and is unheld (RUN FIRST)",
+      "note": "Add `scripts/heal_unregistered_approval.py` to the `paths` list in `config/deep-review-paths.json`.\n\nWHEN TO RUN THIS: **FIRST, and BEFORE the producer-retrofit capture is dispatched.** That work lands in this exact file, and the whole point is that its PR gets HELD for a human. Config-only, minutes, no dependencies. Do not batch it behind anything.\n\nWHY \u2014 THE GAP, WITH EVIDENCE FROM 2026-07-31/08-01:\n`heal_unregistered_approval.py` is the BIRTH GATE for approval cards: it decides whether a card is ever created at all. It is NOT in the fileset, so a `forge/*` PR touching it gets a Mirror PASS and AUTO-MERGES with no human. Two landed that way in one evening:\n\n  * #1080 (approvals-freshness slice 3, birth probe) merged 2026-08-01T01:17Z, `b70d31a5`, NO labels \u2014 despite its own capture saying verbatim \"REVIEW: /code-review high REQUIRED. It decides what NEVER reaches Larry, which is strictly more dangerous than slice 2 \u2014 a card wrongly suppressed at birth leaves no artifact on the tab to notice.\"\n  * #1077 (reconcile local pending-approvals onto the decide tab) merged the same way earlier.\n\n`scripts/beacon_approval_handler.py` IS held \u2014 but that governs a card that already exists. The module that decides whether a decision reaches Larry AT ALL is unheld. That is the wrong way round. It also minted 4 of the 8 cards on Larry's tab on 2026-07-29, so it is high-volume, not a corner.\n\nThe failure mode is invisible BY CONSTRUCTION: a card wrongly suppressed at birth produces no card, no artifact, no alert \u2014 there is nothing on the tab to notice. That is the exact \"fails looking like success\" test the fileset exists for.\n\nTHE COST, STATED HONESTLY: adding a path means every future change to that file waits on a human. There is precedent and Larry has taken this trade knowingly before \u2014 see the `_comment_dispatch_backstop` note already in the file for `scripts/heal_undispatched_pr_review.py`, added 2026-07-28 \"with Larry's explicit sign-off, knowing the cost\". This file is lower-churn than outbox_notifier.py, so the toil is smaller. Add a matching `_comment` explaining WHY it is listed, so a future reader does not prune it as noise.\n\nSEPARATE, STILL-OPEN DECISION (do NOT fold into this card): whether to review #1080 retroactively. It is merged and live on the 10-min tick. Note that it is currently INERT \u2014 no producer authors a `freshness_probe`, so the birth check never fires \u2014 which means there is time to review it deliberately rather than urgently. It stops being inert the moment the producer-retrofit work lands. Decide before that.\n\nREVIEW: not needed for this change itself \u2014 it is one entry appended to a list, and its failure direction is MORE human review, never less. Verify by opening a scratch PR touching `scripts/heal_unregistered_approval.py` and confirming the hold fires (or read `outbox_notifier._deep_review_required` and confirm the fnmatch hits); a glob that matches nothing is false comfort.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "main",
+        "captured_at": "2026-08-01T02:47:48.627450+00:00"
+      },
+      "last_touched": "2026-08-01T02:47:48.627450+00:00",
+      "promoted_to": null,
+      "spawned": {
+        "kind": "delegate",
+        "task_id": "delegate-cap-deep-review-fileset-gap-heal-unregistered-approv-eb17",
+        "stamped_at": "2026-08-01T02:49:50.598566+00:00"
+      },
+      "briefing": {
+        "what": "A one-line settings change that puts the piece of the system deciding whether a decision ever reaches you at all onto the must-be-reviewed-by-a-human list \u2014 right now it isn't on that list, so changes to it go live untouched.",
+        "why": "When that piece gets it wrong, nothing shows up on your decide tab and nothing warns you: a decision you should have made simply never appears, and two changes to it already went live unreviewed in a single evening.",
+        "suggest": "Do this one first, before the related follow-on work starts, since it takes minutes and its only downside is that future changes there wait on you \u2014 then separately, and without rushing, decide whether to look back at the two changes that slipped through."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-01T02:53:13.353756+00:00",
+        "from_state": "parked"
+      }
+    },
+    {
+      "id": "cap-approvals-freshness-retrofit-a-producer-to-autho-9525",
+      "title": "Approvals freshness \u2014 RETROFIT a producer to author probes (the step that makes the arc do anything; run LAST)",
+      "note": "Make a producer AUTHOR a `freshness_probe` on the approval cards it files. This is the step that makes the whole approvals-freshness arc actually DO something.\n\nWHEN TO RUN THIS \u2014 two hard preconditions, both of them real:\n  1. AFTER the deep-review-fileset capture lands (`scripts/heal_unregistered_approval.py` added to `config/deep-review-paths.json`). This work lands in that exact file, and today a `forge/*` PR touching it auto-merges with no human \u2014 which is how #1080 and #1077 both landed unreviewed. Do not open this PR into an unheld path.\n  2. AFTER approvals-freshness 2b lands (the Supabase stamp). Without it a probe verdict never reaches the tab, so you cannot SEE the effect of the probes you author \u2014 you would be authoring blind.\nSlices 1 (#1072), 2 (#1079), 2a (dashboard #155) and 3 (#1080) are already MERGED, so nothing else blocks it.\n\nWHY IT MATTERS: every one of those five slices built MACHINERY. Not one of them makes a single card carry a probe \u2014 all five explicitly deferred \"retrofitting producers\" as out of scope, and until this lands the arc marks ZERO cards stale and suppresses ZERO cards at birth. Every card reads \"Unverified\" on the tab: honest, correct, and no behavior change whatsoever. This is the card that pays off the original problem \u2014 8 cards on Larry's tab on 2026-07-29, 6 of which did not need a human.\n\nSCOPE \u2014 START WITH ONE PRODUCER. This is the scoping trap that killed the parent capture (its delegation died at the 600s wall having produced nothing). ~10 modules emit APPROVAL_REQUEST markers (beacon_approval_handler, beacon_telegram_bot, build_sequence_advancer, build_sequence_kickoff, dashboard_api, dispatch_validator, drain_board_to_beacon, heal_pipeline_stall, heal_unregistered_approval, larry_alerts) and Beacon authors some as free LLM text. DO NOT cover them all. Land `heal_unregistered_approval` ALONE \u2014 it minted 4 of the 8 cards that day and 3 were stale or unanswerable. Widen only after that one is proven in production.\n\nHOW: authors already write the evidence down; converting a cited fact into a probe is near-free at filing and impossible afterward. Two real worked examples to build against: the confirm-all card cited `app/queue/verdict.ts` + `CONFIRM_ALL_TIERS` + `bulkCovered` (a `file_contains` probe would have flipped FALSE when RSDPM #151 merged, 2h18m after filing); `unreg-approval-cfd444ed29ee` (\"migration 0033 not live\") gave the exact `schema_migration_log` query (a `sql` probe would have flipped FALSE 8 minutes BEFORE Larry saw the card). Schema + kinds are in `scripts/freshness_probe.py`.\n\nTHE TEETH \u2014 READ THIS BEFORE AUTHORING THE FIRST PROBE: slice 3 is MERGED AND LIVE, and it SUPPRESSES a card at birth on a FALSE probe. So a badly-authored probe means a REAL decision that never reaches Larry, with no artifact on the tab to notice. A probe is only as good as its author. Before shipping the first one, confirm slice 3's FALSE branch actually logs loudly (what was suppressed, which probe, what it returned) and that the log is somewhere a human reads \u2014 a suppressed-card log nobody can read is the same false-clean this whole arc is about. Note the `sql` kind is still INERT (\u2192 INDETERMINATE \u2192 keep) until a read-only SQL executor lands, so the 0033 example cannot be built yet; start with the git-backed kinds.\n\nREVIEW: /code-review high REQUIRED. This decides what never reaches Larry's decision queue, and a wrong probe drops a live decision while the tab looks like it is working.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "main",
+        "captured_at": "2026-08-01T02:47:55.189461+00:00"
+      },
+      "last_touched": "2026-08-01T02:47:55.189461+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "Turning on the part of the approvals cleanup that actually filters your queue \u2014 right now everything built for it is sitting idle and changing nothing.",
+        "why": "On a recent day you got eight approval requests and six of them didn't need you; this is the piece that starts holding those back instead of just labeling them.",
+        "suggest": "Green-light it for the single worst offender only, and have us verify that anything held back is visibly logged before it goes live \u2014 a bad filter could quietly hide a decision you actually needed to make."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-01T02:53:13.353756+00:00",
+        "from_state": "parked"
+      },
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     }
   ]
