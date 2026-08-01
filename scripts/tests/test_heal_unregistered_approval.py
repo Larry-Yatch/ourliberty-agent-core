@@ -2634,5 +2634,229 @@ class BirthGateMainIntegrationTest(unittest.TestCase):
         r['add_pending'].assert_called_once()  # promotes exactly as today
 
 
+# ===================================================================
+# Birth-suppression durability + human surface
+# (approvals-freshness-suppression-visibility-001): a withheld card must be
+# recoverable from a durable record and visible on the alert path, exactly once
+# per card even though it is re-suppressed on every tick.
+# ===================================================================
+
+class BirthSuppressionRecordTest(unittest.TestCase):
+    """Criterion 1 + 3: one durable record carrying the FULL card payload, and
+    identity-keyed dedup that holds across repeated ticks."""
+
+    def setUp(self):
+        self.store = Path(
+            tempfile.mkdtemp(prefix='ol-birth-suppress-')) / 'suppressed.json'
+        for target, kw in (('birth_suppressed_state_file',
+                            {'return_value': self.store}),
+                           ('_emit_birth_suppression_alert', {}),
+                           ('log', {})):
+            patcher = mock.patch.object(h, target, **kw)
+            setattr(self, target.lstrip('_'), patcher.start())
+            self.addCleanup(patcher.stop)
+
+    def _suppress(self, cards, verdict=_FP.FALSE, evaluator=None):
+        """One tick: gate the batch, then record + alert whatever it withheld."""
+        _kept, suppressed = h.apply_birth_freshness_gate(
+            cards, evaluator=evaluator or (lambda _p: verdict))
+        return h.record_and_alert_birth_suppressions(suppressed)
+
+    def _stored(self):
+        return json.loads(self.store.read_text(encoding='utf-8'))['suppressed']
+
+    def test_false_verdict_writes_one_recoverable_record(self):
+        card = _card(probe={'kind': 'pr_state', 'task_id': 't'})
+        new = self._suppress([card])
+        self.assertEqual(len(new), 1)
+        stored = self._stored()
+        self.assertEqual(list(stored), ['subject:migration-0033'])
+        rec = stored['subject:migration-0033']
+        # The whole point: the card is reconstructable, not just summarized.
+        self.assertEqual(rec['card'], card)
+        self.assertEqual(rec['probe'], card['freshness_probe'])
+        self.assertEqual(rec['verdict'], _FP.FALSE)
+        self.assertEqual(rec['task_id'], card['task_id'])
+        self.assertEqual(rec['identity'], 'subject:migration-0033')
+        self.assertTrue(rec['suppressed_at'])
+
+    def test_repeated_ticks_yield_one_record_and_one_alert(self):
+        # The suppressed card is NOT written to the promoted ledger, so the same
+        # source alert is re-scanned and re-suppressed every tick. Dedup must
+        # absorb that: one card -> one record, one notification. Forever.
+        card = _card(probe={'kind': 'pr_state', 'task_id': 't'})
+        for _ in range(5):
+            self._suppress([card])
+        self.assertEqual(len(self._stored()), 1)
+        self.assertEqual(self.emit_birth_suppression_alert.call_count, 1)
+
+    def test_keep_paths_write_no_record_and_raise_no_alert(self):
+        probed = _card(probe={'kind': 'pr_state', 'task_id': 't'})
+
+        def _raise(_p):
+            raise RuntimeError('evaluator exploded')
+
+        cases = [
+            ([probed], _FP.TRUE, None),
+            ([probed], _FP.INDETERMINATE, None),
+            ([probed], None, _raise),               # evaluator error
+            ([_card(probe=None)], _FP.FALSE, None),  # no probe: never evaluated
+        ]
+        for cards, verdict, evaluator in cases:
+            with self.subTest(verdict=verdict, evaluator=bool(evaluator)):
+                self.assertEqual(
+                    self._suppress(cards, verdict=verdict, evaluator=evaluator),
+                    [])
+        self.assertFalse(self.store.exists())
+        self.emit_birth_suppression_alert.assert_not_called()
+
+    def test_identity_falls_back_to_task_id(self):
+        card = _card(probe={'kind': 'pr_state', 'task_id': 't'})
+        card.pop('promoted_from_alert')
+        self._suppress([card])
+        self.assertEqual(list(self._stored()), [card['task_id']])
+
+    def test_id_less_cards_do_not_collapse_into_one_bucket(self):
+        # An empty dedup key would silently drop every record but the first.
+        a = {'summary': 'a', 'freshness_probe': {'kind': 'pr_state'}}
+        b = {'summary': 'b', 'freshness_probe': {'kind': 'pr_state'}}
+        self._suppress([a, b])
+        stored = self._stored()
+        self.assertEqual(len(stored), 2)
+        self.assertTrue(all(k.startswith('cardhash:') for k in stored))
+
+    def test_malformed_store_reads_as_empty(self):
+        self.store.parent.mkdir(parents=True, exist_ok=True)
+        self.store.write_text('{not json', encoding='utf-8')
+        self.assertEqual(h.load_birth_suppressed(self.store), {})
+        self._suppress([_card(probe={'kind': 'pr_state', 'task_id': 't'})])
+        self.assertEqual(len(self._stored()), 1)
+
+    def test_store_is_bounded_evicting_oldest_first(self):
+        records = {
+            f'id-{i}': {'suppressed_at': f'2026-08-0{i}T00:00:00+00:00'}
+            for i in range(1, 4)
+        }
+        with mock.patch.object(h, 'MAX_BIRTH_SUPPRESSION_RECORDS', 2):
+            h.save_birth_suppressed(records, self.store)
+        self.assertEqual(sorted(self._stored()), ['id-2', 'id-3'])
+
+
+class BirthSuppressionAlertTest(unittest.TestCase):
+    """Criterion 2: the suppression reaches the alert path with everything needed
+    to answer 'no, that one was real' — and a failing notifier never raises."""
+
+    def setUp(self):
+        self.store = Path(
+            tempfile.mkdtemp(prefix='ol-birth-alert-')) / 'suppressed.json'
+        for target, kw in (('birth_suppressed_state_file',
+                            {'return_value': self.store}), ('log', {})):
+            patcher = mock.patch.object(h, target, **kw)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def test_alert_carries_identity_probe_and_recovery_pointer(self):
+        card = _card(probe={'kind': 'json_path', 'path': '/c', 'key': 'k',
+                            'expected': 1})
+        with mock.patch('larry_alerts.append_alert') as append:
+            h.record_and_alert_birth_suppressions([card])
+        append.assert_called_once()
+        kw = append.call_args.kwargs
+        self.assertEqual(kw['source'], h.HEALER_SOURCE)
+        self.assertEqual(kw['route'], 'escalate')   # never demoted to digest/hold
+        self.assertTrue(kw['needs_larry'])          # a withheld decision is his call
+        self.assertEqual(kw['subject'],
+                         'birth-suppressed:subject:migration-0033')
+        for expected in (card['task_id'], 'subject:migration-0033', 'json_path',
+                         'migration 0033', str(self.store)):
+            self.assertIn(expected, kw['message'])
+
+    def test_alert_failure_still_records_and_never_raises(self):
+        card = _card(probe={'kind': 'pr_state', 'task_id': 't'})
+        with mock.patch('larry_alerts.append_alert',
+                        side_effect=RuntimeError('telegram down')):
+            new = h.record_and_alert_birth_suppressions([card])
+        self.assertEqual(len(new), 1)
+        self.assertIn('subject:migration-0033',
+                      h.load_birth_suppressed(self.store))
+
+
+class BirthSuppressionFailurePostureTest(unittest.TestCase):
+    """Criterion 5: recording/notifying is observability only — a raising recorder
+    or notifier must still promote the kept cards and never crash the tick."""
+
+    def _drive(self, **patches):
+        import contextlib
+        # One card carrying a FALSE probe (suppressed) + one with no probe
+        # (promotes as today), so a broken recorder is visible against a card
+        # that must still reach the tab.
+        suppressed_rec = dict(FORLARRY_DECISION_RECORD,
+                              freshness_probe={'kind': 'pr_state', 'task_id': 't'})
+        keep_rec = dict(
+            FORLARRY_DECISION_RECORD,
+            id='mirror-review:keep-task',
+            pr_url='https://github.com/Larry-Yatch/ourliberty-agent-core/pull/999',
+            head_sha='def67890',
+            dedup_identity=(
+                'https://github.com/Larry-Yatch/ourliberty-agent-core/'
+                'pull/999@def67890'),
+        )
+        add_pending = mock.MagicMock(
+            side_effect=lambda p, **kw: {'id': p['task_id']})
+        patchers = [
+            mock.patch.object(h, 'kill_switch',
+                              return_value=Path('/nonexistent/kill-switch')),
+            mock.patch.object(h, 'heartbeat'),
+            mock.patch.object(h, 'log'),
+            mock.patch.object(h, 'load_heuristics',
+                              return_value=FORLARRY_HEURISTICS),
+            mock.patch.object(h, 'read_alerts', return_value=[]),
+            mock.patch.object(h, 'read_for_larry_records',
+                              return_value=[suppressed_rec, keep_rec]),
+            mock.patch.object(h, 'load_beacon_outbox_markers', return_value=[]),
+            mock.patch.object(h, 'load_promoted', return_value={}),
+            mock.patch.object(h, 'save_promoted'),
+            mock.patch.object(h, 'reconcile_retire',
+                              side_effect=lambda led, *a, **k: ([], led)),
+            mock.patch.object(h, '_chat_id', return_value=4242),
+            mock.patch.object(h, 'doorbell_counts', return_value=(0, 0)),
+            mock.patch.object(h, '_emit_self_failure'),
+            mock.patch('for_larry_escalations.clear', return_value=True),
+            mock.patch.object(h, 'emit_approval_event', return_value=True),
+            mock.patch.object(h.freshness_probe, 'evaluate',
+                              return_value=_FP.FALSE),
+            mock.patch.object(approval, 'state_lock',
+                              return_value=contextlib.nullcontext()),
+            mock.patch.object(approval, 'save_state'),
+            mock.patch.object(approval, 'add_pending', new=add_pending),
+            mock.patch.object(approval, 'load_state',
+                              side_effect=lambda *a, **k: {'pending': [],
+                                                           'history': []}),
+        ]
+        patchers += [mock.patch.object(h, target, **kw)
+                     for target, kw in patches.items()]
+        with contextlib.ExitStack() as stack:
+            for patcher in patchers:
+                stack.enter_context(patcher)
+            rc = h.main()
+        return rc, add_pending
+
+    def test_raising_recorder_still_promotes(self):
+        rc, add_pending = self._drive(
+            record_birth_suppressions={'side_effect': RuntimeError('disk full')})
+        self.assertEqual(rc, 0)
+        add_pending.assert_called_once()
+
+    def test_raising_notifier_still_promotes(self):
+        rc, add_pending = self._drive(
+            birth_suppressed_state_file={
+                'return_value': Path(
+                    tempfile.mkdtemp(prefix='ol-birth-posture-')) / 's.json'},
+            _emit_birth_suppression_alert={
+                'side_effect': RuntimeError('notify exploded')})
+        self.assertEqual(rc, 0)
+        add_pending.assert_called_once()
+
+
 if __name__ == '__main__':
     unittest.main()
