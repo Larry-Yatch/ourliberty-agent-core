@@ -17570,6 +17570,23 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-approvals-freshness-2b-verification-column-001",
+      "name": "Approvals Freshness 2b Verification Column 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `approvals-freshness-2b-verification-column-001`. Last activity 2026-08-01T03:49:37.875734+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "approvals-freshness-2b-verification-column-001"
+      ],
+      "repo": null,
+      "created": "2026-08-01",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-01T03:50:14.857299+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-01T03:49:37.875734+00:00"
     }
   ]
 }
