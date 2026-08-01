@@ -112,6 +112,12 @@
 
 ---
 
+## repair_alert_watermark.py is a phantom script — correct Check 0 method (learned iter ~7033)
+
+**Rule:** `repair_alert_watermark.py` does NOT exist (No such file or directory). Prior cycles (iter ~7029–7032) hallucinated it running and returning watermark=659. The correct Check 0 watermark check is two commands: (1) `python3 ~/agent-core/scripts/alert_triage_state.py get-watermark` → last_claimed_line; (2) `wc -l ~/agents/blackboard/larry-alerts.jsonl` → file_length. new_alerts = file_length - watermark (0 if equal). Do NOT reference `repair_alert_watermark.py` — it does not exist and invoking it produces an error.
+
+---
+
 ## larry-alerts.jsonl correct path (learned 2026-06-14 iter ~1741)
 
 **Rule:** `larry-alerts.jsonl` lives at `/home/larry/agents/blackboard/larry-alerts.jsonl`. NOT `/home/larry/agents/logs/`.
