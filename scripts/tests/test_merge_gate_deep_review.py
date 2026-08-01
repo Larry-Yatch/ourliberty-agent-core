@@ -29,6 +29,7 @@ try:  # engage the test sandbox before any production import reads env/paths
 except ImportError:
     import _bootstrap  # noqa: F401
 
+import fnmatch
 import importlib
 import json
 import os
@@ -78,6 +79,22 @@ def tearDownModule():  # noqa: N802
 
 
 REPO = 'Larry-Yatch/ourliberty-agent-core'
+
+# ---- shipped-fileset coverage sampler ---------------------------------------
+# Turns a fileset entry into a concrete PR file path it is supposed to match,
+# so ShippedFilesetTest can assert coverage for EVERY shipped entry instead of
+# a hand-picked subset. Only `*` is instantiated; any other fnmatch
+# metacharacter is rejected loudly at the call site rather than sampled wrong,
+# because a sample that quietly fails to match its own glob would read as "this
+# entry does not hold" — a false alarm indistinguishable from a real one.
+_GLOB_SAMPLE_TOKEN = 'sampled'
+_UNSAMPLED_GLOB_META = ('?', '[')
+
+
+def _sample_path_for(glob: str) -> str:
+    """A concrete path the fileset entry `glob` must match. A literal entry
+    (`scripts/outbox_notifier.py`) is its own sample."""
+    return glob.replace('*', _GLOB_SAMPLE_TOKEN)
 DASHBOARD_REPO = 'Larry-Yatch/ourliberty-dashboard'
 
 
@@ -480,12 +497,50 @@ class ShippedFilesetTest(_GateTestBase):
     durable hold: the sole brake was somebody remembering to apply
     `deep-review-required` by hand.
 
-    These assert the real file's *coverage*, so an entry cannot be dropped
-    silently. Coverage is asserted through `_deep_review_required` rather than
-    by string-matching the list, so a glob that is present but does not actually
-    match still fails — an entry that cannot tell right from wrong is the thing
-    being guarded against.
+    Coverage is asserted two ways, because neither alone holds:
+
+      - EVERY entry in the shipped list is instantiated into a concrete path
+        and run through `_deep_review_required` (not string-matched), so a glob
+        that is present but does not actually match still fails, and a NEW
+        entry gains coverage by the act of being added — nobody has to remember
+        to write a test for it.
+      - Membership itself is PINNED below, because the loop above iterates the
+        shipped list and therefore cannot see an entry that was deleted from
+        it. Deleting a path from the config AND from the code default used to
+        pass the whole suite green (measured 2026-08-01 on
+        `scripts/heal_unregistered_approval.py`, added by PR #1083): the sync
+        test still agreed, and the two hand-enumerated coverage tests only
+        named 7 of 17 entries. The pin is the third copy that makes a removal
+        show up in a diff.
     """
+
+    # A deliberate THIRD copy of the fileset (config, code default, here).
+    # Its only job is to fail when an entry LEAVES: the `_comment_*` rationale
+    # keys exist because these entries read as noise to anyone who does not
+    # know what they cost to earn, and the realistic loss is someone pruning
+    # one from both live copies at once. Removing an entry is allowed — it just
+    # has to be deliberate enough to edit this pin, which puts it in the diff a
+    # human reads. Entries may be ADDED without touching this (subset check),
+    # since the coverage loop picks them up automatically.
+    PINNED_FILESET = frozenset({
+        'scripts/beacon_approval_handler.py',
+        'scripts/heal_unregistered_approval.py',
+        'scripts/decision_*.py',
+        'scripts/resolve*.py',
+        'scripts/for_larry_*.py',
+        'scripts/larry_alerts.py',
+        'scripts/chain_event_emit.py',
+        'scripts/trust_policy.py',
+        'scripts/outbox_notifier.py',
+        'scripts/heal_undispatched_pr_review.py',
+        'config/trust-policy.json',
+        'config/suite-guardian.json',
+        'supabase/migrations/*',
+        'supabase/verify/*',
+        'middleware.ts',
+        'lib/route-access.ts',
+        'lib/houston/whitelist.ts',
+    })
 
     def setUp(self):
         super().setUp()
@@ -496,27 +551,60 @@ class ShippedFilesetTest(_GateTestBase):
         )
         self.on._invalidate_deep_review_paths_cache()
 
-    def test_shipped_config_holds_rsdpm_critical_paths(self):
-        for path in (
-            'supabase/migrations/0031_workspace_boundary.sql',
-            'supabase/verify/99_assertions.sql',
-            'middleware.ts',
-            'lib/route-access.ts',
-            'lib/houston/whitelist.ts',
-        ):
-            with self.subTest(path=path):
+    def _shipped_paths(self) -> list[str]:
+        return json.loads(
+            self.on._DEEP_REVIEW_PATHS_CONFIG_PATH.read_text())['paths']
+
+    def test_shipped_config_holds_every_listed_path(self):
+        """Every entry, not a hand-picked few.
+
+        The sample is DERIVED from the entry, so adding a path to the config
+        adds an assertion here for free. The gate is the oracle: an entry whose
+        glob is malformed (or whose file was renamed out from under it) matches
+        nothing and fails, even though the string is still sitting in the list.
+        """
+        entries = self._shipped_paths()
+        self.assertTrue(entries, 'the shipped fileset must not be empty')
+        for glob in entries:
+            with self.subTest(glob=glob):
+                unsampled = [c for c in _UNSAMPLED_GLOB_META if c in glob]
+                self.assertEqual(
+                    unsampled, [],
+                    f'{glob!r} uses fnmatch metacharacter(s) {unsampled} that '
+                    f'_sample_path_for does not instantiate — extend the '
+                    f'sampler, do not leave the entry uncovered',
+                )
+                sample = _sample_path_for(glob)
+                # Sampler self-check first, so a bad sample reports as a bad
+                # sample instead of masquerading as a dead entry. Checked
+                # per-entry because the gate ORs over the whole list — a live
+                # sibling glob could otherwise cover for a dead one.
+                self.assertTrue(
+                    fnmatch.fnmatch(sample, glob),
+                    f'sampled path {sample!r} does not match its own entry '
+                    f'{glob!r}',
+                )
                 self.assertTrue(
                     self.on._deep_review_required(
-                        REPO, 1, [path], labels=['auto-review']),
-                    f'{path} must be deep-review-held, not auto-merged',
+                        REPO, 1, [sample], labels=['auto-review']),
+                    f'a PR touching {sample!r} (entry {glob!r}) must be '
+                    f'deep-review-held, not auto-merged',
                 )
 
-    def test_shipped_config_still_holds_agent_core_critical_paths(self):
-        # The RSDPM entries are additive — nothing above them regressed.
-        for path in ('scripts/outbox_notifier.py', 'config/trust-policy.json'):
-            with self.subTest(path=path):
-                self.assertTrue(self.on._deep_review_required(
-                    REPO, 1, [path], labels=['auto-review']))
+    def test_shipped_fileset_never_loses_an_entry_silently(self):
+        """An entry may not vanish from the shipped list without a diff a human
+        reads. The coverage loop above iterates the list, so it goes quiet on a
+        deletion; `test_shipped_config_and_code_default_agree` only catches
+        ONE-SIDED drift. This is the assertion that survives a prune of both.
+        """
+        missing = sorted(self.PINNED_FILESET - set(self._shipped_paths()))
+        self.assertEqual(
+            missing, [],
+            f'{missing} left config/deep-review-paths.json. Each entry there '
+            f'holds a file whose failure mode is quiet in the MERGE direction '
+            f'(see the _comment_* keys). If the removal is intended, remove it '
+            f'from PINNED_FILESET in the same commit — deliberately.',
+        )
 
     def test_shipped_config_does_not_hold_ordinary_files(self):
         # The fileset must still discriminate — a gate that holds everything is
