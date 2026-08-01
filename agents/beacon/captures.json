@@ -2996,7 +2996,7 @@
       "id": "cap-approvals-freshness-2b-stamp-verification-onto-t-d9a4",
       "title": "Approvals freshness 2b \u2014 stamp verification onto the card's Supabase row (shape PINNED to the merged #155 reader)",
       "note": "SLICE 2b of the approvals-freshness arc \u2014 the write half CUT from PR #1079. DEPENDS ON #1079 (demote + tick probe leg, MERGED 16892715). Its reader, dashboard PR #155, is ALREADY MERGED (0f8d53fb) \u2014 so the contract below is FIXED, not negotiable. Build to it exactly.\n\nWHY THE WRITE MUST GO TO SUPABASE: the Approvals tab reads chain_events STRAIGHT FROM SUPABASE in the dashboard frontend (lib/needs-you-queries.ts). It does NOT go through the droplet. The freshness state lives in a droplet file (beacon-pending-approvals.json), so no in-repo projection can ever surface it. #1079's Part C tried exactly that in dashboard_api and was dead on arrival. Verify the read path before wiring a field.\n\nTHE EXACT SHAPE THE MERGED READER PARSES (ourliberty-dashboard lib/types.ts, CardVerification; logic in app/approvals/components/PendingCard.tsx deriveVerification):\n\n    verification = { state: \"verified\" | \"stale\", probed_at?: string, evidence?: string }\n\nA NESTED OBJECT \u2014 not scalar columns. The reader does `typeof raw !== \"object\" -> unverified`, so writing verification='stale' as a plain string makes EVERY card read Unverified forever and the feature is silently dead (the Part C failure class, one slice later). Read those two files before writing code.\n\nLOCATION IS STILL OPEN \u2014 the reader does `event.verification ?? event.payload?.verification`, so either works:\n(a) a dedicated JSON column `verification` (like read_at / actor, migration 0006 precedent). RECOMMENDED.\n(b) inside the existing payload JSON. No migration, but PostgREST cannot patch a JSON subfield, so read-modify-write; safe only because this healer is the sole writer.\n\nBUILD \u2014 in heal_stale_approvals.reconcile_stale_premises:\n1. Stamp via one keyed PostgREST UPDATE modelled EXACTLY on chain_event_emit.clear_approval_request: .eq('event_type','approval_request').eq('task_id',<id>).is_('read_at','null'), best-effort, swallows every failure, never blocks the local write.\n2. FALSE -> {state:'stale', evidence:<the _probe_evidence string>}.\n3. TRUE -> {state:'verified', probed_at:<now ISO>}. THIS IS NEW BEHAVIOR: the merged leg currently does NOTHING on TRUE (it only demotes on FALSE), so the TRUE write must be added.\n4. RE-STAMP probed_at ON EVERY TICK the probe reads TRUE. The reader DECAYS a 'verified' older than 30 min back to Unverified \u2014 deliberately, so a dead healer cannot hold the tab green. The healer ticks every 10 min, so a fresh stamp each tick keeps it inside the window. Stamp once and every card ages to Unverified in half an hour.\n5. Write NOTHING for INDETERMINATE or a probe-less card. Absence is the honest default and the reader renders absent as Unverified.\n\nTHE JOIN IS GUARANTEED: add_pending sets entry['id'] = payload['task_id'], and PR #1077 mints missing decide-tab cards under the pending entry's OWN id, so chain_events.task_id == the pending entry id by construction. Proven twice in-tree: triage_decisions.build_beacon_signals and clear_approval_request.\n\nRETRY IS FREE \u2014 BUILD NONE: reconcile_stale_premises re-evaluates every probe-carrying entry each 10-min tick, so a failed stamp retries next tick at no cost.\n\nREVIEW: /code-review high REQUIRED. This writes to the store feeding Larry's decision queue; a wrong filter or mis-keyed update can mark a LIVE card stale, which fails looking exactly like a working tab. Watch the read_at IS NULL guard (a resolved card must never be restamped) and the task_id match (a near-miss key silently stamps the wrong card).",
-      "state": "parked",
+      "state": "review_close",
       "label": null,
       "origin": {
         "source": "desktop-chat",
@@ -3024,14 +3024,18 @@
       "spawned": {
         "kind": "delegate",
         "task_id": "delegate-cap-approvals-freshness-2b-stamp-verification-onto-t-d9a4",
-        "stamped_at": "2026-08-01T02:50:04.875848+00:00"
-      }
+        "stamped_at": "2026-08-01T02:50:04.875848+00:00",
+        "outcome": "merged"
+      },
+      "closed_by": "heal_missions_card_gc:terminal-backstop",
+      "shipped_note": "shipped (linked work merged)",
+      "awaiting_ack": true
     },
     {
       "id": "cap-deep-review-fileset-gap-heal-unregistered-approv-eb17",
       "title": "Deep-review fileset gap \u2014 heal_unregistered_approval.py is the card BIRTH GATE and is unheld (RUN FIRST)",
       "note": "Add `scripts/heal_unregistered_approval.py` to the `paths` list in `config/deep-review-paths.json`.\n\nWHEN TO RUN THIS: **FIRST, and BEFORE the producer-retrofit capture is dispatched.** That work lands in this exact file, and the whole point is that its PR gets HELD for a human. Config-only, minutes, no dependencies. Do not batch it behind anything.\n\nWHY \u2014 THE GAP, WITH EVIDENCE FROM 2026-07-31/08-01:\n`heal_unregistered_approval.py` is the BIRTH GATE for approval cards: it decides whether a card is ever created at all. It is NOT in the fileset, so a `forge/*` PR touching it gets a Mirror PASS and AUTO-MERGES with no human. Two landed that way in one evening:\n\n  * #1080 (approvals-freshness slice 3, birth probe) merged 2026-08-01T01:17Z, `b70d31a5`, NO labels \u2014 despite its own capture saying verbatim \"REVIEW: /code-review high REQUIRED. It decides what NEVER reaches Larry, which is strictly more dangerous than slice 2 \u2014 a card wrongly suppressed at birth leaves no artifact on the tab to notice.\"\n  * #1077 (reconcile local pending-approvals onto the decide tab) merged the same way earlier.\n\n`scripts/beacon_approval_handler.py` IS held \u2014 but that governs a card that already exists. The module that decides whether a decision reaches Larry AT ALL is unheld. That is the wrong way round. It also minted 4 of the 8 cards on Larry's tab on 2026-07-29, so it is high-volume, not a corner.\n\nThe failure mode is invisible BY CONSTRUCTION: a card wrongly suppressed at birth produces no card, no artifact, no alert \u2014 there is nothing on the tab to notice. That is the exact \"fails looking like success\" test the fileset exists for.\n\nTHE COST, STATED HONESTLY: adding a path means every future change to that file waits on a human. There is precedent and Larry has taken this trade knowingly before \u2014 see the `_comment_dispatch_backstop` note already in the file for `scripts/heal_undispatched_pr_review.py`, added 2026-07-28 \"with Larry's explicit sign-off, knowing the cost\". This file is lower-churn than outbox_notifier.py, so the toil is smaller. Add a matching `_comment` explaining WHY it is listed, so a future reader does not prune it as noise.\n\nSEPARATE, STILL-OPEN DECISION (do NOT fold into this card): whether to review #1080 retroactively. It is merged and live on the 10-min tick. Note that it is currently INERT \u2014 no producer authors a `freshness_probe`, so the birth check never fires \u2014 which means there is time to review it deliberately rather than urgently. It stops being inert the moment the producer-retrofit work lands. Decide before that.\n\nREVIEW: not needed for this change itself \u2014 it is one entry appended to a list, and its failure direction is MORE human review, never less. Verify by opening a scratch PR touching `scripts/heal_unregistered_approval.py` and confirming the hold fires (or read `outbox_notifier._deep_review_required` and confirm the fnmatch hits); a glob that matches nothing is false comfort.",
-      "state": "parked",
+      "state": "done",
       "label": null,
       "origin": {
         "source": "desktop-chat",
@@ -3045,7 +3049,8 @@
       "spawned": {
         "kind": "delegate",
         "task_id": "delegate-cap-deep-review-fileset-gap-heal-unregistered-approv-eb17",
-        "stamped_at": "2026-08-01T02:49:50.598566+00:00"
+        "stamped_at": "2026-08-01T02:49:50.598566+00:00",
+        "outcome": "merged"
       },
       "briefing": {
         "what": "A one-line settings change that puts the piece of the system deciding whether a decision ever reaches you at all onto the must-be-reviewed-by-a-human list \u2014 right now it isn't on that list, so changes to it go live untouched.",
@@ -3059,7 +3064,10 @@
         "model": "claude-opus-5",
         "at": "2026-08-01T02:53:13.353756+00:00",
         "from_state": "parked"
-      }
+      },
+      "closed_by": "heal_missions_card_gc:terminal-backstop",
+      "shipped_note": "shipped (linked work merged)",
+      "closed_at": "2026-08-01T17:46:20.223982+00:00"
     },
     {
       "id": "cap-approvals-freshness-retrofit-a-producer-to-autho-9525",
