@@ -20774,3 +20774,85 @@ NOMINAL ✅
 
 ---
 
+## Iteration ~6900 — 2026-07-31T15:22Z UTC (Larry /cycle chat, Tier 1 [consecutive_clean 1→2]; Check 0: 0 new alerts [watermark=586=file_length; NOMINAL]; pending=1 [unchanged; suite-guardian-graduation-stage-1]; 4 open PRs [#1074 in Mirror review]; all checks NOMINAL; sync ~51min <2h)
+
+**Health:** ✅ Nominal — all checks clean.
+
+**VERIFY-BEFORE-REASSERT (from iter ~6899 at ~15:15Z UTC 2026-07-31):**
+- **"pending=1 (suite-guardian-graduation-stage-1)"**: CONFIRMED ✅ → pending=1 (same item, unchanged; chat_id=0, DM drop known). [carry ✅]
+- **"Tier 1 (consecutive_clean=0→1)"**: UPDATED ✅ → consecutive_clean=1 at cycle start; this clean iter → 1→2. Tier 1 stays (need 3 consecutive for de-escalation). [carry ✅ UPDATED]
+- **"HEAD=31c2120b=origin/main"**: UPDATED ✅ → HEAD=5739bc60 ("Pulse cycle 20260731T151718Z") = origin/main. Working tree clean. [carry ✅ UPDATED]
+- **"4 open PRs (#1065, #1070, #1071, #1074)"**: CONFIRMED ✅ → same 4 PRs open. #1065 now ~37h. #1074 (~17 min, in Mirror review per 15:05:17Z UTC dispatch). [carry ✅]
+- **"PR#1074 (lost-marker net) in Mirror review"**: CONFIRMED ✅ → reviewDecision="" (pending); Mirror-review dispatch confirmed 15:05:17Z UTC. Monitoring. [carry ✅]
+- **"watermark-rotation-gap 1st occurrence [tracking]"**: CARRY → no 2nd occurrence this iter (watermark=586=file_length, no repair needed). [carry — monitoring]
+- **"Check I carry artifact check-i-2026-07-31.json"**: CARRY → $1,201/wk (+206%); 1 proposal [small] 45.2σ. `/dispatch 1` to act. [carry]
+- G-rule carries (unchanged): forge-marker-taskid-suffix-increment; medic-draft-status-false-positive; check-i-force-bypass-dm-route; beacon-pending-approvals-path-bug; deep-review-hold-approved-loop-post-merge-001; pending-auto-merge-exhausted-for-merged-pr (monitoring). VPs: pulse-cycle-check0-helper-override, auto-merge-conflict-route-hold, direction-ask-rsdpm-no-autolabel-review-gap-001.
+
+**Check 0 — Alert triage (~15:22Z UTC):** repair-watermark → {repaired=false, old_watermark=586, file_length=586} — no new alerts. get-watermark → 586; 0 new alerts. NOMINAL ✅
+
+**Check 1 — Log noise (~15:22Z UTC):** outbox-notifier.log last entry [2026-07-31 09:05:17 MDT] = 15:05:17Z UTC (review-request dispatched mirror for PR#1074). No new WARN/ERROR patterns. NOMINAL ✅
+
+**Check 2 — Telegram sweep (~15:22Z UTC):** Last bot-log entry [2026-07-31T08:18:45-0600] = 14:18:45Z UTC (notification idx=586 doorbell delivered). No new Larry directives in last 4h. NOMINAL ✅
+
+**Check 3 — Pipeline stall (~15:22Z UTC):** heal_pipeline_stall.py --dry-run → DRY-RUN: 0 alert(s) would fire. FORGE_NO_PR_SKIP ×3 (#1068/#1072/#1073 — all MERGED ✅). Cooldown-suppressed: #1071, #1070, #1065-stranded, dashboard#153, dashboard#154, RSDPM#169. NOMINAL ✅
+
+**Check 4 — Pending directives (~15:22Z UTC):** beacon-pending-approvals.json (state/): **pending=1** (unchanged):
+1. **suite-guardian-graduation-stage-1** (created=2026-07-30T03:40:11Z UTC): chat_id=0 (DM drop known). ~35.7h old. [CARRY]
+NOMINAL (carry) ✅
+
+**Check 5 — Stale daemon code (~15:22Z UTC):** heal-stale-daemon-code.heartbeat=2026-07-31T15:18:49Z UTC (fresh ~4 min; <60 min). system-health=healthy ts=2026-07-31T15:17:40Z UTC (fresh ~5 min). All 4 bots alive (beacon/forge/mirror/pulse: desired=up, alive=True, action=noop). NOMINAL ✅
+
+**Check A — Source repo (~15:22Z UTC):** On main. Working tree clean. HEAD=5739bc60 ("Pulse cycle 20260731T151718Z") = origin/main. NOMINAL ✅
+**Check B — Sync health (~15:22Z UTC):** last_sync=2026-07-31T14:31:13Z UTC (~51 min; <2h threshold); status=no-change; consecutive_push_failures=0. NOMINAL ✅
+**Check C — Agent liveness (~15:22Z UTC):** system-health=healthy ts=2026-07-31T15:17:40Z UTC (fresh ~5 min). All 4 bots alive. NOMINAL ✅
+**Check E — PR/merge state (~15:22Z UTC):** ourliberty-agent-core: 4 open PRs:
+- **#1074** `feat(safety): flag rendered-but-never-emitted approval markers (lost-marker net)` — ~17 min old; in Mirror review (dispatched 15:05:17Z UTC); MERGEABLE. [monitoring; fresh]
+- **#1071** `Stop the bind-drift healer restarting (and false-paging) ephemeral units` — ~20h open. Cooldown-suppressed. [monitoring; <72h]
+- **#1070** `feat(models): move beacon + forge + narrator to claude-opus-5` — ~21h open. Cooldown-suppressed. [monitoring; <72h]
+- **#1065** `test(guard): harden agents-root override scanner` — ~37h open; bot DM idx=603 at 20:53:25Z UTC 2026-07-30; no reply. [CARRY — awaiting direction; escalate at 72h = 2026-08-02T02:39Z UTC]
+NOMINAL ✅
+
+**Check H — Forge activity (~15:22Z UTC):** No new merges in last 4h (last: #1073 merged 2026-07-30T20:54:50Z UTC). PR#1074 in Mirror review. NOMINAL ✅
+
+**§5.0 one-shots (~15:22Z UTC):** audit_due_nudge → no-op ✅. distill_detector → no-op ✅. audit_cadence_signal → no-op ✅. silence_file_auditor → 7 files (3 expired @ 50.4d + 4 permanent/0-suppressed); no FIRED ✅. NOMINAL ✅
+
+**§5 periodic — Check I (carry):** Fired today at ~14:11Z UTC (artifact check-i-2026-07-31.json). Result: $1,201/wk (+206%); 1 proposal [small] `cycle-202607230601240000` 45.2σ. `/dispatch 1` to act. NOMINAL ✅
+**§5 periodic — Check III (carry):** Most recent: check-iii-2026-07-26.json. Next: Sun 2026-08-03. NOMINAL ✅
+
+**Credential rotation (~15:22Z UTC):** SUPABASE_SERVICE_ROLE_KEY: due ~2026-08-22 (~22d); last DM 2026-07-20T20:00:15Z UTC; 14d dedup expires ~2026-08-03T20:00Z UTC (~3d remaining). Within dedup window — no DM. All other credentials due 2027+. NOMINAL ✅
+
+**PRIME DIRECTIVE accounting:** No new intervention this iter. iter_clean row appended via cycle_prime_ledger.py (tier=1, kind=iter_clean, ts=2026-07-31T15:22:41Z UTC). Ratio=39.19 (interventions≈1881, systemic_fixes=48, verification_pending=22; trend=worsening). **TIER: Tier 1** (consecutive_clean=1→2; last_signal_at=2026-07-31T15:09:20Z UTC; 5-min cadence).
+
+**Patterns:**
+- **Tier 1 at consecutive_clean=2 [noted]**: Recovering from watermark-rotation-gap auto-repair at iter ~6898. 1 more clean iter needed for de-escalation to Tier 2.
+- **PR#1074 in Mirror review [blue]**: `feat(safety): lost-marker net`. Forge-built at 15:04:50Z UTC; Mirror-review dispatched 15:05:17Z UTC. Monitoring for auto-merge on PASS.
+- **#1065 ~37h open [carry]**: No reply to bot DM idx=603. Cooldown-suppressed. Watching; escalate at 72h = 2026-08-02T02:39Z UTC.
+- **silence_file_auditor 3 expired entries [blue]**: Same 3 expired/0-suppressed files at 50.4d. No FIRED; no action.
+- **watermark-rotation-gap [carry/monitoring]**: 1st occurrence at iter ~6898; no 2nd occurrence. G-rule candidate at 3/10.
+- G-rule carries (unchanged): forge-marker-taskid-suffix-increment; medic-draft-status-false-positive; check-i-force-bypass-dm-route; beacon-pending-approvals-path-bug; deep-review-hold-approved-loop-post-merge-001; pending-auto-merge-exhausted-for-merged-pr (monitoring). VPs: pulse-cycle-check0-helper-override, auto-merge-conflict-route-hold, direction-ask-rsdpm-no-autolabel-review-gap-001.
+
+**Actions taken:**
+1. Check 0: repair-watermark → {repaired=false, old_watermark=586, file_length=586} — no-op. ✅
+2. Check 0: get-watermark → 586; 0 new alerts. ✅
+3. §5.0 one-shots: audit_due_nudge, distill_detector, audit_cadence_signal, silence_file_auditor → all no-op/no-FIRED. ✅
+4. PRIME DIRECTIVE: iter_clean row appended (tier=1, kind=iter_clean, ts=2026-07-31T15:22:41Z UTC). ✅
+5. Tier state: `cycle_tier_state.py record --checks-clean true` → Tier 1; consecutive_clean=1→2. ✅
+
+**Escalations:**
+- **[carry ⚠️ — dashboard only]** suite-guardian-graduation-stage-1: chat_id=0 (DM drop known). Approve via Approvals dashboard.
+- **[carry ⚠️ — awaiting Larry]** PR#1065 (~37h, fix/agents-root-guard-hardening): bot DM idx=603 at 20:53:25Z UTC 2026-07-30; no reply. Add `auto-review` label or close/defer. Escalate threshold: 72h = 2026-08-02T02:39Z UTC.
+- **[carry ⚠️] RSDPM staging drift (0035, 0036, 0037)**: Awaiting Larry ssh investigation.
+- [carry] check-vi-posture-proposals-2026-07-07 (2 proposals). Awaiting Larry.
+- [carry — monitoring] Mirror queue-wait p95=1065.6m.
+- [carry — no Larry reply] Check XIV Tier-4 × 2: oversilence + fleet digest.
+- [carry — monitoring] tier4-rsdpm-install-drift.
+- [carry — monitoring] forge-wip-redispatch EXHAUSTED (rsdpm-pr155).
+- **[blue] Check I carry**: artifact check-i-2026-07-31.json. Proposal #1 (45σ cycle anomaly `cycle-202607230601240000`); `/dispatch 1` to act.
+- **[blue] PR#1074 (lost-marker net)**: In Mirror review; monitoring for auto-merge.
+- **[blue] PR#1070 (claude-opus-5 upgrade)**: Larry-authored; add `auto-review` label when ready to ship.
+- **[blue] PR#1071 (bind-drift healer fix)**: Forge-authored; add `auto-review` label to merge.
+
+**Tier end-of-iter:** **Tier 1** (consecutive_clean=2; last_signal_at=2026-07-31T15:09:20Z UTC; 5-min cadence).
+
+---
+
