@@ -63,6 +63,7 @@ if str(_SCRIPT_DIR) not in sys.path:
 
 import beacon_approval_handler as approval  # noqa: E402
 import chain_event_emit  # noqa: E402
+import freshness_probe  # noqa: E402 — birth-time falsifiable-premise evaluator (slice 3/3)
 import task_terminal_state as tts  # noqa: E402 — shared terminal-state probe kernel
 
 CONFIG_FILE = _SCRIPT_DIR.parent / 'config' / 'unregistered-approval-heuristics.json'
@@ -754,7 +755,7 @@ def build_approval_payload(
             'Approve OR Reject both route back to Beacon to formalize this into '
             'a proper binary approval_request (or resolve in chat).'
         )
-    return {
+    out: dict[str, Any] = {
         'task_id': task_id,
         'summary': summary,
         'target_agent': 'beacon',
@@ -774,6 +775,13 @@ def build_approval_payload(
         # Stripped before the payload reaches add_pending / the chain helper.
         '_subject': subject,
     }
+    # Carry a freshness_probe forward (slice 3): when the source alert records a
+    # falsifiable premise, it rides into dispatch_payload so the birth gate can
+    # honor it and later ticks (slice 2) can re-check it. Absent => unchanged.
+    probe = extract_freshness_probe(record)
+    if probe is not None:
+        out['freshness_probe'] = probe
+    return out
 
 
 # -------------------- marker recovery from Beacon's outbox archive --------
@@ -924,7 +932,7 @@ def build_approval_payload_from_marker(
         'Approve to let Beacon dispatch the proposed task; Reject to decline. '
         'Resolved via the Approvals tab buttons.'
     )
-    return {
+    out: dict[str, Any] = {
         'task_id': task_id,
         'summary': summary,
         'target_agent': marker_target,
@@ -943,6 +951,13 @@ def build_approval_payload_from_marker(
         'bare_approvable': False,
         '_subject': subject,
     }
+    # Carry a freshness_probe forward (slice 3): Beacon's recovered marker is the
+    # likeliest carrier, but honor one on the downstream alert too. Absent =>
+    # unchanged.
+    probe = extract_freshness_probe(marker, record)
+    if probe is not None:
+        out['freshness_probe'] = probe
+    return out
 
 
 # -------------------- registration matching (pure) --------------------
@@ -1468,6 +1483,11 @@ def build_for_larry_approval_payload(
     }
     if recheck_target is not None:
         payload['recheck_target'] = recheck_target
+    # Carry a freshness_probe forward (slice 3) when the for-Larry record records
+    # a falsifiable premise. Absent => unchanged.
+    probe = extract_freshness_probe(record)
+    if probe is not None:
+        payload['freshness_probe'] = probe
     return payload
 
 
@@ -1775,6 +1795,118 @@ def reconcile_beacon_pending_retire(
         retired.append(task_id)
         log(f'beacon-pending retire: {key!r} task={task_id} (entry left pending)')
     return retired, remaining
+
+
+# -------------------- birth-time freshness gate (slice 3/3) ----------------
+#
+# Slice 1 (freshness_probe.py) shipped a pure, total evaluate() that answers
+# whether an approval card's own FALSIFIABLE premise still holds; slice 3 wires
+# it into THIS producer's promote path so a card whose premise is ALREADY FALSE
+# at the moment it is minted never lands on the Approvals tab. It COMPOSES WITH
+# the existing decision-resolution gate (evaluate()'s `_resolution_check`): that
+# gate asks "was this DECISION already resolved?"; this one asks "is the card's
+# carried PREMISE still true?". Either gate skipping means the card is not
+# promoted. Conservative posture, inherited from slice 1: suppression fires ONLY
+# on an explicit FALSE — a probe error, timeout, unknown/missing kind, non-dict
+# probe, or no probe at all all promote (fail toward the human, never toward the
+# convenient suppression). The 2026-07-29 unreg-approval-cfd444ed29ee incident —
+# a card asserting 'migration 0033 not live' minted ~8 min after 0033 went live —
+# is exactly the shape this closes.
+
+
+def extract_freshness_probe(*sources: Any) -> Optional[dict[str, Any]]:
+    """Return the first freshness_probe dict carried by any source, else None.
+
+    A probe may ride either at a top-level `freshness_probe` key or nested under
+    `dispatch_payload.freshness_probe` (slice 1's schema); both shapes are
+    checked on each source, in argument order. A non-dict `freshness_probe`
+    value is treated as absent — the evaluator would map it to INDETERMINATE
+    (=> promote) anyway, so skipping it here keeps such a card on the exact
+    no-probe, zero-behavior-change path. Never raises."""
+    for src in sources:
+        if not isinstance(src, dict):
+            continue
+        for container in (src, src.get('dispatch_payload')):
+            if isinstance(container, dict):
+                probe = container.get('freshness_probe')
+                if isinstance(probe, dict):
+                    return probe
+    return None
+
+
+def _card_summary_snippet(payload: dict[str, Any], limit: int = 200) -> str:
+    """The card's human-facing headline text for the suppression log line, so a
+    wrongly-suppressed REAL decision is legible (and recoverable) straight from
+    the log. Prefers `summary`, truncated to `limit` chars."""
+    text = str(payload.get('summary') or payload.get('prompt') or '').strip()
+    text = ' '.join(text.split())  # collapse newlines/runs for a one-line log
+    return text[:limit]
+
+
+def apply_birth_freshness_gate(
+    to_promote: list[dict[str, Any]],
+    *,
+    evaluator: Any = None,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Split the promote batch into (kept, suppressed) by evaluating each card's
+    carried freshness_probe at BIRTH.
+
+    A card is SUPPRESSED (not promoted) iff its probe evaluates to an explicit
+    FALSE — the falsifiable premise the ask depends on is already dead at mint
+    time. EVERY other outcome KEEPS the card, promoting it exactly as today:
+      * no freshness_probe                       -> keep (zero behavior change)
+      * verdict in freshness_probe.KEEP_STATES   -> keep (TRUE or INDETERMINATE)
+      * the evaluator raises                     -> keep (fail toward the human)
+
+    freshness_probe.evaluate is already total (it collapses every error / timeout
+    / missing-field / unknown-kind path to INDETERMINATE internally and never
+    raises), but this gate ALSO catches an evaluator exception defensively so an
+    injected/stubbed evaluator that raises still promotes — the INDETERMINATE
+    posture holds regardless of the evaluator's own contract.
+
+    NEVER SILENTLY DROP (load-bearing): each suppression emits ONE structured,
+    greppable line — task/identity id, probe `kind`, the FALSE verdict, and the
+    card's summary — so a wrongly-suppressed REAL decision is one grep away and
+    fully recoverable from the healer log.
+
+    `evaluator` is injected purely for unit-testing (default
+    freshness_probe.evaluate); production passes nothing."""
+    evaluate_probe = evaluator or freshness_probe.evaluate
+    kept: list[dict[str, Any]] = []
+    suppressed: list[dict[str, Any]] = []
+    for payload in to_promote:
+        probe = extract_freshness_probe(payload)
+        if probe is None:
+            kept.append(payload)
+            continue
+        try:
+            verdict = evaluate_probe(probe)
+        except Exception as e:  # noqa: BLE001 — an evaluator error is never a verdict
+            log(f'BIRTH_FRESHNESS_ERROR task={payload.get("task_id")!r} '
+                f'probe_kind={probe.get("kind")!r} '
+                f'({type(e).__name__}: {e}); promoting (INDETERMINATE posture)',
+                'WARN')
+            kept.append(payload)
+            continue
+        if verdict in freshness_probe.KEEP_STATES:
+            kept.append(payload)
+            continue
+        if verdict == freshness_probe.FALSE:
+            suppressed.append(payload)
+            log(
+                'BIRTH_FRESHNESS_SUPPRESS '
+                f'task={payload.get("task_id")!r} '
+                f'identity={payload.get("promoted_from_alert")!r} '
+                f'probe_kind={probe.get("kind")!r} verdict=FALSE '
+                f'summary={_card_summary_snippet(payload)!r}'
+            )
+            continue
+        # Unreachable: evaluate() only ever returns TRUE/FALSE/INDETERMINATE.
+        # Any unexpected value fails toward the human — keep, and flag it.
+        log(f'BIRTH_FRESHNESS_UNEXPECTED task={payload.get("task_id")!r} '
+            f'verdict={verdict!r}; promoting (fail-safe)', 'WARN')
+        kept.append(payload)
+    return kept, suppressed
 
 
 # -------------------- retire-on-resolution (decision 3) --------------------
@@ -2206,6 +2338,20 @@ def main() -> int:
     if bp_changed:
         ledger_changed = True
 
+    # --- BIRTH-TIME FRESHNESS GATE (slice 3/3) ---
+    # For every card about to be promoted, if it carries a falsifiable
+    # freshness_probe, evaluate it NOW: a premise already FALSE at mint time means
+    # the ask is moot before it ever reaches the tab, so the card is suppressed
+    # (and logged). Composes with the decision-resolution gate above — either gate
+    # skipping keeps the card off the tab. Conservative: only an explicit FALSE
+    # suppresses; no-probe / KEEP_STATES / evaluator-error all promote as today.
+    try:
+        to_promote, birth_suppressed = apply_birth_freshness_gate(to_promote)
+    except Exception as e:  # noqa: BLE001 — the gate must never crash the tick
+        log(f'birth-freshness gate failed: {type(e).__name__}: {e}; '
+            f'promoting all candidates (fail toward the human)', 'ERROR')
+        birth_suppressed = []
+
     # Record the suppressed needs-triage identities in the promoted ledger as
     # SKIP markers so they are not re-evaluated (or re-logged) on the next tick.
     # No card is created; the source larry-alert is untouched. reconcile_retire
@@ -2233,6 +2379,7 @@ def main() -> int:
         log(f'tick: scanned {len(alerts)} alert(s) + '
             f'{len(for_larry_records)} for-larry record(s); nothing to promote '
             f'from feeds; beacon-pending minted {bp_minted}; '
+            f'birth-freshness suppressed {len(birth_suppressed)}; '
             f'retired {len(retired)} (+{len(bp_retired)} beacon-pending)')
         return 0
 
@@ -2404,6 +2551,7 @@ def main() -> int:
         retired=len(retired) + len(bp_retired))
     log(f'done: promoted {promoted_count} direction-ask(s); '
         f'beacon-pending minted {bp_minted}; '
+        f'birth-freshness suppressed {len(birth_suppressed)}; '
         f'retired {len(retired)} (+{len(bp_retired)} beacon-pending); '
         f'repair-failures {len(repair_failures)}')
     return 0
