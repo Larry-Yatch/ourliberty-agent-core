@@ -1,0 +1,19 @@
+[Unit]
+Description=Parity check — every item awaiting Larry is on the decide tab, and clears
+
+[Timer]
+# OnCalendar (not OnUnitActiveSec) per the OnUnitActiveSec-dies lesson: an
+# absolute wall-clock schedule keeps firing even if a run is missed/slow.
+# Every 15 minutes, matching the remediator (heal-unregistered-approval) it
+# checks — the sentinel must not tick faster than the healer it grades, or a
+# normal promote would look like drift. Offset to :07 so each check lands AFTER
+# that healer's :00/15 run has had time to promote/retire, which keeps in-flight
+# churn out of the divergence set. With the 3-tick grace, a real divergence
+# surfaces within ~45 min.
+OnCalendar=*-*-* *:07/15:00
+Persistent=true
+RandomizedDelaySec=60
+Unit=ourliberty-heal-approvals-surface-drift.service
+
+[Install]
+WantedBy=timers.target
