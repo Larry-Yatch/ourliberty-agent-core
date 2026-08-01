@@ -353,6 +353,81 @@ class StateCrudTest(unittest.TestCase):
         self.assertLessEqual(len(state['history']), ah.HISTORY_CAP)
 
 
+class DemoteTest(unittest.TestCase):
+    """approvals-freshness slice 2 Part A: demote() marks a premise DEAD in place
+    (premise_stale marker) and keeps the entry in pending[] — the anti-auto-clear
+    counterpart to resolve()."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._root = Path(self._tmp.name)
+        self._original_path = ah.PENDING_APPROVALS_PATH
+        ah.PENDING_APPROVALS_PATH = self._root / 'pending.json'
+
+    def tearDown(self):
+        ah.PENDING_APPROVALS_PATH = self._original_path
+        self._tmp.cleanup()
+
+    def _add_with_probe(self, task_id, probe):
+        payload = _good_payload(task_id=task_id)
+        payload['freshness_probe'] = probe
+        return ah.add_pending(payload, chat_id=1)
+
+    def test_demote_stamps_in_place_never_clears(self):
+        """FALSE verdict path: entry stays in pending[], gets a premise_stale
+        marker carrying evidence + kind + probed_at, nothing moves to history,
+        read_at is never set, and _clear_dashboard_pending is NEVER called."""
+        import chain_event_emit as cee
+        cleared = []
+        orig = cee.clear_approval_request
+        cee.clear_approval_request = lambda tid, **kw: cleared.append(tid)
+        try:
+            self._add_with_probe('t-demote', {'kind': 'file_contains',
+                                              'substring': 'x'})
+            moved = ah.demote('t-demote', 'file_contains premise FALSE: ...')
+        finally:
+            cee.clear_approval_request = orig
+        self.assertIsNotNone(moved)
+        # NEVER auto-clears on a probe verdict.
+        self.assertEqual(cleared, [])
+        state = ah.load_state()
+        self.assertEqual([e['id'] for e in state['pending']], ['t-demote'])
+        self.assertEqual(state['history'], [])
+        entry = state['pending'][0]
+        marker = entry['premise_stale']
+        self.assertEqual(marker['evidence'], 'file_contains premise FALSE: ...')
+        self.assertEqual(marker['kind'], 'file_contains')   # read from the probe
+        self.assertIn('probed_at', marker)
+        self.assertNotIn('read_at', entry)
+        self.assertEqual(entry['status'], 'pending')          # status unchanged
+
+    def test_demote_idempotent_refresh(self):
+        """A second demote refreshes evidence/probed_at but never duplicates the
+        marker (single dict, not a list) and never escalates to a clear/history."""
+        self._add_with_probe('t-demote', {'kind': 'json_path'})
+        first = ah.demote('t-demote', 'evidence-1')
+        first_at = first['premise_stale']['probed_at']
+        second = ah.demote('t-demote', 'evidence-2')
+        marker = second['premise_stale']
+        self.assertIsInstance(marker, dict)          # not a list
+        self.assertEqual(marker['evidence'], 'evidence-2')  # refreshed
+        self.assertGreaterEqual(marker['probed_at'], first_at)
+        state = ah.load_state()
+        self.assertEqual(len(state['pending']), 1)   # no escalation
+        self.assertEqual(state['history'], [])
+
+    def test_demote_unknown_id_is_noop(self):
+        self.assertIsNone(ah.demote('t-missing', 'evidence'))
+
+    def test_demote_kind_none_when_no_probe(self):
+        """Defensive: an entry with no freshness_probe still demotes (kind=None)
+        rather than raising — the reconciler only demotes probe-carrying entries,
+        but demote() must not assume the probe is present."""
+        ah.add_pending(_good_payload(task_id='t-noprobe'), chat_id=1)
+        moved = ah.demote('t-noprobe', 'evidence')
+        self.assertIsNone(moved['premise_stale']['kind'])
+
+
 class PauseFlagTest(unittest.TestCase):
     """File-flag based pause."""
 

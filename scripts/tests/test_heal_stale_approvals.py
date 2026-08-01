@@ -34,6 +34,7 @@ _SCRIPTS_DIR = Path(__file__).resolve().parent.parent
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
+import freshness_probe as fp  # noqa: E402
 import task_terminal_state as tts  # noqa: E402
 
 NOW = datetime(2026, 6, 2, 12, 0, 0, tzinfo=timezone.utc)
@@ -551,6 +552,163 @@ class TestReconcileTerminalApprovals(_TerminalBase):
         self.assertEqual(counts2['pending'], 1)   # only the open one remains
         self.assertEqual(counts2['retired'], 0)
         self.assertEqual(counts2['kept'], 1)
+
+
+# ---- stale-premise reconcile (approvals-freshness slice 2, Part B) ----
+
+def _probe_entry(approval_id, created_at, probe, *, premise_stale=None):
+    """A pending entry carrying a freshness_probe on its dispatch_payload (where
+    the evaluator reads it). An optional pre-existing premise_stale marker
+    exercises the idempotent-refresh path."""
+    entry = _entry(approval_id, created_at, task_id=approval_id)
+    entry['dispatch_payload']['freshness_probe'] = probe
+    if premise_stale is not None:
+        entry['premise_stale'] = premise_stale
+    return entry
+
+
+# A file_contains probe — the demonstrable end-to-end path this slice ships.
+_FC_PROBE = {
+    'kind': 'file_contains', 'repo': '/tmp/zz-fixture-repo',
+    'path': 'x.py', 'substring': 'gone', 'ref': 'origin/main',
+}
+
+
+class TestReconcileStalePremises(_TerminalBase):
+    """The load-bearing semantics of the probe leg:
+      FALSE -> demote in place (still pending, read_at untouched, no history);
+      TRUE / INDETERMINATE -> untouched;
+      no freshness_probe -> not probed;
+      NEVER auto-clear on a probe verdict (resolve/_clear never called);
+      idempotent second tick (no history, no clear, no escalation);
+      a demote that finds the entry gone is NOT counted as a demotion;
+      --dry-run writes nothing."""
+
+    def _patch_approval(self, name, fn):
+        """Monkeypatch an attribute on the SHARED beacon_approval_handler module
+        and restore it at teardown. `_TerminalBase.setUp` reloads the module, so
+        an unrestored stub happens to be cleaned up before the next test in this
+        file — but only by accident of class ordering. Restoring explicitly keeps
+        a raising stub from ever escaping into a suite-wide run."""
+        original = getattr(self.approval, name)
+        self.addCleanup(setattr, self.approval, name, original)
+        setattr(self.approval, name, fn)
+
+    def _guard_no_autoclear(self):
+        """Make resolve() / _clear_dashboard_pending() fail the test if the probe
+        leg ever reaches the auto-CLEAR path."""
+        def _boom_resolve(*a, **k):
+            raise AssertionError('probe leg must NEVER call resolve()')
+
+        def _boom_clear(*a, **k):
+            raise AssertionError('probe leg must NEVER call _clear_dashboard_pending()')
+        self._patch_approval('resolve', _boom_resolve)
+        self._patch_approval('_clear_dashboard_pending', _boom_clear)
+
+    def test_false_demotes_in_place(self):
+        self._guard_no_autoclear()
+        self._write_state([_probe_entry('zz-fixture-dead', OLD_TS, _FC_PROBE)])
+        counts = self.mod.reconcile_stale_premises(
+            now=NOW, evaluate=lambda _p: fp.FALSE)
+        self.assertEqual(counts, {'pending': 1, 'probed': 1, 'demoted': 1, 'kept': 0})
+        state = self._load()
+        # STILL in pending[]; nothing moved to history.
+        self.assertEqual([e['id'] for e in state['pending']], ['zz-fixture-dead'])
+        self.assertEqual(state['history'], [])
+        entry = state['pending'][0]
+        marker = entry['premise_stale']
+        self.assertEqual(marker['kind'], 'file_contains')
+        self.assertIn('file_contains premise FALSE', marker['evidence'])
+        self.assertIn('probed_at', marker)
+        # read_at is NEVER touched by the probe leg.
+        self.assertNotIn('read_at', entry)
+
+    def test_true_and_indeterminate_untouched(self):
+        self._guard_no_autoclear()
+        self._write_state([
+            _probe_entry('zz-fixture-true', OLD_TS, dict(_FC_PROBE)),
+            _probe_entry('zz-fixture-indet', OLD_TS, dict(_FC_PROBE)),
+        ])
+        verdicts = {'zz-fixture-true': fp.TRUE, 'zz-fixture-indet': fp.INDETERMINATE}
+
+        def _eval(probe):
+            # key off the substring we vary per entry below
+            return verdicts[probe['_id']]
+        # tag each probe so the fake evaluate can tell them apart
+        st = self._load()
+        for e in st['pending']:
+            e['dispatch_payload']['freshness_probe']['_id'] = e['id']
+        self.pending_path.write_text(json.dumps(st))
+
+        counts = self.mod.reconcile_stale_premises(now=NOW, evaluate=_eval)
+        self.assertEqual(counts['probed'], 2)
+        self.assertEqual(counts['demoted'], 0)
+        self.assertEqual(counts['kept'], 2)
+        for e in self._load()['pending']:
+            self.assertNotIn('premise_stale', e)
+
+    def test_no_freshness_probe_not_probed(self):
+        self._guard_no_autoclear()
+        # a plain approval with no probe — must be left entirely alone
+        self._write_state([_entry('zz-fixture-noprobe', OLD_TS,
+                                   task_id='zz-fixture-noprobe')])
+
+        def _eval(_p):
+            raise AssertionError('evaluate() must not run on a probe-less entry')
+        counts = self.mod.reconcile_stale_premises(now=NOW, evaluate=_eval)
+        self.assertEqual(counts, {'pending': 1, 'probed': 0, 'demoted': 0, 'kept': 0})
+        self.assertNotIn('premise_stale', self._load()['pending'][0])
+
+    def test_vanished_entry_is_not_counted_as_demoted(self):
+        """The lost race: the entry is resolved between the probe read and the
+        demote write, so demote() returns None. That is NOT a demotion — counting
+        it would inflate `demoted` and emit a log line claiming a card was marked
+        stale when nothing was written, which is the same false-clean shape this
+        leg exists to prevent."""
+        self._guard_no_autoclear()
+        self._write_state([_probe_entry('zz-fixture-dead', OLD_TS, _FC_PROBE)])
+        self._patch_approval('demote', lambda *a, **k: None)
+        counts = self.mod.reconcile_stale_premises(
+            now=NOW, evaluate=lambda _p: fp.FALSE)
+        self.assertEqual(counts['probed'], 1)
+        self.assertEqual(counts['demoted'], 0)   # NOT 1 — nothing was written
+        self.assertNotIn('premise_stale', self._load()['pending'][0])
+
+    def test_idempotent_second_tick(self):
+        self._guard_no_autoclear()
+        self._write_state([_probe_entry('zz-fixture-dead', OLD_TS, _FC_PROBE)])
+        self.mod.reconcile_stale_premises(now=NOW, evaluate=lambda _p: fp.FALSE)
+        first = self._load()['pending'][0]['premise_stale']
+        # second tick over the already-demoted entry
+        counts2 = self.mod.reconcile_stale_premises(
+            now=NOW, evaluate=lambda _p: fp.FALSE)
+        self.assertEqual(counts2['demoted'], 1)  # re-demoted (refresh), not escalated
+        state = self._load()
+        self.assertEqual(len(state['pending']), 1)     # no escalation to clear
+        self.assertEqual(state['history'], [])         # nothing moved to history
+        marker = state['pending'][0]['premise_stale']
+        self.assertEqual(marker['kind'], first['kind'])  # single dict, not a list
+        self.assertIsInstance(marker, dict)
+
+    def test_dry_run_writes_nothing(self):
+        self._guard_no_autoclear()
+        self._write_state([_probe_entry('zz-fixture-dead', OLD_TS, _FC_PROBE)])
+        counts = self.mod.reconcile_stale_premises(
+            now=NOW, evaluate=lambda _p: fp.FALSE, dry_run=True)
+        self.assertEqual(counts['demoted'], 1)  # classified
+        self.assertNotIn('premise_stale', self._load()['pending'][0])  # not written
+
+    def test_default_evaluate_keeps_inert_sql(self):
+        # sql stays on the inert default executor -> INDETERMINATE -> keep, with
+        # the REAL freshness_probe.evaluate (no injected evaluate).
+        self._guard_no_autoclear()
+        self._write_state([_probe_entry(
+            'zz-fixture-sql', OLD_TS,
+            {'kind': 'sql', 'query': 'select true'})])
+        counts = self.mod.reconcile_stale_premises(now=NOW)
+        self.assertEqual(counts['demoted'], 0)
+        self.assertEqual(counts['kept'], 1)
+        self.assertNotIn('premise_stale', self._load()['pending'][0])
 
 
 # ---- mirror-review PR-coordinate reconcile (out-of-band merge phantoms) ----
