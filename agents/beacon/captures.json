@@ -2584,7 +2584,7 @@
       "id": "cap-approvals-freshness-2-3-evaluate-the-probe-on-th-9902",
       "title": "Approvals freshness 2/3: evaluate the probe on the 10-min tick and DEMOTE, never auto-clear",
       "note": "SLICE 2 of 3. DEPENDS ON cap-approvals-freshness-1-3-add-an-optional-freshnes-582f (the freshness_probe schema + pure evaluator). Do not start until that has landed.\n\nTHIS SLICE: wire the evaluator into the healer that already ticks, and give a dead-premise card somewhere to go that is NOT deletion.\n\nWHERE: scripts/heal_stale_approvals.py already runs OnCalendar=*:0/10 and already has the discipline this needs \u2014 backup-first, reversible (read_at -> NULL), idempotent, conservative on missing state. Add a probe leg beside the existing signals. Do NOT build a new healer.\n\nBEHAVIOR:\n  - probe TRUE or INDETERMINATE => keep, untouched. (INDETERMINATE includes error/timeout/unparseable \u2014 slice 1 guarantees this.)\n  - probe FALSE => DEMOTE the card to a 'premise_stale' state carrying the probe's output as evidence, e.g. 'filed 2026-07-28 23:37 because Confirm-all's parent closure ignored parent tier; as of now bulkCovered is ancestor-closed \u2014 RSDPM #151, 3d66718'. Larry one-taps dismiss.\n  - NEVER auto-clear on a probe result. Auto-clear stays reserved for the exact probes already trusted \u2014 reconcile_terminal_approvals' PR-coordinate class, which retires on MERGED/CLOSED after TERMINAL_APPROVAL_GRACE_HOURS=2.\n\nWHY DEMOTE AND NOT CLEAR: clearing a LIVE decision is far worse than showing a stale one. The human keeps the irreversible verb. A probe is evidence, not a verdict.\n\nALSO IN THIS SLICE \u2014 the anti-false-clean requirement, non-negotiable: a card with NO probe must render as visibly UNVERIFIED, never as silently fresh. Most cards will have no probe for a long time (see slice 3's scoping note). A freshness check that covers a third of the queue while the tab reads as fully checked is [[existence-gates-are-false-clean-generators]] \u2014 the exact class that let 6 of 8 cards reach Larry on 2026-07-29.\n\nDO NOT put the verification subagent on a timer. dashboard_api.py:11173+ (/api/larry/cleanup-review) already has one, and its fail-safe posture is already correct (_cleanup_review_verify_uncertain returns {} on ANY failure = keep every uncertain row). It is TEMPTING to schedule it because it handles exactly the no-probe cases. Don't: that is an LLM deciding 'still true?' on every card every tick \u2014 unbounded cost, and its failure mode is silently clearing a live decision. agents/beacon/specs/approvals-queue-rework.md deliberately keeps it behind a button and writes 'NEVER clears an item it cannot confirm resolved.'\n\nOUT OF SCOPE: probing at birth (slice 3); retrofitting producers to author probes.\n\nREVIEW: /code-review high REQUIRED. This decides what disappears from Larry's decision queue, and a wrong filter drops a real decision while looking exactly like a working tab.",
-      "state": "parked",
+      "state": "review_close",
       "label": null,
       "origin": {
         "source": "desktop-chat",
@@ -2612,8 +2612,12 @@
       "spawned": {
         "kind": "delegate",
         "task_id": "delegate-cap-approvals-freshness-2-3-evaluate-the-probe-on-th-9902",
-        "stamped_at": "2026-07-31T22:17:16.282973+00:00"
-      }
+        "stamped_at": "2026-07-31T22:17:16.282973+00:00",
+        "outcome": "merged"
+      },
+      "closed_by": "heal_missions_card_gc:terminal-backstop",
+      "shipped_note": "shipped (linked work merged)",
+      "awaiting_ack": true
     },
     {
       "id": "cap-approvals-freshness-3-3-run-the-same-probe-at-bi-2616",
@@ -2917,7 +2921,12 @@
         "at": "2026-08-01T01:43:08.206519+00:00",
         "from_state": "parked"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "spawned": {
+        "kind": "delegate",
+        "task_id": "delegate-cap-approvals-freshness-2a-render-the-unverified-bad-4abb",
+        "stamped_at": "2026-08-01T02:05:44.122382+00:00"
+      }
     },
     {
       "id": "cap-approvals-freshness-2b-stamp-the-verification-st-9d7c",
@@ -2945,6 +2954,36 @@
         "by": "beacon",
         "model": "claude-opus-4-8",
         "at": "2026-08-01T01:43:08.206519+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+    },
+    {
+      "id": "cap-approvals-freshness-2b-stamp-the-verification-st-eb07",
+      "title": "Approvals freshness 2b \u2014 stamp the verification state onto the card's Supabase row from the demote path",
+      "note": "SLICE 2b of the approvals-freshness arc \u2014 the write half CUT from PR #1079. DEPENDS ON #1079 (demote + tick probe leg, merged); pairs with the dashboard renderer slice 2a, which ships FIRST and independently.\n\nTHE CONSTRAINT THAT DEFINES THIS SLICE: the Approvals tab reads chain_events STRAIGHT FROM SUPABASE in the dashboard frontend (ourliberty-dashboard lib/needs-you-queries.ts). It does NOT go through the droplet. The freshness state lives in a droplet file (beacon-pending-approvals.json). So the state must be WRITTEN TO SUPABASE \u2014 no in-repo projection can ever surface it. #1079's Part C tried to project it in dashboard_api and was dead on arrival for exactly this reason. Do not repeat that: verify the read path before wiring a field.\n\nThe one precedent that does NOT apply: latest_team_message_id / blocked_on_you had the same shape and were solved by RECOMPUTING them in the frontend from card_message chain_events. That works only because the source data was already in Supabase. Freshness state is not \u2014 there is nothing to derive from.\n\nBUILD \u2014 in the demote path (heal_stale_approvals.reconcile_stale_premises / beacon_approval_handler.demote):\n1. Stamp the verification state onto the card's approval_request chain_event row. Model it EXACTLY on chain_event_emit.clear_approval_request: one keyed PostgREST UPDATE filtered .eq('event_type','approval_request').eq('task_id',<id>).is_('read_at','null'), best-effort, swallows every failure, never blocks the local write.\n2. Write ONLY the positive states: 'stale' + evidence on FALSE; 'verified' + probed_at on TRUE. Write NOTHING for INDETERMINATE or a no-probe card \u2014 absence is the honest default and 2a reads absent as 'unverified'.\n3. probed_at is REQUIRED on 'verified' \u2014 2a decays a stale-dated 'verified' back to Unverified, which is what stops a dead healer leaving the tab reading green.\n\nTHE JOIN IS ALREADY GUARANTEED: add_pending sets entry['id'] = payload['task_id'], and PR #1077 (merged 2026-07-31) mints missing decide-tab cards under the pending entry's OWN id. So chain_events.task_id == the pending entry id by construction. Proven twice in-tree: triage_decisions.build_beacon_signals and clear_approval_request.\n\nRETRY IS FREE \u2014 BUILD NONE: reconcile_stale_premises re-demotes every matching entry on every 10-min tick (idempotent, verified in #1079), so a failed stamp retries next tick at no cost.\n\nOPEN DECISION \u2014 where the field lives:\n(a) a dedicated column (verification / verification_evidence / verified_at), like read_at and actor (migration 0006 precedent). Cleanest, PostgREST updates it directly, needs a migration. RECOMMENDED.\n(b) inside the payload JSON. No migration, but PostgREST cannot patch a JSON subfield, so read-modify-write. Safe only because this healer is the sole writer \u2014 a sharper edge for no real saving.\nSettle this WITH the 2a author before either lands, so reader and writer agree on the shape.\n\nREVIEW: /code-review high REQUIRED. This writes to the store feeding Larry's decision queue, and a wrong filter or mis-keyed update can mark a LIVE card stale \u2014 which fails looking exactly like a working tab. Watch the read_at IS NULL guard (a resolved card must never be restamped) and the task_id match (a near-miss key silently stamps the wrong card).",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "main",
+        "captured_at": "2026-08-01T02:09:11.300780+00:00"
+      },
+      "last_touched": "2026-08-01T02:09:11.300780+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "A fix so your approvals list clearly flags which items are still current versus which have gone stale, instead of quietly showing outdated ones as if they're live.",
+        "why": "It protects the trustworthiness of your decision queue \u2014 right now a stale item can look perfectly valid, risking a wrong call on something that no longer matters.",
+        "suggest": "Worth doing, but move deliberately: confirm the display side is settled first and double-check it can never mislabel a live item as stale before committing."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-08-01T02:13:10.349218+00:00",
         "from_state": "parked"
       },
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
