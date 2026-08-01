@@ -188,10 +188,15 @@ SUPERVISED_RESTART_POLICIES = frozenset({
     'on-abort',
 })
 # `Restart=` values that mean "run to completion, then stay stopped" →
-# EPHEMERAL_JOB. '' is included per the classification contract; a MISSING
-# `Restart` property (systemctl could not be read) is SKIP_UNKNOWN instead, so
-# an unreadable unit is never silently descoped OR silently restarted.
-EPHEMERAL_RESTART_POLICIES = frozenset({'', 'no'})
+# EPHEMERAL_JOB. ONLY the literal 'no': systemd normalises an omitted Restart=
+# to 'no' and never reports it empty, so an EMPTY value does not mean "the unit
+# declared no restart policy" — it means the property dump was malformed or
+# truncated. That is the same failed-read `Type=` and `ReadWritePaths=` already
+# treat as SKIP_UNKNOWN, and it must classify the same way here: descoping a
+# live daemon on the strength of a bad read is exactly the silent-descope this
+# module exists to prevent. A MISSING property is SKIP_UNKNOWN for the same
+# reason.
+EPHEMERAL_RESTART_POLICIES = frozenset({'no'})
 
 # Unit glob (NOT .timer — timers activate the underlying .service).
 UNIT_GLOB = 'ourliberty-*.service'

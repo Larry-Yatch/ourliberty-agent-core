@@ -327,8 +327,11 @@ class ClassificationTests(unittest.TestCase):
          dict(restart='on-failure'), 'monitor'),
         ('oneshot healer + timer',
          dict(type_='oneshot', restart='no'), 'skip-oneshot'),
-        ('Restart= empty (systemd default shape)', dict(restart=''),
-         'ephemeral-job'),
+        # EMPTY is a BAD READ, not a declared policy: systemd normalises an
+        # omitted Restart= to 'no' and never reports it empty. Classifying it
+        # ephemeral would descope a live daemon on a truncated dump.
+        ('Restart= empty (malformed/truncated read)', dict(restart=''),
+         'skip-unknown'),
     ]
 
     TRIGGERED_BY_VALUES = ['', 'ourliberty-cycle.timer', 'ourliberty-other.timer',
@@ -425,11 +428,13 @@ class RestartDeclarationLintTests(unittest.TestCase):
     persistent carve-out daemon that OMITS Restart= would silently become an
     EPHEMERAL_JOB and leave coverage. Fail CI instead.
 
-    KNOWN PROSPECTIVE GAP (documented in the healer's module docstring): this
-    reads the unit FILE, so a unit that omits `Type=` entirely is skipped even
-    though systemd defaults it to Type=simple and the runtime classifier does
-    see it. No unit in systemd/ omits Type= today, and the runtime `departed=`
-    detector in coverage_delta covers the case in the meantime."""
+    KNOWN PROSPECTIVE GAP, UNMITIGATED (documented in the healer's module
+    docstring): this reads the unit FILE, so a unit that omits `Type=` entirely
+    is skipped even though systemd defaults it to Type=simple and the runtime
+    classifier does see it. No unit in systemd/ omits Type= today. There is NO
+    runtime detector covering this in the meantime — say so plainly rather than
+    naming a mitigation, because a lint that overstates its own coverage is
+    worse than one that admits a hole."""
 
     KNOWN_EPHEMERAL_UNITS = {'ourliberty-cycle.service'}
 
@@ -653,13 +658,25 @@ class PartialReadTests(_IsolatedAgentsRoot):
         self.assertEqual(outcome, h.OUTCOME_SKIP_NOCARVE)
 
     def test_the_two_unreadable_cuts_agree(self):
-        """PROPERTY: Type and Restart fail the SAME way. The asymmetry — absent
-        Restart -> skip-unknown but absent Type -> skip-oneshot — is the defect."""
+        """PROPERTY: Type and Restart fail the SAME way, for BOTH shapes a bad
+        read takes. The asymmetry — absent Restart -> skip-unknown but absent
+        Type -> skip-oneshot — was the first defect. Testing only the ABSENT
+        shape was the second: it left empty Restart= classifying ephemeral-job
+        (via '' in EPHEMERAL_RESTART_POLICIES) while empty Type= classified
+        skip-unknown, so this property asserted symmetry it did not have.
+        systemd normalises an omitted Restart= to 'no' and never reports it
+        empty, so EMPTY means the dump was malformed — never a declared policy."""
         for prop in ('Type', 'Restart'):
-            with self.subTest(absent=prop):
-                props = _props(restart='always')
-                del props[prop]
-                self.assertEqual(self._classify(props)[0], h.CLASS_SKIP_UNKNOWN)
+            for shape in ('absent', 'empty'):
+                with self.subTest(prop=prop, shape=shape):
+                    props = _props(restart='always')
+                    if shape == 'absent':
+                        del props[prop]
+                    else:
+                        props[prop] = ''
+                    self.assertEqual(
+                        self._classify(props)[0], h.CLASS_SKIP_UNKNOWN,
+                        msg=f'{shape} {prop}= must never descope a live daemon')
 
     def test_forking_is_persistent(self):
         """A double-forking daemon is as long-lived as a simple one and its
