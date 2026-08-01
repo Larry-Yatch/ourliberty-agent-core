@@ -543,5 +543,135 @@ class GraduationAskOnceTest(unittest.TestCase):
                                                    state_path=self.state))
 
 
+class L10RegressionWiringTest(unittest.TestCase):
+    """L10 END-TO-END: a resolved fix whose victim goes red again must actually
+    reach `mark_regressed`, the counters, the downgrade, and the graduation bar.
+
+    These are WIRING tests on purpose. The pre-existing L10 tests above all call
+    `apply_downgrade` with the cause passed in as a literal and feed
+    `evaluate_graduation` literal tallies — so every one of them stayed green
+    while NOTHING in the guardian ever called `mark_regressed`. The counter was
+    structurally pinned at 0 and the Stage-2 bar's regression clause could not
+    fire. Asserting the plumbing, not just the units, is the whole point here.
+
+    Every state file is explicit tmp: `apply_downgrade` otherwise writes the
+    process-wide sandbox stage state and would leak a penalty_cap into the
+    classes above."""
+
+    VICTIM = 'test_mod.Case.test_victim'
+    POISON = 'test_poison_victim'
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.root = Path(self._tmp.name)
+        self.state = self.root / 'stage-state.json'
+        self.ledger = self.root / 'ledger.json'
+        self.notices = []
+
+    def tearDown(self):
+        self._tmp.cleanup()
+
+    # -- helpers ----------------------------------------------------------
+    def _resolved_row(self, *, filed_stage=1, resolved_run=10):
+        """Drive a row through the REAL lifecycle to RESOLVED — no hand-built
+        dicts, so this breaks if the lifecycle itself changes."""
+        ledger.open_proposal(self.VICTIM, run_task_id='run-1',
+                             poison_test_name=self.POISON, path=self.ledger)
+        ledger.set_decision(self.VICTIM, ledger.DEC_APPROVED, path=self.ledger)
+        ledger.mark_dispatched(self.VICTIM, 'fix-task-1',
+                               filed_stage=filed_stage, path=self.ledger)
+        ledger.record_observation(self.VICTIM, green_streak=2, poison_present=True,
+                                  current_run=resolved_run, path=self.ledger)
+        rows = ledger.list_by_status(ledger.RESOLVED, path=self.ledger)
+        self.assertEqual(len(rows), 1, 'fixture failed to reach RESOLVED')
+        return rows[0]
+
+    def _registry(self, *, victim_red, poison_red=False):
+        return {'_meta': {'completed_runs': 20}, 'tests': {
+            self.VICTIM: {'consecutive_red_runs': 3 if victim_red else 0},
+            f'test_mod.Case.{self.POISON}': {
+                'consecutive_red_runs': 2 if poison_red else 0},
+        }}
+
+    def _detect(self, registry, *, effective_stage=1, current_run=20):
+        import main_suite_guardian as g
+        return g.detect_regressions(
+            registry, ledger_path=self.ledger, effective_stage=effective_stage,
+            current_run=current_run, stage_state_path=self.state,
+            notify_downgrade=lambda **kw: self.notices.append(kw),
+        )
+
+    # -- the wiring -------------------------------------------------------
+    def test_same_leak_regression_reaches_counter_and_downgrades(self):
+        self._resolved_row()
+        out = self._detect(self._registry(victim_red=True, poison_red=True))
+
+        self.assertEqual([r['attribution'] for r in out], ['same-leak'])
+        # The counter the Stage-2 bar reads — pinned at 0 before this change.
+        self.assertEqual(ledger.count_same_leak_regressions(path=self.ledger), 1)
+        # The downgrade actually landed in stage state.
+        st = stage.load_stage_state(path=self.state)
+        self.assertEqual(st.get('penalty_cap'), 0)
+        self.assertEqual(st.get('penalty_cause'), stage.CAUSE_REGRESSION)
+        # And Larry hears about it (L10: briefings channel, not the Approvals tab).
+        self.assertEqual(len(self.notices), 1)
+        self.assertEqual(self.notices[0]['cause'], stage.CAUSE_REGRESSION)
+
+    def test_same_leak_regression_blocks_the_stage_2_card(self):
+        self._resolved_row()
+        self._detect(self._registry(victim_red=True, poison_red=True))
+        # Feed the REAL counter into the REAL bar — the join that never existed.
+        self.assertIsNone(stage.evaluate_graduation(
+            config_stage=1, dial_level='balanced', completed_runs=99,
+            flip_flop_count=0, closed_windows=99, auto_filed_closed_windows=0,
+            same_leak_regressions=ledger.count_same_leak_regressions(
+                path=self.ledger),
+            scope_violations=ledger.count_scope_violations(path=self.ledger),
+        ))
+
+    def test_regressed_row_can_never_bank_its_window(self):
+        self._resolved_row(resolved_run=1)
+        self._detect(self._registry(victim_red=True, poison_red=True))
+        # 14+ runs have passed, so this WOULD close were it not regressed.
+        ledger.close_windows(99, path=self.ledger)
+        self.assertEqual(ledger.count_closed_windows(path=self.ledger), 0)
+
+    def test_auto_filed_fix_hard_resets_to_stage_zero(self):
+        self._resolved_row(filed_stage=2)
+        out = self._detect(self._registry(victim_red=True, poison_red=True),
+                           effective_stage=2)
+        self.assertEqual(out[0]['cause'], stage.CAUSE_AUTO_MERGED_REGRESSION)
+        self.assertEqual(
+            stage.load_stage_state(path=self.state).get('penalty_cap'), 0)
+
+    # -- the other direction (a guarantee test must exercise both) ---------
+    def test_new_polluter_is_recorded_but_costs_nothing(self):
+        self._resolved_row()
+        out = self._detect(self._registry(victim_red=True, poison_red=False))
+
+        self.assertEqual([r['attribution'] for r in out], ['new-polluter'])
+        self.assertFalse(out[0]['downgraded'])
+        # Recorded as regressed (so it cannot bank a window) but NOT counted
+        # against the fix, and no penalty — L10's explicit carve-out.
+        self.assertEqual(ledger.count_same_leak_regressions(path=self.ledger), 0)
+        self.assertIsNone(
+            stage.load_stage_state(path=self.state).get('penalty_cap'))
+        self.assertEqual(self.notices, [])
+
+    def test_victim_still_green_is_not_a_regression(self):
+        self._resolved_row()
+        self.assertEqual(self._detect(self._registry(victim_red=False)), [])
+        self.assertEqual(ledger.count_same_leak_regressions(path=self.ledger), 0)
+
+    def test_regression_is_counted_once_not_every_night(self):
+        self._resolved_row()
+        reg = self._registry(victim_red=True, poison_red=True)
+        self.assertEqual(len(self._detect(reg)), 1)
+        # Still red the next night — must not re-mark or re-downgrade.
+        self.assertEqual(self._detect(reg), [])
+        self.assertEqual(ledger.count_same_leak_regressions(path=self.ledger), 1)
+        self.assertEqual(len(self.notices), 1)
+
+
 if __name__ == '__main__':
     unittest.main()

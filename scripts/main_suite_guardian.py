@@ -49,6 +49,7 @@ atomic_io). Never mutates production state outside the registry it owns.
 from __future__ import annotations
 
 import argparse
+import functools
 import json
 import os
 import re
@@ -1177,6 +1178,124 @@ def _unstable_count(registry: dict) -> int:
     )
 
 
+def attribute_regression(row: dict, tests: dict) -> str:
+    """L10 attribution for a victim that went red again after its fix resolved:
+    ``same-leak`` (the original leak returned — counts against the fix) vs
+    ``new-polluter`` (a different polluter re-reddened the victim — does not).
+
+    The discriminator is the fix's own named poison test. It lives in
+    ``scripts/tests/**`` and so runs inside the same full suite, which means this
+    run ALREADY classified it — no second isolation pass is needed to satisfy
+    L10's "re-run the classifier before any regressed verdict". Poison red = the
+    exact leak it was written to reproduce is back. Poison green = something else
+    re-reddened the victim.
+
+    Fail-safe direction is ``same-leak`` (unattributable counts AGAINST the fix):
+    an unattributable regression must not be able to buy the guardian more
+    autonomy than a clearly-attributed one, and erring toward less autonomy is
+    the repo's fail-closed idiom. Pure — unit-testable with plain dicts."""
+    poison = row.get('poison_test_name')
+    if not poison:
+        return 'same-leak'
+    for tid, entry in tests.items():
+        # Registry ids are `module.Class.method`; the poison name is the method.
+        if tid == poison or tid.endswith('.' + poison):
+            return ('same-leak' if int(entry.get('consecutive_red_runs', 0)) > 0
+                    else 'new-polluter')
+    # The poison test is not in the registry at all. It is only ever absent when
+    # it was never collected (deleted, renamed, or the fix never really added it)
+    # — every one of those means the fix's own proof is gone, so it counts.
+    return 'same-leak'
+
+
+def detect_regressions(
+    registry: dict,
+    *,
+    ledger_path: Path,
+    effective_stage: int,
+    current_run: int,
+    notify_downgrade: Optional[Callable[..., None]] = None,
+    stage_state_path: Optional[Path] = None,
+    now: Optional[datetime] = None,
+) -> list[dict]:
+    """L10 regression detection — the half that was specified but never wired.
+
+    A RESOLVED obligation whose victim is red again is a regression. Mark it (so
+    it can never close a graduation window), attribute it, and on ``same-leak``
+    impose the proportional downgrade + escalate. ``new-polluter`` is recorded
+    but costs the guardian nothing, per L10.
+
+    MUST run before :func:`suite_guardian_ledger.close_windows` — that function
+    skips regressed rows, so marking first is what stops a regressed fix from
+    banking its window in the same cycle it broke.
+
+    Returns one summary dict per regression. Never raises into the timer."""
+    out: list[dict] = []
+    tests = registry.get('tests', {})
+    try:
+        resolved = ledger.list_by_status(ledger.RESOLVED, path=ledger_path)
+    except Exception as exc:  # noqa: BLE001
+        print(f'main_suite_guardian: regression scan failed: {exc}', file=sys.stderr)
+        return out
+
+    for row in resolved:
+        if row.get('regressed'):
+            continue  # already counted; a standing regression re-marks nothing
+        tid = row.get('test_id')
+        entry = tests.get(tid) or {}
+        if int(entry.get('consecutive_red_runs', 0) or 0) <= 0:
+            continue  # victim still green — the fix is holding
+        attribution = attribute_regression(row, tests)
+        if not ledger.mark_regressed(
+                tid, attribution=attribution, now=now, path=ledger_path):
+            continue
+        rec = {'test_id': tid, 'attribution': attribution, 'downgraded': False}
+
+        if attribution == 'same-leak':
+            # L10 severity: a fix that reached main with NO Larry decision in the
+            # loop (auto-filed at stage >=2, and nothing stage-gates the merge)
+            # hard-resets to Stage 0. A stage-1 fix was consented to per-dispatch,
+            # so it takes the proportional stage-1 decrement.
+            auto = int(row.get('filed_stage') or 0) >= 2
+            cause = (stage.CAUSE_AUTO_MERGED_REGRESSION if auto
+                     else stage.CAUSE_REGRESSION)
+            try:
+                stage.apply_downgrade(
+                    cause=cause, current_stage=effective_stage,
+                    run_seq=current_run, now=now, path=stage_state_path,
+                )
+                rec['downgraded'] = True
+                rec['cause'] = cause
+            except Exception as exc:  # noqa: BLE001
+                print(f'main_suite_guardian: downgrade failed for {tid}: {exc}',
+                      file=sys.stderr)
+            if notify_downgrade is not None:
+                try:
+                    notify_downgrade(test_id=tid, cause=cause, row=row)
+                except Exception as exc:  # noqa: BLE001
+                    print(f'main_suite_guardian: downgrade notice failed: {exc}',
+                          file=sys.stderr)
+        out.append(rec)
+    return out
+
+
+def _prod_notify_downgrade(*, test_id: str, cause: str, row: dict,
+                           chat_id: int = 0) -> None:
+    """L10 downgrade notice. Goes to the BRIEFINGS/journal channel, not the
+    Approvals tab — the tab carries decisions only, and a downgrade is not a
+    decision Larry makes (L10's last line)."""
+    import larry_alerts as la
+    la.append_notification(
+        'suite-guardian',
+        'autonomy-downgrade',
+        f'⬇️ Guardian fix for {test_id} REGRESSED (same-leak); autonomy '
+        f'downgraded ({cause}). Re-promotion needs evidence accrued after this '
+        f'run, and the next graduation card must cite the cause.',
+        chat_id or 0,
+        task_id=row.get('fix_task_id') or test_id,
+    )
+
+
 def _run_stage_maintenance(
     repo_root: Path,
     *,
@@ -1184,17 +1303,42 @@ def _run_stage_maintenance(
     ledger_path=None,
     chat_id: int = 0,
     now: Optional[datetime] = None,
+    notify_downgrade: Optional[Callable[..., None]] = None,
 ) -> None:
     """Post-cycle stage bookkeeping (D3+D4), all best-effort so nothing wedges the
-    nightly timer: close matured 14-run graduation windows, emit a graduation card
-    when the guardian has EARNED the next stage (Check-V — never self-promotes),
-    and file the one-time L8 gate-tightening card. Evidence is scoped past the L10
-    downgrade floor and the graduation card cites any standing downgrade cause."""
+    nightly timer: detect L10 regressions, close matured 14-run graduation windows,
+    emit a graduation card when the guardian has EARNED the next stage (Check-V —
+    never self-promotes), and file the one-time L8 gate-tightening card. Evidence is
+    scoped past the L10 downgrade floor and the graduation card cites any standing
+    downgrade cause."""
     rp = Path(registry_path) if registry_path else default_registry_path()
     lp = Path(ledger_path) if ledger_path else ledger.default_ledger_path()
     registry = load_registry(rp)
     meta = registry.get('_meta', {})
     completed_runs = int(meta.get('completed_runs', 0))
+
+    # 0. L10 regression detection. FIRST — before close_windows, which skips
+    #    regressed rows: marking here is what stops a fix that just broke from
+    #    banking its graduation window in the same cycle. Runs at EVERY stage
+    #    (including 0) for the same reason the rest of this function does — a
+    #    downgrade must not be able to starve the detector that imposes the next.
+    try:
+        regressions = detect_regressions(
+            registry,
+            ledger_path=lp,
+            effective_stage=stage.effective_stage(repo_root),
+            current_run=completed_runs,
+            notify_downgrade=(notify_downgrade if notify_downgrade is not None
+                              else functools.partial(_prod_notify_downgrade,
+                                                     chat_id=chat_id)),
+            now=now,
+        )
+        for r in regressions:
+            print(f'main_suite_guardian: REGRESSED {r["test_id"]} '
+                  f'({r["attribution"]}, downgraded={r["downgraded"]})')
+    except Exception as exc:  # noqa: BLE001
+        print(f'main_suite_guardian: regression detection failed: {exc}',
+              file=sys.stderr)
 
     # 1. Close matured graduation windows (only CLOSED windows count, spec D3).
     try:
