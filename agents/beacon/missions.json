@@ -17495,6 +17495,23 @@
       "retired_at": "2026-07-31T23:03:57.777151+00:00",
       "retired_reason": "orphan-terminal",
       "retired_signal": "pr_merged:#812"
+    },
+    {
+      "id": "proposed-pr-ourliberty-agent-core-1075",
+      "name": "PR Ourliberty Agent Core 1075",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pr-ourliberty-agent-core-1075`. Last activity 2026-08-01T00:20:18.320498+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pr-ourliberty-agent-core-1075"
+      ],
+      "repo": null,
+      "created": "2026-08-01",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-01T00:34:32.535438+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-01T00:20:18.320498+00:00"
     }
   ]
 }
