@@ -2897,7 +2897,7 @@
       "id": "cap-approvals-freshness-2a-render-the-unverified-bad-4abb",
       "title": "Approvals freshness 2a \u2014 render the Unverified badge, absent means unverified (ship alone, first)",
       "note": "SLICE 2a of the approvals-freshness arc \u2014 the half that was CUT from PR #1079. SHIP THIS ALONE AND FIRST. It has no backend dependency and must not wait on one.\n\nWHY IT WAS CUT: #1079 shipped a dashboard_api.compute_approval_verification() whose output never reached a card \u2014 it was merged into _open_delegate_approvals' dict and discarded one hop later by _delegation_needs_you_field, which rebuilds a hard-coded {approval_id, created_at}. Verified by running it at the PR head; repo-wide the key appeared nowhere else. But the deeper reason it could not have worked ANYWHERE in agent-core: the Approvals tab reads chain_events STRAIGHT FROM SUPABASE in this repo (lib/needs-you-queries.ts) and never goes through the droplet, so no droplet-side projection over the local beacon-pending-approvals.json can light this badge. That file's own Contract F comment says the same thing about latest_team_message_id / blocked_on_you.\n\nTHE REQUIREMENT (from the parent capture, quoted, marked non-negotiable): \"a card with NO probe must render as visibly UNVERIFIED, never as silently fresh. Most cards will have no probe for a long time. A freshness check that covers a third of the queue while the tab reads as fully checked is [[existence-gates-are-false-clean-generators]] \u2014 the exact class that let 6 of 8 cards reach Larry on 2026-07-29.\"\n\nBUILD \u2014 renderer only, in app/approvals/components/:\n1. Read `verification` off the card (payload field or column, per slice 2b \u2014 see OUT OF SCOPE). Render three states: absent/unknown -> \"Unverified\"; 'stale' -> demoted-card treatment + the evidence string; 'verified' -> checked.\n2. ABSENT MUST DEFAULT TO 'unverified'. This is the whole load-bearing property. Do NOT default to verified, do NOT hide the badge when the field is missing, and do NOT wait for the backend to start writing it.\n3. DECAY: treat a 'verified' whose probed_at is older than ~30 min (three healer ticks) as 'unverified'. Without this, \"verified\" means only \"a probe is attached\", so a dead healer leaves the whole tab reading green forever \u2014 the same false-clean bug pointed the other way. This is the cheapest guard in the arc; do not skip it.\n\nWHY FIRST, AND WHY IT IS SAFE ALONE: today ZERO cards carry a probe. A renderer that defaults to Unverified therefore tells the exact truth about the current queue on day one, and delivers the non-negotiable requirement before a single probe exists. It cannot regress: a field that never arrives leaves every card honestly labeled. Shipping the backend first (what #1079 attempted) produces a field nobody reads \u2014 which is precisely what happened.\n\nOUT OF SCOPE: writing the field. That is slice 2b in ourliberty-agent-core (stamp the positive states onto the card's Supabase row from the demote path). 2b decides whether the field arrives as a dedicated column or inside payload \u2014 build the reader tolerant of both, or coordinate the shape before 2b lands.\n\nREVIEW: not required \u2014 pure rendering, no write path, and its failure mode is a card labeled Unverified when it could have said more. That is the safe direction by construction.",
-      "state": "parked",
+      "state": "review_close",
       "label": null,
       "origin": {
         "source": "desktop-chat",
@@ -2925,8 +2925,12 @@
       "spawned": {
         "kind": "delegate",
         "task_id": "delegate-cap-approvals-freshness-2a-render-the-unverified-bad-4abb",
-        "stamped_at": "2026-08-01T02:05:44.122382+00:00"
-      }
+        "stamped_at": "2026-08-01T02:05:44.122382+00:00",
+        "outcome": "merged"
+      },
+      "closed_by": "heal_missions_card_gc:terminal-backstop",
+      "shipped_note": "shipped (linked work merged)",
+      "awaiting_ack": true
     },
     {
       "id": "cap-approvals-freshness-2b-stamp-the-verification-st-9d7c",
