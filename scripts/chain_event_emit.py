@@ -91,6 +91,11 @@ _LARRY_FACING_DECISION_TYPES = (
     'escalation',
 )
 
+# The only two verdicts the dashboard's `deriveVerification` renders as anything
+# other than Unverified. Anything else is a silent no-op on the read side, so
+# `stamp_approval_verification` refuses it rather than writing dead data.
+_VERIFICATION_STATES = ('verified', 'stale')
+
 
 def _get_client():
     """Lazily build a supabase client. Returns None if unconfigured.
@@ -292,6 +297,101 @@ def clear_approval_request(
             'clear_approval_request failed (task_id=%s): %s: %s — '
             'heal_stale_approvals will reconcile on its next tick',
             task_id, type(e).__name__, e,
+        )
+        return False
+
+
+def stamp_approval_verification(
+    task_id: Optional[str],
+    verification: dict[str, Any],
+    *,
+    client: Optional[Any] = None,
+    logger: Optional[logging.Logger] = None,
+) -> bool:
+    """Stamp the freshness verdict onto the pending `approval_request` row(s).
+
+    The projection half of the approvals-freshness arc (slice 2b). The 10-minute
+    freshness tick (`heal_stale_approvals.reconcile_stale_premises`) already
+    knows whether each pending card's recorded premise still holds; this writes
+    that verdict where the dashboard's Decide lane can see it, so a card's badge
+    reflects a live probe instead of the permanent "Unverified" default.
+
+    Same keyed-update shape as `clear_approval_request` — one PostgREST UPDATE
+    scoped to this task's still-unread `approval_request` rows — but it writes
+    the `verification` column and NEVER touches `read_at`. A probe verdict is not
+    a resolution: stamping one must not retire the card.
+
+    `verification` is written as a top-level column rather than a payload
+    subfield because PostgREST cannot patch a JSON subfield (the stated rationale
+    in the dashboard's migration 0008). Accepted shapes, matching what the
+    reader (`deriveVerification` in `app/approvals/components/PendingCard.tsx`)
+    parses:
+
+        {'state': 'stale',    'evidence': <str>}
+        {'state': 'verified', 'probed_at': <ISO-8601 UTC>}
+
+    THE GUARD: the reader renders "verified" as Checked ONLY when `probed_at` is
+    a parseable timestamp inside its 30-minute window; a "verified" verdict
+    without one silently renders Unverified forever, with the write succeeding
+    and nothing raising. That failure is invisible by construction, so it is
+    refused HERE at the boundary rather than written and never noticed.
+
+    Best-effort, fire-and-forget — same contract as its siblings: returns False
+    (never raises) on a missing client, a malformed verdict, a Supabase error, or
+    no matching row. A dropped stamp is safe by design: the reader decays an
+    unrefreshed verdict back to Unverified, which is honest, and the next tick
+    re-stamps. Returns True iff >=1 row was stamped. `client` is for tests.
+    """
+    log = logger or _LOGGER
+    if not task_id:
+        return False
+    if not isinstance(verification, dict) or not verification:
+        log.warning(
+            'stamp_approval_verification: verification must be a non-empty '
+            'dict (task_id=%s, got %r) — refusing to write',
+            task_id, type(verification).__name__,
+        )
+        return False
+    state = verification.get('state')
+    if state not in _VERIFICATION_STATES:
+        log.warning(
+            'stamp_approval_verification: unknown state=%r (task_id=%s); the '
+            'reader renders anything but %s as Unverified — refusing to write',
+            state, task_id, '/'.join(_VERIFICATION_STATES),
+        )
+        return False
+    if state == 'verified' and not verification.get('probed_at'):
+        log.warning(
+            'stamp_approval_verification: "verified" without probed_at '
+            '(task_id=%s) renders Unverified forever — refusing to write',
+            task_id,
+        )
+        return False
+    cli = client if client is not None else _get_client()
+    if cli is None:
+        log.debug(
+            'stamp_approval_verification: Supabase client unavailable '
+            '(creds unset / supabase-py missing / test mode); leaving '
+            'task_id=%s unstamped (reads Unverified)', task_id,
+        )
+        return False
+    try:
+        resp = (
+            cli.table('chain_events')
+            .update({'verification': verification}, count='exact')
+            .eq('event_type', 'approval_request')
+            .eq('task_id', task_id)
+            .is_('read_at', 'null')
+            .execute()
+        )
+        rows = getattr(resp, 'data', None) or []
+        count = getattr(resp, 'count', None)
+        return bool(rows) or bool(count and count > 0)
+    except Exception as e:  # noqa: BLE001 — push writer must not crash producer
+        log.warning(
+            'stamp_approval_verification failed (task_id=%s state=%s): %s: %s '
+            '— the card decays to Unverified until the next tick re-stamps',
+            task_id, state, type(e).__name__, e,
         )
         return False
 

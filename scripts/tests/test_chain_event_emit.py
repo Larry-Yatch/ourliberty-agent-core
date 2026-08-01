@@ -324,6 +324,117 @@ class TestClearApprovalRequest(unittest.TestCase):
             cee.reset_client_for_testing()
 
 
+class TestStampApprovalVerification(unittest.TestCase):
+    """stamp_approval_verification — the Decide-card freshness projection
+    (approvals-freshness slice 2b): one keyed UPDATE of the `verification`
+    column, never touching read_at, refusing verdicts the dashboard reader would
+    silently render as Unverified."""
+
+    def setUp(self):
+        cee.reset_client_for_testing()
+        self._silent_logger = logging.getLogger('test-stamp-verification')
+        self._silent_logger.setLevel(logging.CRITICAL)
+
+    def _verified(self):
+        return {'state': 'verified', 'probed_at': '2026-08-01T21:30:00.000Z'}
+
+    def test_success_writes_verification_with_correct_filters(self):
+        client = _ClearClient(data=[{'event_id': 'e1'}], count=1)
+        ok = cee.stamp_approval_verification(
+            'task-42', self._verified(), client=client)
+        self.assertTrue(ok)
+        self.assertEqual(client.captured_table, 'chain_events')
+        self.assertEqual(client.captured_update, {'verification': self._verified()})
+        self.assertEqual(client.captured_count_kw, 'exact')
+        self.assertEqual(client.filters.get('event_type'), 'approval_request')
+        self.assertEqual(client.filters.get('task_id'), 'task-42')
+        self.assertIn(('read_at', 'null'), client.is_null)
+
+    def test_never_writes_read_at(self):
+        """A probe verdict is not a resolution — stamping one must never retire
+        the card the way clear_approval_request does."""
+        client = _ClearClient(data=[{'event_id': 'e1'}], count=1)
+        cee.stamp_approval_verification('task-42', self._verified(), client=client)
+        self.assertNotIn('read_at', client.captured_update)
+
+    def test_stale_verdict_carries_evidence(self):
+        client = _ClearClient(data=[{'event_id': 'e1'}], count=1)
+        verdict = {'state': 'stale', 'evidence': 'file_contains premise FALSE: ...'}
+        self.assertTrue(
+            cee.stamp_approval_verification('task-42', verdict, client=client))
+        self.assertEqual(client.captured_update, {'verification': verdict})
+
+    def test_verified_without_probed_at_is_refused(self):
+        """THE trap this helper exists to close: the reader renders a `verified`
+        verdict with no parseable probed_at as Unverified, forever, while the
+        write succeeds and nothing raises. Refuse it at the boundary."""
+        client = _ClearClient(data=[{'event_id': 'e1'}], count=1)
+        ok = cee.stamp_approval_verification(
+            'task-42', {'state': 'verified'},
+            client=client, logger=self._silent_logger)
+        self.assertFalse(ok)
+        self.assertFalse(client.executed)
+
+    def test_unknown_state_is_refused(self):
+        client = _ClearClient(data=[{'event_id': 'e1'}], count=1)
+        for verdict in ({'state': 'fresh'}, {'state': None}, {}):
+            with self.subTest(verdict=verdict):
+                ok = cee.stamp_approval_verification(
+                    'task-42', verdict, client=client,
+                    logger=self._silent_logger)
+                self.assertFalse(ok)
+        self.assertFalse(client.executed)
+
+    def test_non_dict_verification_is_refused(self):
+        client = _ClearClient(data=[{'event_id': 'e1'}], count=1)
+        for verdict in ('verified', ['verified'], None):
+            with self.subTest(verdict=verdict):
+                ok = cee.stamp_approval_verification(
+                    'task-42', verdict, client=client,
+                    logger=self._silent_logger)
+                self.assertFalse(ok)
+        self.assertFalse(client.executed)
+
+    def test_empty_task_id_returns_false_without_touching_client(self):
+        client = _ClearClient(data=[{'event_id': 'e'}], count=1)
+        ok = cee.stamp_approval_verification(
+            '', self._verified(), client=client, logger=self._silent_logger)
+        self.assertFalse(ok)
+        self.assertFalse(client.executed)
+
+    def test_true_when_only_count_reports_a_row(self):
+        client = _ClearClient(data=[], count=2)
+        self.assertTrue(cee.stamp_approval_verification(
+            'task-x', self._verified(), client=client))
+
+    def test_false_when_no_row_matched(self):
+        client = _ClearClient(data=[], count=0)
+        self.assertFalse(cee.stamp_approval_verification(
+            'task-absent', self._verified(), client=client))
+
+    def test_supabase_error_returns_false_does_not_raise(self):
+        client = _ClearClient(raise_on_execute=RuntimeError('supabase down'))
+        ok = cee.stamp_approval_verification(
+            'task-err', self._verified(), client=client,
+            logger=self._silent_logger)
+        self.assertFalse(ok)
+
+    def test_client_unavailable_returns_false(self):
+        original_url = cee.os.environ.pop('SUPABASE_URL', None)
+        original_key = cee.os.environ.pop('SUPABASE_SERVICE_ROLE_KEY', None)
+        try:
+            cee.reset_client_for_testing()
+            ok = cee.stamp_approval_verification(
+                'task-no-client', self._verified(), logger=self._silent_logger)
+            self.assertFalse(ok)
+        finally:
+            if original_url is not None:
+                cee.os.environ['SUPABASE_URL'] = original_url
+            if original_key is not None:
+                cee.os.environ['SUPABASE_SERVICE_ROLE_KEY'] = original_key
+            cee.reset_client_for_testing()
+
+
 @unittest.skipIf(
     'pytest' in sys.modules,
     'conftest autouse fixture neutralizes _get_client under pytest; run via '

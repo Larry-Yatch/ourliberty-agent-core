@@ -24,10 +24,11 @@ except ImportError:  # discover loads this module top-level (no package parent)
 import importlib
 import json
 import os
+import re
 import sys
 import tempfile
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 _SCRIPTS_DIR = Path(__file__).resolve().parent.parent
@@ -574,15 +575,10 @@ _FC_PROBE = {
 }
 
 
-class TestReconcileStalePremises(_TerminalBase):
-    """The load-bearing semantics of the probe leg:
-      FALSE -> demote in place (still pending, read_at untouched, no history);
-      TRUE / INDETERMINATE -> untouched;
-      no freshness_probe -> not probed;
-      NEVER auto-clear on a probe verdict (resolve/_clear never called);
-      idempotent second tick (no history, no clear, no escalation);
-      a demote that finds the entry gone is NOT counted as a demotion;
-      --dry-run writes nothing."""
+class _ProbeLegBase(_TerminalBase):
+    """_TerminalBase + the probe leg's shared guards, so the demote-side and
+    stamp-side suites can both use them without one inheriting (and re-running)
+    the other's tests."""
 
     def _patch_approval(self, name, fn):
         """Monkeypatch an attribute on the SHARED beacon_approval_handler module
@@ -605,12 +601,26 @@ class TestReconcileStalePremises(_TerminalBase):
         self._patch_approval('resolve', _boom_resolve)
         self._patch_approval('_clear_dashboard_pending', _boom_clear)
 
+
+class TestReconcileStalePremises(_ProbeLegBase):
+    """The load-bearing semantics of the probe leg:
+      FALSE -> demote in place (still pending, read_at untouched, no history);
+      TRUE / INDETERMINATE -> untouched;
+      no freshness_probe -> not probed;
+      NEVER auto-clear on a probe verdict (resolve/_clear never called);
+      idempotent second tick (no history, no clear, no escalation);
+      a demote that finds the entry gone is NOT counted as a demotion;
+      --dry-run writes nothing."""
+
     def test_false_demotes_in_place(self):
         self._guard_no_autoclear()
         self._write_state([_probe_entry('zz-fixture-dead', OLD_TS, _FC_PROBE)])
         counts = self.mod.reconcile_stale_premises(
             now=NOW, evaluate=lambda _p: fp.FALSE)
-        self.assertEqual(counts, {'pending': 1, 'probed': 1, 'demoted': 1, 'kept': 0})
+        self.assertEqual(counts, {
+            'pending': 1, 'probed': 1, 'demoted': 1, 'kept': 0,
+            # No client passed -> the stamp lane skips rather than fails.
+            'verified': 0, 'stale': 0, 'skipped': 1, 'failed': 0})
         state = self._load()
         # STILL in pending[]; nothing moved to history.
         self.assertEqual([e['id'] for e in state['pending']], ['zz-fixture-dead'])
@@ -656,7 +666,9 @@ class TestReconcileStalePremises(_TerminalBase):
         def _eval(_p):
             raise AssertionError('evaluate() must not run on a probe-less entry')
         counts = self.mod.reconcile_stale_premises(now=NOW, evaluate=_eval)
-        self.assertEqual(counts, {'pending': 1, 'probed': 0, 'demoted': 0, 'kept': 0})
+        self.assertEqual(counts, {
+            'pending': 1, 'probed': 0, 'demoted': 0, 'kept': 0,
+            'verified': 0, 'stale': 0, 'skipped': 0, 'failed': 0})
         self.assertNotIn('premise_stale', self._load()['pending'][0])
 
     def test_vanished_entry_is_not_counted_as_demoted(self):
@@ -709,6 +721,297 @@ class TestReconcileStalePremises(_TerminalBase):
         self.assertEqual(counts['demoted'], 0)
         self.assertEqual(counts['kept'], 1)
         self.assertNotIn('premise_stale', self._load()['pending'][0])
+
+
+# ---- verification stamps (approvals-freshness slice 2b) ----
+
+class _StampRecorder:
+    """Stand-in for chain_event_emit.stamp_approval_verification, capturing what
+    the tick would project onto each card's Supabase row."""
+
+    def __init__(self, ok=True):
+        self.calls: list[tuple] = []
+        self._ok = ok
+
+    def __call__(self, task_id, verification, *, client=None):
+        self.calls.append((task_id, dict(verification)))
+        return self._ok
+
+    @property
+    def by_state(self):
+        out: dict[str, list] = {}
+        for task_id, v in self.calls:
+            out.setdefault(v['state'], []).append((task_id, v))
+        return out
+
+
+# ECMA-262's Date Time String Format — what `Date.parse` accepts unambiguously.
+_ES_DATETIME_RE = re.compile(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$')
+
+
+class TestVerificationStamps(_ProbeLegBase):
+    """Slice 2b: the tick projects each verdict onto the card's chain_events row.
+
+    The whole risk surface is SILENT failure — the dashboard reader renders a
+    malformed or expired verdict as Unverified without erroring — so these tests
+    pin the two invariants that keep the badge honest: every `verified` stamp
+    carries a parseable probed_at, and it is re-stamped on EVERY tick rather than
+    only on a change of verdict."""
+
+    def _tick(self, verdict, *, stamp=None, client=None, **kw):
+        stamp = stamp if stamp is not None else _StampRecorder()
+        counts = self.mod.reconcile_stale_premises(
+            evaluate=lambda _p: verdict,
+            stamp=stamp,
+            client=client if client is not None else object(),
+            **kw)
+        return stamp, counts
+
+    def test_true_stamps_verified_with_probed_at(self):
+        self._guard_no_autoclear()
+        self._write_state([_probe_entry('zz-fixture-live', OLD_TS, _FC_PROBE)])
+        stamp, counts = self._tick(fp.TRUE, now=NOW)
+        self.assertEqual(counts['verified'], 1)
+        self.assertEqual(counts['failed'], 0)
+        self.assertEqual(len(stamp.calls), 1)
+        task_id, verification = stamp.calls[0]
+        self.assertEqual(task_id, 'zz-fixture-live')
+        self.assertEqual(verification['state'], 'verified')
+        self.assertIn('probed_at', verification)
+        # A TRUE verdict must not demote or move the card.
+        self.assertNotIn('premise_stale', self._load()['pending'][0])
+
+    def test_every_verified_stamp_carries_a_date_parseable_probed_at(self):
+        """Criterion 6. `probed_at` is OPTIONAL on the reader's type, but a
+        `verified` verdict without a parseable one renders Unverified forever —
+        the write succeeding and nothing raising is exactly what makes this
+        invisible. The format must be the one ECMA-262 specifies, not merely one
+        today's engines happen to tolerate."""
+        self._guard_no_autoclear()
+        self._write_state([
+            _probe_entry('zz-fixture-a', OLD_TS, dict(_FC_PROBE)),
+            _probe_entry('zz-fixture-b', OLD_TS, dict(_FC_PROBE)),
+        ])
+        stamp, _ = self._tick(fp.TRUE, now=NOW)
+        self.assertEqual(len(stamp.calls), 2)
+        for _task_id, verification in stamp.calls:
+            probed_at = verification.get('probed_at')
+            self.assertIsInstance(probed_at, str)
+            self.assertRegex(probed_at, _ES_DATETIME_RE)
+            # Round-trips back to the instant it claims (UTC, no offset drift).
+            parsed = datetime.strptime(probed_at, '%Y-%m-%dT%H:%M:%S.%fZ')
+            self.assertEqual(parsed.replace(tzinfo=timezone.utc), NOW)
+
+    def test_second_consecutive_tick_restamps_with_newer_probed_at(self):
+        """Criterion 5 — the guard that kills the transition-only optimization.
+        The reader decays anything older than 30 min back to Unverified, so a
+        verdict written once and re-written only 'when it changes' lights the
+        badge for one window and then goes dark forever, silently. The verdict
+        here does NOT change between ticks; the write must happen anyway, with a
+        strictly newer probed_at."""
+        self._guard_no_autoclear()
+        self._write_state([_probe_entry('zz-fixture-live', OLD_TS, _FC_PROBE)])
+        later = NOW + timedelta(minutes=10)
+
+        stamp = _StampRecorder()
+        self._tick(fp.TRUE, stamp=stamp, now=NOW)
+        self._tick(fp.TRUE, stamp=stamp, now=later)
+
+        self.assertEqual(len(stamp.calls), 2, 'second tick issued no write')
+        first, second = stamp.calls[0][1], stamp.calls[1][1]
+        self.assertEqual(second['state'], 'verified')
+        self.assertGreater(second['probed_at'], first['probed_at'])
+        self.assertNotEqual(second['probed_at'], first['probed_at'])
+
+    def test_false_stamps_stale_with_evidence_after_demote(self):
+        self._guard_no_autoclear()
+        self._write_state([_probe_entry('zz-fixture-dead', OLD_TS, _FC_PROBE)])
+        stamp, counts = self._tick(fp.FALSE, now=NOW)
+        self.assertEqual(counts['stale'], 1)
+        self.assertEqual(counts['demoted'], 1)
+        task_id, verification = stamp.calls[0]
+        self.assertEqual(task_id, 'zz-fixture-dead')
+        self.assertEqual(verification['state'], 'stale')
+        self.assertIn('file_contains premise FALSE', verification['evidence'])
+        # Criterion 2: still pending, read_at untouched, nothing in history.
+        state = self._load()
+        self.assertEqual([e['id'] for e in state['pending']], ['zz-fixture-dead'])
+        self.assertEqual(state['history'], [])
+        self.assertNotIn('read_at', state['pending'][0])
+        # A `stale` verdict does not decay, so it needs no probed_at.
+        self.assertNotIn('probed_at', verification)
+
+    def test_no_stale_stamp_when_the_demote_did_not_land(self):
+        """The badge must never claim a demotion that didn't happen: if the entry
+        vanished between probe and write, there is nothing to mark stale."""
+        self._guard_no_autoclear()
+        self._write_state([_probe_entry('zz-fixture-dead', OLD_TS, _FC_PROBE)])
+        self._patch_approval('demote', lambda *a, **k: None)
+        stamp, counts = self._tick(fp.FALSE, now=NOW)
+        self.assertEqual(stamp.calls, [])
+        self.assertEqual(counts['stale'], 0)
+        self.assertEqual(counts['demoted'], 0)
+
+    def test_indeterminate_stamps_nothing(self):
+        """Criterion 3. Absence is the honest Unverified default — writing a
+        verdict we could not determine is the false-clean shape this leg exists
+        to prevent."""
+        self._guard_no_autoclear()
+        self._write_state([_probe_entry('zz-fixture-indet', OLD_TS, _FC_PROBE)])
+        stamp, counts = self._tick(fp.INDETERMINATE, now=NOW)
+        self.assertEqual(stamp.calls, [])
+        self.assertEqual(counts['skipped'], 1)
+        self.assertEqual(counts['verified'], 0)
+        self.assertEqual(counts['stale'], 0)
+
+    def test_probe_less_entry_stamps_nothing(self):
+        self._guard_no_autoclear()
+        self._write_state([_entry('zz-fixture-noprobe', OLD_TS,
+                                  task_id='zz-fixture-noprobe')])
+        stamp = _StampRecorder()
+        counts = self.mod.reconcile_stale_premises(
+            now=NOW, evaluate=lambda _p: fp.TRUE, stamp=stamp, client=object())
+        self.assertEqual(stamp.calls, [])
+        self.assertEqual(counts['probed'], 0)
+
+    def test_dry_run_stamps_nothing(self):
+        """Criterion 4."""
+        self._guard_no_autoclear()
+        self._write_state([
+            _probe_entry('zz-fixture-dead', OLD_TS, dict(_FC_PROBE)),
+        ])
+        stamp, counts = self._tick(fp.FALSE, now=NOW, dry_run=True)
+        self.assertEqual(stamp.calls, [])
+        self.assertEqual(counts['stale'], 1)   # classified...
+        self.assertFalse(self.mod.VERIFICATION_FAILURE_FILE.exists())
+
+    def test_no_client_skips_stamps_but_still_demotes(self):
+        """A Supabase outage must not stop the local demote: the card still gets
+        marked, it just reads Unverified until a later tick stamps it."""
+        self._guard_no_autoclear()
+        self._write_state([_probe_entry('zz-fixture-dead', OLD_TS, _FC_PROBE)])
+        stamp = _StampRecorder()
+        counts = self.mod.reconcile_stale_premises(
+            now=NOW, evaluate=lambda _p: fp.FALSE, stamp=stamp, client=None)
+        self.assertEqual(stamp.calls, [])
+        self.assertEqual(counts['skipped'], 1)
+        self.assertEqual(counts['failed'], 0)
+        self.assertEqual(counts['demoted'], 1)
+        self.assertIn('premise_stale', self._load()['pending'][0])
+
+    def test_uses_dispatch_payload_task_id_as_the_join_key(self):
+        """The chain_events row is keyed by the dispatch task_id, which normally
+        equals the entry id but is read through `_entry_task_id` so a divergent
+        payload still stamps the right row."""
+        self._guard_no_autoclear()
+        entry = _probe_entry('zz-fixture-approval-id', OLD_TS, _FC_PROBE)
+        entry['dispatch_payload']['task_id'] = 'zz-fixture-work-id'
+        self._write_state([entry])
+        stamp, _ = self._tick(fp.TRUE, now=NOW)
+        self.assertEqual(stamp.calls[0][0], 'zz-fixture-work-id')
+
+
+class TestVerificationFailureEscalation(_ProbeLegBase):
+    """A permanently broken stamp is invisible by construction — the card just
+    reads Unverified, which is also the honest default. Only an unbroken run of
+    totally-failed ticks (~the 30-min decay window) escalates; single failures
+    stay silent per the actionable-only alert doctrine."""
+
+    def setUp(self):
+        super().setUp()
+        self.alerts: list[tuple] = []
+        self.mod._alert_stamps_failing = (
+            lambda streak, attempted: self.alerts.append((streak, attempted)))
+
+    def _failing_tick(self, ok=False):
+        self._guard_no_autoclear()
+        return self.mod.reconcile_stale_premises(
+            now=NOW, evaluate=lambda _p: fp.TRUE,
+            stamp=_StampRecorder(ok=ok), client=object())
+
+    def test_single_failed_tick_is_silent(self):
+        self._write_state([_probe_entry('zz-fixture-live', OLD_TS, _FC_PROBE)])
+        counts = self._failing_tick()
+        self.assertEqual(counts['failed'], 1)
+        self.assertEqual(counts['verified'], 0)
+        self.assertEqual(self.alerts, [])
+        self.assertEqual(self.mod._read_fail_streak(), 1)
+
+    def test_escalates_after_three_consecutive_all_failed_ticks(self):
+        self._write_state([_probe_entry('zz-fixture-live', OLD_TS, _FC_PROBE)])
+        for _ in range(2):
+            self._failing_tick()
+        self.assertEqual(self.alerts, [])
+        self._failing_tick()
+        self.assertEqual(len(self.alerts), 1)
+        self.assertEqual(self.alerts[0], (3, 1))
+
+    def test_a_successful_tick_resets_the_streak(self):
+        self._write_state([_probe_entry('zz-fixture-live', OLD_TS, _FC_PROBE)])
+        self._failing_tick()
+        self._failing_tick()
+        self.assertEqual(self.mod._read_fail_streak(), 2)
+        self._failing_tick(ok=True)
+        self.assertEqual(self.mod._read_fail_streak(), 0)
+        self._failing_tick()
+        self.assertEqual(self.alerts, [])
+
+    def test_a_tick_with_nothing_to_stamp_leaves_the_streak_alone(self):
+        """A quiet period is not evidence the writer recovered — otherwise an
+        empty queue would silently clear a genuinely broken writer's streak."""
+        self._write_state([_probe_entry('zz-fixture-live', OLD_TS, _FC_PROBE)])
+        self._failing_tick()
+        self._failing_tick()
+        self._write_state([])  # no pending cards at all
+        self._failing_tick()
+        self.assertEqual(self.mod._read_fail_streak(), 2)
+
+    def test_unreadable_streak_file_reads_as_zero(self):
+        self.mod.VERIFICATION_FAILURE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        self.mod.VERIFICATION_FAILURE_FILE.write_text('{not json')
+        self.assertEqual(self.mod._read_fail_streak(), 0)
+
+
+class TestTimerFreshnessCoupling(unittest.TestCase):
+    """Criterion 7 — pin the coupling between the tick cadence and the reader's
+    decay window. Nothing in either repo enforces this at runtime: relaxing the
+    timer past ~1/3 of the window would leave `verified` stamps expiring between
+    ticks, and the Checked badge would simply stop appearing. No error, no log
+    line — so it is pinned here, where it fails loudly instead."""
+
+    TIMER = (Path(__file__).resolve().parents[2] / 'systemd'
+             / 'ourliberty-heal-stale-approvals.timer')
+
+    def _interval_seconds(self):
+        """The tick interval from `OnCalendar=*:0/N` (every N minutes)."""
+        for line in self.TIMER.read_text().splitlines():
+            line = line.strip()
+            if not line.startswith('OnCalendar='):
+                continue
+            m = re.search(r'/(\d+)\s*$', line)
+            self.assertIsNotNone(
+                m, f'unrecognized OnCalendar form: {line!r} — if the schedule '
+                   f'shape changed, this coupling check must be updated too')
+            return int(m.group(1)) * 60
+        self.fail(f'no OnCalendar= line in {self.TIMER}')
+
+    def test_timer_fires_often_enough_to_keep_verified_stamps_fresh(self):
+        import heal_stale_approvals as mod
+        interval = self._interval_seconds()
+        budget = mod.VERIFICATION_FRESH_SECONDS / 3
+        self.assertLessEqual(
+            interval, budget,
+            f'the tick runs every {interval}s but a `verified` stamp decays '
+            f'after {mod.VERIFICATION_FRESH_SECONDS}s; at least three stamps '
+            f'per window (<= {budget:.0f}s apart) keeps the Checked badge lit '
+            f'through a missed tick and the timer jitter')
+
+    def test_freshness_window_matches_the_dashboard_reader(self):
+        """VERIFICATION_FRESH_SECONDS mirrors VERIFICATION_FRESH_MS in the
+        dashboard's PendingCard.tsx. It is duplicated rather than imported (other
+        repo), so drift is caught here."""
+        import heal_stale_approvals as mod
+        self.assertEqual(mod.VERIFICATION_FRESH_SECONDS, 30 * 60)
 
 
 # ---- mirror-review PR-coordinate reconcile (out-of-band merge phantoms) ----
