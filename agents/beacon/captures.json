@@ -2966,7 +2966,7 @@
       "id": "cap-approvals-freshness-2b-stamp-the-verification-st-eb07",
       "title": "Approvals freshness 2b \u2014 stamp the verification state onto the card's Supabase row from the demote path",
       "note": "SLICE 2b of the approvals-freshness arc \u2014 the write half CUT from PR #1079. DEPENDS ON #1079 (demote + tick probe leg, merged); pairs with the dashboard renderer slice 2a, which ships FIRST and independently.\n\nTHE CONSTRAINT THAT DEFINES THIS SLICE: the Approvals tab reads chain_events STRAIGHT FROM SUPABASE in the dashboard frontend (ourliberty-dashboard lib/needs-you-queries.ts). It does NOT go through the droplet. The freshness state lives in a droplet file (beacon-pending-approvals.json). So the state must be WRITTEN TO SUPABASE \u2014 no in-repo projection can ever surface it. #1079's Part C tried to project it in dashboard_api and was dead on arrival for exactly this reason. Do not repeat that: verify the read path before wiring a field.\n\nThe one precedent that does NOT apply: latest_team_message_id / blocked_on_you had the same shape and were solved by RECOMPUTING them in the frontend from card_message chain_events. That works only because the source data was already in Supabase. Freshness state is not \u2014 there is nothing to derive from.\n\nBUILD \u2014 in the demote path (heal_stale_approvals.reconcile_stale_premises / beacon_approval_handler.demote):\n1. Stamp the verification state onto the card's approval_request chain_event row. Model it EXACTLY on chain_event_emit.clear_approval_request: one keyed PostgREST UPDATE filtered .eq('event_type','approval_request').eq('task_id',<id>).is_('read_at','null'), best-effort, swallows every failure, never blocks the local write.\n2. Write ONLY the positive states: 'stale' + evidence on FALSE; 'verified' + probed_at on TRUE. Write NOTHING for INDETERMINATE or a no-probe card \u2014 absence is the honest default and 2a reads absent as 'unverified'.\n3. probed_at is REQUIRED on 'verified' \u2014 2a decays a stale-dated 'verified' back to Unverified, which is what stops a dead healer leaving the tab reading green.\n\nTHE JOIN IS ALREADY GUARANTEED: add_pending sets entry['id'] = payload['task_id'], and PR #1077 (merged 2026-07-31) mints missing decide-tab cards under the pending entry's OWN id. So chain_events.task_id == the pending entry id by construction. Proven twice in-tree: triage_decisions.build_beacon_signals and clear_approval_request.\n\nRETRY IS FREE \u2014 BUILD NONE: reconcile_stale_premises re-demotes every matching entry on every 10-min tick (idempotent, verified in #1079), so a failed stamp retries next tick at no cost.\n\nOPEN DECISION \u2014 where the field lives:\n(a) a dedicated column (verification / verification_evidence / verified_at), like read_at and actor (migration 0006 precedent). Cleanest, PostgREST updates it directly, needs a migration. RECOMMENDED.\n(b) inside the payload JSON. No migration, but PostgREST cannot patch a JSON subfield, so read-modify-write. Safe only because this healer is the sole writer \u2014 a sharper edge for no real saving.\nSettle this WITH the 2a author before either lands, so reader and writer agree on the shape.\n\nREVIEW: /code-review high REQUIRED. This writes to the store feeding Larry's decision queue, and a wrong filter or mis-keyed update can mark a LIVE card stale \u2014 which fails looking exactly like a working tab. Watch the read_at IS NULL guard (a resolved card must never be restamped) and the task_id match (a near-miss key silently stamps the wrong card).",
-      "state": "parked",
+      "state": "dropped",
       "label": null,
       "origin": {
         "source": "desktop-chat",
@@ -2978,16 +2978,46 @@
       "last_touched": "2026-08-01T02:09:11.300780+00:00",
       "promoted_to": null,
       "briefing": {
-        "what": "A fix so your approvals list clearly flags which items are still current versus which have gone stale, instead of quietly showing outdated ones as if they're live.",
-        "why": "It protects the trustworthiness of your decision queue \u2014 right now a stale item can look perfectly valid, risking a wrong call on something that no longer matters.",
-        "suggest": "Worth doing, but move deliberately: confirm the display side is settled first and double-check it can never mislabel a live item as stale before committing."
+        "what": "A small piece of plumbing that lets your approvals dashboard show whether each item waiting on you is still live or has already gone stale.",
+        "why": "Right now the list can't tell fresh from stale, so you can waste time on decisions that no longer matter \u2014 or worse, trust a list that looks current but isn't.",
+        "suggest": "Worth doing, but move deliberately: lock down the exact format with the dashboard-display work first and double-check it can never flag a live item as dead before this goes anywhere near your queue."
       },
       "risk": "careful",
       "recommended_action": "delegate",
       "briefing_provenance": {
         "by": "beacon",
         "model": "claude-opus-4-8",
-        "at": "2026-08-01T02:13:10.349218+00:00",
+        "at": "2026-08-01T02:43:11.422699+00:00",
+        "from_state": "dropped"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+    },
+    {
+      "id": "cap-approvals-freshness-2b-stamp-verification-onto-t-d9a4",
+      "title": "Approvals freshness 2b \u2014 stamp verification onto the card's Supabase row (shape PINNED to the merged #155 reader)",
+      "note": "SLICE 2b of the approvals-freshness arc \u2014 the write half CUT from PR #1079. DEPENDS ON #1079 (demote + tick probe leg, MERGED 16892715). Its reader, dashboard PR #155, is ALREADY MERGED (0f8d53fb) \u2014 so the contract below is FIXED, not negotiable. Build to it exactly.\n\nWHY THE WRITE MUST GO TO SUPABASE: the Approvals tab reads chain_events STRAIGHT FROM SUPABASE in the dashboard frontend (lib/needs-you-queries.ts). It does NOT go through the droplet. The freshness state lives in a droplet file (beacon-pending-approvals.json), so no in-repo projection can ever surface it. #1079's Part C tried exactly that in dashboard_api and was dead on arrival. Verify the read path before wiring a field.\n\nTHE EXACT SHAPE THE MERGED READER PARSES (ourliberty-dashboard lib/types.ts, CardVerification; logic in app/approvals/components/PendingCard.tsx deriveVerification):\n\n    verification = { state: \"verified\" | \"stale\", probed_at?: string, evidence?: string }\n\nA NESTED OBJECT \u2014 not scalar columns. The reader does `typeof raw !== \"object\" -> unverified`, so writing verification='stale' as a plain string makes EVERY card read Unverified forever and the feature is silently dead (the Part C failure class, one slice later). Read those two files before writing code.\n\nLOCATION IS STILL OPEN \u2014 the reader does `event.verification ?? event.payload?.verification`, so either works:\n(a) a dedicated JSON column `verification` (like read_at / actor, migration 0006 precedent). RECOMMENDED.\n(b) inside the existing payload JSON. No migration, but PostgREST cannot patch a JSON subfield, so read-modify-write; safe only because this healer is the sole writer.\n\nBUILD \u2014 in heal_stale_approvals.reconcile_stale_premises:\n1. Stamp via one keyed PostgREST UPDATE modelled EXACTLY on chain_event_emit.clear_approval_request: .eq('event_type','approval_request').eq('task_id',<id>).is_('read_at','null'), best-effort, swallows every failure, never blocks the local write.\n2. FALSE -> {state:'stale', evidence:<the _probe_evidence string>}.\n3. TRUE -> {state:'verified', probed_at:<now ISO>}. THIS IS NEW BEHAVIOR: the merged leg currently does NOTHING on TRUE (it only demotes on FALSE), so the TRUE write must be added.\n4. RE-STAMP probed_at ON EVERY TICK the probe reads TRUE. The reader DECAYS a 'verified' older than 30 min back to Unverified \u2014 deliberately, so a dead healer cannot hold the tab green. The healer ticks every 10 min, so a fresh stamp each tick keeps it inside the window. Stamp once and every card ages to Unverified in half an hour.\n5. Write NOTHING for INDETERMINATE or a probe-less card. Absence is the honest default and the reader renders absent as Unverified.\n\nTHE JOIN IS GUARANTEED: add_pending sets entry['id'] = payload['task_id'], and PR #1077 mints missing decide-tab cards under the pending entry's OWN id, so chain_events.task_id == the pending entry id by construction. Proven twice in-tree: triage_decisions.build_beacon_signals and clear_approval_request.\n\nRETRY IS FREE \u2014 BUILD NONE: reconcile_stale_premises re-evaluates every probe-carrying entry each 10-min tick, so a failed stamp retries next tick at no cost.\n\nREVIEW: /code-review high REQUIRED. This writes to the store feeding Larry's decision queue; a wrong filter or mis-keyed update can mark a LIVE card stale, which fails looking exactly like a working tab. Watch the read_at IS NULL guard (a resolved card must never be restamped) and the task_id match (a near-miss key silently stamps the wrong card).",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "main",
+        "captured_at": "2026-08-01T02:37:35.093721+00:00"
+      },
+      "last_touched": "2026-08-01T02:37:35.093721+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "This makes the approvals list on your dashboard correctly show whether each pending decision is still current or has gone out of date.",
+        "why": "Without it, your decision queue can quietly show the wrong status on items \u2014 making a live decision look settled or vice versa \u2014 which erodes trust in the one screen you rely on to act.",
+        "suggest": "Worth doing, but proceed deliberately and with an extra review pass, since a small mistake here could mislabel a real decision and hide it from you."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-4-8",
+        "at": "2026-08-01T02:43:11.422699+00:00",
         "from_state": "parked"
       },
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
