@@ -47941,3 +47941,74 @@ ourliberty-dashboard: 0 open PRs. NOMINAL ✅
 
 ---
 
+## Iteration ~7264 — 2026-08-02T16:19Z UTC (Larry /loop /cycle chat, Tier 1 [consecutive_clean=0]; Check 0: 2 new alerts [watermark 641→643] both Tier-3 silenced [heal-wedged-review race + review-pass notification]; Check A: ff-main 220343e4→23471eb2 [PR#1088 merge]; Check 4: pending=2 UNCHANGED [PR#1085+PR#1086 deep-review-hold]; PR#1088 ✅ MERGED 16:15Z UTC; 12h reminder PR#1085 fires ~16:19Z UTC [imminent]; all other checks NOMINAL)
+
+**Health:** ⚠️ Signal — Check 4: pending=2 (PR#1085+PR#1086 deep-review-hold carry UNCHANGED). Check A: fast-forward executed (PR#1088 merged since last iter). 12h reminder for PR#1085 fires ~16:19Z UTC (now). Tier-reset (consecutive_clean=0; 5-min cadence).
+
+**VERIFY-BEFORE-REASSERT (from iter ~7263 at 16:08Z UTC 2026-08-02):**
+- **"PR#1085+PR#1086 deep-review hold"**: CONFIRMED → pending=2 {deep-review-hold-pr1085-599bd3a0, deep-review-hold-pr1086-7402d1de}. reminders=[6] for both. UNCHANGED. [carry ✅]
+- **"PR#1088 Mirror review in progress"**: RESOLVED ✅ → outbox-notifier.log: Mirror PASS at 16:14:57Z UTC; AUTO_MERGE at 16:15:04Z UTC (--squash --delete-branch); worktrees torn down 16:15:05Z UTC. PR#1088 confirmed merged (3 open PRs, down from 4). [resolved ✅]
+- **"watermark=641"**: UPDATED ✅ → repair-watermark: {"repaired":false,"old_watermark":641,"file_length":643}. 2 new alerts claimed + triaged; watermark advanced 641→643. [updated ✅]
+- **"heal-stale-daemon-code.heartbeat fresh"**: CONFIRMED → heartbeat=2026-08-02T16:08:02Z UTC (~11 min at ~16:19Z; <60 min). system-health.json ts=2026-08-02T16:13:09Z UTC; all 4 bots alive. [carry ✅ ts updated]
+- **"PRIME ratio worsening"**: RE-VERIFIED → pre-append ratio=43.913 (interventions=2020). [carry ✅]
+- **"consecutive_clean=0"**: CONFIRMED → cycle-tier.json: tier=1, consecutive_clean=0, last_signal_at=2026-08-02T16:08:14Z UTC. [carry ✅]
+- **"12h reminders pending at ~16:19Z/#1085 and ~16:44Z/#1086"**: IMMINENT/#1085 NOW → from ~16:19Z UTC: #1085 fires ~now; #1086 fires ~16:44Z UTC (~25 min). reminders=[6] for both (6h sent, 12h pending). [carry ✅ #1085 imminent]
+- **"SUPABASE_SERVICE_ROLE_KEY ~27.9h remaining"**: CONFIRMED → last DM=2026-07-20T20:00:15Z UTC; 14d dedup expires 2026-08-03T20:00Z UTC; ~27.7h remaining from ~16:19Z UTC. [carry ✅]
+- G-rule carries (unchanged): forge-marker-taskid-suffix-increment; medic-draft-status-false-positive; check-i-force-bypass-dm-route; beacon-pending-approvals-path-bug; deep-review-hold-approved-loop-post-merge-001; pulse-triage-self-report-should-be-tier3-001 [1/3]. VPs: pulse-cycle-check0-helper-override, auto-merge-conflict-route-hold, direction-ask-rsdpm-no-autolabel-review-gap-001.
+
+**Check 0 — Alert triage (~16:16Z UTC):** repair-watermark → {"repaired":false,"old_watermark":641,"file_length":643}. **2 new alerts** since last watermark:
+- **Alert 642**: `source=heal-wedged-review-sessions`, `subject=wedged-review-silent:wt-mirror-restore-supabase-db-password-registry-entry-001`, ts=16:13:09Z UTC. triage-alert → **Tier 3 silence** (known-pattern match in alert-translations.json). Condition self-resolved 2 min later (Mirror PASS 16:14:57Z, merge 16:15:04Z, worktree torn down 16:15:05Z). Race between healer-alert and mirror-completion. No action. [Tier-3 no-tier-reset]
+- **Alert 643**: `source=outbox-notifier`, `kind=notification`, `intent=review-pass`, task=restore-supabase-db-password-registry-entry-001. triage-alert → **Tier 3 silence** (known-pattern match). Completion DM. [Tier-3 no-tier-reset]
+- Watermark advanced 641→643. **0 actionable alerts.** NOMINAL ✅
+
+**Check 1 — Log noise (~16:16Z UTC):** outbox-notifier.log — last entry [2026-08-02 10:15:05 MDT]=16:15:05Z UTC (AUTO_MERGE_WORKTREE_TEARDOWN for PR#1088, by-design). New since iter ~7263: Mirror PASS (16:14:57Z) + AUTO_MERGE (16:15:04Z) + teardown. All by-design. 0 WARN/ERROR above threshold. NOMINAL ✅
+
+**Check 2 — Telegram sweep (~16:16Z UTC):** beacon_telegram_bot.log — last entries [2026-08-02T10:15:46-0600]=16:15:46Z UTC: alert idx=641 delivered (heal-wedged-review-sessions, Tier-3 silenced) + notification idx=642 delivered (review-pass completion DM). No new Larry messages. No agent-distress. NOMINAL ✅
+
+**Check 3 — Pipeline stall (~16:16Z UTC):** heal_pipeline_stall.py --dry-run → "no stalls detected". FORGE_NO_PR_SKIP ×3 (expected). MIRROR_PASS_UNMERGED_SKIP ×2 (PR#1085+PR#1086 held_deep_review, intentional). NOMINAL ✅
+
+**Check 4 — Pending directives (~16:16Z UTC):** state/beacon-pending-approvals.json: **pending=2** (UNCHANGED from iter ~7263):
+1. **deep-review-hold-pr1085-599bd3a0** status=pending, reminders=[6]. PR#1085 `feat(approvals): slice 2b — stamp chain_events.verification from the freshness tick` — ~18.4h, UNKNOWN/MERGEABLE. **ask-then-do — awaiting /code-review high + merge_reviewed_pr.sh 1085.** 12h reminder fires ~16:19Z UTC (NOW). → TIER-RESET ⚠️
+2. **deep-review-hold-pr1086-7402d1de** status=pending, reminders=[6]. PR#1086 `feat(approvals): make birth-suppressed cards visible + recoverable before probes exist` — ~17.8h, UNKNOWN/MERGEABLE. **ask-then-do — awaiting /code-review high + merge_reviewed_pr.sh 1086.** 12h reminder fires ~16:44Z UTC (~25 min). → TIER-RESET ⚠️
+SIGNAL ⚠️
+
+**Check 5 — Stale daemon code (~16:16Z UTC):** heartbeat=2026-08-02T16:08:02Z UTC (~11 min; <60 min threshold). system-health.json ts=2026-08-02T16:13:09Z UTC; beacon/forge/mirror/pulse all alive=True, action=noop. NOMINAL ✅
+
+**Check A — Source repo (~16:16Z UTC):** branch=main, tree CLEAN, **behind origin/main by 1 commit** (PR#1088 merge 23471eb2). → **always-fix: fast-forward.** `git pull --ff-only` → Updated 220343e4..23471eb2 (`config/token-rotation-schedule.json` added; restore-supabase chain final commit). HEAD=23471eb2=origin/main. NOMINAL ✅
+**Check B — Sync health (~16:16Z UTC):** last_sync=2026-08-02T15:39:59Z UTC (~36 min; <2h threshold). status=no-change, consecutive_push_failures=0. NOMINAL ✅
+**Check C — Agent liveness (~16:16Z UTC):** system-health.json ts=2026-08-02T16:13:09Z UTC; beacon/forge/mirror/pulse all alive=True, action=noop. NOMINAL ✅
+**Check E — PR/merge state (~16:16Z UTC):** ourliberty-agent-core: **3 open PRs** (↓ from 4 — PR#1088 merged ✅):
+- **#1086** `feat(approvals): make birth-suppressed cards visible + recoverable before probes exist` — ~17.8h, UNKNOWN/MERGEABLE, HELD /code-review high. 72h escalate=2026-08-04T22:26Z UTC (~54.1h remaining). [carry]
+- **#1085** `feat(approvals): slice 2b — stamp chain_events.verification from the freshness tick` — ~18.4h, UNKNOWN/MERGEABLE, HELD /code-review high. 72h escalate=2026-08-04T21:49Z UTC (~53.5h remaining). [carry]
+- **#1081** `fix(suite-guardian): wire L10 regression detection + downgrade` — ~40.9h, UNKNOWN/MERGEABLE, fix/* unrouted-by-design. 72h escalate=2026-08-04T00:24Z UTC (~32.1h remaining). [carry]
+ourliberty-dashboard: 0 open PRs. NOMINAL ✅
+**Check H — Forge activity (~16:16Z UTC):** Last merge: PR#1088 ~1 min ago (16:15Z UTC, restore-supabase config chain complete). 2 Forge PRs HELD (#1086+#1085). PR#1081 fix/* unrouted-by-design. All within 72h. NOMINAL ✅
+
+**§5.0 one-shots (~16:17Z UTC):** audit_due_nudge → no-op ✅. distill_detector → no-op ✅. silence_file_auditor → 5 entries (1 expired [52.4d] + 4 permanent), 0 active suppressions ✅. audit_cadence_signal.py (review/distill/) → no-op ✅. NOMINAL ✅
+
+**§5 periodic — Check I (~16:17Z UTC):** check-i-2026-08-02.json exists (Aug 2 08:15 local). No new artifact. Next firing Mon 2026-08-04 ~14:13Z UTC. NOMINAL ✅
+**§5 periodic — Check III (~16:17Z UTC):** Last artifact check-iii-2026-07-26.json. 14d gate skips until 2026-08-09. NOMINAL ✅
+
+**Rotations (~16:17Z UTC):** SUPABASE_SERVICE_ROLE_KEY: last DM=2026-07-20T20:00:15Z UTC; 14d dedup expires 2026-08-03T20:00Z UTC (~27.7h remaining). Within dedup window — no DM. Journal note only. UPCOMING-INFO ⏳
+
+**Actions taken:**
+- Check A always-fix: fast-forwarded main 220343e4→23471eb2 (`config/token-rotation-schedule.json` added; PR#1088 restore-supabase merge commit). Logged to cycle-actions.jsonl.
+- Check 0: watermark advanced 641→643 (2 new Tier-3 alerts claimed + silenced).
+- PRIME DIRECTIVE: intervention row appended at 2026-08-02T16:18:40Z UTC (tier=1, kind=intervention, template=pending-approval-carry, detail=pending=2 PR#1085+PR#1086 carry; PR#1088 merged; Check A ff-main; 2 new alerts Tier-3 silenced; iter ~7264).
+- Tier state: `cycle_tier_state.py record --checks-clean false` → tier=1, consecutive_clean=0, last_signal_at=2026-08-02T16:19:35Z UTC.
+
+**Escalations:** None new this iter. 12h reminder for PR#1085 fires ~16:19Z UTC (NOW — auto-fires via outbox-notifier); PR#1086 ~16:44Z UTC (~25 min).
+
+**PRIME DIRECTIVE (post-action):** interventions=2021, systemic_fixes=46, ratio=43.935, trend=worsening. Δ since last iter: +1 intervention. No new systemic_fix rows.
+
+**Patterns:**
+- **[resolved ✅] PR#1088 restore-supabase-db-password-registry-entry-001** — Mirror PASS 16:14:57Z UTC → auto-merged 16:15:04Z UTC → HEAD=23471eb2. Chain fully complete. `config/token-rotation-schedule.json` now on main.
+- **[monitoring ⚠️] PR#1085 + PR#1086 deep-review-hold** — pending=2 UNCHANGED. 12h reminder fires ~16:19Z/#1085 (NOW) and ~16:44Z/#1086 (~25 min) from 16:19Z. Actions: `/code-review high` on PR#1085 → `scripts/merge_reviewed_pr.sh 1085`; then same for PR#1086.
+- **[carry ⚠️ monitoring] PR#1081 no-label + MERGEABLE** — ~40.9h, fix/* unrouted-by-design. 72h escalate=2026-08-04T00:24Z UTC (~32.1h remaining). [carry]
+- **[blue] Check I 2026-08-02** — proposal #1 (45.2σ anomaly `cycle-202607230601240000`, $2.16 vs $0.87 baseline). `/dispatch 1` to act. [carry]
+- G-rule carries (unchanged): forge-marker-taskid-suffix-increment; medic-draft-status-false-positive; check-i-force-bypass-dm-route; beacon-pending-approvals-path-bug; deep-review-hold-approved-loop-post-merge-001; pulse-triage-self-report-should-be-tier3-001 [1/3]. VPs: pulse-cycle-check0-helper-override, auto-merge-conflict-route-hold, direction-ask-rsdpm-no-autolabel-review-gap-001.
+
+**Tier end-of-iter:** **Tier 1** (consecutive_clean=0; last_signal_at=2026-08-02T16:19:35Z UTC; 5-min cadence; Check 4 non-clean carry).
+
+---
+
