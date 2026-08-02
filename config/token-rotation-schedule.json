@@ -328,6 +328,23 @@
       "notes": "prefix sbp_ (NOT eyJ); generated at https://supabase.com/dashboard/account/tokens; fallback if lapsed is Larry's Mac CLI."
     },
     {
+      "name": "SUPABASE_DB_PASSWORD",
+      "storage_location": "env_file:/home/larry/credentials/.env.larry",
+      "credential_type": "password",
+      "purpose": "Supabase project database password for `supabase link` + direct psql connections from the droplet. Re-installed 2026-08-01 after the 2026-07-27 dashboard password reset. No automated consumer reads it — staging migration paths authenticate via SUPABASE_ACCESS_TOKEN through the Management API — so it is an operator-facing credential for manual CLI/psql work.",
+      "rotation_type": "revocation_only",
+      "cadence_days": null,
+      "created_at": "2026-08-01",
+      "last_rotated_at": "2026-08-01",
+      "next_rotation_due": null,
+      "calendar_event_url": null,
+      "runbook_path": "docs/runbooks/rotate-supabase-db-password.md",
+      "severity_if_lapsed": "high",
+      "owner_role": "larry",
+      "scopes": ["full-account"],
+      "notes": "Rotate ONLY if compromised; rotation breaks all connections and requires re-running `supabase link` afterward — see the runbook. Also stored in 1Password on Larry's Mac; both copies must be updated in the same rotation window. History: registered 2026-05-26, retired 2026-07-29 by PR #1066 because the 2026-07-27 reset left the key absent from .env.larry, then re-installed by Larry on 2026-08-01 via ~/bin/install-supabase-db-password.sh. This entry restores registry coverage for the live value and clears credential-drift:MISSING_REGISTRY_ENTRY."
+    },
+    {
       "name": "OL_DB_RO_URL",
       "storage_location": "env_file:/home/larry/credentials/.env.larry",
       "credential_type": "connection_string",
