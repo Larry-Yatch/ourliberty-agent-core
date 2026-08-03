@@ -143,6 +143,14 @@ MAX_ARCHIVE_FILES_READ = 200
 # mediator), so a typo'd/exotic target can't advertise a bogus route on the card.
 KNOWN_TARGET_AGENTS = frozenset({'beacon', 'forge', 'mirror', 'pulse'})
 
+# Cap on retained birth-suppression records. Each record holds a FULL card
+# payload, so the store is bounded rather than unbounded; eviction is
+# oldest-first. Generous on purpose: the dedup that prevents an alert storm is
+# "this identity is already in the store", so an evicted identity that is still
+# being suppressed re-alerts once — at 1000 distinct suppressions apart, which is
+# a re-notification, not a storm.
+MAX_BIRTH_SUPPRESSION_RECORDS = 1000
+
 # "Choose A or B" / "Pick A vs B" / "Reply A or B" splitter for binary options.
 _BINARY_SPLIT_RE = re.compile(r'\s+(?:or|vs\.?|versus)\s+', re.IGNORECASE)
 _LEADING_VERB_RE = re.compile(
@@ -180,6 +188,15 @@ def healer_heartbeat() -> Path:
 
 def promoted_state_file() -> Path:
     return state_dir() / 'heal-unregistered-approval-promoted.json'
+
+
+def birth_suppressed_state_file() -> Path:
+    """Durable record of every card the birth-freshness gate withheld. A SEPARATE
+    file from the promoted ledger on purpose: an entry in that ledger stops a card
+    from ever promoting again, and a freshness verdict is not monotone (a
+    `json_path` / `file_contains` premise can come back TRUE), so a suppression
+    must never be written there."""
+    return state_dir() / 'heal-unregistered-approval-birth-suppressed.json'
 
 
 def log_file() -> Path:
@@ -1909,6 +1926,174 @@ def apply_birth_freshness_gate(
     return kept, suppressed
 
 
+# ---------- birth-suppression durability + human surface ----------
+#
+# The gate above decides; this section makes the decision RECOVERABLE and VISIBLE.
+# Without it a suppressed card leaves one line in a droplet log nobody reads and
+# its payload is gone, so a wrongly-suppressed REAL decision is unrecoverable.
+#
+# The suppressed card is NOT written to the promoted ledger (see
+# birth_suppressed_state_file), so the source alert is re-scanned and re-suppressed
+# on EVERY tick. Dedup therefore lives in the store itself: a record is inserted
+# once per identity and ONLY a newly-inserted identity raises an alert, so one
+# withheld card yields one record and one notification no matter how many ticks
+# run. Cooldown cannot carry that guarantee — the warning bucket self-expires
+# hourly, which would re-DM the same card forever.
+
+def _suppression_identity(payload: dict[str, Any]) -> str:
+    """The dedup key for a suppressed card: the source-alert identity the promote
+    path already keys on, falling back to the healer-deterministic task_id.
+
+    A card with neither falls back to a digest of the payload rather than the
+    empty string, because an empty key would collapse every id-less suppression
+    into ONE bucket and silently drop all but the first record."""
+    for key in ('promoted_from_alert', 'task_id'):
+        val = payload.get(key)
+        if isinstance(val, str) and val.strip():
+            return val.strip()
+    blob = json.dumps(payload, sort_keys=True, default=str)
+    return 'cardhash:' + hashlib.sha256(blob.encode('utf-8')).hexdigest()[:16]
+
+
+def _suppression_record_ts(value: Any) -> str:
+    return str(value.get('suppressed_at') or '') if isinstance(value, dict) else ''
+
+
+def load_birth_suppressed(path: Optional[Path] = None) -> dict[str, Any]:
+    """The suppression store as {identity: record}. A missing/malformed file reads
+    as empty (never raises) — same tolerance as load_promoted."""
+    p = path or birth_suppressed_state_file()
+    try:
+        data = json.loads(p.read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return {}
+    records = data.get('suppressed') if isinstance(data, dict) else None
+    if not isinstance(records, dict):
+        return {}
+    return {k: v for k, v in records.items() if isinstance(k, str)}
+
+
+def save_birth_suppressed(
+    records: dict[str, Any], path: Optional[Path] = None,
+) -> None:
+    """Atomically persist the store, evicting oldest-first past
+    MAX_BIRTH_SUPPRESSION_RECORDS. `default=str` keeps an exotic value in a card
+    payload from failing the whole write — a degraded record still beats none."""
+    p = path or birth_suppressed_state_file()
+    if len(records) > MAX_BIRTH_SUPPRESSION_RECORDS:
+        ordered = sorted(records.items(), key=lambda kv: _suppression_record_ts(kv[1]))
+        records = dict(ordered[-MAX_BIRTH_SUPPRESSION_RECORDS:])
+    payload = {
+        '_schema': {
+            'version': 1,
+            'purpose': (
+                'Durable record of approval cards suppressed at birth by '
+                'heal_unregistered_approval.apply_birth_freshness_gate (an '
+                'explicit FALSE freshness_probe). Keyed by source identity, one '
+                'record per card, carrying the FULL card payload so a wrongly '
+                'suppressed decision can be reconstructed and re-promoted by '
+                'hand. NOT a dedup gate for promotion — see '
+                'birth_suppressed_state_file().'
+            ),
+        },
+        'suppressed': records,
+    }
+    try:
+        p.parent.mkdir(parents=True, exist_ok=True)
+        tmp = p.with_name(p.name + '.tmp')
+        tmp.write_text(
+            json.dumps(payload, indent=2, sort_keys=True, default=str),
+            encoding='utf-8')
+        os.replace(tmp, p)
+    except OSError:
+        pass
+
+
+def record_birth_suppressions(
+    suppressed: list[dict[str, Any]], path: Optional[Path] = None,
+) -> list[dict[str, Any]]:
+    """Persist one durable record per NEWLY suppressed card and return just those
+    new records (the ones a notification is owed for).
+
+    Each record carries the timestamp, task_id, identity, the probe dict verbatim,
+    the verdict, and the FULL card payload — everything needed to reconstruct and
+    re-promote the decision by hand. An identity already in the store is a re-scan
+    of a card already recorded on an earlier tick: skipped, so the store holds one
+    record per card and no notification re-fires."""
+    if not suppressed:
+        return []
+    records = load_birth_suppressed(path)
+    now = datetime.now(timezone.utc).isoformat()
+    new_records: list[dict[str, Any]] = []
+    for payload in suppressed:
+        identity = _suppression_identity(payload)
+        if identity in records:
+            continue
+        record = {
+            'suppressed_at': now,
+            'identity': identity,
+            'task_id': payload.get('task_id'),
+            'probe': extract_freshness_probe(payload),
+            'verdict': freshness_probe.FALSE,
+            'card': payload,
+        }
+        records[identity] = record
+        new_records.append(record)
+    if new_records:
+        save_birth_suppressed(records, path)
+    return new_records
+
+
+def _emit_birth_suppression_alert(record: dict[str, Any]) -> None:
+    """Raise ONE actionable alert for a newly suppressed card. A withheld decision
+    is actionable by definition — Larry can answer "no, that one was real" — so it
+    takes the alert path (needs-you) rather than a routine digest line, for as long
+    as this filter is unproven. Never raises."""
+    identity = record.get('identity') or ''
+    probe = record.get('probe')
+    kind = probe.get('kind') if isinstance(probe, dict) else None
+    card = record.get('card') if isinstance(record.get('card'), dict) else {}
+    try:
+        sys.path.insert(0, str(_SCRIPT_DIR))
+        import larry_alerts as la  # noqa: E402
+        la.append_alert(
+            source=HEALER_SOURCE,
+            severity='warning',
+            message=(
+                f'An approval card was WITHHELD from your Approvals tab at birth: '
+                f'its freshness_probe ({kind}) evaluated FALSE, so the ask was '
+                f'judged already moot and never became a card. '
+                f'task={record.get("task_id")!r} identity={identity!r}. '
+                f'Card summary: {_card_summary_snippet(card)}. '
+                f'If that decision was REAL, the full card payload is recorded in '
+                f'{birth_suppressed_state_file()} and can be re-promoted by hand.'
+            ),
+            subject=f'birth-suppressed:{identity}',
+            suggested_action=f'jq .suppressed {birth_suppressed_state_file()}',
+            # Explicit escalate so a later graduation of this source's default
+            # route cannot quietly demote a withheld decision to hold/digest.
+            route='escalate',
+            needs_larry=True,
+        )
+    except Exception as e:  # noqa: BLE001 — a notify failure never wedges the tick
+        log(f'birth-suppression alert emit failed for identity={identity!r}: '
+            f'{type(e).__name__}: {e}', 'WARN')
+
+
+def record_and_alert_birth_suppressions(
+    suppressed: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Record every newly suppressed card durably, then raise one alert per new
+    record. Returns the new records (for logging/tests)."""
+    new_records = record_birth_suppressions(suppressed)
+    for record in new_records:
+        _emit_birth_suppression_alert(record)
+    if new_records:
+        log(f'BIRTH_FRESHNESS_RECORDED {len(new_records)} new suppression(s) to '
+            f'{birth_suppressed_state_file()}; alerted Larry for each')
+    return new_records
+
+
 # -------------------- retire-on-resolution (decision 3) --------------------
 
 def _ledger_entry_fields(key: str, value: Any) -> tuple[str, str, Optional[str]]:
@@ -2351,6 +2536,19 @@ def main() -> int:
         log(f'birth-freshness gate failed: {type(e).__name__}: {e}; '
             f'promoting all candidates (fail toward the human)', 'ERROR')
         birth_suppressed = []
+
+    # Make each suppression durable + visible: one recoverable record (full card
+    # payload) and one alert per withheld card, deduped by identity so the every-
+    # tick re-suppression can't storm. Same fail-open posture as the gate itself —
+    # the promote batch is already decided above, so a failure here degrades to
+    # the log line without changing which cards reach the tab or crashing the tick.
+    if birth_suppressed:
+        try:
+            record_and_alert_birth_suppressions(birth_suppressed)
+        except Exception as e:  # noqa: BLE001 — observability never gates a card
+            log(f'birth-suppression record/alert failed: {type(e).__name__}: {e}; '
+                f'{len(birth_suppressed)} suppression(s) are log-only this tick',
+                'ERROR')
 
     # Record the suppressed needs-triage identities in the promoted ledger as
     # SKIP markers so they are not re-evaluated (or re-logged) on the next tick.
