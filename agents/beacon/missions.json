@@ -17726,7 +17726,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-08-03T23:45:20.141394+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-08-03T23:36:09.797225+00:00"
+      "orphan_last_activity_ts": "2026-08-03T23:36:09.797225+00:00",
+      "briefing": {
+        "what": "A change to how spending limits are handled went live without anyone on your side signing off on it first.",
+        "why": "Money-related controls that ship unreviewed are exactly the kind of thing that quietly costs you later, and right now these slip by unnoticed in the daily wrap-up.",
+        "suggest": "Ask for each of these unreviewed money-related changes to be called out to you by name as a yes-or-no decision, and take a quick look at this one before accepting it."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-03T23:55:20.938939+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-delegate-cap-auto-retire-provably-merged-cards-kill-the-ack-b-9ae0",
@@ -17743,7 +17757,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-08-03T23:45:20.141394+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-08-03T23:30:52.91687+00:00"
+      "orphan_last_activity_ts": "2026-08-03T23:30:52.91687+00:00",
+      "briefing": {
+        "what": "A change to how finished work clears itself off your queue: once something is genuinely done, it closes on its own instead of waiting for you to click acknowledge, and anything sensitive that closed that way gets named in your regular summary.",
+        "why": "Your queue currently fills up with items that are already finished, which buries the handful of things that actually need your attention and slows down every decision you make.",
+        "suggest": "Worth approving, but ask to see the first week's summary of what auto-closed so you can confirm nothing important is slipping past you before it becomes routine."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-03T23:55:20.938939+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     }
   ]
 }
