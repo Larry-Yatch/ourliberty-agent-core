@@ -58,6 +58,7 @@ from typing import Any, Optional
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from supabase_chunk import chunked_clear, ChunkedClearError  # noqa: E402
 import beacon_approval_handler as approval  # noqa: E402
+import chain_event_emit as cee  # noqa: E402 — keyed verification stamp (slice 2b)
 import freshness_probe  # noqa: E402 — pure premise evaluator (slice 1, PR #1072)
 import task_terminal_state as tts  # noqa: E402 — shared terminal-state probe
 from decision_identity import canonical_decision_key  # noqa: E402
@@ -74,8 +75,30 @@ LOG_FILE = AGENTS_ROOT / 'logs' / 'heal-stale-approvals.log'
 HEARTBEAT_FILE = AGENTS_ROOT / 'blackboard' / 'heal-stale-approvals.heartbeat'
 PENDING_APPROVALS = AGENTS_ROOT / 'state' / 'beacon-pending-approvals.json'
 BACKUP_DIR = AGENTS_ROOT / 'blackboard' / 'backups'
+VERIFICATION_FAILURE_FILE = (
+    AGENTS_ROOT / 'blackboard' / 'heal-stale-approvals-verification-failures.json')
 
 UPDATE_BATCH = 200
+
+# Slice 2b — Decide-card freshness stamps.
+#
+# The dashboard reader (ourliberty-dashboard
+# app/approvals/components/PendingCard.tsx, `VERIFICATION_FRESH_MS`) decays a
+# `verified` verdict back to Unverified once it is older than this. It is
+# duplicated here rather than imported because it lives in another repo; the
+# coupling is pinned by a test that reads the systemd timer and asserts the tick
+# interval leaves room for several stamps inside this window. Relaxing the timer
+# past ~1/3 of this would silently kill the Checked badge — nothing would error,
+# the badge would simply never light.
+VERIFICATION_FRESH_SECONDS = 30 * 60
+
+# Consecutive ticks in which EVERY attempted stamp failed before escalating to
+# Larry. Three ticks is ~30 min — the decay window — so the alert fires exactly
+# when the badge has actually gone dark, not on a single transient failure. A
+# broken stamp is invisible by construction (the card just reads Unverified,
+# which is also the honest default), so this counter is the only thing standing
+# between a permanently dead writer and nobody noticing.
+_VERIFICATION_FAIL_ALERT_TICKS = 3
 
 # Terminal-state reconciliation (spec terminal-state-reconciliation.md § 3.1).
 # A pending approval is only probed against its work's terminal ground truth
@@ -571,11 +594,94 @@ def _probe_evidence(probe: dict[str, Any]) -> str:
     return f'{kind} premise FALSE'
 
 
+def _verification_iso(now: datetime) -> str:
+    """`now` as the ES Date Time String Format the dashboard reader parses.
+
+    The reader gates its Checked badge on `Date.parse(probed_at)`, so the format
+    has to be one JS parses unambiguously: UTC, `Z`-suffixed, milliseconds. The
+    obvious `datetime.isoformat()` emits `+00:00` with SIX fractional digits,
+    which is outside the format ECMA-262 specifies — engines happen to accept it
+    today, but a stamp the reader can't parse renders Unverified silently, so
+    this path does not lean on that leniency."""
+    return now.astimezone(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+
+
+def _read_fail_streak(path: Path = VERIFICATION_FAILURE_FILE) -> int:
+    """Consecutive all-failed stamp ticks recorded so far. Each tick is its own
+    systemd-run process, so the streak has to live on disk. Unreadable or
+    malformed state reads as 0 (never raises) — losing the streak delays an
+    alert by a few ticks, which is strictly better than crashing the healer."""
+    try:
+        data = json.loads(path.read_text())
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return 0
+    value = data.get('consecutive_failed_ticks') if isinstance(data, dict) else None
+    return value if isinstance(value, int) and value > 0 else 0
+
+
+def _write_fail_streak(streak: int, path: Path = VERIFICATION_FAILURE_FILE) -> None:
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({
+            'consecutive_failed_ticks': streak,
+            'updated_at': datetime.now(timezone.utc).isoformat(),
+        }))
+    except OSError:
+        pass
+
+
+def _record_stamp_outcome(
+    *, attempted: int, failed: int, path: Path = VERIFICATION_FAILURE_FILE,
+) -> None:
+    """Advance (or clear) the all-failed streak and escalate once it hits the
+    threshold.
+
+    A tick that attempted NOTHING is not evidence either way and leaves the
+    streak untouched — otherwise a quiet period with no probed cards would
+    silently reset a genuinely broken writer's streak. Single failures stay
+    silent per the actionable-only alert doctrine; only an unbroken run of
+    totally-failed ticks (~the decay window) is worth Larry's attention."""
+    if attempted <= 0:
+        return
+    if failed < attempted:
+        _write_fail_streak(0, path)
+        return
+    streak = _read_fail_streak(path) + 1
+    _write_fail_streak(streak, path)
+    if streak >= _VERIFICATION_FAIL_ALERT_TICKS:
+        _alert_stamps_failing(streak, attempted)
+
+
+def _alert_stamps_failing(streak: int, attempted: int) -> None:
+    """Escalate a persistently dead stamp writer. Best-effort: an alert-side
+    failure must never take down the healer leg that noticed the problem."""
+    try:
+        import larry_alerts  # noqa: PLC0415 — lazy so the leg runs without it
+        larry_alerts.append_alert(
+            'heal-stale-approvals', 'warning',
+            f'Decide-card freshness stamps have failed on {streak} consecutive '
+            f'ticks (~{streak * 10} min, {attempted} stamp(s) last tick). Every '
+            f'Checked badge has decayed to Unverified — the cards still work, '
+            f'but the tab can no longer tell you which asks are still live. '
+            f'Either no chain_events row matches those cards, or the write is '
+            f'being rejected.',
+            subject='verification-stamp-failing',
+            suggested_action=(
+                'journalctl -u ourliberty-heal-stale-approvals.service -n 50'),
+            needs_larry=True,
+        )
+    except Exception as e:  # noqa: BLE001
+        log(f'could not escalate failing verification stamps: '
+            f'{type(e).__name__}: {e}', 'WARN')
+
+
 def reconcile_stale_premises(
     *,
     beacon_state: Optional[dict[str, Any]] = None,
     now: Optional[datetime] = None,
     evaluate: Any = None,
+    client: Any = None,
+    stamp: Any = None,
     dry_run: bool = False,
 ) -> dict[str, int]:
     """Slice 2: DEMOTE pending approvals whose recorded freshness_probe now reads
@@ -591,13 +697,20 @@ def reconcile_stale_premises(
     stays reserved for the terminal-state leg's positively-terminal signal.
 
     Only entries carrying `dispatch_payload.freshness_probe` are probed; an entry
-    with none is left untouched. NOTE: the anti-false-clean `unverified` BADGE is
-    NOT in this slice. The Approvals tab reads `chain_events` straight from
-    Supabase in the dashboard frontend (`lib/needs-you-queries.ts`) — it does not
-    read this local store — so no in-repo projection can light that badge. It
-    lands as its own slice: the renderer defaults ABSENT -> 'unverified' (so the
-    tab tells the truth before any probe exists), and the demote path stamps the
-    positive states onto the card's Supabase row. For each probed entry,
+    with none is left untouched. SLICE 2b adds the projection this docstring used
+    to defer: each verdict is ALSO stamped onto the card's Supabase row via
+    `chain_event_emit.stamp_approval_verification`, because the Approvals tab
+    reads `chain_events` straight from Supabase (`lib/needs-you-queries.ts`) and
+    never reads this local store. FALSE stamps `stale` (after the demote lands,
+    so the badge can never claim a demotion that didn't happen), TRUE stamps
+    `verified` with a fresh `probed_at`, and INDETERMINATE stamps NOTHING —
+    absence is the honest Unverified default.
+
+    The stamp is UNCONDITIONAL, not transition-gated: the reader decays a
+    `verified` verdict older than 30 minutes back to Unverified, so a verdict
+    written once and only re-written "when it changes" would light the badge for
+    one window and then go dark forever, with every tick succeeding and nothing
+    raising. Re-stamping every tick IS the mechanism. For each probed entry,
     `freshness_probe.evaluate(probe)` returns one tri-state:
         FALSE          -> demote() (premise dead, the ask is moot)
         TRUE / INDET.  -> untouched. INDETERMINATE folds in every error / timeout /
@@ -614,18 +727,60 @@ def reconcile_stale_premises(
     `evaluate` is injectable for tests (default `freshness_probe.evaluate`, which
     carries its own injectable executors + production defaults: pr_state via
     task_terminal_state, file_contains/file_lacks via git_show at origin/main,
-    json_path via file read, sql inert). `beacon_state` / `now` are injectable
-    too, mirroring the sibling reconcilers. `--dry-run` reports intended demotions
-    without writing. Returns a counts dict."""
+    json_path via file read, sql inert). `beacon_state` / `now` / `stamp` are
+    injectable too, mirroring the sibling reconcilers. `client` is the Supabase
+    client the stamps go through; without one the leg still demotes and simply
+    leaves cards unstamped. `--dry-run` reports intended demotions and stamps
+    without writing either. Returns a counts dict, whose `verified` / `stale` /
+    `skipped` / `failed` keys are the stamp lane's per-tick accounting."""
     now = now or datetime.now(timezone.utc)
     evaluate = evaluate or freshness_probe.evaluate
-    counts = {'pending': 0, 'probed': 0, 'demoted': 0, 'kept': 0}
+    stamp = stamp or cee.stamp_approval_verification
+    counts = {'pending': 0, 'probed': 0, 'demoted': 0, 'kept': 0,
+              'verified': 0, 'stale': 0, 'skipped': 0, 'failed': 0}
+    attempted = 0
+
+    def _stamp(task_id: Optional[str], verification: dict[str, Any]) -> None:
+        """Project one verdict onto the card's Supabase row. Best-effort by
+        design: a lost stamp decays to Unverified, which is honest, and the next
+        tick re-stamps — so a failure is counted, never raised."""
+        nonlocal attempted
+        label = 'verified' if verification['state'] == 'verified' else 'stale'
+        if not task_id:
+            counts['skipped'] += 1
+            return
+        if dry_run:
+            counts[label] += 1
+            log(f'DRY-RUN would stamp verification={label} on {task_id}')
+            return
+        if client is None:
+            counts['skipped'] += 1
+            return
+        attempted += 1
+        try:
+            ok = stamp(task_id, verification, client=client)
+        except Exception as e:  # noqa: BLE001 — one bad row never kills the tick
+            log(f'verification stamp raised for {task_id}: '
+                f'{type(e).__name__}: {e}', 'ERROR')
+            ok = False
+        if ok:
+            counts[label] += 1
+        else:
+            counts['failed'] += 1
+            log(f'verification stamp did not land for {task_id} '
+                f'(state={label}); card reads Unverified until the next tick',
+                'WARN')
 
     state = beacon_state if beacon_state is not None else approval.load_state()
     pending = state.get('pending', []) if isinstance(state, dict) else []
     counts['pending'] = len(pending)
 
-    to_demote: list[tuple[str, str]] = []  # (approval_id, evidence)
+    # (approval_id, evidence, task_id) — task_id is the chain_events join key,
+    # which normally equals the entry id (add_pending sets id = payload task_id)
+    # but is read through `_entry_task_id` so a divergent payload still stamps
+    # the right row.
+    to_demote: list[tuple[str, str, Optional[str]]] = []
+    to_verify: list[Optional[str]] = []  # task_ids whose premise still holds
     for entry in pending:
         if not isinstance(entry, dict):
             continue
@@ -639,16 +794,28 @@ def reconcile_stale_premises(
         counts['probed'] += 1
         verdict = evaluate(probe)
         if verdict == freshness_probe.FALSE:
-            to_demote.append((approval_id, _probe_evidence(probe)))
+            to_demote.append(
+                (approval_id, _probe_evidence(probe), _entry_task_id(entry)))
         else:
             # TRUE or INDETERMINATE — keep. Never demote on a non-FALSE verdict.
             counts['kept'] += 1
+            if verdict == freshness_probe.TRUE:
+                to_verify.append(_entry_task_id(entry))
+            else:
+                # INDETERMINATE stamps NOTHING. Writing a verdict we couldn't
+                # determine would be the false-clean shape this leg prevents;
+                # absence reads Unverified, which is the truth.
+                counts['skipped'] += 1
 
-    for approval_id, evidence in to_demote:
+    for task_id in to_verify:
+        _stamp(task_id, {'state': 'verified', 'probed_at': _verification_iso(now)})
+
+    for approval_id, evidence, task_id in to_demote:
         if dry_run:
             counts['demoted'] += 1
             log(f'DRY-RUN would demote pending approval {approval_id} '
                 f'(premise FALSE: {evidence})')
+            _stamp(task_id, {'state': 'stale', 'evidence': evidence})
             continue
         try:
             demoted = approval.demote(approval_id, evidence)
@@ -663,9 +830,15 @@ def reconcile_stale_premises(
             # card was marked stale when it wasn't is the same false-clean shape
             # this whole leg exists to prevent.
             log(f'premise-demote: {approval_id} no longer pending ({evidence})')
+            counts['skipped'] += 1
             continue
         counts['demoted'] += 1
         log(f'demoted pending approval {approval_id} (premise FALSE: {evidence})')
+        # Only AFTER the demote landed — a `stale` badge must never claim a
+        # demotion that didn't happen.
+        _stamp(task_id, {'state': 'stale', 'evidence': evidence})
+
+    _record_stamp_outcome(attempted=attempted, failed=counts['failed'])
 
     log('stale-premise reconcile: ' + ('DRY-RUN ' if dry_run else '')
         + ' '.join(f'{k}={v}' for k, v in counts.items()))
@@ -861,23 +1034,30 @@ def main() -> int:
         log(f'terminal-approval reconcile FAILED: {type(e).__name__}: {e}', 'ERROR')
         rc = 1
 
-    # Slice 2 — stale-premise reconcile. Like the terminal leg it needs only the
-    # local beacon-pending-approvals.json + git/gh (through freshness_probe's
-    # default executors) + a local demote write, so it runs BEFORE the Supabase
-    # connect and is guarded independently: a probe-leg failure never aborts the
-    # other reconcilers, and it NEVER auto-clears (demote is in-place).
+    # Connect ONCE, up front, and tolerate failure. Slice 2b's verification
+    # stamps need a client, but the legs below must not become Supabase-gated:
+    # a None client simply means cards go unstamped (reading as the honest
+    # Unverified default) while demotion and terminal-retire carry on.
     try:
-        reconcile_stale_premises(dry_run=args.dry_run)
+        client = _connect_supabase()
+    except Exception as e:  # noqa: BLE001
+        log(f'cannot connect to Supabase: {e}', 'WARN')
+        client = None
+
+    # Slice 2 — stale-premise reconcile. Its DEMOTE half needs only the local
+    # beacon-pending-approvals.json + git/gh (through freshness_probe's default
+    # executors), so it runs even with no client, and is guarded independently:
+    # a probe-leg failure never aborts the other reconcilers, and it NEVER
+    # auto-clears (demote is in-place). Slice 2b's stamps ride along on `client`.
+    try:
+        reconcile_stale_premises(client=client, dry_run=args.dry_run)
     except Exception as e:  # noqa: BLE001
         log(f'stale-premise reconcile FAILED: {type(e).__name__}: {e}', 'ERROR')
         rc = 1
 
     # The original Supabase-backed auto-clear (resolved decision rows on the
     # dashboard). Degrades to a clean skip when Supabase is unavailable.
-    try:
-        client = _connect_supabase()
-    except Exception as e:  # noqa: BLE001
-        log(f'cannot connect to Supabase: {e}', 'WARN')
+    if client is None:
         return rc
 
     try:
