@@ -17605,6 +17605,40 @@
       "retired_by": "heal_orphan_autoregister",
       "retired_at": "2026-08-01T17:39:30.752446+00:00",
       "retired_reason": "orphan-terminal"
+    },
+    {
+      "id": "proposed-graduation-ff-main-when-behind",
+      "name": "Graduation Ff Main When Behind",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `graduation-ff-main-when-behind`. Last activity 2026-08-03T17:33:40.779617+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "graduation-ff-main-when-behind"
+      ],
+      "repo": null,
+      "created": "2026-08-03",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-03T17:42:39.769561+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-03T17:33:40.779617+00:00"
+    },
+    {
+      "id": "proposed-graduation-auto-merge-clean-pr",
+      "name": "Graduation Auto Merge Clean PR",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `graduation-auto-merge-clean-pr`. Last activity 2026-08-03T17:31:25.03723+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "graduation-auto-merge-clean-pr"
+      ],
+      "repo": null,
+      "created": "2026-08-03",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-03T17:42:39.769561+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-03T17:31:25.03723+00:00"
     }
   ]
 }
