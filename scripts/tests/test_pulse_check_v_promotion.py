@@ -348,6 +348,31 @@ class TestReconcile(_RegistryFileBase):
         store = {'restart-daemon': [_ex(days_ago=i) for i in range(2, 0, -1)]}
         self.assertFalse(p5.reconcile_streaks(doc, store))
 
+    def test_promotion_loop_does_not_persist_the_streak_cache(self):
+        """The reconcile is IN MEMORY only — the registry file must not change.
+
+        clean_streak is a write-only cache: every gate derives the real streak
+        from the executions store, and no reader consults the stored field.
+        Persisting it wrote to a file outside Pulse's cycle write-set, so the
+        guard reverted it on EVERY run (the value has been 0 in every commit
+        since the registry was created) and each revert filed a stray-edit
+        incident. If this test fails, someone re-added the write — the fix is
+        NOT to widen the write-set: this is the file that defines what Pulse
+        may do unsupervised.
+        """
+        self._write(_registry(_pattern('restart-daemon', clean_streak=0)))
+        before = self.reg_path.read_text()
+        orig_store = p5.load_executions_store
+        p5.load_executions_store = lambda *a, **k: {
+            'restart-daemon': [_ex(days_ago=i) for i in range(4, 0, -1)]}
+        try:
+            p5.run_promotion_loop()
+        finally:
+            p5.load_executions_store = orig_store
+        self.assertEqual(
+            self.reg_path.read_text(), before,
+            'run_promotion_loop persisted the streak cache to the registry')
+
 
 if __name__ == '__main__':
     unittest.main()

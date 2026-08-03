@@ -715,8 +715,17 @@ def run_promotion_loop(*, chat_id: Optional[int] = None) -> dict[str, Any]:
     Returns a summary dict for the artifact/log."""
     doc = load_registry()
     store = load_executions_store()
-    if reconcile_streaks(doc, store):
-        save_registry(doc)
+    # Reconcile IN MEMORY only — deliberately not persisted. The registry's
+    # clean_streak is a write-only cache: every gate derives the real streak
+    # fresh from the executions store (find_graduation_candidates below), and
+    # grepping the tree finds no reader of the stored field for any decision.
+    # Persisting it wrote to a file outside Pulse's cycle write-set, so the
+    # guard reverted it on every single run — the value has been 0 in EVERY
+    # commit since the registry was created — and each revert filed a
+    # stray-cycle-edit incident. Dropping the write removes that toil and
+    # changes no behaviour. Do NOT "fix" this by widening the write-set: this
+    # is the file that defines what Pulse may do unsupervised.
+    reconcile_streaks(doc, store)
     candidates = find_graduation_candidates(doc, store)
     created = emit_graduation_proposals(candidates, chat_id=chat_id)
     return {
@@ -785,13 +794,25 @@ def main(argv: Optional[list[str]] = None) -> int:
     # itself now flows from the executions-derived clean streak, not the
     # dispatch-count rule. Run after the artifact write so a promotion-loop
     # failure can't block the monthly idempotency marker.
+    promo_emitted: Optional[int] = None
     try:
         promo = run_promotion_loop()
+        promo_emitted = promo['proposals_emitted']
         log(f'promotion loop: candidates={promo["candidates"]} '
-            f'proposals_emitted={promo["proposals_emitted"]}')
+            f'proposals_emitted={promo_emitted}')
     except Exception as e:  # noqa: BLE001 — never wedge the monthly check
         log(f'promotion loop failed: {type(e).__name__}: {e}', 'WARN')
-    log(f'Check V complete: proposals={len(result.proposals)} '
+    # Report the LIVE path's count first. This line used to print only
+    # len(result.proposals) — the legacy guard-list shim, which no longer
+    # graduates anything and is structurally always 0. On 2026-08-03 it logged
+    # `proposals=0` immediately after the promotion loop emitted THREE real
+    # graduation proposals, so every reader (the digest, the alert, my own
+    # memory) recorded Check V as quiet while two PRs sat stalled. A summary
+    # that omits the live path is worse than no summary.
+    _promo_txt = 'unavailable (loop failed)' if promo_emitted is None \
+        else str(promo_emitted)
+    log(f'Check V complete: graduation_proposals={_promo_txt} '
+        f'legacy_guard_list_proposals={len(result.proposals)} '
         f'templates_evaluated={result.template_count}')
     return 0
 

@@ -596,8 +596,18 @@ def synthesize_proposals(
     ]
     if sigma_hits and len(proposals) < MAX_PROPOSALS_PER_DIGEST:
         top = sigma_hits[0]
+        # Never render a naked empty identifier. ledger_weekly now normalises an
+        # empty task_id to "unknown", but this proposal is the thing Larry acts
+        # on, so it degrades to what the row DOES know (agent + type) rather than
+        # emitting "task ``" and sending him to the archive to guess.
+        _tid = (top.get("task_id") or "").strip()
+        if _tid and _tid != "unknown":
+            _what = f"task `{_tid}`"
+        else:
+            _what = (f"unidentified task from `{top.get('agent') or 'unknown'}`"
+                     f" (type: {top.get('task_type') or 'unclassified'})")
         proposals.append({
-            "title": f"Review high-σ anomaly task `{top.get('task_id')}`",
+            "title": f"Review high-σ anomaly {_what}",
             "effort": "small",
             "impact": (
                 f"${float(top.get('cost_usd', 0.0)):.2f} task vs "

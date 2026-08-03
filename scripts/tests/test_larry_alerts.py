@@ -486,6 +486,12 @@ class CliSubcommandTest(_IsolatedQueueTest):
         self.assertEqual(rec['body'], 'do X')
         self.assertEqual(rec['source'], 'medic')
         self.assertEqual(rec['chat_id'], 7)
+        # An approval_request must carry `subject`, not just `approval_id`.
+        # Every consumer that GROUPS alerts keys on source+subject, so a record
+        # without it aggregates as `<source> / "" xN` — which is how Check V's
+        # three real graduation proposals appeared in the 2026-08-03 digest as
+        # `pulse-check-v / "" x3`, with nothing to identify them by.
+        self.assertEqual(rec['subject'], 'medic-fp-1')
 
     def test_approval_request_source_defaults_when_omitted(self):
         rc = larry_alerts.main([
