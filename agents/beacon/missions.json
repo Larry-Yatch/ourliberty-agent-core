@@ -17710,6 +17710,40 @@
       "retired_by": "heal_orphan_autoregister",
       "retired_at": "2026-08-03T20:44:07.680556+00:00",
       "retired_reason": "orphan-terminal"
+    },
+    {
+      "id": "proposed-delegate-cap-flag-work-that-merged-with-no-human-review-as-a-c32c",
+      "name": "Delegate Cap Flag Work That Merged With No Human Review As A C32c",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `delegate-cap-flag-work-that-merged-with-no-human-review-as-a-c32c`. Last activity 2026-08-03T23:36:09.797225+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "delegate-cap-flag-work-that-merged-with-no-human-review-as-a-c32c"
+      ],
+      "repo": null,
+      "created": "2026-08-03",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-03T23:45:20.141394+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-03T23:36:09.797225+00:00"
+    },
+    {
+      "id": "proposed-delegate-cap-auto-retire-provably-merged-cards-kill-the-ack-b-9ae0",
+      "name": "Delegate Cap Auto Retire Provably Merged Cards Kill The Ack B 9ae0",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `delegate-cap-auto-retire-provably-merged-cards-kill-the-ack-b-9ae0`. Last activity 2026-08-03T23:30:52.91687+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "delegate-cap-auto-retire-provably-merged-cards-kill-the-ack-b-9ae0"
+      ],
+      "repo": null,
+      "created": "2026-08-03",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-03T23:45:20.141394+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-03T23:30:52.91687+00:00"
     }
   ]
 }
