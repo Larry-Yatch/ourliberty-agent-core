@@ -6,6 +6,12 @@
 
 ---
 
+## G-rule pulse-check-xiv-tier4-no-translation-001 — 1/3 (new, iter ~7390)
+
+**Rule:** pulse-check-xiv alerts (subject^=pulse-check-xiv-oversilence: and subject=pulse-check-xiv-digest) return Tier-4 from triage helper (novel, no translation match). These are informational FYI-tier observability reports that the bot already delivers via the alert pipeline (outbox-notifier/beacon_telegram_bot.py). Pulse receiving them via larry-alerts.jsonl and sending a SECOND DM would be duplicate noise. Fix: add Tier-3 (or Tier-FYI) translation entries for `source=pulse-check-xiv` in config/alert-translations.json so Check 0 silences them on sight. First occurrence: iter ~7390 (2026-08-03T12:00Z UTC; 3 alerts: oversilence:doorbell, oversilence:medic, digest). Dispatch to Beacon at 3/3.
+
+---
+
 ## G-rule check-v-auto-fix-patterns-no-commit-path-001 — 1/3 (new, iter ~7374)
 
 **Rule:** Check V systemd timer writes graduation tracking data (clean_streak counter updates) to `config/auto-fix-patterns.json`, but that file is NOT in `PULSE_RUNTIME_PATHS` or `SYNC_EXTRA_RUNTIME_PATHS`. Result: run_cycle.sh's stray-edit guard detects it as non-managed dirt, archives the diff, and reverts the file — losing Check V's streak data each cycle. First occurrence: iter ~7374 (2026-08-03T11:08Z UTC). The clean_streak for `auto-merge-clean-pr` updated 0→338 was reverted by the stray-edit guard. Symptom also seen: Check A fires as dirty-tree finding each time Check V runs. Dispatch permanent fix to Beacon at 3/3: Check V needs either (a) add `config/auto-fix-patterns.json` to PULSE_RUNTIME_PATHS so run_cycle.sh commits it, or (b) Check V writes its tracking state to a non-git state file and only updates auto-fix-patterns.json via a PR when graduation is actually approved by Larry.
