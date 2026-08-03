@@ -2892,6 +2892,15 @@ class AlertRefRepoTest(unittest.TestCase):
         rec = {'message': 'PR #9 (Larry-Yatch/RSDPM) on branch `x` opened'}
         self.assertEqual(h.alert_ref_repo(rec), 'Larry-Yatch/RSDPM')
 
+    def test_a_url_outranks_a_parenthesised_slug(self):
+        """The URL is unambiguous; the slug regex could match some other
+        parenthesised path. Pinned because only a DISAGREEING pair can tell the
+        two orderings apart — with real alerts, where they agree, the wrong
+        precedence is invisible."""
+        rec = {'message': 'PR #1 (Larry-Yatch/decoy) on branch `x`',
+               'suggested_action': 'https://github.com/Larry-Yatch/RSDPM/pull/1'}
+        self.assertEqual(h.alert_ref_repo(rec), 'Larry-Yatch/RSDPM')
+
     def test_none_when_the_alert_names_no_repo(self):
         """agent-core alerts name no owner/repo — they MUST stay on the historic
         default so this change is a no-op for them."""
