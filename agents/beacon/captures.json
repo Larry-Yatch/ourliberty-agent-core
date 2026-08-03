@@ -3146,6 +3146,110 @@
       "closed_by": "heal_missions_card_gc:terminal-backstop",
       "shipped_note": "shipped (linked work merged)",
       "awaiting_ack": true
+    },
+    {
+      "id": "cap-auto-retire-provably-merged-cards-kill-the-ack-b-9ae0",
+      "title": "Auto-retire provably-merged cards (kill the ack button) + name what closed in the CEO digest",
+      "note": "Stop diverting provably-merged cards into a human ack queue, and name what closed in the digest Larry already reads. ONE change \u2014 see WHY THEY CANNOT SHIP SEPARATELY.\n\nWHEN TO RUN THIS: anytime. No dependencies. Larry approved the shape 2026-08-03.\n\nTHE PROBLEM: `classify_completion` routes a verified-merged card by RISK \u2014 `safe` auto-closes to `done`; `medium`/`careful`/un-rated go to `review_close` + `awaiting_ack`. All 12 cards currently in `review_close` are rated `careful` (9) or `medium` (3), so the gate is working as designed. But the ack is theatre: Larry cannot verify the work himself, closing the card cannot un-merge anything, and there is no choice attached \u2014 it is a decision-shaped control on something that is not a decision. The risk rating describes BUILDING the thing; it says nothing about closing a record of work that already merged. Larry's words: \"If all I'm doing is clicking a button without any insights or choices, why does the button exist?\"\n\nWorse, `review_close` renders NOWHERE \u2014 the dashboard knows exactly three capture states (`parked`/`promoted`/`dropped`) and neither `dashboard_api` nor the frontend mentions `review_close`. So the state built to stop a risky card closing silently makes it vanish silently.\n\nBUILD:\n1. In `classify_completion` (heal_missions_card_gc), a verified-merged card auto-closes to `done` regardless of risk. Keep the merge proof EXACTLY as strict as it is \u2014 belt-and-suspenders (chain_events `auto_merge` AND `gh pr view` MERGED, every task_id); anything unresolved still KEEPS the card. Only the risk-based diversion goes.\n2. Retire the `review_close` state and the `awaiting_ack` flag with it, OR render them \u2014 do not leave a written-but-undisplayed state behind. Recommend retiring: nothing should write a state no surface reads.\n3. Add risky-shipped work to the existing CEO digest (`ceo_digest_generator.py`, one `ceo_digest` chain_event, already rendered by the Approvals page DigestCard \u2014 NO new surface). Each line must name BOTH the card that closed AND the PR that closed it.\n\nWHY THEY CANNOT SHIP SEPARATELY \u2014 this is load-bearing: auto-close removes the only thing that surfaces a closure. The digest becomes the sole awareness path. Shipping (1) without (3) means risky work closes with nothing telling Larry, which is strictly worse than today.\n\nTHE FALSE-POSITIVE THIS MUST TOLERATE (found 2026-08-03, real): the `terminal-backstop` leg proves only that the DELEGATION spawned a PR that MERGED \u2014 not that the PR did what the card asked. Live example: `cap-approvals-freshness-retrofit-a-producer-to-autho-9525` says \"make a producer author probes\"; its delegation merged adjacent work; NOTHING authors a probe; the card reads `shipped (linked work merged)` with no `shipped_pr_url`. So \"shipped\" means \"your delegation merged something\". That is exactly why the digest must print card + closing PR side by side: a human reading \"closed <card> because <PR> merged\" spots a mismatch instantly, where a silent auto-close hides it forever. Do NOT try to make the probe semantically verify intent \u2014 that is a much bigger problem; make the closure READABLE instead.\n\nREVIEW: /code-review high REQUIRED. It changes what silently disappears from Larry's board, and a wrong branch closes live work while looking exactly like a working board.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "main",
+        "captured_at": "2026-08-03T23:19:09.169358+00:00"
+      },
+      "last_touched": "2026-08-03T23:19:09.169358+00:00",
+      "promoted_to": null,
+      "spawned": {
+        "kind": "delegate",
+        "task_id": "delegate-cap-auto-retire-provably-merged-cards-kill-the-ack-b-9ae0",
+        "stamped_at": "2026-08-03T23:23:52.911161+00:00"
+      },
+      "briefing": {
+        "what": "Work that's already finished currently sits waiting for you to click an acknowledge button that offers you no real choice, so this would close those items automatically and instead list each one \u2014 along with what actually shipped \u2014 in the daily summary you already read.",
+        "why": "Right now a dozen finished items are stuck in a holding state that no screen even displays, so you're doing busywork on some work while losing sight of the rest \u2014 and the summary line naming what closed is what lets you catch the occasional case where something shipped that doesn't match what was asked for.",
+        "suggest": "Worth doing, but only as a single change where the automatic closing and the summary listing land together \u2014 closing things silently without telling you would be worse than today, so it needs a careful review before it goes live."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-03T23:25:12.357727+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+    },
+    {
+      "id": "cap-flag-work-that-merged-with-no-human-review-as-a-c32c",
+      "title": "Flag work that merged with NO human review as a real choice \u2014 review now, or accept",
+      "note": "Surface work that merged with NO human review as a real question \u2014 \"review this now, or accept it\" \u2014 instead of burying it among closeouts nobody can act on.\n\nWHEN TO RUN THIS: after (or with) the auto-retire + digest card. It needs the digest as its delivery surface. No other dependency. Larry approved the shape 2026-08-03.\n\nTHE INSIGHT: the current closeout gate asks \"was this RISKY TO BUILD?\" That is the wrong question \u2014 a risky card whose PR already had a real human review has had its scrutiny, and acking it adds nothing. The question worth Larry's attention is \"DID ANYONE ACTUALLY LOOK AT THIS?\" A change that merged with no human review is the one he might want eyes on, whatever its risk rating.\n\nBUILD:\n1. When a card's work is verified-merged, check whether its PR carried human review \u2014 the `deep-review-passed` label is the durable signal (see `config/deep-review-paths.json` and `outbox_notifier._deep_review_required`); a Mirror PASS alone is NOT a human.\n2. Reviewed \u2192 close it, mention it in the digest, ask nothing.\n3. NOT reviewed \u2192 surface ONE real choice: \"this merged without a human review \u2014 review it now, or accept it.\" That is a genuine decision with a genuine action behind it, unlike the ack it replaces.\n4. Deliver it in the existing CEO digest (`ceo_digest_generator.py` \u2192 Approvals page DigestCard). Do NOT invent a new lane or a new state; the `review_close` mistake is exactly what happens when a writer targets a surface no reader knows about.\n\nWHY IT MATTERS, MEASURED ON THE CURRENT BOARD: of the approvals-freshness arc, #1079, #1083, #1085 and #1086 carried `deep-review-passed`; #1072, #1077, #1080 and #1087 did not. **#1080 is the birth gate** \u2014 it decides whether an approval card is ever CREATED, i.e. whether a decision ever reaches Larry \u2014 and it merged with nobody looking (2026-08-01T01:17Z, `b70d31a5`, no labels), because `heal_unregistered_approval.py` was not in the deep-review fileset at the time (fixed since, #1083). Under this rule that one card surfaces and the other eleven retire themselves. Today it is indistinguishable from eleven cards that need nothing, which is precisely why the whole pile reads as noise.\n\nSCOPE DISCIPLINE: this is a READ of an existing label plus a line in an existing digest. It is NOT a new review pipeline, NOT a new state, NOT a new dashboard lane. If it starts growing one, stop and re-scope.\n\nREVIEW: /code-review high REQUIRED \u2014 it decides which merged-unreviewed work gets flagged to Larry, and a wrong branch means dangerous work merges unreviewed AND unmentioned, which fails looking exactly like a clean board.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "main",
+        "captured_at": "2026-08-03T23:19:09.635472+00:00"
+      },
+      "last_touched": "2026-08-03T23:19:09.635472+00:00",
+      "promoted_to": null,
+      "spawned": {
+        "kind": "delegate",
+        "task_id": "delegate-cap-flag-work-that-merged-with-no-human-review-as-a-c32c",
+        "stamped_at": "2026-08-03T23:23:55.734071+00:00"
+      },
+      "briefing": {
+        "what": "A change to your daily summary so that any work which went live without a person ever looking at it gets called out to you by name, with one question: look at it now, or let it stand.",
+        "why": "Right now that work is mixed in with everything else that needs nothing from you, so the one item that actually deserved a second pair of eyes reads as noise \u2014 recently a change controlling whether decisions even reach you at all slipped through with nobody looking.",
+        "suggest": "Worth doing, and it's a small, low-stakes addition to the summary you already get \u2014 do it right after the summary cleanup lands, and hold the line on keeping it that small."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-03T23:25:12.357727+00:00",
+        "from_state": "parked"
+      }
+    },
+    {
+      "id": "cap-approvals-freshness-retrofit-a-producer-to-autho-6430",
+      "title": "Approvals freshness \u2014 RETROFIT a producer to author probes (RE-FILE: the original was falsely auto-closed)",
+      "note": "RE-FILE of `cap-approvals-freshness-retrofit-a-producer-to-autho-9525`, which was FALSELY closed as shipped. The work described below has NOT been done. This is the last piece of the approvals-freshness arc and the only one that makes any of it do something.\n\nWHY THIS CARD EXISTS TWICE: the original was moved to `review_close` by `heal_missions_card_gc:terminal-backstop` with `shipped_note: \"shipped (linked work merged)\"` and NO `shipped_pr_url`. That leg proves only that the card's DELEGATION spawned a PR that merged \u2014 not that the PR did what the card asked. Its delegation merged adjacent work; nothing authors a probe. Verified 2026-08-03 on origin/main: `heal_unregistered_approval` only CARRIES FORWARD a probe via `extract_freshness_probe(record)` when a source record already has one (slice 3 plumbing). No producer CONSTRUCTS one. `larry_alerts.py` does not mention `freshness_probe` at all.\n\nWHEN TO RUN THIS: anytime \u2014 both original preconditions are now met. The deep-review fileset now holds `scripts/heal_unregistered_approval.py` (#1083 merged 2026-08-01), so this PR gets HELD for a human. Slice 2b (#1085) shipped, so a probe verdict reaches the Approvals tab and you can SEE what you author.\n\nTHE WORK: make a producer AUTHOR a `freshness_probe` on the approval cards it files. Every slice of the arc (1 #1072, 2 #1079, 2a dashboard #155, 2b #1085, 3 #1080) built machinery and every one deferred this. Until it lands the arc marks ZERO cards stale and suppresses ZERO cards at birth; every card reads \"Unverified\" \u2014 honest, correct, and no behaviour change. This is the card that pays off the original problem: 8 cards on Larry's tab 2026-07-29, 6 of which did not need a human.\n\nSCOPE \u2014 ONE PRODUCER. This is the trap that killed the parent capture (its delegation died at the 600s wall having produced nothing). ~10 modules emit APPROVAL_REQUEST markers. Do NOT cover them all. Land `heal_unregistered_approval` ALONE \u2014 it minted 4 of the 8 cards that day, 3 stale or unanswerable. Widen only after it is proven in production.\n\nHOW: authors already write the evidence down; converting a cited fact into a probe is near-free at filing and impossible after. Worked examples: the confirm-all card cited `app/queue/verdict.ts` + `CONFIRM_ALL_TIERS` + `bulkCovered` (a `file_contains` probe flips FALSE when RSDPM #151 merged, 2h18m after filing); `unreg-approval-cfd444ed29ee` (\"migration 0033 not live\") gave the exact `schema_migration_log` query. Schema + kinds: `scripts/freshness_probe.py`. NOTE the `sql` kind is still INERT (\u2192 INDETERMINATE \u2192 keep) with no read-only executor, so start with the git-backed kinds.\n\nTHE TEETH: slice 3 is MERGED AND LIVE and SUPPRESSES a card at birth on a FALSE probe. A badly-authored probe means a REAL decision that never reaches Larry. #1086 (merged 2026-08-03) made birth-suppressed cards visible + recoverable, which defuses most of this \u2014 CONFIRM that is actually working before authoring the first probe, and do not rely on logs alone.\n\nREVIEW: /code-review high REQUIRED. It decides what never reaches Larry's decision queue.",
+      "state": "parked",
+      "label": null,
+      "origin": {
+        "source": "desktop-chat",
+        "session_id": null,
+        "repo": "ourliberty-agent-core",
+        "branch": "main",
+        "captured_at": "2026-08-03T23:19:16.919861+00:00"
+      },
+      "last_touched": "2026-08-03T23:19:16.919861+00:00",
+      "promoted_to": null,
+      "spawned": {
+        "kind": "delegate",
+        "task_id": "delegate-cap-approvals-freshness-retrofit-a-producer-to-autho-6430",
+        "stamped_at": "2026-08-03T23:23:58.844597+00:00"
+      },
+      "briefing": {
+        "what": "A small change so the system checks whether an approval request is still relevant before it lands on your desk \u2014 and quietly drops the ones that answered themselves.",
+        "why": "On a recent day you got eight approval requests and six of them didn't actually need you; everything built so far to fix that is sitting idle until this last piece is in place.",
+        "suggest": "Worth doing, but keep it to the single biggest source of these requests and confirm first that anything auto-dropped still shows up somewhere you can find it, since the cost of hiding a real decision is higher than the nuisance it saves."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-03T23:25:12.357727+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     }
   ]
 }
