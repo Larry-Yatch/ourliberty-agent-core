@@ -2959,6 +2959,44 @@ class PrimaryRefRepoTest(unittest.TestCase):
         self.assertIsNone(h.primary_ref_repo('no numbers here', {}))
 
 
+class ForLarryRefRepoTest(unittest.TestCase):
+    """The for-Larry builder's `_ref_repo` must actually FIRE.
+
+    Caught by self-review, not by the suite: the first attempt derived it from
+    the record id, but a for-Larry id is `mirror-review:<task>` and carries no
+    `#<n>` — so it returned None for every record of this shape while the repo
+    sat unread in the record's own `pr_url`. A stamp that never fires is the
+    same inert-plumbing defect the review flagged on the marker path."""
+
+    def test_reads_the_records_own_pr_url(self):
+        self.assertEqual(
+            h.record_pr_url_repo(FORLARRY_DECISION_RECORD),
+            'Larry-Yatch/ourliberty-agent-core')
+
+    def test_the_id_alone_yields_nothing(self):
+        """Pins WHY the pr_url path is needed — if this ever starts returning a
+        repo, the builder could go back to the subject-based derivation."""
+        self.assertEqual(h.parse_ref_numbers(FORLARRY_DECISION_RECORD['id']), [])
+        self.assertIsNone(h.primary_ref_repo(
+            FORLARRY_DECISION_RECORD['id'], FORLARRY_DECISION_RECORD))
+
+    def test_builder_stamps_a_real_repo(self):
+        payload = h.build_for_larry_approval_payload(
+            FORLARRY_DECISION_RECORD,
+            h.forlarry_dedup_key(FORLARRY_DECISION_RECORD['id']))
+        self.assertEqual(payload['_ref_repo'],
+                         'Larry-Yatch/ourliberty-agent-core')
+
+    def test_untrusted_owner_in_pr_url_is_refused(self):
+        rec = dict(FORLARRY_DECISION_RECORD,
+                   pr_url='https://github.com/someone-else/repo/pull/854')
+        self.assertIsNone(h.record_pr_url_repo(rec))
+
+    def test_no_pr_url_is_none_not_a_raise(self):
+        for rec in ({}, {'pr_url': None}, {'pr_url': 'nonsense'}, None, 42):
+            self.assertIsNone(h.record_pr_url_repo(rec))
+
+
 class RepoOverrideTest(unittest.TestCase):
     """An operator who pinned the repo outranks anything derived from text."""
 

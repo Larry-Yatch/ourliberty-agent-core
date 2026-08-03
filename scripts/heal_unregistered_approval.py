@@ -619,6 +619,21 @@ def primary_ref_repo(subject: Any, *sources: Any) -> Optional[str]:
     return ref_repo_for_number(min(refs), *sources)
 
 
+def record_pr_url_repo(record: Any) -> Optional[str]:
+    """Repo from a record's own `pr_url` coordinate, else None.
+
+    For-Larry records are keyed by an opaque id (`mirror-review:<task>`), not a
+    subject carrying `#<n>`, so `primary_ref_repo` finds no ref in them and
+    returns None for EVERY such record — a stamp that never fires. Their repo is
+    not missing though: the record carries an explicit `pr_url`. Reads it through
+    `parse_pr_url` (the same grammar the recheck consumer uses) and re-checks the
+    number against the record so the trusted-owner rule still applies."""
+    coord = parse_pr_url(record.get('pr_url') if isinstance(record, dict) else None)
+    if coord is None:
+        return None
+    return ref_repo_for_number(coord[1], record)
+
+
 def _gh_state(kind: str, number: int, repo: str, timeout: float) -> Optional[str]:
     """Return the `state` field from `gh <kind> view <number>` or None on any
     failure (timeout, gh missing, non-PR/issue number, bad JSON).
@@ -1619,11 +1634,12 @@ def build_for_larry_approval_payload(
         '_subject': record_id,
         '_forlarry_norm_id': forlarry_norm_id(str(record_id)),
         # Stamped here too: main() reads `_ref_repo` off every payload in the
-        # promote batch, and this builder feeds that same batch. Leaving it off
-        # made the key a non-invariant and silently dropped a repo this record
-        # already carries (its pr_url), so those entries retired against the
-        # default repo — the same defect, one path over.
-        '_ref_repo': primary_ref_repo(record_id, record),
+        # promote batch, and this builder feeds that same batch, so leaving it
+        # off made the key a non-invariant. It reads the record's OWN `pr_url` —
+        # a for-Larry id carries no `#<n>`, so the subject-based derivation
+        # returns None for every record of this shape and would be a stamp that
+        # never fires.
+        '_ref_repo': record_pr_url_repo(record),
     }
     if recheck_target is not None:
         payload['recheck_target'] = recheck_target
