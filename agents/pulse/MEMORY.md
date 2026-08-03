@@ -6,6 +6,12 @@
 
 ---
 
+## G-rule heal-approvals-surface-drift-missing-card-cooldown-collision-001 — 1/3 (new, iter ~7530)
+
+**Rule:** heal-approvals-surface-drift fires `missing_card` alerts when an approval card exists in the unregistered-approval state but doesn't appear on the Approvals tab decide tab for ≥3 consecutive checks. First occurrence: iter ~7530 (2026-08-03T21:56Z UTC). Context: `unreg-approval-732b8a6c7762` was created for `pipeline-stall:unrouted-pr:PR#1092` (a fix/* branch that is unrouted-by-design, cooldown-suppressed by heal_pipeline_stall since iter ~7522). The approval card was likely created before the cooldown engaged; the promote predicate is now failing to surface it on the tab. Bot delivered idx=661 at 21:54:50Z UTC. Proposed fix: `scripts/heal_unregistered_approval.py` should not create or retain approval cards for alerts that are currently cooldown-suppressed by `heal_pipeline_stall.py` (i.e., if the originating alert is cooldown-suppressed, the approval card should be retired, not promoted). Dispatch to Beacon at 3/3.
+
+---
+
 ## G-rule pulse-check-xiv-tier4-no-translation-001 — 1/3 (new, iter ~7390)
 
 **Rule:** pulse-check-xiv alerts (subject^=pulse-check-xiv-oversilence: and subject=pulse-check-xiv-digest) return Tier-4 from triage helper (novel, no translation match). These are informational FYI-tier observability reports that the bot already delivers via the alert pipeline (outbox-notifier/beacon_telegram_bot.py). Pulse receiving them via larry-alerts.jsonl and sending a SECOND DM would be duplicate noise. Fix: add Tier-3 (or Tier-FYI) translation entries for `source=pulse-check-xiv` in config/alert-translations.json so Check 0 silences them on sight. First occurrence: iter ~7390 (2026-08-03T12:00Z UTC; 3 alerts: oversilence:doorbell, oversilence:medic, digest). Dispatch to Beacon at 3/3.
