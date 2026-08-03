@@ -31,6 +31,11 @@ auto-promotes to ``systemic_fix`` when its verifying signal appears
 within 7d; ``promote_verification_pending`` performs the promotion by
 appending a new ``systemic_fix`` row that references the original.
 
+``verification_pending`` is RETIRED as of 2026-08-03 (``runbooks/cycle-prompt.md``
+§ 6.2) — see ``RETIRED_KINDS``. The ``append`` CLI rejects it; everything else
+about the kind is unchanged, because the log is append-only and the historical
+rows must keep parsing, promoting, and expiring for the G5 retrospective.
+
 Stdlib only. Atomic write semantics for promotion (the append-only base
 log can use simple appends; promotions write a new row, never rewrite).
 """
@@ -68,6 +73,23 @@ VALID_KINDS = (
 # — so an untagged *real* intervention is preserved as a visible, countable,
 # single-bucket data point instead of being silently lost.
 TEMPLATE_REQUIRED_KINDS = ('intervention', 'systemic_fix')
+
+# Kinds that stay VALID FOR READING but may no longer be written from the CLI.
+# verification_pending was retired 2026-08-03 (cycle-prompt.md § 6.2): of the 48
+# expired-unpromoted rows in full history only 2 carried a verification_anchor
+# at all (both free-text prose) and every one had verifies_at null, so nothing
+# falsifiable was ever recorded at filing time and a pending row could never be
+# promoted. The kind stays in VALID_KINDS deliberately — the log is append-only,
+# the historical rows must keep parsing, and promote_verification_pending /
+# expired_unpromoted_verification_pending must keep working so the G5 weekly
+# retrospective still surfaces them.
+RETIRED_KINDS = {
+    'verification_pending': (
+        'retired 2026-08-03 (cycle-prompt.md § 6.2) — record `intervention` '
+        'instead, or `systemic_fix` if you have confirmed the fix landed and '
+        'worked. Historical rows remain readable; no new ones are written.'
+    ),
+}
 
 # The "classify me" bucket. Never an auto-fix pattern, permanently non-
 # graduating (config/auto-fix-patterns.json marks it permanent_guard; Check V
@@ -514,6 +536,14 @@ def _cli_ratio(_args) -> int:
 
 
 def _cli_append(args) -> int:
+    # Retired kinds are rejected at the CLI boundary only: append_action stays
+    # lenient for internal callers (promote_verification_pending) and the read
+    # path is untouched. Reject BEFORE any parsing or write so the log is never
+    # touched.
+    if args.kind in RETIRED_KINDS:
+        print(f'error: --kind {args.kind} is {RETIRED_KINDS[args.kind]}',
+              file=sys.stderr)
+        return 2
     payload = json.loads(args.payload) if args.payload else {}
     # Preferred path: separate --template / --detail flags. They are routed
     # through canonical_intervention_id, which validates the template shape and
@@ -558,7 +588,11 @@ def main(argv: Optional[list[str]] = None) -> int:
                    help='Print the trailing-30d ratio metric as JSON.')
     p_app = sub.add_parser('append', help='Append one row.')
     p_app.add_argument('--tier', required=True, type=int, choices=[1, 2, 3])
-    p_app.add_argument('--kind', required=True, choices=list(VALID_KINDS))
+    p_app.add_argument('--kind', required=True, choices=list(VALID_KINDS),
+                       help='Row kind. Kinds in RETIRED_KINDS '
+                            '(verification_pending) stay valid for READING but '
+                            'are rejected here — the command exits non-zero and '
+                            'writes nothing.')
     p_app.add_argument('--iter', type=int, default=0)
     p_app.add_argument('--template',
                        help='Action-template id (kebab-case, '

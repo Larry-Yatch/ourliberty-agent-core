@@ -114,11 +114,17 @@ class TestRules(unittest.TestCase):
 
     def test_tighten_masking_fires_when_pending_low_and_trend_not_improving(self):
         # pending_rate < 0.05, trend != improving. Build rows where
-        # interventions = systemic_fixes ≈ same in both halves -> flat
-        # trend, and pending=0 (rate=0 < 0.05).
-        rows = []
+        # interventions = systemic_fixes in both halves -> flat trend, plus ONE
+        # live pending row so the rate is low-but-nonzero (1/41 ≈ 0.02).
+        # The row is required: with pending=0 the retired-category
+        # short-circuit precedes this rule and no proposal is emitted (that is
+        # the whole point of the retirement — see
+        # TestRetiredCategoryShortCircuit). It is dated inside the 7d promote
+        # window so it is not "aged", keeping rule 3 out of the result.
+        rows = [_row(kind='verification_pending', days_ago=2,
+                     intervention_id='live')]
         for h in (20 * 24, 1):  # older + recent halves
-            for _ in range(5):
+            for _ in range(10):
                 rows.append({
                     'ts': (NOW - timedelta(hours=h)).isoformat(),
                     'kind': 'intervention', 'tier': 1,
@@ -129,6 +135,8 @@ class TestRules(unittest.TestCase):
                     'kind': 'systemic_fix', 'tier': 1,
                     'intervention_id': '', 'verified_at': None,
                 })
+        metrics = p6.compute_metrics(rows, now=NOW)
+        self.assertLess(metrics.pending_rate, p6.PENDING_LOW_RATE)
         result = p6.run_check(rows=rows, now=NOW)
         rules = {p.rule for p in result.proposals}
         self.assertIn('tighten_masking', rules)
@@ -185,6 +193,74 @@ class TestArtifactAtomicity(unittest.TestCase):
         path = p6.write_artifact(artifact)
         leftovers = list(path.parent.glob('*.tmp'))
         self.assertEqual(leftovers, [])
+
+
+class TestRetiredCategoryShortCircuit(unittest.TestCase):
+    """verification_pending retired 2026-08-03 (cycle-prompt.md § 6.2).
+
+    With no NEW pending rows in the window the check must short-circuit BEFORE
+    every proposal rule and emit zero proposals.
+    """
+
+    def test_zero_pending_rows_short_circuits_to_retired(self):
+        rows = [
+            _row(kind='intervention', days_ago=d) for d in range(1, 20)
+        ] + [_row(kind='systemic_fix', days_ago=5)]
+        res = p6.run_check(rows=rows, now=NOW)
+        self.assertEqual(res.rule_fired, 'retired')
+        self.assertEqual(res.proposals, [])
+        self.assertIn('retired', res.rationale)
+
+    def test_does_not_fire_tighten_masking_off_zero_pending_rate(self):
+        """The load-bearing guard: a retired category drives pending_rate to
+        0.0, which satisfies rule 2's `< 0.05` forever. Without the
+        short-circuit Check VI proposes 'tighten' on an empty category every
+        month. These rows are built to satisfy rule 2 in full."""
+        rows = [
+            _row(kind='intervention', days_ago=d) for d in range(1, 15)
+        ] + [_row(kind='systemic_fix', days_ago=20)]
+        metrics = p6.compute_metrics(rows, now=NOW)
+        self.assertEqual(metrics.pending_rate, 0.0)
+        self.assertLess(metrics.pending_rate, p6.PENDING_LOW_RATE)
+        self.assertNotEqual(metrics.ratio_trend, 'improving')
+
+        res = p6.run_check(rows=rows, now=NOW)
+        self.assertEqual([p.rule for p in res.proposals], [])
+        self.assertEqual(res.rule_fired, 'retired')
+
+    def test_historical_rows_only_still_zero_proposals(self):
+        """Historical pending rows sit outside the 30d window; they must not
+        revive the category."""
+        rows = [
+            _row(kind='verification_pending', days_ago=90,
+                 intervention_id='old-a'),
+            _row(kind='verification_pending', days_ago=200,
+                 intervention_id='old-b'),
+            _row(kind='intervention', days_ago=3),
+        ]
+        res = p6.run_check(rows=rows, now=NOW)
+        self.assertEqual(res.rule_fired, 'retired')
+        self.assertEqual(res.proposals, [])
+
+    def test_retired_artifact_emits_no_dm(self):
+        rows = [_row(kind='intervention', days_ago=2)]
+        artifact = p6.build_artifact(p6.run_check(rows=rows, now=NOW))
+        self.assertEqual(artifact['rule_fired'], 'retired')
+        self.assertEqual(artifact['proposals'], [])
+        self.assertFalse(p6.dm_digest(artifact))
+        self.assertIn('retired', p6.format_digest(artifact))
+
+    def test_short_circuit_precedes_every_proposal_rule(self):
+        """Structural guard: the retired check must sit ahead of rules 1-3 in
+        run_check's source, not merely filter their output."""
+        src = (_REPO_SCRIPTS / 'pulse_check_vi.py').read_text()
+        body = src.split('def run_check(', 1)[1]
+        self.assertLess(body.index("rule_fired='retired'"),
+                        body.index("rule='tighten_lenient'"))
+        self.assertLess(body.index("rule_fired='retired'"),
+                        body.index("rule='tighten_masking'"))
+        self.assertLess(body.index("rule_fired='retired'"),
+                        body.index("rule='stricter_unverifiable'"))
 
 
 class TestNoLLMCalls(unittest.TestCase):

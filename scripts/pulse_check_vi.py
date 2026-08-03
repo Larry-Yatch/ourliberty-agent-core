@@ -16,7 +16,16 @@ Monthly cadence. Data substrate: ``~/agents/blackboard/cycle-prime-ledger.jsonl`
     the 7d auto-promote window with no promotion / (pending rows older
     than 7d total).
 
-Three proposal-firing rules (per spec § 12.3 Check VI):
+RETIRED CATEGORY (2026-08-03, `runbooks/cycle-prompt.md` § 6.2): Pulse no
+longer files ``verification_pending`` rows. ``run_check`` short-circuits to
+``rule_fired='retired'`` with ZERO proposals whenever no NEW pending row lands
+in the window, BEFORE any rule below is evaluated — mirroring Check VIII's
+``already_deprecated``. Without it rule 2 would fire forever, because a retired
+category makes ``pending_rate`` 0.0 and rule 2 triggers on ``< 0.05``.
+Historical rows stay readable; the G5 weekly retrospective still surfaces them.
+
+Three proposal-firing rules (per spec § 12.3 Check VI), all now unreachable
+while the category stays retired:
 
   1. ``tighten_lenient`` — pending_rate > 0.40 AND auto_promote_rate
      > 0.80 → posture too lenient. Propose tightening (move toward
@@ -125,6 +134,8 @@ class CheckVIResult:
     proposals: list[Proposal]
     as_of_iso: str
     month_anchor: str
+    rule_fired: str = 'none'   # 'retired' | 'none' | 'proposals'
+    rationale: str = ''
 
 
 def _read_ledger(path: Path = LEDGER_FILE) -> list[dict[str, Any]]:
@@ -269,6 +280,30 @@ def run_check(
     metrics = compute_metrics(rows, now=now)
     proposals: list[Proposal] = []
 
+    # 0. Retired category — precedes ALL proposal rules.
+    # verification_pending was retired 2026-08-03 (cycle-prompt.md § 6.2): no
+    # new rows are written, so every rate below is computed over an empty
+    # category. This short-circuit is load-bearing, not cosmetic — rule 2
+    # (tighten_masking) fires on pending_rate < 0.05, and _safe_rate returns
+    # 0.0 for an empty numerator, so without it Check VI would propose
+    # "tighten" on a category that no longer exists, every month, forever.
+    if metrics.pending_count == 0:
+        return CheckVIResult(
+            metrics=metrics,
+            proposals=[],
+            as_of_iso=now.isoformat(),
+            month_anchor=month_anchor(now.date()),
+            rule_fired='retired',
+            rationale=(
+                'verification_pending is retired (cycle-prompt.md § 6.2): no '
+                'new rows in the trailing '
+                f'{LOOKBACK_DAYS}d window. Every posture rate is computed over '
+                'an empty category, so there is no posture to tune. No '
+                'proposal this cycle. Historical rows remain readable and the '
+                'G5 weekly retrospective still surfaces them.'
+            ),
+        )
+
     # Rule 1: tighten_lenient.
     if (metrics.pending_rate > PENDING_HIGH_RATE
             and metrics.auto_promote_rate > AUTO_PROMOTE_HIGH_RATE):
@@ -326,6 +361,8 @@ def run_check(
         proposals=proposals,
         as_of_iso=now.isoformat(),
         month_anchor=month_anchor(now.date()),
+        rule_fired='proposals' if proposals else 'none',
+        rationale='',
     )
 
 
@@ -336,6 +373,8 @@ def build_artifact(result: CheckVIResult) -> dict[str, Any]:
         'month_anchor': result.month_anchor,
         'check': 'VI',
         'lookback_days': LOOKBACK_DAYS,
+        'rule_fired': result.rule_fired,
+        'rationale': result.rationale,
         'metrics': {
             'pending_count': m.pending_count,
             'intervention_count': m.intervention_count,
@@ -369,6 +408,8 @@ def format_digest(artifact: dict[str, Any]) -> str:
     proposals = artifact.get('proposals') or []
     date_str = artifact['as_of'][:10]
     metrics = artifact['metrics']
+    if artifact.get('rule_fired') == 'retired':
+        return f'Check VI ({date_str}) — {artifact["rationale"]}'
     if not proposals:
         return (
             f'Check VI ({date_str}) — posture metrics within bounds. '
@@ -455,7 +496,8 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     write_artifact(artifact)
     dm_digest(artifact)
-    log(f'Check VI complete: proposals={len(result.proposals)} '
+    log(f'Check VI complete: rule={result.rule_fired} '
+        f'proposals={len(result.proposals)} '
         f'pending_rate={result.metrics.pending_rate:.2f} '
         f'trend={result.metrics.ratio_trend}')
     return 0

@@ -15,7 +15,9 @@ try:  # engage the test sandbox before any production import reads env/paths
 except ImportError:  # discover loads this module top-level (no package parent)
     import _bootstrap  # noqa: F401
 
+import contextlib
 import importlib
+import io
 import json
 import os
 import sys
@@ -514,6 +516,82 @@ class TestIterCleanKind(_LedgerTestBase):
                 self._ledger_path().read_text().splitlines() if l.strip()]
         self.assertEqual(rows[0]['kind'], 'iter_clean')
         self.assertEqual(rows[0]['intervention_id'], '')
+
+
+class TestRetiredVerificationPending(_LedgerTestBase):
+    """verification_pending retired 2026-08-03 (cycle-prompt.md § 6.2).
+
+    The CLI refuses to write new rows, but the kind stays VALID FOR READING:
+    the log is append-only, 48 historical rows must keep parsing, and the G5
+    weekly retrospective still surfaces the expired ones.
+    """
+
+    def _write_historical(self) -> None:
+        path = self._ledger_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        rows = [
+            _row(kind='verification_pending', hours_ago=24 * 30,
+                 intervention_id='old-a'),
+            _row(kind='verification_pending', hours_ago=24 * 45,
+                 intervention_id='old-b'),
+            _row(kind='intervention', hours_ago=2, intervention_id='t:live'),
+        ]
+        path.write_text(''.join(json.dumps(r) + '\n' for r in rows))
+
+    def test_cli_rejects_retired_kind_with_actionable_message(self):
+        buf = io.StringIO()
+        with contextlib.redirect_stderr(buf):
+            rc = cpl.main(['append', '--tier', '1',
+                           '--kind', 'verification_pending', '--iter', '9'])
+        self.assertNotEqual(rc, 0)
+        msg = buf.getvalue()
+        self.assertIn('retired', msg)
+        self.assertIn('intervention', msg)
+
+    def test_cli_rejection_writes_nothing(self):
+        with contextlib.redirect_stderr(io.StringIO()):
+            cpl.main(['append', '--tier', '1',
+                      '--kind', 'verification_pending'])
+        self.assertFalse(self._ledger_path().exists(),
+                         'a retired kind must never write a ledger row')
+
+    def test_cli_rejection_leaves_existing_log_uncorrupted(self):
+        self._write_historical()
+        before = self._ledger_path().read_text()
+        with contextlib.redirect_stderr(io.StringIO()):
+            cpl.main(['append', '--tier', '1',
+                      '--kind', 'verification_pending'])
+        self.assertEqual(self._ledger_path().read_text(), before)
+
+    def test_historical_rows_still_parse(self):
+        self._write_historical()
+        rows = cpl._read_rows()
+        kinds = [r['kind'] for r in rows]
+        self.assertEqual(kinds.count('verification_pending'), 2)
+        out = cpl.compute_ratio_30d(rows=rows, now=NOW)
+        self.assertEqual(out['interventions'], 1)
+
+    def test_expired_helper_still_returns_historical_rows(self):
+        """G5 weekly-retrospective surfacing must be unaffected."""
+        self._write_historical()
+        expired = cpl.expired_unpromoted_verification_pending(
+            now=NOW, rows=cpl._read_rows())
+        self.assertEqual([r['intervention_id'] for r in expired],
+                         ['old-b', 'old-a'])
+
+    def test_promote_still_works_for_a_pending_row_in_window(self):
+        """promote_verification_pending is an internal caller of the lenient
+        append_action path; the CLI rejection must not break it."""
+        rows = [_row(kind='verification_pending', hours_ago=24,
+                     intervention_id='p1')]
+        new = cpl.promote_verification_pending('p1', now=NOW, rows=rows)
+        self.assertIsNotNone(new)
+        self.assertEqual(new['kind'], 'systemic_fix')
+        self.assertEqual(new['intervention_id'], 'p1')
+
+    def test_kind_stays_valid_for_reading(self):
+        self.assertIn('verification_pending', cpl.VALID_KINDS)
+        self.assertIn('verification_pending', cpl.RETIRED_KINDS)
 
 
 class TestReplayIters767To771(_LedgerTestBase):

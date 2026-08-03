@@ -227,7 +227,7 @@ When I wake up for a cycle iter, here's the order I operate in. This is the pers
 3. **Run the MANDATORY 5 checks** — in order, every iter (§ 3). Do not skip, do not reorder.
 4. **Run additive checks** — every iter, after the mandatory 5 (§ 4).
 5. **Triage conditional / periodic check output** (§ 5). Every periodic check (I, III, IV, V, VI, VIII, IX, X, XI) fires from its own systemd timer as of 2026-07-07 — I never invoke them. I read their new artifacts / journal blocks and fold them into my cycle entry. The § 5.0 self-gating one-shots are the exception: those I still run every cycle.
-6. **PRIME DIRECTIVE accounting** — for each finding this iter, record an `intervention` row and (if I dispatched a permanent fix) a `systemic_fix` or `verification_pending` row to the cycle-prime ledger (§ 6).
+6. **PRIME DIRECTIVE accounting** — for each finding this iter, record an `intervention` row, and a `systemic_fix` row ONLY when I have actually confirmed the fix landed and worked (§ 6). `verification_pending` is RETIRED — I never file it.
 7. **Write journal + ledger rows** — journal entry to `runbooks/cycle-journal.md`; ledger rows via `scripts/cycle_prime_ledger.py:append_action(...)`.
 8. **Send escalations** — Larry-facing alerts via `larry_alerts.append_alert`; Beacon/Forge/Mirror dispatches via inbox envelopes (§ 15).
 9. **Update tier state + exit** — apply tier transitions per § 2; end the session (§ 16). No backgrounded poll loops (post-cycle exit discipline above).
@@ -236,10 +236,12 @@ When I wake up for a cycle iter, here's the order I operate in. This is the pers
 
 Two ledger files exist. Do NOT confuse them.
 
-- **`~/agents/blackboard/cycle-prime-ledger.jsonl`** — the PRIME DIRECTIVE ledger. Rows of `kind: "intervention" | "systemic_fix" | "verification_pending"` (the only three valid kinds). Written via `scripts/cycle_prime_ledger.py:append_action(tier, kind, payload)`. This is what § 6.4 specifies and what the trailing-30d ratio is computed from.
+- **`~/agents/blackboard/cycle-prime-ledger.jsonl`** — the PRIME DIRECTIVE ledger. Rows of `kind: "intervention" | "systemic_fix"` (plus the `iter_clean` liveness heartbeat, which is excluded from the ratio). Written via `scripts/cycle_prime_ledger.py:append_action(tier, kind, payload)`. This is what § 6.4 specifies and what the trailing-30d ratio is computed from.
 - **`runbooks/cycle-actions.jsonl`** — the auto-fix action log (per `cycle-prompt.md` § 11). One JSON line per allow-listed auto-fix the wrapper executes. Git-tracked. NOT the PRIME DIRECTIVE ledger.
 
-**Rule:** if I'm recording intervention / systemic_fix / verification_pending, the destination is `cycle-prime-ledger.jsonl` via `append_action`. If I'm logging that the wrapper ran an allow-listed auto-fix, the destination is `cycle-actions.jsonl`. Different files, different purposes; routing one to the other corrupts the ratio AND the auto-fix audit trail.
+**Rule:** if I'm recording intervention / systemic_fix, the destination is `cycle-prime-ledger.jsonl` via `append_action`. If I'm logging that the wrapper ran an allow-listed auto-fix, the destination is `cycle-actions.jsonl`. Different files, different purposes; routing one to the other corrupts the ratio AND the auto-fix audit trail.
+
+**`verification_pending` is RETIRED (2026-08-03).** I write no new rows of that kind; historical rows stay in the ledger and stay readable (the log is append-only and the weekly retrospective still surfaces them). Why: no falsifiable anchor was ever recorded at filing time — of 48 expired-unpromoted rows only 2 carried a `verification_anchor` at all, both free-text prose, and every one had `verifies_at: null` — so the rows could never be promoted, and the 94% "stuck forever" rate Check VI kept alarming on measured a category that was never wired at the write end. An unverified fix is an `intervention`; a `systemic_fix` requires that I actually confirmed it landed and worked. See `cycle-prompt.md` § 6 for the operative rule and § 6.7 for the retired Decision II design history.
 
 I do NOT write to `cycle-prime-ledger.jsonl` directly — always through `append_action(...)`. The function validates `kind`, validates `tier`, and atomic-appends with the right schema (`intervention_id`, `fix_commit_sha`, `chain_event_id`, `verifies_at`, `verified_at`, `verification_anchor`). Hand-rolled writes drift the schema.
 
