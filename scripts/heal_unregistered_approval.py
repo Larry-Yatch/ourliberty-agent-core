@@ -529,6 +529,47 @@ def ref_repo() -> str:
     return os.environ.get('OURLIBERTY_HEAL_APPROVAL_REPO') or DEFAULT_REF_REPO
 
 
+# A bare `#<n>` is AMBIGUOUS ACROSS REPOS, and the decision identity built from
+# it (`ref:<n>`) carries no repo. agent-core is past #1085 while RSDPM is around
+# #172, so essentially every RSDPM PR number ALSO exists in agent-core as a
+# long-merged PR — resolving a bare number against the single default repo made
+# every RSDPM ask read "merged/closed" forever. Measured 2026-08-03: the alert
+# for RSDPM #172 (OPEN, genuinely unrouted) was skipped every tick because
+# agent-core #172 is a docs PR merged 2026-05-28. This finds the repo the alert
+# ITSELF names, so the probe asks the right GitHub.
+#
+# `heal_pipeline_stall` writes it two ways, and both appear in every unrouted-PR
+# alert: a parenthesised slug in the message ("PR #172 (Larry-Yatch/RSDPM) on
+# branch ...") and a full PR URL in suggested_action.
+_ALERT_REPO_RE = re.compile(r'\(([\w.-]+/[\w.-]+)\)')
+_ANY_PR_URL_RE = re.compile(r'https://github\.com/([\w.-]+/[\w.-]+)/pull/\d+')
+
+
+def alert_ref_repo(*sources: Any) -> Optional[str]:
+    """The `owner/repo` an alert's PR/issue refs belong to, else None.
+
+    A URL beats a parenthesised slug (it is unambiguous — the slug regex could
+    in principle match some other parenthesised path), and `pr_url` beats free
+    text. Returns None when the alert names no repo, which keeps the caller on
+    the historical `ref_repo()` default — so agent-core alerts, which name no
+    repo, behave EXACTLY as before this change. Never raises."""
+    texts: list[str] = []
+    for src in sources:
+        if isinstance(src, dict):
+            for field in ('pr_url', 'suggested_action', 'message', 'subject'):
+                v = src.get(field)
+                if isinstance(v, str) and v:
+                    texts.append(v)
+        elif isinstance(src, str) and src:
+            texts.append(src)
+    for pattern in (_ANY_PR_URL_RE, _ALERT_REPO_RE):
+        for text in texts:
+            m = pattern.search(text)
+            if m:
+                return m.group(1)
+    return None
+
+
 def _gh_state(kind: str, number: int, repo: str, timeout: float) -> Optional[str]:
     """Return the `state` field from `gh <kind> view <number>` or None on any
     failure (timeout, gh missing, non-PR/issue number, bad JSON).
@@ -576,12 +617,19 @@ def gh_pr_head_sha(owner_repo: str, number: int) -> Optional[str]:
     return sha if isinstance(sha, str) and sha else None
 
 
-def gh_ref_resolved(number: int) -> Optional[bool]:
+def gh_ref_resolved(number: int, repo: Optional[str] = None) -> Optional[bool]:
     """True if PR/issue #number is MERGED or CLOSED, False if open, None if
     undetermined (gh unavailable / no auth / number is neither). Mirrors
     build_sequence_advancer.gh_pr_says_merged's tri-state contract so an
-    undetermined probe is a SOFT result — never a wrongful skip/retire."""
-    repo = ref_repo()
+    undetermined probe is a SOFT result — never a wrongful skip/retire.
+
+    `repo` is the owner/repo the number belongs to, normally from
+    `alert_ref_repo` on the alert that raised it. It MUST be threaded through:
+    a bare number resolved against the wrong repo is not an undetermined probe,
+    it is a CONFIDENTLY WRONG one, and both callers treat True as authority to
+    skip or retire. None falls back to `ref_repo()` — the historical default,
+    correct for the agent-core alerts that name no repo."""
+    repo = repo or ref_repo()
     for kind in ('pr', 'issue'):
         state = _gh_state(kind, number, repo, GH_VIEW_TIMEOUT_SEC)
         if state is None:
@@ -675,6 +723,7 @@ def resolution_signal(
     *,
     after_ts: Optional[str] = None,
     gh_probe: Any = gh_ref_resolved,
+    ref_repo_hint: Optional[str] = None,
 ) -> Optional[str]:
     """Return a human-readable reason a decision is RESOLVED, else None.
 
@@ -682,10 +731,18 @@ def resolution_signal(
     string (retire path, where only the ledger key survives). Conservative by
     construction: an undetermined gh probe (None) is NOT a signal, so the
     caller favors surfacing/keeping a real decision over hiding it.
+
+    `ref_repo_hint` is the owner/repo the referenced numbers belong to. On the
+    promote path it is derived from the alert itself; on the retire path only
+    the ledger key survives, so the caller passes the repo the ledger recorded
+    at promote time. Without it a bare `#<n>` resolves against the default repo
+    and a same-numbered PR there answers for an unrelated one here — see
+    `alert_ref_repo`.
     """
     if isinstance(record_or_key, dict):
         subject = alert_dedup_key(record_or_key)
         identity = decision_identity(record_or_key)
+        ref_repo_hint = ref_repo_hint or alert_ref_repo(record_or_key)
     else:
         subject = str(record_or_key)
         identity = decision_identity({'subject': subject})
@@ -698,9 +755,11 @@ def resolution_signal(
             for n in parse_ref_numbers(record_or_key.get(field)):
                 if n not in ref_numbers:
                     ref_numbers.append(n)
+    probe_repo = ref_repo_hint or ref_repo()
     for n in ref_numbers:
-        if gh_probe(n) is True:
-            return f'SKIP_MERGED_PR referenced #{n} is merged/closed'
+        if gh_probe(n, probe_repo) is True:
+            return (f'SKIP_MERGED_PR referenced {probe_repo}#{n} is '
+                    f'merged/closed')
     # (b) a resolved entry for the same decision in beacon history
     if history_resolution_match(subject, identity, state):
         return 'resolved entry in beacon-pending-approvals history'
@@ -791,6 +850,9 @@ def build_approval_payload(
         # promoted ledger (for the retire pass's subject-based signals).
         # Stripped before the payload reaches add_pending / the chain helper.
         '_subject': subject,
+        # Transient, same lifecycle: the repo the alert's PR refs belong to, so
+        # the ledger can carry it to the retire pass (`_ledger_ref_repo`).
+        '_ref_repo': alert_ref_repo(record),
     }
     # Carry a freshness_probe forward (slice 3): when the source alert records a
     # falsifiable premise, it rides into dispatch_payload so the birth gate can
@@ -967,6 +1029,9 @@ def build_approval_payload_from_marker(
         'origin': HEALER_SOURCE,
         'bare_approvable': False,
         '_subject': subject,
+        # The marker is Beacon's, so the REPO evidence lives on the downstream
+        # alert; check both, marker first.
+        '_ref_repo': alert_ref_repo(marker, record),
     }
     # Carry a freshness_probe forward (slice 3): Beacon's recovered marker is the
     # likeliest carrier, but honor one on the downstream alert too. Absent =>
@@ -2108,6 +2173,24 @@ def _ledger_entry_fields(key: str, value: Any) -> tuple[str, str, Optional[str]]
     return key, derive_task_id(key), (value if isinstance(value, str) else None)
 
 
+def _ledger_ref_repo(value: Any) -> Optional[str]:
+    """The owner/repo recorded on a promoted-ledger entry, else None.
+
+    The retire path probes from the ledger long after the source alert has aged
+    out of the scan window, so the repo has to be CARRIED rather than re-derived
+    — otherwise a retire falls back to the default repo and an unrelated
+    same-numbered PR there can retire a live card off the tab. Entries written
+    before this field existed return None and keep the old default-repo
+    behavior, which is correct for them: they are all agent-core asks (a
+    non-agent-core ask could never get promoted, because this very bug skipped
+    it at the promote gate)."""
+    if isinstance(value, dict):
+        repo = value.get('ref_repo')
+        if isinstance(repo, str) and repo:
+            return repo
+    return None
+
+
 def reconcile_retire(
     promoted: dict[str, Any],
     state: dict[str, Any],
@@ -2151,6 +2234,7 @@ def reconcile_retire(
         reason = resolution_signal(
             subject, state, alerts, heuristics,
             after_ts=promoted_at, gh_probe=gh_probe,
+            ref_repo_hint=_ledger_ref_repo(value),
         )
         if not reason:
             remaining[key] = value
@@ -2257,6 +2341,7 @@ def _strip_helper_keys(payload: dict[str, Any]) -> Optional[str]:
     source_ts = payload.pop('_source_ts', None)
     payload.pop('_subject', None)
     payload.pop('_forlarry_norm_id', None)
+    payload.pop('_ref_repo', None)
     return source_ts
 
 
@@ -2654,6 +2739,7 @@ def main() -> int:
                     f'(identity={identity!r}); not duplicating the card')
                 continue
             p = dict(payload)
+            ref_repo_of = p.get('_ref_repo')
             source_ts = _strip_helper_keys(p)
             try:
                 approval.add_pending(p, chat_id=chat_id, state=fresh)
@@ -2664,6 +2750,9 @@ def main() -> int:
             registered.append({
                 'payload': p, 'source_ts': source_ts,
                 'identity': identity, 'subject': subject, 'task_id': task_id,
+                # The repo this promote decision was made against, so the retire
+                # pass probes the same GitHub (see `_ledger_ref_repo`).
+                'ref_repo': ref_repo_of,
                 # For-larry payloads carry the norm-id marker; the raw record id
                 # (subject) is what for_larry_escalations.clear() resolves on a
                 # CONFIRMED render (defect 3). None for larry-alert-sourced cards.
@@ -2720,6 +2809,10 @@ def main() -> int:
             'task_id': task_id,
             'subject': item['subject'],
             'promoted_at': datetime.now(timezone.utc).isoformat(),
+            # Carried so the retire pass probes the SAME GitHub this promote
+            # decision was made against, long after the alert ages out of the
+            # scan window. Omitted when the alert names no repo (agent-core).
+            **({'ref_repo': item['ref_repo']} if item.get('ref_repo') else {}),
         }
         promoted_count += 1
         log(f'promoted {task_id} (tab-write=ok) from decision '
