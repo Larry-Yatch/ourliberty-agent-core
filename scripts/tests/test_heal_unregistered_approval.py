@@ -2882,39 +2882,103 @@ RSDPM_172_ALERT = {
 }
 
 
-class AlertRefRepoTest(unittest.TestCase):
-    """`alert_ref_repo` reads the repo the alert itself names."""
+class RefRepoForNumberTest(unittest.TestCase):
+    """`ref_repo_for_number` accepts a URL only as evidence ABOUT the ref being
+    probed, and only under a trusted owner."""
 
-    def test_prefers_the_pr_url(self):
-        self.assertEqual(h.alert_ref_repo(RSDPM_172_ALERT), 'Larry-Yatch/RSDPM')
+    def test_reads_the_url_for_that_number(self):
+        self.assertEqual(h.ref_repo_for_number(172, RSDPM_172_ALERT),
+                         'Larry-Yatch/RSDPM')
+
+    def test_a_url_for_a_DIFFERENT_number_is_ignored(self):
+        """Review finding: taking any URL in the alert let a boilerplate or
+        runbook link redirect every ref in it. An alert about agent-core #1084
+        that merely quotes an RSDPM link must NOT resolve to RSDPM."""
+        rec = {'subject': 'pipeline-stall:unrouted-pr:PR#1084',
+               'message': 'PR #1084 needs routing.',
+               'suggested_action': ('see the runbook example '
+                                    'https://github.com/Larry-Yatch/RSDPM/pull/172')}
+        self.assertIsNone(h.ref_repo_for_number(1084, rec))
+        # ...and the number it DOES name still resolves.
+        self.assertEqual(h.ref_repo_for_number(172, rec), 'Larry-Yatch/RSDPM')
+
+    def test_a_number_is_not_matched_by_a_longer_one(self):
+        rec = {'message': 'https://github.com/Larry-Yatch/RSDPM/pull/1720'}
+        self.assertIsNone(h.ref_repo_for_number(172, rec))
+        self.assertEqual(h.ref_repo_for_number(1720, rec), 'Larry-Yatch/RSDPM')
+
+    def test_an_untrusted_owner_is_ignored(self):
+        """Review finding: GitHub hosts every repo on earth. A third-party URL
+        quoted in an alert must never become the repo a skip is decided on."""
+        rec = {'message': 'see https://github.com/someone-else/RSDPM/pull/172'}
+        self.assertIsNone(h.ref_repo_for_number(172, rec))
 
     def test_a_parenthesised_slug_is_NOT_trusted(self):
-        """A repo-shaped slug in prose is REFUSED, by measurement: across 663
-        live alerts that pattern also matched parenthesised BRANCH names
-        (`spec/m14-workspace-boundary`, `fix/deep-review-status-post-alert`) and
-        other slash-y text (`dependents/seams`). Probing an invented repo is
-        fail-safe (gh errors -> None -> keep), but it silently disables a
-        legitimate skip, so the slug is not read at all."""
-        self.assertIsNone(h.alert_ref_repo(
-            {'message': 'PR #9 (Larry-Yatch/RSDPM) on branch `x` opened'}))
-        self.assertIsNone(h.alert_ref_repo(
-            {'message': 'stalled (spec/m14-workspace-boundary) needs a call'}))
-
-    def test_a_url_wins_even_when_a_decoy_slug_is_present(self):
-        rec = {'message': 'PR #1 (Larry-Yatch/decoy) on branch `x`',
-               'suggested_action': 'https://github.com/Larry-Yatch/RSDPM/pull/1'}
-        self.assertEqual(h.alert_ref_repo(rec), 'Larry-Yatch/RSDPM')
+        """Measured across 663 live alerts, a repo-shaped slug also matches
+        parenthesised BRANCH names (`spec/m14-workspace-boundary`) and other
+        slash-y prose (`dependents/seams`)."""
+        self.assertIsNone(h.ref_repo_for_number(
+            9, {'message': 'PR #9 (Larry-Yatch/RSDPM) on branch `x` opened'}))
 
     def test_none_when_the_alert_carries_no_pr_url(self):
-        """agent-core alerts carry no URL — they MUST stay on the historic
+        """agent-core alerts link no URL — they MUST stay on the historic
         default so this change is a no-op for them."""
-        self.assertIsNone(h.alert_ref_repo(PR294_ALERT))
-        self.assertIsNone(h.alert_ref_repo(
-            {'message': 'PR #28 (ourliberty-agent-core) on branch `foo`'}))
+        self.assertIsNone(h.ref_repo_for_number(294, PR294_ALERT))
 
     def test_never_raises_on_junk(self):
         for src in (None, 42, [], {'message': None}, ''):
-            self.assertIsNone(h.alert_ref_repo(src))
+            self.assertIsNone(h.ref_repo_for_number(1, src))
+        for bad in (None, 'abc', '', []):
+            self.assertIsNone(h.ref_repo_for_number(bad, RSDPM_172_ALERT))
+
+
+class PrimaryRefRepoTest(unittest.TestCase):
+    """The ledger's stored repo must be the repo of the ref the ledger KEY is
+    built from — `decision_identity` anchors on the lowest referenced number."""
+
+    def test_uses_the_identity_number_not_the_first_url(self):
+        subject = 'pipeline-stall:unrouted-pr:PR#172'
+        rec = {'subject': subject,
+               'message': ('unrelated https://github.com/Larry-Yatch/'
+                           'ourliberty-agent-core/pull/999 and the real '
+                           'https://github.com/Larry-Yatch/RSDPM/pull/172')}
+        self.assertEqual(h.decision_identity({'subject': subject}), 'ref:172')
+        self.assertEqual(h.primary_ref_repo(subject, rec), 'Larry-Yatch/RSDPM')
+
+    def test_none_without_refs(self):
+        self.assertIsNone(h.primary_ref_repo('no numbers here', {}))
+
+
+class RepoOverrideTest(unittest.TestCase):
+    """An operator who pinned the repo outranks anything derived from text."""
+
+    def setUp(self):
+        self._saved = os.environ.get('OURLIBERTY_HEAL_APPROVAL_REPO')
+
+    def tearDown(self):
+        if self._saved is None:
+            os.environ.pop('OURLIBERTY_HEAL_APPROVAL_REPO', None)
+        else:
+            os.environ['OURLIBERTY_HEAL_APPROVAL_REPO'] = self._saved
+
+    def test_override_beats_a_derived_repo(self):
+        os.environ['OURLIBERTY_HEAL_APPROVAL_REPO'] = 'Larry-Yatch/sandbox'
+        seen = []
+        with mock.patch.object(
+                h, '_gh_state',
+                lambda kind, number, repo, timeout: seen.append(repo) or None):
+            h.gh_ref_resolved(172, 'Larry-Yatch/RSDPM')
+        # gh_ref_resolved tries kind 'pr' then 'issue'; only the REPO matters.
+        self.assertEqual(set(seen), {'Larry-Yatch/sandbox'})
+
+    def test_derived_repo_used_when_no_override(self):
+        os.environ.pop('OURLIBERTY_HEAL_APPROVAL_REPO', None)
+        seen = []
+        with mock.patch.object(
+                h, '_gh_state',
+                lambda kind, number, repo, timeout: seen.append(repo) or None):
+            h.gh_ref_resolved(172, 'Larry-Yatch/RSDPM')
+        self.assertEqual(set(seen), {'Larry-Yatch/RSDPM'})
 
 
 class GhRefResolvedRepoArgTest(unittest.TestCase):

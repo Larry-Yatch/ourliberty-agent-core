@@ -525,8 +525,17 @@ DEFAULT_REF_REPO = 'Larry-Yatch/ourliberty-agent-core'
 GH_VIEW_TIMEOUT_SEC = 15
 
 
+def repo_override() -> Optional[str]:
+    """The operator's explicit repo pin, else None.
+
+    Kept distinct from `ref_repo()` because an OPERATOR who pinned this (to aim
+    the healer at a sandbox, say) means it — so it must outrank a repo DERIVED
+    from alert text, not quietly lose to it."""
+    return os.environ.get('OURLIBERTY_HEAL_APPROVAL_REPO') or None
+
+
 def ref_repo() -> str:
-    return os.environ.get('OURLIBERTY_HEAL_APPROVAL_REPO') or DEFAULT_REF_REPO
+    return repo_override() or DEFAULT_REF_REPO
 
 
 # A bare `#<n>` is AMBIGUOUS ACROSS REPOS, and the decision identity built from
@@ -538,32 +547,49 @@ def ref_repo() -> str:
 # agent-core #172 is a docs PR merged 2026-05-28. This finds the repo the alert
 # ITSELF names, so the probe asks the right GitHub.
 #
-# ONLY a full PR URL is trusted. A parenthesised `owner/repo`-looking slug was
-# tried and REJECTED: measured over 663 live alerts it also matches parenthesised
-# BRANCH names and other slash-y prose — `dependents/seams`,
-# `spec/m14-workspace-boundary`, `fix/deep-review-status-post-alert` — and
-# anchoring it to `PR #<n> (...)` still let two branch names through. A URL
-# cannot be confused with anything else, and it costs almost nothing: it resolves
-# 45 of the 50 approval-class alerts that reference a PR at all.
-_ANY_PR_URL_RE = re.compile(r'https://github\.com/([\w.-]+/[\w.-]+)/pull/\d+')
+# ONLY a full PR URL is trusted, and only one whose NUMBER is the number being
+# probed. Two rejected alternatives, both measured:
+#   * a parenthesised `owner/repo`-looking slug — over 663 live alerts it also
+#     matches parenthesised BRANCH names and other slash-y prose
+#     (`dependents/seams`, `spec/m14-workspace-boundary`), and anchoring it to
+#     `PR #<n> (...)` still let two branch names through;
+#   * ANY PR URL in the alert — an alert about agent-core #1084 that merely
+#     quotes an unrelated RSDPM link (a runbook line, a boilerplate
+#     `suggested_action`) would resolve to RSDPM and make the probe meaningless.
+# So the URL must name the SAME number, which is what makes it evidence ABOUT
+# that ref rather than text that happens to sit nearby.
+_PR_URL_FOR_RE = r'https://github\.com/([\w.-]+/[\w.-]+)/pull/{n}(?![0-9])'
+
+# Repos whose answers are trusted. GitHub hosts every repo on earth; a
+# third-party URL quoted in an alert must never become the repo a skip/retire
+# decision is made against. Owner-scoped rather than an explicit repo list so a
+# new first-party repo needs no code change.
+def _trusted_owner() -> str:
+    return ref_repo().split('/', 1)[0]
 
 
-def alert_ref_repo(*sources: Any) -> Optional[str]:
-    """The `owner/repo` an alert's PR/issue refs belong to, else None.
+def ref_repo_for_number(number: Any, *sources: Any) -> Optional[str]:
+    """The `owner/repo` of a PR URL for THIS EXACT `number`, else None.
 
-    Read ONLY from a full PR URL — see `_ANY_PR_URL_RE` for why a repo-shaped
-    slug is not trusted. Fields are searched in `pr_url`, `suggested_action`,
-    `message`, `subject` order.
+    Evidence must be about the ref being probed: a URL for a different PR, or a
+    URL under an untrusted owner, is ignored. Fields are searched in `pr_url`,
+    `suggested_action`, `message`, `subject` order.
 
-    Returns None when the alert carries no PR URL, which keeps the caller on the
-    historical `ref_repo()` default — so agent-core alerts behave EXACTLY as
-    before this change. KNOWN REMAINING GAP: 5 of the 50 live approval-class
-    alerts that reference a PR carry no URL (RSDPM-titled ones raised by other
-    producers), so they still resolve against the default repo and keep the
-    original defect. Closing that needs those producers to emit a URL — it is
-    not something this side can infer. Never raises."""
-    texts: list[str] = []
+    Returns None when the alert carries no such URL, which keeps the caller on
+    the historical default — so agent-core alerts behave EXACTLY as before this
+    change. KNOWN REMAINING GAP, deliberately not papered over: alerts that
+    reference a PR without linking it (measured: 5 of 50 live approval-class
+    alerts, RSDPM-titled ones from producers that emit no URL) still resolve
+    against the default repo and keep the original defect. Closing that needs
+    those producers to emit a URL; it cannot be inferred here. Never raises."""
+    try:
+        n = int(str(number).strip())
+    except (TypeError, ValueError):
+        return None
+    pattern = re.compile(_PR_URL_FOR_RE.format(n=n))
+    owner = _trusted_owner()
     for src in sources:
+        texts: list[str] = []
         if isinstance(src, dict):
             for field in ('pr_url', 'suggested_action', 'message', 'subject'):
                 v = src.get(field)
@@ -571,11 +597,26 @@ def alert_ref_repo(*sources: Any) -> Optional[str]:
                     texts.append(v)
         elif isinstance(src, str) and src:
             texts.append(src)
-    for text in texts:
-        m = _ANY_PR_URL_RE.search(text)
-        if m:
-            return m.group(1)
+        for text in texts:
+            for match in pattern.finditer(text):
+                repo = match.group(1)
+                if repo.split('/', 1)[0] == owner:
+                    return repo
     return None
+
+
+def primary_ref_repo(subject: Any, *sources: Any) -> Optional[str]:
+    """Repo for the ref the DECISION IDENTITY keys on, else None.
+
+    `decision_identity` anchors on `min(parse_ref_numbers(subject))`, and the
+    ledger is keyed by that identity — so the repo the ledger stores has to be
+    the repo of THAT number, not of whichever PR the alert happens to mention
+    first. Anything else lets the promote decision and the later retire decision
+    probe different repos for the same card."""
+    refs = parse_ref_numbers(subject if isinstance(subject, str) else '')
+    if not refs:
+        return None
+    return ref_repo_for_number(min(refs), *sources)
 
 
 def _gh_state(kind: str, number: int, repo: str, timeout: float) -> Optional[str]:
@@ -632,12 +673,15 @@ def gh_ref_resolved(number: int, repo: Optional[str] = None) -> Optional[bool]:
     undetermined probe is a SOFT result — never a wrongful skip/retire.
 
     `repo` is the owner/repo the number belongs to, normally from
-    `alert_ref_repo` on the alert that raised it. It MUST be threaded through:
-    a bare number resolved against the wrong repo is not an undetermined probe,
-    it is a CONFIDENTLY WRONG one, and both callers treat True as authority to
-    skip or retire. None falls back to `ref_repo()` — the historical default,
-    correct for the agent-core alerts that name no repo."""
-    repo = repo or ref_repo()
+    `ref_repo_for_number` on the alert that raised it. It MUST be threaded
+    through: a bare number resolved against the wrong repo is not an
+    undetermined probe, it is a CONFIDENTLY WRONG one, and both callers treat
+    True as authority to skip or retire. None falls back to `ref_repo()` — the
+    historical default, correct for the agent-core alerts that link no URL.
+
+    An explicit `repo_override()` wins outright: an operator who pinned the repo
+    outranks anything derived from alert text."""
+    repo = repo_override() or repo or DEFAULT_REF_REPO
     for kind in ('pr', 'issue'):
         state = _gh_state(kind, number, repo, GH_VIEW_TIMEOUT_SEC)
         if state is None:
@@ -740,17 +784,15 @@ def resolution_signal(
     construction: an undetermined gh probe (None) is NOT a signal, so the
     caller favors surfacing/keeping a real decision over hiding it.
 
-    `ref_repo_hint` is the owner/repo the referenced numbers belong to. On the
-    promote path it is derived from the alert itself; on the retire path only
-    the ledger key survives, so the caller passes the repo the ledger recorded
-    at promote time. Without it a bare `#<n>` resolves against the default repo
-    and a same-numbered PR there answers for an unrelated one here — see
-    `alert_ref_repo`.
+    `ref_repo_hint` is the repo to fall back to when the alert links no URL for
+    a given number. On the retire path only the ledger key survives, so the
+    caller passes the repo the ledger recorded at promote time. Without any of
+    it a bare `#<n>` resolves against the default repo and a same-numbered PR
+    there answers for an unrelated one here — see `ref_repo_for_number`.
     """
     if isinstance(record_or_key, dict):
         subject = alert_dedup_key(record_or_key)
         identity = decision_identity(record_or_key)
-        ref_repo_hint = ref_repo_hint or alert_ref_repo(record_or_key)
     else:
         subject = str(record_or_key)
         identity = decision_identity({'subject': subject})
@@ -763,8 +805,11 @@ def resolution_signal(
             for n in parse_ref_numbers(record_or_key.get(field)):
                 if n not in ref_numbers:
                     ref_numbers.append(n)
-    probe_repo = ref_repo_hint or ref_repo()
     for n in ref_numbers:
+        # PER NUMBER, not once per alert: an alert can name several PRs, and a
+        # URL is only evidence about the ref whose number it carries.
+        probe_repo = (ref_repo_for_number(n, record_or_key)
+                      or ref_repo_hint or ref_repo())
         if gh_probe(n, probe_repo) is True:
             return (f'SKIP_MERGED_PR referenced {probe_repo}#{n} is '
                     f'merged/closed')
@@ -858,9 +903,10 @@ def build_approval_payload(
         # promoted ledger (for the retire pass's subject-based signals).
         # Stripped before the payload reaches add_pending / the chain helper.
         '_subject': subject,
-        # Transient, same lifecycle: the repo the alert's PR refs belong to, so
-        # the ledger can carry it to the retire pass (`_ledger_ref_repo`).
-        '_ref_repo': alert_ref_repo(record),
+        # Transient, same lifecycle: the repo of the ref the IDENTITY keys on,
+        # so the ledger carries it to the retire pass (`_ledger_ref_repo`) and
+        # both decisions probe the same GitHub.
+        '_ref_repo': primary_ref_repo(subject, record),
     }
     # Carry a freshness_probe forward (slice 3): when the source alert records a
     # falsifiable premise, it rides into dispatch_payload so the birth gate can
@@ -1037,9 +1083,11 @@ def build_approval_payload_from_marker(
         'origin': HEALER_SOURCE,
         'bare_approvable': False,
         '_subject': subject,
-        # The marker is Beacon's, so the REPO evidence lives on the downstream
-        # alert; check both, marker first.
-        '_ref_repo': alert_ref_repo(marker, record),
+        # Read from the downstream ALERT only. A Beacon APPROVAL_REQUEST marker
+        # carries none of the fields this reads, so passing it contributed
+        # nothing — and reading it FIRST would have let a marker and the promote
+        # gate (which sees only the record) derive different repos for one card.
+        '_ref_repo': primary_ref_repo(subject, record),
     }
     # Carry a freshness_probe forward (slice 3): Beacon's recovered marker is the
     # likeliest carrier, but honor one on the downstream alert too. Absent =>
@@ -1570,6 +1618,12 @@ def build_for_larry_approval_payload(
         # register between this tick's snapshot and the locked append.
         '_subject': record_id,
         '_forlarry_norm_id': forlarry_norm_id(str(record_id)),
+        # Stamped here too: main() reads `_ref_repo` off every payload in the
+        # promote batch, and this builder feeds that same batch. Leaving it off
+        # made the key a non-invariant and silently dropped a repo this record
+        # already carries (its pr_url), so those entries retired against the
+        # default repo — the same defect, one path over.
+        '_ref_repo': primary_ref_repo(record_id, record),
     }
     if recheck_target is not None:
         payload['recheck_target'] = recheck_target
@@ -2187,11 +2241,18 @@ def _ledger_ref_repo(value: Any) -> Optional[str]:
     The retire path probes from the ledger long after the source alert has aged
     out of the scan window, so the repo has to be CARRIED rather than re-derived
     — otherwise a retire falls back to the default repo and an unrelated
-    same-numbered PR there can retire a live card off the tab. Entries written
-    before this field existed return None and keep the old default-repo
-    behavior, which is correct for them: they are all agent-core asks (a
-    non-agent-core ask could never get promoted, because this very bug skipped
-    it at the promote gate)."""
+    same-numbered PR there can retire a live card off the tab.
+
+    Entries with no `ref_repo` return None and keep the old default-repo
+    behavior — i.e. THEY STILL CARRY THE ORIGINAL DEFECT. Do not read that as
+    "harmless because they must be agent-core": that reasoning is false. A
+    non-agent-core ask reaches the ledger whenever the promote-time probe came
+    back UNDETERMINED (a `gh` outage, auth failure, or rate limit makes the
+    skip fail open by design), plus every entry promoted before this field
+    shipped. Those retire against the default repo and can be killed by an
+    unrelated same-numbered PR. Closing that needs a backfill or a refusal to
+    retire un-repo'd entries, and both are behavior changes beyond this fix —
+    it is recorded here rather than assumed away."""
     if isinstance(value, dict):
         repo = value.get('ref_repo')
         if isinstance(repo, str) and repo:
