@@ -17621,7 +17621,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-08-03T17:42:39.769561+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-08-03T17:33:40.779617+00:00"
+      "orphan_last_activity_ts": "2026-08-03T17:33:40.779617+00:00",
+      "briefing": {
+        "what": "Two related improvements to how the system keeps itself up to date are waiting on you, and one has to go first because it also fixes a stale check that would otherwise block the other.",
+        "why": "Until they go through in the right order, this whole line of self-maintenance work stays stuck and keeps coming back to your desk.",
+        "suggest": "Approve the bundled one to go first so the second clears on its own \u2014 it's the faster path, though it does fold a small cleanup in alongside the main change."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-03T17:52:51.561131+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     },
     {
       "id": "proposed-graduation-auto-merge-clean-pr",
@@ -17638,7 +17652,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-08-03T17:42:39.769561+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-08-03T17:31:25.03723+00:00"
+      "orphan_last_activity_ts": "2026-08-03T17:31:25.03723+00:00",
+      "briefing": {
+        "what": "A change that lets one of your automated quality steps promote itself to fully hands-off, bundled together with a small fix to the checks that were blocking it.",
+        "why": "It removes a manual approval you currently sit in the middle of, so routine work moves without waiting on you.",
+        "suggest": "Approve it, but ask for confirmation that the safety checks still pass on their own before it runs unattended."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-03T17:52:51.561131+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
