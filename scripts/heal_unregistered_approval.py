@@ -564,6 +564,18 @@ _PR_URL_FOR_RE = r'https://github\.com/([\w.-]+/[\w.-]+)/pull/{n}(?![0-9])'
 # third-party URL quoted in an alert must never become the repo a skip/retire
 # decision is made against. Owner-scoped rather than an explicit repo list so a
 # new first-party repo needs no code change.
+#
+# WHY NOT REUSE `dispatchable_target_repo` (whose own docstring warns that "a
+# second copy of the allowlist rule here is exactly how this defect survived its
+# first round of tests"): measured, it is not the same check and does not
+# subsume this one. It runs `routing_validator.canonical_repo`, which matches on
+# the BARE name — so `dispatchable_target_repo('someone-else/RSDPM')` returns
+# 'RSDPM', accepting exactly the third-party URL this guard exists to refuse.
+# It also fails CLOSED when agent-models.json is unreadable, which would
+# silently switch every derivation back to the default repo — i.e. quietly
+# restore the original bug on a config glitch. The two are complementary; this
+# one answers "is this OUR GitHub account", which is the question a `gh --repo`
+# probe actually turns on.
 def _trusted_owner() -> str:
     return ref_repo().split('/', 1)[0]
 
