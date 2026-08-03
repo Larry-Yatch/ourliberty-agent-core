@@ -6,6 +6,12 @@
 
 ---
 
+## G-rule check-v-auto-fix-patterns-no-commit-path-001 — 1/3 (new, iter ~7374)
+
+**Rule:** Check V systemd timer writes graduation tracking data (clean_streak counter updates) to `config/auto-fix-patterns.json`, but that file is NOT in `PULSE_RUNTIME_PATHS` or `SYNC_EXTRA_RUNTIME_PATHS`. Result: run_cycle.sh's stray-edit guard detects it as non-managed dirt, archives the diff, and reverts the file — losing Check V's streak data each cycle. First occurrence: iter ~7374 (2026-08-03T11:08Z UTC). The clean_streak for `auto-merge-clean-pr` updated 0→338 was reverted by the stray-edit guard. Symptom also seen: Check A fires as dirty-tree finding each time Check V runs. Dispatch permanent fix to Beacon at 3/3: Check V needs either (a) add `config/auto-fix-patterns.json` to PULSE_RUNTIME_PATHS so run_cycle.sh commits it, or (b) Check V writes its tracking state to a non-git state file and only updates auto-fix-patterns.json via a PR when graduation is actually approved by Larry.
+
+---
+
 ## G-rule pulse-triage-self-report-should-be-tier3-001 — 1/3 (new, iter ~6982)
 
 **Rule:** `source=pulse-triage` writes in larry-alerts.jsonl are Pulse's own triage-documentation artifacts (Pulse writes these after DM'ing Larry about a Tier-4 alert). They are NOT new action items — exactly analogous to `kind=approval_request` delivery confirmations. Current behavior: helper returns Tier 4 (novel, no translation), which triggers a journal-note only (no second DM). The correct permanent fix: add `source=pulse-triage` as a Tier-3 entry in `config/alert-translations.json`. First occurrence: iter ~6982 (2026-08-01). Dispatch to Beacon at 3/3.
