@@ -147,13 +147,13 @@
     },
     {
       "template": "ff-main-when-behind",
-      "state": "probation",
+      "state": "graduated",
       "reversible": true,
       "permanent_guard": false,
       "clean_streak": 0,
       "total_dispatches": 0,
       "last_larry_correction_at": null,
-      "graduated_at": null,
+      "graduated_at": "2026-08-03T17:31:25.343045+00:00",
       "plain_language": {
         "what": "The droplet's local ~/agent-core checkout is on a clean main that is behind an already-merged origin/main.",
         "action": "Fast-forward the local checkout to origin/main (git pull --ff-only). Nothing is pushed and no code is authored.",
