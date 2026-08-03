@@ -2888,24 +2888,27 @@ class AlertRefRepoTest(unittest.TestCase):
     def test_prefers_the_pr_url(self):
         self.assertEqual(h.alert_ref_repo(RSDPM_172_ALERT), 'Larry-Yatch/RSDPM')
 
-    def test_falls_back_to_a_parenthesised_slug(self):
-        rec = {'message': 'PR #9 (Larry-Yatch/RSDPM) on branch `x` opened'}
-        self.assertEqual(h.alert_ref_repo(rec), 'Larry-Yatch/RSDPM')
+    def test_a_parenthesised_slug_is_NOT_trusted(self):
+        """A repo-shaped slug in prose is REFUSED, by measurement: across 663
+        live alerts that pattern also matched parenthesised BRANCH names
+        (`spec/m14-workspace-boundary`, `fix/deep-review-status-post-alert`) and
+        other slash-y text (`dependents/seams`). Probing an invented repo is
+        fail-safe (gh errors -> None -> keep), but it silently disables a
+        legitimate skip, so the slug is not read at all."""
+        self.assertIsNone(h.alert_ref_repo(
+            {'message': 'PR #9 (Larry-Yatch/RSDPM) on branch `x` opened'}))
+        self.assertIsNone(h.alert_ref_repo(
+            {'message': 'stalled (spec/m14-workspace-boundary) needs a call'}))
 
-    def test_a_url_outranks_a_parenthesised_slug(self):
-        """The URL is unambiguous; the slug regex could match some other
-        parenthesised path. Pinned because only a DISAGREEING pair can tell the
-        two orderings apart — with real alerts, where they agree, the wrong
-        precedence is invisible."""
+    def test_a_url_wins_even_when_a_decoy_slug_is_present(self):
         rec = {'message': 'PR #1 (Larry-Yatch/decoy) on branch `x`',
                'suggested_action': 'https://github.com/Larry-Yatch/RSDPM/pull/1'}
         self.assertEqual(h.alert_ref_repo(rec), 'Larry-Yatch/RSDPM')
 
-    def test_none_when_the_alert_names_no_repo(self):
-        """agent-core alerts name no owner/repo — they MUST stay on the historic
+    def test_none_when_the_alert_carries_no_pr_url(self):
+        """agent-core alerts carry no URL — they MUST stay on the historic
         default so this change is a no-op for them."""
         self.assertIsNone(h.alert_ref_repo(PR294_ALERT))
-        # A BARE parenthesised name (no owner/ prefix) is not a repo slug.
         self.assertIsNone(h.alert_ref_repo(
             {'message': 'PR #28 (ourliberty-agent-core) on branch `foo`'}))
 

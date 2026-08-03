@@ -538,21 +538,30 @@ def ref_repo() -> str:
 # agent-core #172 is a docs PR merged 2026-05-28. This finds the repo the alert
 # ITSELF names, so the probe asks the right GitHub.
 #
-# `heal_pipeline_stall` writes it two ways, and both appear in every unrouted-PR
-# alert: a parenthesised slug in the message ("PR #172 (Larry-Yatch/RSDPM) on
-# branch ...") and a full PR URL in suggested_action.
-_ALERT_REPO_RE = re.compile(r'\(([\w.-]+/[\w.-]+)\)')
+# ONLY a full PR URL is trusted. A parenthesised `owner/repo`-looking slug was
+# tried and REJECTED: measured over 663 live alerts it also matches parenthesised
+# BRANCH names and other slash-y prose — `dependents/seams`,
+# `spec/m14-workspace-boundary`, `fix/deep-review-status-post-alert` — and
+# anchoring it to `PR #<n> (...)` still let two branch names through. A URL
+# cannot be confused with anything else, and it costs almost nothing: it resolves
+# 45 of the 50 approval-class alerts that reference a PR at all.
 _ANY_PR_URL_RE = re.compile(r'https://github\.com/([\w.-]+/[\w.-]+)/pull/\d+')
 
 
 def alert_ref_repo(*sources: Any) -> Optional[str]:
     """The `owner/repo` an alert's PR/issue refs belong to, else None.
 
-    A URL beats a parenthesised slug (it is unambiguous — the slug regex could
-    in principle match some other parenthesised path), and `pr_url` beats free
-    text. Returns None when the alert names no repo, which keeps the caller on
-    the historical `ref_repo()` default — so agent-core alerts, which name no
-    repo, behave EXACTLY as before this change. Never raises."""
+    Read ONLY from a full PR URL — see `_ANY_PR_URL_RE` for why a repo-shaped
+    slug is not trusted. Fields are searched in `pr_url`, `suggested_action`,
+    `message`, `subject` order.
+
+    Returns None when the alert carries no PR URL, which keeps the caller on the
+    historical `ref_repo()` default — so agent-core alerts behave EXACTLY as
+    before this change. KNOWN REMAINING GAP: 5 of the 50 live approval-class
+    alerts that reference a PR carry no URL (RSDPM-titled ones raised by other
+    producers), so they still resolve against the default repo and keep the
+    original defect. Closing that needs those producers to emit a URL — it is
+    not something this side can infer. Never raises."""
     texts: list[str] = []
     for src in sources:
         if isinstance(src, dict):
@@ -562,11 +571,10 @@ def alert_ref_repo(*sources: Any) -> Optional[str]:
                     texts.append(v)
         elif isinstance(src, str) and src:
             texts.append(src)
-    for pattern in (_ANY_PR_URL_RE, _ALERT_REPO_RE):
-        for text in texts:
-            m = pattern.search(text)
-            if m:
-                return m.group(1)
+    for text in texts:
+        m = _ANY_PR_URL_RE.search(text)
+        if m:
+            return m.group(1)
     return None
 
 
