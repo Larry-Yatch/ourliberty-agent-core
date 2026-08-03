@@ -2997,6 +2997,42 @@ class ForLarryRefRepoTest(unittest.TestCase):
             self.assertIsNone(h.record_pr_url_repo(rec))
 
 
+class RefRepoReachesTheLedgerTest(ReconcilerMainTest):
+    """The repo has to survive builder -> payload -> ledger THROUGH main().
+
+    Deliberately reuses `ReconcilerMainTest._drive` (i.e. runs the real
+    `h.main()`) rather than re-walking its steps. A first attempt DID re-walk
+    them, and swapping main()'s read of `_ref_repo` to AFTER
+    `_strip_helper_keys` — which silently blanks the repo on every ledger entry
+    and restores the original bug — left that version green. A test that
+    restates the code cannot catch the code changing
+    ([[test-the-gate-not-your-restatement-of-it]])."""
+
+    def _ledger(self, r):
+        self.assertTrue(r['save_promoted'].called, 'ledger never written')
+        return r['save_promoted'].call_args[0][0]
+
+    def test_repo_survives_main_into_the_ledger(self):
+        r = self._drive(records=[FORLARRY_DECISION_RECORD], chat_id=4242,
+                        emit=True)
+        self.assertEqual(r['rc'], 0)
+        entries = [v for v in self._ledger(r).values() if isinstance(v, dict)]
+        self.assertTrue(entries, 'no promoted entry in the ledger')
+        self.assertEqual(
+            [e.get('ref_repo') for e in entries],
+            ['Larry-Yatch/ourliberty-agent-core'],
+            'the repo was lost between the builder and the ledger')
+        # ...and the retire pass reads back exactly what main() wrote.
+        self.assertEqual(h._ledger_ref_repo(entries[0]),
+                         'Larry-Yatch/ourliberty-agent-core')
+
+    def test_the_transient_key_never_reaches_the_card(self):
+        r = self._drive(records=[FORLARRY_DECISION_RECORD], chat_id=4242,
+                        emit=True)
+        card = r['add_pending'].call_args[0][0]
+        self.assertNotIn('_ref_repo', card)
+
+
 class RepoOverrideTest(unittest.TestCase):
     """An operator who pinned the repo outranks anything derived from text."""
 
