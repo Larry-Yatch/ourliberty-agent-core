@@ -2936,14 +2936,24 @@ class PrimaryRefRepoTest(unittest.TestCase):
     """The ledger's stored repo must be the repo of the ref the ledger KEY is
     built from — `decision_identity` anchors on the lowest referenced number."""
 
-    def test_uses_the_identity_number_not_the_first_url(self):
-        subject = 'pipeline-stall:unrouted-pr:PR#172'
+    def test_uses_the_identity_number_not_some_other_ref(self):
+        """The subject names TWO PRs in two repos, so min-vs-any actually
+        differs — with a single-ref subject this assertion cannot fail and the
+        coupling to `decision_identity` would be untested."""
+        # Parse order is [999, 172] while the identity keys on min = 172, so
+        # this fixture separates "the identity's ref" from both "the first ref"
+        # and "the highest ref" — all three coincide on a one-ref subject.
+        subject = 'PR #999 blocked by PR #172'
         rec = {'subject': subject,
-               'message': ('unrelated https://github.com/Larry-Yatch/'
-                           'ourliberty-agent-core/pull/999 and the real '
-                           'https://github.com/Larry-Yatch/RSDPM/pull/172')}
+               'message': ('https://github.com/Larry-Yatch/ourliberty-agent-core'
+                           '/pull/999 and https://github.com/Larry-Yatch/RSDPM'
+                           '/pull/172')}
+        # The ledger key is built from the LOWEST ref...
         self.assertEqual(h.decision_identity({'subject': subject}), 'ref:172')
+        # ...so the stored repo must be that ref's repo, not the other one's.
         self.assertEqual(h.primary_ref_repo(subject, rec), 'Larry-Yatch/RSDPM')
+        self.assertEqual(h.ref_repo_for_number(999, rec),
+                         'Larry-Yatch/ourliberty-agent-core')
 
     def test_none_without_refs(self):
         self.assertIsNone(h.primary_ref_repo('no numbers here', {}))
