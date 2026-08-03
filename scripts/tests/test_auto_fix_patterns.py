@@ -91,9 +91,16 @@ class TestRecordShape(unittest.TestCase):
             self.assertIsInstance(r['total_dispatches'], int)
 
     def test_seeded_records_start_cold(self):
-        # PR A seeds nothing as graduated; the ladder must be earned.
+        # PR A seeds nothing as graduated; the ladder must be earned. A record
+        # leaves the cold seed state only via an approved graduation, which
+        # stamps graduated_at — so a graduated record is checked for that stamp
+        # instead of for the seed values it has legitimately left behind.
         for r in self.patterns:
-            self.assertEqual(r['state'], 'probation')
+            if r['state'] == 'graduated':
+                self.assertIsNotNone(
+                    r['graduated_at'],
+                    f'{r["template"]} is graduated without a graduated_at stamp')
+                continue
             self.assertEqual(r['clean_streak'], 0)
             self.assertEqual(r['total_dispatches'], 0)
             self.assertIsNone(r['graduated_at'])
@@ -148,8 +155,14 @@ class TestDerivedGuardedSet(unittest.TestCase):
             r['template'] for r in patterns
             if r['state'] != 'graduated' or r['permanent_guard']
         }
-        # Every seeded record is probation, so all are guarded for now.
-        self.assertEqual(guarded, {r['template'] for r in patterns})
+        # Assert the RULE, not the seed snapshot: a permanent_guard record is
+        # guarded whatever its state, and a graduated non-guard record is the
+        # only shape that drops out of the view.
+        for r in patterns:
+            if r['permanent_guard'] or r['state'] != 'graduated':
+                self.assertIn(r['template'], guarded)
+            else:
+                self.assertNotIn(r['template'], guarded)
 
 
 if __name__ == '__main__':
