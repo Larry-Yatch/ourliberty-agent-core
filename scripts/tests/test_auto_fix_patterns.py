@@ -20,12 +20,14 @@ except ImportError:  # discover loads this module top-level (no package parent)
 import json
 import sys
 import unittest
+from datetime import datetime
 from pathlib import Path
 
 _REPO_SCRIPTS = Path(__file__).resolve().parent.parent
 if str(_REPO_SCRIPTS) not in sys.path:
     sys.path.insert(0, str(_REPO_SCRIPTS))
 
+import alert_triage_state as ats  # noqa: E402
 import cycle_prime_ledger as cpl  # noqa: E402
 
 _REGISTRY = _REPO_SCRIPTS.parent / 'config' / 'auto-fix-patterns.json'
@@ -90,14 +92,52 @@ class TestRecordShape(unittest.TestCase):
             self.assertIsInstance(r['clean_streak'], int)
             self.assertIsInstance(r['total_dispatches'], int)
 
-    def test_seeded_records_start_cold(self):
-        # PR A seeds nothing as graduated; the ladder must be earned.
-        for r in self.patterns:
-            self.assertEqual(r['state'], 'probation')
-            self.assertEqual(r['clean_streak'], 0)
-            self.assertEqual(r['total_dispatches'], 0)
-            self.assertIsNone(r['graduated_at'])
-            self.assertIsNone(r['last_larry_correction_at'])
+    # These two replace the original test_seeded_records_start_cold, which
+    # pinned the day-one SEED against a file the system legitimately mutates:
+    # it asserted state=='probation' for every record (so any first graduation
+    # turned main red) and clean_streak==0 (which Check V's reconcile
+    # overwrites from the executions store on every run). Both are asserted
+    # here as state-independent INVARIANTS instead, so neither a graduation nor
+    # a reconcile can break them.
+
+    def test_ungraduated_records_carry_no_graduation_residue(self):
+        # Must hold after a trust loss too, not just at seed time: demote()
+        # returns a record to exactly this shape. clean_streak and
+        # total_dispatches are deliberately NOT asserted — both are caches
+        # Check V derives from the executions store, so a probation record may
+        # legitimately carry non-zero values.
+        for r in (p for p in self.patterns if p['state'] != 'graduated'):
+            self.assertIsNone(
+                r['graduated_at'],
+                f'{r["template"]} is not graduated but carries a graduated_at '
+                f'stamp — demote() must clear it')
+
+    def test_graduated_records_satisfy_every_graduation_invariant(self):
+        for r in (p for p in self.patterns if p['state'] == 'graduated'):
+            t = r['template']
+            # A real timestamp, not merely "not null" — '' / 0 / False must fail.
+            self.assertIsInstance(
+                r['graduated_at'], str,
+                f'{t} graduated_at must be an ISO-8601 string')
+            try:
+                graduated_at = datetime.fromisoformat(r['graduated_at'])
+            except ValueError:
+                self.fail(f'{t} graduated_at {r["graduated_at"]!r} is not ISO-8601')
+            # Only reversible, non-guarded templates may ever hold this state.
+            self.assertTrue(
+                r['reversible'],
+                f'{t} is graduated but marked irreversible')
+            self.assertFalse(
+                r['permanent_guard'],
+                f'{t} is graduated but carries the permanent_guard floor')
+            # A past correction does not bar re-graduation, but a correction
+            # NEWER than the graduation means a demotion was missed.
+            if r['last_larry_correction_at'] is not None:
+                self.assertLess(
+                    datetime.fromisoformat(r['last_larry_correction_at']),
+                    graduated_at,
+                    f'{t} is graduated but was corrected after it graduated — '
+                    f'demote_on_adverse_execution should have demoted it')
 
 
 class TestSafetyInvariants(unittest.TestCase):
@@ -142,14 +182,59 @@ class TestDerivedGuardedSet(unittest.TestCase):
             'standalone guard-list is SUPERSEDED by the registry; it must not exist')
 
     def test_derived_view_rule(self):
-        # { template | state != 'graduated' or permanent_guard }
-        patterns = _load()['patterns']
-        guarded = {
-            r['template'] for r in patterns
-            if r['state'] != 'graduated' or r['permanent_guard']
+        # Drive the PRODUCTION consumer, not a restatement of it. Rebuilding
+        # the { state != 'graduated' or permanent_guard } comprehension here
+        # and then asserting against it would pass for every possible registry
+        # content — it never touches the code that actually gates auto-fix.
+        # alert_triage_state.classify() is that code (§ 6.6 gates 2 and 3).
+        registry = ats.load_registry(_REGISTRY)
+        self.assertEqual(
+            set(registry), {r['template'] for r in _load()['patterns']},
+            'load_registry() dropped or invented a template')
+        for r in _load()['patterns']:
+            t = r['template']
+            verdict = ats.classify(
+                {'source': 'test', 'subject': t, 'template': t},
+                registry=registry, translations={},
+                route_fn=lambda *_a, **_k: 'escalate')
+            if r['permanent_guard'] or r['state'] != 'graduated':
+                self.assertEqual(
+                    (verdict['tier'], verdict['decision']), (2, 'ask'),
+                    f'{t} is guarded but classify() did not route it to ask')
+            else:
+                self.assertEqual(
+                    (verdict['tier'], verdict['decision']), (1, 'auto-fix'),
+                    f'{t} is graduated and non-guarded but classify() did not '
+                    f'route it to auto-fix')
+
+    def test_permanent_guard_beats_graduated_state_in_classify(self):
+        # Every record in the live registry that is permanent_guard is ALSO
+        # probation, so `permanent_guard` and `state != 'graduated'` never
+        # disagree on real data — a classify() that dropped the guard check
+        # entirely would still pass the loop above. This pins the half that
+        # disagrees, using a shape the real registry may never hold (see
+        # TestSafetyInvariants.test_no_permanent_guard_is_graduated): if the
+        # floor were ever bypassed upstream, classify() must STILL refuse to
+        # auto-fix it.
+        impossible = {
+            'template': 'rotate-credential',
+            'state': 'graduated',
+            'reversible': False,
+            'permanent_guard': True,
+            'clean_streak': 9_999,
+            'total_dispatches': 9_999,
+            'last_larry_correction_at': None,
+            'graduated_at': '2026-01-01T00:00:00+00:00',
         }
-        # Every seeded record is probation, so all are guarded for now.
-        self.assertEqual(guarded, {r['template'] for r in patterns})
+        verdict = ats.classify(
+            {'source': 'test', 'subject': 'x', 'template': 'rotate-credential'},
+            registry={'rotate-credential': impossible}, translations={},
+            route_fn=lambda *_a, **_k: 'escalate')
+        self.assertEqual(
+            (verdict['tier'], verdict['decision']), (2, 'ask'),
+            'a permanent_guard record marked graduated must still route to '
+            'ask — the guard floor outranks state')
+        self.assertIn('permanent_guard floor', verdict['rationale'])
 
 
 if __name__ == '__main__':

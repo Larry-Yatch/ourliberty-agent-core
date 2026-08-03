@@ -132,13 +132,13 @@
     },
     {
       "template": "auto-merge-clean-pr",
-      "state": "probation",
+      "state": "graduated",
       "reversible": true,
       "permanent_guard": false,
       "clean_streak": 0,
       "total_dispatches": 0,
       "last_larry_correction_at": null,
-      "graduated_at": null,
+      "graduated_at": "2026-08-03T17:03:48.324826+00:00",
       "plain_language": {
         "what": "A PR has passed every required CI check AND a Mirror review (REVIEW_PASS), and the mergeability gate is satisfied.",
         "action": "Squash-merge the PR and delete its branch (the merge outbox_notifier / heal_pr_auto_merge already perform once a PR is green + reviewed).",
