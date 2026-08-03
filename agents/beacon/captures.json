@@ -3112,7 +3112,7 @@
       "id": "cap-slice-2b-build-the-approvals-freshness-writer-st-acc6",
       "title": "Slice 2b \u2014 build the approvals-freshness writer (stamps chain_events.verification)",
       "note": "The column is LIVE and verified in production (ourliberty-dashboard #156, merged 35667e66, applied 2026-08-01 and confirmed readable by the anon key the dashboard actually uses). The reader shipped in #155. What is missing is the WRITER.\n\nTHE TRAP, which is the whole reason this card exists: probed_at is declared OPTIONAL on CardVerification, but a \"verified\" verdict without it renders Unverified \u2014 forever. Same if you stamp once and never re-stamp: the reader decays anything older than 30 minutes (VERIFICATION_FRESH_MS) back to Unverified. In BOTH cases the write SUCCEEDS, nothing errors, and the badge silently never lights.\n\nSo the writer must:\n  (a) always include probed_at as an ISO timestamp on a \"verified\" verdict, and\n  (b) re-stamp on a cadence comfortably under 30 minutes (~three healer ticks).\n\nShape: { state: \"verified\" | \"stale\", probed_at?: string, evidence?: string }\nWrite to the TOP-LEVEL verification column via a keyed PostgREST patch \u2014 NOT into payload; PostgREST cannot patch a JSON subfield.\n\nPinned by ourliberty-dashboard app/approvals/components/__tests__/pending-card-verification.test.tsx, which covers every rejection path including the missing-probed_at case (added in #161). That test pins the BEHAVIOUR, not a single guard \u2014 two independent guards defend it, so deleting either one alone stays green.",
-      "state": "parked",
+      "state": "review_close",
       "label": null,
       "origin": {
         "source": "desktop-chat",
@@ -3126,7 +3126,8 @@
       "spawned": {
         "kind": "delegate",
         "task_id": "delegate-cap-slice-2b-build-the-approvals-freshness-writer-st-acc6",
-        "stamped_at": "2026-08-01T21:16:33.660566+00:00"
+        "stamped_at": "2026-08-01T21:16:33.660566+00:00",
+        "outcome": "merged"
       },
       "briefing": {
         "what": "The dashboard can already show a \"verified\" badge on approval cards, but nothing is currently writing the freshness signal that makes it light up.",
@@ -3141,7 +3142,10 @@
         "at": "2026-08-01T21:18:30.159024+00:00",
         "from_state": "parked"
       },
-      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
+      "closed_by": "heal_missions_card_gc:terminal-backstop",
+      "shipped_note": "shipped (linked work merged)",
+      "awaiting_ack": true
     }
   ]
 }
