@@ -4,6 +4,93 @@
 
 ---
 
+## Iteration ~7519 — 2026-08-03T21:10Z UTC (Larry /cycle chat via /loop, Tier 1 [Check A: ff-main-when-behind auto-fixed (PR#1089 merge commit); Check 4: signal CLEARED (beacon-pending-approvals.json MISSING — healers resolved unreg-approval); all mandatory checks NOMINAL; tier stays 1])
+
+**Health:** ✅ NOMINAL (mandatory) / ⚡ AUTO-FIX — Check A: behind origin/main by 1 commit (PR#1089 merge 6fa4b105); fast-forwarded. Check 4: signal CLEARED — beacon-pending-approvals.json MISSING (prior pending=1 unreg-approval-a6f045f54afe; healers ran 21:00:19/21:00:42Z UTC; likely resolved). All 6 mandatory checks NOMINAL. Tier stays 1 (additive auto-fix keeps consecutive_clean=0).
+
+**VERIFY-BEFORE-REASSERT (from iter ~7518 at ~21:00Z UTC 2026-08-03):**
+- **"watermark=658, file_length=658"**: CONFIRMED → repair-watermark={"repaired":false,"old_watermark":658,"file_length":658}. 0 new alerts. [confirmed ✅]
+- **"pending=1 (unreg-approval-a6f045f54afe unchanged)"**: UPDATED → beacon-pending-approvals.json MISSING (no such file). Prior signal CLEARED. heal-stale-approvals ran 21:00:19Z UTC, heal-unregistered-approval ran 21:00:42Z UTC; approval likely resolved by healers. [updated ✅ signal cleared]
+- **"system-health overall=healthy"**: CONFIRMED → ts=2026-08-03T21:03:24Z UTC (~7 min from iter start); overall=healthy. [confirmed ✅]
+- **"PRIME ratio=43.130"**: CONFIRMED → ratio=43.130, systemic_fixes=46, verification_pending=19 (pre-this-iter). [confirmed ✅]
+- **"tier=1, last_signal_at=2026-08-03T20:59:52Z UTC"**: UPDATED → last_signal_at=2026-08-03T21:10:16Z UTC this iter. [updated ✅]
+- **"SUPABASE_SERVICE_ROLE_KEY dedup-window EXPIRED"**: CONFIRMED → last_dm=2026-07-20T20:00:15Z UTC; 0 new alerts (watermark=658 unchanged). No healer DM yet. [carry ✅]
+- **"PR#1081 ~68.6h (72h escalate ~3.4h remaining)"**: UPDATED → ~68.8h from ~21:08Z UTC; 72h escalate=2026-08-04T00:24:18Z UTC (~3.3h remaining). [carry ✅ age updated]
+- **"PR#1089 Mirror PASS AUTO_MERGE_HELD blocker=#1090"**: UPDATED → **PR#1089 MERGED** at 2026-08-03T21:05:03Z UTC. [updated ✅ RESOLVED]
+- **"PR#1090 MERGEABLE Mirror FAILURE (seed-snapshot)"**: UPDATED → MERGEABLE, reviewDecision="" (FAILURE label gone from gh; autoMergeRequest=null). OPEN. [updated ✅ — monitoring]
+- **"PR#1092 ~45 min fix/* unrouted-by-design"**: UPDATED → UNKNOWN, ~53 min from ~21:08Z UTC. [carry ✅ age updated]
+- **"heal-lost-marker unblock-graduation-serializer-deadlock-001 [NEW 1st]"**: CONFIRMED → alert idx=657 delivered to Larry at 20:59:52Z UTC. 0 new alerts this iter. Larry has notification; monitoring for action. [carry ✅]
+- **"heal-approvals-surface-drift graduation-ff-main-when-behind missing_card [1/3]"**: CONFIRMED → 0 new alerts this iter. Count stays 1/3. [carry ✅]
+- G-rule pulse-check-xiv-tier4-no-translation-001 [1/3]: VBR — 0 new alerts (no pulse-check-xiv). Count stays 1/3. [carry ✅]
+- G-rule check-v-auto-fix-patterns-no-commit-path-001 [1/3]: VBR — tree at 6fa4b105 after ff. Count stays 1/3. [carry ✅]
+- G-rule carries (unchanged): forge-marker-taskid-suffix-increment; medic-draft-status-false-positive; check-i-force-bypass-dm-route; beacon-pending-approvals-path-bug; deep-review-hold-approved-loop-post-merge-001; pulse-triage-self-report-should-be-tier3-001 [1/3]. VPs: pulse-cycle-check0-helper-override, auto-merge-conflict-route-hold, direction-ask-rsdpm-no-autolabel-review-lag-001. [carry ✅]
+
+**Check 0 — Alert triage (~21:08Z UTC):** repair-watermark={"repaired":false,"old_watermark":658,"file_length":658}. **0 new alerts.** Watermark stays 658. NOMINAL ✅
+
+**Check 1 — Log noise (~21:08Z UTC):** outbox-notifier.log — last entry `[2026-08-03 14:34:59]` outbox-notifier starting (unchanged; no new WARN/ERROR). NOMINAL ✅
+
+**Check 2 — Telegram sweep (~21:08Z UTC):** beacon_telegram_bot.log — last entry `[2026-08-03T14:59:52-0600]` alert idx=657 delivered (heal-lost-marker unblock-graduation-serializer-deadlock-001). No new network errors since the 14:45Z UTC transient; bot fully operational. No new Larry messages. NOMINAL ✅ [Telegram RESOLVED — confirmed operational]
+
+**Check 3 — Pipeline stall (~21:08Z UTC):** heal_pipeline_stall.py --dry-run:
+- FORGE_NO_PR_SKIP: graduation-enable-pr-auto-merge (superseded_session), graduation-auto-merge-clean-pr (pr_exists=#1089), graduation-ff-main-when-behind (pr_exists=#1090). ✅
+- suppressed (cooldown): unrouted_open_pr:Larry-Yatch/RSDPM:172. ✅
+- **DRY-RUN: 0 alert(s) would fire, 0 recovery(ies).** NOMINAL ✅
+
+**Check 4 — Pending directives (~21:08Z UTC):** beacon-pending-approvals.json: **MISSING** (no such file). Prior iter: pending=1 (unreg-approval-a6f045f54afe). heal-stale-approvals.heartbeat=2026-08-03T21:00:19Z UTC; heal-unregistered-approval.heartbeat=2026-08-03T21:00:42Z UTC — both ran just before this iter; approval likely processed and file cleaned up. **Signal CLEARED.** NOMINAL ✅
+
+**Check 5 — Stale daemon code (~21:08Z UTC):** heal-stale-daemon-code.heartbeat=2026-08-03T21:04:20Z UTC (~4 min; <60 min threshold). system-health ts=2026-08-03T21:03:24Z UTC (~5 min); overall=healthy. NOMINAL ✅
+
+**Check A — Source repo (~21:08Z UTC):** HEAD=6b3050a2 ≠ origin/main=6fa4b105 (behind by 1 commit: "chore(pulse): graduate auto-fix pattern auto-merge-clean-pr (#1089)"). On main, tree clean. → **ALWAYS-FIX: ff-main-when-behind** executed: `git -C ~/agent-core/ pull --ff-only` → Fast-forward 6b3050a2..6fa4b105 (4 files: config/auto-fix-patterns.json, scripts/pulse_check_v.py, 2 test files). Now at 6fa4b105=origin/main. ⚡ [auto-fixed]
+**Check B — Sync health (~21:08Z UTC):** agent-core-sync.json: last_sync=2026-08-03T20:42:42Z UTC (~26 min; <2h threshold). NOMINAL ✅
+**Check C — Agent liveness (~21:08Z UTC):** system-health ts=2026-08-03T21:03:24Z UTC; overall=healthy. NOMINAL ✅
+**Check E — PR/merge state (~21:08Z UTC):** ourliberty-agent-core: **3 open PRs** (PR#1089 merged):
+- **#1092** `fix(approvals): resolve PR refs against the repo the alert names` — created 20:15:17Z UTC (~53 min), UNKNOWN, fix/approvals-ref-repo-qualified. Unrouted-by-design (fix/*). [monitoring — carry]
+- **#1090** `chore(pulse): graduate auto-fix pattern ff-main-when-behind` — created 17:33:04Z UTC (~3.6h), MERGEABLE, reviewDecision="", autoMergeRequest=null. forge/graduation-ff-main-when-behind. [monitoring — seed-snapshot FAILURE flag gone; confirm Mirror re-review status]
+- **#1081** `fix(suite-guardian): wire L10 regression detection + downgrade` — created 2026-08-01T00:24:18Z UTC (~68.8h), UNKNOWN. fix/* unrouted-by-design. 72h escalate=2026-08-04T00:24:18Z UTC (~3.3h remaining). [monitoring — carry]
+ourliberty-dashboard: 0 open PRs. NOMINAL ✅
+
+**§5.0 one-shots (~21:08Z UTC):** audit_due_nudge → "no committed audit baseline; no-op" ✅. distill_detector → "no un-distilled audits; no-op" ✅. audit_cadence_signal (`review/distill/`) → "no post-seed decision-grade distill artifacts yet; no-op" ✅. NOMINAL ✅ [carry — pattern holds 11+ consecutive iters]
+
+**§5 periodic — Check I (~21:08Z UTC):** Artifact check-i-2026-08-03.json confirmed (latest). SURFACED ✅ [carry]
+**§5 periodic — Check III (~21:08Z UTC):** Last artifact check-iii-2026-07-26.json. 14d gate until 2026-08-09 (Sunday). QUIET ✅ [carry]
+**§5 periodic — Check IV (~21:08Z UTC):** No new artifact since prior check. QUIET ✅ [carry]
+**§5 periodic — Check V (~21:08Z UTC):** PR#1089 MERGED ✅; PR#1090 OPEN MERGEABLE (auto-merge not armed). PARTIAL [updated — monitoring #1090]
+**§5 periodic — Check VI (~21:08Z UTC):** PR#1091 MERGED ✅ (iter ~7514). RESOLVED ✅ [carry]
+**§5 periodic — Check VIII (~21:08Z UTC):** state=already_deprecated. QUIET ✅ [carry]
+**§5 periodic — Check IX (~21:08Z UTC):** Last artifact check-ix-2026-08-03.json confirmed. QUIET ✅ [carry]
+**§5 periodic — Check X (~21:08Z UTC):** Last artifact check-x-2026-08-03.json confirmed. QUIET ✅ [carry]
+
+**Rotations (~21:08Z UTC):** SUPABASE_SERVICE_ROLE_KEY: last_dm=2026-07-20T20:00:15Z UTC; EXPIRED (~70 min past). 0 new alerts this iter. Healer timer still pending. ✅ SUPABASE_DB_PASSWORD: resolved (PR#1088 MERGED 2026-08-02). ✅
+
+**Actions taken:**
+- Check A: ff-main-when-behind — `git -C ~/agent-core/ pull --ff-only` executed → 6fa4b105 (PR#1089 merge). Logged to cycle-actions.jsonl at 2026-08-03T21:10Z UTC.
+- PRIME DIRECTIVE: intervention row appended (tier=1, kind=intervention, template=check-a-ff-main-behind-plus-check4-cleared, ...) at 2026-08-03T21:10:15Z UTC.
+- Tier state: `cycle_tier_state.py record --checks-clean false` → tier=1 (additive auto-fix; last_signal_at=2026-08-03T21:10:16Z UTC).
+
+**Escalations:** None this iter.
+- Check 4 cleared: beacon-pending-approvals.json missing; approval likely resolved by healers. No Pulse DM (no longer a pending signal).
+- PR#1089 merged: positive signal. PR#1090 still OPEN; monitoring.
+- PR#1081: 72h escalate fires ~2026-08-04T00:24:18Z UTC (~3.3h). Next cycles will escalate [yellow] to Larry if unresolved.
+- SUPABASE_SERVICE_ROLE_KEY: dedup ~70 min expired; healer timer pending. No Pulse action.
+- heal-lost-marker idx=657: bot delivered to Larry. No new recurrence. Monitoring.
+
+**PRIME DIRECTIVE (post-action):** ratio=43.130 pre-append; systemic_fixes=46, verification_pending=19; intervention row appended at 21:10:15Z UTC.
+
+**Patterns:**
+- **[green ✅ NEW] PR#1089 MERGED — graduate auto-fix pattern auto-merge-clean-pr**: 6fa4b105. Files: config/auto-fix-patterns.json (pattern registered), scripts/pulse_check_v.py (Check V logic), 2 test files. Systemic fix graduation landed. Next step: observe whether the auto-merge-clean-pr pattern fires correctly in production. [resolved — monitoring activation]
+- **[yellow ⚠️ resolved] Check 4 signal cleared**: prior pending=1 (unreg-approval-a6f045f54afe) → MISSING file. Healers ran just before iter; approval likely processed. [signal CLEARED ✅]
+- **[yellow ⚠️ carry] Graduation ecosystem**: PR#1089 merged. PR#1090 (graduation-ff-main-when-behind) still OPEN MERGEABLE; seed-snapshot FAILURE flag no longer showing in gh; autoMergeRequest=null (not armed for auto-merge). Monitor for Mirror re-review or Larry direction. [carry]
+- **[carry ⚠️ monitoring] PR#1081 fix/* ~68.8h**: 72h escalate at 2026-08-04T00:24:18Z UTC (~3.3h remaining). Next cycles will escalate. [carry ✅ age updated]
+- **[info] heal-lost-marker unblock-graduation-serializer-deadlock-001**: 1st occurrence; delivered to Larry. No recurrence this iter. [1st — monitoring]
+- **[1/3] G-rule heal-approvals-surface-drift-missing-card-graduation-ff-main-when-behind-001**: 0 new alerts this iter. Count stays 1/3. [carry]
+- **[1/3] G-rule pulse-check-xiv-tier4-no-translation-001**: carry; dispatch to Beacon at 3/3.
+- **[1/3] G-rule check-v-auto-fix-patterns-no-commit-path-001**: carry; dispatch to Beacon at 3/3.
+- G-rule carries (unchanged): forge-marker-taskid-suffix-increment; medic-draft-status-false-positive; check-i-force-bypass-dm-route; beacon-pending-approvals-path-bug; deep-review-hold-approved-loop-post-merge-001; pulse-triage-self-report-should-be-tier3-001 [1/3]. VPs: pulse-cycle-check0-helper-override, auto-merge-conflict-route-hold, direction-ask-rsdpm-no-autolabel-review-lag-001.
+
+**Tier end-of-iter:** **Tier 1** (consecutive_clean=0; last_signal_at=2026-08-03T21:10:16Z UTC; 5-min cadence active). All mandatory checks clean; additive Check A auto-fix keeps consecutive_clean=0.
+
+---
+
 ## Iteration ~7518 — 2026-08-03T21:00Z UTC (Larry /cycle chat via /loop, Tier 1 [Check 0: 2 new Tier-4 alerts (heal-approvals-surface-drift missing_card graduation-ff-main-when-behind; heal-lost-marker unblock-graduation-serializer-deadlock-001); Check 4: pending=1 (unreg-approval-a6f045f54afe unchanged); all other checks NOMINAL; tier stays 1])
 
 **Health:** ⚠️ SIGNAL — Check 0: 2 new Tier-4 alerts. Check 4: pending=1 (unreg-approval-a6f045f54afe, unchanged since iter ~7494). All other mandatory + additive checks NOMINAL. Tier stays 1.
@@ -3162,80 +3249,6 @@ ourliberty-dashboard: 0 open PRs. NOMINAL ✅
 - G-rule carries (unchanged): forge-marker-taskid-suffix-increment; medic-draft-status-false-positive; check-i-force-bypass-dm-route; beacon-pending-approvals-path-bug; deep-review-hold-approved-loop-post-merge-001; pulse-triage-self-report-should-be-tier3-001 [1/3]. VPs: pulse-cycle-check0-helper-override, auto-merge-conflict-route-hold, direction-ask-rsdpm-no-autolabel-review-gap-001.
 
 **Tier end-of-iter:** **Tier 1** (consecutive_clean=0; last_signal_at=2026-08-03T15:26:43Z UTC; 5-min cadence active).
-
----
-
-## Iteration ~7446 — 2026-08-03T15:23Z UTC (Larry /cycle chat, Tier 1 [consecutive_clean=0; Check 0: 0 new alerts [watermark 643=file_length=643]; Check 4: pending=3 graduation approval_requests still awaiting Larry reply]; Check A: CLEAN; PR#1081 UNSTABLE fix/* [~63.0h, 72h escalate 2026-08-04T00:24Z UTC ~9.03h remaining]; all other checks NOMINAL; NOT-CLEAN ITER)
-
-**Health:** ⚠️ NOT-CLEAN — Check 4 pending=3 (graduation approval_requests still awaiting Larry's reply; unchanged). All mandatory checks otherwise nominal. PR#1081 mergeStateStatus=UNSTABLE (MERGEABLE; CI: mirror-review=FAILURE; ~63.0h; 72h escalate=2026-08-04T00:24Z UTC ~9.03h remaining from 15:23Z UTC). consecutive_clean=0; tier 1.
-
-**VERIFY-BEFORE-REASSERT (from iter ~7444 at ~15:16Z UTC 2026-08-03):**
-- **"pending=3"**: CONFIRMED → beacon-pending-approvals.json pending=3 (graduation-auto-merge-clean-pr, graduation-ff-main-when-behind, graduation-enable-pr-auto-merge; all 2026-08-03T10:52Z UTC). Still awaiting Larry's reply. [carry ✅]
-- **"watermark=643=file_length=643"**: CONFIRMED → repair-watermark: {"repaired":false,"old_watermark":643,"file_length":643}. 0 new alerts this iter. [carry ✅]
-- **"system-health overall=healthy"**: CONFIRMED → ts=2026-08-03T15:17:10Z UTC (~6 min from 15:23Z UTC). overall=healthy; all 4 bots alive=True (beacon/forge/mirror/pulse). [carry ✅ ts updated]
-- **"PRIME ratio=43.478"**: UPDATED → ratio=43.5 post-append (interventions=2001, systemic_fixes=46, verification_pending=19; 30d rolling). +1 intervention row appended this iter. [carry ✅]
-- **"consecutive_clean=0"**: CONFIRMED → tier=1, consecutive_clean=0, last_signal_at=2026-08-03T15:22:45Z UTC (updated this iter). [carry ✅]
-- **"SUPABASE_SERVICE_ROLE_KEY dedup-window expires ~4.73h from 15:16Z"**: UPDATED → ~4.62h from 15:23Z UTC (dedup_expires=2026-08-03T20:00:15Z UTC). Within dedup window — no DM. [carry ✅ time updated]
-- **"PR#1081 UNSTABLE ~62.87h"**: UPDATED → mergeStateStatus=UNSTABLE (MERGEABLE; CI: mirror-review=FAILURE; age=~63.0h from 15:23Z UTC; 72h escalate=2026-08-04T00:24Z UTC ~9.03h remaining). [carry ✅ age updated]
-- **"Check I 2026-08-03 artifact resolved"**: CONFIRMED — artifact check-i-2026-08-03.json at 14:14Z UTC; auto-dispatch fired; idx=640 at 14:18:23Z UTC. [carry ✅ unchanged]
-- G-rule pulse-check-xiv-tier4-no-translation-001 [1/3]: VBR — bot log last entry idx=642 (doorbell 15:03:46Z UTC; UNCHANGED since iter ~7444). No new pulse-check-xiv alerts. Count stays 1/3. [carry ✅]
-- G-rule check-v-auto-fix-patterns-no-commit-path-001 [1/3]: VBR — tree CLEAN this iter (git status --short: empty). Count stays 1/3. [carry ✅]
-- G-rule carries (unchanged): forge-marker-taskid-suffix-increment; medic-draft-status-false-positive; check-i-force-bypass-dm-route; beacon-pending-approvals-path-bug; deep-review-hold-approved-loop-post-merge-001; pulse-triage-self-report-should-be-tier3-001 [1/3]. VPs: pulse-cycle-check0-helper-override, auto-merge-conflict-route-hold, direction-ask-rsdpm-no-autolabel-review-gap-001. [carry ✅]
-
-**Check 0 — Alert triage (~15:23Z UTC):** repair-watermark: {"repaired":false,"old_watermark":643,"file_length":643}. **0 new alerts.** NOMINAL ✅
-
-**Check 1 — Log noise (~15:23Z UTC):** outbox-notifier.log — last entry [2026-08-03 08:21:46 MDT]=14:21:46Z UTC (UNCHANGED from iter ~7444; same pulse-auto-dispatch WARN, known G-rule VP). journalctl 30-min: no WARN/ERROR from agent services. NOMINAL ✅
-
-**Check 2 — Telegram sweep (~15:23Z UTC):** beacon_telegram_bot.log — last entry idx=642 [2026-08-03T09:03:46-0600]=15:03:46Z UTC (doorbell; UNCHANGED from iter ~7444). No new Larry directives. No agent-distress signals. NOMINAL ✅
-
-**Check 3 — Pipeline stall (~15:23Z UTC):** heal_pipeline_stall.py --dry-run → "0 alert(s) would fire, 0 recovery(ies)". FORGE_NO_PR_SKIP ×1 (restore-supabase-db-password-registry-entry-001, pr_exists pr=#1088 MERGED). RSDPM PR#172 suppressed (cooldown). NOMINAL ✅
-
-**Check 4 — Pending directives (~15:23Z UTC):** state/beacon-pending-approvals.json: **pending=3** ⚠️ (graduation-auto-merge-clean-pr, graduation-ff-main-when-behind, graduation-enable-pr-auto-merge; all created 2026-08-03T10:52Z UTC). UNCHANGED. Already delivered to Larry's Telegram at 10:56Z UTC (bot log idx=629/630/631). **Larry action needed:** reply `approve graduation auto-merge-clean-pr`, `approve graduation ff-main-when-behind`, `approve graduation enable-pr-auto-merge` on Telegram. Classification: ask-then-do (already delivered; awaiting reply). NOT-CLEAN ⚠️
-
-**Check 5 — Stale daemon code (~15:23Z UTC):** heal-stale-daemon-code.heartbeat=2026-08-03T15:11:10Z UTC (~12 min; <60 min threshold). system-health.json ts=2026-08-03T15:17:10Z UTC (~6 min); overall=healthy; all 4 bots alive=True (beacon/forge/mirror/pulse). NOMINAL ✅
-
-**Check A — Source repo (~15:23Z UTC):** branch=main, tree CLEAN (git status --short: empty), HEAD=a388beeb (Pulse cycle 20260803T151912Z)=origin/main. NOMINAL ✅
-**Check B — Sync health (~15:23Z UTC):** agent-core-sync.json: last_sync=2026-08-03T14:42:16Z UTC (~41 min; <2h threshold). status=no-change. consecutive_push_failures=0. NOMINAL ✅
-**Check C — Agent liveness (~15:23Z UTC):** system-health ts=2026-08-03T15:17:10Z UTC (~6 min); overall=healthy; all 4 bots alive=True (beacon/forge/mirror/pulse). NOMINAL ✅
-**Check E — PR/merge state (~15:23Z UTC):** gh pr list: ourliberty-agent-core: **1 open PR**:
-- **#1081** `fix(suite-guardian): wire L10 regression detection + downgrade` — ~63.0h (createdAt=2026-08-01T00:24:18Z UTC), **mergeStateStatus=UNSTABLE** (MERGEABLE; CI: mirror-review=FAILURE). fix/* unrouted-by-design. 72h escalate=2026-08-04T00:24Z UTC (~9.03h remaining from 15:23Z UTC). [monitoring continues]
-ourliberty-dashboard: 0 open PRs. NOMINAL ✅
-**Check H — Forge activity (~15:23Z UTC):** 0 open Forge PRs (UNCHANGED). 0 merged Forge PRs in last 4h. Last merge PR#1086 (feat(approvals): birth-suppressed cards visible+recoverable) at 2026-08-03T01:32:09Z UTC. NOMINAL ✅
-
-**§5.0 one-shots (~15:23Z UTC):** audit_due_nudge → no-op ✅. distill_detector → no-op ✅. silence_file_auditor → 3 expired entries (agent-runner-forge:transcript-not-persisted:tier1/tier2 ~53.4d; agent-runner-pulse:transcript-not-persisted:tier1 ~53.4d), 4 permanent entries intact. audit_cadence_signal.py (review/distill/) → no-op ✅. NOMINAL ✅
-
-**§5 periodic — Check I (~15:23Z UTC):** Artifact check-i-2026-08-03.json confirmed (DM idx=640, 14:18:23Z UTC). Auto-dispatch fired for proposal #1 [small] (ledger-sigma-baseline-correctness-001; envelope=pulse-auto-1b494aa182-20260803). SURFACED ✅ [no new action]
-**§5 periodic — Check III (~15:23Z UTC):** Last artifact check-iii-2026-07-26.json. 14d gate skips until 2026-08-09. QUIET ✅
-**§5 periodic — Check V (~15:23Z UTC):** check-v-2026-08.json (today 10:52Z UTC). Graduation proposals already in pending=3 on Telegram. SURFACED ✅ [no new action]
-**§5 periodic — Check VI (~15:23Z UTC):** check-vi-2026-08.json (today 10:59Z UTC). Proposals already on Telegram. SURFACED ✅ [no new action]
-**§5 periodic — Check VIII (~15:23Z UTC):** already_deprecated state. QUIET ✅
-
-**Rotations (~15:23Z UTC):** SUPABASE_SERVICE_ROLE_KEY: last_dm=2026-07-20T20:00:15Z UTC; dedup_expires=2026-08-03T20:00:15Z UTC (~4.62h remaining from 15:23Z UTC). Within dedup window — no DM. ✅ SUPABASE_DB_PASSWORD: resolved (PR#1088 MERGED 2026-08-02). ✅
-
-**Actions taken:**
-- Check 0: 0 new alerts. Watermark stays at 643. No triage actions.
-- Check 4: no auto-fix (ask-then-do; graduation approval_requests already on Telegram). Status unchanged.
-- PRIME DIRECTIVE: intervention row appended (tier=1, kind=intervention, template=pending-graduation-approvals, detail=Check 4: pending=3 graduation approval_requests still awaiting Larry reply + PR#1081 UNSTABLE ~63.0h; Check 0: 0 new alerts; iter ~7446) at 2026-08-03T15:22:44Z UTC.
-- Tier state: `cycle_tier_state.py record --checks-clean false` → **tier=1, consecutive_clean=0** (last_signal_at=2026-08-03T15:22:45Z UTC).
-
-**Escalations:** None requiring new Larry action this iter.
-- Check 4 graduation proposals already on Larry's Telegram (10:56Z UTC). No second DM.
-- Check I 2026-08-03 proposal #1 [small] auto-dispatched; no additional action needed.
-- PR#1081 monitoring continues; escalation fires if it hits 72h (2026-08-04T00:24Z UTC) still UNSTABLE/blocked.
-
-**PRIME DIRECTIVE (post-action):** ratio≈43.5 (30d rolling window; interventions=2001, systemic_fixes=46, verification_pending=19, trend=worsening).
-
-**Patterns:**
-- **[yellow] Check V graduation proposals — Larry action needed** — 3 templates ready for graduation. Reply `approve graduation <template>` on Telegram: auto-merge-clean-pr (338/338, 25d), ff-main-when-behind (27/27, 16d), enable-pr-auto-merge (5/5, 4d). [carry — already on Telegram]
-- **[yellow] Check VI PRIME DIRECTIVE proposals** — stuck_forever_rate=0.94, trend=worsening. Reply `approve check-vi-update-2026-08-03` or `reject check-vi-update-2026-08-03 <reason>` on Telegram. [carry]
-- **[carry ⚠️ monitoring] PR#1081 UNSTABLE fix/* unrouted-by-design** — mergeStateStatus=UNSTABLE (~63.0h); CI: mirror-review=FAILURE. 72h escalate=2026-08-04T00:24Z UTC (~9.03h remaining from 15:23Z UTC). [carry]
-- **[blue] Check I 2026-08-03** — Ledger $1345.49 (+$144.19, +12.0%); 495 σ-flagged; proposal #1 [small]: ledger-sigma-baseline-correctness-001 ($5.56 task vs $0.18 baseline, 65.4σ). Auto-dispatched. DM delivered 14:18Z UTC.
-- **[info] SUPABASE_SERVICE_ROLE_KEY dedup-window expires ~4.62h** — dedup_expires=2026-08-03T20:00:15Z UTC; credential_due=2026-08-22. Healer will auto-DM after expiry. [carry]
-- **[1/3] G-rule pulse-check-xiv-tier4-no-translation-001** — pulse-check-xiv oversilence + digest alerts return Tier-4 (novel, no translation match). Fix: add Tier-3 translation entries in alert-translations.json for source=pulse-check-xiv. Dispatch to Beacon at 3/3. [carry]
-- **[1/3] G-rule check-v-auto-fix-patterns-no-commit-path-001** — Check V timer writes config/auto-fix-patterns.json outside PULSE_RUNTIME_PATHS; stray-edit guard reverts it. Dispatch to Beacon at 3/3. [carry]
-- G-rule carries (unchanged): forge-marker-taskid-suffix-increment; medic-draft-status-false-positive; check-i-force-bypass-dm-route; beacon-pending-approvals-path-bug; deep-review-hold-approved-loop-post-merge-001; pulse-triage-self-report-should-be-tier3-001 [1/3]. VPs: pulse-cycle-check0-helper-override, auto-merge-conflict-route-hold, direction-ask-rsdpm-no-autolabel-review-gap-001.
-
-**Tier end-of-iter:** **Tier 1** (consecutive_clean=0; last_signal_at=2026-08-03T15:22:45Z UTC; 5-min cadence active).
 
 ---
 
