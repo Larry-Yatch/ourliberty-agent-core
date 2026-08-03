@@ -48,7 +48,8 @@ def _ex(*, outcome='success', correction=False, days_ago=0.0):
 
 
 def _pattern(template, *, state='probation', reversible=True,
-             permanent_guard=False, clean_streak=0, plain_language=None):
+             permanent_guard=False, clean_streak=0, plain_language=None,
+             graduated_at=None):
     return {
         'template': template,
         'state': state,
@@ -57,7 +58,7 @@ def _pattern(template, *, state='probation', reversible=True,
         'clean_streak': clean_streak,
         'total_dispatches': 0,
         'last_larry_correction_at': None,
-        'graduated_at': None,
+        'graduated_at': graduated_at,
         'plain_language': plain_language if plain_language is not None else {
             'what': f'the {template} signal fires',
             'action': f'run the {template} fix automatically',
@@ -305,6 +306,22 @@ class TestDemotion(_RegistryFileBase):
                                             correction=True)
         self.assertTrue(ok)
         self.assertEqual(self._read()['patterns'][0]['state'], 'probation')
+
+    def test_demote_clears_the_graduation_stamp(self):
+        """A demoted record must carry NO graduation residue. Left in place,
+        graduated_at contradicts state for anything auditing the stamp rather
+        than the state, and a later re-graduation is indistinguishable from the
+        original."""
+        self._write(_registry(_pattern(
+            'restart-daemon', state='graduated', clean_streak=4,
+            graduated_at='2026-01-01T00:00:00+00:00')))
+        self.assertTrue(p5.demote_on_adverse_execution(
+            'restart-daemon', reason='failed execution'))
+        rec = self._read()['patterns'][0]
+        self.assertEqual(rec['state'], 'probation')
+        self.assertIsNone(
+            rec['graduated_at'],
+            'demote() left the graduated_at stamp behind')
 
     def test_adverse_on_probation_is_noop(self):
         """An adverse execution on an already-probation pattern is a no-op —

@@ -671,9 +671,14 @@ def apply_graduation(template: str, *, path: Optional[Path] = None,
 def demote(template: str, *, reason: str = '', correction: bool = False,
            path: Optional[Path] = None, now: Optional[str] = None) -> bool:
     """Flip a registry record ``graduated → probation``, reset
-    ``clean_streak = 0``, and stamp ``last_larry_correction_at``. Automatic and
-    UNGATED — losing trust is never approval-gated. Returns False on an unknown
-    template."""
+    ``clean_streak = 0``, CLEAR ``graduated_at``, and stamp
+    ``last_larry_correction_at``. Automatic and UNGATED — losing trust is never
+    approval-gated. Returns False on an unknown template.
+
+    Clearing ``graduated_at`` is what makes the demotion complete: a record left
+    in probation while still carrying a graduation stamp reads as graduated to
+    anything auditing the stamp rather than the state, and re-graduation would
+    then be indistinguishable from the original."""
     doc = load_registry(path)
     rec = _find_pattern(doc, template)
     if rec is None:
@@ -681,6 +686,7 @@ def demote(template: str, *, reason: str = '', correction: bool = False,
         return False
     rec['state'] = 'probation'
     rec['clean_streak'] = 0
+    rec['graduated_at'] = None
     rec['last_larry_correction_at'] = now or _iso_now()
     save_registry(doc, path)
     log(f'demoted {template} -> probation '
