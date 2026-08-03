@@ -617,29 +617,33 @@ def ref_repo_for_number(number: Any, *sources: Any) -> Optional[str]:
     return None
 
 
-def primary_ref_repo(subject: Any, *sources: Any) -> Optional[str]:
-    """Repo for the ref the DECISION IDENTITY keys on, else None.
+def ledger_ref_repo(subject: Any, record: Any) -> Optional[str]:
+    """The repo to STORE on this card's ledger entry, else None.
 
-    `decision_identity` anchors on `min(parse_ref_numbers(subject))`, and the
-    ledger is keyed by that identity — so the repo the ledger stores has to be
-    the repo of THAT number, not of whichever PR the alert happens to mention
-    first. Anything else lets the promote decision and the later retire decision
-    probe different repos for the same card."""
+    ONE function for all three payload builders, deliberately. It replaced a
+    pair that each answered this same question by a different route and left
+    every builder to pick — and a builder picking the wrong one is exactly how
+    the for-Larry stamp shipped inert. With one function there is no pick.
+
+    Two routes, in order, because the two card shapes carry their coordinate
+    differently:
+
+    1. The ref the DECISION IDENTITY keys on. `decision_identity` anchors on
+       `min(parse_ref_numbers(subject))` and the ledger is keyed by that
+       identity, so the stored repo must be THAT number's — not whichever PR the
+       alert mentions first, which would let the promote and retire decisions
+       probe different repos for one card.
+    2. The record's own `pr_url`. For-Larry records are keyed by an opaque id
+       (`mirror-review:<task>`) carrying no `#<n>`, so route 1 finds nothing for
+       every record of that shape; their coordinate is explicit instead.
+
+    Both routes end in `ref_repo_for_number`, so the same-number and
+    trusted-owner rules apply either way. Never raises."""
     refs = parse_ref_numbers(subject if isinstance(subject, str) else '')
-    if not refs:
-        return None
-    return ref_repo_for_number(min(refs), *sources)
-
-
-def record_pr_url_repo(record: Any) -> Optional[str]:
-    """Repo from a record's own `pr_url` coordinate, else None.
-
-    For-Larry records are keyed by an opaque id (`mirror-review:<task>`), not a
-    subject carrying `#<n>`, so `primary_ref_repo` finds no ref in them and
-    returns None for EVERY such record — a stamp that never fires. Their repo is
-    not missing though: the record carries an explicit `pr_url`. Reads it through
-    `parse_pr_url` (the same grammar the recheck consumer uses) and re-checks the
-    number against the record so the trusted-owner rule still applies."""
+    if refs:
+        found = ref_repo_for_number(min(refs), record)
+        if found:
+            return found
     coord = parse_pr_url(record.get('pr_url') if isinstance(record, dict) else None)
     if coord is None:
         return None
@@ -933,7 +937,7 @@ def build_approval_payload(
         # Transient, same lifecycle: the repo of the ref the IDENTITY keys on,
         # so the ledger carries it to the retire pass (`_ledger_ref_repo`) and
         # both decisions probe the same GitHub.
-        '_ref_repo': primary_ref_repo(subject, record),
+        '_ref_repo': ledger_ref_repo(subject, record),
     }
     # Carry a freshness_probe forward (slice 3): when the source alert records a
     # falsifiable premise, it rides into dispatch_payload so the birth gate can
@@ -1114,7 +1118,7 @@ def build_approval_payload_from_marker(
         # carries none of the fields this reads, so passing it contributed
         # nothing — and reading it FIRST would have let a marker and the promote
         # gate (which sees only the record) derive different repos for one card.
-        '_ref_repo': primary_ref_repo(subject, record),
+        '_ref_repo': ledger_ref_repo(subject, record),
     }
     # Carry a freshness_probe forward (slice 3): Beacon's recovered marker is the
     # likeliest carrier, but honor one on the downstream alert too. Absent =>
@@ -1651,7 +1655,7 @@ def build_for_larry_approval_payload(
         # a for-Larry id carries no `#<n>`, so the subject-based derivation
         # returns None for every record of this shape and would be a stamp that
         # never fires.
-        '_ref_repo': record_pr_url_repo(record),
+        '_ref_repo': ledger_ref_repo(record_id, record),
     }
     if recheck_target is not None:
         payload['recheck_target'] = recheck_target

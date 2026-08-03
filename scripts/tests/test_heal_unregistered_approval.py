@@ -2932,7 +2932,36 @@ class RefRepoForNumberTest(unittest.TestCase):
             self.assertIsNone(h.ref_repo_for_number(bad, RSDPM_172_ALERT))
 
 
-class PrimaryRefRepoTest(unittest.TestCase):
+class GhProbeTriStateTest(unittest.TestCase):
+    """An UNDETERMINED probe must never read as "resolved".
+
+    Found by pre-flight item 3: deleting this rule left the suite green on
+    pristine main too — a PRE-EXISTING unguarded rule, not one this branch
+    masked. Guarded here because this whole change rests on it: the fix decides
+    which repo to ask, and if a failed ask started counting as "merged", it
+    would skip live asks in every repo at once. It is also the exact mechanism
+    behind the 2026-07-29 stale-card incident, where an undetermined probe let a
+    dead card through ([[promote-gate-fails-open-on-an-undetermined-gh-probe]])."""
+
+    def test_gh_failure_is_none_not_resolved(self):
+        with mock.patch.object(h, '_gh_state',
+                               lambda kind, number, repo, timeout: None):
+            self.assertIsNone(h.gh_ref_resolved(172, 'Larry-Yatch/RSDPM'))
+
+    def test_open_pr_is_false_not_none(self):
+        with mock.patch.object(h, '_gh_state',
+                               lambda kind, number, repo, timeout: 'OPEN'):
+            self.assertIs(h.gh_ref_resolved(172, 'Larry-Yatch/RSDPM'), False)
+
+    def test_an_undetermined_probe_does_not_skip_the_ask(self):
+        """The consumer's side of it: None must not produce a skip reason."""
+        reason = h.resolution_signal(
+            RSDPM_172_ALERT, {'pending': [], 'history': []}, [],
+            DEFAULT_HEURISTICS, gh_probe=lambda n, repo=None: None)
+        self.assertIsNone(reason)
+
+
+class LedgerRefRepoIdentityTest(unittest.TestCase):
     """The ledger's stored repo must be the repo of the ref the ledger KEY is
     built from — `decision_identity` anchors on the lowest referenced number."""
 
@@ -2951,12 +2980,12 @@ class PrimaryRefRepoTest(unittest.TestCase):
         # The ledger key is built from the LOWEST ref...
         self.assertEqual(h.decision_identity({'subject': subject}), 'ref:172')
         # ...so the stored repo must be that ref's repo, not the other one's.
-        self.assertEqual(h.primary_ref_repo(subject, rec), 'Larry-Yatch/RSDPM')
+        self.assertEqual(h.ledger_ref_repo(subject, rec), 'Larry-Yatch/RSDPM')
         self.assertEqual(h.ref_repo_for_number(999, rec),
                          'Larry-Yatch/ourliberty-agent-core')
 
     def test_none_without_refs(self):
-        self.assertIsNone(h.primary_ref_repo('no numbers here', {}))
+        self.assertIsNone(h.ledger_ref_repo('no numbers here', {}))
 
 
 class ForLarryRefRepoTest(unittest.TestCase):
@@ -2970,15 +2999,15 @@ class ForLarryRefRepoTest(unittest.TestCase):
 
     def test_reads_the_records_own_pr_url(self):
         self.assertEqual(
-            h.record_pr_url_repo(FORLARRY_DECISION_RECORD),
+            h.ledger_ref_repo(FORLARRY_DECISION_RECORD['id'], FORLARRY_DECISION_RECORD),
             'Larry-Yatch/ourliberty-agent-core')
 
     def test_the_id_alone_yields_nothing(self):
         """Pins WHY the pr_url path is needed — if this ever starts returning a
         repo, the builder could go back to the subject-based derivation."""
         self.assertEqual(h.parse_ref_numbers(FORLARRY_DECISION_RECORD['id']), [])
-        self.assertIsNone(h.primary_ref_repo(
-            FORLARRY_DECISION_RECORD['id'], FORLARRY_DECISION_RECORD))
+        # route 1 (identity ref) finds nothing; route 2 (pr_url) is what fires.
+        self.assertEqual(h.parse_ref_numbers(FORLARRY_DECISION_RECORD['id']), [])
 
     def test_builder_stamps_a_real_repo(self):
         payload = h.build_for_larry_approval_payload(
@@ -2990,11 +3019,11 @@ class ForLarryRefRepoTest(unittest.TestCase):
     def test_untrusted_owner_in_pr_url_is_refused(self):
         rec = dict(FORLARRY_DECISION_RECORD,
                    pr_url='https://github.com/someone-else/repo/pull/854')
-        self.assertIsNone(h.record_pr_url_repo(rec))
+        self.assertIsNone(h.ledger_ref_repo('no-refs-here', rec))
 
     def test_no_pr_url_is_none_not_a_raise(self):
         for rec in ({}, {'pr_url': None}, {'pr_url': 'nonsense'}, None, 42):
-            self.assertIsNone(h.record_pr_url_repo(rec))
+            self.assertIsNone(h.ledger_ref_repo('no-refs-here', rec))
 
 
 class RefRepoReachesTheLedgerTest(ReconcilerMainTest):
