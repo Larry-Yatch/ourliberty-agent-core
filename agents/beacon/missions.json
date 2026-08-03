@@ -17666,7 +17666,11 @@
         "at": "2026-08-03T17:52:51.561131+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-08-03T21:14:15.526669+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-retire-verification-pending-category-001",
