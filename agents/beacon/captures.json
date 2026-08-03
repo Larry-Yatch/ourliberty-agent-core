@@ -3073,7 +3073,7 @@
       "id": "cap-approvals-freshness-retrofit-a-producer-to-autho-9525",
       "title": "Approvals freshness \u2014 RETROFIT a producer to author probes (the step that makes the arc do anything; run LAST)",
       "note": "Make a producer AUTHOR a `freshness_probe` on the approval cards it files. This is the step that makes the whole approvals-freshness arc actually DO something.\n\nWHEN TO RUN THIS \u2014 two hard preconditions, both of them real:\n  1. AFTER the deep-review-fileset capture lands (`scripts/heal_unregistered_approval.py` added to `config/deep-review-paths.json`). This work lands in that exact file, and today a `forge/*` PR touching it auto-merges with no human \u2014 which is how #1080 and #1077 both landed unreviewed. Do not open this PR into an unheld path.\n  2. AFTER approvals-freshness 2b lands (the Supabase stamp). Without it a probe verdict never reaches the tab, so you cannot SEE the effect of the probes you author \u2014 you would be authoring blind.\nSlices 1 (#1072), 2 (#1079), 2a (dashboard #155) and 3 (#1080) are already MERGED, so nothing else blocks it.\n\nWHY IT MATTERS: every one of those five slices built MACHINERY. Not one of them makes a single card carry a probe \u2014 all five explicitly deferred \"retrofitting producers\" as out of scope, and until this lands the arc marks ZERO cards stale and suppresses ZERO cards at birth. Every card reads \"Unverified\" on the tab: honest, correct, and no behavior change whatsoever. This is the card that pays off the original problem \u2014 8 cards on Larry's tab on 2026-07-29, 6 of which did not need a human.\n\nSCOPE \u2014 START WITH ONE PRODUCER. This is the scoping trap that killed the parent capture (its delegation died at the 600s wall having produced nothing). ~10 modules emit APPROVAL_REQUEST markers (beacon_approval_handler, beacon_telegram_bot, build_sequence_advancer, build_sequence_kickoff, dashboard_api, dispatch_validator, drain_board_to_beacon, heal_pipeline_stall, heal_unregistered_approval, larry_alerts) and Beacon authors some as free LLM text. DO NOT cover them all. Land `heal_unregistered_approval` ALONE \u2014 it minted 4 of the 8 cards that day and 3 were stale or unanswerable. Widen only after that one is proven in production.\n\nHOW: authors already write the evidence down; converting a cited fact into a probe is near-free at filing and impossible afterward. Two real worked examples to build against: the confirm-all card cited `app/queue/verdict.ts` + `CONFIRM_ALL_TIERS` + `bulkCovered` (a `file_contains` probe would have flipped FALSE when RSDPM #151 merged, 2h18m after filing); `unreg-approval-cfd444ed29ee` (\"migration 0033 not live\") gave the exact `schema_migration_log` query (a `sql` probe would have flipped FALSE 8 minutes BEFORE Larry saw the card). Schema + kinds are in `scripts/freshness_probe.py`.\n\nTHE TEETH \u2014 READ THIS BEFORE AUTHORING THE FIRST PROBE: slice 3 is MERGED AND LIVE, and it SUPPRESSES a card at birth on a FALSE probe. So a badly-authored probe means a REAL decision that never reaches Larry, with no artifact on the tab to notice. A probe is only as good as its author. Before shipping the first one, confirm slice 3's FALSE branch actually logs loudly (what was suppressed, which probe, what it returned) and that the log is somewhere a human reads \u2014 a suppressed-card log nobody can read is the same false-clean this whole arc is about. Note the `sql` kind is still INERT (\u2192 INDETERMINATE \u2192 keep) until a read-only SQL executor lands, so the 0033 example cannot be built yet; start with the git-backed kinds.\n\nREVIEW: /code-review high REQUIRED. This decides what never reaches Larry's decision queue, and a wrong probe drops a live decision while the tab looks like it is working.",
-      "state": "parked",
+      "state": "review_close",
       "label": null,
       "origin": {
         "source": "desktop-chat",
@@ -3101,8 +3101,12 @@
       "spawned": {
         "kind": "delegate",
         "task_id": "delegate-cap-approvals-freshness-retrofit-a-producer-to-autho-9525",
-        "stamped_at": "2026-08-01T21:16:40.041862+00:00"
-      }
+        "stamped_at": "2026-08-01T21:16:40.041862+00:00",
+        "outcome": "merged"
+      },
+      "closed_by": "heal_missions_card_gc:terminal-backstop",
+      "shipped_note": "shipped (linked work merged)",
+      "awaiting_ack": true
     },
     {
       "id": "cap-slice-2b-build-the-approvals-freshness-writer-st-acc6",
