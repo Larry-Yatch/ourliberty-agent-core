@@ -162,13 +162,13 @@
     },
     {
       "template": "enable-pr-auto-merge",
-      "state": "probation",
+      "state": "graduated",
       "reversible": true,
       "permanent_guard": false,
       "clean_streak": 0,
       "total_dispatches": 0,
       "last_larry_correction_at": null,
-      "graduated_at": null,
+      "graduated_at": "2026-08-03T16:58:45.698689+00:00",
       "plain_language": {
         "what": "A T0 PR has been clean + green for more than 30 minutes and GitHub's auto-merge flag is not yet enabled.",
         "action": "Arm GitHub's native auto-merge on the PR (gh pr merge <num> --auto --squash).",
