@@ -3218,6 +3218,266 @@ class CrossRepoRefResolutionTest(unittest.TestCase):
         self.assertEqual([r for _n, r in seen], [h.ref_repo()])
 
 
+# ===================================================================
+# approvals-twin-card-source-key-and-nonpromotable-sentinel-001
+#
+# Two changes closing the 2026-08-03 twin-card class:
+#   (1) every promoted card carries `source_decision_key`, a STRUCTURAL
+#       backreference to the key it was promoted from, all the way onto the
+#       emitted chain_event — so the drift sentinel can match on it;
+#   (2) drift-sentinel alerts are a named, deterministically non-promotable
+#       class, refused ahead of is_approval_class's needs_larry branch.
+# ===================================================================
+
+# The sentinel alert that got promoted as the twin card at 21:00 on 2026-08-03.
+DRIFT_SENTINEL_ALERT = {
+    'ts': _ts(1),
+    'source': 'heal-approvals-surface-drift',
+    'severity': 'warning',
+    'route': 'escalate',
+    'needs_larry': True,
+    'subject': ('heal-approvals-surface-drift:missing_card:'
+                'mirror-review:graduation-ff-main-when-behind'),
+    'message': (
+        'Approvals surface drift: `mirror-review:graduation-ff-main-when-'
+        'behind` (for-larry) is awaiting you but NOT on the decide tab.'
+    ),
+    'suggested_action': (
+        'Read ~/agents/logs/heal-approvals-surface-drift.log, then fix the '
+        'promote/retire path named above in '
+        'scripts/heal_unregistered_approval.py.'
+    ),
+    'decision_key': 'mirror-review:graduation-ff-main-when-behind',
+}
+
+
+class SourceDecisionKeyStampTest(unittest.TestCase):
+    """Criteria 1+2 — every promote path stamps the backreference, and the
+    for-Larry one stamps the UNPREFIXED record id."""
+
+    def test_for_larry_payload_stamps_the_unprefixed_record_id(self):
+        key = h.forlarry_dedup_key(FORLARRY_DECISION_RECORD['id'])
+        payload = h.build_for_larry_approval_payload(
+            FORLARRY_DECISION_RECORD, key)
+        self.assertEqual(payload['source_decision_key'],
+                         FORLARRY_DECISION_RECORD['id'])
+        # NOT the prefixed ledger key: the sentinel's set-A alias for this
+        # record is the unprefixed id, so the prefixed form could never match.
+        self.assertNotIn(h.FORLARRY_LEDGER_PREFIX,
+                         payload['source_decision_key'])
+        self.assertEqual(payload['promoted_from_alert'], key)
+
+    def test_alert_payload_prefers_the_alerts_own_decision_key(self):
+        record = dict(PR294_ALERT, decision_key='ref:294')
+        payload = h.build_approval_payload(record, h.decision_identity(record))
+        self.assertEqual(payload['source_decision_key'], 'ref:294')
+
+    def test_alert_payload_falls_back_to_the_subject(self):
+        payload = h.build_approval_payload(
+            PR294_ALERT, h.decision_identity(PR294_ALERT))
+        self.assertEqual(payload['source_decision_key'], PR294_ALERT['subject'])
+
+    def test_blank_decision_key_falls_back_to_the_subject(self):
+        record = dict(PR294_ALERT, decision_key='   ')
+        payload = h.build_approval_payload(record, h.decision_identity(record))
+        self.assertEqual(payload['source_decision_key'], PR294_ALERT['subject'])
+
+    def test_recovered_marker_payload_stamps_the_same_key(self):
+        record = dict(PR412_STALL_ALERT, decision_key='ref:412')
+        payload = h.build_approval_payload_from_marker(
+            PR412_MARKER, record, h.decision_identity(record))
+        self.assertEqual(payload['source_decision_key'], 'ref:412')
+
+    def test_key_survives_helper_stripping_onto_the_chain_event(self):
+        """The whole point: it must reach the emitted chain_event, because the
+        sentinel reads it back off the tab. A transient `_`-prefixed key would
+        be stripped here."""
+        key = h.forlarry_dedup_key(FORLARRY_DECISION_RECORD['id'])
+        payload = h.build_for_larry_approval_payload(
+            FORLARRY_DECISION_RECORD, key)
+        source_ts = h._strip_helper_keys(payload)
+        self.assertIn('source_decision_key', payload)
+        event = approval.build_approval_request_chain_event(
+            payload, ts=source_ts)
+        self.assertEqual(event['payload']['source_decision_key'],
+                         FORLARRY_DECISION_RECORD['id'])
+
+    def test_a_payload_without_the_key_leaves_the_chain_event_unchanged(self):
+        """Absent on every other producer, so their events stay byte-identical."""
+        payload = {'task_id': 't1', 'target_agent': 'beacon', 'prompt': 'p'}
+        event = approval.build_approval_request_chain_event(
+            payload, ts='2026-08-03T19:16:00+00:00')
+        self.assertNotIn('source_decision_key', event['payload'])
+
+
+class NonPromotableDriftSentinelTest(unittest.TestCase):
+    """Criterion 4 — the sentinel's own alerts are refused deterministically,
+    independent of needs_larry / route / suggested_action phrasing."""
+
+    def _empty(self):
+        return {'pending': [], 'history': []}
+
+    def test_predicate_matches_source_and_subject_prefix(self):
+        self.assertTrue(h.is_drift_sentinel_alert(DRIFT_SENTINEL_ALERT))
+        # Either coordinate alone is enough.
+        self.assertTrue(h.is_drift_sentinel_alert(
+            {'subject': DRIFT_SENTINEL_ALERT['subject'], 'source': 'relay'}))
+        self.assertTrue(h.is_drift_sentinel_alert(
+            {'source': h.DRIFT_SENTINEL_SOURCE, 'subject': 'anything'}))
+
+    def test_predicate_does_not_match_a_lookalike_subject(self):
+        # The prefix ends at the ':' component boundary, so an adjacent source
+        # is NOT swallowed by the class.
+        self.assertFalse(h.is_drift_sentinel_alert(
+            {'source': 'heal-approvals-surface-drift-adjacent',
+             'subject': 'heal-approvals-surface-drift-adjacent:foo'}))
+
+    def test_sentinel_alert_is_not_promoted_and_the_refusal_is_recorded(self):
+        sink = []
+        out = h.evaluate([DRIFT_SENTINEL_ALERT], DEFAULT_HEURISTICS,
+                         self._empty(), {}, now=NOW, skipped_needs_triage=sink)
+        self.assertEqual(out, [])
+        identity = h.decision_identity(DRIFT_SENTINEL_ALERT)
+        self.assertEqual([s['identity'] for s in sink], [identity])
+        self.assertEqual(sink[0]['reason'], h.SKIP_REASON_DRIFT_SENTINEL)
+        self.assertEqual(sink[0]['task_id'], h.derive_task_id(identity))
+
+    def test_refusal_holds_regardless_of_route_needs_larry_or_phrasing(self):
+        variants = [
+            dict(DRIFT_SENTINEL_ALERT, needs_larry=False),
+            dict(DRIFT_SENTINEL_ALERT, route='alert'),
+            dict(DRIFT_SENTINEL_ALERT,
+                 suggested_action='Choose fix-the-promoter or waive-it'),
+            dict(DRIFT_SENTINEL_ALERT,
+                 message='Beacon needs your call on this drift.'),
+        ]
+        for i, record in enumerate(variants):
+            with self.subTest(variant=i):
+                self.assertEqual(
+                    h.evaluate([record], DEFAULT_HEURISTICS, self._empty(), {},
+                               now=NOW),
+                    [])
+
+    def test_refusal_is_not_re_recorded_once_it_is_in_the_ledger(self):
+        identity = h.decision_identity(DRIFT_SENTINEL_ALERT)
+        sink = []
+        h.evaluate([DRIFT_SENTINEL_ALERT], DEFAULT_HEURISTICS, self._empty(),
+                   {identity: {'skipped': h.SKIP_REASON_DRIFT_SENTINEL}},
+                   now=NOW, skipped_needs_triage=sink)
+        self.assertEqual(sink, [])
+
+    def test_non_sentinel_alerts_still_promote(self):
+        """Criterion 5 — no regression on the path this must not touch."""
+        out = h.evaluate([DEPLOY_NOTIFIER_ALERT, DRIFT_SENTINEL_ALERT],
+                         DEFAULT_HEURISTICS, self._empty(), {}, now=NOW)
+        self.assertEqual(len(out), 1)
+        self.assertEqual(
+            out[0]['task_id'],
+            h.derive_task_id(h.decision_identity(DEPLOY_NOTIFIER_ALERT)))
+
+    def test_main_records_the_refusal_under_its_own_reason(self):
+        import contextlib
+        save_promoted = mock.MagicMock()
+        # main() scans against the REAL clock, so the alert must be in-window.
+        live_alert = dict(DRIFT_SENTINEL_ALERT,
+                          ts=datetime.now(timezone.utc).isoformat())
+        with mock.patch.object(h, 'kill_switch',
+                               return_value=Path('/nonexistent/kill-switch')), \
+             mock.patch.object(h, 'load_heuristics',
+                               return_value=DEFAULT_HEURISTICS), \
+             mock.patch.object(h, 'read_alerts',
+                               return_value=[live_alert]), \
+             mock.patch.object(h, 'read_for_larry_records', return_value=[]), \
+             mock.patch.object(h, 'load_beacon_outbox_markers',
+                               return_value=[]), \
+             mock.patch.object(h, 'load_promoted', return_value={}), \
+             mock.patch.object(h, 'save_promoted', new=save_promoted), \
+             mock.patch.object(h, 'resolution_signal', return_value=None), \
+             mock.patch.object(h, 'reconcile_retire',
+                               side_effect=lambda led, *a, **k: ([], led)), \
+             mock.patch.object(h, 'open_approval_card_task_ids',
+                               return_value=set()), \
+             mock.patch.object(h, 'retire_needs_triage_cards', return_value=[]), \
+             mock.patch.object(h, '_clear_retired_read_at', return_value=0), \
+             mock.patch.object(h, 'doorbell_counts', return_value=(0, 0)), \
+             mock.patch.object(h.chain_event_emit, 'emit_event') as emit, \
+             mock.patch.object(approval, 'state_lock',
+                               return_value=contextlib.nullcontext()), \
+             mock.patch.object(approval, 'load_state',
+                               return_value={'pending': [], 'history': []}):
+            self.assertEqual(h.main(), 0)
+        emit.assert_not_called()
+        ledger = save_promoted.call_args[0][0]
+        entry = ledger[h.decision_identity(DRIFT_SENTINEL_ALERT)]
+        self.assertEqual(entry['skipped'], h.SKIP_REASON_DRIFT_SENTINEL)
+
+
+class PromotedIdentityStillSubjectDerivedTest(unittest.TestCase):
+    """Criterion 7 — pins the NON-GOAL. Honoring an alert's own `decision_key`
+    when deriving promoted IDENTITY was considered and REJECTED: the for-Larry
+    ledger identity is namespaced (`forlarry:`) on purpose, so honoring the key
+    would not have collided anyway. `source_decision_key` is a payload field,
+    not an identity input — this must stay true."""
+
+    def test_decision_key_does_not_change_the_promoted_identity(self):
+        with_key = dict(PR294_ALERT, decision_key='some-other-key')
+        self.assertEqual(h.decision_identity(with_key),
+                         h.decision_identity(PR294_ALERT))
+        out = h.evaluate([with_key], DEFAULT_HEURISTICS,
+                         {'pending': [], 'history': []}, {}, now=NOW)
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0]['task_id'],
+                         h.derive_task_id(h.decision_identity(PR294_ALERT)))
+        self.assertEqual(out[0]['promoted_from_alert'],
+                         h.decision_identity(PR294_ALERT))
+
+
+class OpenApprovalCardsTest(unittest.TestCase):
+    """The companion card read: task_id -> source_decision_key for every open
+    card, fail-closed on any failure."""
+
+    def _fake_td(self, rows):
+        fake_td = mock.MagicMock()
+        fake_td._fetch.return_value = rows
+        return fake_td
+
+    def _run(self, fake_td, client=object()):
+        with mock.patch.object(h.chain_event_emit, '_get_client',
+                               return_value=client), \
+             mock.patch.dict(sys.modules, {'triage_decisions': fake_td}):
+            return h.open_approval_cards()
+
+    def test_maps_task_ids_to_their_source_keys(self):
+        fake_td = self._fake_td([
+            {'task_id': 'unreg-approval-a6f045f54afe',
+             'payload': {'source_decision_key':
+                         'mirror-review:graduation-ff-main-when-behind'}},
+            {'task_id': 'legacy-card', 'payload': {'prompt': 'x'}},
+            {'task_id': 'no-payload-card', 'payload': None},
+        ])
+        self.assertEqual(self._run(fake_td), {
+            'unreg-approval-a6f045f54afe':
+                'mirror-review:graduation-ff-main-when-behind',
+            'legacy-card': None,
+            'no-payload-card': None,
+        })
+        # The payload column is what makes the backreference readable at all.
+        self.assertIn('payload', fake_td._fetch.call_args.kwargs['columns'])
+
+    def test_no_client_fails_closed(self):
+        self.assertIsNone(self._run(self._fake_td([]), client=None))
+
+    def test_query_failure_fails_closed(self):
+        fake_td = mock.MagicMock()
+        fake_td._fetch.side_effect = RuntimeError('postgrest down')
+        self.assertIsNone(self._run(fake_td))
+
+    def test_reads_the_same_rows_as_the_mint_paths_set(self):
+        """One fetch gives the sentinel both halves of set B."""
+        fake_td = self._fake_td([{'task_id': 'a', 'payload': {}},
+                                 {'task_id': 'b', 'payload': {}}])
+        self.assertEqual(set(self._run(fake_td)), {'a', 'b'})
+
 # -------------------- slice 4: this healer AUTHORS the probe --------------------
 
 class BuildPrStateProbeTest(unittest.TestCase):

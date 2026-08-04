@@ -121,6 +121,25 @@ PROMOTED_SOURCE_FORLARRY = 'for-larry-mirror-review'
 # so the allowlist check and the coordinate it validates cannot disagree.
 MIRROR_AGENT = 'mirror'
 
+# NON-PROMOTABLE ALERT CLASS: the approvals drift sentinel
+# (heal_approvals_surface_drift). Its alerts are maintenance INSTRUCTIONS to the
+# chain — their own suggested_action reads "fix the promote/retire path named
+# above in scripts/heal_unregistered_approval.py" — not decisions for Larry.
+# They carry route='escalate' + needs_larry=True, so is_approval_class's signal
+# branch would promote them; on 2026-08-03 that produced a twin card
+# (`unreg-approval-fb5811bfbc44`) for a decision that already had one, and it
+# could never auto-retire because a sentinel subject carries no `#<n>` ref for
+# the retire pass to anchor on. Refusing the class by name makes that
+# deterministic rather than (as it was) an accident of the needs-triage gate.
+DRIFT_SENTINEL_SOURCE = 'heal-approvals-surface-drift'
+DRIFT_SENTINEL_SUBJECT_PREFIX = DRIFT_SENTINEL_SOURCE + ':'
+
+# Reason recorded in the promoted ledger for a refusal of the class above, so a
+# refusal is observable in heal-unregistered-approval-promoted.json rather than
+# silent. Distinct from the 'needs_triage' reason that shares the accounting.
+SKIP_REASON_NEEDS_TRIAGE = 'needs_triage'
+SKIP_REASON_DRIFT_SENTINEL = 'drift_sentinel_alert'
+
 # Summary literal for the needs-triage card shape (build_approval_payload's else
 # branch): a larry-alert whose suggested_action does NOT parse into two options,
 # so it is not a binary decision. Lifted into ONE constant referenced by BOTH the
@@ -357,6 +376,24 @@ def within_window(record: dict[str, Any], now: datetime, window_hours: float) ->
         return True
     age_h = (now - ts).total_seconds() / 3600.0
     return -1.0 <= age_h <= window_hours  # small negative tolerance for clock skew
+
+
+def is_drift_sentinel_alert(record: dict[str, Any]) -> bool:
+    """True for an alert of the approvals-drift-sentinel class — a maintenance
+    instruction to the chain, never a decision for Larry.
+
+    Matched on EITHER coordinate the sentinel stamps (source, or the subject it
+    builds as `<source>:<direction>:<key>`), so a record that reaches this
+    healer through a relay that dropped one of them is still refused. Read
+    BEFORE `is_approval_class` in evaluate(), so the refusal holds regardless of
+    route / needs_larry / suggested_action phrasing."""
+    if not isinstance(record, dict):
+        return False
+    if record.get('source') == DRIFT_SENTINEL_SOURCE:
+        return True
+    subject = record.get('subject')
+    return (isinstance(subject, str)
+            and subject.strip().startswith(DRIFT_SENTINEL_SUBJECT_PREFIX))
 
 
 def is_approval_class(record: dict[str, Any], heuristics: dict[str, Any]) -> bool:
@@ -873,6 +910,21 @@ def parse_binary_options(suggested_action: Any) -> Optional[tuple[str, str]]:
     return a, b
 
 
+def source_decision_key_for_alert(record: dict[str, Any]) -> str:
+    """The key a card promoted from `record` backreferences.
+
+    The alert's OWN `decision_key` when it carries one (the emitter's chosen
+    cross-store identity), else the subject via `alert_dedup_key`. This is a
+    DURABLE payload field, not an identity input: the promoted card's identity
+    stays subject-derived (`decision_identity`), so honoring a decision_key here
+    changes no dedup or ledger behavior — it only lets a reader of the tab see
+    which source key a card came from."""
+    key = record.get('decision_key')
+    if isinstance(key, str) and key.strip():
+        return key.strip()
+    return alert_dedup_key(record)
+
+
 def build_approval_payload(
     record: dict[str, Any], dedup_key: str,
 ) -> dict[str, Any]:
@@ -922,6 +974,13 @@ def build_approval_payload(
         'prompt': prompt,
         'task_type': 'direction-ask',
         'promoted_from_alert': dedup_key,
+        # STRUCTURAL BACKREFERENCE to the key this card was promoted FROM.
+        # Durable (no '_' prefix, so it survives _strip_helper_keys) and
+        # forwarded onto the chain_event, because the drift sentinel reads it
+        # back off the tab to tell "this decision already has a card" from
+        # "this decision is stranded". Prose in the prompt body cannot be read
+        # by a parity check; this can.
+        'source_decision_key': source_decision_key_for_alert(record),
         # Seam audit H2: this is a healer/dashboard-routed card, NOT something
         # Larry was DMed an approve-grammar prompt for. It reaches the Approvals
         # tab and is resolved by id via the tab's approve/reject buttons. Stamp
@@ -1116,6 +1175,10 @@ def build_approval_payload_from_marker(
         'recovered_marker': {k: v for k, v in marker.items()
                              if not k.startswith('_')},
         'promoted_from_alert': dedup_key,
+        # Same structural backreference as the alert-derived path — read from
+        # the downstream ALERT, not the marker, so both card shapes for one
+        # decision report the same source key to the drift sentinel.
+        'source_decision_key': source_decision_key_for_alert(record),
         'origin': HEALER_SOURCE,
         'bare_approvable': False,
         '_subject': subject,
@@ -1266,6 +1329,10 @@ def evaluate(
     can record it in the promoted ledger (not re-evaluated next tick) and a
     SKIP_NEEDS_TRIAGE line names it. The BINARY alert-derived path and the
     marker-backed path are unchanged; the source larry-alert is left untouched.
+
+    NON-PROMOTABLE CLASS: an alert from the approvals drift sentinel
+    (:func:`is_drift_sentinel_alert`) is refused outright, ahead of every other
+    gate, and recorded in the same accounting list under a distinct reason.
     """
     now = now or datetime.now(timezone.utc)
     window = heuristics['scan_window_hours']
@@ -1276,6 +1343,25 @@ def evaluate(
     seen_keys: set[str] = set()
     for record in alerts:
         if not within_window(record, now, window):
+            continue
+        # NON-PROMOTABLE CLASS, read FIRST: a drift-sentinel alert is an
+        # instruction to fix this healer, not a decision for Larry. Ahead of
+        # is_approval_class so its `needs_larry` signal branch can never promote
+        # one, and ahead of the marker/binary gates so no phrasing can either.
+        if is_drift_sentinel_alert(record):
+            identity = decision_identity(record)
+            if identity not in promoted and identity not in seen_keys:
+                log(f'SKIP_NON_PROMOTABLE: {identity!r} '
+                    f'({DRIFT_SENTINEL_SOURCE} alert; a maintenance instruction '
+                    f'to this healer, not a decision for Larry)')
+                if skipped_needs_triage is not None:
+                    skipped_needs_triage.append({
+                        'identity': identity,
+                        'task_id': derive_task_id(identity),
+                        'subject': alert_dedup_key(record),
+                        'reason': SKIP_REASON_DRIFT_SENTINEL,
+                    })
+            seen_keys.add(identity)
             continue
         if not is_approval_class(record, heuristics):
             continue
@@ -1333,7 +1419,8 @@ def evaluate(
             if skipped_needs_triage is not None:
                 skipped_needs_triage.append(
                     {'identity': identity, 'task_id': task_id,
-                     'subject': subject})
+                     'subject': subject,
+                     'reason': SKIP_REASON_NEEDS_TRIAGE})
             seen_keys.add(identity)
             continue
         if marker is not None:
@@ -1650,6 +1737,13 @@ def build_for_larry_approval_payload(
         'prompt': prompt,
         'task_type': 'direction-ask',
         'promoted_from_alert': dedup_key,
+        # STRUCTURAL BACKREFERENCE, and deliberately the UNPREFIXED record id —
+        # the key sitting behind `forlarry_dedup_key`'s `forlarry:` prefix. The
+        # sentinel's set-A alias for this record is the unprefixed id, so the
+        # unprefixed form is the one that can match; stamping the ledger key
+        # would reintroduce the namespace gap this closes. `promoted_from_alert`
+        # keeps the prefixed key (it is the ledger identity, not a backref).
+        'source_decision_key': str(record_id),
         'origin': HEALER_SOURCE,
         'bare_approvable': False,
         'promoted_source': PROMOTED_SOURCE_FORLARRY,
@@ -1783,6 +1877,52 @@ def open_approval_card_task_ids() -> Optional[set[str]]:
         if isinstance(tid, str) and tid:
             ids.add(tid)
     return ids
+
+
+def open_approval_cards() -> Optional[dict[str, Optional[str]]]:
+    """task_id -> `payload.source_decision_key` (None when the card carries
+    none) for EVERY open approval_request card — the same rows as
+    :func:`open_approval_card_task_ids`, read with the payload column so a
+    consumer can also see which source key each card backreferences.
+
+    A companion, not a replacement: that function is the mint path's
+    fail-closed set-membership read and keeps its narrow select. This one is the
+    drift sentinel's single card read — it needs the backreference to tell an
+    already-carded decision apart from a stranded one, and one fetch gives it
+    both halves. Cards minted before the field existed map to None, which reads
+    exactly as the pre-fix behavior.
+
+    Same fail-closed contract: None on ANY client/query failure (or no client),
+    so the caller skips its tick rather than treating an unreadable tab as
+    evidence about the tab's contents."""
+    try:
+        client = chain_event_emit._get_client()
+    except Exception as e:  # noqa: BLE001 — a client build failure fails closed
+        log(f'open-card fetch: supabase client unavailable '
+            f'({type(e).__name__}: {e})', 'WARN')
+        return None
+    if client is None:
+        return None
+    try:
+        import triage_decisions as td  # noqa: E402 — local: keeps import IO lazy
+        rows = td._fetch(client, columns='task_id,payload',
+                         event_type='approval_request')
+    except Exception as e:  # noqa: BLE001 — a query failure fails closed
+        log(f'open-card fetch with payload failed '
+            f'({type(e).__name__}: {e})', 'WARN')
+        return None
+    out: dict[str, Optional[str]] = {}
+    for row in rows or []:
+        if not isinstance(row, dict):
+            continue
+        tid = row.get('task_id')
+        if not isinstance(tid, str) or not tid:
+            continue
+        payload = row.get('payload')
+        key = payload.get('source_decision_key') if isinstance(payload, dict) \
+            else None
+        out[tid] = key.strip() if isinstance(key, str) and key.strip() else None
+    return out
 
 
 def _beacon_pending_entry_id(entry: dict[str, Any]) -> Optional[str]:
@@ -2751,9 +2891,10 @@ def main() -> int:
         return match_marker_for_record(record, recovered_markers)
 
     # --- SKIP-BEFORE-PROMOTE + PROMOTE (decisions 1 + 2) ---
-    # `skipped_needs_triage` collects the non-binary alert-derived asks the
-    # prevention gate suppressed; they are recorded in the promoted ledger below
-    # so the same identity is not re-evaluated (and re-logged) every tick.
+    # `skipped_needs_triage` collects the alerts a prevention gate suppressed —
+    # non-binary alert-derived asks, and the non-promotable drift-sentinel class,
+    # each carrying its own `reason`. They are recorded in the promoted ledger
+    # below so the same identity is not re-evaluated (and re-logged) every tick.
     skipped_needs_triage: list[dict[str, Any]] = []
     try:
         to_promote = evaluate(
@@ -2838,8 +2979,10 @@ def main() -> int:
                 f'{len(birth_suppressed)} suppression(s) are log-only this tick',
                 'ERROR')
 
-    # Record the suppressed needs-triage identities in the promoted ledger as
-    # SKIP markers so they are not re-evaluated (or re-logged) on the next tick.
+    # Record the suppressed identities (needs-triage + non-promotable class) in
+    # the promoted ledger as SKIP markers, each under its own reason, so they are
+    # not re-evaluated (or re-logged) on the next tick and a refusal is
+    # observable in heal-unregistered-approval-promoted.json rather than silent.
     # No card is created; the source larry-alert is untouched. reconcile_retire
     # leaves `skipped` entries alone (there is nothing on the tab to retire).
     if skipped_needs_triage:
@@ -2852,7 +2995,7 @@ def main() -> int:
                 'task_id': skip['task_id'],
                 'subject': skip['subject'],
                 'promoted_at': promoted_at,
-                'skipped': 'needs_triage',
+                'skipped': skip.get('reason') or SKIP_REASON_NEEDS_TRIAGE,
             }
             ledger_changed = True
 
