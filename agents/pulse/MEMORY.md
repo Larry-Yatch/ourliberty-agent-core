@@ -24,9 +24,9 @@
 
 ---
 
-## G-rule pulse-triage-self-report-should-be-tier3-001 — 1/3 (new, iter ~6982)
+## G-rule pulse-triage-self-report-should-be-tier3-001 — 2/3 (iter ~6982 first, iter ~7563 second)
 
-**Rule:** `source=pulse-triage` writes in larry-alerts.jsonl are Pulse's own triage-documentation artifacts (Pulse writes these after DM'ing Larry about a Tier-4 alert). They are NOT new action items — exactly analogous to `kind=approval_request` delivery confirmations. Current behavior: helper returns Tier 4 (novel, no translation), which triggers a journal-note only (no second DM). The correct permanent fix: add `source=pulse-triage` as a Tier-3 entry in `config/alert-translations.json`. First occurrence: iter ~6982 (2026-08-01). Dispatch to Beacon at 3/3.
+**Rule:** Pulse's own triage-documentation writes in larry-alerts.jsonl appear as new Tier-4 alerts (no translation match). Two observed patterns: (a) `source=pulse-triage` (iter ~6982); (b) `source=pulse, subject^=tier4-novel:` (iter ~7563 — Pulse's forge-wip-redispatch DM confirmation write). Both are NOT new action items — the underlying DM was already sent before the write. Current behavior: helper returns Tier 4 (novel), journal-note only, no second DM. The correct permanent fix: add `source=pulse` + `subject^=tier4-novel:` (and `source=pulse-triage`) as Tier-3 entries in `config/alert-translations.json`. Dispatch to Beacon at 3/3.
 
 ---
 
