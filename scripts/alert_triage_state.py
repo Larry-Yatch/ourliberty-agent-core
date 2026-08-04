@@ -123,6 +123,17 @@ VALID_TIERS = (1, 2, 3, 4)
 # lowest safe tier, never toward Tier 4).
 GUARD_FALLBACK_TIER = 3
 
+# Alert sources that are Pulse's OWN alert writers. A row from one of these was
+# written by Pulse via larry_alerts.append_alert, and delivery to Larry already
+# happened AT WRITE TIME (the bot's _check_pending_alerts gates purely on the
+# row's `route`). Re-triaging it at Check 0 can only produce a SECOND DM about an
+# alert Larry already has, so classify() silences them at Gate 0.
+#
+# 'pulse-check' is deliberately ABSENT: those are pulse-check-failed alerts from
+# pulse_check_heartbeat.py / pulse_check_xi.py, written route=digest — Check 0's
+# escalation is their ONLY path to Larry, so they must keep reaching Tier 4.
+SELF_AUTHORED_SOURCES = frozenset({'pulse', 'pulse-triage'})
+
 # Agent name stamped on a Tier-1 auto-fix dispatch row. The remediation is
 # acted by Pulse / existing healers (Phase B does not build a dispatcher); this
 # names the actor for the audit trail.
@@ -693,6 +704,8 @@ def classify(alert: dict[str, Any], *, registry: dict[str, dict[str, Any]],
 
     Evaluates the gates in order (first match wins, per spec § 3.0 / § 6.6):
 
+      0. source in ``SELF_AUTHORED_SOURCES`` and NOT
+         ``never_silence``                            → Tier 3 (silence→digest)
       1. (source, subject) in ``translations``        → Tier 3 (silence→digest)
       2. registry template, permanent_guard OR
          state != "graduated"                         → Tier 2 (ask→escalate)
@@ -715,16 +728,35 @@ def classify(alert: dict[str, Any], *, registry: dict[str, dict[str, Any]],
     template = alert.get('template')
     template = str(template) if template is not None else None
 
+    # The SINGLE translation lookup, shared by Gates 0 and 1 below.
+    # ``subject`` stays untouched below (route_fn / is_significant / rationale);
+    # the intent fallback is scoped to this translation lookup only.
+    match = _translation_match(translations, source, subject,
+                               alert.get('intent'), alert.get('kind'))
+    never_silence = match is not None and bool(match.get('never_silence'))
+
+    # Gate 0 — Tier 3: Pulse wrote this alert herself, so Check 0 must not look
+    # at it a second time. A ``never_silence`` entry on a specific pulse subject
+    # falls THROUGH — the escape hatch for a self-authored subject that must
+    # surface at Check 0 anyway.
+    if source in SELF_AUTHORED_SOURCES and not never_silence:
+        return {
+            'tier': 3,
+            'route': 'digest',
+            'decision': 'silence',
+            'rationale': ('self-authored: Pulse wrote this alert via '
+                          'larry_alerts.append_alert; the row\'s own route '
+                          'already delivered it at write time, so Check 0 '
+                          're-triage would only duplicate the DM'),
+            'template': None,
+        }
+
     # Gate 1 — Tier 3: Larry already approved silence on this known pattern.
     # Exception: an entry tagged ``never_silence`` is a known pattern Larry wants
     # *translated but still surfaced* (e.g. a dark pulse check). Such an entry
     # must not be muted to digest — it falls through to Tier 4 so it escalates
     # with its translation intact.
-    # ``subject`` stays untouched below (route_fn / is_significant / rationale);
-    # the intent fallback is scoped to this translation lookup only.
-    match = _translation_match(translations, source, subject,
-                               alert.get('intent'), alert.get('kind'))
-    if match is not None and not match.get('never_silence'):
+    if match is not None and not never_silence:
         return {
             'tier': 3,
             'route': 'digest',
