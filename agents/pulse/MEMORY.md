@@ -6,6 +6,12 @@
 
 ---
 
+## G-rule enable-pr-auto-merge-reviewdecision-guard-001 — 1/3 (new, iter ~7573)
+
+**Rule:** Pulse's `enable-pr-auto-merge` always-allowed action (Check E) fires on `age>30m + MERGEABLE` regardless of `reviewDecision`. In iter ~7572, Pulse triggered `gh pr merge 1095 --auto --squash` on PR#1095 (docs(registry) fix) at 33-min age when `reviewDecision=""` (no Mirror review, intentionally unrouted fix/* no-label PR). The PR merged immediately (no CI, no branch protection blocking). `heal-unreviewed-merge-detector` fired `unreviewed-merge:1095` (Tier-4, never-silence pattern). The specific PR was doc-only with 0 operational impact; no revert needed. Fix: add `reviewDecision=APPROVED` guard before the always-fix fires, OR an explicit skip-review marker for intentionally-unrouted trivial PRs. First occurrence: iter ~7573 (2026-08-04T01:31Z UTC). Dispatch to Beacon at 3/3.
+
+---
+
 ## G-rule heal-approvals-surface-drift-missing-card-cooldown-collision-001 — 2/3 (iter ~7530 first, iter ~7540 second)
 
 **Rule:** heal-approvals-surface-drift fires `missing_card` alerts when an approval card exists in the unregistered-approval state but doesn't appear on the Approvals tab decide tab for ≥3 consecutive checks. First occurrence: iter ~7530 (2026-08-03T21:56Z UTC). Context: `unreg-approval-732b8a6c7762` was created for `pipeline-stall:unrouted-pr:PR#1092` (a fix/* branch that is unrouted-by-design, cooldown-suppressed by heal_pipeline_stall since iter ~7522). The approval card was likely created before the cooldown engaged; the promote predicate is now failing to surface it on the tab. Bot delivered idx=661 at 21:54:50Z UTC. Proposed fix: `scripts/heal_unregistered_approval.py` should not create or retain approval cards for alerts that are currently cooldown-suppressed by `heal_pipeline_stall.py` (i.e., if the originating alert is cooldown-suppressed, the approval card should be retired, not promoted). Dispatch to Beacon at 3/3.
