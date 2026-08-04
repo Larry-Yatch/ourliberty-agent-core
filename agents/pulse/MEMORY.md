@@ -18,7 +18,14 @@
 
 ---
 
-## G-rule pulse-check-xiv-tier4-no-translation-001 — 1/3 (new, iter ~7390)
+## G-rule medic-diagnosis-subject-specific-tier4-no-translation-001 — 1/3 (new, iter ~7582)
+
+**Rule:** medic-diagnosis alerts with specific PR subjects return Tier-4 when only the subject=null (or generic) pattern is in the translation table. Alert 694 (source=medic, intent=medic-diagnosis, subject=pipeline-stall:unrouted-pr:PR#175, RSDPM-scoped) returned Tier-4 (no translation match). Prior alert 691 (same intent, PR#1096 in agent-core) was Tier-3 because that specific subject string was in the table. The medic's own diagnosis already says "by-design" — Tier-4 guard confirmed it's genuine (no translation), but content is self-resolving (no DM issued). Fix: add wildcard or prefix match for `source=medic, intent=medic-diagnosis, subject^=pipeline-stall:unrouted-pr:` in config/alert-translations.json. Dispatch to Beacon at 3/3.
+
+---
+
+## G-rule pulse-check-xiv-tier4-no-translation-001 — 2/3 (iter ~7390 first, iter ~7563+ second)
+
 
 **Rule:** pulse-check-xiv alerts (subject^=pulse-check-xiv-oversilence: and subject=pulse-check-xiv-digest) return Tier-4 from triage helper (novel, no translation match). These are informational FYI-tier observability reports that the bot already delivers via the alert pipeline (outbox-notifier/beacon_telegram_bot.py). Pulse receiving them via larry-alerts.jsonl and sending a SECOND DM would be duplicate noise. Fix: add Tier-3 (or Tier-FYI) translation entries for `source=pulse-check-xiv` in config/alert-translations.json so Check 0 silences them on sight. First occurrence: iter ~7390 (2026-08-03T12:00Z UTC; 3 alerts: oversilence:doorbell, oversilence:medic, digest). Dispatch to Beacon at 3/3.
 
