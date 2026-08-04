@@ -586,8 +586,15 @@ def _probe_evidence(probe: dict[str, Any]) -> str:
         return (f'{kind} premise FALSE: substring {probe.get("substring")!r} {rel} '
                 f'{probe.get("repo")}:{probe.get("path")}@{probe.get("ref") or "origin/main"}')
     if kind == 'pr_state':
-        return (f'pr_state premise FALSE: work for task {probe.get("task_id")!r} '
-                f'reached a terminal state (expect={probe.get("expect", "open")})')
+        # Coordinate probes carry no task_id, so naming one unconditionally would
+        # stamp "task None" on every demotion the authoring producers cause — and
+        # this line IS the recovery surface for a card demoted wrongly.
+        if probe.get('repo') or probe.get('pr_number') is not None:
+            what = f'{probe.get("repo")}#{probe.get("pr_number")}'
+        else:
+            what = f'work for task {probe.get("task_id")!r}'
+        return (f'pr_state premise FALSE: {what} reached a terminal state '
+                f'(expect={probe.get("expect", "open")})')
     if kind == 'json_path':
         return (f'json_path premise FALSE: {probe.get("key")!r} in '
                 f'{probe.get("path")!r} != expected {probe.get("expected")!r}')

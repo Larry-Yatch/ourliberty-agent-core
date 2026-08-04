@@ -52,6 +52,7 @@ if not os.environ.get('OURLIBERTY_AGENTS_ROOT'):
 
 import heal_unregistered_approval as h  # noqa: E402
 import beacon_approval_handler as approval  # noqa: E402
+import task_terminal_state as tts  # noqa: E402 — state constants for probe tests
 
 
 # Runtime backstop: h resolves agents_root() at CALL time, and an
@@ -2787,9 +2788,12 @@ class BirthSuppressionFailurePostureTest(unittest.TestCase):
 
     def _drive(self, **patches):
         import contextlib
-        # One card carrying a FALSE probe (suppressed) + one with no probe
-        # (promotes as today), so a broken recorder is visible against a card
-        # that must still reach the tab.
+        # One card whose premise is DEAD (suppressed) + one whose premise is LIVE
+        # (promotes), so a broken recorder is visible against a card that must
+        # still reach the tab. The second card used to carry NO probe; since
+        # slice 4 it AUTHORS a pr_state coordinate probe from its own pr_url, so
+        # the evaluator below discriminates per-probe rather than returning a
+        # blanket FALSE — which would now suppress both and erase the control.
         suppressed_rec = dict(FORLARRY_DECISION_RECORD,
                               freshness_probe={'kind': 'pr_state', 'task_id': 't'})
         keep_rec = dict(
@@ -2823,8 +2827,10 @@ class BirthSuppressionFailurePostureTest(unittest.TestCase):
             mock.patch.object(h, '_emit_self_failure'),
             mock.patch('for_larry_escalations.clear', return_value=True),
             mock.patch.object(h, 'emit_approval_event', return_value=True),
-            mock.patch.object(h.freshness_probe, 'evaluate',
-                              return_value=_FP.FALSE),
+            mock.patch.object(
+                h.freshness_probe, 'evaluate',
+                side_effect=lambda probe, **kw: (
+                    _FP.FALSE if probe.get('task_id') == 't' else _FP.TRUE)),
             mock.patch.object(approval, 'state_lock',
                               return_value=contextlib.nullcontext()),
             mock.patch.object(approval, 'save_state'),
@@ -3210,6 +3216,255 @@ class CrossRepoRefResolutionTest(unittest.TestCase):
             promoted, {'pending': [], 'history': []}, [], DEFAULT_HEURISTICS,
             now=NOW, gh_probe=lambda n, r=None: seen.append((n, r)) or None)
         self.assertEqual([r for _n, r in seen], [h.ref_repo()])
+
+
+# -------------------- slice 4: this healer AUTHORS the probe --------------------
+
+class BuildPrStateProbeTest(unittest.TestCase):
+    """`build_pr_state_freshness_probe` authors a probe ONLY when the repo AND a
+    single PR number are both unambiguous. Every other shape returns None, which
+    is byte-identical to the pre-slice-4 behaviour."""
+
+    def _hint(self, record, subject=None):
+        subject = record.get('subject') if subject is None else subject
+        return h.ledger_ref_repo(subject, record)
+
+    def _build(self, record, subject=None):
+        subject = record.get('subject') if subject is None else subject
+        return h.build_pr_state_freshness_probe(
+            record, subject, self._hint(record, subject))
+
+    def test_cross_repo_alert_resolves_against_the_repo_it_names(self):
+        # THE bug this must not reintroduce: agent-core is past #1085 while RSDPM
+        # is near #172, so agent-core also has a long-merged #172. A probe that
+        # re-derived the repo badly would read FALSE and suppress a live RSDPM
+        # decision at birth — where Larry never sees it at all.
+        probe = self._build(RSDPM_172_ALERT)
+        self.assertEqual(probe, {'kind': 'pr_state',
+                                 'repo': 'Larry-Yatch/RSDPM',
+                                 'pr_number': 172, 'expect': 'open'})
+
+    def test_alert_whose_only_url_is_untrusted_authors_nothing(self):
+        # UNROUTED_PR_ALERT names `#28` but its only URL is github.com/x/y/pull/28
+        # — an untrusted owner, so there is no evidence of the real repo.
+        self.assertIsNone(self._build(UNROUTED_PR_ALERT))
+
+    def test_for_larry_record_uses_its_structured_pr_url(self):
+        probe = self._build(FORLARRY_DECISION_RECORD,
+                            subject=FORLARRY_DECISION_RECORD['id'])
+        self.assertEqual(probe, {'kind': 'pr_state',
+                                 'repo': 'Larry-Yatch/ourliberty-agent-core',
+                                 'pr_number': 854, 'expect': 'open'})
+
+    def test_expect_is_open_because_the_ask_dies_when_the_pr_goes_terminal(self):
+        self.assertEqual(self._build(RSDPM_172_ALERT)['expect'], 'open')
+
+    def test_no_repo_evidence_authors_nothing(self):
+        # A bare `#<n>` with no URL is ambiguous across repos -> refuse.
+        rec = {'subject': 'pipeline-stall:unrouted-pr:PR#169',
+               'message': 'PR #169 is stranded.', 'suggested_action': 'Route it.'}
+        self.assertIsNone(self._build(rec))
+
+    def test_multiple_refs_are_ambiguous_and_author_nothing(self):
+        rec = dict(RSDPM_172_ALERT,
+                   message=RSDPM_172_ALERT['message'] + ' See also PR #1092.')
+        self.assertIsNone(self._build(rec))
+
+    def test_no_ref_at_all_authors_nothing(self):
+        rec = {'subject': 'migration 0033 is not live', 'message': 'no refs here'}
+        self.assertIsNone(self._build(rec))
+
+    def test_untrusted_owner_authors_nothing(self):
+        rec = dict(RSDPM_172_ALERT,
+                   suggested_action='see https://github.com/attacker/RSDPM/pull/172')
+        rec['message'] = 'PR #172 on branch foo has no dispatch.'
+        self.assertIsNone(self._build(rec))
+
+    def test_hint_disagreeing_with_the_number_authors_nothing(self):
+        # A record whose pr_url and subject ref name DIFFERENT PRs must refuse
+        # rather than pair one PR's number with another PR's repo.
+        rec = dict(RSDPM_172_ALERT,
+                   pr_url='https://github.com/Larry-Yatch/ourliberty-agent-core/pull/999')
+        self.assertIsNone(
+            h.build_pr_state_freshness_probe(rec, rec['subject'],
+                                             'Larry-Yatch/RSDPM'))
+
+    def test_pr_url_naming_a_different_pr_than_the_prose_authors_nothing(self):
+        # The repo check alone cannot catch this: the card's TEXT is about #28 but
+        # its pr_url points at #999 in the SAME repo, so both halves agree on the
+        # repo and disagree on the pull request. Probing the merged #999 would
+        # suppress a card about the still-open #28 at birth.
+        rec = {'subject': 'pipeline-stall:unrouted-pr:PR#28',
+               'message': ('PR #28 https://github.com/Larry-Yatch/'
+                           'ourliberty-agent-core/pull/28 has no dispatch.'),
+               'pr_url': ('https://github.com/Larry-Yatch/'
+                          'ourliberty-agent-core/pull/999')}
+        self.assertEqual(self._hint(rec), 'Larry-Yatch/ourliberty-agent-core')
+        self.assertIsNone(self._build(rec))
+
+    def test_missing_or_bad_hint_authors_nothing(self):
+        for hint in (None, '', 'noslash', 42):
+            with self.subTest(hint=hint):
+                self.assertIsNone(h.build_pr_state_freshness_probe(
+                    RSDPM_172_ALERT, RSDPM_172_ALERT['subject'], hint))
+
+    def test_non_dict_record_authors_nothing(self):
+        self.assertIsNone(
+            h.build_pr_state_freshness_probe('not-a-dict', 's', 'a/b'))
+
+
+class BuilderAuthorsFreshnessProbeTest(unittest.TestCase):
+    """The three mint paths construct a probe when — and only when — the source
+    is unambiguous, and a CARRIED probe always wins over a constructed one."""
+
+    def test_alert_builder_authors_from_the_alert(self):
+        payload = h.build_approval_payload(RSDPM_172_ALERT,
+                                           RSDPM_172_ALERT['subject'])
+        self.assertEqual(payload['freshness_probe'],
+                         {'kind': 'pr_state', 'repo': 'Larry-Yatch/RSDPM',
+                          'pr_number': 172, 'expect': 'open'})
+
+    def test_alert_builder_carry_forward_wins_over_construction(self):
+        carried = {'kind': 'file_lacks', 'repo': '/r', 'path': 'p',
+                   'substring': 's'}
+        rec = dict(RSDPM_172_ALERT, freshness_probe=carried)
+        payload = h.build_approval_payload(rec, rec['subject'])
+        self.assertEqual(payload['freshness_probe'], carried)
+
+    def test_alert_builder_authors_nothing_when_ambiguous(self):
+        rec = {'subject': 'sub', 'message': 'm',
+               'suggested_action': 'Choose ship or hold'}
+        self.assertNotIn('freshness_probe', h.build_approval_payload(rec, 'sub'))
+
+    def test_for_larry_builder_authors_from_structured_pr_url(self):
+        key = h.forlarry_dedup_key(FORLARRY_DECISION_RECORD['id'])
+        payload = h.build_for_larry_approval_payload(FORLARRY_DECISION_RECORD, key)
+        self.assertEqual(payload['freshness_probe'],
+                         {'kind': 'pr_state',
+                          'repo': 'Larry-Yatch/ourliberty-agent-core',
+                          'pr_number': 854, 'expect': 'open'})
+
+    def test_for_larry_builder_carry_forward_wins(self):
+        carried = {'kind': 'json_path', 'path': '/c', 'key': 'k', 'expected': 1}
+        rec = dict(FORLARRY_DECISION_RECORD, freshness_probe=carried)
+        key = h.forlarry_dedup_key(rec['id'])
+        payload = h.build_for_larry_approval_payload(rec, key)
+        self.assertEqual(payload['freshness_probe'], carried)
+
+    def test_marker_builder_authors_nothing_for_a_pre_pr_marker(self):
+        # Recovered Beacon markers are typically PRE-PR: no PR exists to name, so
+        # authoring nothing is the correct outcome, not a gap.
+        marker = {'task_id': 't', 'summary': 's', 'target_agent': 'beacon'}
+        payload = h.build_approval_payload_from_marker(
+            marker, {'subject': 'needs a direction call'}, 'sub')
+        self.assertNotIn('freshness_probe', payload)
+
+    def test_marker_builder_authors_from_the_downstream_alert(self):
+        marker = {'task_id': 't', 'summary': 's', 'target_agent': 'beacon'}
+        payload = h.build_approval_payload_from_marker(
+            marker, RSDPM_172_ALERT, RSDPM_172_ALERT['subject'])
+        self.assertEqual(payload['freshness_probe']['pr_number'], 172)
+        self.assertEqual(payload['freshness_probe']['repo'], 'Larry-Yatch/RSDPM')
+
+
+class AuthoredProbeAgreesWithResolutionSignalTest(unittest.TestCase):
+    """A constructed probe must never NEWLY suppress a card the existing
+    skip-before-promote gate would have promoted.
+
+    Structural reason it cannot: `resolution_signal` already skips any card whose
+    ref is merged/closed, and it reads the same ref through the same
+    repo-qualified probe. So a card that REACHES the birth gate has a
+    non-terminal ref, and the probe authored from that same ref reads TRUE."""
+
+    def test_card_that_survives_resolution_signal_probes_true_at_birth(self):
+        record, subject = RSDPM_172_ALERT, RSDPM_172_ALERT['subject']
+        # The promote gate consulted gh and did NOT skip -> ref is still open.
+        self.assertIsNone(h.resolution_signal(
+            record, {'pending': [], 'history': []}, [], DEFAULT_HEURISTICS,
+            gh_probe=lambda n, r=None: False))
+        payload = h.build_approval_payload(record, subject)
+        verdict = _FP.evaluate(payload['freshness_probe'],
+                               pr_coordinate_probe=lambda r, n: tts.OPEN)
+        self.assertEqual(verdict, _FP.TRUE)
+        # The executor is injected, never defaulted: defaulting here makes the gate
+        # shell out to `gh` for a real PR, so the test would go red the day RSDPM
+        # #172 merges — a red gate attributable to nothing.
+        kept, suppressed = h.apply_birth_freshness_gate(
+            [payload],
+            evaluator=lambda p: _FP.evaluate(
+                p, pr_coordinate_probe=lambda r, n: tts.OPEN))
+        self.assertEqual((len(kept), len(suppressed)), (1, 0))
+
+    def test_probe_and_skip_gate_read_the_same_repo_and_number(self):
+        seen = []
+        h.resolution_signal(
+            RSDPM_172_ALERT, {'pending': [], 'history': []}, [],
+            DEFAULT_HEURISTICS,
+            gh_probe=lambda n, r=None: seen.append((n, r)) or False)
+        probe = h.build_approval_payload(
+            RSDPM_172_ALERT, RSDPM_172_ALERT['subject'])['freshness_probe']
+        self.assertEqual(seen, [(probe['pr_number'], probe['repo'])])
+
+
+class AuthoredProbeBirthSuppressionEndToEndTest(unittest.TestCase):
+    """The whole arc for an AUTHORED probe: a card whose PR is already merged is
+    suppressed at birth, persisted with its full payload, and surfaced to Larry —
+    the path that had never once fired in production, because until now nothing
+    ever authored a probe."""
+
+    def setUp(self):
+        self.store = Path(
+            tempfile.mkdtemp(prefix='ol-authored-e2e-')) / 'suppressed.json'
+        for target, kw in (('birth_suppressed_state_file',
+                            {'return_value': self.store}), ('log', {})):
+            patcher = mock.patch.object(h, target, **kw)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+    def test_merged_pr_card_is_suppressed_persisted_and_recoverable(self):
+        payload = h.build_approval_payload(RSDPM_172_ALERT,
+                                           RSDPM_172_ALERT['subject'])
+        probe = payload['freshness_probe']
+        self.assertEqual(probe['pr_number'], 172)
+
+        # The PR has since MERGED -> the premise is dead at mint time.
+        kept, suppressed = h.apply_birth_freshness_gate(
+            [payload],
+            evaluator=lambda p: _FP.evaluate(
+                p, pr_coordinate_probe=lambda r, n: tts.MERGED))
+        self.assertEqual((len(kept), len(suppressed)), (0, 1))
+
+        with mock.patch.object(h, '_emit_birth_suppression_alert') as alert:
+            new = h.record_and_alert_birth_suppressions(suppressed)
+        self.assertEqual(len(new), 1)
+        self.assertEqual(alert.call_count, 1)
+
+        stored = json.loads(self.store.read_text(encoding='utf-8'))['suppressed']
+        rec = list(stored.values())[0]
+        # Recoverable: the FULL card payload survives, so a wrongly-suppressed
+        # real decision can be re-promoted by hand.
+        self.assertEqual(rec['card'], payload)
+        self.assertEqual(rec['probe'], probe)
+        self.assertEqual(rec['verdict'], _FP.FALSE)
+
+    def test_still_open_pr_card_is_not_suppressed(self):
+        payload = h.build_approval_payload(RSDPM_172_ALERT,
+                                           RSDPM_172_ALERT['subject'])
+        kept, suppressed = h.apply_birth_freshness_gate(
+            [payload],
+            evaluator=lambda p: _FP.evaluate(
+                p, pr_coordinate_probe=lambda r, n: tts.OPEN))
+        self.assertEqual((len(kept), len(suppressed)), (1, 0))
+        self.assertFalse(self.store.exists())
+
+    def test_gh_failure_keeps_the_card(self):
+        # UNKNOWN -> INDETERMINATE -> promote. Fail toward the human.
+        payload = h.build_approval_payload(RSDPM_172_ALERT,
+                                           RSDPM_172_ALERT['subject'])
+        kept, suppressed = h.apply_birth_freshness_gate(
+            [payload],
+            evaluator=lambda p: _FP.evaluate(
+                p, pr_coordinate_probe=lambda r, n: tts.UNKNOWN))
+        self.assertEqual((len(kept), len(suppressed)), (1, 0))
 
 
 if __name__ == '__main__':
