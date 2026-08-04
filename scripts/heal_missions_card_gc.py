@@ -133,15 +133,23 @@ REVIEW_SHAPED_TASK_ID_PREFIXES = ('dag-preflight-', 'notify-', 'review-')
 # instead of sitting on the board silently forever.
 EMPTY_PROBEABLE_MISSION_GRACE_DAYS = 14
 
-# Phase S (S3) completion states. A parked card whose spawned work reaches
-# verified-merged (belt-and-suspenders) is routed by its risk: a `safe` card
-# auto-closes to `done` (with a shipped note), a `medium`/`careful` (or
-# un-briefed) card moves to `review_close` carrying a Narrator closeout briefing
-# and awaits Larry's ack. Both are terminal for the parked lane, so the
+# Phase S (S3) completion state. A parked card whose spawned work reaches
+# verified-merged (belt-and-suspenders) auto-closes to `done` with a shipped
+# note, WHATEVER its risk. The former risk diversion — `medium`/`careful`/
+# un-briefed cards to a `review_close` state carrying an `awaiting_ack` flag —
+# was retired: no surface ever read that state, so the gate built to stop a risky
+# card closing silently was itself the thing that made it vanish silently, and
+# the ack it waited on carried no choice (closing the record cannot un-merge the
+# work). Awareness now comes from the CEO digest, which names each risky closure
+# alongside the PR that closed it. `done` is terminal for the parked lane, so the
 # completion reconcile's own `state == 'parked'` guard makes it idempotent.
 COMPLETED_STATE_DONE = 'done'
-COMPLETED_STATE_REVIEW = 'review_close'
 COMPLETED_BY = 'heal_missions_card_gc'
+
+# The retired state + flag, kept ONLY as migration inputs (see
+# `migrate_review_close_captures`). Nothing writes them.
+LEGACY_STATE_REVIEW = 'review_close'
+LEGACY_ACK_FLAG = 'awaiting_ack'
 
 # Match the trailing PR number in a GitHub PR URL (…/pull/<N>).
 _PR_NUM_RE = re.compile(r'/pull/(\d+)')
@@ -864,7 +872,7 @@ def reconcile_mission_phases(
     return res
 
 
-# ---------- Phase S (S3): completion — auto-close safe / closeout risky -------
+# ---------- Phase S (S3): completion — auto-close verified-merged cards ------
 
 
 def pr_number_from_url(pr_url: Any) -> Optional[str]:
@@ -886,7 +894,7 @@ def shipped_note(pr_url: Any) -> str:
 
 @dataclass(frozen=True)
 class CompletionDecision:
-    action: str   # 'auto_close' | 'closeout' | 'keep'
+    action: str   # 'auto_close' | 'keep'
     reason: str
 
 
@@ -896,31 +904,36 @@ def classify_completion(
     """Route a parked card on its spawned work's verified-merge (spec § 3 S3).
     Pure — the caller resolves the belt-and-suspenders gate into ``verified_merged``.
 
-      not verified            ⇒ keep   (retry next tick; never close early)
-      verified + risk == safe ⇒ auto_close (state → done + shipped note)
-      verified + medium/      ⇒ closeout   (Narrator closeout + review_close)
-        careful/un-briefed
+      not verified ⇒ keep       (retry next tick; never close early)
+      verified     ⇒ auto_close (state → done + shipped note), ANY risk
 
-    An un-briefed card (no risk yet) routes to closeout, not auto-close — fail
-    toward Larry's review rather than silently closing a card we never classified
-    (mirrors the Narrator's fail-toward-caution posture)."""
+    Risk no longer diverts a verified-merged card. The rating describes how
+    careful we should be BUILDING the thing; it says nothing about closing the
+    record of work that already merged, and closing that record cannot un-merge
+    anything. The un-verified branch below is untouched and is where all the
+    safety actually lives: the caller's belt-and-suspenders gate (chain_events
+    `auto_merge` AND `gh pr view` MERGED, every task_id) must positively prove
+    the merge, and ANY ambiguity still KEEPS the card.
+
+    This is the single choke point all three completion paths route through
+    (`reconcile_completed_cards`, `reconcile_terminal_captures`, and the board
+    drain's `reconcile_promoted_drafts`), so the policy lives in exactly one
+    place."""
     if not verified_merged:
         return CompletionDecision('keep', 'not-verified-merged')
-    if capture.get('risk') == 'safe':
-        return CompletionDecision('auto_close', 'safe-verified-merged')
-    return CompletionDecision('closeout', f'{capture.get("risk") or "unbriefed"}-verified-merged')
+    return CompletionDecision(
+        'auto_close', f'{capture.get("risk") or "unbriefed"}-verified-merged')
 
 
 @dataclass
 class CompletionResult:
     closed: list[tuple[str, str]] = field(default_factory=list)   # (id, note)
-    closeouts: list[str] = field(default_factory=list)            # ids → review_close
     kept: int = 0
 
     @property
     def changed(self) -> bool:
         """True iff this tick mutated a capture (so the caller writes+commits)."""
-        return bool(self.closed or self.closeouts)
+        return bool(self.closed)
 
 
 def reconcile_completed_cards(
@@ -928,30 +941,25 @@ def reconcile_completed_cards(
     now: datetime,
     *,
     verify_fn: Callable[[str, Optional[str]], tuple[bool, Optional[str]]],
-    closeout_fn: Callable[[dict[str, Any], Optional[str], datetime], dict[str, Any]],
     dry_run: bool,
 ) -> CompletionResult:
     """Phase S S3: close the loop on parked cards whose spawned work has merged.
 
     For each parked capture carrying a `spawned.task_id` (S-1's delegate join
     key), resolve the belt-and-suspenders verified-merge gate via ``verify_fn``
-    (production: chain_events `auto_merge` AND `gh pr view MERGED`, both required)
-    and route by risk:
-
-      * safe        → state → `done`, stamped with a "shipped in PR #X" note.
-      * medium/     → ``closeout_fn`` authors a Narrator closeout briefing onto
-        careful/       the card and the state moves to `review_close`, awaiting
-        un-briefed     Larry's ack.
+    (production: chain_events `auto_merge` AND `gh pr view MERGED`, both required).
+    A card that clears it moves to `done` stamped with a "shipped in PR #X" note,
+    whatever its risk; a card that does not is KEPT for the next tick.
 
     Effectful ONLY on the in-memory registry dict — the caller (run_once) owns
     the single atomic write + git commit, so this never becomes a second
     captures.json committer (single-committer invariant; the same reuse the
-    Narrator sweep relies on). Fail-safe per capture: a verify/author error keeps
-    the card (retried next tick). Idempotent: a closed/review_close card is no
-    longer `parked`, so it is skipped on every subsequent tick.
+    Narrator sweep relies on). Fail-safe per capture: a verify error keeps the
+    card (retried next tick). Idempotent: a closed card is no longer `parked`, so
+    it is skipped on every subsequent tick.
 
     ``verify_fn(task_id, dispatched_at) -> (verified_merged, pr_url)``; ``pr_url``
-    is threaded into the shipped note and the closeout so neither has to refetch."""
+    is threaded into the shipped note so it doesn't have to refetch."""
     res = CompletionResult()
     for cap in registry.get('captures', []):
         if not isinstance(cap, dict) or cap.get('state') != 'parked':
@@ -975,42 +983,63 @@ def reconcile_completed_cards(
             res.kept += 1
             continue
         cid = cap.get('id') if isinstance(cap.get('id'), str) else '<unknown>'
-        if decision.action == 'auto_close':
-            note = shipped_note(pr_url)
-            if dry_run:
-                res.closed.append((cid, note + ' (dry-run)'))
-                continue
-            cap['state'] = COMPLETED_STATE_DONE
-            cap['closed_at'] = now.isoformat()
-            cap['closed_by'] = COMPLETED_BY
-            cap['shipped_note'] = note
-            if pr_url:
-                cap['shipped_pr_url'] = pr_url
-            cap.pop('aging', None)  # a closed card is no longer an aging nudge
-            res.closed.append((cid, note))
-            log(f'completion: capture {cid} (safe) -> done [{note}]')
-            continue
-        # closeout (medium / careful / un-briefed)
+        note = shipped_note(pr_url)
         if dry_run:
-            res.closeouts.append(cid)
+            res.closed.append((cid, note + ' (dry-run)'))
             continue
-        try:
-            fields = closeout_fn(cap, pr_url, now)
-        except Exception as e:  # noqa: BLE001 — per-capture fail-safe
-            log(f'completion: closeout author failed for {cid}: '
-                f'{type(e).__name__}: {e} — keep')
-            res.kept += 1
-            continue
-        cap.update(fields)
-        cap['state'] = COMPLETED_STATE_REVIEW
-        cap['awaiting_ack'] = True
+        cap['state'] = COMPLETED_STATE_DONE
+        cap['closed_at'] = now.isoformat()
+        cap['closed_by'] = COMPLETED_BY
+        cap['shipped_note'] = note
         if pr_url:
             cap['shipped_pr_url'] = pr_url
-        cap.pop('aging', None)
-        res.closeouts.append(cid)
+        cap.pop('aging', None)  # a closed card is no longer an aging nudge
+        res.closed.append((cid, note))
         log(f'completion: capture {cid} ({cap.get("risk") or "unbriefed"}) '
-            f'-> review_close (closeout authored)')
+            f'-> done [{note}]')
     return res
+
+
+def migrate_review_close_captures(
+    registry: dict[str, Any], now: datetime, *, dry_run: bool,
+) -> list[str]:
+    """Convert every legacy `review_close` capture to `done`, returning the ids
+    converted.
+
+    These cards were diverted by the retired risk gate and then stranded: no
+    surface ever rendered `review_close`, so the ack they were waiting on could
+    never be given. They already carry their merge evidence (`closed_by`,
+    `shipped_note`, and `shipped_pr_url` where the closing path resolved one) —
+    this only moves them to the state that evidence always justified, and drops
+    the `awaiting_ack` flag nothing reads.
+
+    Preserves `closed_by` / `shipped_note` / `shipped_pr_url` / `risk` untouched;
+    sets `closed_at` only when absent (the legacy closeout branch never stamped
+    one) so an existing timestamp is never rewritten and the card lands in the
+    digest window for the run that migrates it.
+
+    Effectful ONLY on the in-memory registry — the caller (run_once) owns the
+    single atomic write + commit, so this never becomes a second captures.json
+    committer. A key DELETION survives that path: `_merge_registry_deltas`
+    applies removed keys as well as changed ones. Idempotent by construction — a
+    converted card is no longer `review_close`, so a second pass matches nothing
+    and returns []; safe to leave resident on a clean board."""
+    converted: list[str] = []
+    for cap in registry.get('captures', []):
+        if not isinstance(cap, dict) or cap.get('state') != LEGACY_STATE_REVIEW:
+            continue
+        cid = cap.get('id') if isinstance(cap.get('id'), str) else '<unknown>'
+        converted.append(cid)
+        if dry_run:
+            continue
+        cap['state'] = COMPLETED_STATE_DONE
+        cap.pop(LEGACY_ACK_FLAG, None)
+        if not cap.get('closed_at'):
+            cap['closed_at'] = now.isoformat()
+        cap.pop('aging', None)
+        log(f'review-close-migration: capture {cid} '
+            f'({cap.get("risk") or "unbriefed"}) -> done')
+    return converted
 
 
 def _fetch_task_events(client: Any, task_id: str) -> list[dict[str, Any]]:
@@ -1053,7 +1082,7 @@ def _default_completion_verify_fn() -> Callable[[str, Optional[str]], tuple[bool
     an `auto_merge` row with a merged outcome (since dispatch) AND `gh pr view`
     reports the PR MERGED. Either leg failing/indeterminate ⇒ NOT verified (keep,
     retry next tick). The pr_url is resolved from chain_events and threaded back
-    so the shipped note / closeout don't refetch it.
+    so the shipped note doesn't refetch it.
 
     Lazy imports (build_sequence_advancer, chain_event_emit) keep stdlib-only
     import at module load — the advancer's module-level is constants-only, so this
@@ -1074,17 +1103,6 @@ def _default_completion_verify_fn() -> Callable[[str, Optional[str]], tuple[bool
         return (gh_merged is True, pr_url)
 
     return _verify
-
-
-def _default_completion_closeout_fn() -> Callable[[dict[str, Any], Optional[str], datetime], dict[str, Any]]:
-    """Build the production closeout_fn (spec § 3 S3): the Narrator authors a
-    plain-language closeout briefing (what we did · the outcome · anything to
-    know) for a medium/careful card, returned as a field dict the reconcile merges
-    onto the capture. Lazy import (no narrator import at module load; the
-    narrator→healer import is the only static edge, so importing it here is
-    cycle-free)."""
-    from missions_narrator import author_closeout  # noqa: PLC0415
-    return author_closeout
 
 
 # ---------- Phase S (S4): failure/blocked rings back loud -------------------
@@ -1319,21 +1337,20 @@ def _delegate_origin_ids(registry: dict[str, Any]) -> list[str]:
 @dataclass
 class TerminalReconcileResult:
     completed: list[tuple[str, str]] = field(default_factory=list)      # (id, note) → done
-    closeouts: list[str] = field(default_factory=list)                  # id → review_close
     closed_failed: list[tuple[str, str]] = field(default_factory=list)  # (id, reason) → rung
     kept: int = 0
 
     @property
     def changed(self) -> bool:
         """True iff this tick stamped a capture (so the caller writes+commits)."""
-        return bool(self.completed or self.closeouts or self.closed_failed)
+        return bool(self.completed or self.closed_failed)
 
 
 def reconcile_terminal_captures(
     registry: dict[str, Any],
     now: datetime,
     *,
-    terminal_fn: Callable[[str], str],
+    terminal_fn: Callable[[str], tuple[str, Optional[str]]],
     ring_fn: Callable[..., dict[str, Any]],
     dry_run: bool,
     bridge_fn: Callable[[list[str]], dict[str, str]] = delegate_dispatched_task_ids,
@@ -1342,12 +1359,19 @@ def reconcile_terminal_captures(
     spawned work reached an identity-grade terminal state that S3/S4 missed.
 
     For each parked capture carrying a `spawned.task_id`, probe
-    ``terminal_fn(task_id)`` (production: tts.task_terminal_state — the shared,
-    conservative gh-only probe: OPEN wins, any ambiguity → UNKNOWN) and route:
+    ``terminal_fn(task_id) -> (state, pr_url)`` (production:
+    tts.task_terminal_state_with_pr — the shared, conservative gh-only probe:
+    OPEN wins, any ambiguity → UNKNOWN; `pr_url` is non-None only on an
+    unambiguous MERGED match) and route:
 
-      * MERGED → stamp `spawned.outcome='merged'` and complete the card by risk
-        (classify_completion: safe → `done`, else → `review_close`) — the S3
-        completion the belt-and-suspenders gate never saw.
+      * MERGED → stamp `spawned.outcome='merged'` and close the card to `done`
+        (classify_completion, any risk) — the S3 completion the
+        belt-and-suspenders gate never saw — carrying `shipped_pr_url` and a
+        PR-bearing shipped note whenever the probe resolved one. That url is
+        what lets the digest print "closed <card> because <PR> merged": this
+        backstop proves only that the card's DELEGATION spawned a PR that
+        merged, NOT that the PR did what the card asked, so naming the change
+        is the mitigation that makes such a mismatch visible.
       * CLOSED → stamp `spawned.outcome='closed'` and ring the loud
         blocked-on-you doorbell (the work was abandoned/rejected); the card STAYS
         parked — failure surfaces for Larry, it never auto-closes (mirrors S4).
@@ -1395,7 +1419,7 @@ def reconcile_terminal_captures(
             continue
         probe_id = bridge.get(task_id, task_id)  # ledger bridge; origin as fallback
         try:
-            state = terminal_fn(probe_id)
+            state, probe_pr_url = terminal_fn(probe_id)
         except Exception as e:  # noqa: BLE001 — per-capture fail-safe
             log(f'terminal-backstop: probe failed for {probe_id}: '
                 f'{type(e).__name__}: {e} — keep')
@@ -1408,8 +1432,11 @@ def reconcile_terminal_captures(
         via = ('task_terminal_state' if probe_id == task_id
                else f'task_terminal_state via ledger bridge {probe_id}')
         if state == tts.MERGED:
-            decision = classify_completion(cap, verified_merged=True)
-            note = shipped_note(None)  # tts gives no url; degrades to PR-less phrasing
+            # The probe resolves the url only on an unambiguous single match;
+            # otherwise the note degrades to the PR-less phrasing and the digest
+            # marks the closure as untraced rather than naming a guess.
+            pr_url = probe_pr_url if isinstance(probe_pr_url, str) and probe_pr_url else None
+            note = shipped_note(pr_url)
             if dry_run:
                 res.completed.append((cid, note + ' (dry-run)'))
                 continue
@@ -1417,19 +1444,13 @@ def reconcile_terminal_captures(
             cap.pop('aging', None)  # a completed card is no longer an aging nudge
             cap['closed_by'] = TERMINAL_BACKSTOP_BY
             cap['shipped_note'] = note
-            if decision.action == 'auto_close':
-                cap['state'] = COMPLETED_STATE_DONE
-                cap['closed_at'] = now.isoformat()
-                res.completed.append((cid, note))
-                log(f'terminal-backstop: capture {cid} (safe) -> done '
-                    f'[MERGED via {via}]')
-            else:
-                cap['state'] = COMPLETED_STATE_REVIEW
-                cap['awaiting_ack'] = True
-                res.closeouts.append(cid)
-                log(f'terminal-backstop: capture {cid} '
-                    f'({cap.get("risk") or "unbriefed"}) -> review_close '
-                    f'[MERGED via {via}]')
+            cap['state'] = COMPLETED_STATE_DONE
+            cap['closed_at'] = now.isoformat()
+            if pr_url:
+                cap['shipped_pr_url'] = pr_url
+            res.completed.append((cid, note))
+            log(f'terminal-backstop: capture {cid} '
+                f'({cap.get("risk") or "unbriefed"}) -> done [MERGED via {via}]')
             continue
         # state == CLOSED — abandoned/rejected work; surface loudly, keep parked.
         reason = 'linked PR was closed without merging (terminal-state backstop)'
@@ -1462,11 +1483,17 @@ def reconcile_terminal_captures(
     return res
 
 
-def _default_terminal_fn() -> Callable[[str], str]:
+def _default_terminal_fn() -> Callable[[str], tuple[str, Optional[str]]]:
     """Production terminal-state probe (completeness-pr2 G3): the shared
-    conservative gh-only `task_terminal_state`. Stdlib + gh only (no Supabase),
-    so this seam degrades independently of the chain_events-backed S3/S4 seams."""
-    return lambda task_id: tts.task_terminal_state(task_id)  # noqa: E731
+    conservative gh-only probe, in its url-carrying form. Stdlib + gh only (no
+    Supabase), so this seam degrades independently of the chain_events-backed
+    S3/S4 seams.
+
+    `task_terminal_state_with_pr` returns the SAME verdict as `task_terminal_state`
+    (the latter delegates to it) plus the merged PR's url when exactly one PR
+    matched — which is what lets a backstop closure name the change that closed
+    it instead of the anonymous "linked work merged"."""
+    return lambda task_id: tts.task_terminal_state_with_pr(task_id)  # noqa: E731
 
 
 # ---------- Phase S (S7): apply a deferred pause/drop after a safe stop ------
@@ -1697,8 +1724,7 @@ def _emit_summary(retire: RetireResult, aged: list[str], commit_status: str,
     if completed is not None and completed.changed:
         close_verb = 'would close' if dry_run else 'closed'
         closed_ids = [cid for cid, _ in completed.closed]
-        summary += (f'; {close_verb} {len(completed.closed)} card(s) {closed_ids}; '
-                    f'{len(completed.closeouts)} closeout(s) {completed.closeouts}')
+        summary += f'; {close_verb} {len(completed.closed)} card(s) {closed_ids}'
     if failed is not None and failed.changed:
         ring_verb = 'would ring' if dry_run else 'rang'
         rung_ids = [cid for cid, _ in failed.rung]
@@ -2137,15 +2163,14 @@ def run_once(*, dry_run: bool,
              narrate_fn: Optional[Callable[..., int]] = None,
              mission_author_fn: Optional[Callable[..., tuple[int, int]]] = None,
              completion_verify_fn: Optional[Callable[[str, Optional[str]], tuple[bool, Optional[str]]]] = None,
-             completion_closeout_fn: Optional[Callable[[dict[str, Any], Optional[str], datetime], dict[str, Any]]] = None,
              failure_fn: Optional[Callable[[str], Optional[str]]] = None,
              ring_fn: Optional[Callable[..., dict[str, Any]]] = None,
-             terminal_fn: Optional[Callable[[str], str]] = None,
+             terminal_fn: Optional[Callable[[str], tuple[str, Optional[str]]]] = None,
              in_flight_fn: Optional[Callable[[str], bool]] = None,
              state_log_fn: Optional[Callable[..., Any]] = None,
              now: Optional[datetime] = None) -> int:
     """One healer tick. The injectable seams (emit_fn / events_fetcher /
-    mission_probe_fn / author_fn / completion_verify_fn / completion_closeout_fn /
+    mission_probe_fn / author_fn / completion_verify_fn /
     failure_fn / ring_fn / in_flight_fn / state_log_fn / now) keep the effectful edges
     test-controllable; production resolves them from chain_event_emit + the live
     Supabase client + the shared terminal-state probe + the Narrator sweep + the
@@ -2210,6 +2235,7 @@ def run_once(*, dry_run: bool,
     failed = FailureResult()
     terminal_backstop = TerminalReconcileResult()
     deferred_actions = DeferredActionResult()
+    review_close_migrated: list[str] = []
     commit_status = 'nothing'
     cap_path = captures_path(repo_paths)
     if cap_path is None:
@@ -2244,28 +2270,32 @@ def run_once(*, dry_run: bool,
                 except Exception as e:  # noqa: BLE001 — fail-safe: report, never corrupt
                     log(f'deferred-reconcile raised: {type(e).__name__}: {e}')
                     deferred_actions = DeferredActionResult()
-            # --- phase S (S3): complete linked work — auto-close safe / closeout
-            # risky. Runs BEFORE aging + the Narrator sweep so terminal work is
-            # resolved first (a card closing this tick is never also aged), and so
-            # the sweep's needs_briefing skip-states guard sees the new
-            # done/review_close state. Production resolves the belt-and-suspenders
-            # verify gate + the Narrator closeout author lazily. ---
+            # --- one-time migration: convert any legacy `review_close` card to
+            # `done`. Runs FIRST so the rest of the tick sees a board with no
+            # retired state on it. A no-op once the board is clean, so it is safe
+            # to leave resident. ---
+            try:
+                review_close_migrated = migrate_review_close_captures(
+                    registry, now, dry_run=dry_run)
+            except Exception as e:  # noqa: BLE001 — fail-safe: report, never corrupt
+                log(f'review-close-migration raised: {type(e).__name__}: {e}')
+                review_close_migrated = []
+            # --- phase S (S3): complete linked work — auto-close a verified-merged
+            # card whatever its risk. Runs BEFORE aging + the Narrator sweep so
+            # terminal work is resolved first (a card closing this tick is never
+            # also aged), and so the sweep's needs_briefing skip-states guard sees
+            # the new `done` state. Production resolves the belt-and-suspenders
+            # verify gate lazily. ---
             if completion_verify_fn is None:
                 try:
                     completion_verify_fn = _default_completion_verify_fn()
                 except Exception as e:  # noqa: BLE001 — degrade: skip completion this tick
                     log(f'completion: verify seam unavailable: {type(e).__name__}: {e}')
-            if completion_closeout_fn is None:
-                try:
-                    completion_closeout_fn = _default_completion_closeout_fn()
-                except Exception as e:  # noqa: BLE001 — degrade: skip completion this tick
-                    log(f'completion: closeout seam unavailable: {type(e).__name__}: {e}')
-            if completion_verify_fn is not None and completion_closeout_fn is not None:
+            if completion_verify_fn is not None:
                 try:
                     completed = reconcile_completed_cards(
                         registry, now,
                         verify_fn=completion_verify_fn,
-                        closeout_fn=completion_closeout_fn,
                         dry_run=dry_run)
                 except Exception as e:  # noqa: BLE001 — fail-safe: report, never corrupt
                     log(f'completion-reconcile raised: {type(e).__name__}: {e}')
@@ -2342,7 +2372,8 @@ def run_once(*, dry_run: bool,
             except Exception as e:  # noqa: BLE001 — fail-safe: never abort the tick
                 log(f'delegate-thread narration raised: {type(e).__name__}: {e}')
             if (completed.changed or failed.changed or terminal_backstop.changed
-                    or deferred_actions.changed or aged or briefed) and not dry_run:
+                    or deferred_actions.changed or review_close_migrated
+                    or aged or briefed) and not dry_run:
                 # The Narrator sweep can hold the registry for minutes (one claude
                 # spawn per pending capture, up to NARRATOR_MAX_PER_TICK ×
                 # CLAUDE_TIMEOUT_SEC). Writing the stale in-memory copy would clobber
@@ -2375,7 +2406,8 @@ def run_once(*, dry_run: bool,
                         commit_status = commit_and_push_captures(
                             core, _commit_audit(retire, aged, briefed, completed,
                                                 failed, deferred_actions,
-                                                terminal_backstop))
+                                                terminal_backstop,
+                                                review_close_migrated))
                     except Exception as e:  # noqa: BLE001 — fail-safe
                         log(f'commit+push raised: {type(e).__name__}: {e}')
                         commit_status = 'push-failed'
@@ -2512,21 +2544,21 @@ def _commit_audit(retire: RetireResult, aged: list[str], briefed: int = 0,
                   completed: Optional['CompletionResult'] = None,
                   failed: Optional['FailureResult'] = None,
                   deferred_actions: Optional['DeferredActionResult'] = None,
-                  terminal_backstop: Optional['TerminalReconcileResult'] = None) -> str:
+                  terminal_backstop: Optional['TerminalReconcileResult'] = None,
+                  review_close_migrated: Optional[list[str]] = None) -> str:
     closed = len(completed.closed) if completed else 0
-    closeouts = len(completed.closeouts) if completed else 0
     rang = len(failed.rung) if failed else 0
     applied = len(deferred_actions.applied) if deferred_actions else 0
     ts_done = len(terminal_backstop.completed) if terminal_backstop else 0
-    ts_closeouts = len(terminal_backstop.closeouts) if terminal_backstop else 0
     ts_closed = len(terminal_backstop.closed_failed) if terminal_backstop else 0
+    migrated = len(review_close_migrated) if review_close_migrated else 0
     return (f'Auto-committed by heal_missions_card_gc. '
             f'retired={len(retire.retired)} aged={len(aged)} briefed={briefed} '
-            f'closed={closed} closeouts={closeouts} failure-rings={rang} '
+            f'closed={closed} failure-rings={rang} '
             f'deferred-applied={applied} '
             f'terminal-backstop-done={ts_done} '
-            f'terminal-backstop-closeouts={ts_closeouts} '
-            f'terminal-backstop-closed={ts_closed}.')
+            f'terminal-backstop-closed={ts_closed} '
+            f'review-close-migrated={migrated}.')
 
 
 def _missions_commit_audit(missions: MissionReconcileResult) -> str:

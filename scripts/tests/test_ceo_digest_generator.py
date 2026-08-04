@@ -6,6 +6,8 @@ Covers:
   - activity buckets: auto-cleared classification, attention dedup, spend
     window-sum, decisions-waiting parse, commit-prefix stripping.
   - render_raw: jargon-free plain outcomes containing the key figures.
+  - risky closures: window/state/risk selection off the capture board, the
+    deterministic block, and its bypass of the CEO voice.
   - build_prompt: carries the jargon ban + the facts.
   - generate_ceo_voice: success + every failure path (timeout, non-zero,
     bad JSON, empty result) falls through to (None, None).
@@ -340,6 +342,138 @@ class CollectSelfHealedTest(unittest.TestCase):
         self.assertEqual(cdg.collect_self_healed(start, end), [])
 
 
+class CollectRiskyClosuresTest(unittest.TestCase):
+    """The auto-close replacement for the ack: risky cards that closed
+    themselves inside the window, each carrying what closed it."""
+
+    START = datetime(2026, 6, 1, tzinfo=timezone.utc)
+    END = datetime(2026, 6, 2, tzinfo=timezone.utc)
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self._path = Path(self._tmp.name) / 'captures.json'
+        self._patch = mock.patch.object(
+            cdg, 'captures_file', return_value=self._path)
+        self._patch.start()
+
+    def tearDown(self):
+        self._patch.stop()
+        self._tmp.cleanup()
+
+    def _write(self, captures):
+        self._path.write_text(json.dumps({'captures': captures}))
+
+    def _collect(self):
+        return cdg.collect_risky_closures(self.START, self.END)
+
+    def test_selects_risky_done_cards_in_window(self):
+        self._write([
+            {'id': 'c1', 'title': 'rework billing', 'state': 'done',
+             'risk': 'careful', 'closed_at': '2026-06-01T08:00:00+00:00',
+             'shipped_pr_url': 'https://example.test/1'},
+            {'id': 'c2', 'title': 'safe tidy-up', 'state': 'done',
+             'risk': 'safe', 'closed_at': '2026-06-01T09:00:00+00:00'},
+            {'id': 'c3', 'title': 'still open', 'state': 'parked',
+             'risk': 'careful', 'closed_at': '2026-06-01T09:00:00+00:00'},
+            {'id': 'c4', 'title': 'closed yesterday', 'state': 'done',
+             'risk': 'medium', 'closed_at': '2026-05-30T09:00:00+00:00'},
+        ])
+        out = self._collect()
+        self.assertEqual([c['id'] for c in out], ['c1'])
+        self.assertEqual(out[0]['title'], 'rework billing')
+        self.assertEqual(out[0]['shipped_pr_url'], 'https://example.test/1')
+
+    def test_unbriefed_card_counts_as_risky(self):
+        """No recorded risk means nobody assessed it — the opposite of a card
+        someone judged harmless, so it surfaces."""
+        self._write([
+            {'id': 'c1', 'title': 'unassessed', 'state': 'done',
+             'closed_at': '2026-06-01T08:00:00+00:00'},
+        ])
+        self.assertEqual([c['id'] for c in self._collect()], ['c1'])
+
+    def test_missing_url_reported_as_none(self):
+        self._write([
+            {'id': 'c1', 'title': 'legacy card', 'state': 'done',
+             'risk': 'medium', 'closed_at': '2026-06-01T08:00:00+00:00'},
+        ])
+        self.assertIsNone(self._collect()[0]['shipped_pr_url'])
+
+    def test_unparseable_or_absent_closed_at_is_skipped(self):
+        self._write([
+            {'id': 'c1', 'title': 'no timestamp', 'state': 'done',
+             'risk': 'careful'},
+            {'id': 'c2', 'title': 'bad timestamp', 'state': 'done',
+             'risk': 'careful', 'closed_at': 'not-a-date'},
+        ])
+        self.assertEqual(self._collect(), [])
+
+    def test_missing_file_yields_empty(self):
+        self.assertEqual(self._collect(), [])
+
+    def test_unreadable_file_yields_empty(self):
+        self._path.write_text('{not json')
+        self.assertEqual(self._collect(), [])
+
+
+class RenderRiskyClosuresTest(unittest.TestCase):
+    def test_names_card_and_closing_change_on_one_line(self):
+        block = cdg.render_risky_closures([
+            {'id': 'c1', 'title': 'rework billing',
+             'shipped_pr_url': 'https://example.test/1'},
+        ])
+        self.assertIn('rework billing', block)
+        self.assertIn('https://example.test/1', block)
+        # Both facts on the SAME line — the point of the block is that Larry
+        # can read a closure and its change together without cross-referencing.
+        line = [l for l in block.splitlines() if 'rework billing' in l][0]
+        self.assertIn('https://example.test/1', line)
+
+    def test_marks_untraceable_closure_honestly(self):
+        block = cdg.render_risky_closures([
+            {'id': 'c1', 'title': 'legacy card', 'shipped_pr_url': None},
+        ])
+        self.assertIn(cdg.CLOSURE_UNIDENTIFIED, block)
+
+    def test_empty_window_renders_nothing(self):
+        self.assertEqual(cdg.render_risky_closures([]), '')
+
+    def test_raw_carries_the_block_exactly_once(self):
+        activity = {
+            'shipped': [], 'shipped_count': 0, 'auto_cleared_count': 0,
+            'decisions_waiting': [], 'spend_usd': 0.0, 'attention': [],
+            'self_healed': [],
+            'risky_closures': [{'id': 'c1', 'title': 'rework billing',
+                                'shipped_pr_url': 'https://example.test/1'}],
+        }
+        raw = cdg.render_raw('daily', 'Monday, June 1', activity)
+        self.assertEqual(raw.count('rework billing'), 1)
+        self.assertIn(cdg.CLOSURE_HEADING, raw)
+
+    def test_raw_omits_block_when_no_risky_closures(self):
+        activity = {
+            'shipped': [], 'shipped_count': 0, 'auto_cleared_count': 0,
+            'decisions_waiting': [], 'spend_usd': 0.0, 'attention': [],
+            'self_healed': [], 'risky_closures': [],
+        }
+        self.assertNotIn(cdg.CLOSURE_HEADING,
+                         cdg.render_raw('daily', 'Monday, June 1', activity))
+
+    def test_closure_facts_never_reach_the_voice_prompt(self):
+        """The block bypasses the LLM: a voice under orders to translate
+        specifics into outcomes would paraphrase the one clickable fact."""
+        activity = {
+            'shipped': [], 'shipped_count': 0, 'auto_cleared_count': 0,
+            'decisions_waiting': [], 'spend_usd': 0.0, 'attention': [],
+            'self_healed': [],
+            'risky_closures': [{'id': 'c1', 'title': 'rework billing',
+                                'shipped_pr_url': 'https://example.test/1'}],
+        }
+        prompt = cdg.build_prompt('daily', 'Monday, June 1', activity)
+        self.assertNotIn('rework billing', prompt)
+        self.assertNotIn('example.test', prompt)
+
+
 class PromptTest(unittest.TestCase):
     def test_prompt_bans_jargon_and_includes_facts(self):
         activity = {
@@ -462,6 +596,11 @@ class RunEndToEndTest(unittest.TestCase):
         # Isolate the self-healed digest read from the live alerts queue.
         stack.enter_context(mock.patch.object(
             larry_alerts, 'ALERTS_FILE', Path('/nonexistent/larry-alerts.jsonl')))
+        # Same for the closure block: unpatched, this reads the REAL capture
+        # board, so a genuine risky closure landing in the test's window would
+        # append live card titles to the asserted summary.
+        stack.enter_context(mock.patch.object(
+            cdg, 'captures_file', return_value=Path('/nonexistent/captures.json')))
         # run() calls heartbeat(), which writes the import-frozen
         # HEARTBEAT_FILE — un-patched, a bare un-sandboxed run freshens the
         # REAL ceo-digest-generator.heartbeat and masks genuine staleness
@@ -513,6 +652,49 @@ class RunEndToEndTest(unittest.TestCase):
         self.assertTrue(row['payload']['used_fallback'])
         # Fallback summary equals the raw rendering.
         self.assertEqual(row['payload']['summary'], row['payload']['raw'])
+
+    def _with_one_risky_closure(self, stack):
+        d = stack.enter_context(tempfile.TemporaryDirectory())
+        path = Path(d) / 'captures.json'
+        path.write_text(json.dumps({'captures': [{
+            'id': 'c1', 'title': 'rework billing', 'state': 'done',
+            'risk': 'careful', 'closed_at': '2026-06-01T08:00:00+00:00',
+            'shipped_pr_url': 'https://example.test/1',
+        }]}))
+        stack.enter_context(mock.patch.object(
+            cdg, 'captures_file', return_value=path))
+
+    def test_voice_path_appends_closure_block_once(self):
+        client = _FakeClient(events=[])
+        with ExitStack() as stack:
+            self._patch_sources(stack)
+            self._with_one_risky_closure(stack)
+            stack.enter_context(mock.patch.object(
+                cdg, 'generate_ceo_voice', return_value=('CEO voice note', 0.02)))
+            rc = cdg.run('daily',
+                         now_utc=datetime(2026, 6, 2, 13, tzinfo=timezone.utc),
+                         client=client)
+        self.assertEqual(rc, 0)
+        summary = client.upserted[0]['rows'][0]['payload']['summary']
+        self.assertTrue(summary.startswith('CEO voice note'))
+        self.assertEqual(summary.count('rework billing'), 1)
+        self.assertIn('https://example.test/1', summary)
+
+    def test_fallback_path_does_not_double_render_closure_block(self):
+        """The fallback summary IS the raw rendering, which already carries the
+        block — appending again there would print every closure twice."""
+        client = _FakeClient(events=[])
+        with ExitStack() as stack:
+            self._patch_sources(stack)
+            self._with_one_risky_closure(stack)
+            stack.enter_context(mock.patch.object(
+                cdg, 'generate_ceo_voice', return_value=(None, None)))
+            rc = cdg.run('daily',
+                         now_utc=datetime(2026, 6, 2, 13, tzinfo=timezone.utc),
+                         client=client)
+        self.assertEqual(rc, 0)
+        summary = client.upserted[0]['rows'][0]['payload']['summary']
+        self.assertEqual(summary.count('rework billing'), 1)
 
 
 class RegistrationTest(unittest.TestCase):

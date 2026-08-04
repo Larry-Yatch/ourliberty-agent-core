@@ -22,6 +22,13 @@ LLM voice is unavailable (timeout, auth, parse failure), the row still lands
 with a deterministic plain-English `raw` rendering and `used_fallback: true`,
 so the card always has something glanceable to show ("falls through to raw").
 
+One exception to the voice contract, added deliberately: when the window closed
+risky capture cards on their own, a short deterministic block naming each card
+and the change that closed it is concatenated onto the summary. Those closures
+used to stop and wait for Larry's ack; they no longer do, so this block is the
+only place they surface. It bypasses the voice because a url the CEO voice has
+paraphrased is a url Larry can't click.
+
 Timezone (spec § 6 [LOCKED] 6:00am Larry-local): Larry's tz is documented as
 America/Denver (MDT/MST) — the droplet system tz, the ledger timer comment,
 and Pulse's MDT digest all agree. It is configurable via OURLIBERTY_LARRY_TZ
@@ -51,6 +58,7 @@ if str(_SCRIPT_DIR) not in sys.path:
 
 import active_tier  # noqa: E402
 import chain_event_emit as cee  # noqa: E402
+import heal_missions_card_gc as card_gc  # noqa: E402 — captures.json location
 import larry_alerts  # noqa: E402
 import task_terminal_state as tts  # noqa: E402 — shared terminal-state probe
 from test_isolation_guard import refuse_under_test  # noqa: E402
@@ -355,6 +363,62 @@ def collect_self_healed(start_utc: datetime, end_utc: datetime) -> list[str]:
     return seen
 
 
+def captures_file() -> Optional[Path]:
+    """The capture board's location, resolved the way the card healers resolve
+    it. Its own function so tests have one thing to redirect — the other file
+    sources here are module-level constants tests patch, and this keeps the
+    board in the same shape even though its path comes from config."""
+    return card_gc.captures_path(card_gc.load_repo_paths())
+
+
+def collect_risky_closures(start_utc: datetime, end_utc: datetime) -> list[dict]:
+    """Cards carrying real-world risk that closed themselves inside the window.
+
+    A verified-shipped card now closes without stopping to ask, whatever its
+    risk. That is the right default — the work is provably out in the world, so
+    holding the card open buys nothing — but it means a risky change can land
+    with Larry never having seen it named anywhere. This list is what replaces
+    the ack: the digest names each one, next to the change that closed it, so
+    the closure is visible after the fact even though it wasn't gated before it.
+
+    Selected: `state == 'done'` with `closed_at` in [start, end) and a risk that
+    isn't `safe`. A card with NO risk recorded counts as risky — an unbriefed
+    card is one nobody assessed, which is the opposite of a card someone judged
+    harmless, so it gets surfaced rather than silently dropped.
+
+    Best-effort by construction: a missing or unreadable captures file yields []
+    and the digest goes out without the block. A digest that ships slightly thin
+    beats a digest that doesn't ship."""
+    path = captures_file()
+    if path is None or not path.exists():
+        return []
+    try:
+        with open(path, encoding='utf-8') as f:
+            registry = json.load(f)
+    except (OSError, json.JSONDecodeError) as e:
+        log(f'risky-closure read failed: {type(e).__name__}: {e}', 'WARN')
+        return []
+    captures = registry.get('captures') if isinstance(registry, dict) else None
+    if not isinstance(captures, list):
+        return []
+    out: list[dict] = []
+    for cap in captures:
+        if not isinstance(cap, dict) or cap.get('state') != 'done':
+            continue
+        if str(cap.get('risk') or '').strip().lower() == 'safe':
+            continue
+        closed_at = _parse_iso(str(cap.get('closed_at') or ''))
+        if closed_at is None or not (start_utc <= closed_at < end_utc):
+            continue
+        url = cap.get('shipped_pr_url')
+        out.append({
+            'id': str(cap.get('id') or ''),
+            'title': str(cap.get('title') or '').strip() or 'an unnamed item',
+            'shipped_pr_url': url if isinstance(url, str) and url else None,
+        })
+    return out
+
+
 def fetch_decisions_waiting() -> list[str]:
     """Plain-English summaries of decisions still pending Larry (point-in-time)."""
     if not APPROVALS_FILE.exists():
@@ -420,6 +484,7 @@ def gather_activity(
         'spend_usd': sum_spend(start_utc, end_utc),
         'attention': collect_attention(events),
         'self_healed': collect_self_healed(start_utc, end_utc),
+        'risky_closures': collect_risky_closures(start_utc, end_utc),
     }
 
 
@@ -428,6 +493,36 @@ def gather_activity(
 
 def _plural(n: int, singular: str, plural: Optional[str] = None) -> str:
     return singular if n == 1 else (plural or singular + 's')
+
+
+# Stands in for the closing change when it can't be pinned to exactly one — an
+# honest blank rather than a plausible guess. Naming the wrong change would be
+# worse than naming none: the whole value of the line is that Larry can click
+# through and see what actually landed.
+CLOSURE_UNIDENTIFIED = '(closing change not identified)'
+
+CLOSURE_HEADING = 'Closed without asking you — each carried some risk:'
+
+
+def render_risky_closures(closures: list[dict]) -> str:
+    """The closure block, or '' when the window closed nothing risky.
+
+    Deterministic and LLM-free on purpose. These lines carry a card title and a
+    url that must survive verbatim for Larry to act on them, and the CEO voice
+    is under instructions to translate specifics into outcomes — routing this
+    through it would round the one auditable fact off the one thing in the
+    digest that exists to be audited. So it is composed here and concatenated
+    onto whatever the voice produced.
+
+    Empty in, empty out: a quiet window appends nothing, so the digest reads
+    exactly as it did before rather than carrying an empty heading."""
+    if not closures:
+        return ''
+    lines = [CLOSURE_HEADING]
+    for c in closures:
+        title = c.get('title') or 'an unnamed item'
+        lines.append(f"  • {title} — {c.get('shipped_pr_url') or CLOSURE_UNIDENTIFIED}")
+    return '\n'.join(lines)
 
 
 def render_raw(period: str, label: str, activity: dict) -> str:
@@ -487,6 +582,15 @@ def render_raw(period: str, label: str, activity: dict) -> str:
         lines.append('  • Worth a look:')
         for s in attention[:3]:
             lines.append(f"      – {s}")
+
+    # The closure block is appended here as well as onto the voiced summary, so
+    # the two renderings of the same window agree. `run` appends it to `summary`
+    # only on the LLM path — on the fallback path `summary` IS this string, and
+    # appending again would print the block twice.
+    closures = render_risky_closures(activity.get('risky_closures', []))
+    if closures:
+        lines.append('')
+        lines.append(closures)
     return '\n'.join(lines)
 
 
@@ -695,15 +799,20 @@ def run(period: str, now_utc: Optional[datetime] = None,
         f'waiting={len(activity["decisions_waiting"])} '
         f'spend=${activity["spend_usd"]} '
         f'attention={len(activity["attention"])} '
-        f'self_healed={len(activity["self_healed"])}')
+        f'self_healed={len(activity["self_healed"])} '
+        f'risky_closures={len(activity["risky_closures"])}')
 
     summary_text, llm_cost = generate_ceo_voice(build_prompt(period, label, activity))
     used_fallback = summary_text is None
     if used_fallback:
+        # `render_raw` already carries the closure block — see the note there.
         summary_text = render_raw(period, label, activity)
         log('used raw fallback (LLM voice unavailable)')
     else:
         append_cost_row(period, llm_cost, success=True)
+        closures = render_risky_closures(activity['risky_closures'])
+        if closures:
+            summary_text = f'{summary_text.rstrip()}\n\n{closures}'
 
     ok = write_digest(period, label, start_utc, end_utc, activity,
                       summary_text, used_fallback, client=client)

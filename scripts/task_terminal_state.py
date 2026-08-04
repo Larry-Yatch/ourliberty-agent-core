@@ -386,9 +386,37 @@ def task_terminal_state(
         limit: how many recent PRs to scan per repo.
         min_len: minimum id length to trust as a boundary-token match.
     """
+    return task_terminal_state_with_pr(
+        task_id, variants, repos, timeout=timeout, limit=limit, min_len=min_len,
+    )[0]
+
+
+def task_terminal_state_with_pr(
+    task_id: str,
+    variants: Iterable[str] = (),
+    repos: Optional[Iterable[str]] = None,
+    *,
+    timeout: float = DEFAULT_GH_TIMEOUT_SEC,
+    limit: int = DEFAULT_PR_LOOKBACK,
+    min_len: int = MATCH_MIN_LEN,
+) -> tuple[str, Optional[str]]:
+    """`task_terminal_state`'s verdict PLUS the url of the PR that produced it —
+    `(state, pr_url)`.
+
+    The url is non-None ONLY when the verdict is MERGED and EXACTLY ONE PR
+    matched. Every other shape yields `(state, None)`: a non-MERGED verdict has
+    no shipped PR to name, and two or more matches mean we cannot say *which*
+    one shipped the work — naming a guess would be worse than naming nothing,
+    because the whole point of surfacing the url is that a human can audit the
+    card against the change that closed it.
+
+    Same matching, same `_combine` precedence, and the same UNKNOWN-on-anything-
+    unresolved posture as `task_terminal_state`, which delegates here for its
+    state — so the two can never disagree about the verdict.
+    """
     if not task_id or not isinstance(task_id, str):
-        return UNKNOWN
-    # gh-api-burn phase 2: reads now come from the shared cached PR snapshot
+        return UNKNOWN, None
+    # gh-api-burn phase 2: reads come from the shared cached PR snapshot
     # (refreshed once per ~3 min by gh_pr_snapshot_refresher), not a live
     # per-caller `gh pr list`. That removes this probe from the burn path entirely
     # — so the phase-1 budget backoff guard that used to gate these queries is
@@ -398,8 +426,14 @@ def task_terminal_state(
     repo_list = list(repos) if repos is not None else default_repos()
     candidates = expand_variants(task_id, variants)
     matched_states: list[str] = []
+    matched_urls: list[str] = []
     for repo in repo_list:
         for pr in _snapshot_all_prs(repo, limit=limit, timeout=timeout):
             if isinstance(pr, dict) and _pr_matches(pr, candidates, min_len):
                 matched_states.append(classify_state(pr.get('state')))
-    return _combine(matched_states)
+                url = pr.get('url')
+                matched_urls.append(url if isinstance(url, str) else '')
+    state = _combine(matched_states)
+    if state != MERGED or len(matched_urls) != 1 or not matched_urls[0]:
+        return state, None
+    return state, matched_urls[0]
