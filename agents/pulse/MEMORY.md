@@ -43,9 +43,9 @@
 
 ---
 
-## G-rule pulse-triage-self-report-should-be-tier3-001 — DISPATCHED (3/3, iter ~7564)
+## G-rule pulse-triage-self-report-should-be-tier3-001 — SHIPPED via PR#1099 (merged 2026-08-04T18:23:38Z UTC); behavioral verification pending
 
-**Rule:** Pulse's own escalation DM writes to larry-alerts.jsonl appear back as new Tier-4 alerts (no translation match). Three observed patterns: (a) `source=pulse-triage` (iter ~6982); (b) `source=pulse, subject=tier4-novel:forge-wip-redispatch` (iter ~7563 — Pulse DM confirmation write); (c) `source=pulse, subject=pr1081-72h-gate-imminent:...` (iter ~7564 — Pulse [yellow] escalation write). All are NOT new action items — the underlying DM was already sent/delivered before the write appeared as an alert. **Dispatched 3/3:** direction-ask `direction-ask-add-pulse-source-tier3-translation-001` written to Beacon inbox at 2026-08-04T00:26Z UTC. Fix: add `source=pulse` + `source=pulse-triage` as Tier-3 entries in `config/alert-translations.json`.
+**Rule:** Pulse's own escalation DM writes to larry-alerts.jsonl appear back as new Tier-4 alerts (no translation match). Three observed patterns: (a) `source=pulse-triage` (iter ~6982); (b) `source=pulse, subject=tier4-novel:forge-wip-redispatch` (iter ~7563 — Pulse DM confirmation write); (c) `source=pulse, subject=pr1081-72h-gate-imminent:...` (iter ~7564 — Pulse [yellow] escalation write). All are NOT new action items — the underlying DM was already sent/delivered before the write appeared as an alert. **Dispatched 3/3:** direction-ask written to Beacon inbox at 2026-08-04T00:26Z UTC. Fix: exclude self-authored (source=pulse/pulse-triage) alerts from Check 0 re-triage. **PR#1099 merged at 18:23:38Z UTC (iter ~7718).** Outbox-notifier restarted cleanly at 18:24:51Z UTC (new code active). **Verification:** Next cycle where Pulse sends a DM — the resulting larry-alerts.jsonl write should NOT bounce back as Tier-4. Record `systemic_fix` only after that observation is confirmed.
 
 ---
 
