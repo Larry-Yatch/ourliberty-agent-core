@@ -12,13 +12,20 @@
 
 ---
 
-## G-rule heal-approvals-surface-drift-missing-card-cooldown-collision-001 — 2/3 (iter ~7530 first, iter ~7540 second)
+## G-rule heal-approvals-surface-drift-missing-card-cooldown-collision-001 — DISPATCHED (iter ~7530 first, iter ~7540 second, iter ~7585 third — 3/3)
 
-**Rule:** heal-approvals-surface-drift fires `missing_card` alerts when an approval card exists in the unregistered-approval state but doesn't appear on the Approvals tab decide tab for ≥3 consecutive checks. First occurrence: iter ~7530 (2026-08-03T21:56Z UTC). Context: `unreg-approval-732b8a6c7762` was created for `pipeline-stall:unrouted-pr:PR#1092` (a fix/* branch that is unrouted-by-design, cooldown-suppressed by heal_pipeline_stall since iter ~7522). The approval card was likely created before the cooldown engaged; the promote predicate is now failing to surface it on the tab. Bot delivered idx=661 at 21:54:50Z UTC. Proposed fix: `scripts/heal_unregistered_approval.py` should not create or retain approval cards for alerts that are currently cooldown-suppressed by `heal_pipeline_stall.py` (i.e., if the originating alert is cooldown-suppressed, the approval card should be retired, not promoted). Dispatch to Beacon at 3/3.
+**Rule:** heal-approvals-surface-drift fires `missing_card` alerts when an approval card exists in the unregistered-approval state but doesn't appear on the Approvals tab decide tab for ≥3 consecutive checks. Pattern: approval card is created before the cooldown on the originating alert engages; after cooldown fires, promote predicate fails (originating alert is suppressed), so drift healer fires `missing_card` 3+ times. Three instances: unreg-approval-732b8a6c7762 (PR#1092, iter ~7530); same pattern iter ~7540; unreg-approval-01235467ce2b (PR#1096, iter ~7585, line 695). **DISPATCHED 3/3:** direction-ask `direction-ask-fix-approvals-drift-missing-card-cooldown-collision-001` written to Beacon inbox at 2026-08-04T03:06Z UTC. Fix: `scripts/heal_unregistered_approval.py` should retire (not promote) approval cards whose originating `pipeline-stall:*` alert is cooldown-suppressed by `heal_pipeline_stall.py`. Also add Tier-3 translation entry for `source=heal-approvals-surface-drift, subject^=heal-approvals-surface-drift:missing_card:` in alert-translations.json.
 
 ---
 
-## G-rule pulse-check-xiv-tier4-no-translation-001 — 1/3 (new, iter ~7390)
+## G-rule medic-diagnosis-subject-specific-tier4-no-translation-001 — 1/3 (new, iter ~7582)
+
+**Rule:** medic-diagnosis alerts with specific PR subjects return Tier-4 when only the subject=null (or generic) pattern is in the translation table. Alert 694 (source=medic, intent=medic-diagnosis, subject=pipeline-stall:unrouted-pr:PR#175, RSDPM-scoped) returned Tier-4 (no translation match). Prior alert 691 (same intent, PR#1096 in agent-core) was Tier-3 because that specific subject string was in the table. The medic's own diagnosis already says "by-design" — Tier-4 guard confirmed it's genuine (no translation), but content is self-resolving (no DM issued). Fix: add wildcard or prefix match for `source=medic, intent=medic-diagnosis, subject^=pipeline-stall:unrouted-pr:` in config/alert-translations.json. Dispatch to Beacon at 3/3.
+
+---
+
+## G-rule pulse-check-xiv-tier4-no-translation-001 — 2/3 (iter ~7390 first, iter ~7563+ second)
+
 
 **Rule:** pulse-check-xiv alerts (subject^=pulse-check-xiv-oversilence: and subject=pulse-check-xiv-digest) return Tier-4 from triage helper (novel, no translation match). These are informational FYI-tier observability reports that the bot already delivers via the alert pipeline (outbox-notifier/beacon_telegram_bot.py). Pulse receiving them via larry-alerts.jsonl and sending a SECOND DM would be duplicate noise. Fix: add Tier-3 (or Tier-FYI) translation entries for `source=pulse-check-xiv` in config/alert-translations.json so Check 0 silences them on sight. First occurrence: iter ~7390 (2026-08-03T12:00Z UTC; 3 alerts: oversilence:doorbell, oversilence:medic, digest). Dispatch to Beacon at 3/3.
 
