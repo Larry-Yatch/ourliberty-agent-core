@@ -629,23 +629,29 @@ class ClassifyCompletionTest(unittest.TestCase):
         d = h.classify_completion({'risk': 'safe'}, verified_merged=True)
         self.assertEqual(d.action, 'auto_close')
 
-    def test_medium_verified_closeouts(self):
-        d = h.classify_completion({'risk': 'medium'}, verified_merged=True)
-        self.assertEqual(d.action, 'closeout')
+    def test_risk_does_not_change_the_verdict(self):
+        # Verified-merged means the work is provably out in the world; holding
+        # the card open for an ack buys nothing, whatever its risk. The risky
+        # ones are surfaced after the fact in the CEO digest instead.
+        for risk in ('safe', 'medium', 'careful'):
+            with self.subTest(risk=risk):
+                d = h.classify_completion({'risk': risk}, verified_merged=True)
+                self.assertEqual(d.action, 'auto_close')
 
-    def test_careful_verified_closeouts(self):
-        d = h.classify_completion({'risk': 'careful'}, verified_merged=True)
-        self.assertEqual(d.action, 'closeout')
-
-    def test_unbriefed_verified_closeouts_fail_toward_caution(self):
-        # No risk field yet ⇒ route to closeout (Larry review), never auto-close.
+    def test_unbriefed_verified_auto_closes(self):
         d = h.classify_completion({}, verified_merged=True)
-        self.assertEqual(d.action, 'closeout')
+        self.assertEqual(d.action, 'auto_close')
+
+    def test_verification_still_gates_regardless_of_risk(self):
+        for risk in ('safe', 'medium', 'careful'):
+            with self.subTest(risk=risk):
+                d = h.classify_completion({'risk': risk}, verified_merged=False)
+                self.assertEqual(d.action, 'keep')
 
 
 class ReconcileCompletedCardsTest(unittest.TestCase):
-    """safe⇒done auto-close, risky⇒review_close closeout, gate-mismatch⇒keep,
-    verify/author error⇒keep, idempotent on closed cards, dry-run no-mutate."""
+    """any-risk verified⇒done auto-close, gate-mismatch⇒keep, verify error⇒keep,
+    idempotent on closed cards, dry-run no-mutate."""
 
     def _now(self):
         return datetime(2026, 6, 16, 12, 0, 0, tzinfo=timezone.utc)
@@ -666,16 +672,12 @@ class ReconcileCompletedCardsTest(unittest.TestCase):
     def _verify_merged(self, pr_url):
         return lambda task_id, dispatched_at: (True, pr_url)
 
-    def _closeout_stub(self, cap, pr_url, now):
-        return {'closeout': {'what': 'w', 'outcome': 'o', 'note': 'n'},
-                'closeout_provenance': {'by': 'beacon', 'pr_url': pr_url}}
-
     def test_safe_card_auto_closes_with_shipped_note(self):
         reg = self._registry(self._cap('c1', 'safe', aging=True))
         res = h.reconcile_completed_cards(
             reg, self._now(),
             verify_fn=self._verify_merged('https://github.com/o/r/pull/541'),
-            closeout_fn=self._closeout_stub, dry_run=False)
+            dry_run=False)
         cap = reg['captures'][0]
         self.assertEqual(cap['state'], 'done')
         self.assertEqual(cap['shipped_note'], 'shipped in PR #541')
@@ -686,28 +688,28 @@ class ReconcileCompletedCardsTest(unittest.TestCase):
         self.assertEqual([cid for cid, _ in res.closed], ['c1'])
         self.assertTrue(res.changed)
 
-    def test_medium_card_routes_to_closeout_review(self):
+    def test_risky_card_auto_closes_without_awaiting_ack(self):
         reg = self._registry(self._cap('c2', 'medium'))
         res = h.reconcile_completed_cards(
             reg, self._now(),
             verify_fn=self._verify_merged('https://github.com/o/r/pull/9'),
-            closeout_fn=self._closeout_stub, dry_run=False)
+            dry_run=False)
         cap = reg['captures'][0]
-        self.assertEqual(cap['state'], 'review_close')
-        self.assertTrue(cap['awaiting_ack'])
-        self.assertEqual(cap['closeout'], {'what': 'w', 'outcome': 'o', 'note': 'n'})
+        self.assertEqual(cap['state'], 'done')
+        self.assertNotIn('awaiting_ack', cap)
+        self.assertNotIn('closeout', cap)
         self.assertEqual(cap['shipped_pr_url'], 'https://github.com/o/r/pull/9')
-        self.assertEqual(res.closeouts, ['c2'])
+        self.assertEqual([cid for cid, _ in res.closed], ['c2'])
 
-    def test_unbriefed_card_routes_to_closeout(self):
+    def test_unbriefed_card_auto_closes(self):
         cap = self._cap('c3', None)
         cap.pop('risk')
         reg = self._registry(cap)
         h.reconcile_completed_cards(
             reg, self._now(),
             verify_fn=self._verify_merged('https://github.com/o/r/pull/3'),
-            closeout_fn=self._closeout_stub, dry_run=False)
-        self.assertEqual(reg['captures'][0]['state'], 'review_close')
+            dry_run=False)
+        self.assertEqual(reg['captures'][0]['state'], 'done')
 
     def test_gate_mismatch_keeps_card_parked(self):
         # One leg of the belt-and-suspenders gate fails ⇒ verify_fn returns
@@ -716,10 +718,20 @@ class ReconcileCompletedCardsTest(unittest.TestCase):
         res = h.reconcile_completed_cards(
             reg, self._now(),
             verify_fn=lambda t, d: (False, 'https://github.com/o/r/pull/4'),
-            closeout_fn=self._closeout_stub, dry_run=False)
+            dry_run=False)
         self.assertEqual(reg['captures'][0]['state'], 'parked')
         self.assertEqual(res.closed, [])
         self.assertFalse(res.changed)
+        self.assertEqual(res.kept, 1)
+
+    def test_gate_mismatch_keeps_risky_card_too(self):
+        # The auto-close widening loosened the RISK branch, not the proof
+        # branch: an unverified card is still kept no matter how it's briefed.
+        reg = self._registry(self._cap('c4b', 'careful'))
+        res = h.reconcile_completed_cards(
+            reg, self._now(), verify_fn=lambda t, d: (False, None),
+            dry_run=False)
+        self.assertEqual(reg['captures'][0]['state'], 'parked')
         self.assertEqual(res.kept, 1)
 
     def test_verify_error_keeps_card(self):
@@ -727,19 +739,7 @@ class ReconcileCompletedCardsTest(unittest.TestCase):
             raise RuntimeError('supabase down')
         reg = self._registry(self._cap('c5', 'safe'))
         res = h.reconcile_completed_cards(
-            reg, self._now(), verify_fn=_boom,
-            closeout_fn=self._closeout_stub, dry_run=False)
-        self.assertEqual(reg['captures'][0]['state'], 'parked')
-        self.assertEqual(res.kept, 1)
-
-    def test_closeout_author_error_keeps_card(self):
-        def _boom(cap, pr_url, now):
-            raise RuntimeError('claude down')
-        reg = self._registry(self._cap('c6', 'careful'))
-        res = h.reconcile_completed_cards(
-            reg, self._now(),
-            verify_fn=self._verify_merged('https://github.com/o/r/pull/6'),
-            closeout_fn=_boom, dry_run=False)
+            reg, self._now(), verify_fn=_boom, dry_run=False)
         self.assertEqual(reg['captures'][0]['state'], 'parked')
         self.assertEqual(res.kept, 1)
 
@@ -750,7 +750,7 @@ class ReconcileCompletedCardsTest(unittest.TestCase):
         res = h.reconcile_completed_cards(
             reg, self._now(),
             verify_fn=self._verify_merged('https://github.com/o/r/pull/7'),
-            closeout_fn=self._closeout_stub, dry_run=False)
+            dry_run=False)
         # Idempotent: a done card is untouched; a card with no spawned.task_id
         # is not a completion candidate.
         self.assertEqual(reg['captures'][0]['state'], 'done')
@@ -762,12 +762,75 @@ class ReconcileCompletedCardsTest(unittest.TestCase):
         res = h.reconcile_completed_cards(
             reg, self._now(),
             verify_fn=self._verify_merged('https://github.com/o/r/pull/9'),
-            closeout_fn=self._closeout_stub, dry_run=True)
+            dry_run=True)
         # Reported as would-close, but both captures stay parked.
         self.assertTrue(res.changed)
         self.assertEqual(reg['captures'][0]['state'], 'parked')
         self.assertEqual(reg['captures'][1]['state'], 'parked')
-        self.assertNotIn('closeout', reg['captures'][1])
+
+
+class MigrateReviewCloseCapturesTest(unittest.TestCase):
+    """The one-time conversion of cards left in the retired `review_close`
+    state — through the healer's own write path, not a hand-edit."""
+
+    def _now(self):
+        return datetime(2026, 6, 16, 12, 0, 0, tzinfo=timezone.utc)
+
+    def test_converts_to_done_and_drops_the_flag(self):
+        reg = {'captures': [
+            {'id': 'c1', 'state': 'review_close', 'awaiting_ack': True,
+             'risk': 'careful', 'closed_by': 'heal_missions_card_gc',
+             'shipped_note': 'shipped in PR #12',
+             'shipped_pr_url': 'https://github.com/o/r/pull/12', 'aging': True},
+        ]}
+        self.assertEqual(
+            h.migrate_review_close_captures(reg, self._now(), dry_run=False), ['c1'])
+        cap = reg['captures'][0]
+        self.assertEqual(cap['state'], 'done')
+        self.assertNotIn('awaiting_ack', cap)
+        self.assertNotIn('aging', cap)
+        # The closure's own provenance is history, not something to rewrite.
+        self.assertEqual(cap['closed_by'], 'heal_missions_card_gc')
+        self.assertEqual(cap['shipped_note'], 'shipped in PR #12')
+        self.assertEqual(cap['shipped_pr_url'], 'https://github.com/o/r/pull/12')
+        self.assertEqual(cap['closed_at'], self._now().isoformat())
+
+    def test_existing_closed_at_is_not_restamped(self):
+        reg = {'captures': [
+            {'id': 'c1', 'state': 'review_close',
+             'closed_at': '2026-06-01T00:00:00+00:00'},
+        ]}
+        h.migrate_review_close_captures(reg, self._now(), dry_run=False)
+        self.assertEqual(reg['captures'][0]['closed_at'],
+                         '2026-06-01T00:00:00+00:00')
+
+    def test_is_idempotent(self):
+        reg = {'captures': [{'id': 'c1', 'state': 'review_close',
+                             'awaiting_ack': True}]}
+        h.migrate_review_close_captures(reg, self._now(), dry_run=False)
+        snapshot = json.loads(json.dumps(reg))
+        self.assertEqual(
+            h.migrate_review_close_captures(reg, self._now(), dry_run=False), [])
+        self.assertEqual(reg, snapshot)
+
+    def test_leaves_other_states_alone(self):
+        reg = {'captures': [
+            {'id': 'c1', 'state': 'parked'},
+            {'id': 'c2', 'state': 'done'},
+            {'id': 'c3', 'state': 'dropped'},
+        ]}
+        self.assertEqual(
+            h.migrate_review_close_captures(reg, self._now(), dry_run=False), [])
+        self.assertEqual([c['state'] for c in reg['captures']],
+                         ['parked', 'done', 'dropped'])
+
+    def test_dry_run_reports_without_mutating(self):
+        reg = {'captures': [{'id': 'c1', 'state': 'review_close',
+                             'awaiting_ack': True}]}
+        self.assertEqual(
+            h.migrate_review_close_captures(reg, self._now(), dry_run=True), ['c1'])
+        self.assertEqual(reg['captures'][0]['state'], 'review_close')
+        self.assertTrue(reg['captures'][0]['awaiting_ack'])
 
 
 # ---------------------------------------- S4: failure rings back (§ 3 S4 / § 9)
@@ -894,9 +957,10 @@ class ReconcileFailedCardsTest(unittest.TestCase):
 
 class ReconcileTerminalCapturesTest(unittest.TestCase):
     """The task_terminal_state backstop that catches the terminal cases S3/S4
-    miss: MERGED-without-auto_merge-event ⇒ complete-by-risk; CLOSED-unmerged ⇒
-    ring + keep parked; UNKNOWN/OPEN ⇒ KEEP (the failed-delegate shape). Stamps
-    spawned.outcome by replacing the top-level key (lost-update-safe)."""
+    miss: MERGED-without-auto_merge-event ⇒ close to done (naming the PR when
+    the probe resolves exactly one); CLOSED-unmerged ⇒ ring + keep parked;
+    UNKNOWN/OPEN ⇒ KEEP (the failed-delegate shape). Stamps spawned.outcome by
+    replacing the top-level key (lost-update-safe)."""
 
     def _now(self):
         return datetime(2026, 7, 8, 12, 0, 0, tzinfo=timezone.utc)
@@ -918,7 +982,7 @@ class ReconcileTerminalCapturesTest(unittest.TestCase):
         reg = self._registry(self._cap('c1', 'safe', aging=True))
         res = h.reconcile_terminal_captures(
             reg, self._now(),
-            terminal_fn=lambda t: h.tts.MERGED, ring_fn=mock.Mock(), dry_run=False)
+            terminal_fn=lambda t: (h.tts.MERGED, None), ring_fn=mock.Mock(), dry_run=False)
         cap = reg['captures'][0]
         self.assertEqual(cap['state'], 'done')
         self.assertEqual(cap['spawned']['outcome'], 'merged')
@@ -929,18 +993,44 @@ class ReconcileTerminalCapturesTest(unittest.TestCase):
         self.assertEqual([cid for cid, _ in res.completed], ['c1'])
         self.assertTrue(res.changed)
 
-    def test_merged_risky_card_routes_to_review_close(self):
+    def test_merged_risky_card_also_auto_closes_to_done(self):
         reg = self._registry(self._cap('c2', 'careful'))
         ring = mock.Mock()
         res = h.reconcile_terminal_captures(
             reg, self._now(),
-            terminal_fn=lambda t: h.tts.MERGED, ring_fn=ring, dry_run=False)
+            terminal_fn=lambda t: (h.tts.MERGED, None), ring_fn=ring, dry_run=False)
         cap = reg['captures'][0]
-        self.assertEqual(cap['state'], 'review_close')
-        self.assertTrue(cap['awaiting_ack'])
+        self.assertEqual(cap['state'], 'done')
+        self.assertNotIn('awaiting_ack', cap)
         self.assertEqual(cap['spawned']['outcome'], 'merged')
-        self.assertEqual(res.closeouts, ['c2'])
+        self.assertEqual([cid for cid, _ in res.completed], ['c2'])
         ring.assert_not_called()
+
+    def test_merged_probe_url_is_recorded_and_named_in_the_note(self):
+        # The backstop used to close cards with no url at all, which left the
+        # digest unable to say WHAT closed them. The probe now hands back the
+        # single matching PR and the card carries it.
+        reg = self._registry(self._cap('c2b', 'careful'))
+        res = h.reconcile_terminal_captures(
+            reg, self._now(),
+            terminal_fn=lambda t: (h.tts.MERGED, 'https://github.com/o/r/pull/77'),
+            ring_fn=mock.Mock(), dry_run=False)
+        cap = reg['captures'][0]
+        self.assertEqual(cap['shipped_pr_url'], 'https://github.com/o/r/pull/77')
+        self.assertEqual(cap['shipped_note'], 'shipped in PR #77')
+        self.assertIn('#77', res.completed[0][1])
+
+    def test_ambiguous_probe_closes_without_naming_a_guess(self):
+        # No url from the probe (two matches, or none resolvable) ⇒ the card
+        # still closes, but the note degrades rather than naming a maybe.
+        reg = self._registry(self._cap('c2c', 'careful'))
+        h.reconcile_terminal_captures(
+            reg, self._now(), terminal_fn=lambda t: (h.tts.MERGED, None),
+            ring_fn=mock.Mock(), dry_run=False)
+        cap = reg['captures'][0]
+        self.assertEqual(cap['state'], 'done')
+        self.assertNotIn('shipped_pr_url', cap)
+        self.assertEqual(cap['shipped_note'], 'shipped (linked work merged)')
 
     def test_merged_replaces_spawned_top_level_not_in_place(self):
         # The lost-update delta merge diffs top-level keys against a shallow
@@ -951,7 +1041,7 @@ class ReconcileTerminalCapturesTest(unittest.TestCase):
         reg = self._registry(cap)
         h.reconcile_terminal_captures(
             reg, self._now(),
-            terminal_fn=lambda t: h.tts.MERGED, ring_fn=mock.Mock(), dry_run=False)
+            terminal_fn=lambda t: (h.tts.MERGED, None), ring_fn=mock.Mock(), dry_run=False)
         self.assertIsNot(reg['captures'][0]['spawned'], original_spawned)
         self.assertNotIn('outcome', original_spawned)
 
@@ -960,7 +1050,7 @@ class ReconcileTerminalCapturesTest(unittest.TestCase):
         ring = mock.Mock(return_value={'rung': True})
         res = h.reconcile_terminal_captures(
             reg, self._now(),
-            terminal_fn=lambda t: h.tts.CLOSED, ring_fn=ring, dry_run=False)
+            terminal_fn=lambda t: (h.tts.CLOSED, None), ring_fn=ring, dry_run=False)
         cap = reg['captures'][0]
         self.assertEqual(cap['state'], 'parked')  # surfaces, never auto-closes
         self.assertEqual(cap['spawned']['outcome'], 'closed')
@@ -981,7 +1071,7 @@ class ReconcileTerminalCapturesTest(unittest.TestCase):
         ring = mock.Mock()
         res = h.reconcile_terminal_captures(
             reg, self._now(),
-            terminal_fn=lambda t: h.tts.UNKNOWN, ring_fn=ring, dry_run=False)
+            terminal_fn=lambda t: (h.tts.UNKNOWN, None), ring_fn=ring, dry_run=False)
         cap = reg['captures'][0]
         self.assertEqual(cap['state'], 'parked')
         self.assertNotIn('outcome', cap['spawned'])
@@ -994,7 +1084,7 @@ class ReconcileTerminalCapturesTest(unittest.TestCase):
         reg = self._registry(self._cap('c6', 'safe'))
         res = h.reconcile_terminal_captures(
             reg, self._now(),
-            terminal_fn=lambda t: h.tts.OPEN, ring_fn=mock.Mock(), dry_run=False)
+            terminal_fn=lambda t: (h.tts.OPEN, None), ring_fn=mock.Mock(), dry_run=False)
         self.assertEqual(reg['captures'][0]['state'], 'parked')
         self.assertFalse(res.changed)
         self.assertEqual(res.kept, 1)
@@ -1003,7 +1093,7 @@ class ReconcileTerminalCapturesTest(unittest.TestCase):
         cap = self._cap('c7', 'safe')
         cap['spawned']['outcome'] = 'merged'
         reg = self._registry(cap)
-        probe = mock.Mock(return_value=h.tts.MERGED)
+        probe = mock.Mock(return_value=(h.tts.MERGED, None))
         res = h.reconcile_terminal_captures(
             reg, self._now(), terminal_fn=probe, ring_fn=mock.Mock(), dry_run=False)
         probe.assert_not_called()  # idempotent: no re-probe of a stamped card
@@ -1012,7 +1102,7 @@ class ReconcileTerminalCapturesTest(unittest.TestCase):
     def test_failure_signaled_card_left_to_s4(self):
         cap = self._cap('c8', 'safe', failure_signaled={'reason': 'x', 'at': 'y'})
         reg = self._registry(cap)
-        probe = mock.Mock(return_value=h.tts.MERGED)
+        probe = mock.Mock(return_value=(h.tts.MERGED, None))
         res = h.reconcile_terminal_captures(
             reg, self._now(), terminal_fn=probe, ring_fn=mock.Mock(), dry_run=False)
         probe.assert_not_called()
@@ -1022,7 +1112,7 @@ class ReconcileTerminalCapturesTest(unittest.TestCase):
         done = self._cap('c9', 'safe', state='done')
         no_spawn = {'id': 'c10', 'state': 'parked', 'risk': 'safe'}
         reg = self._registry(done, no_spawn)
-        probe = mock.Mock(return_value=h.tts.MERGED)
+        probe = mock.Mock(return_value=(h.tts.MERGED, None))
         res = h.reconcile_terminal_captures(
             reg, self._now(), terminal_fn=probe, ring_fn=mock.Mock(), dry_run=False)
         probe.assert_not_called()
@@ -1045,7 +1135,7 @@ class ReconcileTerminalCapturesTest(unittest.TestCase):
         reg = self._registry(self._cap('c12', 'safe'))
         res = h.reconcile_terminal_captures(
             reg, self._now(),
-            terminal_fn=lambda t: h.tts.CLOSED, ring_fn=_boom, dry_run=False)
+            terminal_fn=lambda t: (h.tts.CLOSED, None), ring_fn=_boom, dry_run=False)
         cap = reg['captures'][0]
         self.assertEqual(cap['state'], 'parked')
         self.assertNotIn('outcome', cap['spawned'])
@@ -1056,7 +1146,7 @@ class ReconcileTerminalCapturesTest(unittest.TestCase):
         reg = self._registry(self._cap('c13', 'safe'), self._cap('c14', 'medium'))
         res = h.reconcile_terminal_captures(
             reg, self._now(),
-            terminal_fn=lambda t: h.tts.MERGED, ring_fn=mock.Mock(), dry_run=True)
+            terminal_fn=lambda t: (h.tts.MERGED, None), ring_fn=mock.Mock(), dry_run=True)
         self.assertTrue(res.changed)
         for cap in reg['captures']:
             self.assertEqual(cap['state'], 'parked')
@@ -1067,7 +1157,7 @@ class ReconcileTerminalCapturesTest(unittest.TestCase):
         # never a PR branch. Probe the fresh dispatch id from the ledger instead,
         # or the card can never clear (always UNKNOWN → always KEEP).
         reg = self._registry(self._cap('c15', 'safe'))
-        probe = mock.Mock(return_value=h.tts.MERGED)
+        probe = mock.Mock(return_value=(h.tts.MERGED, None))
         res = h.reconcile_terminal_captures(
             reg, self._now(), terminal_fn=probe, ring_fn=mock.Mock(), dry_run=False,
             bridge_fn=lambda ids: {'delegate-c15': 'real-build-task-001'})
@@ -1079,7 +1169,7 @@ class ReconcileTerminalCapturesTest(unittest.TestCase):
         # Pre-origin_task_id delegations (and never-dispatched ones) have no
         # bridge row: unchanged behavior — probe the origin, get UNKNOWN, KEEP.
         reg = self._registry(self._cap('c16', 'safe'))
-        probe = mock.Mock(return_value=h.tts.UNKNOWN)
+        probe = mock.Mock(return_value=(h.tts.UNKNOWN, None))
         res = h.reconcile_terminal_captures(
             reg, self._now(), terminal_fn=probe, ring_fn=mock.Mock(), dry_run=False,
             bridge_fn=lambda ids: {})
@@ -1092,7 +1182,7 @@ class ReconcileTerminalCapturesTest(unittest.TestCase):
         # UNKNOWN on the FRESH id is correct — 'no PR' is never 'done'.
         reg = self._registry(self._cap('c17', 'safe'))
         res = h.reconcile_terminal_captures(
-            reg, self._now(), terminal_fn=lambda t: h.tts.UNKNOWN,
+            reg, self._now(), terminal_fn=lambda t: (h.tts.UNKNOWN, None),
             ring_fn=mock.Mock(), dry_run=False,
             bridge_fn=lambda ids: {'delegate-c17': 'prose-task-001'})
         self.assertEqual(reg['captures'][0]['state'], 'parked')
@@ -1102,7 +1192,7 @@ class ReconcileTerminalCapturesTest(unittest.TestCase):
         def _boom(ids):
             raise RuntimeError('ledger unreadable')
         reg = self._registry(self._cap('c18', 'safe'))
-        probe = mock.Mock(return_value=h.tts.UNKNOWN)
+        probe = mock.Mock(return_value=(h.tts.UNKNOWN, None))
         res = h.reconcile_terminal_captures(
             reg, self._now(), terminal_fn=probe, ring_fn=mock.Mock(),
             dry_run=False, bridge_fn=_boom)
@@ -1124,7 +1214,7 @@ class ReconcileTerminalCapturesTest(unittest.TestCase):
         )
         seen = []
         h.reconcile_terminal_captures(
-            reg, self._now(), terminal_fn=lambda t: h.tts.OPEN,
+            reg, self._now(), terminal_fn=lambda t: (h.tts.OPEN, None),
             ring_fn=mock.Mock(), dry_run=False,
             bridge_fn=lambda ids: (seen.append(list(ids)) or {}))
         self.assertEqual(seen, [['delegate-d1']])
@@ -1190,10 +1280,12 @@ class ReconcileTerminalCapturesTest(unittest.TestCase):
         self.assertEqual(h.delegate_dispatched_task_ids([]), {})
 
     def test_default_terminal_fn_wraps_shared_probe(self):
-        with mock.patch.object(h.tts, 'task_terminal_state',
-                               return_value=h.tts.MERGED) as probe:
+        with mock.patch.object(
+                h.tts, 'task_terminal_state_with_pr',
+                return_value=(h.tts.MERGED, 'https://github.com/o/r/pull/1')) as probe:
             fn = h._default_terminal_fn()
-            self.assertEqual(fn('some-task'), h.tts.MERGED)
+            self.assertEqual(fn('some-task'),
+                             (h.tts.MERGED, 'https://github.com/o/r/pull/1'))
         probe.assert_called_once_with('some-task')
 
 
@@ -1756,13 +1848,61 @@ class RunOnceTest(unittest.TestCase):
                     author_fn=lambda registry, **_: (0, 0),  # skip the narrator
                     completion_verify_fn=lambda t, d: (
                         True, 'https://github.com/o/r/pull/600'),
-                    completion_closeout_fn=lambda c, p, n: {},
                     now=now,
                 )
             self.assertEqual(rc, 0)
             cap = json.loads((core / h.CAPTURES_REL).read_text())['captures'][0]
             self.assertEqual(cap['state'], 'done')
             self.assertEqual(cap['shipped_note'], 'shipped in PR #600')
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_legacy_review_close_cards_migrate_through_write(self):
+        # The board carries cards parked in the retired `review_close` state,
+        # waiting on an ack nothing will ever ask for again. The tick converts
+        # them to `done` and drops the flag, and a SECOND tick is a no-op —
+        # the migration is safe to leave resident.
+        now = datetime(2026, 6, 16, 12, 0, tzinfo=timezone.utc)
+        tmp = tempfile.mkdtemp(prefix='run-once-migrate-')
+        try:
+            core = Path(tmp) / 'agent-core'
+            (core / 'agents' / 'beacon').mkdir(parents=True)
+            (core / h.CAPTURES_REL).write_text(json.dumps({
+                'schema_version': 1,
+                'captures': [{
+                    'id': 'cap-legacy', 'state': 'review_close', 'risk': 'careful',
+                    'awaiting_ack': True, 'title': 'a risky thing that shipped',
+                    'closed_by': 'heal_missions_card_gc',
+                    'shipped_note': 'shipped in PR #500',
+                    'last_touched': now.isoformat(),
+                }],
+            }) + '\n')
+
+            import larry_alerts
+            with mock.patch.object(h, 'load_repo_paths',
+                                   return_value={'ourliberty-agent-core': core}), \
+                    mock.patch.object(larry_alerts, 'append_alert'):
+                kwargs = dict(
+                    dry_run=False,
+                    emit_fn=lambda **_: True,
+                    events_fetcher=lambda: [],
+                    author_fn=lambda registry, **_: (0, 0),
+                    completion_verify_fn=lambda t, d: (False, None),
+                    now=now,
+                )
+                self.assertEqual(h.run_once(**kwargs), 0)
+                after_first = json.loads(
+                    (core / h.CAPTURES_REL).read_text())['captures'][0]
+                self.assertEqual(h.run_once(**kwargs), 0)
+            cap = json.loads((core / h.CAPTURES_REL).read_text())['captures'][0]
+            self.assertEqual(cap['state'], 'done')
+            # The key DELETION has to survive the delta merge, or the flag
+            # would silently ride along on every migrated card.
+            self.assertNotIn('awaiting_ack', cap)
+            # The original closure's provenance is preserved, not restamped.
+            self.assertEqual(cap['shipped_note'], 'shipped in PR #500')
+            self.assertEqual(cap['closed_at'], after_first['closed_at'])
         finally:
             import shutil
             shutil.rmtree(tmp, ignore_errors=True)
@@ -1798,7 +1938,6 @@ class RunOnceTest(unittest.TestCase):
                     events_fetcher=lambda: [],
                     author_fn=lambda registry, **_: (0, 0),
                     completion_verify_fn=lambda t, d: (False, None),
-                    completion_closeout_fn=lambda c, p, n: {},
                     failure_fn=lambda t: 'forge_reject: tests broke',
                     ring_fn=lambda **kw: rings.append(kw) or {'rung': True},
                     in_flight_fn=lambda t: False,
@@ -1846,7 +1985,6 @@ class RunOnceTest(unittest.TestCase):
                     events_fetcher=lambda: [],
                     author_fn=lambda registry, **_: (0, 0),
                     completion_verify_fn=lambda t, d: (False, None),
-                    completion_closeout_fn=lambda c, p, n: {},
                     failure_fn=lambda t: None,
                     ring_fn=lambda **kw: {'rung': True},
                     in_flight_fn=lambda t: False,

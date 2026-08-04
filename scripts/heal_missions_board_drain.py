@@ -18,9 +18,9 @@ idempotent / atomic / fail-safe (a bad pass reports + skips, never corrupts):
      task_id). Only a fully verified-merged draft is closed; anything
      unresolved/indeterminate is KEPT (fail-safe — the conservative posture the
      whole GC family shares). Routing reuses S-2's `classify_completion`: a
-     `safe` draft auto-closes to `done` with a "shipped in PR #X" note; a
-     `medium`/`careful`/un-briefed draft moves to `review_close` (awaiting Larry's
-     ack) so a risky card is never silently closed.
+     verified-merged draft auto-closes to `done` with a "shipped in PR #X" note,
+     whatever its risk. Awareness of a risky closure comes from the CEO digest,
+     which names the card alongside the change that closed it.
 
   C. DROP VERIFIABLY-TERMINAL ORPHAN PROPOSALS (spec § 4 C2). The Proposed lane
      fills with `proposed_by == heal_orphan_autoregister` cards — one per orphan
@@ -109,12 +109,6 @@ ARCHIVE_REASON_LEGACY_DRAFT = 'legacy-drafting-never-advanced'
 # than `since_ts`; pass this far-past floor so NO terminal PR is filtered on age.
 _TERMINAL_SINCE_FLOOR = datetime(2000, 1, 1, tzinfo=timezone.utc)
 
-# A deterministic closeout stamped on a risky promoted draft drained to review.
-# The drain is a one-shot board-clean, not the live loop, so it does NOT invoke
-# the Narrator (no LLM dependency in a one-time script): it leaves a plain,
-# operator-readable note and the card awaits Larry's ack like any review_close.
-DRAIN_CLOSEOUT_NOTE = 'Linked work already merged (board drain) — review & close.'
-
 # The proposed-backlog surfacing artifact lives in the blackboard (gitignored
 # operational state, NOT the repo) so it never dirties the working tree.
 _DRAIN_ARTIFACT_SUBDIR = 'missions-board-drain'
@@ -139,14 +133,13 @@ def drain_artifact_path(now: datetime) -> Path:
 @dataclass
 class PromotedDrainResult:
     closed: list[tuple[str, str]] = field(default_factory=list)   # (id, note)
-    closeouts: list[str] = field(default_factory=list)            # ids → review_close
     unresolved: list[str] = field(default_factory=list)           # no resolvable task_id
     kept: int = 0
 
     @property
     def changed(self) -> bool:
         """True iff a capture was mutated (so the caller writes the delta)."""
-        return bool(self.closed or self.closeouts)
+        return bool(self.closed)
 
 
 def _missions_by_id(missions_registry: dict[str, Any]) -> dict[str, dict[str, Any]]:
@@ -217,9 +210,9 @@ def reconcile_promoted_drafts(
     """Close every `state == 'promoted'` capture whose spawned work is
     verified-merged (spec § 3 S8). Effectful ONLY on the in-memory registry — the
     caller owns the single atomic write (and never commits; the GC healer is the
-    sole committer). Idempotent: a closed/review_close card is no longer
-    `promoted`, so it is skipped on every later run. Fail-safe per capture: an
-    unresolved join or a verify error KEEPS the card."""
+    sole committer). Idempotent: a closed card is no longer `promoted`, so it is
+    skipped on every later run. Fail-safe per capture: an unresolved join or a
+    verify error KEEPS the card."""
     res = PromotedDrainResult()
     for cap in captures_registry.get('captures', []):
         if not isinstance(cap, dict) or cap.get('state') != 'promoted':
@@ -239,36 +232,20 @@ def reconcile_promoted_drafts(
         if decision.action == 'keep':
             res.kept += 1
             continue
-        if decision.action == 'auto_close':
-            note = gc.shipped_note(pr_url)
-            if dry_run:
-                res.closed.append((cid, note + ' (dry-run)'))
-                continue
-            cap['state'] = gc.COMPLETED_STATE_DONE
-            cap['closed_at'] = now.isoformat()
-            cap['closed_by'] = DRAIN_BY
-            cap['shipped_note'] = note
-            if pr_url:
-                cap['shipped_pr_url'] = pr_url
-            cap.pop('aging', None)
-            res.closed.append((cid, note))
-            gc.log(f'drain: promoted draft {cid} (safe) -> done [{note}]')
-            continue
-        # closeout: medium / careful / un-briefed → review_close (awaiting ack).
+        note = gc.shipped_note(pr_url)
         if dry_run:
-            res.closeouts.append(cid)
+            res.closed.append((cid, note + ' (dry-run)'))
             continue
-        cap['state'] = gc.COMPLETED_STATE_REVIEW
-        cap['awaiting_ack'] = True
+        cap['state'] = gc.COMPLETED_STATE_DONE
+        cap['closed_at'] = now.isoformat()
         cap['closed_by'] = DRAIN_BY
-        cap['shipped_note'] = gc.shipped_note(pr_url)
-        cap['drain_closeout'] = DRAIN_CLOSEOUT_NOTE
+        cap['shipped_note'] = note
         if pr_url:
             cap['shipped_pr_url'] = pr_url
         cap.pop('aging', None)
-        res.closeouts.append(cid)
+        res.closed.append((cid, note))
         gc.log(f'drain: promoted draft {cid} ({cap.get("risk") or "unbriefed"}) '
-               f'-> review_close')
+               f'-> done [{note}]')
     return res
 
 
@@ -747,7 +724,6 @@ def _emit_summary(promoted: PromotedDrainResult, orphans: OrphanDrainResult,
                   archived: ArchiveResult, surfaced: ProposedSurfaceResult,
                   dry_run: bool) -> None:
     close_verb = 'would close' if dry_run else 'closed'
-    review_verb = 'would move' if dry_run else 'moved'
     drop_verb = 'would drop' if dry_run else 'dropped'
     archive_verb = 'would archive' if dry_run else 'archived'
     surface_verb = 'would surface' if dry_run else 'surfaced'
@@ -755,7 +731,6 @@ def _emit_summary(promoted: PromotedDrainResult, orphans: OrphanDrainResult,
     parts = [
         'DRY-RUN ' if dry_run else '',
         f'drain: {close_verb} {len(promoted.closed)} promoted draft(s) to done; ',
-        f'{review_verb} {len(promoted.closeouts)} to review_close; ',
         f'kept {promoted.kept} ({len(promoted.unresolved)} unresolved); ',
         f'{drop_verb} {len(orphans.dropped)} terminal orphan proposal(s) '
         f'(kept {orphan_kept}: {len(orphans.kept_open)} open, '

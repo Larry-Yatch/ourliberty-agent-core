@@ -97,6 +97,58 @@ class FourStatesTest(unittest.TestCase):
         self.assertEqual(_state_with(prs), tts.UNKNOWN)
 
 
+# -------------------- the url-carrying sibling --------------------
+
+class TerminalStateWithPrTest(unittest.TestCase):
+    """`task_terminal_state_with_pr` names the PR behind a MERGED verdict —
+    but only when there is exactly one, and never at the cost of the verdict."""
+
+    def _probe(self, prs, task=TASK):
+        with mock.patch.object(tts, '_snapshot_all_prs', return_value=prs):
+            return tts.task_terminal_state_with_pr(task, repos=REPO)
+
+    def test_single_merged_match_yields_its_url(self):
+        prs = [_pr('MERGED', branch=f'forge/{TASK}', number=77)]
+        self.assertEqual(self._probe(prs), (tts.MERGED, 'https://x/pull/77'))
+
+    def test_two_matches_yield_no_url(self):
+        # Two PRs carry the id: we cannot say WHICH one shipped the work, and a
+        # guessed url is worse than none — the url exists to be audited.
+        prs = [
+            _pr('MERGED', branch=f'forge/{TASK}', number=1),
+            _pr('MERGED', branch=f'forge/{TASK}-001', number=2),
+        ]
+        self.assertEqual(self._probe(prs), (tts.MERGED, None))
+
+    def test_non_merged_verdict_yields_no_url(self):
+        for state in ('OPEN', 'CLOSED'):
+            with self.subTest(state=state):
+                prs = [_pr(state, branch=f'forge/{TASK}', number=3)]
+                self.assertEqual(self._probe(prs)[1], None)
+
+    def test_no_match_is_unknown_with_no_url(self):
+        self.assertEqual(self._probe([]), (tts.UNKNOWN, None))
+        self.assertEqual(
+            tts.task_terminal_state_with_pr('', repos=REPO), (tts.UNKNOWN, None))
+
+    def test_verdict_always_matches_the_original_probe(self):
+        # The two must never disagree — `task_terminal_state` delegates here for
+        # its state, and this asserts the delegation stays honest.
+        cases = [
+            [_pr('MERGED', branch=f'forge/{TASK}')],
+            [_pr('CLOSED', branch=f'forge/{TASK}')],
+            [_pr('MERGED', branch=f'forge/{TASK}', number=1),
+             _pr('OPEN', branch=f'forge/{TASK}-001', number=2)],
+            [_pr('MERGED', branch='forge/unrelated-task')],
+        ]
+        for prs in cases:
+            with self.subTest(prs=prs):
+                with mock.patch.object(tts, '_snapshot_all_prs', return_value=prs):
+                    self.assertEqual(
+                        tts.task_terminal_state(TASK, repos=REPO),
+                        tts.task_terminal_state_with_pr(TASK, repos=REPO)[0])
+
+
 # -------------------- variant matching --------------------
 
 class VariantMatchTest(unittest.TestCase):

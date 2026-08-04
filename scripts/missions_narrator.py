@@ -103,11 +103,17 @@ NARRATOR_MAX_PER_TICK = 8
 VALID_RISKS = ('safe', 'medium', 'careful')
 
 # Terminal completion states (Phase S S3). A card the GC healer has closed
-# (`done`) or moved to closeout review (`review_close`) is past the meaning-layer
-# lifecycle: its `briefing` was authored for `parked`, so a naive state-mismatch
-# check would re-brief it forever. Skip these states so a closed card is never
-# re-authored (the closeout briefing on a `review_close` card is owned by
-# `author_closeout`, not this parked-card sweep).
+# (`done`) is past the meaning-layer lifecycle: its `briefing` was authored for
+# `parked`, so a naive state-mismatch check would re-brief it forever. Skip these
+# states so a closed card is never re-authored.
+#
+# `review_close` is RETAINED here even though nothing writes it any more (the
+# risk diversion that produced it was retired, and the GC healer migrates the
+# stragglers to `done`). It is kept deliberately: this sweep can run against a
+# board the migration has not reached yet — a tick where captures.json didn't
+# resolve, or a registry read by another process mid-migration — and dropping the
+# state from this guard would put exactly those cards into the re-brief-forever
+# loop the guard exists to prevent. Costs nothing on a clean board.
 _NARRATOR_SKIP_STATES = frozenset({'done', 'review_close'})
 
 # Keywords in a capture's title/note that mark the proposed work as
@@ -492,12 +498,14 @@ def author_meaning_layer(
 
 # ---------------- closeout authoring (Phase S S3) ----------------
 #
-# When a medium/careful card's spawned work reaches verified-merged, the GC
-# healer routes it to closeout (not auto-close): the Narrator authors a
-# plain-language *closeout briefing* (what we did · the outcome · anything to
-# know) and the card moves to `review_close` awaiting Larry's ack. This reuses
-# the Phase 4.1 fold — same claude round-trip + deterministic raw fallback — with
-# closeout-shaped keys.
+# DORMANT. This fold authored a plain-language *closeout briefing* (what we did ·
+# the outcome · anything to know) for the medium/careful cards the GC healer used
+# to divert to `review_close` for Larry's ack. That diversion is retired — every
+# verified-merged card now auto-closes to `done`, and the CEO digest names each
+# risky closure instead — so the healer no longer calls in here. The fold is left
+# standing (rather than deleted along with its tests) for a follow-up removal; it
+# reuses the Phase 4.1 machinery — same claude round-trip + deterministic raw
+# fallback — with closeout-shaped keys.
 
 CLOSEOUT_KEYS = ('what', 'outcome', 'note')
 
@@ -614,11 +622,11 @@ def needs_briefing(capture: dict[str, Any]) -> bool:
     `snoozed_until` — so it is intentionally NOT a re-brief trigger here: the
     card's meaning is unchanged by a snooze.)
 
-    A card in a terminal completion state (`done`/`review_close`, Phase S S3) is
-    never re-briefed: its parked-state briefing is final, and a `review_close`
-    card carries its own closeout authored by `author_closeout`. Without this
-    guard the state-mismatch check below would re-brief every closed card on
-    every sweep (its from_state is `parked`, its state is now terminal)."""
+    A card in a terminal completion state (`done`, plus the retired
+    `review_close` — see `_NARRATOR_SKIP_STATES`) is never re-briefed: its
+    parked-state briefing is final. Without this guard the state-mismatch check
+    below would re-brief every closed card on every sweep (its from_state is
+    `parked`, its state is now terminal)."""
     if capture.get('state') in _NARRATOR_SKIP_STATES:
         return False
     if not isinstance(capture.get('briefing'), dict):

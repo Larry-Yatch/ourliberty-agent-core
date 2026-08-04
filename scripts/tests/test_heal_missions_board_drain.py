@@ -5,9 +5,9 @@ Covers the Mirror-review focus areas for the one-time board drain:
   * only closes verified-merged drafts — a promoted draft is closed ONLY when
     EVERY resolved task_id passes the belt-and-suspenders verify gate; any
     unverified/indeterminate/unresolved draft is KEPT (fail-safe).
-  * risk routing reuses S-2 — a `safe` draft auto-closes to `done`; a
-    `medium`/`careful`/un-briefed draft moves to `review_close` (awaiting ack),
-    never silently closed.
+  * risk routing reuses S-2 — a verified-merged draft auto-closes to `done`
+    whatever its risk; the risky ones are surfaced afterwards in the CEO digest
+    rather than held open for an ack.
   * proposed surfaced, NOT auto-dismissed — the proposed pass writes a
     batch-review artifact and never mutates missions.json.
   * idempotent — a closed draft (no longer `promoted`) is skipped on re-run; the
@@ -136,24 +136,23 @@ class ReconcilePromotedDraftsTest(unittest.TestCase):
         self.assertEqual(cap['shipped_note'], 'shipped in PR #541')
         self.assertEqual(cap['shipped_pr_url'], _PR)
 
-    def test_risky_verified_moves_to_review(self):
+    def test_risky_verified_also_auto_closes(self):
         cap = _promoted('c-med', risk='medium', spawned={'task_id': 't1'})
         reg = self._reg(cap)
         res = d.reconcile_promoted_drafts(
             reg, {}, _NOW, verify_fn=_verify_all({'t1'}), dry_run=False)
-        self.assertEqual(res.closeouts, ['c-med'])
-        self.assertEqual(cap['state'], d.gc.COMPLETED_STATE_REVIEW)
-        self.assertTrue(cap['awaiting_ack'])
-        self.assertEqual(cap['drain_closeout'], d.DRAIN_CLOSEOUT_NOTE)
+        self.assertEqual([c[0] for c in res.closed], ['c-med'])
+        self.assertEqual(cap['state'], d.gc.COMPLETED_STATE_DONE)
+        self.assertNotIn('awaiting_ack', cap)
+        self.assertEqual(cap['shipped_pr_url'], _PR)
 
-    def test_unbriefed_verified_moves_to_review(self):
-        # No risk key ⇒ classify_completion routes to closeout (fail toward review).
+    def test_unbriefed_verified_auto_closes(self):
         cap = _promoted('c-unbriefed', spawned={'task_id': 't1'})
         reg = self._reg(cap)
         res = d.reconcile_promoted_drafts(
             reg, {}, _NOW, verify_fn=_verify_all({'t1'}), dry_run=False)
-        self.assertEqual(res.closeouts, ['c-unbriefed'])
-        self.assertEqual(cap['state'], d.gc.COMPLETED_STATE_REVIEW)
+        self.assertEqual([c[0] for c in res.closed], ['c-unbriefed'])
+        self.assertEqual(cap['state'], d.gc.COMPLETED_STATE_DONE)
 
     def test_unverified_kept(self):
         cap = _promoted('c-open', risk='safe', spawned={'task_id': 't1'})
