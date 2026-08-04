@@ -17783,7 +17783,12 @@
         "at": "2026-08-03T23:55:20.938939+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-08-04T00:45:47.534628+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#1094"
     }
   ]
 }
