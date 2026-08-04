@@ -4,6 +4,84 @@
 
 ---
 
+## Iteration ~7650 — 2026-08-04T10:27Z UTC (Larry /cycle chat, Tier 1 [Check 0: 0 new alerts (watermark=653=file_length=653); Check 1: outbox-notifier silence ~229min (DM sent idx=705 prev iters; carry); Check 3: CLEAN ✅ (65th consecutive); Check 4: pending=2 (unchanged; **103rd consecutive NOT-CLEAN**); PR#1096 age=~555min fix/* cooldown; PR#1081 age=~4923min ci=FAILURE mss=MERGEABLE; all other checks NOMINAL; NOT-CLEAN consecutive_clean=0])
+
+**Health:** ⚠️ NOT-CLEAN — Check 0: 0 new alerts. Check 1: outbox-notifier silence ~229min (DM delivered idx=705 at 07:46:11Z UTC; service alive; by-design idle). Check 3: CLEAN ✅ (65th consecutive). Check 4: pending=2 (unchanged; **103rd consecutive NOT-CLEAN**). PR#1096/1081 threshold breaches continue. consecutive_clean=0; tier 1.
+
+**VERIFY-BEFORE-REASSERT (from iter ~7649 at ~10:19Z UTC 2026-08-04):**
+- **"watermark=653=file_length=653, 0 new alerts"**: CONFIRMED → repair-watermark={repaired:false, old_watermark:653, file_length:653}. 0 new alerts. [confirmed ✅]
+- **"pending=2 (same 2 items)"**: CONFIRMED → pending=2 (pulse-self-report-tier3-narrow-001 + approvals-tab-nonbinary-contract-001). [confirmed ✅]
+- **"system-health overall=healthy, all 4 bots alive"**: STATE CHANGE → ts=2026-08-04T10:21:32Z UTC (~6min before check); overall=healthy; all 4 bots alive=True (beacon/forge/mirror/pulse), action=noop. outbox_notifier=ok. disk=16%, memory=15%. [state-change ✅]
+- **"PRIME ratio≈42.51"**: STATE CHANGE → ratio=42.53 (iter ~7649 intervention appended). [state-change ✅]
+- **"tier=1, consecutive_clean=0, last_signal_at=2026-08-04T10:19:06Z UTC"**: STATE CHANGE → last_signal_at=2026-08-04T10:27:32Z UTC this iter. [updated ✅]
+- **"PR#1096 age=~547min fix/* cooldown"**: STATE CHANGE → age=~555min (~9.25h). Cooldown still active. mss=MERGEABLE. [state-change ✅]
+- **"PR#1081 age=~4915min ci=FAILURE mss=MERGEABLE"**: STATE CHANGE → age=~4923min (~82.1h). ci=FAILURE (mirror-review). mss=MERGEABLE. [state-change ✅]
+- **"Check 3: CLEAN (64th consecutive)"**: STATE CHANGE → **65th consecutive** CLEAN ✅. [state-change ✅]
+- **"HEAD=aa058529=origin/main"**: STATE CHANGE → HEAD=8a5d0e17=origin/main (wrapper committed Pulse cycle 20260804T102045Z). [state-change ✅ — expected]
+- **"outbox-notifier silence ~225min; DM delivered idx=705"**: STATE CHANGE → silence now ~229min from check (last entry still 2026-08-04T06:38:28Z UTC = 00:38:28 MDT). No new DM this iter. [carry ✅]
+- **"Check B sync ~55min"**: STATE CHANGE → last_sync=2026-08-04T10:23:48Z UTC (~4min from check at ~10:27Z). NOMINAL ✅ (<2h threshold)
+- **"Check 5: heal-stale-daemon-code.heartbeat=10:11:25Z UTC"**: STATE CHANGE → heartbeat=2026-08-04T10:21:32Z UTC (~6min before check; <60min threshold). NOMINAL ✅
+- G-rule carries (unchanged): enable-pr-auto-merge-reviewdecision-guard-001 [1/3]; heal-pipeline-stall-no-mirror-dispatch-tier4-no-translation-001 [1/3]; pulse-triage-self-report-should-be-tier3-001 [DISPATCHED]; pulse-check-xiv-tier4-no-translation-001 [2/3]; medic-diagnosis-subject-specific-tier4-no-translation-001 [1/3]; outbox-notifier-forge-reject-notification-tier4-no-translation-001 [1/3]; forge-wip-redispatch-tier4-no-translation-001 [1/3]. VPs: pulse-cycle-check0-helper-override, auto-merge-conflict-route-hold, direction-ask-rsdpm-no-autolabel-review-lag-001. [carry ✅]
+
+**Check 0 — Alert triage (~10:27Z UTC):** repair-watermark={repaired:false, old_watermark:653, file_length:653}. **0 new alerts.** Watermark stays at 653. NOMINAL ✅
+
+**Check 1 — Log noise (~10:27Z UTC):** outbox-notifier.log: last entry 00:38:28 MDT = 2026-08-04T06:38:28Z UTC (~229min before check). system-health outbox_notifier=ok; log_growth reason=idle (empty inboxes, watcher healthy). DM already sent iter ~7627 (idx=705 delivered 07:46:11Z UTC). Root cause unchanged: PR#1094 reconcile loop exhausted; outbox-notifier idle awaiting new inbox tasks. No new DM this iter (ask-then-do already executed). NOT-CLEAN ⚠️ (carry; silence growing ~229min)
+
+**Check 2 — Telegram sweep (~10:27Z UTC):** beacon_telegram_bot.log: last entry 03:16:58 MDT = 2026-08-04T09:16:58Z UTC (reminder for approvals-tab-nonbinary-contract-001). Last Larry-facing delivery idx=705 (07:46:11Z UTC). No new Larry messages. No agent-distress signals. NOMINAL ✅
+
+**Check 3 — Pipeline stall (~10:26Z UTC):** heal_pipeline_stall.py --dry-run → **"0 alert(s) would fire, 0 recovery(ies) would be attempted; no writes performed."**
+- FORGE_NO_PR_SKIP ×9: graduation-enable-pr-auto-merge superseded_session; graduation-auto-merge-clean-pr pr=#1089; graduation-ff-main-when-behind pr=#1090; retire-verification-pending-category-001 pr=#1091; delegate-cap-auto-retire-provably-merged-cards-kill-the-ack-b-9ae0 pr=#1094; delegate-cap-flag-work-that-merged-with-no-human-review-as-a-c32c CLARIFY_REQUEST archived; approvals-freshness-4-producer-authors-probe-001 pr=#1097; delegate-cap-auto-retire-provably-merged-cards-kil-retry1 pr=#1094; approvals-twin-card-source-key-and-nonpromotable-sentinel-001 pr=#1098.
+- suppressed (cooldown): unrouted_open_pr:PR#1096; unrouted_open_pr:RSDPM:176; unrouted_open_pr:RSDPM:175; unrouted_open_pr_stranded:RSDPM:172.
+CLEAN ✅ (65th consecutive)
+
+**Check 4 — Pending directives (~10:27Z UTC):** `~/agents/state/beacon-pending-approvals.json`: **pending=2** ⚠️ (unchanged; **103rd consecutive NOT-CLEAN**):
+- `pulse-self-report-tier3-narrow-001` (created 2026-08-04T00:35:25Z UTC): Beacon plan — APPROVE = ship narrow `pulse/tier4-novel` → Tier-3 entry. REJECT = alternative. **Larry: Approvals tab.**
+- `approvals-tab-nonbinary-contract-001` (created 2026-08-04T03:12:46Z UTC): Beacon plan correcting FALSE PREMISE G-rule. APPROVE = narrow sentinel to binary-only contract (cheap). REJECT = widen tab (more work). **Larry: Approvals tab.**
+NOT-CLEAN ⚠️
+
+**Check 5 — Stale daemon code (~10:27Z UTC):** heal-stale-daemon-code.heartbeat=2026-08-04T10:21:32Z UTC (~6min before check; <60min threshold). NOMINAL ✅
+
+**Check A — Source repo (~10:27Z UTC):** branch=main, tree CLEAN ✅, HEAD=8a5d0e17=origin/main (0 behind, 0 ahead). NOMINAL ✅
+**Check B — Sync health (~10:27Z UTC):** agent-core-sync.json: last_sync=2026-08-04T10:23:48Z UTC (~4min; <2h threshold). status=no-change. consecutive_push_failures=0. NOMINAL ✅
+**Check C — Agent liveness (~10:27Z UTC):** system-health.json ts=2026-08-04T10:21:32Z UTC (~6min); overall=healthy; all 4 bots alive=True (beacon/forge/mirror/pulse — desired=up, alive=true, action=noop). outbox_notifier=ok. disk=16%, memory=15%. NOMINAL ✅
+**Check E — PR/merge state (~10:27Z UTC):** ourliberty-agent-core: **2 open PRs** (unchanged):
+- **#1096** `fix(alerts): retract this healer's own unrouted-PR nudges once the PR lands` — mss=MERGEABLE, rd='', ci=none, age=~555min (~9.25h). fix/* unrouted. Cooldown active. [⚠️ BREACHED — fix/* by-design]
+- **#1081** `fix(suite-guardian): wire L10 regression detection + downgrade` — mss=MERGEABLE, rd='', ci=FAILURE (mirror-review FAILURE, started 2026-08-01T01:18:10Z UTC), age=~4923min (~82.1h). DM [yellow] sent idx=672. [⚠️ BREACHED — Larry action required]
+ourliberty-dashboard: 0 open PRs (carry). RSDPM: PR#176, PR#175, PR#172 (cooldowns active). NOT-CLEAN ⚠️
+**Check H — Forge digest (~10:27Z UTC):** 0 open Forge PRs beyond current open set. 0 merged last 4h. NOMINAL ✅
+
+**§5.0 one-shots (~10:27Z UTC):** audit_due_nudge → no-op. distill_detector → no-op. audit_cadence_signal → no-op. silence_file_auditor → 7 files (3 expired, 4 permanent; 0 suppressed; carry). NOMINAL ✅
+**§5 periodic — Check I (~10:27Z UTC):** Latest artifact check-i-2026-08-03.json (Aug 3 08:14 MDT). Today=Tuesday (weekday=1); next fire Wed 2026-08-06. QUIET ✅
+**§5 periodic — Check III (~10:27Z UTC):** Last artifact check-iii-2026-07-26.json. 14d gate until 2026-08-09. QUIET ✅
+**§5 periodic — Check VIII (~10:27Z UTC):** already_deprecated. QUIET ✅
+
+**Rotations (~10:27Z UTC):** SUPABASE_SERVICE_ROLE_KEY: due=2026-08-22 (18d); last_dm=2026-08-03T22:52:32Z UTC (~11.6h ago; ~13d dedup remaining). ✅ SUPABASE_DB_PASSWORD: revocation_only (no schedule). ✅ All other credentials >60d out. ✅
+
+**Actions taken:**
+- Check 0: 0 new alerts; watermark stays at 653.
+- PRIME DIRECTIVE: 1 intervention row appended at 10:27:32Z UTC (iter=7650): check4-pending-approvals:pending=2-103rd-consecutive-NOT-CLEAN.
+- Tier state: `cycle_tier_state.py record --checks-clean false` → **tier=1, consecutive_clean=0** (last_signal_at=2026-08-04T10:27:32Z UTC).
+
+**Escalations:**
+- **outbox-notifier silence ~229min**: DM already delivered (idx=705, 07:46:11Z UTC). Service alive; idle by-design (empty inboxes). [no new DM this iter]
+- **Check 4 pending=2**: unchanged (103rd consecutive). Both items await Larry's Approvals tab. [no new DM]
+- **PR#1096**: ~555min breach; fix/* by-design; cooldown active. [no DM]
+- **PR#1081**: ~82.1h; ci=FAILURE (mirror-review, confirmed). DM idx=672 previously sent. [no new DM — Larry: decide (merge, close, or fix CI)]
+
+**PRIME DIRECTIVE (post-action):** ratio≈42.53 (interventions in 30d window; systemic_fixes=47; vp=19; trend=worsening). Net flat.
+
+**Patterns:**
+- **[positive ✅] Check 3 CLEAN (65th consecutive)**: Pipeline stall scope fully stable.
+- **[milestone ⚠️ 103rd consecutive] Check 4 pending=2**: Primary unblock: Larry's Approvals tab decisions on `pulse-self-report-tier3-narrow-001` and `approvals-tab-nonbinary-contract-001`. Items now ~9.9h and ~7.2h old. Approvals tab is the only unblock path.
+- **[carry ⚠️ BREACHED] PR#1081**: ~82.1h. ci=FAILURE (mirror-review). DM sent. Larry: decide (merge, close, or fix CI).
+- **[carry ⚠️ ask-then-do sent] outbox-notifier**: ~229min silence; DM delivered (idx=705). Service alive; PR#1094 reconcile loop exhausted; by-design idle. Will self-resolve when next inbox task arrives.
+- **[1/3 carry] G-rule enable-pr-auto-merge-reviewdecision-guard-001**: no new erroneous auto-merges. Dispatch at 3/3.
+- G-rule carries: heal-pipeline-stall-no-mirror-dispatch-tier4-no-translation-001 [1/3]; pulse-triage-self-report-should-be-tier3-001 [DISPATCHED]; pulse-check-xiv-tier4-no-translation-001 [2/3]; medic-diagnosis-subject-specific-tier4-no-translation-001 [1/3]; outbox-notifier-forge-reject-notification-tier4-no-translation-001 [1/3]; forge-wip-redispatch-tier4-no-translation-001 [1/3]. VPs: pulse-cycle-check0-helper-override, auto-merge-conflict-route-hold, direction-ask-rsdpm-no-autolabel-review-lag-001. [carry ✅]
+
+**Tier end-of-iter:** **Tier 1** (consecutive_clean=0; last_signal_at=2026-08-04T10:27:32Z UTC; 5-min cadence active). Remaining blockers: Check 4 pending=2 (103rd consecutive — Larry's Approvals tab), PR#1096/1081 threshold breaches, outbox-notifier silence (monitoring).
+
+---
+
 ## Iteration ~7649 — 2026-08-04T10:19Z UTC (Larry /cycle chat, Tier 1 [Check 0: 0 new alerts (watermark=653=file_length=653); Check 1: outbox-notifier silence ~225min (DM sent idx=705 prev iters; carry); Check 3: CLEAN ✅ (64th consecutive); Check 4: pending=2 (unchanged; **102nd consecutive NOT-CLEAN**); PR#1096 age=~547min fix/* cooldown; PR#1081 age=~4915min ci=FAILURE mss=MERGEABLE; all other checks NOMINAL; NOT-CLEAN consecutive_clean=0])
 
 **Health:** ⚠️ NOT-CLEAN — Check 0: 0 new alerts. Check 1: outbox-notifier silence ~225min (DM delivered idx=705 at 07:46:11Z UTC; service alive; by-design idle). Check 3: CLEAN ✅ (64th consecutive). Check 4: pending=2 (unchanged; **102nd consecutive NOT-CLEAN**). PR#1096/1081 threshold breaches continue. consecutive_clean=0; tier 1.
@@ -2983,79 +3061,6 @@ ourliberty-dashboard: 0 open PRs. RSDPM: PR#176 (cooldown), PR#175 (cooldown), P
 - G-rule carries: heal-pipeline-stall-no-mirror-dispatch-tier4-no-translation-001 [1/3]; pulse-triage-self-report-should-be-tier3-001 [DISPATCHED]; pulse-check-xiv-tier4-no-translation-001 [2/3]; medic-diagnosis-subject-specific-tier4-no-translation-001 [1/3]; outbox-notifier-forge-reject-notification-tier4-no-translation-001 [1/3]; forge-wip-redispatch-tier4-no-translation-001 [1/3]. VPs: pulse-cycle-check0-helper-override, auto-merge-conflict-route-hold, direction-ask-rsdpm-no-autolabel-review-lag-001. [carry ✅]
 
 **Tier end-of-iter:** **Tier 1** (consecutive_clean=0; last_signal_at=2026-08-04T05:57:55Z UTC; 5-min cadence active). Remaining blockers: Check 4 pending=2, PR#1096/1081 threshold breaches.
-
----
-
-## Iteration ~7610 — 2026-08-04T05:51Z UTC (Larry /cycle chat, Tier 1 [Check 0: 0 new alerts (watermark=704=file_length); Check 3: CLEAN ✅ (25th consecutive); Check 4: pending=2 (unchanged; 63rd consecutive NOT-CLEAN); PR#1096 age=~275min fix/* cooldown; PR#1081 age=~4644min ci=FAILURE; all other checks NOMINAL; NOT-CLEAN consecutive_clean=0])
-
-**Health:** ⚠️ NOT-CLEAN — Check 0: 0 new alerts. Check 3: CLEAN ✅ (25th consecutive). Check 4: pending=2 (unchanged; 63rd consecutive NOT-CLEAN). PR#1096/1081 threshold breaches continue. consecutive_clean=0; tier 1.
-
-**VERIFY-BEFORE-REASSERT (from iter ~7609 at ~05:44Z UTC 2026-08-04):**
-- **"watermark=704, file_length=704, 0 new alerts"**: CONFIRMED → repair-watermark={repaired:false, old_watermark:704, file_length:704}. [confirmed ✅]
-- **"pending=2 (same 2 items)"**: CONFIRMED → pending=2 (pulse-self-report-tier3-narrow-001 + approvals-tab-nonbinary-contract-001). [confirmed ✅]
-- **"system-health overall=healthy, all 4 bots alive"**: STATE CHANGE → ts=2026-08-04T05:45:40Z UTC (~6 min before check); overall=healthy; all 4 bots alive=True (beacon/forge/mirror/pulse). [state-change ✅ — timestamp updated]
-- **"PRIME ratio≈42.45 (interventions=1996 post-append)"**: 30d-window roll → pre-append interventions=1995 (some rows aged out); ratio≈42.45 unchanged; systemic_fixes=47; verification_pending=19. [updated ✅]
-- **"tier=1, consecutive_clean=0, last_signal_at=2026-08-04T05:44:01Z UTC"**: UPDATED → last_signal_at=2026-08-04T05:49:35Z UTC this iter. [updated ✅]
-- **"PR#1096 age=~270min fix/* cooldown"**: STATE CHANGE → age=~275min. Cooldown still active. [state-change ✅ — minor age increment]
-- **"PR#1081 age=~4638min ci=FAILURE"**: STATE CHANGE → age=~4644min (~77.4h); ci=FAILURE re-confirmed (statusCheckRollup: mirror-review, state=FAILURE, startedAt=2026-08-01T01:18:10Z). [state-change noted]
-- **"Check 3: CLEAN (24th consecutive)"**: STATE CHANGE → **25th consecutive** CLEAN ✅ (dry-run=0 alerts). [state-change ✅]
-- **"HEAD=0b585202=origin/main"**: STATE CHANGE → HEAD=e1f5c361=origin/main (wrapper committed Pulse cycle 20260804T054621Z). [state-change ✅ — expected]
-- G-rule carries (unchanged): enable-pr-auto-merge-reviewdecision-guard-001 [1/3]; heal-pipeline-stall-no-mirror-dispatch-tier4-no-translation-001 [1/3]; pulse-triage-self-report-should-be-tier3-001 [DISPATCHED]; pulse-check-xiv-tier4-no-translation-001 [2/3]; medic-diagnosis-subject-specific-tier4-no-translation-001 [1/3]; outbox-notifier-forge-reject-notification-tier4-no-translation-001 [1/3]; forge-wip-redispatch-tier4-no-translation-001 [1/3]. VPs: pulse-cycle-check0-helper-override, auto-merge-conflict-route-hold, direction-ask-rsdpm-no-autolabel-review-lag-001. [carry ✅]
-
-**Check 0 — Alert triage (~05:47Z UTC):** repair-watermark={repaired:false, old_watermark:704, file_length:704}. **0 new alerts.** Watermark stays at 704. NOMINAL ✅
-
-**Check 1 — Log noise (~05:47Z UTC):** outbox-notifier.log: last entry 23:47:03 MDT = 2026-08-04T05:47:03Z UTC (~0 min before check). PR#1094 reconcile-skip INFO loop — expected (by-design; PR#1094 merged, retry1 task still in outbox). No WARN/ERROR. systemd WARN/ERROR scan (last 30m): 0 patterns. NOMINAL ✅
-
-**Check 2 — Telegram sweep (~05:47Z UTC):** beacon_telegram_bot.log: last delivery idx=703 (intent=doorbell, 21:34:00 MDT = 03:34:00Z UTC, ~2h13min ago). Bot restarted 21:23:55 MDT. No new deliveries or Larry messages since. Queue empty. NOMINAL ✅
-
-**Check 3 — Pipeline stall (~05:47Z UTC):** heal_pipeline_stall.py --dry-run → **"0 alert(s) would fire, 0 recovery(ies) would be attempted; no writes performed."**
-- FORGE_NO_PR_SKIP ×9: graduation-enable-pr-auto-merge superseded_session; graduation-auto-merge-clean-pr pr=#1089; graduation-ff-main-when-behind pr=#1090; retire-verification-pending-category-001 pr=#1091; delegate-cap-auto-retire-provably-merged-cards-kill-the-ack-b-9ae0 pr=#1094 (branch_truncated); delegate-cap-flag-work-that-merged-with-no-human-review-as-a-c32c CLARIFY_REQUEST archived; approvals-freshness-4-producer-authors-probe-001 pr=#1097; delegate-cap-auto-retire-provably-merged-cards-kil-retry1 pr=#1094 (branch_truncated); approvals-twin-card-source-key-and-nonpromotable-sentinel-001 pr=#1098.
-- suppressed (cooldown): unrouted_open_pr:PR#1096; unrouted_open_pr:RSDPM:176; unrouted_open_pr:RSDPM:175; unrouted_open_pr_stranded:RSDPM:172.
-CLEAN ✅ (25th consecutive)
-
-**Check 4 — Pending directives (~05:49Z UTC):** `~/agents/state/beacon-pending-approvals.json`: **pending=2** ⚠️ (unchanged; 63rd consecutive NOT-CLEAN):
-- `pulse-self-report-tier3-narrow-001` (created 2026-08-04T00:35:25Z UTC): Beacon plan — APPROVE = ship narrow `pulse/tier4-novel` → Tier-3 entry. REJECT = alternative. **Larry: Approvals tab.**
-- `approvals-tab-nonbinary-contract-001` (created 2026-08-04T03:12:46Z UTC): Beacon plan correcting FALSE PREMISE G-rule. APPROVE = narrow sentinel to binary-only contract (cheap). REJECT = widen tab (more work). **Larry: Approvals tab.**
-NOT-CLEAN ⚠️
-
-**Check 5 — Stale daemon code (~05:47Z UTC):** heal-stale-daemon-code.heartbeat=2026-08-04T05:38:39Z UTC (~9 min before check; <60 min threshold). NOMINAL ✅
-
-**Check A — Source repo (~05:47Z UTC):** branch=main, tree CLEAN ✅, HEAD=e1f5c361=origin/main (0 behind, 0 ahead). NOMINAL ✅
-**Check B — Sync health (~05:47Z UTC):** agent-core-sync.json: last_sync=2026-08-04T05:23:26Z UTC (~24 min; <2h threshold). status=no-change. consecutive_push_failures=0. NOMINAL ✅
-**Check C — Agent liveness (~05:47Z UTC):** system-health ts=2026-08-04T05:45:40Z UTC (~6 min); overall=healthy; all 4 bots alive=True (beacon/forge/mirror/pulse). NOMINAL ✅
-**Check E — PR/merge state (~05:47Z UTC):** ourliberty-agent-core: **2 open PRs** (unchanged):
-- **#1096** `fix(alerts): retract this healer's own unrouted-PR nudges once the PR lands` — mss=UNKNOWN (transient), rd='', ci=none, age=~275min (~4.6h). fix/* unrouted. Cooldown active. [⚠️ BREACHED — fix/* by-design]
-- **#1081** `fix(suite-guardian): wire L10 regression detection + downgrade` — mss=UNKNOWN (transient), rd='', ci=FAILURE (mirror-review, state=FAILURE, startedAt=2026-08-01T01:18:10Z), age=~4644min (~77.4h). DM [yellow] sent idx=672. [⚠️ BREACHED — Larry action required]
-ourliberty-dashboard: 0 open PRs. RSDPM: PR#176 (age~4.9h), PR#175 (age~5.3h), PR#172 (age~53.0h) all cooldown-suppressed. NOT-CLEAN ⚠️
-**Check H — Forge digest (~05:47Z UTC):** 0 open Forge PRs. Recently merged (last 4h): PR#1098 (03:23Z, ~144min ago), PR#1097 (02:32Z, ~195min ago). NOMINAL ✅
-
-**§5.0 one-shots (~05:49Z UTC):** audit_due_nudge → no-op. distill_detector → no-op. audit_cadence_signal (at review/distill/) → no-op (no post-seed decision-grade distill artifacts yet). silence_file_auditor → 7 files: 3 expired/0-suppressed (agent-runner-forge/pulse transcript-not-persisted; 54.0d old), 4 permanent/0-suppressed (pipeline-stall forge-no-pr entries; 40-61d old). NOMINAL ✅
-**§5 periodic — Check I (~05:49Z UTC):** Latest artifact check-i-2026-08-03.json. Today=Tuesday (weekday=1); next fire Wed 2026-08-06. QUIET ✅
-**§5 periodic — Check III (~05:49Z UTC):** Last artifact check-iii-2026-07-26.json. 14d gate until 2026-08-09. QUIET ✅
-**§5 periodic — Check VIII (~05:49Z UTC):** already_deprecated. QUIET ✅
-
-**Rotations (~05:49Z UTC):** SUPABASE_SERVICE_ROLE_KEY: ~18d remaining (due=2026-08-22; last_dm=2026-08-03T22:52:32Z UTC; dedup active ~14 more days). ✅ SUPABASE_DB_PASSWORD: revocation_only (no schedule). ✅ All other credentials >60d out. ✅
-
-**Actions taken:**
-- Check 0: watermark stays at 704 (0 new alerts; no triage needed).
-- PRIME DIRECTIVE: 1 intervention row appended at 05:49:35Z UTC: check4-pending-approvals:pending=2-63rd-consecutive-NOT-CLEAN.
-- Tier state: `cycle_tier_state.py record --checks-clean false` → **tier=1, consecutive_clean=0** (last_signal_at=2026-08-04T05:49:35Z UTC).
-
-**Escalations:**
-- **Check 4 pending=2**: unchanged (no state change). Both items await Larry's Approvals tab. [no new DM]
-- **PR#1096**: ~275min breach; fix/* by-design; cooldown active. [no DM]
-- **PR#1081**: ~77.4h; ci=FAILURE (re-confirmed). DM idx=672 previously sent. [no new DM — Larry still needs to decide: merge, close, or fix CI]
-
-**PRIME DIRECTIVE (post-action):** ratio≈42.45 pre-append (systemic_fixes=47; verification_pending=19; trend=worsening). Post-append: 1 new intervention row (interventions→1996 in 30d window).
-
-**Patterns:**
-- **[positive ✅] Check 3 CLEAN (25th consecutive)**: Pipeline stall scope fully stable — all signals cooldown-suppressed or FORGE_NO_PR_SKIP.
-- **[carry ⚠️ 63rd consecutive] Check 4 pending=2**: Primary unblocks: Larry's Approvals tab decisions on `approvals-tab-nonbinary-contract-001` and `pulse-self-report-tier3-narrow-001`.
-- **[carry ⚠️ BREACHED] PR#1081**: ~77.4h. ci=FAILURE (re-confirmed). DM sent. Larry: decide (merge, close, or fix CI).
-- **[1/3 carry] G-rule enable-pr-auto-merge-reviewdecision-guard-001**: no new erroneous auto-merges. Dispatch at 3/3.
-- G-rule carries: heal-pipeline-stall-no-mirror-dispatch-tier4-no-translation-001 [1/3]; pulse-triage-self-report-should-be-tier3-001 [DISPATCHED]; pulse-check-xiv-tier4-no-translation-001 [2/3]; medic-diagnosis-subject-specific-tier4-no-translation-001 [1/3]; outbox-notifier-forge-reject-notification-tier4-no-translation-001 [1/3]; forge-wip-redispatch-tier4-no-translation-001 [1/3]. VPs: pulse-cycle-check0-helper-override, auto-merge-conflict-route-hold, direction-ask-rsdpm-no-autolabel-review-lag-001. [carry ✅]
-
-**Tier end-of-iter:** **Tier 1** (consecutive_clean=0; last_signal_at=2026-08-04T05:49:35Z UTC; 5-min cadence active). Remaining blockers: Check 4 pending=2, PR#1096/1081 threshold breaches.
 
 ---
 
