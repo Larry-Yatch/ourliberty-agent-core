@@ -537,7 +537,7 @@ def _gh_merged(numbers):
     """Fake gh probe: True for the given resolved PR/issue numbers, else None
     (undetermined — the conservative default)."""
     wanted = set(numbers)
-    return lambda n: True if n in wanted else None
+    return lambda n, repo=None: True if n in wanted else None
 
 
 class DecisionIdentityTest(unittest.TestCase):
@@ -576,13 +576,13 @@ class ResolutionSignalTest(unittest.TestCase):
         # Conservative: gh can't confirm -> promote/keep, never skip/retire.
         reason = h.resolution_signal(
             PR294_ALERT, self._empty(), [], DEFAULT_HEURISTICS,
-            gh_probe=lambda n: None)
+            gh_probe=lambda n, repo=None: None)
         self.assertIsNone(reason)
 
     def test_open_pr_is_no_signal(self):
         reason = h.resolution_signal(
             PR294_ALERT, self._empty(), [], DEFAULT_HEURISTICS,
-            gh_probe=lambda n: False)
+            gh_probe=lambda n, repo=None: False)
         self.assertIsNone(reason)
 
     def test_resolved_beacon_history_is_a_signal(self):
@@ -594,7 +594,7 @@ class ResolutionSignalTest(unittest.TestCase):
         }]}
         reason = h.resolution_signal(
             DEPLOY_NOTIFIER_A, state, [], DEFAULT_HEURISTICS,
-            gh_probe=lambda n: None)
+            gh_probe=lambda n, repo=None: None)
         self.assertIsNotNone(reason)
         self.assertIn('history', reason)
 
@@ -607,7 +607,7 @@ class ResolutionSignalTest(unittest.TestCase):
         }], 'history': []}
         reason = h.resolution_signal(
             DEPLOY_NOTIFIER_A, state, [], DEFAULT_HEURISTICS,
-            gh_probe=lambda n: None)
+            gh_probe=lambda n, repo=None: None)
         self.assertIsNone(reason)
 
     def test_later_resolution_alert_is_a_signal(self):
@@ -619,13 +619,13 @@ class ResolutionSignalTest(unittest.TestCase):
         }
         reason = h.resolution_signal(
             DEPLOY_NOTIFIER_A, self._empty(), [resolved], DEFAULT_HEURISTICS,
-            after_ts=DEPLOY_NOTIFIER_A['ts'], gh_probe=lambda n: None)
+            after_ts=DEPLOY_NOTIFIER_A['ts'], gh_probe=lambda n, repo=None: None)
         self.assertIsNotNone(reason)
 
     def test_live_ask_has_no_signal(self):
         reason = h.resolution_signal(
             CYCLE_TIMER_ALERT, self._empty(), [CYCLE_TIMER_ALERT],
-            DEFAULT_HEURISTICS, gh_probe=lambda n: None)
+            DEFAULT_HEURISTICS, gh_probe=lambda n, repo=None: None)
         self.assertIsNone(reason)
 
 
@@ -649,7 +649,7 @@ class SkipBeforePromoteTest(unittest.TestCase):
     def test_undetermined_pr_ask_still_promoted(self):
         # Conservative branch: gh can't confirm -> still surfaced.
         state = self._empty()
-        check = self._check(state, [PR294_ALERT], lambda n: None)
+        check = self._check(state, [PR294_ALERT], lambda n, repo=None: None)
         out = h.evaluate([PR294_ALERT], DEFAULT_HEURISTICS, state, {},
                          now=NOW, resolution_check=check)
         self.assertEqual(len(out), 1)
@@ -662,7 +662,7 @@ class SkipBeforePromoteTest(unittest.TestCase):
 
     def test_live_ask_promoted_once(self):
         state = self._empty()
-        check = self._check(state, [CYCLE_TIMER_ALERT], lambda n: None)
+        check = self._check(state, [CYCLE_TIMER_ALERT], lambda n, repo=None: None)
         out = h.evaluate([CYCLE_TIMER_ALERT], DEFAULT_HEURISTICS, state, {},
                          now=NOW, resolution_check=check)
         self.assertEqual(len(out), 1)
@@ -740,7 +740,7 @@ class SkipBeforePromoteTest(unittest.TestCase):
             'suggested_action': 'Choose rebuild-the-dispatch or waive-it',
         }
         state = self._empty()
-        check = self._check(state, [merged_body_alert], lambda n: None)
+        check = self._check(state, [merged_body_alert], lambda n, repo=None: None)
         out = h.evaluate([merged_body_alert], DEFAULT_HEURISTICS, state, {},
                          now=NOW, resolution_check=check)
         self.assertEqual(len(out), 1)
@@ -777,7 +777,7 @@ class ReconcileRetireTest(unittest.TestCase):
         promoted = {subject: _ts(1)}
         retired, remaining = h.reconcile_retire(
             promoted, state, [CYCLE_TIMER_ALERT], DEFAULT_HEURISTICS,
-            now=NOW, gh_probe=lambda n: None)
+            now=NOW, gh_probe=lambda n, repo=None: None)
         self.assertEqual(retired, [])
         self.assertEqual(remaining, promoted)
         self.assertEqual(len(state['pending']), 1)  # still live
@@ -2856,6 +2856,360 @@ class BirthSuppressionFailurePostureTest(unittest.TestCase):
                 'side_effect': RuntimeError('notify exploded')})
         self.assertEqual(rc, 0)
         add_pending.assert_called_once()
+
+
+# ---- repo-qualified ref resolution (the cross-repo collision fix) ----
+
+# The real 2026-08-03 alert. RSDPM #172 was OPEN and genuinely unrouted, but
+# agent-core #172 is a docs PR merged 2026-05-28 — and the healer skipped the
+# ask every tick because it resolved the bare number against agent-core.
+RSDPM_172_ALERT = {
+    'ts': _ts(1),
+    'source': 'heal-pipeline-stall',
+    'severity': 'warning',
+    'route': 'escalate',
+    'needs_larry': True,
+    'subject': 'pipeline-stall:unrouted-pr:PR#172',
+    'message': (
+        'PR #172 (Larry-Yatch/RSDPM) on branch `fix/coverage-floor-ci` opened '
+        '73 min ago has NO review-request dispatch logged in '
+        'routing-events.jsonl.'
+    ),
+    'suggested_action': (
+        'Dispatch a Mirror review via Beacon chat: `dispatch mirror review '
+        'pr=https://github.com/Larry-Yatch/RSDPM/pull/172`.'
+    ),
+}
+
+
+class RefRepoForNumberTest(unittest.TestCase):
+    """`ref_repo_for_number` accepts a URL only as evidence ABOUT the ref being
+    probed, and only under a trusted owner."""
+
+    def test_reads_the_url_for_that_number(self):
+        self.assertEqual(h.ref_repo_for_number(172, RSDPM_172_ALERT),
+                         'Larry-Yatch/RSDPM')
+
+    def test_a_url_for_a_DIFFERENT_number_is_ignored(self):
+        """Review finding: taking any URL in the alert let a boilerplate or
+        runbook link redirect every ref in it. An alert about agent-core #1084
+        that merely quotes an RSDPM link must NOT resolve to RSDPM."""
+        rec = {'subject': 'pipeline-stall:unrouted-pr:PR#1084',
+               'message': 'PR #1084 needs routing.',
+               'suggested_action': ('see the runbook example '
+                                    'https://github.com/Larry-Yatch/RSDPM/pull/172')}
+        self.assertIsNone(h.ref_repo_for_number(1084, rec))
+        # ...and the number it DOES name still resolves.
+        self.assertEqual(h.ref_repo_for_number(172, rec), 'Larry-Yatch/RSDPM')
+
+    def test_a_number_is_not_matched_by_a_longer_one(self):
+        rec = {'message': 'https://github.com/Larry-Yatch/RSDPM/pull/1720'}
+        self.assertIsNone(h.ref_repo_for_number(172, rec))
+        self.assertEqual(h.ref_repo_for_number(1720, rec), 'Larry-Yatch/RSDPM')
+
+    def test_an_untrusted_owner_is_ignored(self):
+        """Review finding: GitHub hosts every repo on earth. A third-party URL
+        quoted in an alert must never become the repo a skip is decided on."""
+        rec = {'message': 'see https://github.com/someone-else/RSDPM/pull/172'}
+        self.assertIsNone(h.ref_repo_for_number(172, rec))
+
+    def test_a_parenthesised_slug_is_NOT_trusted(self):
+        """Measured across 663 live alerts, a repo-shaped slug also matches
+        parenthesised BRANCH names (`spec/m14-workspace-boundary`) and other
+        slash-y prose (`dependents/seams`)."""
+        self.assertIsNone(h.ref_repo_for_number(
+            9, {'message': 'PR #9 (Larry-Yatch/RSDPM) on branch `x` opened'}))
+
+    def test_none_when_the_alert_carries_no_pr_url(self):
+        """agent-core alerts link no URL — they MUST stay on the historic
+        default so this change is a no-op for them."""
+        self.assertIsNone(h.ref_repo_for_number(294, PR294_ALERT))
+
+    def test_never_raises_on_junk(self):
+        for src in (None, 42, [], {'message': None}, ''):
+            self.assertIsNone(h.ref_repo_for_number(1, src))
+        for bad in (None, 'abc', '', []):
+            self.assertIsNone(h.ref_repo_for_number(bad, RSDPM_172_ALERT))
+
+
+class GhProbeTriStateTest(unittest.TestCase):
+    """An UNDETERMINED probe must never read as "resolved".
+
+    Found by pre-flight item 3: deleting this rule left the suite green on
+    pristine main too — a PRE-EXISTING unguarded rule, not one this branch
+    masked. Guarded here because this whole change rests on it: the fix decides
+    which repo to ask, and if a failed ask started counting as "merged", it
+    would skip live asks in every repo at once. It is also the exact mechanism
+    behind the 2026-07-29 stale-card incident, where an undetermined probe let a
+    dead card through ([[promote-gate-fails-open-on-an-undetermined-gh-probe]])."""
+
+    def test_gh_failure_is_none_not_resolved(self):
+        with mock.patch.object(h, '_gh_state',
+                               lambda kind, number, repo, timeout: None):
+            self.assertIsNone(h.gh_ref_resolved(172, 'Larry-Yatch/RSDPM'))
+
+    def test_open_pr_is_false_not_none(self):
+        with mock.patch.object(h, '_gh_state',
+                               lambda kind, number, repo, timeout: 'OPEN'):
+            self.assertIs(h.gh_ref_resolved(172, 'Larry-Yatch/RSDPM'), False)
+
+    def test_an_undetermined_probe_does_not_skip_the_ask(self):
+        """The consumer's side of it: None must not produce a skip reason."""
+        reason = h.resolution_signal(
+            RSDPM_172_ALERT, {'pending': [], 'history': []}, [],
+            DEFAULT_HEURISTICS, gh_probe=lambda n, repo=None: None)
+        self.assertIsNone(reason)
+
+
+class LedgerRefRepoIdentityTest(unittest.TestCase):
+    """The ledger's stored repo must be the repo of the ref the ledger KEY is
+    built from — `decision_identity` anchors on the lowest referenced number."""
+
+    def test_uses_the_identity_number_not_some_other_ref(self):
+        """The subject names TWO PRs in two repos, so min-vs-any actually
+        differs — with a single-ref subject this assertion cannot fail and the
+        coupling to `decision_identity` would be untested."""
+        # Parse order is [999, 172] while the identity keys on min = 172, so
+        # this fixture separates "the identity's ref" from both "the first ref"
+        # and "the highest ref" — all three coincide on a one-ref subject.
+        subject = 'PR #999 blocked by PR #172'
+        rec = {'subject': subject,
+               'message': ('https://github.com/Larry-Yatch/ourliberty-agent-core'
+                           '/pull/999 and https://github.com/Larry-Yatch/RSDPM'
+                           '/pull/172')}
+        # The ledger key is built from the LOWEST ref...
+        self.assertEqual(h.decision_identity({'subject': subject}), 'ref:172')
+        # ...so the stored repo must be that ref's repo, not the other one's.
+        self.assertEqual(h.ledger_ref_repo(subject, rec), 'Larry-Yatch/RSDPM')
+        self.assertEqual(h.ref_repo_for_number(999, rec),
+                         'Larry-Yatch/ourliberty-agent-core')
+
+    def test_none_without_refs(self):
+        self.assertIsNone(h.ledger_ref_repo('no numbers here', {}))
+
+
+class ForLarryRefRepoTest(unittest.TestCase):
+    """The for-Larry builder's `_ref_repo` must actually FIRE.
+
+    Caught by self-review, not by the suite: the first attempt derived it from
+    the record id, but a for-Larry id is `mirror-review:<task>` and carries no
+    `#<n>` — so it returned None for every record of this shape while the repo
+    sat unread in the record's own `pr_url`. A stamp that never fires is the
+    same inert-plumbing defect the review flagged on the marker path."""
+
+    def test_reads_the_records_own_pr_url(self):
+        self.assertEqual(
+            h.ledger_ref_repo(FORLARRY_DECISION_RECORD['id'], FORLARRY_DECISION_RECORD),
+            'Larry-Yatch/ourliberty-agent-core')
+
+    def test_the_id_alone_yields_nothing(self):
+        """Pins WHY the pr_url path is needed — if this ever starts returning a
+        repo, the builder could go back to the subject-based derivation."""
+        self.assertEqual(h.parse_ref_numbers(FORLARRY_DECISION_RECORD['id']), [])
+        # route 1 (identity ref) finds nothing; route 2 (pr_url) is what fires.
+        self.assertEqual(h.parse_ref_numbers(FORLARRY_DECISION_RECORD['id']), [])
+
+    def test_builder_stamps_a_real_repo(self):
+        payload = h.build_for_larry_approval_payload(
+            FORLARRY_DECISION_RECORD,
+            h.forlarry_dedup_key(FORLARRY_DECISION_RECORD['id']))
+        self.assertEqual(payload['_ref_repo'],
+                         'Larry-Yatch/ourliberty-agent-core')
+
+    def test_untrusted_owner_in_pr_url_is_refused(self):
+        rec = dict(FORLARRY_DECISION_RECORD,
+                   pr_url='https://github.com/someone-else/repo/pull/854')
+        self.assertIsNone(h.ledger_ref_repo('no-refs-here', rec))
+
+    def test_no_pr_url_is_none_not_a_raise(self):
+        for rec in ({}, {'pr_url': None}, {'pr_url': 'nonsense'}, None, 42):
+            self.assertIsNone(h.ledger_ref_repo('no-refs-here', rec))
+
+
+class RefRepoReachesTheLedgerTest(ReconcilerMainTest):
+    """The repo has to survive builder -> payload -> ledger THROUGH main().
+
+    Deliberately reuses `ReconcilerMainTest._drive` (i.e. runs the real
+    `h.main()`) rather than re-walking its steps. A first attempt DID re-walk
+    them, and swapping main()'s read of `_ref_repo` to AFTER
+    `_strip_helper_keys` — which silently blanks the repo on every ledger entry
+    and restores the original bug — left that version green. A test that
+    restates the code cannot catch the code changing
+    ([[test-the-gate-not-your-restatement-of-it]])."""
+
+    def _ledger(self, r):
+        self.assertTrue(r['save_promoted'].called, 'ledger never written')
+        return r['save_promoted'].call_args[0][0]
+
+    def test_repo_survives_main_into_the_ledger(self):
+        r = self._drive(records=[FORLARRY_DECISION_RECORD], chat_id=4242,
+                        emit=True)
+        self.assertEqual(r['rc'], 0)
+        entries = [v for v in self._ledger(r).values() if isinstance(v, dict)]
+        self.assertTrue(entries, 'no promoted entry in the ledger')
+        self.assertEqual(
+            [e.get('ref_repo') for e in entries],
+            ['Larry-Yatch/ourliberty-agent-core'],
+            'the repo was lost between the builder and the ledger')
+        # ...and the retire pass reads back exactly what main() wrote.
+        self.assertEqual(h._ledger_ref_repo(entries[0]),
+                         'Larry-Yatch/ourliberty-agent-core')
+
+    def test_the_transient_key_never_reaches_the_card(self):
+        r = self._drive(records=[FORLARRY_DECISION_RECORD], chat_id=4242,
+                        emit=True)
+        card = r['add_pending'].call_args[0][0]
+        self.assertNotIn('_ref_repo', card)
+
+
+class RepoOverrideTest(unittest.TestCase):
+    """An operator who pinned the repo outranks anything derived from text."""
+
+    def setUp(self):
+        self._saved = os.environ.get('OURLIBERTY_HEAL_APPROVAL_REPO')
+
+    def tearDown(self):
+        if self._saved is None:
+            os.environ.pop('OURLIBERTY_HEAL_APPROVAL_REPO', None)
+        else:
+            os.environ['OURLIBERTY_HEAL_APPROVAL_REPO'] = self._saved
+
+    def test_override_beats_a_derived_repo(self):
+        os.environ['OURLIBERTY_HEAL_APPROVAL_REPO'] = 'Larry-Yatch/sandbox'
+        seen = []
+        with mock.patch.object(
+                h, '_gh_state',
+                lambda kind, number, repo, timeout: seen.append(repo) or None):
+            h.gh_ref_resolved(172, 'Larry-Yatch/RSDPM')
+        # gh_ref_resolved tries kind 'pr' then 'issue'; only the REPO matters.
+        self.assertEqual(set(seen), {'Larry-Yatch/sandbox'})
+
+    def test_derived_repo_used_when_no_override(self):
+        os.environ.pop('OURLIBERTY_HEAL_APPROVAL_REPO', None)
+        seen = []
+        with mock.patch.object(
+                h, '_gh_state',
+                lambda kind, number, repo, timeout: seen.append(repo) or None):
+            h.gh_ref_resolved(172, 'Larry-Yatch/RSDPM')
+        self.assertEqual(set(seen), {'Larry-Yatch/RSDPM'})
+
+
+class GhRefResolvedRepoArgTest(unittest.TestCase):
+    """`gh_ref_resolved` itself must ASK the repo it was given.
+
+    Every other test here injects a `gh_probe` stub, which sits at exactly this
+    seam — so without this class the real probe could ignore its `repo` argument
+    entirely and the whole suite would stay green
+    ([[mutation-evidence-is-void-when-mocks-sit-at-the-seam]])."""
+
+    def _capture(self):
+        seen = []
+
+        def fake_gh_state(kind, number, repo, timeout):
+            seen.append((kind, number, repo))
+            return 'MERGED'
+        return fake_gh_state, seen
+
+    def test_probes_the_repo_it_was_given(self):
+        fake, seen = self._capture()
+        with mock.patch.object(h, '_gh_state', fake):
+            self.assertIs(h.gh_ref_resolved(172, 'Larry-Yatch/RSDPM'), True)
+        self.assertEqual([r for _k, _n, r in seen], ['Larry-Yatch/RSDPM'])
+
+    def test_falls_back_to_the_default_repo_when_none(self):
+        fake, seen = self._capture()
+        with mock.patch.object(h, '_gh_state', fake):
+            h.gh_ref_resolved(294)
+        self.assertEqual([r for _k, _n, r in seen], [h.ref_repo()])
+
+
+class CrossRepoRefResolutionTest(unittest.TestCase):
+    """THE REGRESSION: a bare `#<n>` is ambiguous across repos, and the decision
+    identity (`ref:<n>`) carries none. agent-core is past #1085 while RSDPM is
+    around #172, so every RSDPM number also exists in agent-core as a merged PR
+    — resolving against the default repo marked every RSDPM ask moot forever."""
+
+    def _empty(self):
+        return {'pending': [], 'history': []}
+
+    def _probe_merged_only_in(self, repo):
+        """gh stand-in: #172 is merged in `repo`, OPEN everywhere else."""
+        seen = []
+
+        def probe(n, r=None):
+            seen.append((n, r))
+            return True if r == repo else False
+        return probe, seen
+
+    def test_rsdpm_ask_is_not_skipped_by_the_agent_core_pr(self):
+        probe, seen = self._probe_merged_only_in(
+            'Larry-Yatch/ourliberty-agent-core')
+        reason = h.resolution_signal(
+            RSDPM_172_ALERT, self._empty(), [], DEFAULT_HEURISTICS,
+            gh_probe=probe)
+        self.assertIsNone(reason, 'a live RSDPM ask was skipped by a '
+                                  'same-numbered agent-core PR')
+        self.assertIn(('172', 'Larry-Yatch/RSDPM'),
+                      [(str(n), r) for n, r in seen])
+
+    def test_rsdpm_ask_IS_skipped_when_the_rsdpm_pr_really_merged(self):
+        """The fix must not make the gate blind — the correct repo still skips."""
+        probe, _ = self._probe_merged_only_in('Larry-Yatch/RSDPM')
+        reason = h.resolution_signal(
+            RSDPM_172_ALERT, self._empty(), [], DEFAULT_HEURISTICS,
+            gh_probe=probe)
+        self.assertIsNotNone(reason)
+        self.assertIn('Larry-Yatch/RSDPM#172', reason)
+
+    def test_repoless_alert_still_uses_the_default_repo(self):
+        """Zero behavior change for the agent-core alerts that name no repo."""
+        seen = []
+        h.resolution_signal(
+            PR294_ALERT, self._empty(), [], DEFAULT_HEURISTICS,
+            gh_probe=lambda n, r=None: seen.append((n, r)) or None)
+        self.assertEqual([r for _n, r in seen], [h.ref_repo()])
+
+    def test_builder_stamps_the_repo_for_the_ledger(self):
+        payload = h.build_approval_payload(RSDPM_172_ALERT, 'ref:172')
+        self.assertEqual(payload['_ref_repo'], 'Larry-Yatch/RSDPM')
+        # ...and it is transient: never persisted onto the card itself.
+        h._strip_helper_keys(payload)
+        self.assertNotIn('_ref_repo', payload)
+
+    def test_retire_probes_the_repo_the_ledger_carried(self):
+        """The alert has aged out of the scan window by retire time, so the repo
+        has to be CARRIED — otherwise the retire falls back to the default repo
+        and an unrelated same-numbered PR retires a live card."""
+        probe, seen = self._probe_merged_only_in(
+            'Larry-Yatch/ourliberty-agent-core')
+        task_id = h.derive_task_id('ref:172')
+        state = {'pending': [{'id': task_id, 'status': 'pending'}],
+                 'history': []}
+        promoted = {'ref:172': {
+            'task_id': task_id, 'subject': RSDPM_172_ALERT['subject'],
+            'promoted_at': _ts(1), 'ref_repo': 'Larry-Yatch/RSDPM'}}
+        retired, remaining = h.reconcile_retire(
+            promoted, state, [], DEFAULT_HEURISTICS, now=NOW, gh_probe=probe)
+        self.assertEqual(retired, [], 'a live RSDPM card was retired by the '
+                                      'agent-core PR of the same number')
+        self.assertEqual(remaining, promoted)
+        self.assertIn(('172', 'Larry-Yatch/RSDPM'),
+                      [(str(n), r) for n, r in seen])
+
+    def test_legacy_ledger_entry_without_a_repo_uses_the_default(self):
+        """Entries written before the field existed carry no repo; they are all
+        agent-core asks, so falling back to the default is correct for them."""
+        seen = []
+        task_id = h.derive_task_id('ref:294')
+        promoted = {'ref:294': {
+            'task_id': task_id,
+            # The retire path scans the SUBJECT for refs, not the ledger key.
+            'subject': 'PR #294 Mirror review gap — source=larry routing miss',
+            'promoted_at': _ts(1)}}
+        h.reconcile_retire(
+            promoted, {'pending': [], 'history': []}, [], DEFAULT_HEURISTICS,
+            now=NOW, gh_probe=lambda n, r=None: seen.append((n, r)) or None)
+        self.assertEqual([r for _n, r in seen], [h.ref_repo()])
 
 
 if __name__ == '__main__':
