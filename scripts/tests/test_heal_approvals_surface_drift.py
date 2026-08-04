@@ -97,7 +97,7 @@ def _alert(subject, **extra):
 
 
 def _tick(state=None, for_larry=None, alerts=None, cards=None, tracked=None,
-          grace=3, now=NOW):
+          grace=3, now=NOW, card_source_keys=None):
     """One run_tick with everything injected. No I/O."""
     return d.run_tick(
         state or {'pending': [], 'history': []},
@@ -108,6 +108,7 @@ def _tick(state=None, for_larry=None, alerts=None, cards=None, tracked=None,
         tracked if tracked is not None else {},
         now=now,
         grace=grace,
+        card_source_keys=card_source_keys,
     )
 
 
@@ -348,7 +349,7 @@ class ObserveOnlyTest(unittest.TestCase):
         self.tmp = tempfile.mkdtemp(prefix='ol-drift-observe-')
         self.state_path = Path(self.tmp) / 'ledger.json'
 
-    def _run_main_with(self, *, state, alerts, cards):
+    def _run_main_with(self, *, state, alerts, cards, card_source_keys=None):
         """main() with every store read stubbed and every MUTATING entry point
         replaced by a tripwire that fails the test if it is ever called."""
         import beacon_approval_handler as approval
@@ -365,8 +366,10 @@ class ObserveOnlyTest(unittest.TestCase):
             mock.patch.object(d, 'kill_switch',
                               return_value=Path(self.tmp) / 'no-kill-switch'),
             mock.patch.object(d, 'state_file', return_value=self.state_path),
-            mock.patch.object(heal, 'open_approval_card_task_ids',
-                              return_value=set(cards)),
+            mock.patch.object(
+                heal, 'open_approval_cards',
+                return_value={c: (card_source_keys or {}).get(c)
+                              for c in cards}),
             mock.patch.object(heal, 'load_heuristics', return_value=HEURISTICS),
             mock.patch.object(heal, 'read_alerts', return_value=alerts),
             mock.patch.object(heal, 'read_for_larry_records', return_value=[]),
@@ -422,7 +425,7 @@ class ObserveOnlyTest(unittest.TestCase):
         with mock.patch.object(d, 'kill_switch',
                                return_value=Path(self.tmp) / 'none'), \
                 mock.patch.object(d, 'state_file', return_value=self.state_path), \
-                mock.patch.object(heal, 'open_approval_card_task_ids',
+                mock.patch.object(heal, 'open_approval_cards',
                                   return_value=None):
             self.assertEqual(d.main(), 0)
         self.assertEqual(self.state_path.read_bytes(), before)
@@ -431,9 +434,91 @@ class ObserveOnlyTest(unittest.TestCase):
         switch = Path(self.tmp) / 'healers.disabled'
         switch.write_text('off')
         with mock.patch.object(d, 'kill_switch', return_value=switch), \
-                mock.patch.object(heal, 'open_approval_card_task_ids') as fetch:
+                mock.patch.object(heal, 'open_approval_cards') as fetch:
             self.assertEqual(d.main(), 0)
         fetch.assert_not_called()
+
+
+class SourceDecisionKeyMatchTest(unittest.TestCase):
+    """approvals-twin-card-source-key-and-nonpromotable-sentinel-001, gap 1.
+
+    The 2026-08-03 incident: a for-Larry record was carded at 19:16, but the
+    card's task_id is a hash of the PREFIXED `forlarry:<id>` ledger key while
+    this sentinel's alias for the record is the UNPREFIXED id — so the two
+    surfaces could never meet, the 20:52 tick called the card missing, and the
+    promoter carded that alert as a twin at 21:00. The card's
+    `source_decision_key` is the structural backreference that closes it."""
+
+    RECORD_ID = 'mirror-review:graduation-ff-main-when-behind'
+    CARD_ID = 'unreg-approval-a6f045f54afe'
+
+    def _record(self, **extra):
+        rec = {'id': self.RECORD_ID, 'source': 'mirror-review',
+               'resolved': False}
+        rec.update(extra)
+        return rec
+
+    def test_replay_incident_card_with_source_key_is_not_missing(self):
+        _tracked, divergences, to_alert = _tick(
+            for_larry=[self._record()],
+            cards=[self.CARD_ID],
+            card_source_keys={self.CARD_ID: self.RECORD_ID},
+            grace=1,
+        )
+        self.assertEqual(divergences, [])
+        self.assertEqual(to_alert, [])
+
+    def test_replay_incident_pre_fix_card_behaves_as_it_does_today(self):
+        """A card minted before the field existed carries no backreference —
+        the sentinel must not change behavior for it."""
+        _tracked, divergences, _to_alert = _tick(
+            for_larry=[self._record()], cards=[self.CARD_ID], grace=1)
+        self.assertEqual([x['direction'] for x in divergences],
+                         [d.MISSING_CARD, d.ORPHAN_CARD])
+
+    def test_source_key_also_matches_an_alert_derived_awaiting_item(self):
+        """An alert-derived card stamps the alert's own `decision_key`, which is
+        also a set-A alias — so the two meet even when the card's task_id is
+        nothing the awaiting side could have derived."""
+        record = _alert('pipeline-stall:unrouted-pr:PR#1084',
+                        decision_key='pipeline-stall:pr-1084')
+        _tracked, divergences, _to_alert = _tick(
+            alerts=[record], cards=['unreg-approval-deadbeef'],
+            card_source_keys={
+                'unreg-approval-deadbeef': 'pipeline-stall:pr-1084'},
+            grace=1)
+        self.assertEqual(divergences, [])
+
+    def test_a_card_with_two_keys_reports_at_most_one_orphan(self):
+        """The card side is now many-keys-to-one-card; an orphan must not
+        alert twice for the same card."""
+        _tracked, divergences, _to_alert = _tick(
+            cards=[self.CARD_ID],
+            card_source_keys={self.CARD_ID: self.RECORD_ID}, grace=1)
+        self.assertEqual(len(divergences), 1)
+        self.assertEqual(divergences[0]['direction'], d.ORPHAN_CARD)
+        self.assertEqual(divergences[0]['label'], self.CARD_ID)
+        # ... and keeps the ledger identity a pre-fix card would have had.
+        self.assertEqual(divergences[0]['key'], d._key(self.CARD_ID))
+
+    def test_source_key_pointing_at_nothing_awaiting_is_still_an_orphan(self):
+        """Criterion 5 — orphan detection still fires."""
+        _tracked, divergences, _to_alert = _tick(
+            state={'pending': [_pending('something-else')]},
+            cards=[self.CARD_ID, 'something-else'],
+            card_source_keys={self.CARD_ID: 'nobody-is-waiting-on-this'},
+            grace=1)
+        orphans = [x for x in divergences if x['direction'] == d.ORPHAN_CARD]
+        self.assertEqual([x['label'] for x in orphans], [self.CARD_ID])
+
+    def test_muted_source_key_does_not_resurrect_a_premise_stale_card(self):
+        """A premise_stale item is muted out of BOTH directions; a card keyed
+        under its source key must not sneak back in as an orphan."""
+        state = {'pending': [_pending('demoted-ask', premise_stale=True)]}
+        _tracked, divergences, _to_alert = _tick(
+            state=state, cards=[self.CARD_ID],
+            card_source_keys={self.CARD_ID: 'demoted-ask'}, grace=1)
+        self.assertEqual(divergences, [])
 
 
 class LedgerTest(unittest.TestCase):

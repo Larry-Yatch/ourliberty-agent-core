@@ -1132,6 +1132,15 @@ def build_approval_request_chain_event(
     promoted_source = payload.get('promoted_source')
     if isinstance(promoted_source, str) and promoted_source:
         chain_payload['promoted_source'] = promoted_source
+    # Structural backreference to the key a promoted card came FROM
+    # (heal_unregistered_approval). It has to reach the tab feed because
+    # heal_approvals_surface_drift reads it back off the open cards to tell an
+    # already-carded decision apart from a stranded one — the card's prompt body
+    # names its source in PROSE, which no parity check can read. Absent on every
+    # other producer's payload, so their chain events stay byte-identical.
+    source_decision_key = payload.get('source_decision_key')
+    if isinstance(source_decision_key, str) and source_decision_key:
+        chain_payload['source_decision_key'] = source_decision_key
     # Null-chat leg (fix-pulse-auto-dispatch-null-chat-chain-event-001): when the
     # notifier resolved a chat destination (a valid inbound int, or the Larry
     # fallback for a null reply_chat_id), thread it into the chain event AND both

@@ -367,19 +367,36 @@ def _is_mock_task_id(task_id: str) -> bool:
 
 def collect_cards(
     open_task_ids: set[str], muted: set[str],
+    source_keys: Optional[dict[str, str]] = None,
 ) -> dict[str, str]:
     """key -> task_id for every OPEN approval_request card, minus mocks and
-    minus cards whose item is muted (premise_stale)."""
+    minus cards whose item is muted (premise_stale).
+
+    A card answers to its task_id AND — when the promoter stamped one — to its
+    `source_decision_key`: the structural backreference to the key the card was
+    promoted FROM. Without it the two surfaces can only meet on the promoter's
+    hashed task_id, which for a for-Larry card is a hash of the PREFIXED
+    `forlarry:<id>` ledger key while set A's alias is the unprefixed id — they
+    can never match, so a decision that HAS a card reads as missing and the
+    promoter cards the resulting alert a second time (the 2026-08-03 twin).
+    Cards minted before the field existed carry no source key and behave exactly
+    as they do today.
+
+    Muting is per-CARD, not per-key: a card ANY of whose keys is muted
+    (premise_stale) drops out entirely, so a card whose backreference names a
+    deliberately-demoted item is not reported as an orphan."""
     out: dict[str, str] = {}
+    source_keys = source_keys or {}
     for task_id in sorted(open_task_ids or set()):
         if not isinstance(task_id, str) or not task_id:
             continue
         if _is_mock_task_id(task_id):
             continue
-        key = _key(task_id)
-        if not key or key in muted:
+        keys = [k for k in (_key(task_id), _key(source_keys.get(task_id))) if k]
+        if not keys or any(k in muted for k in keys):
             continue
-        out.setdefault(key, task_id)
+        for key in keys:
+            out.setdefault(key, task_id)
     return out
 
 
@@ -394,8 +411,10 @@ def compute_divergences(
     """The symmetric difference, as a list of divergence records.
 
     An awaiting item is carded when ANY of its aliases has an open card; a card
-    is backed when its key is any awaiting item's alias. Muted (premise_stale)
-    keys are excluded from both directions."""
+    is backed when ANY of ITS keys (task_id or source_decision_key) is any
+    awaiting item's alias. Muted (premise_stale) keys are excluded from both
+    directions. The orphan pass groups by CARD, not by key, so a card answering
+    to two keys still reports at most one divergence."""
     card_keys = set(cards)
     out: list[dict[str, Any]] = []
     for key, item in sorted(awaiting.items()):
@@ -410,12 +429,18 @@ def compute_divergences(
             'label': item['label'],
             'remedy': item['remedy'],
         })
+    by_card: dict[str, list[str]] = {}
     for key, task_id in sorted(cards.items()):
-        if key in alias_keys or key in muted:
+        by_card.setdefault(task_id, []).append(key)
+    for task_id, keys in sorted(by_card.items()):
+        if any(k in alias_keys or k in muted for k in keys):
             continue
+        # Report under the task_id's own key when it has one, so a card that
+        # gained a source_decision_key keeps the ledger identity it already had.
+        own = _key(task_id)
         out.append({
             'direction': ORPHAN_CARD,
-            'key': key,
+            'key': own if own in keys else keys[0],
             'origin': 'chain_events',
             'label': task_id,
             'remedy': _REMEDY_ORPHAN,
@@ -563,8 +588,14 @@ def run_tick(
     now: Optional[datetime] = None,
     grace: Optional[int] = None,
     resolution_check: Optional[Callable[[dict[str, Any]], Optional[str]]] = None,
+    card_source_keys: Optional[dict[str, str]] = None,
 ) -> tuple[dict[str, Any], list[dict[str, Any]], list[dict[str, Any]]]:
     """One parity check. Returns (new_tracked, divergences, to_alert).
+
+    `card_source_keys` maps an open card's task_id to the `source_decision_key`
+    the promoter stamped on it — the backreference that lets a card match the
+    awaiting item it was minted for. Omitted (or empty) means no card carries
+    one, which is exactly the pre-fix behavior.
 
     PURE apart from log(): it reads nothing and writes nothing. main() supplies
     the store snapshots and persists the ledger, which is what keeps the
@@ -581,7 +612,7 @@ def run_tick(
     )
     awaiting = index_awaiting(items)
     alias_keys = awaiting_alias_keys(items)
-    cards = collect_cards(open_task_ids, muted)
+    cards = collect_cards(open_task_ids, muted, card_source_keys)
     divergences = compute_divergences(awaiting, alias_keys, cards, muted)
     new_tracked, to_alert = update_tracking(tracked, divergences, now, grace)
     return new_tracked, divergences, to_alert
@@ -593,21 +624,27 @@ def main() -> int:
         return 0
     heartbeat()
 
-    # Set B FIRST: it is the only read that can fail closed. open_approval_card_
-    # task_ids returns None on any client/query failure, and an unreadable tab is
-    # NOT evidence of drift — comparing against an empty set would flag every
+    # Set B FIRST: it is the only read that can fail closed. open_approval_cards
+    # returns None on any client/query failure, and an unreadable tab is NOT
+    # evidence of drift — comparing against an empty set would flag every
     # awaiting item at once. Skip the tick with the ledger untouched, so a
     # divergence that really is persisting keeps its accumulated grace.
+    #
+    # ONE read for both halves of set B: the task_ids the tab renders, and the
+    # `source_decision_key` each card backreferences (None on cards minted
+    # before the promoter stamped it).
     try:
-        open_task_ids = heal.open_approval_card_task_ids()
+        open_cards = heal.open_approval_cards()
     except Exception as e:  # noqa: BLE001
         log(f'open-card fetch raised: {type(e).__name__}: {e}; skipping tick',
             'WARN')
         return 0
-    if open_task_ids is None:
+    if open_cards is None:
         log('open-card fetch unavailable (no client / query failed); '
             'skipping tick without touching the ledger')
         return 0
+    open_task_ids = set(open_cards)
+    card_source_keys = {tid: key for tid, key in open_cards.items() if key}
 
     heuristics = heal.load_heuristics()
     state = approval.load_state()
@@ -625,6 +662,7 @@ def main() -> int:
         new_tracked, divergences, to_alert = run_tick(
             state, for_larry_records, alerts, heuristics, open_task_ids,
             tracked, grace=grace, resolution_check=_resolution_check,
+            card_source_keys=card_source_keys,
         )
     except Exception as e:  # noqa: BLE001
         log(f'parity check failed: {type(e).__name__}: {e}', 'ERROR')

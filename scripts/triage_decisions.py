@@ -54,11 +54,22 @@ def _is_mock(tid):
     return False
 
 
-def _fetch(client, **filt):
+DEFAULT_COLUMNS = "event_id,event_type,task_id,ts,read_at"
+
+
+def _fetch(client, columns=DEFAULT_COLUMNS, **filt):
+    """Every OPEN (read_at IS NULL) chain_event row matching `filt`, paged.
+
+    `columns` widens the select for a caller that needs more than the triage
+    columns (the approvals drift sentinel reads `payload` off the open approval
+    cards). It defaults to the exact triage select, so every existing caller's
+    rows are unchanged — the point of the parameter is that the paging and the
+    read_at filter stay single-sourced here instead of being re-implemented.
+    """
     rows, page, size = [], 0, 1000
     while True:
         q = client.table("chain_events").select(
-            "event_id,event_type,task_id,ts,read_at"
+            columns
         ).is_("read_at", "null")
         for k, v in filt.items():
             q = q.eq(k, v)
