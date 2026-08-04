@@ -3154,7 +3154,7 @@
       "id": "cap-auto-retire-provably-merged-cards-kill-the-ack-b-9ae0",
       "title": "Auto-retire provably-merged cards (kill the ack button) + name what closed in the CEO digest",
       "note": "Stop diverting provably-merged cards into a human ack queue, and name what closed in the digest Larry already reads. ONE change \u2014 see WHY THEY CANNOT SHIP SEPARATELY.\n\nWHEN TO RUN THIS: anytime. No dependencies. Larry approved the shape 2026-08-03.\n\nTHE PROBLEM: `classify_completion` routes a verified-merged card by RISK \u2014 `safe` auto-closes to `done`; `medium`/`careful`/un-rated go to `review_close` + `awaiting_ack`. All 12 cards currently in `review_close` are rated `careful` (9) or `medium` (3), so the gate is working as designed. But the ack is theatre: Larry cannot verify the work himself, closing the card cannot un-merge anything, and there is no choice attached \u2014 it is a decision-shaped control on something that is not a decision. The risk rating describes BUILDING the thing; it says nothing about closing a record of work that already merged. Larry's words: \"If all I'm doing is clicking a button without any insights or choices, why does the button exist?\"\n\nWorse, `review_close` renders NOWHERE \u2014 the dashboard knows exactly three capture states (`parked`/`promoted`/`dropped`) and neither `dashboard_api` nor the frontend mentions `review_close`. So the state built to stop a risky card closing silently makes it vanish silently.\n\nBUILD:\n1. In `classify_completion` (heal_missions_card_gc), a verified-merged card auto-closes to `done` regardless of risk. Keep the merge proof EXACTLY as strict as it is \u2014 belt-and-suspenders (chain_events `auto_merge` AND `gh pr view` MERGED, every task_id); anything unresolved still KEEPS the card. Only the risk-based diversion goes.\n2. Retire the `review_close` state and the `awaiting_ack` flag with it, OR render them \u2014 do not leave a written-but-undisplayed state behind. Recommend retiring: nothing should write a state no surface reads.\n3. Add risky-shipped work to the existing CEO digest (`ceo_digest_generator.py`, one `ceo_digest` chain_event, already rendered by the Approvals page DigestCard \u2014 NO new surface). Each line must name BOTH the card that closed AND the PR that closed it.\n\nWHY THEY CANNOT SHIP SEPARATELY \u2014 this is load-bearing: auto-close removes the only thing that surfaces a closure. The digest becomes the sole awareness path. Shipping (1) without (3) means risky work closes with nothing telling Larry, which is strictly worse than today.\n\nTHE FALSE-POSITIVE THIS MUST TOLERATE (found 2026-08-03, real): the `terminal-backstop` leg proves only that the DELEGATION spawned a PR that MERGED \u2014 not that the PR did what the card asked. Live example: `cap-approvals-freshness-retrofit-a-producer-to-autho-9525` says \"make a producer author probes\"; its delegation merged adjacent work; NOTHING authors a probe; the card reads `shipped (linked work merged)` with no `shipped_pr_url`. So \"shipped\" means \"your delegation merged something\". That is exactly why the digest must print card + closing PR side by side: a human reading \"closed <card> because <PR> merged\" spots a mismatch instantly, where a silent auto-close hides it forever. Do NOT try to make the probe semantically verify intent \u2014 that is a much bigger problem; make the closure READABLE instead.\n\nREVIEW: /code-review high REQUIRED. It changes what silently disappears from Larry's board, and a wrong branch closes live work while looking exactly like a working board.",
-      "state": "parked",
+      "state": "review_close",
       "label": null,
       "origin": {
         "source": "desktop-chat",
@@ -3183,7 +3183,21 @@
         "at": "2026-08-03T23:25:12.357727+00:00",
         "from_state": "parked"
       },
-      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
+      "closeout": {
+        "what": "We removed the click-to-acknowledge step on work that has already shipped \u2014 those cards now close themselves \u2014 and added a line to your daily digest naming each piece of risky work that closed and the exact change that closed it.",
+        "outcome": "It's live (PR #1094): nothing sits waiting on your button anymore, and closures show up in the digest you already read.",
+        "note": "One thing to watch: a card closes when the work it kicked off ships, which isn't always proof it did what you asked \u2014 that's why the digest prints the card and the change side by side, so a mismatch is obvious at a glance."
+      },
+      "closeout_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-04T00:45:42.164081+00:00",
+        "from_state": "parked",
+        "pr_url": "https://github.com/Larry-Yatch/ourliberty-agent-core/pull/1094"
+      },
+      "awaiting_ack": true,
+      "shipped_pr_url": "https://github.com/Larry-Yatch/ourliberty-agent-core/pull/1094"
     },
     {
       "id": "cap-flag-work-that-merged-with-no-human-review-as-a-c32c",
@@ -3217,6 +3231,11 @@
         "model": "claude-opus-5",
         "at": "2026-08-03T23:25:12.357727+00:00",
         "from_state": "parked"
+      },
+      "failure_signaled": {
+        "reason": "preflight_reject: Forge rejected the spec at preflight (marker_type=reject)",
+        "at": "2026-08-04T00:45:42.164081+00:00",
+        "by": "heal_missions_card_gc"
       }
     },
     {
