@@ -2061,7 +2061,9 @@ def build_pr_state_freshness_probe(
         EXACTLY ONE distinct ref across the same subject/message/suggested_action
         fields `resolution_signal` scans, via the SAME `parse_ref_numbers`. One
         ref means the probe and the existing skip-before-promote gate can never
-        disagree about which ref matters; two or more is ambiguous -> None.
+        disagree about which ref matters; two or more is ambiguous -> None. A
+        `pr_url` that names a DIFFERENT pull request than the card's own prose
+        also refuses — see below.
 
     No probe means the card behaves EXACTLY as it does today — the fail-safe
     default, and the reason refusing is always the safe answer. Never raises."""
@@ -2070,16 +2072,23 @@ def build_pr_state_freshness_probe(
     if not (isinstance(ref_repo_hint, str) and '/' in ref_repo_hint):
         return None
     number: Optional[int] = None
+    refs: list[int] = []
+    for text in (subject, record.get('message'),
+                 record.get('suggested_action')):
+        for n in parse_ref_numbers(text):
+            if n not in refs:
+                refs.append(n)
     coord = parse_pr_url(record.get('pr_url'))
     if coord is not None:
         number = coord[1]
+        # The prose refs are what the card's own TEXT is about, and what
+        # `resolution_signal` keys on. A `pr_url` naming a different pull request
+        # than the text does means the two halves disagree about what the card is
+        # FOR, so probing either one answers a question nobody asked. Records with
+        # no prose ref at all (the for-Larry mirror-review shape) are unconstrained.
+        if refs and number not in refs:
+            return None
     else:
-        refs: list[int] = []
-        for text in (subject, record.get('message'),
-                     record.get('suggested_action')):
-            for n in parse_ref_numbers(text):
-                if n not in refs:
-                    refs.append(n)
         if len(refs) != 1:
             return None
         number = refs[0]

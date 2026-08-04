@@ -270,7 +270,7 @@ def _eval_pr_state(
     if expect not in (_PR_EXPECT_OPEN, _PR_EXPECT_TERMINAL):
         return INDETERMINATE
     coord = _parse_pr_coordinate(probe)
-    if coord == _COORD_INVALID:
+    if coord is _COORD_INVALID:
         return INDETERMINATE
     try:
         if coord is not None:

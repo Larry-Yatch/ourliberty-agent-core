@@ -3289,6 +3289,19 @@ class BuildPrStateProbeTest(unittest.TestCase):
             h.build_pr_state_freshness_probe(rec, rec['subject'],
                                              'Larry-Yatch/RSDPM'))
 
+    def test_pr_url_naming_a_different_pr_than_the_prose_authors_nothing(self):
+        # The repo check alone cannot catch this: the card's TEXT is about #28 but
+        # its pr_url points at #999 in the SAME repo, so both halves agree on the
+        # repo and disagree on the pull request. Probing the merged #999 would
+        # suppress a card about the still-open #28 at birth.
+        rec = {'subject': 'pipeline-stall:unrouted-pr:PR#28',
+               'message': ('PR #28 https://github.com/Larry-Yatch/'
+                           'ourliberty-agent-core/pull/28 has no dispatch.'),
+               'pr_url': ('https://github.com/Larry-Yatch/'
+                          'ourliberty-agent-core/pull/999')}
+        self.assertEqual(self._hint(rec), 'Larry-Yatch/ourliberty-agent-core')
+        self.assertIsNone(self._build(rec))
+
     def test_missing_or_bad_hint_authors_nothing(self):
         for hint in (None, '', 'noslash', 42):
             with self.subTest(hint=hint):
@@ -3373,7 +3386,13 @@ class AuthoredProbeAgreesWithResolutionSignalTest(unittest.TestCase):
         verdict = _FP.evaluate(payload['freshness_probe'],
                                pr_coordinate_probe=lambda r, n: tts.OPEN)
         self.assertEqual(verdict, _FP.TRUE)
-        kept, suppressed = h.apply_birth_freshness_gate([payload])
+        # The executor is injected, never defaulted: defaulting here makes the gate
+        # shell out to `gh` for a real PR, so the test would go red the day RSDPM
+        # #172 merges — a red gate attributable to nothing.
+        kept, suppressed = h.apply_birth_freshness_gate(
+            [payload],
+            evaluator=lambda p: _FP.evaluate(
+                p, pr_coordinate_probe=lambda r, n: tts.OPEN))
         self.assertEqual((len(kept), len(suppressed)), (1, 0))
 
     def test_probe_and_skip_gate_read_the_same_repo_and_number(self):
