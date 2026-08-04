@@ -1000,8 +1000,13 @@ def build_approval_payload(
     }
     # Carry a freshness_probe forward (slice 3): when the source alert records a
     # falsifiable premise, it rides into dispatch_payload so the birth gate can
-    # honor it and later ticks (slice 2) can re-check it. Absent => unchanged.
+    # honor it and later ticks (slice 2) can re-check it. Absent => AUTHOR one
+    # (slice 4) when this alert names an unambiguous PR; still absent => unchanged.
+    # Carry-forward WINS: an author's explicit premise is never overwritten by a
+    # derived one.
     probe = extract_freshness_probe(record)
+    if probe is None:
+        probe = build_pr_state_freshness_probe(record, subject, out['_ref_repo'])
     if probe is not None:
         out['freshness_probe'] = probe
     return out
@@ -1185,8 +1190,13 @@ def build_approval_payload_from_marker(
     }
     # Carry a freshness_probe forward (slice 3): Beacon's recovered marker is the
     # likeliest carrier, but honor one on the downstream alert too. Absent =>
-    # unchanged.
+    # AUTHOR one (slice 4) from the ALERT, matching `_ref_repo`'s record-only
+    # derivation so a marker and the promote gate can never disagree. Recovered
+    # markers are typically PRE-PR, so this usually authors nothing — the correct
+    # outcome, not a gap.
     probe = extract_freshness_probe(marker, record)
+    if probe is None:
+        probe = build_pr_state_freshness_probe(record, subject, out['_ref_repo'])
     if probe is not None:
         out['freshness_probe'] = probe
     return out
@@ -1754,8 +1764,13 @@ def build_for_larry_approval_payload(
     if recheck_target is not None:
         payload['recheck_target'] = recheck_target
     # Carry a freshness_probe forward (slice 3) when the for-Larry record records
-    # a falsifiable premise. Absent => unchanged.
+    # a falsifiable premise. Absent => AUTHOR one (slice 4). This is the cleanest
+    # shape: the record carries a STRUCTURED `pr_url`, so the coordinate needs no
+    # prose mining at all.
     probe = extract_freshness_probe(record)
+    if probe is None:
+        probe = build_pr_state_freshness_probe(
+            record, record_id, payload['_ref_repo'])
     if probe is not None:
         payload['freshness_probe'] = probe
     return payload
@@ -2148,6 +2163,93 @@ def extract_freshness_probe(*sources: Any) -> Optional[dict[str, Any]]:
                 if isinstance(probe, dict):
                     return probe
     return None
+
+
+def build_pr_state_freshness_probe(
+    record: Any, subject: Any, ref_repo_hint: Optional[str],
+) -> Optional[dict[str, Any]]:
+    """AUTHOR a `pr_state` freshness_probe for a card this healer is minting, or
+    None when the card's PR coordinate is not UNAMBIGUOUS.
+
+    Slices 1-3 built the whole freshness machinery — the schema + evaluator, the
+    10-min demotion tick, the birth gate, the Unverified badge — and every one
+    deferred AUTHORSHIP, so nothing ever constructed a probe and the arc marked
+    zero cards stale. This is that missing producer, for the one healer that
+    minted half the 2026-07-29 Approvals tab.
+
+    THE PREMISE: `expect: "open"`. Every card shape this healer files asks "this
+    PR still needs something done to it" — routed, reviewed, un-stranded — so the
+    ask dies the moment the PR goes MERGED or CLOSED. The probe is authored as a
+    DIRECT `repo`+`pr_number` coordinate, never a `task_id`: this module's task
+    ids (`unreg-approval-<hash>`) appear in no PR branch or title, so a task_id
+    probe would token-match nothing and read INDETERMINATE forever — an authored
+    probe that can never fire.
+
+    REFUSES (returns None) UNLESS BOTH halves are unambiguous:
+
+      * the REPO — supplied by the caller as `ref_repo_hint`, which is
+        `ledger_ref_repo`'s answer (already computed at every mint site for the
+        ledger stamp). That helper trusts ONLY a full PR URL naming the SAME
+        number under a trusted owner, so a bare `#<n>` yields None here. This is
+        load-bearing: agent-core is past #1085 while RSDPM is near #172, so
+        essentially every RSDPM number ALSO exists in agent-core as a merged PR
+        (agent-core PR #1092). Re-deriving the repo badly would resurrect that
+        bug BEHIND the birth gate, where the cost is a live decision that never
+        reaches Larry at all.
+      * the NUMBER — the record's structured `pr_url` when it has one (the
+        for-Larry mirror-review shape, where no prose mining is needed), else
+        EXACTLY ONE distinct ref across the same subject/message/suggested_action
+        fields `resolution_signal` scans, via the SAME `parse_ref_numbers`. One
+        ref means the probe and the existing skip-before-promote gate can never
+        disagree about which ref matters; two or more is ambiguous -> None. A
+        `pr_url` that names a DIFFERENT pull request than the card's own prose
+        also refuses — see below.
+
+    No probe means the card behaves EXACTLY as it does today — the fail-safe
+    default, and the reason refusing is always the safe answer. Never raises."""
+    if not isinstance(record, dict):
+        return None
+    if not (isinstance(ref_repo_hint, str) and '/' in ref_repo_hint):
+        return None
+    number: Optional[int] = None
+    refs: list[int] = []
+    for text in (subject, record.get('message'),
+                 record.get('suggested_action')):
+        for n in parse_ref_numbers(text):
+            if n not in refs:
+                refs.append(n)
+    coord = parse_pr_url(record.get('pr_url'))
+    if coord is not None:
+        number = coord[1]
+        # The prose refs are what the card's own TEXT is about, and what
+        # `resolution_signal` keys on. A `pr_url` naming a different pull request
+        # than the text does means the two halves disagree about what the card is
+        # FOR, so probing either one answers a question nobody asked. Records with
+        # no prose ref at all (the for-Larry mirror-review shape) are unconstrained.
+        if refs and number not in refs:
+            return None
+    else:
+        if len(refs) != 1:
+            return None
+        number = refs[0]
+    if number <= 0:
+        return None
+    # The repo must be evidence about THE NUMBER BEING PROBED, so it is re-derived
+    # for that exact number rather than inherited. `ref_repo_hint` is then a
+    # CONSISTENCY CHECK, not the source: it is keyed on the identity ref
+    # (`min(subject refs)`), which is the same PR in every real shape but need not
+    # be if a record carries both a `pr_url` and an unrelated subject ref. A
+    # disagreement would mean the probe and the ledger's retire pass ask different
+    # GitHubs about one card — so it refuses instead of picking a side.
+    probe_repo = ref_repo_for_number(number, record, subject)
+    if not probe_repo or probe_repo != ref_repo_hint:
+        return None
+    return {
+        'kind': 'pr_state',
+        'repo': probe_repo,
+        'pr_number': number,
+        'expect': 'open',
+    }
 
 
 def _card_summary_snippet(payload: dict[str, Any], limit: int = 200) -> str:

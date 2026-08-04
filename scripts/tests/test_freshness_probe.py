@@ -353,5 +353,134 @@ class DefaultExecutorTests(unittest.TestCase):
         self.assertIsNone(fp._default_sql_bool('SELECT 1'))
 
 
+# -------------------- pr_state by DIRECT PR coordinate (slice 4) --------------------
+
+class PrStateCoordinateTests(unittest.TestCase):
+    """A `pr_state` probe may name a PR DIRECTLY by (repo, pr_number).
+
+    WHY THIS EXISTS: the historical `task_id` path resolves through
+    `task_terminal_state`, which matches the id as a boundary TOKEN against
+    recent PR branches/titles. A producer that knows the exact PR has no id the
+    PR's branch carries, so a task_id probe matched nothing and read
+    INDETERMINATE forever — an authored probe that could never fire."""
+
+    def _coord(self, **over):
+        probe = {'kind': 'pr_state', 'repo': 'Larry-Yatch/RSDPM',
+                 'pr_number': 172}
+        probe.update(over)
+        return probe
+
+    def _eval(self, probe, state):
+        calls = []
+
+        def _resolve(repo, number):
+            calls.append((repo, number))
+            return state
+        return fp.evaluate(probe, pr_coordinate_probe=_resolve), calls
+
+    def test_open_coordinate_is_true(self):
+        verdict, calls = self._eval(self._coord(), tts.OPEN)
+        self.assertEqual(verdict, fp.TRUE)
+        self.assertEqual(calls, [('Larry-Yatch/RSDPM', 172)])
+
+    def test_merged_coordinate_is_false(self):
+        self.assertEqual(self._eval(self._coord(), tts.MERGED)[0], fp.FALSE)
+
+    def test_closed_coordinate_is_false(self):
+        self.assertEqual(self._eval(self._coord(), tts.CLOSED)[0], fp.FALSE)
+
+    def test_unknown_coordinate_is_indeterminate(self):
+        # Any gh failure collapses to UNKNOWN, which must never decide a premise.
+        self.assertEqual(
+            self._eval(self._coord(), tts.UNKNOWN)[0], fp.INDETERMINATE)
+
+    def test_expect_terminal_direction_holds(self):
+        self.assertEqual(
+            self._eval(self._coord(expect='terminal'), tts.OPEN)[0], fp.TRUE)
+        self.assertEqual(
+            self._eval(self._coord(expect='terminal'), tts.MERGED)[0], fp.FALSE)
+
+    def test_raising_coordinate_executor_is_indeterminate(self):
+        def _boom(repo, number):
+            raise RuntimeError('gh exploded')
+        self.assertEqual(
+            fp.evaluate(self._coord(), pr_coordinate_probe=_boom),
+            fp.INDETERMINATE)
+
+    def test_non_string_executor_result_is_indeterminate(self):
+        # Guards pr_coordinate_state's (state, sha) tuple leaking through
+        # un-unwrapped: a tuple is not a verdict.
+        self.assertEqual(
+            fp.evaluate(self._coord(),
+                        pr_coordinate_probe=lambda r, n: (tts.MERGED, 'sha')),
+            fp.INDETERMINATE)
+
+    def test_numeric_string_pr_number_accepted(self):
+        verdict, calls = self._eval(self._coord(pr_number='172'), tts.MERGED)
+        self.assertEqual(verdict, fp.FALSE)
+        self.assertEqual(calls, [('Larry-Yatch/RSDPM', 172)])
+
+    def test_coordinate_wins_over_task_id_and_task_probe_unused(self):
+        # A probe carrying both must ask the coordinate; consulting the token
+        # matcher instead is the silent no-op this support removes.
+        task_calls = []
+        verdict = fp.evaluate(
+            self._coord(task_id='unreg-approval-abc'),
+            pr_state_probe=lambda tid: task_calls.append(tid) or tts.OPEN,
+            pr_coordinate_probe=lambda r, n: tts.MERGED)
+        self.assertEqual(verdict, fp.FALSE)
+        self.assertEqual(task_calls, [])
+
+    def test_partial_coordinate_never_falls_back_to_task_id(self):
+        # Falling back would answer a DIFFERENT question than the author asked.
+        for partial in ({'repo': 'Larry-Yatch/RSDPM'}, {'pr_number': 172}):
+            with self.subTest(partial=partial):
+                task_calls = []
+                verdict = fp.evaluate(
+                    {'kind': 'pr_state', 'task_id': 'tid', **partial},
+                    pr_state_probe=lambda tid: task_calls.append(tid) or tts.OPEN,
+                    pr_coordinate_probe=lambda r, n: tts.OPEN)
+                self.assertEqual(verdict, fp.INDETERMINATE)
+                self.assertEqual(task_calls, [])
+
+    def test_malformed_coordinates_are_indeterminate(self):
+        for bad in ({'repo': 'noslash', 'pr_number': 1},
+                    {'repo': '', 'pr_number': 1},
+                    {'repo': 'a/b', 'pr_number': 0},
+                    {'repo': 'a/b', 'pr_number': -3},
+                    {'repo': 'a/b', 'pr_number': True},
+                    {'repo': 'a/b', 'pr_number': 'twelve'},
+                    {'repo': 'a/b', 'pr_number': None},
+                    {'repo': 'a/b', 'pr_number': 1.5}):
+            with self.subTest(bad=bad):
+                self.assertEqual(
+                    fp.evaluate({'kind': 'pr_state', **bad},
+                                pr_coordinate_probe=lambda r, n: tts.MERGED),
+                    fp.INDETERMINATE)
+
+    def test_task_id_path_is_untouched_when_no_coordinate_fields(self):
+        seen = []
+        verdict = fp.evaluate(
+            {'kind': 'pr_state', 'task_id': 'tid'},
+            pr_state_probe=lambda tid: seen.append(tid) or tts.MERGED)
+        self.assertEqual(verdict, fp.FALSE)
+        self.assertEqual(seen, ['tid'])
+
+    def test_bad_expect_still_indeterminate_with_coordinate(self):
+        self.assertEqual(
+            fp.evaluate(self._coord(expect='sideways'),
+                        pr_coordinate_probe=lambda r, n: tts.MERGED),
+            fp.INDETERMINATE)
+
+    def test_default_coordinate_executor_unwraps_state_only(self):
+        import unittest.mock as mock
+        with mock.patch.object(fp.tts, 'pr_coordinate_state',
+                               return_value=(tts.MERGED, 'deadbeef')) as m:
+            self.assertEqual(
+                fp._default_pr_coordinate_probe('Larry-Yatch/RSDPM', 172),
+                tts.MERGED)
+        m.assert_called_once_with('Larry-Yatch/RSDPM', 172)
+
+
 if __name__ == '__main__':
     unittest.main()

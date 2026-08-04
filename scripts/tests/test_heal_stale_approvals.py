@@ -1305,5 +1305,26 @@ class TestReconcileResolvedInSupabase(_TerminalBase):
         self.assertEqual(counts, {'pending': 0, 'resolved': 0, 'kept': 0})
 
 
+class ProbeEvidenceTest(unittest.TestCase):
+    """`premise_stale.evidence` is the only surface telling a human WHY a card was
+    demoted, so it must name the thing that was actually probed."""
+
+    def setUp(self):
+        import heal_stale_approvals as mod
+        self.mod = mod
+
+    def test_coordinate_pr_state_names_the_repo_and_number(self):
+        evidence = self.mod._probe_evidence(
+            {'kind': 'pr_state', 'repo': 'Larry-Yatch/RSDPM',
+             'pr_number': 172, 'expect': 'open'})
+        self.assertIn('Larry-Yatch/RSDPM#172', evidence)
+        self.assertNotIn('None', evidence)
+
+    def test_legacy_task_id_pr_state_still_names_the_task(self):
+        evidence = self.mod._probe_evidence(
+            {'kind': 'pr_state', 'task_id': 'some-task'})
+        self.assertIn("work for task 'some-task'", evidence)
+
+
 if __name__ == '__main__':
     unittest.main()
