@@ -236,13 +236,16 @@ _FIXTURE_TRANSLATIONS = {
     },
     # Date-rotating subjects: a stable prefix key matches weekly-<date> /
     # check-i-<date> via the trailing-ISO-date-strip step. ledger is
-    # single-purpose (only weekly-<date>); pulse keys 'check-i' NARROWLY so a
-    # novel dated pulse subject still falls through to Tier 4.
+    # single-purpose (only weekly-<date>).
     'ledger': {
         'weekly': {'severity': 'INFO', 'tier': 'FYI'},
     },
     'pulse': {
         'check-i': {'severity': 'INFO', 'tier': 'FYI'},
+        # Gate-0 escape hatch: a self-authored subject Larry wants surfaced at
+        # Check 0 anyway falls THROUGH the SELF_AUTHORED_SOURCES silence.
+        'must-surface': {'severity': 'WARNING', 'tier': 'SOON',
+                         'never_silence': True},
     },
 }
 
@@ -476,14 +479,48 @@ class TestClassify(unittest.TestCase):
         self.assertEqual(r['route'], 'digest')
         self.assertEqual(r['decision'], 'silence')
 
-    def test_novel_dated_pulse_subject_still_tier4(self):
-        # Regression guard against over-silencing: a novel dated pulse subject
-        # (NOT check-i) must still classify Tier 4 — the narrow key + date-strip
-        # must not swallow genuine one-off pulse escalations.
+    def test_self_authored_pulse_subject_silences_at_gate0(self):
+        # Gate 0: Pulse wrote this alert via larry_alerts.append_alert, so the
+        # row's own route already delivered it at write time. A novel pulse
+        # subject that used to fall through to Tier 4 (producing a SECOND,
+        # duplicate DM on Pulse's next cycle) now silences to digest.
         r = self._classify({'source': 'pulse',
                             'subject': 'unreviewed-merge-2026-06-15'})
+        self.assertEqual(r['tier'], 3)
+        self.assertEqual(r['route'], 'digest')
+        self.assertEqual(r['decision'], 'silence')
+        self.assertIsNone(r['template'])
+        self.assertIn('self-authored', r['rationale'])
+
+    def test_self_authored_pulse_triage_silences_without_translation(self):
+        # pulse-triage has no translation entries at all — Gate 0 keys on the
+        # SOURCE, not on a translation match, so it silences all the same.
+        r = self._classify({'source': 'pulse-triage', 'subject': 'anything'})
+        self.assertEqual(r['tier'], 3)
+        self.assertEqual(r['route'], 'digest')
+        self.assertIn('self-authored', r['rationale'])
+
+    def test_pulse_check_source_still_tier4(self):
+        # The must-not-regress case. pulse-check-failed alerts come from
+        # pulse_check_heartbeat.py under source='pulse-check' and are written
+        # route=digest, so Check 0's escalation is their ONLY path to Larry.
+        # 'pulse-check' is deliberately NOT in SELF_AUTHORED_SOURCES.
+        self.assertNotIn('pulse-check', ats.SELF_AUTHORED_SOURCES)
+        r = self._classify({'source': 'pulse-check',
+                            'subject': 'pulse-check-failed:iv'})
         self.assertEqual(r['tier'], 4)
         self.assertEqual(r['route'], 'escalate')
+        self.assertNotEqual(r['decision'], 'silence')
+
+    def test_never_silence_pulse_subject_falls_through_gate0(self):
+        # The escape hatch: an explicit never_silence translation entry on a
+        # self-authored subject still surfaces at Tier 4 rather than being
+        # muted by Gate 0.
+        r = self._classify({'source': 'pulse', 'subject': 'must-surface'})
+        self.assertEqual(r['tier'], 4)
+        self.assertEqual(r['route'], 'escalate')
+        self.assertNotEqual(r['decision'], 'silence')
+        self.assertIn('never-silence', r['rationale'])
 
     def test_tier2_probation_template_asks(self):
         r = self._classify({'source': 's', 'subject': 'sub',
