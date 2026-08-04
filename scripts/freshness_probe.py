@@ -24,7 +24,10 @@ An optional `freshness_probe` object on an approval's `dispatch_payload`: a
 deterministic, machine-checkable predicate whose FALSITY means the ask is moot.
 Supported kinds (this slice):
 
-  * `pr_state`      — reuse `task_terminal_state.task_terminal_state`; the premise
+  * `pr_state`      — name the work either by `task_id` (token-matched through
+                      `task_terminal_state.task_terminal_state`) or DIRECTLY by a
+                      `repo` + `pr_number` coordinate (resolved through
+                      `task_terminal_state.pr_coordinate_state`); the premise
                       HOLDS while the work is OPEN/UNKNOWN and is FALSE once it is
                       terminal in the kind's declared `expect` direction.
   * `file_contains` — `git show <ref>:<path>` in a repo; premise holds while a
@@ -109,6 +112,11 @@ SUPPORTED_KINDS = frozenset(
 _PR_EXPECT_OPEN = 'open'
 _PR_EXPECT_TERMINAL = 'terminal'
 
+# The two coordinate fields that let a pr_state probe name a PR DIRECTLY instead
+# of going through task_id's token match. Both must be present and valid, or
+# neither — see _parse_pr_coordinate.
+_PR_COORD_FIELDS = ('repo', 'pr_number')
+
 
 # -------------------- default executors (real I/O; fail toward INDETERMINATE) --------------------
 
@@ -133,6 +141,20 @@ def _default_git_show(
     if proc.returncode != 0:
         return None
     return proc.stdout
+
+
+def _default_pr_coordinate_probe(repo: str, number: int) -> str:
+    """Terminal state of ONE PR named by (`repo`, `number`), as a bare
+    task_terminal_state constant.
+
+    Delegates to `task_terminal_state.pr_coordinate_state`, which already asks
+    gh for exactly that PR and returns `(UNKNOWN, None)` on ANY failure — so the
+    conservative posture is inherited, not re-implemented. That function returns
+    a `(state, merge_sha)` tuple; only the state is a verdict input here, so the
+    merge sha is dropped to match the bare-string contract the task_id executor
+    already uses."""
+    state, _merge_sha = tts.pr_coordinate_state(repo, number)
+    return state
 
 
 def _default_read_json(path: str) -> Optional[Any]:
@@ -165,12 +187,73 @@ def _require_str(probe: dict[str, Any], key: str) -> Optional[str]:
 
 # -------------------- per-kind evaluators (each returns a tri-state) --------------------
 
-def _eval_pr_state(probe: dict[str, Any], pr_state_probe: Callable[[str], str]) -> str:
+# Sentinel distinguishing "no coordinate offered" (None -> use task_id) from
+# "a coordinate was offered but is malformed" (-> INDETERMINATE, never a silent
+# fallback to a different question).
+_COORD_INVALID: tuple[str, int] = ('', -1)
+
+
+def _parse_pr_coordinate(probe: dict[str, Any]) -> Optional[tuple[str, int]]:
+    """(repo, pr_number) when the probe carries a VALID direct PR coordinate,
+    else None.
+
+    None means "no coordinate offered" ONLY when BOTH fields are absent — that
+    is the case the caller routes to the historical `task_id` path. A PARTIAL or
+    malformed coordinate (one field present, a blank repo, a non-positive or
+    non-integer number) is a malformed probe, and the caller maps it to
+    INDETERMINATE rather than silently falling back to `task_id`: falling back
+    would answer a DIFFERENT question than the author asked, which is exactly the
+    silent-no-op failure this coordinate support exists to remove.
+
+    `pr_number` accepts an int or an all-digit string (JSON round-trips through
+    both). `bool` is explicitly refused even though it is an int subclass in
+    Python — `True` is not PR #1."""
+    has_any = any(f in probe for f in _PR_COORD_FIELDS)
+    if not has_any:
+        return None
+    repo = _require_str(probe, 'repo')
+    if not repo or '/' not in repo:
+        return _COORD_INVALID
+    raw = probe.get('pr_number')
+    if isinstance(raw, bool):
+        return _COORD_INVALID
+    if isinstance(raw, int):
+        number = raw
+    elif isinstance(raw, str) and raw.strip().isdigit():
+        number = int(raw.strip())
+    else:
+        return _COORD_INVALID
+    if number <= 0:
+        return _COORD_INVALID
+    return repo, number
+
+
+def _eval_pr_state(
+    probe: dict[str, Any],
+    pr_state_probe: Callable[[str], str],
+    pr_coordinate_probe: Optional[Callable[[str, int], str]] = None,
+) -> str:
     """`pr_state`: reuse task_terminal_state rather than re-implementing a gh probe.
 
-    Required: `task_id`. Optional: `expect` in {"open","terminal"} (default
-    "open"). `pr_state_probe(task_id)` returns one of task_terminal_state's
-    MERGED/CLOSED/OPEN/UNKNOWN constants.
+    TWO ways to name the work, checked in this order:
+
+    1. A DIRECT coordinate — `repo` (owner/repo) + `pr_number` — resolved via
+       `pr_coordinate_probe(repo, number)`. Use this when the premise is about a
+       specific PR in a specific repo.
+    2. `task_id` — the historical path, resolved via `pr_state_probe(task_id)`,
+       which matches the id as a boundary TOKEN against recent PR branches and
+       titles.
+
+    WHY (1) EXISTS: the token match in (2) can only find a PR whose branch or
+    title CONTAINS the id. A probe naming a PR by coordinate (`pr-<repo>-<num>`
+    or any id the PR's branch does not carry) matches nothing, returns UNKNOWN ->
+    INDETERMINATE -> keep, FOREVER — a probe that looks authored but can never
+    fire. Producers that know the exact PR must be able to say so directly.
+
+    Behaviour is UNCHANGED when neither coordinate field is present: `task_id`
+    remains required and is resolved exactly as before.
+
+    Optional in both modes: `expect` in {"open","terminal"} (default "open").
 
       expect=open     (premise: "work is still live")
         OPEN            -> TRUE  (still live, keep)
@@ -180,17 +263,30 @@ def _eval_pr_state(probe: dict[str, Any], pr_state_probe: Callable[[str], str]) 
         MERGED/CLOSED   -> FALSE
 
     UNKNOWN (any gh failure / no match) -> INDETERMINATE in BOTH directions: a
-    lookup failure never decides the premise. An unrecognized `expect` value is a
-    malformed field -> INDETERMINATE."""
-    task_id = _require_str(probe, 'task_id')
-    if not task_id:
-        return INDETERMINATE
+    lookup failure never decides the premise. An unrecognized `expect` value, a
+    malformed/partial coordinate, or a missing `task_id` with no coordinate are
+    all malformed fields -> INDETERMINATE."""
     expect = probe.get('expect', _PR_EXPECT_OPEN)
     if expect not in (_PR_EXPECT_OPEN, _PR_EXPECT_TERMINAL):
         return INDETERMINATE
+    coord = _parse_pr_coordinate(probe)
+    if coord == _COORD_INVALID:
+        return INDETERMINATE
     try:
-        state = pr_state_probe(task_id)
+        if coord is not None:
+            repo, number = coord
+            resolve = pr_coordinate_probe or _default_pr_coordinate_probe
+            state = resolve(repo, number)
+        else:
+            task_id = _require_str(probe, 'task_id')
+            if not task_id:
+                return INDETERMINATE
+            state = pr_state_probe(task_id)
     except Exception:  # noqa: BLE001 — a probe error is never a verdict
+        return INDETERMINATE
+    if not isinstance(state, str):
+        # An executor that returned a non-state (e.g. the raw (state, sha) tuple)
+        # is ambiguous, never a verdict.
         return INDETERMINATE
     if state == tts.UNKNOWN:
         return INDETERMINATE
@@ -318,6 +414,7 @@ def evaluate(
     probe: Any,
     *,
     pr_state_probe: Optional[Callable[[str], str]] = None,
+    pr_coordinate_probe: Optional[Callable[[str, int], str]] = None,
     git_show: Optional[Callable[..., Optional[str]]] = None,
     read_json: Optional[Callable[[str], Optional[Any]]] = None,
     sql_bool: Optional[Callable[..., Optional[bool]]] = None,
@@ -337,6 +434,9 @@ def evaluate(
     INDETERMINATE:
       pr_state_probe: task_id -> task_terminal_state constant (default
                       task_terminal_state.task_terminal_state).
+      pr_coordinate_probe: (repo, pr_number) -> task_terminal_state constant, for
+                      a pr_state probe naming a PR DIRECTLY (default
+                      task_terminal_state.pr_coordinate_state, state only).
       git_show:       (repo, ref, path) -> file text or None (default git show).
       read_json:      path -> parsed JSON or None (default file read).
       sql_bool:       (query, dsn=...) -> bool or None (default inert None; this
@@ -355,7 +455,7 @@ def evaluate(
 
     try:
         if kind == 'pr_state':
-            return _eval_pr_state(probe, pr_state_probe)
+            return _eval_pr_state(probe, pr_state_probe, pr_coordinate_probe)
         if kind == 'file_contains':
             return _eval_file_substring(probe, True, git_show)
         if kind == 'file_lacks':
