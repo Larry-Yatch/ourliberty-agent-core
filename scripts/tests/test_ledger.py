@@ -119,6 +119,43 @@ class WindowFilterTests(unittest.TestCase):
         self.assertEqual(ids, ["t-in-end", "t-in-start", "t-naive"])
         self.assertEqual(skipped, 0)
 
+    def test_present_but_empty_identity_fields_normalise_to_unknown(self):
+        """A PRESENT-but-empty field must normalise like an ABSENT one.
+
+        `obj.get(k, "unknown")` only substitutes when the key is missing, so a
+        row carrying `"task_id": ""` kept the empty string and carried it all
+        the way into Check I's proposal title — which is exactly how the
+        2026-08-03 65σ anomaly ($5.56 vs $0.18) became untraceable. This pins
+        both halves: absent AND empty must yield "unknown".
+        """
+        costs = self.root / "costs.jsonl"
+        _write_costs(costs, [
+            {  # every identity field PRESENT but empty
+                "ts": "2026-05-12T12:00:00+00:00", "agent": "",
+                "task_id": "", "model": "", "cost_usd": 5.56, "source": "",
+            },
+            {  # every identity field ABSENT — the case that already worked
+                "ts": "2026-05-12T13:00:00+00:00", "cost_usd": 0.18,
+            },
+            {  # a normal row must be untouched
+                "ts": "2026-05-12T14:00:00+00:00", "agent": "forge",
+                "task_id": "t-real", "model": "claude-opus-4-7",
+                "cost_usd": 0.20, "source": "inbox-watcher",
+            },
+        ])
+        rows, _ = lw.load_cost_rows(
+            costs, WEEK_ENDING - lw.timedelta(days=7), WEEK_ENDING,
+        )
+        self.assertEqual(len(rows), 3)
+        empty_row, absent_row, real_row = rows
+        for label, r in (("empty", empty_row), ("absent", absent_row)):
+            for field in ("agent", "task_id", "model", "source"):
+                self.assertEqual(
+                    getattr(r, field), "unknown",
+                    f'{label} {field} did not normalise to "unknown"')
+        self.assertEqual(real_row.task_id, "t-real")
+        self.assertEqual(real_row.agent, "forge")
+
     def test_skips_malformed_lines(self):
         costs = self.root / "costs.jsonl"
         costs.parent.mkdir(parents=True, exist_ok=True)

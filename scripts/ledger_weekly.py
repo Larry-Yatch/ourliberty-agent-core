@@ -126,15 +126,22 @@ def load_cost_rows(
             if cost_usd is None:
                 skipped += 1
                 continue
+            # `or "unknown"`, NOT `.get(k, "unknown")` — the two-arg default only
+            # fires when the key is ABSENT, and these arrive PRESENT-but-empty
+            # (`"task_id": ""`). The empty string then flows all the way into
+            # Check I's proposal title as an empty identifier, which is what made
+            # the 2026-08-03 65σ anomaly untraceable: the row knew its agent and
+            # its cost, but named no task. Absent and empty must normalise the
+            # same way here.
             rows.append(
                 CostRow(
                     ts=ts,
-                    agent=obj.get("agent", "unknown"),
-                    task_id=obj.get("task_id", "unknown"),
-                    model=obj.get("model", "unknown"),
+                    agent=obj.get("agent") or "unknown",
+                    task_id=obj.get("task_id") or "unknown",
+                    model=obj.get("model") or "unknown",
                     cost_usd=float(cost_usd),
                     duration_sec=obj.get("duration_sec"),
-                    source=obj.get("source", "unknown"),
+                    source=obj.get("source") or "unknown",
                 )
             )
     return rows, skipped

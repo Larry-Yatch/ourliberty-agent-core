@@ -1203,6 +1203,14 @@ def append_approval_request(
         'source': source,
         'kind': 'approval_request',
         'approval_id': approval_id,
+        # Stamp `subject` too. Every consumer that GROUPS alerts (Check XIV's
+        # recurring-novel table, the retrospective author) keys on source+subject
+        # and this shape carried none, so approval requests aggregated as
+        # `<source> / "" xN` — the 2026-08-03 digest listed Check V's three real
+        # graduation proposals as `pulse-check-v / "" x3`, unidentifiable. The
+        # approval_id IS the identifier; it was just never surfaced under the
+        # name the groupers read.
+        'subject': approval_id,
         'chat_id': chat_id,
         'body': body,
     }

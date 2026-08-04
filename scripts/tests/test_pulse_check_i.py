@@ -102,6 +102,39 @@ class ProposalSynthesisTests(unittest.TestCase):
         self.assertIn("burned-task-001", proposals[0]["title"])
         self.assertEqual(proposals[0]["effort"], "small")
 
+    def test_unidentified_anomaly_titles_by_what_it_knows(self):
+        """An anomaly with no task_id must not render an empty identifier.
+
+        This is the literal 2026-08-03 record: the ledger emitted
+        `"task_id": ""`, so the proposal Larry was asked to act on read
+        ``Review high-σ anomaly task `` `` — no way to find the task. The row
+        knew its agent and cost the whole time. ledger_weekly now normalises
+        empty→"unknown" upstream, and this pins the renderer against BOTH
+        shapes so a future producer can't reintroduce a blank title.
+        """
+        for label, tid in (('empty', ''), ('normalised', 'unknown'),
+                           ('missing', None)):
+            anomaly = {
+                "agent": "beacon-telegram-bot",
+                "task_type": "unclassified",
+                "cost_usd": 5.56,
+                "baseline_usd": 0.18,
+                "sigma_above": 65.4,
+                "context": "...",
+            }
+            if tid is not None:
+                anomaly["task_id"] = tid
+            proposals = pci.synthesize_proposals(
+                _sidecar(anomalies=[anomaly]), repeats=[])
+            self.assertEqual(len(proposals), 1, label)
+            title = proposals[0]["title"]
+            self.assertNotIn('``', title, f'{label}: empty identifier rendered')
+            self.assertNotIn('`unknown`', title,
+                             f'{label}: rendered the placeholder as an id')
+            # It must name what it DOES know, so the row is findable.
+            self.assertIn('beacon-telegram-bot', title, label)
+            self.assertIn('unclassified', title, label)
+
     def test_low_sigma_anomaly_no_proposal(self):
         s = _sidecar(anomalies=[{
             "task_id": "mild-anomaly",
