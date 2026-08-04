@@ -12,9 +12,15 @@
 
 ---
 
-## G-rule heal-approvals-surface-drift-missing-card-cooldown-collision-001 — DISPATCHED (iter ~7530 first, iter ~7540 second, iter ~7585 third — 3/3)
+## G-rule heal-approvals-surface-drift-missing-card-cooldown-collision-001 — DISPATCHED (iter ~7585) → FALSE PREMISE (Beacon iter ~7586, 2026-08-04T03:12Z UTC)
 
-**Rule:** heal-approvals-surface-drift fires `missing_card` alerts when an approval card exists in the unregistered-approval state but doesn't appear on the Approvals tab decide tab for ≥3 consecutive checks. Pattern: approval card is created before the cooldown on the originating alert engages; after cooldown fires, promote predicate fails (originating alert is suppressed), so drift healer fires `missing_card` 3+ times. Three instances: unreg-approval-732b8a6c7762 (PR#1092, iter ~7530); same pattern iter ~7540; unreg-approval-01235467ce2b (PR#1096, iter ~7585, line 695). **DISPATCHED 3/3:** direction-ask `direction-ask-fix-approvals-drift-missing-card-cooldown-collision-001` written to Beacon inbox at 2026-08-04T03:06Z UTC. Fix: `scripts/heal_unregistered_approval.py` should retire (not promote) approval cards whose originating `pipeline-stall:*` alert is cooldown-suppressed by `heal_pipeline_stall.py`. Also add Tier-3 translation entry for `source=heal-approvals-surface-drift, subject^=heal-approvals-surface-drift:missing_card:` in alert-translations.json.
+**Rule (retracted):** Original dispatch assumed the root cause was cooldown-collision: approval cards created before cooldown engages → promote predicate fails → `missing_card` flood. **BEACON FOUND FALSE PREMISE (iter ~7586):** The REAL bug is the Approvals tab has a binary-only contract — `needs_larry` alerts whose `suggested_action` is a runbook string (not an A/B choice) hit `SKIP_NEEDS_TRIAGE` and are permanently barred from the Approvals tab. New plan `approvals-tab-nonbinary-contract-001` queued in pending approvals (created 2026-08-04T03:12:46Z UTC). APPROVE = narrow sentinel to binary-only contract (cheap; non-binary items stay off tab, live only in Telegram stream). REJECT = widen tab to carry non-binary items as acknowledge-only cards. **Do NOT dispatch the original cooldown-collision fix** — it addresses the wrong root cause. Wait for Larry to APPROVE/REJECT `approvals-tab-nonbinary-contract-001`.
+
+---
+
+## G-rule heal-pipeline-stall-no-mirror-dispatch-tier4-no-translation-001 — 1/3 (new, iter ~7586)
+
+**Rule:** `source=heal-pipeline-stall, subject=pipeline-stall:no-mirror-dispatch:PR#N` returns Tier-4 from the triage helper (no translation match in alert-translations.json). Alert 696 (iter ~7586, 03:03:43Z UTC): PR#1098 deep-review-hold triggered stall healer's no-mirror-dispatch check → Tier-4. Medic diagnosis (alert 699) says FP: Mirror review WAS dispatched at 01:51:58Z UTC, then suppressed (MIRROR_REVIEW_SUPPRESSED_DEEP_REVIEW_HELD). No DM (medic already DM'd idx=698). Contrast: `pipeline-stall:unrouted-pr:PR#N` alerts have a Tier-3 translation entry (alert 697 resolved Tier-3). Fix: add prefix match for `source=heal-pipeline-stall, subject^=pipeline-stall:no-mirror-dispatch:` as Tier-3 in alert-translations.json. Dispatch to Beacon at 3/3.
 
 ---
 
