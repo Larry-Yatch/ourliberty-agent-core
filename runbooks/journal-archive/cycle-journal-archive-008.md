@@ -29105,3 +29105,94 @@ ourliberty-dashboard: 0 open PRs. RSDPM: **6 open PRs** (unchanged count):
 
 ---
 
+## Iteration ~8010 — 2026-08-05T14:59Z UTC (Larry /cycle chat, Tier 1 [Check 0: 0 new alerts (watermark 621=621); Check 1: NOMINAL ✅; Check 3: CLEAN ✅ (77th consecutive); Check 4: pending=3 (~328th consecutive NOT-CLEAN); Check 5: NOMINAL ✅; NOT-CLEAN consecutive_clean=0])
+
+**Health:** ⚠️ NOT-CLEAN — Check 4: pending=3 (~328th consecutive). Check E: PR#1081 mss=MERGEABLE scr=[FAILURE:mirror-review] (~110.6h; FAILURE persistent; Larry decision still pending); PR#180 RSDPM mss=MERGEABLE scr=[SUCCESS×6] (~12.1h; all checks passing; ready to ship). Check H: Forge build pulse-auto-4c6c74f626-20260805 in build phase (~33min in from 14:26Z UTC; preflight COMPLETED PROCEED; no PR yet). All other checks NOMINAL or CLEAN.
+
+**VERIFY-BEFORE-REASSERT (from iter ~8009 at ~14:52Z UTC 2026-08-05):**
+- **"watermark at 621, 0 new alerts"**: CONFIRMED → watermark=621, file_length=621, 0 new alerts. [confirmed ✅]
+- **"pending=3 (~327th consecutive NOT-CLEAN)"**: STATE-CHANGE → pending=3 (~328th consecutive; same 3 items). [state-change ✅]
+- **"system-health overall=healthy, all 4 bots alive"**: CONFIRMED → ts=2026-08-05T14:50:36Z UTC (~9min before check); overall=healthy. [confirmed ✅]
+- **"PR#1081 mss=MERGEABLE scr=[FAILURE:mirror-review] (~110.4h)"**: CONFIRMED → mss=MERGEABLE, scr=[FAILURE:mirror-review 2026-08-01T01:18Z], age=~110.6h. [confirmed ✅]
+- **"Check 3: CLEAN ✅ (76th consecutive)"**: STATE-CHANGE → CLEAN ✅ (77th consecutive). [state-change ✅]
+- **"HEAD=24359e0b (Pulse cycle 20260805T144721Z)"**: STATE-CHANGE → HEAD=8fea762b (Pulse cycle 20260805T145337Z)=origin/main. [state-change ✅]
+- **"PR#1096: ~37.6h (mss=MERGEABLE, scr=[])"**: STATE-CHANGE → ~37.8h; mss=MERGEABLE, scr=[]. [state-change ✅]
+- **"RSDPM PR#180 mss=MERGEABLE scr=[SUCCESS+?mix] (~11.7h)"**: STATE-CHANGE → scr=[SUCCESS×6] (~12.1h); all checks passing; ready to ship. [state-change ✅]
+- **"Forge build pulse-auto-4c6c74f626-20260805 in progress (~23min in from 14:26Z UTC; no PR yet)"**: STATE-CHANGE → preflight COMPLETED PROCEED at 14:26:11Z UTC ($1.14 cost); build phase dispatched 14:26:13Z UTC; ~33min into build phase; build-pulse-auto inbox file present; no PR yet. [state-change ✅]
+
+**Check 0 — Alert triage (~14:54Z UTC):** repair-watermark: repaired=false (no compaction gap). watermark=621, file_length=621. **0 new alerts.** Watermark at 621.
+**NOMINAL ✅**
+
+**Check 1 — Log noise (~14:54Z UTC):** outbox-notifier.log: 0 WARN/ERROR in last 30min window. Last entry 14:26Z UTC (INFO build-phase dispatched). journalctl ourliberty-*.service: 0 WARN/ERROR in last 30min. **NOMINAL ✅**
+
+**Check 2 — Telegram sweep (~14:54Z UTC):** beacon_telegram_bot.log: last delivery idx=620 (intent=review-pass) at 2026-08-05T08:25:56-0600=14:25:56Z UTC (~33min before check). No Larry directive messages in recent entries. **NOMINAL ✅**
+
+**Check 3 — Pipeline stall (~14:54Z UTC):** heal_pipeline_stall.py --dry-run → "DRY-RUN: 0 alert(s) would fire, 0 recovery(ies) would be attempted; no writes performed."
+- FORGE_NO_PR_SKIP ×1: pulse-check0-self-authored-exclusion-001→#1099 (stable, expected).
+- suppressed (cooldown): unrouted_open_pr_stranded:agent-core:1096; unrouted_open_pr:RSDPM:183; unrouted_open_pr:RSDPM:182; unrouted_open_pr:RSDPM:181; unrouted_open_pr_stranded:RSDPM:176; unrouted_open_pr_stranded:RSDPM:172.
+**CLEAN ✅ (77th consecutive)**
+
+**Check 4 — Pending directives (~14:54Z UTC):** `~/agents/state/beacon-pending-approvals.json`: **pending=3** ⚠️ (**~328th consecutive NOT-CLEAN**):
+- `pulse-self-report-tier3-narrow-001` (created 2026-08-04T00:35:25Z UTC, ~38.4h ago): APPROVE = ship narrow `pulse/tier4-novel` → Tier-3 entry. REJECT = code-exclusion (PR#1099 already covers). **Larry: Approvals tab.**
+- `approvals-tab-nonbinary-contract-001` (created 2026-08-04T03:12:46Z UTC, ~35.8h ago): APPROVE = narrow sentinel to binary-only contract. REJECT = widen tab. **Larry: Approvals tab.**
+- `pulse-check-xiv-alert-translations-001` (created 2026-08-05T00:05:27Z UTC, ~14.9h ago): Add Tier-3 translations for source=pulse-check-xiv alerts. **Larry: Approvals tab.**
+**NOT-CLEAN ⚠️**
+
+**Check 5 — Stale daemon code (~14:54Z UTC):** heal-stale-daemon-code.heartbeat: 2026-08-05T14:46:30Z UTC (~8min before check — fresh). **NOMINAL ✅**
+
+**Check A — Source repo (~14:54Z UTC):** branch=main, tree CLEAN ✅, HEAD=8fea762b=origin/main (Pulse cycle 20260805T145337Z). Up to date with origin. **NOMINAL ✅**
+**Check B — Sync health (~14:54Z UTC):** agent-core-sync.json: last_sync=2026-08-05T14:25:36Z UTC (~33min; status=no-change; consecutive_push_failures=0). Within 2h threshold. **NOMINAL ✅**
+**Check C — Agent liveness (~14:54Z UTC):** system-health.json ts=2026-08-05T14:50:36Z UTC (~4min); overall=healthy. All 4 bots alive (beacon/forge/mirror/pulse action=noop). **NOMINAL ✅**
+**Check E — PR/merge state (~14:54Z UTC):** ourliberty-agent-core: **2 open PRs** (unchanged count):
+- **#1096** `fix(alerts): retract this healer's own unrouted-PR nudges once the PR lands` — rd='', mss=MERGEABLE, scr=[], age=~37.8h. fix/* unrouted; cooldown active. [⚠️ BREACHED — fix/* by-design]
+- **#1081** `fix(suite-guardian): wire L10 regression detection + downgrade` — rd='', mss=MERGEABLE, scr=[FAILURE:mirror-review:2026-08-01], age=~110.6h. FAILURE persistent; Larry decision still pending. [⚠️ BREACHED — Larry decision pending]
+ourliberty-dashboard: 0 open PRs. RSDPM: **6 open PRs** (unchanged count):
+- **#183** test(queue) — mss=MERGEABLE scr=[SUCCESS×5], rd='', age=~10.1h. cooldown active. [⚠️ BREACHED — by-design]
+- **#182** [M1-amendment] — mss=MERGEABLE scr=[SUCCESS×5], rd='', age=~11.2h. cooldown active. [⚠️ BREACHED — by-design]
+- **#181** [M5-amendment] — mss=MERGEABLE scr=[SUCCESS×5], rd='', age=~11.9h. cooldown active. [⚠️ BREACHED — by-design]
+- **#180** `feat(nav): four destinations in the bar, and none of them on the sign-in page` — mss=MERGEABLE scr=[SUCCESS×6], rd='', age=~12.1h. **Ready to ship.** Larry: merge or add auto-review label. [⚠️ BREACHED — READY ✅]
+- PR#176 feat(M12) (~37.0h): mss=MERGEABLE scr=[SUCCESS×5]; cooldown active. PR#172 ci(coverage) (~61.3h): mss=MERGEABLE scr=[SUCCESS×5]; cooldown active.
+**NOT-CLEAN ⚠️** (PR#1081 Larry-pending ~110.6h FAILURE persistent; PR#180 RSDPM ready-to-ship awaiting Larry)
+**Check H — All inboxes (~14:54Z UTC):** forge=1 active (build-pulse-auto-4c6c74f626-20260805.json, mtime 14:26Z UTC, ~33min old; build phase in progress). beacon=0, mirror=0, pulse=0. **NOMINAL ✅** (build in progress; within 1h threshold; healer clean)
+
+**§5.0 one-shots (~14:54Z UTC):** audit_due_nudge → no committed audit baseline; no-op. distill_detector → no un-distilled audits; no-op. audit_cadence_signal → no post-seed distill artifacts yet; no-op. **NOMINAL ✅**
+**§5 periodic — Check I (~14:54Z UTC):** artifact check-i-2026-08-05.json already folded (iter ~8005). Build phase for pulse-auto-4c6c74f626-20260805 in progress; no new artifact. SURFACES ✅ (monitoring)
+**§5 periodic — Check XIV (~14:54Z UTC):** No new artifact (Wednesday; last=check-xiv-2026-08-04.json Tue Aug 4). QUIET ✅
+**§5 periodic — Check III (~14:54Z UTC):** 14d gate until 2026-08-09 (4d away). QUIET ✅
+**§5 periodic — Check VIII (~14:54Z UTC):** already_deprecated. QUIET ✅
+
+**Rotations (~14:54Z UTC):** SUPABASE_SERVICE_ROLE_KEY: due=2026-08-22 (~17d); last_dm=2026-08-03T22:52:32Z UTC; 14d dedup window active (~43.0h elapsed). No new DM. ✅ All other credentials 2027+ (>60d). ✅
+
+**G-rule tracking:**
+- `pulse-triage-self-report-should-be-tier3-001` **RESOLVED ✅**: 0 new alerts (watermark=621=file_length). [carry ✅]
+- `pulse-check-xiv-tier4-no-translation-001` **DISPATCHED ✅ / approval pending**: pulse-check-xiv-alert-translations-001 in pending (~14.9h). [carry]
+- `heal-pipeline-stall-unrouted-pr-stranded-tier4-no-translation-001` [2/3]: no new occurrence. [carry ✅]
+- `enable-pr-auto-merge-reviewdecision-guard-001` [1/3]: no new occurrence. [carry ✅]
+- `outbox-notifier-approval-request-tier4-no-translation-001` [1/3]: no new occurrence. [carry ✅]
+- `heal-pipeline-stall-no-mirror-dispatch-tier4-no-translation-001` [1/3]: no new occurrence. [carry ✅]
+- `medic-diagnosis-subject-specific-tier4-no-translation-001` [1/3]: no new occurrence. [carry ✅]
+
+**Actions taken:**
+- Check 0: 0 new alerts; watermark at 621.
+- PRIME DIRECTIVE: `intervention` appended at 14:58:42Z UTC (kind=intervention; template=check4-pending-approvals; detail=pending=3 ~328th consecutive NOT-CLEAN; Forge build pulse-auto ~33min in build phase, preflight=PROCEED).
+- Tier state: `cycle_tier_state.py record --checks-clean false` → **tier=1, consecutive_clean=0** (last_signal_at=2026-08-05T14:58:44Z UTC).
+
+**Escalations:**
+- **Check 4 pending=3**: ~328th consecutive. All 3 items await Larry's Approvals tab. [no new DM]
+- **PR#1096**: ~37.8h; fix/* by-design; cooldown active. [no DM]
+- **PR#1081**: ~110.6h; scr=[FAILURE:mirror-review] persistent; mss=MERGEABLE. Larry: decision still pending (merge/close/await-fix). [no new DM]
+- **RSDPM PR#180**: mss=MERGEABLE scr=[SUCCESS×6] (~12.1h); all checks passing; ready to ship. Larry: merge or add auto-review label. [no DM — noted]
+
+**PRIME DIRECTIVE (post-action):** ratio≈43.3 (systemic_fixes=47; interventions growing; trailing 30d; trend=worsening).
+
+**Patterns:**
+- **[positive ✅ 77th consecutive] Check 3 CLEAN**: Pipeline stall scope stable.
+- **[PROCEED ✅] Forge build pulse-auto-4c6c74f626-20260805**: Preflight passed. Build phase ~33min in. PR `fix(ledger): per-task within-cohort sigma baselines + stable Check I dedup identity` expected soon.
+- **[READY ✅] RSDPM PR#180**: scr=[SUCCESS×6] — all checks passing. Larry: merge or add auto-review label.
+- **[~328th consecutive ⚠️] Check 4 pending=3**: Primary unblock remains Larry's Approvals tab.
+- **[>110h ⚠️, FAILURE persistent] PR#1081**: scr=[FAILURE:mirror-review] stable (not oscillating this iter); Larry decision still pending.
+
+**Tier end-of-iter:** **Tier 1** (consecutive_clean=0; 5-min cadence active). Remaining blockers: Check 4 pending=3 (Larry's Approvals tab), PR#1081 decision pending, PR#180 RSDPM ready-to-ship awaiting Larry.
+
+---
+
