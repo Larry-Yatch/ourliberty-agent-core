@@ -44,6 +44,9 @@ SIGMA_THRESHOLD = 2.0
 DRIFT_PERCENT_THRESHOLD = 20.0
 BASELINE_WEEKS = 4
 RAMP_UP_WEEKS = 4  # σ-flagging suspended until ≥ this many prior sidecars exist
+# A cohort needs this many baseline rows before its spread is worth dividing by;
+# below it the cohort is skipped exactly as a stdev≤0 cohort already is.
+MIN_BASELINE_ROWS = 20
 
 HOME = Path(os.environ.get("HOME", "/home/larry"))
 _AGENTS = Path(os.environ.get("OURLIBERTY_AGENTS_ROOT") or HOME / "agents")
@@ -231,34 +234,44 @@ def _load_prior_sidecars(
 
 
 def compute_baselines(
-    prior_sidecars: list[dict[str, Any]],
-) -> dict[str, tuple[float, float]]:
-    """Build per-task_type baselines (mean, stdev) of per-task cost.
+    baseline_rows: list[CostRow],
+) -> dict[tuple[str, str], tuple[float, float, int]]:
+    """Build per-(agent, task_type) baselines (mean, stdev, n) of per-task cost.
 
-    Uses the by_task_type summaries from prior sidecars: mean cost per task
-    in each bucket. stdev is computed across weeks if ≥2 weeks of data exist
-    for that task_type; else stdev=0.0 which disables σ-flagging for it.
+    Derived from INDIVIDUAL cost rows over the baseline window, so the stdev
+    measures the spread the anomaly check actually divides by: how much one
+    task's cost varies within its cohort.
+
+    Two corrections over the v1 shape (2026-08-05), each worth ~an order of
+    magnitude of false σ:
+
+    1. Scale. v1 read prior sidecars' `by_task_type` aggregates — one datapoint
+       per week, each a weekly MEAN — then divided an individual row's deviation
+       by that. The stdev of a mean is ~sqrt(n) smaller than the per-task
+       spread, so every σ came out inflated (the row that dispatched this fix
+       read 65.4σ; its true within-cohort z is 2.5).
+    2. Cohort. v1 keyed on task_type alone, pooling every agent together. The
+       `unclassified` bucket spans a 39x cost range — missions-narrator at
+       $0.064/row sets the mean, so beacon-telegram-bot at $2.46/row flags
+       essentially always.
+
+    A cohort below MIN_BASELINE_ROWS is omitted, which disables σ-flagging for
+    it (compute_anomalies skips rows whose cohort has no baseline).
     """
-    per_type_means: dict[str, list[float]] = {}
-    for sidecar in prior_sidecars:
-        bt = sidecar.get("by_task_type", {})
-        for task_type, bucket in bt.items():
-            count = bucket.get("task_count", 0)
-            usd = bucket.get("usd", 0.0)
-            if count > 0:
-                per_type_means.setdefault(task_type, []).append(usd / count)
-    out: dict[str, tuple[float, float]] = {}
-    for task_type, means in per_type_means.items():
-        if len(means) < 2:
-            out[task_type] = (statistics.fmean(means), 0.0)
-        else:
-            out[task_type] = (statistics.fmean(means), statistics.stdev(means))
+    per_cohort: dict[tuple[str, str], list[float]] = {}
+    for row in baseline_rows:
+        per_cohort.setdefault((row.agent, row.task_type), []).append(row.cost_usd)
+    out: dict[tuple[str, str], tuple[float, float, int]] = {}
+    for cohort, costs in per_cohort.items():
+        if len(costs) < MIN_BASELINE_ROWS:
+            continue
+        out[cohort] = (statistics.fmean(costs), statistics.stdev(costs), len(costs))
     return out
 
 
 def compute_anomalies(
     rows: list[CostRow],
-    baselines: dict[str, tuple[float, float]],
+    baselines: dict[tuple[str, str], tuple[float, float, int]],
     sigma_flagging_active: bool,
     ramp_up_weeks_observed: int,
 ) -> list[dict[str, Any]]:
@@ -285,10 +298,10 @@ def compute_anomalies(
         ]
     out: list[dict[str, Any]] = []
     for row in rows:
-        baseline = baselines.get(row.task_type)
+        baseline = baselines.get((row.agent, row.task_type))
         if baseline is None:
             continue
-        mean, stdev = baseline
+        mean, stdev, baseline_n = baseline
         if stdev <= 0.0:
             continue
         sigma_above = (row.cost_usd - mean) / stdev
@@ -300,10 +313,12 @@ def compute_anomalies(
                     "task_type": row.task_type,
                     "cost_usd": row.cost_usd,
                     "baseline_usd": mean,
+                    "baseline_n": baseline_n,
                     "sigma_above": sigma_above,
                     "context": (
                         f"task cost ${row.cost_usd:.2f} vs ${mean:.2f} "
-                        f"baseline (n={BASELINE_WEEKS}wk)"
+                        f"baseline for {row.agent}/{row.task_type} "
+                        f"(n={baseline_n} tasks over {BASELINE_WEEKS}wk)"
                     ),
                 }
             )
@@ -451,8 +466,18 @@ def compute_weekly_report(
     by_task_type = compute_by_task_type(rows)
 
     prior_sidecars = _load_prior_sidecars(output_dir, week_ending, BASELINE_WEEKS)
+    # The ramp-up gate still keys off prior sidecars — "has this system been
+    # reporting long enough to trust a baseline" is a different question from
+    # "what is the baseline", and only the latter changed.
     sigma_active = len(prior_sidecars) >= RAMP_UP_WEEKS
-    baselines = compute_baselines(prior_sidecars) if sigma_active else {}
+    baselines: dict[tuple[str, str], tuple[float, float, int]] = {}
+    if sigma_active:
+        baseline_start = window_start - timedelta(days=7 * BASELINE_WEEKS)
+        baseline_rows, _ = load_cost_rows(costs_file, baseline_start, window_start)
+        # Baseline rows need the same attribution as window rows or the cohort
+        # keys won't match and every cohort falls below MIN_BASELINE_ROWS.
+        attribute_task_types(baseline_rows, outbox_root)
+        baselines = compute_baselines(baseline_rows)
 
     anomalies = compute_anomalies(rows, baselines, sigma_active, len(prior_sidecars))
     retry_overhead = compute_retry_overhead(rows, total_usd)

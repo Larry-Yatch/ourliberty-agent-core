@@ -75,6 +75,32 @@ def _write_prior_sidecar(
         json.dump(sidecar, f)
 
 
+def _baseline_rows(
+    outbox_root: Path,
+    agent: str,
+    task_type: str,
+    costs: list[float],
+    prefix: str = "base",
+    ts: str = "2026-04-20T10:00:00+00:00",
+) -> list[dict]:
+    """Build pre-window cost rows (+ their archives) for one cohort.
+
+    σ baselines read individual rows from the 4 weeks before window_start —
+    for WEEK_ENDING that is [2026-04-13, 2026-05-11) — so a fixture that only
+    writes in-window rows has no baseline and flags nothing.
+    """
+    rows = []
+    for i, cost in enumerate(costs):
+        task_id = f"{prefix}-{agent}-{i}"
+        _write_archive(outbox_root, agent, task_id, task_type)
+        rows.append({
+            "ts": ts, "agent": agent, "task_id": task_id,
+            "model": "claude-opus-4-7", "cost_usd": cost,
+            "source": "inbox-watcher",
+        })
+    return rows
+
+
 class WindowFilterTests(unittest.TestCase):
     """Window is [week_ending - 7 days, week_ending). Inclusive start, exclusive end."""
 
@@ -387,16 +413,22 @@ class SigmaFlaggingTests(unittest.TestCase):
         self.costs = self.root / "costs.jsonl"
         self.outbox = self.root / "outboxes"
         self.output_dir = self.root / "ledger"
-        # 4 prior weeks of stable feature-development at ~$1/task
+        # 4 prior sidecars — the ramp-up gate still keys off these.
         for i, mean_cost in enumerate([1.0, 1.1, 0.95, 1.05], start=1):
             d = (WEEK_ENDING - lw.timedelta(days=7 * i)).date().isoformat()
             _write_prior_sidecar(
                 self.output_dir, d, mean_cost * 2,
                 by_task_type={"feature-development": {"usd": mean_cost * 2, "task_count": 2}},
             )
+        # …but the baseline itself comes from individual pre-window rows:
+        # forge/feature-development at ~$1/task, n well above MIN_BASELINE_ROWS.
+        self.baseline = _baseline_rows(
+            self.outbox, "forge", "feature-development",
+            [1.0, 1.1, 0.95, 1.05] * 6,
+        )
 
     def test_expensive_task_flags(self):
-        _write_costs(self.costs, [{
+        _write_costs(self.costs, self.baseline + [{
             "ts": "2026-05-12T10:00:00+00:00", "agent": "forge",
             "task_id": "t-spike", "model": "claude-opus-4-7",
             "cost_usd": 10.0,  # ~10x baseline
@@ -415,7 +447,7 @@ class SigmaFlaggingTests(unittest.TestCase):
         self.assertIn("baseline", a["context"])
 
     def test_normal_task_does_not_flag(self):
-        _write_costs(self.costs, [{
+        _write_costs(self.costs, self.baseline + [{
             "ts": "2026-05-12T10:00:00+00:00", "agent": "forge",
             "task_id": "t-normal", "model": "claude-opus-4-7",
             "cost_usd": 1.02,
@@ -427,6 +459,131 @@ class SigmaFlaggingTests(unittest.TestCase):
         )
         real_anoms = [a for a in sidecar["anomalies"] if a["task_id"] != "_ramp_up_notice"]
         self.assertEqual(real_anoms, [])
+
+    def test_baseline_comes_from_rows_not_sidecar_aggregates(self):
+        """The prior sidecars' by_task_type numbers no longer drive σ.
+
+        v1 divided by the stdev of weekly MEANS — a denominator ~sqrt(n)
+        too small. Here the sidecars claim a $50/task mean while the actual
+        rows sit at ~$1; the row-derived baseline is what must win.
+        """
+        for i in range(1, 5):
+            d = (WEEK_ENDING - lw.timedelta(days=7 * i)).date().isoformat()
+            _write_prior_sidecar(
+                self.output_dir, d, 100.0,
+                by_task_type={"feature-development": {"usd": 100.0, "task_count": 2}},
+            )
+        _write_costs(self.costs, self.baseline + [{
+            "ts": "2026-05-12T10:00:00+00:00", "agent": "forge",
+            "task_id": "t-spike", "model": "claude-opus-4-7",
+            "cost_usd": 10.0, "source": "inbox-watcher",
+        }])
+        _write_archive(self.outbox, "forge", "t-spike", "feature-development")
+        _, sidecar, _ = lw.compute_weekly_report(
+            WEEK_ENDING, self.costs, self.outbox, self.output_dir,
+        )
+        real_anoms = [a for a in sidecar["anomalies"] if a["task_id"] != "_ramp_up_notice"]
+        self.assertEqual(len(real_anoms), 1)
+        # ~$1.02 from the rows, not $50 from the sidecars.
+        self.assertLess(real_anoms[0]["baseline_usd"], 2.0)
+        self.assertEqual(real_anoms[0]["baseline_n"], len(self.baseline))
+
+
+class CohortSplitTests(unittest.TestCase):
+    """Cohorts key on (agent, task_type), not task_type alone.
+
+    The live bug: `unclassified` pooled 6 agents spanning 39x per-row cost, so
+    the cheap high-volume agent set the mean and every row from an expensive
+    agent flagged. Splitting by agent is what makes an ordinary expensive row
+    ordinary again.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.costs = self.root / "costs.jsonl"
+        self.outbox = self.root / "outboxes"
+        self.output_dir = self.root / "ledger"
+        for i in range(1, 5):
+            d = (WEEK_ENDING - lw.timedelta(days=7 * i)).date().isoformat()
+            _write_prior_sidecar(self.output_dir, d, 10.0)
+        # Same task_type, 25x apart: a cheap chatty agent and an expensive one.
+        self.baseline = (
+            _baseline_rows(self.outbox, "narrator", "unclassified",
+                           [0.08, 0.10, 0.09, 0.11] * 15, prefix="cheap")
+            + _baseline_rows(self.outbox, "bot", "unclassified",
+                             [2.0, 2.4, 1.9, 2.2] * 6, prefix="pricey")
+        )
+
+    def test_expensive_agent_normal_row_does_not_flag(self):
+        _write_costs(self.costs, self.baseline + [{
+            "ts": "2026-05-12T10:00:00+00:00", "agent": "bot",
+            "task_id": "t-bot", "model": "claude-opus-4-7",
+            "cost_usd": 2.3, "source": "inbox-watcher",
+        }])
+        _write_archive(self.outbox, "bot", "t-bot", "unclassified")
+        _, sidecar, _ = lw.compute_weekly_report(
+            WEEK_ENDING, self.costs, self.outbox, self.output_dir,
+        )
+        real_anoms = [a for a in sidecar["anomalies"] if a["task_id"] != "_ramp_up_notice"]
+        self.assertEqual(real_anoms, [])
+
+    def test_each_agent_gets_its_own_baseline(self):
+        baselines = lw.compute_baselines(self._rows(self.baseline))
+        self.assertIn(("narrator", "unclassified"), baselines)
+        self.assertIn(("bot", "unclassified"), baselines)
+        self.assertLess(baselines[("narrator", "unclassified")][0], 0.5)
+        self.assertGreater(baselines[("bot", "unclassified")][0], 1.5)
+
+    def _rows(self, raw: list[dict]) -> list[lw.CostRow]:
+        _write_costs(self.costs, raw)
+        rows, _ = lw.load_cost_rows(
+            self.costs,
+            datetime(2026, 4, 13, tzinfo=timezone.utc),
+            datetime(2026, 5, 11, tzinfo=timezone.utc),
+        )
+        lw.attribute_task_types(rows, self.outbox)
+        return rows
+
+
+class MinBaselineRowsTests(unittest.TestCase):
+    """A cohort under MIN_BASELINE_ROWS is skipped, like a stdev≤0 cohort."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.costs = self.root / "costs.jsonl"
+        self.outbox = self.root / "outboxes"
+        self.output_dir = self.root / "ledger"
+        for i in range(1, 5):
+            d = (WEEK_ENDING - lw.timedelta(days=7 * i)).date().isoformat()
+            _write_prior_sidecar(self.output_dir, d, 10.0)
+
+    def _run(self, n_baseline: int):
+        baseline = _baseline_rows(
+            self.outbox, "forge", "feature-development",
+            [1.0 + (i % 4) * 0.05 for i in range(n_baseline)],
+        )
+        _write_costs(self.costs, baseline + [{
+            "ts": "2026-05-12T10:00:00+00:00", "agent": "forge",
+            "task_id": "t-spike", "model": "claude-opus-4-7",
+            "cost_usd": 10.0, "source": "inbox-watcher",
+        }])
+        _write_archive(self.outbox, "forge", "t-spike", "feature-development")
+        _, sidecar, _ = lw.compute_weekly_report(
+            WEEK_ENDING, self.costs, self.outbox, self.output_dir,
+        )
+        return [a for a in sidecar["anomalies"] if a["task_id"] != "_ramp_up_notice"]
+
+    def test_below_floor_is_not_flagged(self):
+        self.assertEqual(self._run(lw.MIN_BASELINE_ROWS - 1), [])
+
+    def test_at_floor_is_flagged(self):
+        anoms = self._run(lw.MIN_BASELINE_ROWS)
+        self.assertEqual(len(anoms), 1)
+        self.assertEqual(anoms[0]["baseline_n"], lw.MIN_BASELINE_ROWS)
 
 
 class DeltaTests(unittest.TestCase):
@@ -550,7 +707,11 @@ class DmHeadlineTests(unittest.TestCase):
                 self.output_dir, d, mean_cost * 2,
                 by_task_type={"feature-development": {"usd": mean_cost * 2, "task_count": 2}},
             )
-        _write_costs(self.costs, [{
+        baseline = _baseline_rows(
+            self.outbox, "forge", "feature-development",
+            [1.0, 1.1, 0.95, 1.05] * 6,
+        )
+        _write_costs(self.costs, baseline + [{
             "ts": "2026-05-12T10:00:00+00:00", "agent": "forge",
             "task_id": "t-spike", "model": "claude-opus-4-7",
             "cost_usd": 10.0, "source": "inbox-watcher",

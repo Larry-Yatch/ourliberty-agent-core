@@ -51,10 +51,10 @@ The Python module executes these in order:
 4. **Attribute `task_type`.** For each row, attempt to open `~/agents/outboxes/<row.agent>/.archive/<row.task_id>.json` and copy `task_type` from it. On miss / parse-fail, leave as `"unknown"`.
 5. **Compute totals.** `total_usd = sum(row.cost_usd)`. `by_agent` and `by_task_type` are `{<key>: {usd, task_count}}` aggregations.
 6. **Load prior sidecars.** Try to load up to `BASELINE_WEEKS = 4` prior sidecars. If `len(prior_sidecars) >= RAMP_UP_WEEKS = 4`, σ-flagging is active for the week; else it's suspended.
-7. **Compute σ baselines** (only when active). For each `task_type` present in prior sidecars, baseline = `(mean, stdev)` of `(usd/task_count)` across the prior weeks. `stdev=0.0` when only one prior week of data exists for that type — σ-flagging is skipped for that type.
+7. **Compute σ baselines** (only when active). Re-read `costs.jsonl` over the `BASELINE_WEEKS = 4` weeks immediately before `window_start` and attribute `task_type` on those rows the same way as step 4 (or the cohort keys won't match). Group the individual rows by `(agent, task_type)`; baseline = `(mean, stdev, n)` of the per-task costs in each cohort. A cohort with fewer than `MIN_BASELINE_ROWS = 20` rows is omitted, which skips σ-flagging for it. Corrected 2026-08-05 — the v1 shape derived baselines from prior sidecars' `by_task_type` aggregates (weekly means) and keyed on `task_type` alone, which inflated σ ~26x and flagged 15.3% of all rows.
 8. **Compute anomalies.**
    - When σ-flagging is suspended: emit one synthetic informational entry — `{task_id: "_ramp_up_notice", context: "baseline ramp-up: N prior weekly window(s) observed; σ-flagging suspended until ≥4 weeks of data"}`. This is NOT a real anomaly; the DM heartbeat shape still fires.
-   - When σ-flagging is active: for each row, `sigma_above = (cost - mean) / stdev`. Emit a row if `sigma_above ≥ SIGMA_THRESHOLD = 2.0`. Sort descending by `sigma_above`.
+   - When σ-flagging is active: for each row, look up its `(agent, task_type)` cohort baseline (skip the row if the cohort has none) and compute `sigma_above = (cost - mean) / stdev`. Emit a row if `sigma_above ≥ SIGMA_THRESHOLD = 2.0`. Sort descending by `sigma_above`.
 9. **Compute retry overhead.** v1 heuristic: a row counts as a retry if `task_id` starts with `notify-` OR contains `-revision-` OR contains `-cycle-fix-`. Sum their `cost_usd`; compute `percent_of_total`. Tune after week 2 once we have real data.
 10. **Compute top-5.** Sort all rows by `cost_usd` desc, take first 5, emit `{task_id, agent, cost_usd}`.
 11. **Compute week-over-week delta.** If a prior-week sidecar exists, emit `{absolute_usd: total - prior_total, percent: (absolute / prior_total) * 100}`. Else emit `null`.
@@ -120,8 +120,9 @@ This MUST match the schema in `agents/beacon/specs/ledger.md` § 7 byte-for-byte
       "task_type": "feature-development",
       "cost_usd": 2.91,
       "baseline_usd": 0.85,
+      "baseline_n": 63,
       "sigma_above": 2.4,
-      "context": "task cost $2.91 vs $0.85 baseline (n=4wk)"
+      "context": "task cost $2.91 vs $0.85 baseline for forge/feature-development (n=63 tasks over 4wk)"
     }
   ],
   "retry_overhead": {
@@ -137,6 +138,7 @@ This MUST match the schema in `agents/beacon/specs/ledger.md` § 7 byte-for-byte
 Notes:
 - `delta_vs_prior_week` is `null` when no prior-week sidecar exists.
 - `anomalies` is `[]` (empty) when σ-flagging is active and nothing flags; it's a single-element array with `task_id: "_ramp_up_notice"` during ramp-up (weeks 1–4).
+- `baseline_n` is the number of prior-window rows in the anomaly's `(agent, task_type)` cohort — always ≥ `MIN_BASELINE_ROWS`.
 - `by_task_type` contains `"unknown"` bucket whenever any row failed the outbox-archive join.
 - Floats are full-precision in JSON; markdown surfaces round to 2 decimals.
 
