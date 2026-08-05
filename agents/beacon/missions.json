@@ -17903,6 +17903,21 @@
       "retired_by": "heal_orphan_autoregister",
       "retired_at": "2026-08-05T23:18:34.688258+00:00",
       "retired_reason": "orphan-terminal"
+    },
+    {
+      "id": "approvals-tab-informational-cards",
+      "name": "Approvals Tab Informational Cards",
+      "phase": "drafting",
+      "brief": "Larry chose Option B on direction-ask `approvals-tab-nonbinary-contract-001` (2026-08-05): widen the Approvals tab so non-binary awaiting-Larry items become informational cards with an `acknowledge` exit, rather than narrowing the drift sentinel.",
+      "spec_docs": [
+        "agents/beacon/specs/approvals-tab-informational-cards.md"
+      ],
+      "task_ids": [
+        "approvals-informational-cards-spec-001"
+      ],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-08-05",
+      "deferred_reason": null
     }
   ]
 }
