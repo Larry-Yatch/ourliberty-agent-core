@@ -17884,7 +17884,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-08-05T22:48:30.924293+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-08-05T22:45:38.14335+00:00"
+      "orphan_last_activity_ts": "2026-08-05T22:45:38.14335+00:00",
+      "briefing": {
+        "what": "A piece of work the team built and sent for review, but it isn't attached to any active initiative, and it's been waiting in the review queue after one round of requested changes.",
+        "why": "Unassigned work that sits in review ties up people's time without a clear payoff, and the longer it waits the more likely it conflicts with work that is on the roadmap.",
+        "suggest": "Ask the team to name the initiative this supports before it goes further \u2014 if there isn't one, park it rather than finishing the review."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-05T22:51:16.341571+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
