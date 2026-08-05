@@ -1990,7 +1990,8 @@
         "at": "2026-07-28T01:41:40.557894+00:00",
         "from_state": "parked"
       },
-      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
+      "aging": true
     },
     {
       "id": "cap-title-f47b",
