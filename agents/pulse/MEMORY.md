@@ -18,6 +18,12 @@
 
 ---
 
+## G-rule heal-pipeline-stall-unrouted-pr-stranded-tier4-no-translation-001 — 1/3 (new, iter ~7876)
+
+**Rule:** `source=heal-pipeline-stall, subject=pipeline-stall:unrouted-pr-stranded:PR#N` returns Tier-4 from the triage helper (no translation match). Alert 670 (iter ~7876, 2026-08-05T01:17:50Z UTC): PR#1096 stranded cooldown expired; healer fired live alert; triage helper → Tier-4. The healer's own DM IS the notification (idx=669 delivered at 01:18:43Z UTC); a second Pulse DM is duplicate noise. The medic's companion diagnosis alert (671, same subject) was Tier-3 (known-pattern match already in translations table). Fix: add prefix match for `source=heal-pipeline-stall, subject^=pipeline-stall:unrouted-pr-stranded:` as Tier-3 in config/alert-translations.json. Dispatch to Beacon at 3/3.
+
+---
+
 ## G-rule heal-pipeline-stall-no-mirror-dispatch-tier4-no-translation-001 — 1/3 (new, iter ~7586)
 
 **Rule:** `source=heal-pipeline-stall, subject=pipeline-stall:no-mirror-dispatch:PR#N` returns Tier-4 from the triage helper (no translation match in alert-translations.json). Alert 696 (iter ~7586, 03:03:43Z UTC): PR#1098 deep-review-hold triggered stall healer's no-mirror-dispatch check → Tier-4. Medic diagnosis (alert 699) says FP: Mirror review WAS dispatched at 01:51:58Z UTC, then suppressed (MIRROR_REVIEW_SUPPRESSED_DEEP_REVIEW_HELD). No DM (medic already DM'd idx=698). Contrast: `pipeline-stall:unrouted-pr:PR#N` alerts have a Tier-3 translation entry (alert 697 resolved Tier-3). Fix: add prefix match for `source=heal-pipeline-stall, subject^=pipeline-stall:no-mirror-dispatch:` as Tier-3 in alert-translations.json. Dispatch to Beacon at 3/3.
