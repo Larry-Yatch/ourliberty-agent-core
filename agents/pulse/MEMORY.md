@@ -18,9 +18,9 @@
 
 ---
 
-## G-rule heal-pipeline-stall-unrouted-pr-stranded-tier4-no-translation-001 — 1/3 (new, iter ~7876)
+## G-rule heal-pipeline-stall-unrouted-pr-stranded-tier4-no-translation-001 — 2/3 (iter ~7883, 2026-08-05T02:12Z UTC)
 
-**Rule:** `source=heal-pipeline-stall, subject=pipeline-stall:unrouted-pr-stranded:PR#N` returns Tier-4 from the triage helper (no translation match). Alert 670 (iter ~7876, 2026-08-05T01:17:50Z UTC): PR#1096 stranded cooldown expired; healer fired live alert; triage helper → Tier-4. The healer's own DM IS the notification (idx=669 delivered at 01:18:43Z UTC); a second Pulse DM is duplicate noise. The medic's companion diagnosis alert (671, same subject) was Tier-3 (known-pattern match already in translations table). Fix: add prefix match for `source=heal-pipeline-stall, subject^=pipeline-stall:unrouted-pr-stranded:` as Tier-3 in config/alert-translations.json. Dispatch to Beacon at 3/3.
+**Rule:** `source=heal-pipeline-stall, subject=pipeline-stall:unrouted-pr-stranded:PR#N` returns Tier-4 from the triage helper (no translation match). Occurrence 1: iter ~7876 (2026-08-05T01:17:50Z UTC) — PR#1096 stranded; healer DM idx=669. Occurrence 2: iter ~7883 (2026-08-05T02:04:47Z UTC) — RSDPM:176 stranded; alert line 672; guard confirmed authoritative Tier-4 (same_iter_call=true); healer DM idx=671 delivered. Medic companion (alert line 673) was Tier-3 (existing translation, no subject field → generic intent match). In both cases: healer DM IS the notification; Pulse DM = duplicate noise (suppressed). Fix: add prefix match for `source=heal-pipeline-stall, subject^=pipeline-stall:unrouted-pr-stranded:` as Tier-3 in config/alert-translations.json. Dispatch to Beacon at 3/3.
 
 ---
 
