@@ -42,9 +42,9 @@
 
 ---
 
-## G-rule pulse-check-xiv-tier4-no-translation-001 — DISPATCHED ✅ (iter ~7864)
+## G-rule pulse-check-xiv-tier4-no-translation-001 — DISPATCHED ✅ (iter ~7864); approval `pulse-check-xiv-alert-translations-001` PENDING
 
-**Rule:** pulse-check-xiv alerts (subject^=pulse-check-xiv-oversilence: and subject=pulse-check-xiv-digest) return Tier-4 from triage helper (novel, no translation match). These are informational FYI-tier observability reports that the bot already delivers via the alert pipeline (outbox-notifier/beacon_telegram_bot.py). Pulse receiving them via larry-alerts.jsonl and sending a SECOND DM would be duplicate noise. Fix: add Tier-3 (or Tier-FYI) translation entries for `source=pulse-check-xiv` in config/alert-translations.json so Check 0 silences them on sight. **direction-ask-pulse-check-xiv-tier4-no-translation-3of3-001.json dispatched to Beacon inbox at 2026-08-05T00:00Z UTC (iter ~7864).** Occurrences: iter ~7390 (1/3), iter ~7563+ (2/3), iter ~7864 (3/3). Verification pending.
+**Rule:** pulse-check-xiv alerts (subject^=pulse-check-xiv-oversilence: and subject=pulse-check-xiv-digest) return Tier-4 from triage helper. Fix: add Tier-3 translation entries for `source=pulse-check-xiv` in config/alert-translations.json. **direction-ask-pulse-check-xiv-tier4-no-translation-3of3-001.json dispatched to Beacon inbox at 2026-08-05T00:00Z UTC (iter ~7864).** Beacon created approval_request `pulse-check-xiv-alert-translations-001` (now in pending=3 list, created ~00:05Z UTC 2026-08-05, delivered idx=666 at 00:08Z UTC). **Awaiting Larry's sign-off via Approvals tab.** Record `systemic_fix` when approval actioned and PR merges. Occurrences: iter ~7390 (1/3), iter ~7563+ (2/3), iter ~7864 (3/3).
 
 ---
 
@@ -54,9 +54,9 @@
 
 ---
 
-## G-rule pulse-triage-self-report-should-be-tier3-001 — SHIPPED via PR#1099 (merged 2026-08-04T18:23:38Z UTC); behavioral verification pending
+## G-rule pulse-triage-self-report-should-be-tier3-001 — RESOLVED ✅ (systemic_fix recorded iter ~7887, 2026-08-05T02:41Z UTC)
 
-**Rule:** Pulse's own escalation DM writes to larry-alerts.jsonl appear back as new Tier-4 alerts (no translation match). Three observed patterns: (a) `source=pulse-triage` (iter ~6982); (b) `source=pulse, subject=tier4-novel:forge-wip-redispatch` (iter ~7563 — Pulse DM confirmation write); (c) `source=pulse, subject=pr1081-72h-gate-imminent:...` (iter ~7564 — Pulse [yellow] escalation write). All are NOT new action items — the underlying DM was already sent/delivered before the write appeared as an alert. **Dispatched 3/3:** direction-ask written to Beacon inbox at 2026-08-04T00:26Z UTC. Fix: exclude self-authored (source=pulse/pulse-triage) alerts from Check 0 re-triage. **PR#1099 merged at 18:23:38Z UTC (iter ~7718).** Outbox-notifier restarted cleanly at 18:24:51Z UTC (new code active). **Verification:** Next cycle where Pulse sends a DM — the resulting larry-alerts.jsonl write should NOT bounce back as Tier-4. Record `systemic_fix` only after that observation is confirmed.
+**Rule:** Pulse's own escalation DM writes to larry-alerts.jsonl appear back as new Tier-4 alerts (no translation match). Fix: exclude source=pulse/pulse-triage from Check 0 re-triage. **PR#1099 merged 2026-08-04T18:23:38Z UTC. Behavioral verification CONFIRMED iter ~7887: ~600min of outbox-notifier runtime, 0 source=pulse bounce-backs in larry-alerts.jsonl (lines 664-673 checked). `systemic_fix` appended at 02:41:34Z UTC. G-rule CLOSED.** Do not dispatch further; do not re-open.
 
 ---
 
