@@ -17590,7 +17590,11 @@
         "at": "2026-08-01T01:22:59.032407+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-08-05T22:18:19.901873+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-approvals-freshness-2b-verification-column-001",
@@ -17828,7 +17832,11 @@
         "at": "2026-08-05T04:31:02.795534+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-08-05T22:18:19.901873+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-mirror-review-pr-ourliberty-agent-core-850",
