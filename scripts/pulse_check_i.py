@@ -601,11 +601,30 @@ def synthesize_proposals(
         # on, so it degrades to what the row DOES know (agent + type) rather than
         # emitting "task ``" and sending him to the archive to guess.
         _tid = (top.get("task_id") or "").strip()
-        if _tid and _tid != "unknown":
+        _agent = top.get("agent") or "unknown"
+        _ttype = top.get("task_type") or "unclassified"
+        _identified = bool(_tid) and _tid != "unknown"
+        if _identified:
             _what = f"task `{_tid}`"
+            _rationale = (
+                f"Ledger flagged this task at "
+                f"{float(top.get('sigma_above', 0.0)):.1f}σ above baseline. "
+                f"Read the chain archive and propose either: a fast-path "
+                f"for the shape, a prompt-discipline fix, or a model "
+                f"downgrade if the depth wasn't warranted."
+            )
         else:
-            _what = (f"unidentified task from `{top.get('agent') or 'unknown'}`"
-                     f" (type: {top.get('task_type') or 'unclassified'})")
+            _what = f"unidentified task from `{_agent}` (type: {_ttype})"
+            # No task_id means no chain archive to read, so a spec cycle has
+            # nothing to act on. Say that instead of sending the reader to an
+            # archive that cannot exist.
+            _rationale = (
+                f"Ledger flagged a `{_agent}` row at "
+                f"{float(top.get('sigma_above', 0.0)):.1f}σ above baseline, but "
+                f"the row carries no task_id — there is no chain archive to read "
+                f"and no task to fast-path. Triage the cost-attribution gap, or "
+                f"name the task by hand before dispatching."
+            )
         proposals.append({
             "title": f"Review high-σ anomaly {_what}",
             "effort": "small",
@@ -614,13 +633,12 @@ def synthesize_proposals(
                 f"${float(top.get('baseline_usd', 0.0)):.2f} baseline "
                 f"({float(top.get('sigma_above', 0.0)):.1f}σ above)"
             ),
-            "rationale": (
-                f"Ledger flagged this task at "
-                f"{float(top.get('sigma_above', 0.0)):.1f}σ above baseline. "
-                f"Read the chain archive and propose either: a fast-path "
-                f"for the shape, a prompt-discipline fix, or a model "
-                f"downgrade if the depth wasn't warranted."
-            ),
+            "rationale": _rationale,
+            # Identity, not prose: rewording this proposal's title on 2026-08-03
+            # reset its dedup key and let the same anomaly re-dispatch two days
+            # later. The cohort + task identity is what "same anomaly" means.
+            "dedup_identity": f"sigma-anomaly␟{_agent}␟{_ttype}␟{_tid or 'unknown'}",
+            "digest_only": not _identified,
         })
 
     # preflight-marker-discipline regression — surfaced only when the trailing-
@@ -702,7 +720,14 @@ def _is_auto_dispatch_eligible(proposal: dict[str, Any]) -> bool:
     to the funnel for triage. The downstream build is unchanged: Beacon drafts a
     spec, and the trust-policy carve-outs + Mirror REVIEW_PASS + classify_careful
     still gate it.
+
+    A proposal may also opt out explicitly with `digest_only` — used when the
+    proposal names something a spec cycle cannot act on (a σ anomaly with no
+    resolvable task_id has no chain archive to read). Those still surface in the
+    digest and park to the funnel; they just don't open a Beacon cycle.
     """
+    if proposal.get("digest_only"):
+        return False
     if proposal.get("effort") not in ("small", "medium"):
         return False
     impact = proposal.get("impact")
@@ -710,16 +735,28 @@ def _is_auto_dispatch_eligible(proposal: dict[str, Any]) -> bool:
 
 
 def _proposal_dedup_key(proposal: dict[str, Any]) -> str:
-    """SHA-1 of stable proposal fields. The same recurring proposal across
-    Check I runs maps to the same key — different proposals collide only on
-    a real content collision (which would still semantically mean "same fix"
-    so a single dispatch is correct).
+    """SHA-1 of the proposal's identity.
+
+    Prefers an explicit `dedup_identity` — a stable string a producer derives
+    from what the proposal is ABOUT (for σ anomalies: agent + task_type +
+    task_id), never from rendered prose. Falls back to hashing the title /
+    impact / rationale for proposals that set none.
+
+    Why the explicit field (2026-08-05): the content hash makes the dedup window
+    only as stable as the copy. Rewording the σ-anomaly title on 2026-08-03 reset
+    the key, defeated the 7-day window, and let one anomaly open two Beacon
+    cycles in three days. Prose changes when we improve the wording; identity
+    changes only when it's genuinely a different anomaly.
     """
-    blob = "␟".join([
-        str(proposal.get("title") or ""),
-        str(proposal.get("impact") or ""),
-        str(proposal.get("rationale") or ""),
-    ])
+    identity = proposal.get("dedup_identity")
+    if isinstance(identity, str) and identity.strip():
+        blob = f"identity␟{identity.strip()}"
+    else:
+        blob = "␟".join([
+            str(proposal.get("title") or ""),
+            str(proposal.get("impact") or ""),
+            str(proposal.get("rationale") or ""),
+        ])
     return hashlib.sha1(blob.encode("utf-8")).hexdigest()
 
 

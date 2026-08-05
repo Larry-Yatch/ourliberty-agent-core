@@ -135,6 +135,73 @@ class ProposalSynthesisTests(unittest.TestCase):
             self.assertIn('beacon-telegram-bot', title, label)
             self.assertIn('unclassified', title, label)
 
+    def test_identified_anomaly_is_dispatchable(self):
+        s = _sidecar(anomalies=[{
+            "task_id": "burned-task-001", "agent": "forge",
+            "task_type": "feature-development", "cost_usd": 9.20,
+            "baseline_usd": 1.10, "sigma_above": 3.7, "context": "...",
+        }])
+        p = pci.synthesize_proposals(s, repeats=[])[0]
+        self.assertFalse(p["digest_only"])
+        self.assertTrue(pci._is_auto_dispatch_eligible(p))
+        self.assertIn("burned-task-001", p["dedup_identity"])
+        self.assertIn("chain archive", p["rationale"])
+
+    def test_unidentified_anomaly_is_digest_only(self):
+        """No task_id → no chain archive → nothing a spec cycle can act on.
+
+        The 2026-08-05 re-fire opened a Beacon Opus cycle over a row whose
+        task_id was literally "unknown", with a rationale telling the reader to
+        read an archive that cannot exist. It belongs in the digest instead.
+        """
+        for label, tid in (('empty', ''), ('normalised', 'unknown'),
+                           ('missing', None)):
+            anomaly = {
+                "agent": "beacon-telegram-bot", "task_type": "unclassified",
+                "cost_usd": 5.56, "baseline_usd": 0.18,
+                "sigma_above": 65.4, "context": "...",
+            }
+            if tid is not None:
+                anomaly["task_id"] = tid
+            p = pci.synthesize_proposals(_sidecar(anomalies=[anomaly]), repeats=[])[0]
+            self.assertTrue(p["digest_only"], label)
+            self.assertFalse(pci._is_auto_dispatch_eligible(p), label)
+            self.assertNotIn("chain archive and propose", p["rationale"], label)
+
+    def test_dedup_identity_survives_cosmetic_reword(self):
+        """A reworded title must not reset the 7-day dedup window.
+
+        PR #1093 reworded this proposal on 2026-08-03; the content-hash key
+        moved with the copy, and the same anomaly re-dispatched on 2026-08-05.
+        """
+        s = _sidecar(anomalies=[{
+            "task_id": "burned-task-001", "agent": "forge",
+            "task_type": "feature-development", "cost_usd": 9.20,
+            "baseline_usd": 1.10, "sigma_above": 3.7, "context": "...",
+        }])
+        p = pci.synthesize_proposals(s, repeats=[])[0]
+        reworded = dict(p)
+        reworded["title"] = "Look into the expensive forge task"
+        reworded["impact"] = "costs a lot more than usual"
+        reworded["rationale"] = "Entirely different wording, same anomaly."
+        self.assertEqual(
+            pci._proposal_dedup_key(p), pci._proposal_dedup_key(reworded),
+        )
+
+    def test_dedup_identity_differs_for_a_different_anomaly(self):
+        def _key(task_id, agent):
+            s = _sidecar(anomalies=[{
+                "task_id": task_id, "agent": agent,
+                "task_type": "feature-development", "cost_usd": 9.20,
+                "baseline_usd": 1.10, "sigma_above": 3.7, "context": "...",
+            }])
+            return pci._proposal_dedup_key(
+                pci.synthesize_proposals(s, repeats=[])[0])
+
+        base = _key("burned-task-001", "forge")
+        self.assertNotEqual(base, _key("burned-task-002", "forge"))
+        self.assertNotEqual(base, _key("burned-task-001", "mirror"))
+
     def test_low_sigma_anomaly_no_proposal(self):
         s = _sidecar(anomalies=[{
             "task_id": "mild-anomaly",
@@ -1406,6 +1473,33 @@ class AutoDispatchTests(unittest.TestCase):
         self.assertFalse(pci._is_auto_dispatch_eligible(
             {"effort": "small", "impact": "   "}))
         self.assertFalse(pci._is_auto_dispatch_eligible({"effort": "medium"}))
+        # And an explicit opt-out beats otherwise-eligible fields.
+        digest_only = dict(self._eligible_proposal(), digest_only=True)
+        self.assertFalse(pci._is_auto_dispatch_eligible(digest_only))
+
+    def test_digest_only_proposal_is_not_dispatched(self):
+        records = pci.auto_dispatch_proposals(
+            check_i=self._check_i(
+                [dict(self._eligible_proposal(), digest_only=True)]),
+            fired_at=self.fired_at,
+            state_path=self.state_path,
+        )
+        self.assertEqual(records, [])
+        self.assertEqual(self.calls, [])
+
+    def test_dedup_identity_preferred_over_content_hash(self):
+        p = dict(self._eligible_proposal(),
+                 dedup_identity="sigma-anomaly␟forge␟feature-development␟t-1")
+        reworded = dict(p, title="totally different title",
+                        impact="different impact", rationale="different why")
+        self.assertEqual(
+            pci._proposal_dedup_key(p), pci._proposal_dedup_key(reworded),
+        )
+        # A proposal setting no identity still falls back to the content hash.
+        self.assertNotEqual(
+            pci._proposal_dedup_key(self._eligible_proposal()),
+            pci._proposal_dedup_key(p),
+        )
 
     def test_corrupt_state_file_treated_as_empty(self):
         self.state_path.write_text("{not valid json")
