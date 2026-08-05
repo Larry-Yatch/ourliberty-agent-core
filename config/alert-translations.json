@@ -695,6 +695,27 @@
       "recommended_action": "Review the named metric's before -> after numbers in the DM and the full table in ~/agents/blackboard/pulse-check-xii/. The rule is a heads-up about a delivery-throughput/quality/cost shift, not an automated change — decide whether it reflects a real regression worth acting on."
     }
   },
+  "pulse-check-xiv": {
+    "pulse-check-xiv-oversilence": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "plain_language_summary": "Check XIV's over-silence safety surface tripped: one alert source is being silenced at ~100% while still firing at high volume, so a real signal could be sitting under the suppression. This is the guard against over-suppression — it names the source, not a specific failure. The subject carries the over-silenced source name after the colon.",
+      "recommended_action": "Review the over-silenced signatures in ~/agents/blackboard/pulse-check-xiv/ and confirm the alert-translations.json entry is still the right call."
+    },
+    "pulse-check-xiv-digest": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "The periodic alert-precision digest (Check XIV) — how well the alert triage layer is separating signal from noise. It is emitted on the first Monday of the month, or whenever the over-silence surface trips. V1 is measure-and-surface only: it changes no config and takes no automated action.",
+      "recommended_action": "No action required — this is an informational readout. The full metric table (silence rates, novel-signature candidates, over-silence findings) is in ~/agents/blackboard/pulse-check-xiv/."
+    },
+    "pulse-check-xiv-dark": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "never_silence": true,
+      "plain_language_summary": "Check XIV has had repeated consecutive dark runs — the alert log it measures is missing or unreadable, so alert-precision is unobservable. The meter itself is fine; the input is gone. Until this is fixed, nothing is watching whether the triage layer is over- or under-silencing.",
+      "recommended_action": "Check the alert log at ~/agents/blackboard/larry-alerts.jsonl (`ls -l` it) and read ~/agents/logs/pulse-check-xiv.log for the read error. Restore or repair the log before the next Monday firing."
+    }
+  },
   "pulse-cycle": {
     "cycle-blocked": {
       "severity": "WARNING",
