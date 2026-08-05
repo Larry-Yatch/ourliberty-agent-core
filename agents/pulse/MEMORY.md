@@ -18,9 +18,9 @@
 
 ---
 
-## G-rule heal-pipeline-stall-unrouted-pr-stranded-tier4-no-translation-001 — DISPATCHED ✅ (iter ~8041, 2026-08-05T18:18Z UTC)
+## G-rule heal-pipeline-stall-unrouted-pr-stranded-tier4-no-translation-001 — DISPATCHED ✅ (iter ~8041); plan approval queued (iter ~8043)
 
-**Rule:** `source=heal-pipeline-stall, subject=pipeline-stall:unrouted-pr-stranded:PR#N` returns Tier-4 from the triage helper (no translation match). Occurrence 1: iter ~7876 (2026-08-05T01:17:50Z UTC) — PR#1096 stranded; healer DM idx=669. Occurrence 2: iter ~7883 (2026-08-05T02:04:47Z UTC) — RSDPM:176 stranded; alert line 672. Occurrence 3: iter ~8041 (2026-08-05T18:16Z UTC) — RSDPM:176 healer fired live post-cooldown expiry; alert lines 624-625; guard confirmed authoritative Tier-4. Fix: add prefix match for `source=heal-pipeline-stall, subject^=pipeline-stall:unrouted-pr-stranded:` as Tier-3 (route=escalate) in config/alert-translations.json. **direction-ask-heal-pipeline-stall-unrouted-pr-stranded-tier4-no-translation-3of3-001.json dispatched to Beacon inbox at 18:18Z UTC.** Record `systemic_fix` when PR merges and verified. Note: route=escalate → Tier-3 de-dupes safely (does not gag delivery).
+**Rule:** `source=heal-pipeline-stall, subject=pipeline-stall:unrouted-pr-stranded:PR#N` returns Tier-4 from the triage helper (no translation match). Occurrence 1: iter ~7876 (2026-08-05T01:17:50Z UTC) — PR#1096 stranded; healer DM idx=669. Occurrence 2: iter ~7883 (2026-08-05T02:04:47Z UTC) — RSDPM:176 stranded; alert line 672. Occurrence 3: iter ~8041 (2026-08-05T18:16Z UTC) — RSDPM:176 healer fired live post-cooldown expiry; guard confirmed authoritative Tier-4. Fix: add prefix match for `source=heal-pipeline-stall, subject^=pipeline-stall:unrouted-pr-stranded:` as Tier-3 (route=escalate) in config/alert-translations.json. **direction-ask dispatched to Beacon inbox at 18:18Z UTC (iter ~8041). Beacon created approval_request `alert-translations-unrouted-pr-stranded-001` at 18:25:22Z UTC; bot delivered at idx=626 at 18:28:03Z UTC. Approval queued — Larry: Approvals tab.** Record `systemic_fix` when Larry approves + PR merges + verified. Note: route=escalate → Tier-3 de-dupes safely (does not gag delivery).
 
 ---
 
@@ -36,9 +36,9 @@
 
 ---
 
-## G-rule outbox-notifier-approval-request-tier4-no-translation-001 — 1/3 (new, iter ~7866)
+## G-rule outbox-notifier-approval-request-tier4-no-translation-001 — 2/3 (iter ~8043, 2026-08-05T18:30Z UTC)
 
-**Rule:** `source=outbox-notifier, kind=approval_request` alerts land in larry-alerts.jsonl when the notifier queues a Beacon approval_request for Larry. The triage helper returns Tier-4 (novel, no translation match). Guard-tier4 confirmed authoritative Tier-4 (same-iter triage-alert call + classify()==4). The underlying approval_request is already delivered to Larry's Telegram by the bot (idx=666 at 00:08:02Z UTC); a second DM from Pulse would be duplicate noise. Fix: add a Tier-3 translation entry for `source=outbox-notifier, kind=approval_request` in config/alert-translations.json so Check 0 silences these on sight. First occurrence: iter ~7866 (2026-08-05T00:12Z UTC; alert: pulse-check-xiv-alert-translations-001 approval). Dispatch to Beacon at 3/3.
+**Rule:** `source=outbox-notifier, kind=approval_request` alerts land in larry-alerts.jsonl when the notifier queues a Beacon approval_request for Larry. The triage helper returns Tier-4 (novel, no translation match). Guard-tier4 confirmed authoritative Tier-4 (same-iter triage-alert call + classify()==4). The underlying approval_request is already delivered to Larry's Telegram by the bot; a second DM from Pulse would be duplicate noise. Fix: add a Tier-3 translation entry for `source=outbox-notifier, kind=approval_request` in config/alert-translations.json so Check 0 silences these on sight. Occurrence 1: iter ~7866 (2026-08-05T00:12Z UTC; alert: pulse-check-xiv-alert-translations-001 approval, idx=666). Occurrence 2: iter ~8043 (2026-08-05T18:30Z UTC; alert 627: alert-translations-unrouted-pr-stranded-001 approval, idx=626). Dispatch to Beacon at 3/3.
 
 ---
 
