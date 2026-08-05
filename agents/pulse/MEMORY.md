@@ -30,6 +30,12 @@
 
 ---
 
+## G-rule outbox-notifier-approval-request-tier4-no-translation-001 — 1/3 (new, iter ~7866)
+
+**Rule:** `source=outbox-notifier, kind=approval_request` alerts land in larry-alerts.jsonl when the notifier queues a Beacon approval_request for Larry. The triage helper returns Tier-4 (novel, no translation match). Guard-tier4 confirmed authoritative Tier-4 (same-iter triage-alert call + classify()==4). The underlying approval_request is already delivered to Larry's Telegram by the bot (idx=666 at 00:08:02Z UTC); a second DM from Pulse would be duplicate noise. Fix: add a Tier-3 translation entry for `source=outbox-notifier, kind=approval_request` in config/alert-translations.json so Check 0 silences these on sight. First occurrence: iter ~7866 (2026-08-05T00:12Z UTC; alert: pulse-check-xiv-alert-translations-001 approval). Dispatch to Beacon at 3/3.
+
+---
+
 ## G-rule pulse-check-xiv-tier4-no-translation-001 — DISPATCHED ✅ (iter ~7864)
 
 **Rule:** pulse-check-xiv alerts (subject^=pulse-check-xiv-oversilence: and subject=pulse-check-xiv-digest) return Tier-4 from triage helper (novel, no translation match). These are informational FYI-tier observability reports that the bot already delivers via the alert pipeline (outbox-notifier/beacon_telegram_bot.py). Pulse receiving them via larry-alerts.jsonl and sending a SECOND DM would be duplicate noise. Fix: add Tier-3 (or Tier-FYI) translation entries for `source=pulse-check-xiv` in config/alert-translations.json so Check 0 silences them on sight. **direction-ask-pulse-check-xiv-tier4-no-translation-3of3-001.json dispatched to Beacon inbox at 2026-08-05T00:00Z UTC (iter ~7864).** Occurrences: iter ~7390 (1/3), iter ~7563+ (2/3), iter ~7864 (3/3). Verification pending.
