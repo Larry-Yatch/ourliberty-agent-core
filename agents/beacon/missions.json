@@ -17798,6 +17798,23 @@
       "retired_at": "2026-08-04T00:45:47.534628+00:00",
       "retired_reason": "orphan-terminal",
       "retired_signal": "pr_merged:#1094"
+    },
+    {
+      "id": "proposed-pr-RSDPM-180",
+      "name": "PR RSDPM 180",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pr-RSDPM-180`. Last activity 2026-08-05T04:20:30.214852+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pr-RSDPM-180"
+      ],
+      "repo": null,
+      "created": "2026-08-05",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-05T04:25:39.768950+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-05T04:20:30.214852+00:00"
     }
   ]
 }
