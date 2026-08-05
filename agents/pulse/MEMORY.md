@@ -18,9 +18,9 @@
 
 ---
 
-## G-rule heal-pipeline-stall-unrouted-pr-stranded-tier4-no-translation-001 — 2/3 (iter ~7883, 2026-08-05T02:12Z UTC)
+## G-rule heal-pipeline-stall-unrouted-pr-stranded-tier4-no-translation-001 — DISPATCHED ✅ (iter ~8041, 2026-08-05T18:18Z UTC)
 
-**Rule:** `source=heal-pipeline-stall, subject=pipeline-stall:unrouted-pr-stranded:PR#N` returns Tier-4 from the triage helper (no translation match). Occurrence 1: iter ~7876 (2026-08-05T01:17:50Z UTC) — PR#1096 stranded; healer DM idx=669. Occurrence 2: iter ~7883 (2026-08-05T02:04:47Z UTC) — RSDPM:176 stranded; alert line 672; guard confirmed authoritative Tier-4 (same_iter_call=true); healer DM idx=671 delivered. Medic companion (alert line 673) was Tier-3 (existing translation, no subject field → generic intent match). In both cases: healer DM IS the notification; Pulse DM = duplicate noise (suppressed). Fix: add prefix match for `source=heal-pipeline-stall, subject^=pipeline-stall:unrouted-pr-stranded:` as Tier-3 in config/alert-translations.json. Dispatch to Beacon at 3/3.
+**Rule:** `source=heal-pipeline-stall, subject=pipeline-stall:unrouted-pr-stranded:PR#N` returns Tier-4 from the triage helper (no translation match). Occurrence 1: iter ~7876 (2026-08-05T01:17:50Z UTC) — PR#1096 stranded; healer DM idx=669. Occurrence 2: iter ~7883 (2026-08-05T02:04:47Z UTC) — RSDPM:176 stranded; alert line 672. Occurrence 3: iter ~8041 (2026-08-05T18:16Z UTC) — RSDPM:176 healer fired live post-cooldown expiry; alert lines 624-625; guard confirmed authoritative Tier-4. Fix: add prefix match for `source=heal-pipeline-stall, subject^=pipeline-stall:unrouted-pr-stranded:` as Tier-3 (route=escalate) in config/alert-translations.json. **direction-ask-heal-pipeline-stall-unrouted-pr-stranded-tier4-no-translation-3of3-001.json dispatched to Beacon inbox at 18:18Z UTC.** Record `systemic_fix` when PR merges and verified. Note: route=escalate → Tier-3 de-dupes safely (does not gag delivery).
 
 ---
 
@@ -30,9 +30,9 @@
 
 ---
 
-## G-rule medic-diagnosis-subject-specific-tier4-no-translation-001 — 1/3 (new, iter ~7582)
+## G-rule medic-diagnosis-subject-specific-tier4-no-translation-001 — 2/3 (iter ~8041, 2026-08-05T18:16Z UTC)
 
-**Rule:** medic-diagnosis alerts with specific PR subjects return Tier-4 when only the subject=null (or generic) pattern is in the translation table. Alert 694 (source=medic, intent=medic-diagnosis, subject=pipeline-stall:unrouted-pr:PR#175, RSDPM-scoped) returned Tier-4 (no translation match). Prior alert 691 (same intent, PR#1096 in agent-core) was Tier-3 because that specific subject string was in the table. The medic's own diagnosis already says "by-design" — Tier-4 guard confirmed it's genuine (no translation), but content is self-resolving (no DM issued). Fix: add wildcard or prefix match for `source=medic, intent=medic-diagnosis, subject^=pipeline-stall:unrouted-pr:` in config/alert-translations.json. Dispatch to Beacon at 3/3.
+**Rule:** medic-diagnosis alerts with specific PR subjects return Tier-4 when only the subject=null (or generic) pattern is in the translation table. Occurrence 1: Alert 694 (source=medic, intent=medic-diagnosis, subject=pipeline-stall:unrouted-pr:PR#175, RSDPM-scoped) returned Tier-4 (no translation match). Occurrence 2: iter ~8041 — alert 625 (source=medic, intent=medic-diagnosis, subject=pipeline-stall:unrouted-pr-stranded:PR#176); guard confirmed authoritative Tier-4; medic already DM'd idx=624 (no Pulse DM). Fix: add prefix match for `source=medic, intent=medic-diagnosis, subject^=pipeline-stall:unrouted-pr:` (covers both `unrouted-pr:` and `unrouted-pr-stranded:`) in config/alert-translations.json. Dispatch to Beacon at 3/3.
 
 ---
 
