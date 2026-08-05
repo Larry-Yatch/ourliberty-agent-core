@@ -17814,7 +17814,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-08-05T04:25:39.768950+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-08-05T04:20:30.214852+00:00"
+      "orphan_last_activity_ts": "2026-08-05T04:20:30.214852+00:00",
+      "briefing": {
+        "what": "A piece of finished work from the mission-control system that passed its quality check and is now waiting on your sign-off, but it isn't attached to any of your named priorities.",
+        "why": "Completed work sitting idle ties up the team's attention and delays whatever benefit it was meant to deliver, and unlabeled work makes it hard to tell if it's actually worth shipping.",
+        "suggest": "Ask what business need this serves before releasing it \u2014 if there's a clear answer, approve it; if not, park it rather than adding untracked change to a live system."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-05T04:31:02.795534+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
