@@ -22,6 +22,7 @@ except ImportError:  # discover loads this module top-level (no package parent)
     import _bootstrap  # noqa: F401
 
 import json
+import os
 import sys
 import tempfile
 import types
@@ -379,7 +380,88 @@ class RegistryTransitionTest(unittest.TestCase):
 
 # --- run_guardian orchestration (fake invoker) -------------------------------
 
+class RegistryKeyNormalizationTest(_TmpRegistryTest):
+    """One-time re-key of entries written under the doubled id (pre-2026-08-06).
+    Without it the parser fix orphans every entry, and each reads as
+    never-previously-green — silently demoting a standing break to backlog."""
+
+    _DOUBLED = 'test_x.TestY.test_a.test_a'
+    _CANONICAL = 'test_x.TestY.test_a'
+
+    def _write(self, tests):
+        g.save_registry(self.registry_path, {
+            '_meta': {'last_sha': 'a' * 40, 'last_run_result': g.RUN_RED,
+                      'completed_runs': 5, 'last_run_at': 'x'},
+            'tests': tests,
+        })
+
+    def test_doubled_key_is_rekeyed_retaining_fields(self):
+        self._write({self._DOUBLED: {'classification': g.CLS_GENUINE_BREAK,
+                                     'ever_green': True, 'origin_run': 3,
+                                     'consecutive_red_runs': 2}})
+        reg = g.load_registry(self.registry_path)
+        self.assertEqual(list(reg['tests']), [self._CANONICAL])
+        entry = reg['tests'][self._CANONICAL]
+        self.assertEqual(entry['classification'], g.CLS_GENUINE_BREAK)
+        self.assertTrue(entry['ever_green'])
+        self.assertEqual(entry['origin_run'], 3)
+        self.assertEqual(entry['consecutive_red_runs'], 2)
+
+    def test_previously_green_survives_the_rekey(self):
+        # The whole point of the re-key: this entry must still read as
+        # previously-green afterwards, or the next run demotes it to backlog.
+        self._write({self._DOUBLED: {'classification': g.CLS_GENUINE_BREAK,
+                                     'ever_green': True, 'origin_run': 3}})
+        reg = g.load_registry(self.registry_path)
+        self.assertTrue(g.is_previously_green(self._CANONICAL, reg, 5))
+
+    def test_correct_keys_are_untouched(self):
+        self._write({self._CANONICAL: {'classification': g.CLS_BACKLOG},
+                     'test_x.TestY.test_b': {'classification': g.CLS_BACKLOG}})
+        reg = g.load_registry(self.registry_path)
+        self.assertEqual(sorted(reg['tests']),
+                         [self._CANONICAL, 'test_x.TestY.test_b'])
+
+    def test_normalization_is_idempotent(self):
+        self._write({self._DOUBLED: {'classification': g.CLS_GENUINE_BREAK,
+                                     'last_seen': 't1'}})
+        once = g.load_registry(self.registry_path)
+        g.save_registry(self.registry_path, once)
+        twice = g.load_registry(self.registry_path)
+        self.assertEqual(once['tests'], twice['tests'])
+
+    def test_collision_keeps_most_recent(self):
+        self._write({
+            self._DOUBLED: {'classification': g.CLS_GENUINE_BREAK,
+                            'last_seen': '2026-08-06T00:00:00+00:00'},
+            self._CANONICAL: {'classification': g.CLS_BACKLOG,
+                              'last_seen': '2026-08-01T00:00:00+00:00'},
+        })
+        reg = g.load_registry(self.registry_path)
+        self.assertEqual(list(reg['tests']), [self._CANONICAL])
+        self.assertEqual(reg['tests'][self._CANONICAL]['classification'],
+                         g.CLS_GENUINE_BREAK)
+
+    def test_meta_is_untouched(self):
+        self._write({self._DOUBLED: {'classification': g.CLS_BACKLOG}})
+        reg = g.load_registry(self.registry_path)
+        self.assertEqual(reg['_meta']['completed_runs'], 5)
+        self.assertEqual(reg['_meta']['last_sha'], 'a' * 40)
+
+
 class RunGuardianTest(_TmpRegistryTest):
+
+    def test_order_flake_is_reachable(self):
+        """The payoff: a red that passes in isolation classifies as order-flake.
+        Pre-fix the doubled id never resolved, so passed_alone was False for
+        EVERY red and this branch was unreachable dead code — every genuine
+        order-flake was laundered into backlog/genuine-break."""
+        inv = FakeInvoker(red_sets=[{'test_x.TestY.test_a'}],
+                          single_results={'test_x.TestY.test_a': (True, 'OK')})
+        res = _run(inv, self.registry_path)
+        self.assertEqual(res['status'], g.RUN_RED)
+        self.assertEqual(res['classifications']['test_x.TestY.test_a'],
+                         g.CLS_ORDER_FLAKE)
 
     def test_sha_skip_leaves_registry_untouched(self):
         g.save_registry(self.registry_path, {
@@ -547,6 +629,67 @@ class RunSingleTestInDirTest(unittest.TestCase):
                                   return_value=self._fake_proc(0, 'garbage')):
             with self.assertRaises(trc.AnalysisError):
                 trc.run_single_test_in_dir(Path('/wt'), 'test_foo.T.m', {}, 120)
+
+
+# --- parser id round-trip (the id-doubling scar) -----------------------------
+
+class ParsedIdIsRunnableTest(unittest.TestCase):
+    """The contract the id-doubling bug broke: an id the parser EMITS must be an
+    id unittest ACCEPTS. Both halves run for real here — no mocked subprocess —
+    because the bug lived exactly in the seam between them, and a test that
+    stubs either side cannot see it."""
+
+    _MODULE = (
+        'import unittest\n'
+        '\n'
+        '\n'
+        'class SampleTest(unittest.TestCase):\n'
+        '    def test_passes(self):\n'
+        '        self.assertTrue(True)\n'
+        '\n'
+        '    def test_fails(self):\n'
+        '        self.fail("boom")\n'
+    )
+
+    def setUp(self):
+        self.workdir = Path(tempfile.mkdtemp())
+        self.tests_dir = self.workdir / 'scripts' / 'tests'
+        self.tests_dir.mkdir(parents=True)
+        (self.tests_dir / 'test_rt_sample.py').write_text(
+            self._MODULE, encoding='utf-8',
+        )
+
+    def test_emitted_id_round_trips_through_unittest(self):
+        import subprocess
+        proc = subprocess.run(
+            [sys.executable, '-m', 'unittest', '-v', 'test_rt_sample'],
+            cwd=str(self.tests_dir), capture_output=True, text=True, timeout=120,
+        )
+        combined = (proc.stdout or '') + '\n' + (proc.stderr or '')
+        failures = trc.parse_unittest_failures(combined)
+
+        # Exactly the failing test, under the runnable dotted form — on ANY
+        # supported Python. Pre-fix this was doubled on 3.11+.
+        self.assertEqual(failures, {'test_rt_sample.SampleTest.test_fails'})
+
+        # The emitted id resolves: re-running it alone reproduces the failure
+        # rather than dissolving into unittest.loader._FailedTest.
+        with mock.patch.object(trc, '_discover_wall_prefix', return_value=[]):
+            failed_alone, out = trc.run_single_test_in_dir(
+                self.workdir, next(iter(failures)), dict(os.environ), 120,
+            )
+        self.assertFalse(failed_alone)
+        self.assertNotIn('_FailedTest', out)
+
+        # And a PASSING test's id reports passed-alone — the signal
+        # `classify_red` needs for `order-flake` to be reachable at all.
+        with mock.patch.object(trc, '_discover_wall_prefix', return_value=[]):
+            passed_alone, out = trc.run_single_test_in_dir(
+                self.workdir, 'test_rt_sample.SampleTest.test_passes',
+                dict(os.environ), 120,
+            )
+        self.assertTrue(passed_alone)
+        self.assertNotIn('_FailedTest', out)
 
 
 # --- warmer single-flight lock relocation (L7) -------------------------------

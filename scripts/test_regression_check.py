@@ -219,18 +219,52 @@ def resolve_sha(sha: str, repo_root: Path) -> str:
     return result.stdout.strip()
 
 
+def canonical_test_id(test_id: str) -> str:
+    """Collapse a doubled dotted test id back to its runnable form.
+
+    ``mod.Cls.test_x.test_x`` -> ``mod.Cls.test_x``; anything else is returned
+    unchanged. Idempotent, so re-normalizing an already-canonical id is a no-op.
+
+    This is the inverse of the id-doubling bug described in
+    :func:`parse_unittest_failures`, and is reused by the guardian registry and
+    the obligation ledger to re-key state persisted under the doubled form.
+    """
+    head, sep, last = test_id.rpartition('.')
+    if sep and head.rpartition('.')[2] == last:
+        return head
+    return test_id
+
+
 def parse_unittest_failures(output: str) -> set[str]:
     """Extract test IDs from unittest -v output.
 
     A test ID is the dotted form ``module.ClassName.test_method``, which
     matches what ``python3 -m unittest <id>`` accepts as a target.
+
+    Version-tolerant by construction. Python <= 3.10 printed the method OUTSIDE
+    the parens (``ERROR: test_x (mod.Cls)``); since 3.11 unittest prints it
+    INSIDE (``ERROR: test_x (mod.Cls.test_x)``). Appending the method
+    unconditionally — as this did until 2026-08-06 — doubles it on 3.11+, and
+    the droplet runs 3.12. A doubled id does not resolve, so unittest's loader
+    substitutes ``_FailedTest``: the guardian's isolation re-run
+    (``run_single_test_in_dir``) could never report passed-alone, which made its
+    ``order-flake`` branch unreachable and laundered every order-dependent flake
+    into ``genuine-break``/``backlog``. The regression GATE was unaffected
+    throughout — it diffs parent-vs-head red sets, and both sides were mangled
+    identically — which is why this stayed hidden for 26 guardian runs.
     """
     failures: set[str] = set()
     for line in output.splitlines():
         m = _FAILURE_LINE_RE.match(line.strip())
         if m:
             method, fqclass = m.group(1), m.group(2)
-            failures.add(f'{fqclass}.{method}')
+            # 3.11+ already ends in the method; only append when it doesn't.
+            # The suffix test is on the dotted boundary, so a class legitimately
+            # named e.g. ``mod.Clstest_x`` is unaffected.
+            if fqclass.rpartition('.')[2] == method:
+                failures.add(fqclass)
+            else:
+                failures.add(f'{fqclass}.{method}')
     return failures
 
 

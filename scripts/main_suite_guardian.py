@@ -189,6 +189,28 @@ def new_registry() -> dict:
     }
 
 
+def _normalize_test_keys(tests: dict) -> dict:
+    """Re-key entries persisted under the doubled test-id form (the pre-2026-08-06
+    parser bug, see ``trc.parse_unittest_failures``). Idempotent; ``_meta`` is
+    untouched.
+
+    Without this the parser fix would orphan every existing entry, and each would
+    read as never-previously-green on the next run — exactly the input
+    :func:`is_previously_green` depends on, so a standing break would silently
+    demote to ``backlog``. When both the doubled and the canonical key are
+    present, the more recently seen entry wins.
+    """
+    normalized: dict = {}
+    for tid, entry in tests.items():
+        key = trc.canonical_test_id(tid)
+        prior = normalized.get(key)
+        if prior is not None and \
+                str(prior.get('last_seen') or '') >= str(entry.get('last_seen') or ''):
+            continue
+        normalized[key] = entry
+    return normalized
+
+
 def load_registry(path: Path) -> dict:
     try:
         raw = path.read_text(encoding='utf-8')
@@ -202,6 +224,8 @@ def load_registry(path: Path) -> dict:
         return new_registry()
     if not isinstance(data, dict) or 'tests' not in data or '_meta' not in data:
         return new_registry()
+    if isinstance(data['tests'], dict):
+        data['tests'] = _normalize_test_keys(data['tests'])
     return data
 
 

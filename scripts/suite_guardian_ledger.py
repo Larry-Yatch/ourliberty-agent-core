@@ -75,6 +75,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))
 
 import atomic_io  # noqa: E402
+import test_regression_check as trc  # noqa: E402
 
 
 def _agents_root() -> Path:
@@ -168,14 +169,50 @@ def _parse_iso(ts: Any) -> Optional[datetime]:
 
 # -------------------- load / save --------------------
 
+def _merge_rank(was_canonical: bool, row: dict[str, Any]) -> tuple:
+    """Precedence for picking the survivor when a doubled and a canonical key
+    collide: never drop a live obligation, so an OPEN row outranks a terminal
+    one; then the more recently active row; a final tie goes to the row that was
+    already keyed canonically."""
+    return (row.get('status') == OPEN,
+            str(row.get('last_activity_at') or ''),
+            was_canonical)
+
+
 def _load(path: Path) -> dict[str, dict[str, Any]]:
+    """Load the ledger, re-keying rows persisted under the doubled test-id form.
+
+    The pre-2026-08-06 parser bug (see ``trc.parse_unittest_failures``) wrote
+    every id doubled, so rows opened before the fix are keyed by an id that no
+    longer matches any red. Normalizing here — the module's sole read seam, with
+    every mutator being load -> mutate -> ``_save`` — re-keys them in place on the
+    next write, with no separate migration. Idempotent by construction.
+
+    Left doubled, a stale row would keep being re-polled for consent
+    (``main_suite_guardian`` step 1) and, if approved, dispatch a fix against a
+    test id that does not exist — while the fixed parser opened a SECOND row for
+    the same test under its canonical id.
+    """
     try:
         data = json.loads(path.read_text(encoding='utf-8'))
     except (FileNotFoundError, json.JSONDecodeError, OSError):
         return {}
     if not isinstance(data, dict):
         return {}
-    return {k: v for k, v in data.items() if isinstance(v, dict)}
+    grouped: dict[str, list[tuple[bool, dict[str, Any]]]] = {}
+    for key, row in data.items():
+        if not isinstance(row, dict):
+            continue
+        canonical = trc.canonical_test_id(key)
+        grouped.setdefault(canonical, []).append((key == canonical, row))
+    normalized: dict[str, dict[str, Any]] = {}
+    for canonical, candidates in grouped.items():
+        _, winner = max(candidates, key=lambda c: _merge_rank(c[0], c[1]))
+        # Key and field must never diverge — downstream mutators address rows by
+        # ``row['test_id']``, not by the dict key.
+        winner['test_id'] = canonical
+        normalized[canonical] = winner
+    return normalized
 
 
 def _prune(state: dict[str, dict[str, Any]], now: datetime) -> dict[str, dict[str, Any]]:
