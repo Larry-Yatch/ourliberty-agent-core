@@ -5769,6 +5769,53 @@ class TestRetractionRunsAfterTheAlerts(_AlertsQueueMixin, unittest.TestCase):
         self.assertIn(('resolve', 'heal-pipeline-stall:'
                        'pipeline-stall:unrouted-pr:PR#900'), order)
 
+    def test_cooldown_state_is_persisted_before_the_retraction(self) -> None:
+        # The other half of the ordering fix. Moving the retraction below the
+        # emit loop puts ~20s of gh calls between "the DM went out" and
+        # "save_state stamped its cooldown". A SIGTERM in that window — the very
+        # kill this reordering exists to survive — loses the stamps for alerts
+        # Larry has ALREADY been DMed, so the next tick re-DMs every one of
+        # them. save_state must land before the pass, never after it.
+        self._seed(self._nudge_line(900))
+        order: list = []
+        real_resolve = self.la.resolve_alert
+
+        def rec_resolve(key, *a, **kw):
+            order.append(('resolve', key))
+            return real_resolve(key, *a, **kw)
+
+        with contextlib.ExitStack() as stack:
+            for name, value in (
+                ('_all_open_prs', []), ('_all_merged_prs_recent', []),
+                ('_all_closed_prs_recent', []), ('_read_recent_log_lines', []),
+                ('_read_recent_routing_events', []),
+            ):
+                stack.enter_context(
+                    patch.object(self.hps, name, return_value=value))
+            for name in [n for n in dir(self.hps) if n.startswith('check_')]:
+                stack.enter_context(
+                    patch.object(self.hps, name, return_value=[]))
+            stack.enter_context(patch.object(
+                self.hps, 'check_forge_built_no_pr',
+                return_value=[self._stall_alert()]))
+            stack.enter_context(patch.object(
+                self.hps, '_gh_pr_state', return_value='MERGED'))
+            stack.enter_context(patch.object(
+                self.la, 'append_alert', return_value=True))
+            stack.enter_context(patch.object(
+                self.la, 'resolve_alert', side_effect=rec_resolve))
+            stack.enter_context(patch.object(
+                self.hps, 'save_state',
+                side_effect=lambda *a, **kw: order.append(('save_state', None))))
+            stack.enter_context(_allow_alerts())
+            self.hps.run()
+        save_at = next(i for i, (k, _) in enumerate(order) if k == 'save_state')
+        resolve_at = next(i for i, (k, _) in enumerate(order) if k == 'resolve')
+        self.assertLess(
+            save_at, resolve_at,
+            'the tick must persist its cooldown stamps BEFORE spending gh calls '
+            f'on the retraction, or a kill re-DMs every alert; got {order}')
+
     def test_quiet_tick_still_saves_state(self) -> None:
         # GUARD: the no-alerts path stamps cooldown state via save_state, and
         # the restructure must not drop that. Passes before the fix.
@@ -5888,6 +5935,41 @@ class TestStandDownIsNotSilencedByItsOwnCooldown(_AlertsQueueMixin,
         self._real_append_tick(
             {self._url(n): 'MERGED' for n in range(900, 920)})
         self.assertEqual(len(self._closures()), 1)
+
+    def test_batch_subject_stays_bounded(self) -> None:
+        # The subject is not only a cooldown key: `chain_event_shipper.
+        # alert_event_task_id` ships it VERBATIM as the chain_events row's
+        # `task_id`, and `larry_alerts._retract_shipped_alert_events` clears
+        # that same column by it. Spelling the whole batch into it put ~700
+        # chars there for 16 PRs, and the live backlog is 55 keys, so a first
+        # run would write a ~2000-char task_id. The longest subject anywhere in
+        # the live queue is 130 chars (measured 2026-08-05), so the batch id
+        # has to be a bounded digest rather than the list itself.
+        self._seed(*[self._nudge_line(n) for n in range(900, 940)])
+        self._real_append_tick(
+            {self._url(n): 'MERGED' for n in range(900, 940)})
+        closures = self._closures()
+        self.assertEqual(len(closures), 1)
+        subject = closures[0]['subject']
+        self.assertLessEqual(
+            len(subject), 120,
+            f'a 40-PR batch must not spell itself into the shipped task_id; '
+            f'got {len(subject)} chars: {subject[:160]}...')
+        self.assertTrue(
+            subject.startswith(self.hps.RETIRED_NUDGE_CLOSURE_SUBJECT + ':'))
+        # ...and the PRs are still named where Larry actually reads them.
+        self.assertIn('ourliberty-agent-core#900', closures[0]['message'])
+
+    def test_two_different_batches_get_different_subjects(self) -> None:
+        # GUARD on the digest: distinct batches must not collide into one
+        # bucket, or the 6h cooldown silences the second one all over again.
+        self._seed(self._nudge_line(900))
+        self._real_append_tick({self._url(900): 'MERGED'})
+        first = self._closures()[0]['subject']
+        self._seed(*(self._queue() + [self._nudge_line(901)]))
+        self._real_append_tick({self._url(901): 'MERGED'})
+        second = self._closures()[1]['subject']
+        self.assertNotEqual(first, second)
 
 
 class TestStandDownNamesTheRepo(_AlertsQueueMixin, unittest.TestCase):

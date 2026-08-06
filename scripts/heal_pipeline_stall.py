@@ -144,6 +144,7 @@ from __future__ import annotations
 
 import argparse
 import functools
+import hashlib
 import json
 import os
 import re
@@ -3524,8 +3525,9 @@ def check_unrouted_open_prs(open_prs: list[dict],
 UNROUTED_NUDGE_SUBJECT_PREFIX = 'pipeline-stall:unrouted-pr'
 
 # Namespace prefix for the closure stand-down's dedup subject. The subject is
-# this prefix plus the BATCH's own PR list, which puts each distinct batch in
-# its own cooldown bucket.
+# this prefix plus a count and a digest of the BATCH's own PR list, which puts
+# each distinct batch in its own cooldown bucket while keeping the string short
+# enough to be a sane `chain_events.task_id`.
 #
 # It was a single stable string, and that silently defeated the stand-down:
 # `append_alert` keys its cooldown on `source:subject` and `INFO_COOLDOWN_SEC`
@@ -3743,13 +3745,21 @@ def retire_dead_unrouted_pr_nudges(
             f'that have all since merged or closed — nothing is left to route '
             f'on any of them: {listed}. Nothing for you to do.'
         ),
-        # Scoped to THIS batch's PRs, not one stable string: a single bucket put
-        # every batch after the first inside one 6h `info` cooldown and removed
-        # its rows in silence. The WHOLE list, not the capped display list, so
-        # two batches sharing their first 12 PRs still announce separately.
-        # `larry_alerts._safe_key` hashes an over-long key, so a 40-PR batch
-        # still yields a valid cooldown filename.
-        subject=f'{RETIRED_NUDGE_CLOSURE_SUBJECT}:{",".join(labels)}',
+        # Scoped to THIS batch, not one stable string: a single bucket put every
+        # batch after the first inside one 6h `info` cooldown and removed its
+        # rows in silence.
+        #
+        # A DIGEST of the batch, not the batch spelled out. `chain_event_shipper
+        # .alert_event_task_id` ships `subject` VERBATIM as the chain_events
+        # row's `task_id` (and `_retract_shipped_alert_events` clears that column
+        # by it), so the listed form wrote a ~700-char task_id for 16 PRs and
+        # would write ~2000 for the 55-key live backlog, against a longest
+        # observed subject of 130 chars. Digest of the WHOLE list, not the capped
+        # display list, so two batches sharing their first 12 PRs still land in
+        # different buckets; the count stays in the clear for a human reading a
+        # log line.
+        subject=(f'{RETIRED_NUDGE_CLOSURE_SUBJECT}:{len(labels)}:'
+                 f'{hashlib.sha256(",".join(labels).encode()).hexdigest()[:12]}'),
         route='closure',
     )
     return removed_total
@@ -4713,6 +4723,16 @@ def run(dry_run: bool = False) -> int:
     #
     # It is NOT behind the `not all_alerts` branch above: dead nudges pile up
     # precisely on quiet ticks, so it must run whether or not anything fired.
+    #
+    # The cooldown stamps are persisted FIRST, immediately below, for the same
+    # reason the pass moved down here. `record_alert` only mutates `state` in
+    # memory; until `save_state` lands, a tick killed during the retraction's gh
+    # calls would lose the stamps for alerts Larry has ALREADY been DMed, and
+    # the next tick would re-DM every one of them. Nothing in the retraction
+    # reads or writes `state`, so persisting before it is free.
+    if not dry_run:
+        save_state(state)
+
     try:
         retracted = retire_dead_unrouted_pr_nudges(gh_state_cache,
                                                    dry_run=dry_run)
@@ -4721,9 +4741,6 @@ def run(dry_run: bool = False) -> int:
     except Exception as e:
         log(f'retire_dead_unrouted_pr_nudges failed: {type(e).__name__}: {e}',
             'ERROR')
-
-    if not dry_run:
-        save_state(state)
     return 0
 
 
