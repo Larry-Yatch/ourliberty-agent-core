@@ -5809,10 +5809,15 @@ class TestRetractionRunsAfterTheAlerts(_AlertsQueueMixin, unittest.TestCase):
                 side_effect=lambda *a, **kw: order.append(('save_state', None))))
             stack.enter_context(_allow_alerts())
             self.hps.run()
-        save_at = next(i for i, (k, _) in enumerate(order) if k == 'save_state')
-        resolve_at = next(i for i, (k, _) in enumerate(order) if k == 'resolve')
+        kinds = [k for k, _ in order]
+        # Asserted as membership FIRST so a missing call FAILS with this message
+        # instead of raising StopIteration out of a bare next(). An ERRORING
+        # test is indistinguishable from a caught mutation, which is exactly how
+        # a void-check gets a false 'guarded'.
+        self.assertIn('save_state', kinds, f'state was never persisted: {order}')
+        self.assertIn('resolve', kinds, f'nothing was retracted: {order}')
         self.assertLess(
-            save_at, resolve_at,
+            kinds.index('save_state'), kinds.index('resolve'),
             'the tick must persist its cooldown stamps BEFORE spending gh calls '
             f'on the retraction, or a kill re-DMs every alert; got {order}')
 
