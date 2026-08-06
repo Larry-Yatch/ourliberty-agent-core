@@ -58,6 +58,7 @@ import os
 import re
 import sys
 import tempfile
+from collections import deque
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Optional
@@ -123,6 +124,23 @@ VALID_TIERS = (1, 2, 3, 4)
 # lowest safe tier, never toward Tier 4).
 GUARD_FALLBACK_TIER = 3
 
+# The alert ledger Check 0 claims its rows from, resolved through the same
+# OURLIBERTY_AGENTS_ROOT env var as every other path in this module (see
+# _larry_alerts_path). guard_tier4's payload-fidelity gate matches the supplied
+# alert against the REAL rows here, so a payload composed from fields of two
+# adjacent rows can never be recorded as an authoritative Tier 4.
+LARRY_ALERTS_REL = 'blackboard/larry-alerts.jsonl'
+
+# How many trailing ledger rows the fidelity gate scans. The guard is invoked
+# same-iter on freshly-claimed alerts, so a real payload is always among the most
+# recent rows; a bounded tail keeps the scan cost flat as the ledger grows.
+FIDELITY_TAIL_ROWS = 200
+
+# The fields whose combination identifies an alert row for fidelity matching.
+# These are exactly the fields classify() keys its tier decision on, so a payload
+# agreeing with a real row on all three classifies identically to that row.
+FIDELITY_FIELDS = ('source', 'intent', 'subject')
+
 # Alert sources that are Pulse's OWN alert writers. A row from one of these was
 # written by Pulse via larry_alerts.append_alert, and delivery to Larry already
 # happened AT WRITE TIME (the bot's _check_pending_alerts gates purely on the
@@ -153,6 +171,11 @@ def _watermark_path() -> Path:
 def _log_path() -> Path:
     root = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', str(Path.home() / 'agents')))
     return root / LOG_REL
+
+
+def _larry_alerts_path() -> Path:
+    root = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', str(Path.home() / 'agents')))
+    return root / LARRY_ALERTS_REL
 
 
 def _now_iso() -> str:
@@ -887,6 +910,46 @@ def triage_alert(alert_id: str, alert: dict[str, Any], *, iter_num: int = 0,
 # -------------------- Tier-4 override guard (Check 0 authority) --------------------
 
 
+def _fidelity_key(row: dict[str, Any]) -> tuple:
+    """The (source, intent, subject) identity of an alert row.
+
+    Uses ``.get`` so an ABSENT field and an explicit null compare equal — real
+    rows write ``"intent": null`` while a hand-built payload often just omits the
+    key, and those describe the same alert."""
+    return tuple(row.get(f) for f in FIDELITY_FIELDS)
+
+
+def _payload_matches_real_alert(alert: dict[str, Any]) -> Optional[bool]:
+    """Does ``alert`` correspond to a real row in the alert ledger?
+
+    Returns True/False when the ledger is readable, and ``None`` when it is NOT
+    (missing or unreadable) — the caller treats None as INERT and preserves the
+    pre-gate behavior. This mirrors the module's existing fail-soft posture on
+    unreadable inputs (``_alerts_file_length``, ``_read_executions_doc``): an IO
+    error must never manufacture a misclassification.
+
+    Only the trailing ``FIDELITY_TAIL_ROWS`` rows are scanned, streamed through a
+    bounded deque so ledger growth costs no extra memory. Individual unparseable
+    lines are skipped rather than aborting the scan: one corrupt line does not
+    make the ledger unreadable, and skipping it can only withhold a match (fail
+    toward the helper), never invent one."""
+    path = _larry_alerts_path()
+    try:
+        with path.open(encoding='utf-8') as fh:
+            tail = deque(fh, maxlen=FIDELITY_TAIL_ROWS)
+    except OSError:
+        return None
+    want = _fidelity_key(alert)
+    for line in tail:
+        try:
+            row = json.loads(line)
+        except (json.JSONDecodeError, ValueError):
+            continue
+        if isinstance(row, dict) and _fidelity_key(row) == want:
+            return True
+    return False
+
+
 def guard_tier4(alert_id: str, alert: Optional[dict[str, Any]], *,
                 iter_num: Optional[int], claimed_tier: int,
                 registry: Optional[dict[str, dict[str, Any]]] = None,
@@ -896,14 +959,20 @@ def guard_tier4(alert_id: str, alert: Optional[dict[str, Any]], *,
     """Structural gate making the deterministic helper authoritative over any
     in-prompt Tier-4 classification.
 
-    A Tier-4 outcome is authoritative ONLY when BOTH hold:
+    A Tier-4 outcome is authoritative ONLY when ALL of these hold:
       (a) ``same_iter_call`` — a same-iter ``triage-alert`` row is recorded for
           ``alert_id`` (its persisted ``last_triaged_iter`` equals ``iter_num``),
           proving the helper was actually invoked THIS iter, AND
       (b) ``helper_tier == 4`` — a FRESH deterministic ``classify()`` of the
-          alert also returns Tier 4.
+          alert also returns Tier 4, AND
+      (c) payload fidelity — the supplied ``alert`` corresponds to a REAL row in
+          ``larry-alerts.jsonl`` (see ``_payload_matches_real_alert``). Gates
+          (a)+(b) only prove the claimed tier is CONSISTENT with the payload;
+          they say nothing about whether the payload is a real alert. This gate
+          is checked only on the Tier-4 accept path, and is INERT when the ledger
+          is missing/unreadable.
 
-    ``accepted`` is true iff both hold; then ``authoritative_tier == 4``.
+    ``accepted`` is true iff ALL hold; then ``authoritative_tier == 4``.
     Otherwise ``authoritative_tier == helper_tier`` — the deterministic helper
     wins (fail toward the helper). If ``classify()`` cannot run at all (alert
     missing/unparseable), there is no helper tier, so the verdict falls to
@@ -913,6 +982,12 @@ def guard_tier4(alert_id: str, alert: Optional[dict[str, Any]], *,
     Tier 3 on a ``medic/medic-diagnosis`` alert and the cycle LLM hand-wrote
     Tier 4 anyway. Re-running the pure, data-driven ``classify()`` here means a
     skipped OR overridden helper call can never yield a persisted Tier 4.
+
+    Gate (c) closes the adjacent 2026-08-06 hole: Check 0 composed ONE synthetic
+    alert out of two real adjacent rows (a medic row's ``source``+``intent``
+    welded onto a healer row's ``subject``) and the guard rubber-stamped it,
+    because it re-classified the caller's dict without ever comparing it to the
+    ledger. Both real rows classify Tier 3; only the composite reached Tier 4.
 
     Pure: reads state + runs ``classify``; writes nothing. Returns
     ``{authoritative_tier:int, accepted:bool, helper_tier:int,
@@ -958,6 +1033,29 @@ def guard_tier4(alert_id: str, alert: Optional[dict[str, Any]], *,
         }
 
     accepted = bool(helper_tier == 4 and same_iter_call)
+
+    # (c) Payload fidelity — ONLY on the Tier-4 accept path. Gates (a)+(b) prove
+    # the claimed tier is consistent with the payload; neither proves the payload
+    # is a real alert. A payload COMPOSED from fields of two adjacent rows (the
+    # 2026-08-06 incident: medic's source+intent welded onto the healer row's
+    # subject) classifies Tier 4 while BOTH real rows classify Tier 3. Requiring
+    # the payload to correspond to an actual ledger row closes that. Tiers 1/2/3
+    # are untouched — this gate only ever removes an unearned Tier 4.
+    if accepted and _payload_matches_real_alert(alert) is False:
+        return {
+            'authoritative_tier': GUARD_FALLBACK_TIER,
+            'accepted': False,
+            'helper_tier': helper_tier,
+            'same_iter_call': same_iter_call,
+            'reason': (
+                'rejected: payload fidelity — no row in the last '
+                f'{FIDELITY_TAIL_ROWS} of {LARRY_ALERTS_REL} matches this '
+                f'alert\'s {"/".join(FIDELITY_FIELDS)} '
+                f'{_fidelity_key(alert)!r}; a composed/fabricated payload is not '
+                f'a novel alert — falling to safe Tier {GUARD_FALLBACK_TIER}, '
+                'never Tier 4'),
+        }
+
     if accepted:
         reason = ('accepted: helper classify()==4 AND a same-iter triage-alert '
                   f'call is recorded (iter={iter_num}) — genuine novel Tier 4')
