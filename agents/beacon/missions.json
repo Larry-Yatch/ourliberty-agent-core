@@ -17916,7 +17916,7 @@
     {
       "id": "approvals-tab-informational-cards",
       "name": "Approvals Tab Informational Cards",
-      "phase": "drafting",
+      "phase": "shipped",
       "brief": "Larry chose Option B on direction-ask `approvals-tab-nonbinary-contract-001` (2026-08-05): widen the Approvals tab so non-binary awaiting-Larry items become informational cards with an `acknowledge` exit, rather than narrowing the drift sentinel.",
       "spec_docs": [
         "agents/beacon/specs/approvals-tab-informational-cards.md"
@@ -17926,7 +17926,10 @@
       ],
       "repo": "ourliberty-agent-core",
       "created": "2026-08-05",
-      "deferred_reason": null
+      "deferred_reason": null,
+      "shipped_at": "2026-08-06T00:11:29.948350+00:00",
+      "shipped_by": "heal_missions_card_gc",
+      "prior_phase": "drafting"
     }
   ]
 }
