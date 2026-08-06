@@ -38029,3 +38029,81 @@ ourliberty-dashboard: 0 open PRs.
 
 ---
 
+## Iteration ~8172 — 2026-08-06T03:41Z UTC (Larry /loop /cycle chat, Tier 3→1 [Check 0: watermark 583→585; alert 584 Tier-3 known-pattern; alert 585 Tier-4 genuine novel G-rule 3/3 dispatch; Check 1: NOMINAL ✅; Check 3: CLEAN ✅ (DRY-RUN=0); Check 4: CLEAN ✅ (pending=0); Check 5: NOMINAL ✅; NON-CLEAN → Tier 3→1])
+
+**Health:** ⚠️ NON-CLEAN — Check 0: 2 new alerts; alert 585 (medic-diagnosis PR#192) genuine Tier-4. Medic already DM'd Larry (idx=584 at 03:17:45-0600). G-rule `medic-diagnosis-subject-specific-tier4-no-translation-001` → 3/3 → dispatched to Beacon. All other checks nominal. No open PRs. No pending approvals. All bots healthy. Tier reset 3→1.
+
+**VERIFY-BEFORE-REASSERT (from iter ~8171 at ~03:01Z UTC 2026-08-06):**
+- **"0 open PRs"**: CONFIRMED → ourliberty-agent-core: 0, ourliberty-dashboard: 0. [confirmed ✅]
+- **"system-health overall=healthy, all 4 bots alive"**: CONFIRMED → system-health.json ts=2026-08-06T03:33:17Z UTC; overall=healthy; all 4 bots alive. [confirmed ✅]
+- **"HEAD=f6991291 (Pulse cycle 20260806T024411Z)==origin/main"**: STATE-CHANGE → HEAD=dd2d7e0d (Pulse cycle 20260806T030452Z)==origin/main. [expected auto-commit ✅]
+- **"All inboxes empty"**: CONFIRMED → forge=0, beacon=0, mirror=0, pulse=0 (pre-dispatch). [confirmed ✅]
+- **"Check 3 CLEAN (DRY-RUN=0)"**: CONFIRMED → no stalls detected; unrouted_open_pr:Larry-Yatch/RSDPM:192 suppressed (cooldown). [confirmed ✅]
+
+**Check 0 — Alert triage (~03:37Z UTC):** repair-watermark: repaired=false (old_watermark=583, file_length=585). **2 new alerts** (lines 584-585).
+- Alert 584 (heal-pipeline-stall, subject=pipeline-stall:unrouted-pr:PR#192, ts=03:14:27Z UTC): triage-alert → **Tier 3** (known-pattern match in alert-translations.json). Route=digest. Silence + journal. No tier-reset. ✅
+- Alert 585 (source=medic, intent=medic-diagnosis, subject=pipeline-stall:unrouted-pr:PR#192, ts=03:16:30Z UTC): triage-alert → **Tier 4** (novel: no registry template, no translation match). Route=escalate. guard-tier4 → `{"authoritative_tier": 4, "accepted": true, "helper_tier": 4, "same_iter_call": true}` — genuine Tier-4. Medic already DM'd Larry (idx=584 at [2026-08-05T21:17:45-0600] = 03:17:45Z UTC); no Pulse DM. G-rule `medic-diagnosis-subject-specific-tier4-no-translation-001` → **3/3** → dispatched `direction-ask-medic-diagnosis-unrouted-pr-translation-001` to Beacon inbox. Tier-reset.
+- Context: RSDPM PR#192 (feat/onboard-a-second-host, "feat(onboard): give a second person a working desk") is an externally-authored feat/ branch. heal-pipeline-stall DM'd Larry (idx=583) and medic DM'd (idx=584). Larry already notified by both paths. No further Pulse action on the PR.
+**NON-NOMINAL ⚠️ (Tier-4 genuine novel → tier-reset)**
+
+**Check 1 — Log noise (~03:37Z UTC):** outbox-notifier.log: last entry 2026-08-05T18:13:29 local = 2026-08-06T00:13:29Z UTC (~3.4h ago; idle since PR#1101 auto-merge). 0 WARN/ERROR. inbox_watcher.log: last entry 2026-08-06T00:14:47Z UTC; 0 WARN/ERROR. (Telegram deliveries idx=583/584 at 03:17Z UTC came via direct bot path; outbox-notifier idle is expected.)
+**NOMINAL ✅**
+
+**Check 2 — Telegram sweep (~03:37Z UTC):** beacon_telegram_bot.log: last delivery idx=584 (notification, intent=medic-diagnosis) at [2026-08-05T21:17:45-0600] = 2026-08-06T03:17:45Z UTC; prior idx=583 (source=heal-pipeline-stall, subject=pipeline-stall:unrouted-pr:PR#192). No Larry directive messages.
+**NOMINAL ✅**
+
+**Check 3 — Pipeline stall (~03:36Z UTC):** heal_pipeline_stall.py --dry-run → **"no stalls detected"** (DRY-RUN=0). unrouted_open_pr:Larry-Yatch/RSDPM:192 suppressed (cooldown). FORGE_NO_PR_SKIP: same 5 benign merged PRs (PR#1100, pr-RSDPM-172, PR#1101, PR#1102, PR#1103). All benign.
+**CLEAN ✅**
+
+**Check 4 — Pending directives (~03:37Z UTC):** beacon-pending-approvals.json: **pending=0**.
+**CLEAN ✅**
+
+**Check 5 — Stale daemon code (~03:37Z UTC):** heal-stale-daemon-code.heartbeat: 2026-08-06T03:33:16Z UTC (~8min before check). Within 60min threshold.
+**NOMINAL ✅**
+
+**Check A — Source repo (~03:37Z UTC):** branch=main, tree CLEAN ✅, HEAD=dd2d7e0d (Pulse cycle 20260806T030452Z)==origin/main (behind=0, ahead=0). **NOMINAL ✅**
+**Check B — Sync health (~03:37Z UTC):** agent-core-sync.json: last_sync=2026-08-06T03:26:44Z UTC (~11min; status=no-change). Within 2h threshold. **NOMINAL ✅**
+**Check C — Agent liveness (~03:37Z UTC):** system-health.json ts=2026-08-06T03:33:17Z UTC (~4min); overall=healthy. All 4 bots alive (beacon/forge/mirror/pulse). **NOMINAL ✅**
+**Check E — PR/merge state (~03:37Z UTC):** ourliberty-agent-core: **0 open PRs**. ourliberty-dashboard: 0 open PRs.
+**CLEAN ✅**
+**Check H — All inboxes (~03:37Z UTC):** forge=0. beacon=0. mirror=0. pulse=0. (Beacon inbox received 1 new direction-ask this cycle.)
+**NOMINAL ✅**
+
+**§5.0 one-shots:** audit_due_nudge → no committed audit baseline; no-op. distill_detector → no un-distilled audits; no-op. audit_cadence_signal → no-op. **NOMINAL ✅**
+**§5 periodic — Check I:** last artifact=check-i-2026-08-05.json (Wed Aug 5). Today Thu Aug 6 = off-day (UTC weekday=3). Next firing Fri Aug 7. QUIET ✅
+**§5 periodic — Check XIV:** last=check-xiv-2026-08-04.json (as_of=2026-08-04T23:52:17Z UTC; 9 recurring_novel_candidates: outbox-notifier x50, ourliberty-health x17, heal-pipeline-stall x9). No new artifact. QUIET ✅
+**§5 periodic — Check III:** last=check-iii-2026-07-26.json. 14d gate until 2026-08-09 (3d away). QUIET ✅
+**§5 periodic — Check VIII:** already_deprecated. QUIET ✅
+
+**Rotations (~03:37Z UTC):** SUPABASE_SERVICE_ROLE_KEY: due=2026-08-22 (~16d); last_dm=2026-08-03T22:52:32Z UTC (~3d ago); 14d dedup window active. No new DM. ✅ All other credentials >60d out. ✅
+
+**G-rule tracking:**
+- `pulse-triage-self-report-should-be-tier3-001` **RESOLVED ✅**: 0 new bounce-backs. [carry ✅]
+- `pulse-check-xiv-tier4-no-translation-001` **CLOSED ✅**: PR#1101 merged (48409e32). [carry ✅]
+- `heal-pipeline-stall-unrouted-pr-stranded-tier4-no-translation-001` **CLOSED ✅**: PR#1103 merged (93ea91f8). [carry ✅]
+- `approvals-informational-cards-spec-001` **SPEC IN MAIN (PR#1102, cd886496)**: 3 impl steps remain. [SPEC IN MAIN; IMPL NEXT]
+- `medic-diagnosis-subject-specific-tier4-no-translation-001` **3/3 → DISPATCHED** (iter ~8172): alert 585 confirmed Tier-4 (guard accepted). Beacon direction-ask `direction-ask-medic-diagnosis-unrouted-pr-translation-001` written to inbox. Fix: add `source=medic, intent=medic-diagnosis, subject^=pipeline-stall:unrouted-pr:` as Tier-3 entry in config/alert-translations.json. [DISPATCHED; AWAIT BEACON]
+- `outbox-notifier-approval-request-tier4-no-translation-001` [2/3]: no new occurrence. [WATCH]
+- `heal-approvals-surface-drift-tier4-nonbinary-001` [1/3]: no new occurrence. [WATCH]
+- `enable-pr-auto-merge-reviewdecision-guard-001` [1/3]: no new occurrence. [WATCH]
+- `heal-pipeline-stall-no-mirror-dispatch-tier4-no-translation-001` [1/3]: no new occurrence. [WATCH]
+- `beacon-review-escalate-tier4-no-translation-001` [1/3]: no new occurrence. [WATCH]
+
+**Actions taken:**
+- alert_triage_state.py set-watermark --line 585 (advanced from 583).
+- Beacon inbox: wrote `direction-ask-medic-diagnosis-unrouted-pr-translation-001.json` (G-rule 3/3 fix: add Tier-3 translation for `source=medic, intent=medic-diagnosis, subject^=pipeline-stall:unrouted-pr:`).
+- PRIME DIRECTIVE: `intervention` appended at 03:41:18Z UTC (tier=1; kind=intervention; template=medic-diagnosis-unrouted-pr-tier4-no-translation).
+- Tier state: `cycle_tier_state.py record --checks-clean false` → **tier=1, consecutive_clean=0** (reset 3→1; last_signal_at=2026-08-06T03:41:21Z UTC).
+
+**Escalations:** No Pulse DM — medic delivered idx=584 at 03:17:45-0600 (RSDPM PR#192 unrouted). G-rule dispatch to Beacon is the permanent-fix path.
+
+**PRIME DIRECTIVE (post-action):** intervention appended. Trailing 30d: interventions≈2128, systemic_fixes=49, ratio≈43.43 (trend: worsening).
+
+**Patterns:**
+- **[yellow] G-rule dispatched — medic-diagnosis-subject-specific-tier4-no-translation-001**: 3rd occurrence of `source=medic, intent=medic-diagnosis, subject=pipeline-stall:unrouted-pr:PR#N` returning Tier-4. When heal-pipeline-stall fires about an unrouted PR, medic pairs a direct DM to Larry. Pulse seeing a Tier-4 would be a 3rd DM for the same issue. Fix: add prefix-match Tier-3 entry so Check 0 silences it without blocking medic's own delivery path.
+- **[INFO] RSDPM PR#192 (feat/onboard-a-second-host)**: Larry has been DM'd by healer + medic. To route a Mirror review: `dispatch mirror review pr=https://github.com/Larry-Yatch/RSDPM/pull/192` from Beacon chat. Pulse's role complete.
+
+**Tier end-of-iter:** **Tier 1** (reset from Tier 3; signal: Tier-4 genuine novel alert). Next de-escalation: 3 consecutive clean Tier-1 iters.
+
+---
+
