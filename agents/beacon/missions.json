@@ -17952,6 +17952,23 @@
       "retired_at": "2026-08-06T19:55:02.993480+00:00",
       "retired_reason": "orphan-terminal",
       "retired_signal": "pr_merged:#933"
+    },
+    {
+      "id": "proposed-threshold-proposal-2026-07-12",
+      "name": "Threshold Proposal 2026 07 12",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `threshold-proposal-2026-07-12`. Last activity 2026-07-12T10:42:59.661893+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "threshold-proposal-2026-07-12"
+      ],
+      "repo": null,
+      "created": "2026-08-06",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-06T21:40:20.224548+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-07-12T10:42:59.661893+00:00"
     }
   ]
 }
