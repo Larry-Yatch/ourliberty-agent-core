@@ -36423,3 +36423,102 @@ ourliberty-dashboard: 0 open PRs. RSDPM (Larry-Yatch/RSDPM): **3 open PRs**:
 
 ---
 
+## Iteration ~8133 — 2026-08-06T00:08Z UTC (Larry /cycle chat, Tier 1 [Check 0: 3 new alerts all Tier-3 silence NOMINAL ✅; Check 1: NOMINAL ✅; Check 3: CLEAN ✅ (DRY-RUN=0); Check 4: pending=1 (PR#1096 review_escalate — unchanged); Check 5: NOMINAL ✅; NOT-CLEAN consecutive_clean=0])
+
+**Health:** ⚠️ NOT-CLEAN — Check 4: pending=1 (PR#1096 review_escalate, ~54min). Check E: PR#1096 needs Larry decision; RSDPM#181 CONFLICTING (~22h); RSDPM#189 approaching/at stall (~58min). **STATE-CHANGE: PR#1102 (approvals-informational-cards-spec-001) MERGED** at 00:04:26Z UTC (commit cd886496); Mirror .claimed/1 cleared. PR#1103 review still IN PROGRESS in .claimed/0. PR#1101 auto-merge still HELD behind PR#1103. Forge inbox EMPTY. All other checks NOMINAL.
+
+**VERIFY-BEFORE-REASSERT (from iter ~8131 at ~00:05Z UTC 2026-08-06):**
+- **"Check 4: pending=1 (PR#1096 review_escalate)"**: CONFIRMED → id=mirror-review-pr-ourliberty-agent-core-1096-ff5df116, created 23:14:54Z UTC, status=pending (~54min). [confirmed ✅]
+- **"system-health overall=healthy, all 4 bots alive"**: CONFIRMED → system-health.json ts=2026-08-06T00:03:40Z UTC (~5min before check); overall=healthy; all 4 bots alive. heal-stale-daemon-code.heartbeat=2026-08-06T00:01:27Z UTC (fresh ~7min). [confirmed ✅]
+- **"HEAD=010683bc (Pulse cycle 20260806T000745Z)"**: CONFIRMED → HEAD=010683bc == origin/main (clean, on main). [confirmed ✅]
+- **"Forge inbox EMPTY"**: CONFIRMED → forge inbox empty. [confirmed ✅]
+- **"PR#1101 auto-merge-held behind PR#1103"**: CONFIRMED → PR#1101 still MERGEABLE rd=''; PR#1103 review still in .claimed/0. [confirmed ✅]
+- **"PR#1102 IN MIRROR REVIEW (.claimed/1)"**: STATE-CHANGE → Mirror PASSED + auto-merged at 00:04:26Z UTC; commit cd886496. .claimed/1 now CLEARED. [state-change ✅]
+- **"PR#1103 review IN PROGRESS (.claimed/0)"**: CONFIRMED → review-alert-translations-unrouted-pr-stranded-001.json still in .claimed/0. [confirmed ✅]
+- **"RSDPM PR#189 approaching stall (~53min)"**: CONFIRMED → now ~58min MERGEABLE rd=''; still open; healer not yet firing (RSDPM:181+188 in cooldown suppresses per dry-run output). [confirmed ✅]
+- **"RSDPM PR#181 CONFLICTING (~21.7h)"**: CONFIRMED → still CONFLICTING, now ~22h. [confirmed ✅]
+- **"RSDPM PR#188 stall healer fired+cooldown"**: CONFIRMED → still MERGEABLE rd=''; suppressed (cooldown) per DRY-RUN. [confirmed ✅]
+
+**Check 0 — Alert triage (~00:09Z UTC):** repair-watermark: repaired=false (old_watermark=632, file_length=635). **3 new alerts:**
+- **Line 633** (alert_id=633): `source=heal-wedged-review-sessions, subject=wedged-review-silent:wt-mirror-approvals-informational-cards-spec-001, tier_source=translation, tier=SOON, route=escalate` — fired at 00:03:40Z UTC (session idle ~20min). Alert-only (Case 2 not yet graduated). Delivered to Larry as idx=632. Triaged: **Tier-3 silence** (known-pattern: heal-wedged-review-sessions). Note: turned out to be a false alarm — PR#1102 review completed 46s later and auto-merged.
+- **Line 634** (alert_id=634): `source=missions-autoregister, subject=proposed:needs-decision, tier=FYI, route=digest` — 3 proposed cards past 14d need keep/drop decision. route=digest; skipped DM. Triaged: **Tier-3 silence** (known-pattern).
+- **Line 635** (alert_id=635): `source=outbox-notifier, kind=notification, intent=review-pass` — PR#1102 auto-merged + branch deleted. Delivered as idx=634 at 00:06:03Z UTC. Triaged: **Tier-3 silence** (known-pattern: review-pass).
+Watermark advanced 632→635.
+**NOMINAL ✅**
+
+**Check 1 — Log noise (~00:08Z UTC):** outbox-notifier.log last entry=18:04:26 MDT (00:04:26Z UTC) — queued completion DM for PR#1102 review-pass. No WARNs or ERRORs above threshold.
+**NOMINAL ✅**
+
+**Check 2 — Telegram sweep (~00:08Z UTC):** beacon_telegram_bot.log: last delivery idx=634 at [2026-08-05T18:06:03-0600] = 00:06:03Z UTC (intent=review-pass, PR#1102). No Larry directive messages in last 4h.
+**NOMINAL ✅**
+
+**Check 3 — Pipeline stall (~00:09Z UTC):** heal_pipeline_stall.py --dry-run → **"DRY-RUN: 0 alert(s) would fire, 0 recovery(ies) would be attempted."** FORGE_NO_PR_SKIP: pulse-auto-4c6c74f626-20260805 (PR#1100 exists). RSDPM:181+188 suppressed (cooldown).
+**CLEAN ✅**
+
+**Check 4 — Pending directives (~00:09Z UTC):** `~/agents/state/beacon-pending-approvals.json`: **pending=1** (unchanged from iter ~8131):
+- `mirror-review-pr-ourliberty-agent-core-1096-ff5df116` (created 2026-08-05T23:14:54Z UTC, ~54min ago): Session-less Mirror review_escalate for PR#1096. decision_key=pr-ourliberty-agent-core-1096-ff5df116; status=pending. Larry decision: A) Merge past flaky gate (PromoteRaceTest 4th documented instance; Mirror recommends) or B) Fix race test first. **Larry: Approvals tab.**
+**NOT-CLEAN ⚠️**
+
+**Check 5 — Stale daemon code (~00:08Z UTC):** heal-stale-daemon-code.heartbeat: 2026-08-06T00:01:27Z UTC (~7min before check). Within 60min threshold.
+**NOMINAL ✅**
+
+**Check A — Source repo (~00:08Z UTC):** branch=main, tree CLEAN ✅, HEAD=010683bc (Pulse cycle 20260806T000745Z). HEAD==origin/main (behind=0, ahead=0). **NOMINAL ✅**
+**Check B — Sync health (~00:08Z UTC):** agent-core-sync.json: last_sync=2026-08-05T23:26:20Z UTC (~42min; status=no-change). Within 2h threshold. **NOMINAL ✅**
+**Check C — Agent liveness (~00:08Z UTC):** system-health.json ts=2026-08-06T00:03:40Z UTC (~5min); overall=healthy. All 4 bots alive (beacon/forge/mirror/pulse). **NOMINAL ✅**
+**Check E — PR/merge state (~00:09Z UTC):** ourliberty-agent-core: **3 open PRs** (STATE-CHANGE: PR#1102 MERGED cd886496):
+- **#1103** `config(alerts): translate the stranded-unrouted-PR healer nudge` — mss=MERGEABLE, rd='', age=~28min; Mirror review IN PROGRESS (.claimed/0). [INFO — in review]
+- **#1101** `fix(alerts): translate pulse-check-xiv subjects to de-duplicate Check 0 DMs` — mss=MERGEABLE, rd='', age=~34min; Mirror PASS'd; AUTO_MERGE_HELD behind #1103. Will auto-merge when PR#1103 resolves. [INFO — auto-merge pending]
+- **#1096** `fix(alerts): retract this healer's own unrouted-PR nudges once the PR lands` — mss=MERGEABLE, rd='', age=~47h. review_escalate; approval_request pending. [⚠️ NEEDS LARRY DECISION]
+ourliberty-dashboard: 0 open PRs. RSDPM (Larry-Yatch/RSDPM): **3 open PRs**:
+- **#189** `fix(deploy): a clean verified apply now resolves the apply-on-merge card` — mss=MERGEABLE, rd='', age=~58min. Approaching/at stall; healer not yet firing (RSDPM:181+188 cooldown suppresses PR#189 dry-run). [⚠️ watch — ~58min]
+- **#188** `fix(M6): the briefing under-counted by exactly the names` — mss=MERGEABLE, rd='', age=~96min. Stall healer fired+cooldown; Larry alerted (idx=629). [INFO — healer delivered, in cooldown]
+- **#181** `[M5-amendment] make person and organization drafts confirmable` — mss=CONFLICTING, rd='', age=~22h. Forge rebase needed. [⚠️ CONFLICTING]
+**NOT-CLEAN ⚠️** (PR#1096 review_escalate; RSDPM #181 CONFLICTING; RSDPM #189 ~58min watch)
+**Check H — All inboxes (~00:09Z UTC):** mirror root=EMPTY. mirror .claimed/0=1 (review-alert-translations-unrouted-pr-stranded-001.json — PR#1103 in review). mirror .claimed/1=EMPTY (PR#1102 review DONE, cleared). forge=0 active. beacon=0. pulse=0.
+**NOMINAL ✅** (all active items expected pipeline state)
+
+**§5.0 one-shots:** audit_due_nudge → no-op. distill_detector → no-op. audit_cadence_signal → no-op. **NOMINAL ✅**
+**§5 periodic — Check I:** last artifact=check-i-2026-08-05.json (Wed Aug 5). Next firing Fri Aug 7. Today Thu Aug 6 = off-day. QUIET ✅
+**§5 periodic — Check XIV:** last=check-xiv-2026-08-04.json (Mon Aug 4). Today Thu Aug 6. QUIET ✅
+**§5 periodic — Check III:** last=check-iii-2026-07-26.json. 14d gate until 2026-08-09 (3d away). QUIET ✅
+**§5 periodic — Check VIII:** already_deprecated. QUIET ✅
+
+**Rotations (~00:09Z UTC):** SUPABASE_SERVICE_ROLE_KEY: due=2026-08-22 (~16d); last_dm=2026-08-03T22:52:32Z UTC (~2.2d ago); 14d dedup window active. No new DM. ✅ All other credentials 2027+ (>60d). ✅
+
+**G-rule tracking:**
+- `pulse-triage-self-report-should-be-tier3-001` **RESOLVED ✅**: 0 new source=pulse bounce-backs. [carry ✅]
+- `pulse-check-xiv-tier4-no-translation-001` **AUTO-MERGE-HELD**: PR#1101 Mirror PASS'd; waiting for PR#1103 (same file overlap: config/alert-translations.json). Will auto-merge once PR#1103 resolves. [PENDING AUTO-MERGE]
+- `heal-pipeline-stall-unrouted-pr-stranded-tier4-no-translation-001` **IN MIRROR REVIEW**: PR#1103 review still in .claimed/0. [REVIEWING]
+- `approvals-informational-cards-spec-001` **STATE-CHANGE → SPEC MERGED**: PR#1102 MERGED (cd886496) at 00:04:26Z UTC. Option B spec is now in main. 3 impl steps remain per plan. [SPEC IN MAIN; IMPL NEXT]
+- `medic-diagnosis-subject-specific-tier4-no-translation-001` [2/3]: no new occurrence. [WATCH]
+- `outbox-notifier-approval-request-tier4-no-translation-001` [2/3]: no new occurrence. [WATCH]
+- `enable-pr-auto-merge-reviewdecision-guard-001` [1/3]: no new occurrence. [carry ✅]
+- `heal-pipeline-stall-no-mirror-dispatch-tier4-no-translation-001` [1/3]: no new occurrence. [carry ✅]
+- `beacon-review-escalate-tier4-no-translation-001` [1/3]: no new occurrence. [WATCH]
+
+**Actions taken:**
+- Check 0: triaged alert_id=633 (Tier-3 silence) + alert_id=634 (Tier-3 silence) + alert_id=635 (Tier-3 silence). Watermark advanced 632→635.
+- PRIME DIRECTIVE: `intervention` appended at 00:13:13Z UTC (kind=intervention; tier=1; template=check-4-pending-pr1096-review-escalate; detail=PR#1096 review_escalate ~54min unchanged; RSDPM#181 CONFLICTING ~22h; RSDPM#188+189 stall-watch; PR#1101 auto-merge-held behind PR#1103 (in Mirror review); PR#1102 MERGED (cd886496); Forge EMPTY).
+- Tier state: `cycle_tier_state.py record --checks-clean false` → **tier=1, consecutive_clean=0** (last_signal_at=2026-08-06T00:13:14Z UTC).
+
+**Escalations:**
+- **Check 4 pending=1 — PR#1096 review_escalate**: Approval_request already queued; bot delivered idx=628 at 23:25:40Z UTC. [no additional Pulse DM — already delivered]
+- **RSDPM PR#181**: CONFLICTING (~22h). Forge rebase needed. Healer in cooldown. [no new DM]
+- **RSDPM PR#188**: Stall healer already delivered idx=629 at 23:50:53Z UTC. [no new DM]
+- **RSDPM PR#189**: ~58min, stall healer not yet firing for this PR (PR:181+188 cooldown in play). Will surface via healer's own timer when cooldown expires. [no manual escalation — routine healer path]
+- **Wedge false alarm (alert 633)**: heal-wedged-review-sessions correctly stayed alert-only (Case 2 not graduated); review completed naturally 46s later. Pattern signal: ~20min detection threshold may be tight for long-running Mirror reviews. [journal note only — no action]
+
+**PRIME DIRECTIVE (post-action):** intervention appended (kind=intervention; trailing 30d: interventions=2110+, systemic_fixes=47, ratio≈44.91, trend=worsening).
+
+**Patterns:**
+- **[⚠️ steady ~54min] PR#1096 review_escalate**: pending=1 unchanged. Larry decision via Approvals tab: A) Merge past flaky gate (PromoteRaceTest 4th documented instance; Mirror recommends) or B) Fix race test first.
+- **[⚠️ CONFLICTING ~22h] RSDPM PR#181**: Unchanged — Forge rebase still pending.
+- **[STATE-CHANGE ✅ MERGED] PR#1102**: `docs(specs): adopt approvals-tab informational-cards design (Option B)` merged (cd886496) at 00:04:26Z UTC. Option B spec is in main — 3 impl steps follow per plan.
+- **[IN MIRROR REVIEW] PR#1103**: review-alert-translations-unrouted-pr-stranded-001.json in .claimed/0. When Mirror passes, PR#1103 auto-merges → unblocks PR#1101 (auto-merge-held on same file).
+- **[AUTO-MERGE-PENDING] PR#1101**: waiting on PR#1103. Merge order: #1103 first, then #1101.
+- **[⚠️ watch ~58min] RSDPM PR#189**: MERGEABLE rd=''; fix/* branch, no labels. Stall healer timer will fire when PR:181+188 cooldown expires or on next scheduled run.
+
+**Tier end-of-iter:** **Tier 1** (consecutive_clean=0; 5-min cadence active). Blockers: Check 4 pending=1 (PR#1096, Larry decision), RSDPM PR#181 CONFLICTING, RSDPM PR#189 approaching stall.
+
+---
+
