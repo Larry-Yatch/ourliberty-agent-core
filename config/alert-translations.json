@@ -160,6 +160,12 @@
       "plain_language_summary": "An open PR has no Mirror review-request logged — an externally-authored PR skipped the notifier's auto-dispatch, so Mirror won't review it until you route it manually.",
       "recommended_action": "Route it from Beacon chat: `dispatch mirror review pr=<url>` (the raw alert below carries the exact PR URL and a routing-events tail to verify it fired)."
     },
+    "pipeline-stall:unrouted-pr-stranded": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "plain_language_summary": "An open PR has sat past the 24h unrouted-PR scan window and STILL has no Mirror review — a clean PR that was never labeled can stay stranded indefinitely. This is the one-time stranded nudge, keyed on the PR's head SHA, so it only re-fires if a new commit is pushed.",
+      "recommended_action": "Route it: add the `auto-review` label to send it through Mirror, or from Beacon chat run `dispatch mirror review pr=<url>` (the raw alert below carries the exact PR URL). Nudge-only — the healer deliberately never auto-labels or auto-routes, per the label opt-in carve-out."
+    },
     "stalled-pending-sequence": {
       "severity": "WARNING",
       "tier": "SOON",
