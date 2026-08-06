@@ -1093,6 +1093,166 @@ class TestGuardTier4(_ATSTestBase):
             self.assertNotEqual(verdict['authoritative_tier'], 4)
 
 
+class TestGuardTier4PayloadFidelity(_ATSTestBase):
+    """Gate (c): accepting Tier 4 additionally requires the payload to correspond
+    to a REAL larry-alerts.jsonl row (the 2026-08-06 composed-alert incident).
+
+    Gates (a)+(b) only prove the claimed tier is CONSISTENT with the payload —
+    they never ask whether the payload is an alert that actually exists."""
+
+    # The two REAL adjacent rows (idx 583/584). Check 0 welded the medic row's
+    # source+intent onto the healer row's subject and classified the weld.
+    HEALER_ROW = {'ts': '2026-08-06T03:14:27.955974+00:00',
+                  'source': 'heal-pipeline-stall', 'intent': None,
+                  'subject': 'pipeline-stall:unrouted-pr:PR#192'}
+    MEDIC_ROW = {'ts': '2026-08-06T03:16:30.796208+00:00', 'source': 'medic',
+                 'intent': 'medic-diagnosis', 'subject': None}
+    COMPOSITE = {'source': 'medic', 'intent': 'medic-diagnosis',
+                 'subject': 'pipeline-stall:unrouted-pr:PR#192'}
+
+    # Fixture-novel → the fixture helper classifies this Tier 4.
+    NOVEL = {'source': 's', 'subject': 'sub'}
+
+    def _ledger_path(self) -> Path:
+        return self.tmp / ats.LARRY_ALERTS_REL
+
+    def _write_ledger(self, rows) -> Path:
+        path = self._ledger_path()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(''.join(json.dumps(r) + '\n' for r in rows),
+                        encoding='utf-8')
+        return path
+
+    def _guard(self, alert_id, alert, *, iter_num):
+        return ats.guard_tier4(alert_id, alert, iter_num=iter_num, claimed_tier=4,
+                               registry=_FIXTURE_REGISTRY,
+                               translations=_FIXTURE_TRANSLATIONS,
+                               route_fn=_route_stub)
+
+    def _record_same_iter(self, alert_id, alert, iter_num):
+        ats.triage_alert(alert_id, alert, iter_num=iter_num,
+                         registry=_FIXTURE_REGISTRY,
+                         translations=_FIXTURE_TRANSLATIONS, route_fn=_route_stub)
+
+    # ---- no-match branch: the incident ----
+
+    def test_incident_composite_payload_rejected(self):
+        # LIVE config, both real rows present. The composite is not among them.
+        self._write_ledger([self.HEALER_ROW, self.MEDIC_ROW])
+        ats.triage_alert('composite', self.COMPOSITE, iter_num=11)
+        verdict = ats.guard_tier4('composite', self.COMPOSITE, iter_num=11,
+                                  claimed_tier=4)
+        # Gates (a) and (b) BOTH pass — this is exactly why the guard was fooled.
+        self.assertTrue(verdict['same_iter_call'])
+        self.assertEqual(verdict['helper_tier'], 4)
+        # Gate (c) refuses it anyway.
+        self.assertFalse(verdict['accepted'])
+        self.assertEqual(verdict['authoritative_tier'], 3)
+        self.assertIn('fidelity', verdict['reason'])
+
+    def test_both_real_rows_still_classify_tier3(self):
+        # The premise of the incident: neither real row is novel on its own; only
+        # the weld of the two reaches Tier 4.
+        reg, trans = ats.load_registry(), ats.load_translations()
+        for row in (self.HEALER_ROW, self.MEDIC_ROW):
+            result = ats.classify(row, registry=reg, translations=trans)
+            self.assertEqual(result['tier'], 3, row['source'])
+        composite = ats.classify(self.COMPOSITE, registry=reg, translations=trans)
+        self.assertEqual(composite['tier'], 4)
+
+    def test_novel_payload_absent_from_ledger_rejected(self):
+        self._write_ledger([self.MEDIC_ROW])  # NOVEL is not in it
+        self._record_same_iter('a-novel', self.NOVEL, 12)
+        verdict = self._guard('a-novel', self.NOVEL, iter_num=12)
+        self.assertFalse(verdict['accepted'])
+        self.assertEqual(verdict['authoritative_tier'], ats.GUARD_FALLBACK_TIER)
+        self.assertEqual(verdict['helper_tier'], 4)  # reported honestly
+
+    # ---- match branch: a genuine novel alert is unaffected ----
+
+    def test_novel_payload_present_in_ledger_accepted(self):
+        self._write_ledger([self.MEDIC_ROW, self.NOVEL])
+        self._record_same_iter('a-novel', self.NOVEL, 12)
+        verdict = self._guard('a-novel', self.NOVEL, iter_num=12)
+        self.assertTrue(verdict['accepted'])
+        self.assertEqual(verdict['authoritative_tier'], 4)
+
+    def test_absent_field_matches_explicit_null(self):
+        # A real row writes "intent": null; a hand-built payload omits the key.
+        # Those describe the SAME alert and must match.
+        row = dict(self.NOVEL, intent=None)
+        self._write_ledger([row])
+        self.assertNotIn('intent', self.NOVEL)
+        self._record_same_iter('a-novel', self.NOVEL, 6)
+        self.assertTrue(self._guard('a-novel', self.NOVEL, iter_num=6)['accepted'])
+
+    def test_extra_payload_fields_do_not_block_match(self):
+        # Only the identity triple is compared; ts/route/etc. may differ.
+        self._write_ledger([dict(self.NOVEL, ts='2026-08-06T00:00:00+00:00',
+                                 route='escalate')])
+        self._record_same_iter('a-novel', self.NOVEL, 6)
+        self.assertTrue(self._guard('a-novel', self.NOVEL, iter_num=6)['accepted'])
+
+    def test_corrupt_line_skipped_match_still_found(self):
+        path = self._write_ledger([self.MEDIC_ROW])
+        with path.open('a', encoding='utf-8') as fh:
+            fh.write('{not json\n')
+            fh.write(json.dumps(self.NOVEL) + '\n')
+        self._record_same_iter('a-novel', self.NOVEL, 6)
+        self.assertTrue(self._guard('a-novel', self.NOVEL, iter_num=6)['accepted'])
+
+    # ---- inert branch: the ledger cannot be read ----
+
+    def test_missing_ledger_is_inert(self):
+        self.assertFalse(self._ledger_path().exists())
+        self._record_same_iter('a-novel', self.NOVEL, 3)
+        verdict = self._guard('a-novel', self.NOVEL, iter_num=3)
+        self.assertTrue(verdict['accepted'])
+        self.assertEqual(verdict['authoritative_tier'], 4)
+        self.assertIsNone(ats._payload_matches_real_alert(self.NOVEL))
+
+    def test_unreadable_ledger_is_inert(self):
+        # A directory at the ledger path: open() raises OSError. An IO error must
+        # never manufacture a misclassification.
+        self._ledger_path().mkdir(parents=True)
+        self.assertIsNone(ats._payload_matches_real_alert(self.NOVEL))
+        self._record_same_iter('a-novel', self.NOVEL, 3)
+        self.assertTrue(self._guard('a-novel', self.NOVEL, iter_num=3)['accepted'])
+
+    # ---- bound + scope ----
+
+    def test_match_within_tail_window_found(self):
+        filler = [{'source': 'filler', 'intent': None, 'subject': f'f-{i}'}
+                  for i in range(ats.FIDELITY_TAIL_ROWS - 1)]
+        self._write_ledger(filler + [self.NOVEL])
+        self.assertIs(ats._payload_matches_real_alert(self.NOVEL), True)
+
+    def test_match_older_than_tail_window_not_found(self):
+        # The guard runs same-iter on freshly-claimed alerts, so a row pushed out
+        # of the window is by construction not the alert being triaged.
+        filler = [{'source': 'filler', 'intent': None, 'subject': f'f-{i}'}
+                  for i in range(ats.FIDELITY_TAIL_ROWS)]
+        self._write_ledger([self.NOVEL] + filler)
+        self.assertIs(ats._payload_matches_real_alert(self.NOVEL), False)
+
+    def test_lower_tier_verdicts_never_consult_the_ledger(self):
+        # Tiers 1/2/3 are untouched: the gate only ever removes an unearned
+        # Tier 4, so it must not even read the file on those paths.
+        alert = {'source': 'heal-known', 'subject': 'known-subject'}  # → Tier 3
+        self._write_ledger([self.MEDIC_ROW])  # alert deliberately absent
+        self._record_same_iter('a-known', alert, 5)
+        calls = []
+        original = ats._payload_matches_real_alert
+        ats._payload_matches_real_alert = lambda a: calls.append(a)
+        try:
+            verdict = self._guard('a-known', alert, iter_num=5)
+        finally:
+            ats._payload_matches_real_alert = original
+        self.assertEqual(calls, [])
+        self.assertEqual(verdict['authoritative_tier'], 3)
+        self.assertNotIn('fidelity', verdict['reason'])
+
+
 class TestGuardTier4CLI(_ATSTestBase):
     """The write-boundary + verdict-surface CLIs."""
 
@@ -1165,6 +1325,28 @@ class TestGuardTier4CLI(_ATSTestBase):
         self.assertEqual(payload['authoritative_tier'], 3)
         # The persisted row is still Tier 3 (resolved), never overwritten to 4.
         self.assertEqual(ats.read_state()['md']['tier'], 3)
+
+    def test_triage_cli_composite_payload_rejected(self):
+        # The 2026-08-06 incident at the write boundary: a payload composed from
+        # two adjacent real rows is refused even though classify() calls it novel.
+        path = self.tmp / ats.LARRY_ALERTS_REL
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps({'source': 'heal-pipeline-stall', 'intent': None,
+                        'subject': 'pipeline-stall:unrouted-pr:PR#192'}) + '\n'
+            + json.dumps({'source': 'medic', 'intent': 'medic-diagnosis',
+                          'subject': None}) + '\n', encoding='utf-8')
+        composite = json.dumps({'source': 'medic', 'intent': 'medic-diagnosis',
+                                'subject': 'pipeline-stall:unrouted-pr:PR#192'})
+        self._run(['triage-alert', '--alert-id', 'cx', '--alert', composite,
+                   '--iter', '4'])
+        rc, payload = self._run(['triage', '--alert-id', 'cx', '--tier', '4',
+                                 '--decision', 'ask', '--rationale', 'novel',
+                                 '--alert', composite, '--iter', '4'])
+        self.assertEqual(rc, 1)  # write refused
+        self.assertFalse(payload['accepted'])
+        self.assertEqual(payload['authoritative_tier'], 3)
+        self.assertIn('fidelity', payload['reason'])
 
     def test_triage_cli_lower_tiers_unaffected(self):
         # Tiers 1/2/3 need no --alert/--iter and write normally (back-compat).
