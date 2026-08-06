@@ -1280,6 +1280,66 @@
         "done_at": "2026-07-30T18:16:44.438835+00:00",
         "window_sec": 172800
       }
+    },
+    {
+      "id": "approvals-tab-informational-cards",
+      "title": "Approvals Tab Informational Cards",
+      "north_star_ref": null,
+      "repo": "ourliberty-agent-core",
+      "state": "active",
+      "phases": [
+        {
+          "id": "approvals-tab-informational-cards",
+          "title": "Approvals Tab Informational Cards",
+          "desired_end_state": "Larry chose Option B on direction-ask `approvals-tab-nonbinary-contract-001` (2026-08-05): widen the Approvals tab so non-binary awaiting-Larry items become informational cards with an `acknowledge` exit, rather than narrowing the drift sentinel.",
+          "lifecycle_state": "done",
+          "order": 0,
+          "spec_ref": "agents/beacon/specs/approvals-tab-informational-cards.md",
+          "sequence_ref": null,
+          "created_at": "2026-08-06T00:11:30.110568+00:00",
+          "updated_at": "2026-08-06T00:11:29.948350+00:00",
+          "brainstorm": {
+            "is_ai_draft": true,
+            "draft": {
+              "end_state": "When this phase is done, the Approvals tab's stated promise is literally true: every item waiting on Larry shows up there, including the ones that aren't a yes/no decision. An item that carries a runbook-style next step rather than two options appears as an informational card that shows that guidance verbatim and offers a single exit \u2014 acknowledge \u2014 instead of Approve/Reject. Acknowledging clears the card and also drops the item out of the 'awaiting Larry' set, so the parity check between what's awaiting and what's on the tab reports no divergence. Nothing that is genuinely awaiting Larry is visible only in the alert stream anymore.",
+              "why_now": "The tab's invariant is currently false for a whole class of items, and the drift check reports it as a permanent, unfixable discrepancy \u2014 a checker that cries the same alarm forever stops being a checker. A live item has been sitting in that state: actionable, escalated, needing Larry, but permanently absent from the tab because its suggested next step doesn't parse into two choices. The alternative fix \u2014 narrowing the checker so it stops noticing \u2014 was considered and explicitly rejected on 2026-08-05, because it would leave real work visible only in the alert stream, which is the exact failure the checker was built to catch. With that fork settled and the design already adopted, the only thing left is to build it.",
+              "scope": "IN: an informational card shape that is a real approval-tab item (not a new record type), marked explicitly as informational rather than inferred from its wording; a new acknowledge exit that dispatches no work and records its own distinct outcome; removal of the sweep that currently pulls these items back off the tab; making acknowledgement register the item as resolved so the parity check converges; making a skipped item re-evaluable if it later re-fires with materially different text; and the front-end rendering of the card and its single button. OUT: any change to how 'awaiting Larry' is derived \u2014 that independence is what makes the check a real check rather than a mirror. Also out: the previously proposed cooldown-based retirement and the alert-translation downgrade, both of which were verified to rest on false premises. Also out: the separate question of whether the underlying alerts should fire at all.",
+              "constraints_reuse": "This is assembly, not greenfield. The card must ride the existing approval-item machinery, because the parity check is defined over open approval items \u2014 anything bespoke defeats the whole point. The exit verb slots into the existing action vocabulary and should copy the posture the merge action already uses: validate server-side, re-verify immediately before the claim, so an informational-only action can never be fired against a real binary decision. What must not break: the ban on marking an approval item done stays exactly as written; the outcome ledger must record acknowledgement as its own outcome and never as an approval, because that ledger feeds the loop that learns how much autonomy to widen, and teaching it that a dismissal was an approval is a known past failure shape; and a binary decision must not gain a dismiss button. Note this deliberately reverses part of a change merged at the end of July that added both the prevention gate and the retire sweep \u2014 that reversal is the substance of this phase, not drift.",
+              "options_decision": "The main fork was scope, and Larry already settled it: widen the tab rather than narrow the checker. Two forks remain open. First, what acknowledgement means for recurrence: acknowledging could permanently close the item, or it could allow a later re-fire carrying materially different guidance to surface again. Permanent closure is simpler and quieter but can bury a situation that got worse; re-surfacing is safer but risks the tab re-showing something Larry already read. The draft leans toward re-surfacing only when the guidance text materially changes, which is the same idea that fixes the current 'skipped forever' trap. Second, presentation: informational cards can sit inline with real decisions, or in a visually separate band. Inline is the least code and keeps one list to scan; separate protects the decide surface from feeling like an inbox. Recommendation is inline with a clear visual marker, revisited if the volume turns out higher than expected. Build ordering is not a real fork \u2014 the exit verb and the rendering must exist before anything mints cards, or the cards land with no working exit and their buttons fall through to a generic paid no-op.",
+              "risks_guardrails": "Risk: the tab becomes a noticeboard and real decisions get lost in it. Guardrail: only items already classified as escalated and needing Larry qualify \u2014 this adds no new sources of work, it only surfaces work that was already waiting. Risk: acknowledgement clears the card but not the underlying 'awaiting' state, so the checker immediately re-reports it as missing \u2014 trading one permanent drift for another. Guardrail: acknowledgement must register resolution through the same path a normal decision uses, and this is an explicit gate on being done. Risk: acknowledgement gets recorded as approval and pollutes the learning signal about how much autonomy to widen. Guardrail: a distinct outcome value, and a check that a binary item rejects the acknowledge action outright. Risk: the mint step and the removal of the retire sweep get out of sync, producing a card that is created and swept on alternating ticks. Guardrail: verify a minted card survives consecutive ticks unchanged before calling it done. Risk: identifying informational cards by matching their summary text, which is brittle. Guardrail: an explicit marker on the item, never string matching.",
+              "done_gate": "Done means all of the following hold on a real tick, not in theory. A non-binary escalated item that needs Larry appears on the Approvals tab as an informational card carrying its guidance text word for word, not paraphrased or truncated. Acknowledging it clears the card, records the outcome as acknowledged and never as approved, and removes the item from the awaiting set. After a full check cycle, the parity check reports zero missing-card divergence for the live item that motivated this work. Attempting to acknowledge a genuine binary decision is refused. Marking an approval item done is still refused. A freshly minted informational card is still there, unchanged, after several consecutive reconciler ticks \u2014 no create/sweep churn. Tests should cover each of those as an assertion, including the two refusal cases and the multi-tick stability case, since those are the ones a plausible-looking implementation quietly gets wrong.",
+              "breakdown": "Three steps, and the ordering is load-bearing. Step one, in the agent repo: add the acknowledge exit \u2014 its validity rules, its server-side re-verification before the claim, and its ledger semantics. It is inert until cards exist, so it can ship safely on its own. Step two, in the dashboard repo: render the informational card as guidance text plus a single Acknowledge button, with no Approve or Reject affordance. Also inert until cards exist. Steps one and two touch different repositories and share no files, so they are genuinely parallel \u2014 neither depends on the other. Step three, in the agent repo, depends on both: teach the reconciler to mint informational cards, remove the retire sweep, add the text-fingerprint so a materially changed re-fire is re-evaluated, and make acknowledgement register resolution. Shipping step three first would put cards on a tab with no working exit, which spends a paid session on a no-op \u2014 the exact waste this work removes."
+            },
+            "decisions": [
+              "Does acknowledging an item close it for good, or should a later re-fire with materially different guidance bring it back?",
+              "Should informational cards sit inline with real decisions on the tab, or in a visually separate section?",
+              "Do we want to capture a short note when acknowledging, or is a single click the whole interaction?",
+              "Does this treatment apply to every non-binary item waiting on you, or only the alert-derived class we know about today?"
+            ],
+            "decisions_overflow": false,
+            "handoff": {
+              "spec_target_path": "agents/beacon/specs/approvals-tab-informational-cards.md",
+              "target_repo": "ourliberty-agent-core",
+              "north_star_ref": null,
+              "prior_closeout_summary": null,
+              "directive": "Work with Larry to finalize this brainstorm and author the spec at agents/beacon/specs/approvals-tab-informational-cards.md in ourliberty-agent-core; he will mark it Ready to spec."
+            }
+          },
+          "brainstorm_provenance": {
+            "by": "beacon",
+            "model": "claude-opus-5",
+            "at": "2026-08-06T00:11:30.110568+00:00",
+            "from_state": "brainstorm"
+          }
+        }
+      ],
+      "one_off": true,
+      "created_at": "2026-08-06T00:11:30.110568+00:00",
+      "updated_at": "2026-08-06T00:11:30.110568+00:00",
+      "promoted_from": {
+        "kind": "mission",
+        "mission_id": "approvals-tab-informational-cards"
+      }
     }
   ]
 }
