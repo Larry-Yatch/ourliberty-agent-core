@@ -30,9 +30,9 @@
 
 ---
 
-## G-rule medic-diagnosis-subject-specific-tier4-no-translation-001 — 2/3 (iter ~8041, 2026-08-05T18:16Z UTC)
+## G-rule medic-diagnosis-subject-specific-tier4-no-translation-001 — DISPATCHED (iter ~8172, 2026-08-06T03:41Z UTC)
 
-**Rule:** medic-diagnosis alerts with specific PR subjects return Tier-4 when only the subject=null (or generic) pattern is in the translation table. Occurrence 1: Alert 694 (source=medic, intent=medic-diagnosis, subject=pipeline-stall:unrouted-pr:PR#175, RSDPM-scoped) returned Tier-4 (no translation match). Occurrence 2: iter ~8041 — alert 625 (source=medic, intent=medic-diagnosis, subject=pipeline-stall:unrouted-pr-stranded:PR#176); guard confirmed authoritative Tier-4; medic already DM'd idx=624 (no Pulse DM). Fix: add prefix match for `source=medic, intent=medic-diagnosis, subject^=pipeline-stall:unrouted-pr:` (covers both `unrouted-pr:` and `unrouted-pr-stranded:`) in config/alert-translations.json. Dispatch to Beacon at 3/3.
+**Rule:** medic-diagnosis alerts with specific PR subjects return Tier-4 when only the subject=null (or generic) pattern is in the translation table. Occurrence 1: Alert 694 (source=medic, intent=medic-diagnosis, subject=pipeline-stall:unrouted-pr:PR#175, RSDPM-scoped) returned Tier-4 (no translation match). Occurrence 2: iter ~8041 — alert 625 (source=medic, intent=medic-diagnosis, subject=pipeline-stall:unrouted-pr-stranded:PR#176); guard confirmed authoritative Tier-4; medic already DM'd idx=624 (no Pulse DM). Occurrence 3: iter ~8172 — alert 585 (source=medic, intent=medic-diagnosis, subject=pipeline-stall:unrouted-pr:PR#192); guard confirmed Tier-4; medic already DM'd idx=584 (no Pulse DM). Fix: add prefix match for `source=medic, intent=medic-diagnosis, subject^=pipeline-stall:unrouted-pr:` (covers both `unrouted-pr:` and `unrouted-pr-stranded:`) in config/alert-translations.json. **Dispatch `direction-ask-medic-diagnosis-unrouted-pr-translation-001` written to Beacon inbox at iter ~8172. Awaiting Beacon spec + Forge PR.**
 
 ---
 
