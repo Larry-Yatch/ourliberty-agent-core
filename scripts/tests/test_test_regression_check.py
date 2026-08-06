@@ -153,6 +153,72 @@ class ParseUnittestFailuresTest(_IsolatedAgentsRoot):
             {'scripts.tests.test_camel.TestCamel_Mixed.test_Mixed_Case'},
         )
 
+    def test_py311_shape_is_not_doubled(self):
+        """Python 3.11+ prints the method INSIDE the parens. Appending it again
+        yields `mod.Cls.test_x.test_x`, which unittest cannot resolve — that is
+        what made the guardian's isolation re-run always fail and its
+        `order-flake` branch unreachable."""
+        output = (
+            'ERROR: test_boom (scripts.tests.test_x.TestY.test_boom)\n'
+            'FAIL: test_oops (scripts.tests.test_x.TestY.test_oops)\n'
+            'Ran 2 tests in 0.01s\n'
+        )
+        self.assertEqual(
+            trc.parse_unittest_failures(output),
+            {
+                'scripts.tests.test_x.TestY.test_boom',
+                'scripts.tests.test_x.TestY.test_oops',
+            },
+        )
+
+    def test_both_python_shapes_yield_the_same_id(self):
+        """Version tolerance is the contract: the 3.10 and 3.11+ spellings of the
+        same failure must parse to one identical id, so this cannot silently
+        regress the next time CPython changes the format."""
+        pre_311 = 'FAIL: test_a (scripts.tests.test_x.TestY)\nRan 1 tests in 0s\n'
+        post_311 = ('FAIL: test_a (scripts.tests.test_x.TestY.test_a)\n'
+                    'Ran 1 tests in 0s\n')
+        expected = {'scripts.tests.test_x.TestY.test_a'}
+        self.assertEqual(trc.parse_unittest_failures(pre_311), expected)
+        self.assertEqual(trc.parse_unittest_failures(post_311), expected)
+
+    def test_class_ending_in_method_name_is_not_stripped(self):
+        """The suffix test is on the dotted boundary, so a class whose NAME merely
+        ends with the method's characters keeps its method appended."""
+        output = (
+            'FAIL: test_x (scripts.tests.test_m.Clstest_x)\n'
+            'Ran 1 tests in 0s\n'
+        )
+        self.assertEqual(
+            trc.parse_unittest_failures(output),
+            {'scripts.tests.test_m.Clstest_x.test_x'},
+        )
+
+
+class CanonicalTestIdTest(_IsolatedAgentsRoot):
+    def test_doubled_id_collapses(self):
+        self.assertEqual(
+            trc.canonical_test_id('mod.Cls.test_x.test_x'), 'mod.Cls.test_x',
+        )
+
+    def test_canonical_id_unchanged(self):
+        self.assertEqual(
+            trc.canonical_test_id('mod.Cls.test_x'), 'mod.Cls.test_x',
+        )
+
+    def test_idempotent(self):
+        once = trc.canonical_test_id('mod.Cls.test_x.test_x')
+        self.assertEqual(trc.canonical_test_id(once), once)
+
+    def test_no_dot_is_unchanged(self):
+        self.assertEqual(trc.canonical_test_id('bare'), 'bare')
+
+    def test_distinct_trailing_segments_are_untouched(self):
+        self.assertEqual(
+            trc.canonical_test_id('mod.Cls.test_x.test_y'),
+            'mod.Cls.test_x.test_y',
+        )
+
 
 class DefaultPerShaTimeoutTest(_IsolatedAgentsRoot):
     def test_default_per_sha_timeout_exceeds_a_measured_run(self):

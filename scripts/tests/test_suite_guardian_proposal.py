@@ -28,6 +28,7 @@ try:  # engage the test sandbox before any production import reads env/paths
 except ImportError:  # discover loads this module top-level (no package parent)
     import _bootstrap  # noqa: F401
 
+import json
 import sys
 import tempfile
 import unittest
@@ -162,6 +163,94 @@ class PureHelpersTest(unittest.TestCase):
         self.assertIn('test_poison_x', p)
         self.assertIn('scripts/tests/**', p)
         self.assertIn('ORDER-FLAKE', p)
+
+
+# --- ledger key normalization (the id-doubling scar) -------------------------
+
+class LedgerKeyNormalizationTest(_TmpStateTest):
+    """Rows opened under the doubled id are re-keyed at load, the module's sole
+    read seam. Left doubled, a stale row keeps being re-polled for consent and,
+    if approved, dispatches a fix against a test id that does not exist — while
+    the fixed parser opens a SECOND row for the same test."""
+
+    _DOUBLED = 'test_x.TestY.test_a.test_a'
+    _CANONICAL = 'test_x.TestY.test_a'
+
+    def _write(self, rows):
+        self.ledger_path.write_text(json.dumps(rows), encoding='utf-8')
+
+    def test_doubled_row_is_rekeyed_and_field_follows_key(self):
+        self._write({self._DOUBLED: {
+            'test_id': self._DOUBLED, 'status': ledger.OPEN,
+            'decision': ledger.DEC_PROPOSED, 'run_task_id': 'r1',
+        }})
+        row = ledger.get(self._CANONICAL, path=self.ledger_path)
+        self.assertIsNotNone(row)
+        self.assertEqual(row['decision'], ledger.DEC_PROPOSED)
+        # Key and field must not diverge — mutators address rows by test_id.
+        self.assertEqual(row['test_id'], self._CANONICAL)
+        self.assertIsNone(ledger.get(self._DOUBLED, path=self.ledger_path))
+
+    def test_canonical_rows_untouched(self):
+        self._write({self._CANONICAL: {
+            'test_id': self._CANONICAL, 'status': ledger.OPEN,
+            'decision': ledger.DEC_PROPOSED,
+        }})
+        rows = ledger.list_open(path=self.ledger_path)
+        self.assertEqual([r['test_id'] for r in rows], [self._CANONICAL])
+
+    def test_normalization_is_idempotent(self):
+        self._write({self._DOUBLED: {
+            'test_id': self._DOUBLED, 'status': ledger.OPEN,
+            'decision': ledger.DEC_PROPOSED, 'last_activity_at': 't1',
+        }})
+        once = ledger._load(self.ledger_path)
+        twice = ledger._load(self.ledger_path)
+        self.assertEqual(once, twice)
+        self.assertEqual(list(once), [self._CANONICAL])
+
+    def test_collision_prefers_the_open_row(self):
+        # Never drop a live obligation, even if the terminal row is newer.
+        self._write({
+            self._DOUBLED: {'test_id': self._DOUBLED, 'status': ledger.OPEN,
+                            'decision': ledger.DEC_PROPOSED,
+                            'last_activity_at': '2026-08-01T00:00:00+00:00'},
+            self._CANONICAL: {'test_id': self._CANONICAL,
+                              'status': ledger.RESOLVED,
+                              'last_activity_at': '2026-08-06T00:00:00+00:00'},
+        })
+        rows = ledger._load(self.ledger_path)
+        self.assertEqual(list(rows), [self._CANONICAL])
+        self.assertEqual(rows[self._CANONICAL]['status'], ledger.OPEN)
+
+    def test_collision_prefers_most_recent_when_both_open(self):
+        self._write({
+            self._DOUBLED: {'test_id': self._DOUBLED, 'status': ledger.OPEN,
+                            'decision': ledger.DEC_PROPOSED,
+                            'last_activity_at': '2026-08-06T00:00:00+00:00'},
+            self._CANONICAL: {'test_id': self._CANONICAL, 'status': ledger.OPEN,
+                              'decision': ledger.DEC_APPROVED,
+                              'last_activity_at': '2026-08-01T00:00:00+00:00'},
+        })
+        rows = ledger._load(self.ledger_path)
+        self.assertEqual(rows[self._CANONICAL]['decision'], ledger.DEC_PROPOSED)
+
+    def test_rekeyed_row_blocks_a_duplicate_proposal(self):
+        # Consequence (b): pre-fix the de-doubled id opened a SECOND row.
+        self._write({self._DOUBLED: {
+            'test_id': self._DOUBLED, 'status': ledger.OPEN,
+            'decision': ledger.DEC_PROPOSED, 'run_task_id': 'r1',
+            'opened_at': '2026-08-01T00:00:00+00:00',
+        }})
+        ledger.open_proposal(self._CANONICAL, run_task_id='r2',
+                             poison_test_name='p', now=_T0,
+                             path=self.ledger_path)
+        rows = ledger._load(self.ledger_path)
+        self.assertEqual(list(rows), [self._CANONICAL])
+        # Refreshed the existing obligation rather than opening a new one.
+        self.assertEqual(rows[self._CANONICAL]['opened_at'],
+                         '2026-08-01T00:00:00+00:00')
+        self.assertEqual(rows[self._CANONICAL]['run_task_id'], 'r2')
 
 
 # --- select_actionable -------------------------------------------------------
