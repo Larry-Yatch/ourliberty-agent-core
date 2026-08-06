@@ -38956,3 +38956,86 @@ Key finding: the translation for `source=outbox-notifier, kind=approval_request`
 
 ---
 
+## Iteration ~8184 — 2026-08-06T05:40Z UTC (Larry /cycle chat, Tier 2→1 [Check 0: repair-watermark repaired=false (591=591); 5 new alerts (heal-stale-daemon-code ×5, Tier-3 digest ✅); Check A: ALWAYS-FIX ✅ PR#1105 fast-forward; Check 3: CLEAN ✅ (DRY-RUN=0); Check 4: CLEAN ✅ (pending=0); Check 5: NOMINAL ✅; NON-CLEAN → Tier 2→1])
+
+**Health:** ⚠️ ALWAYS-FIX — Repo was behind origin/main by 1 commit (PR#1105 suite-guardian fix merged while at Tier 2). Fast-forwarded. All other checks nominal. 5 new Tier-3 digest alerts (heal-stale-daemon-code cascade restarts). **G-rule suite-guardian-test-id-doubling-parser-fix-001 CLOSED ✅** (PR#1105 merged e9f620d2). Tier reset 2→1.
+
+**VERIFY-BEFORE-REASSERT (from iter ~8183 at 05:19Z UTC 2026-08-06):**
+- **"suite-guardian-test-id-doubling-parser-fix-001 IN-FLIGHT (~38 min elapsed)"**: CONFIRMED COMPLETE → PR#1105 `fix(guardian): stop doubling the method name in parse_unittest_failures on Python 3.11+` merged; `git pull --ff-only` fast-forwarded to e9f620d2; outbox-notifier AUTO_MERGE_WORKTREE_TEARDOWN at 05:36:27Z UTC. **G-RULE CLOSED ✅**
+- **"guard-tier4-payload-fidelity-001 MERGED ✅"**: CONFIRMED → e9f620d2 is the PR#1105 squash; PR#1104 (24a23653) still in git log. [carry ✅]
+- **"system-health overall=healthy, all 4 bots alive"**: CONFIRMED → ts=2026-08-06T05:35:00Z UTC; overall=healthy; all 4 bots alive. [confirmed ✅]
+- **"0 open PRs"**: CONFIRMED → gh pr list: [] for ourliberty-agent-core post-PR#1105 merge. [confirmed ✅]
+- **"Tier 2, consecutive_clean=0"**: STATE-CHANGE → Check A always-fix (repo behind); tier reset 2→1; consecutive_clean=0. [expected ✅]
+
+**Check 0 — Alert triage (~05:38Z UTC):** repair-watermark: repaired=false (old_watermark=591, file_length=596). **5 new alerts** at lines 592–596: all `source=heal-stale-daemon-code` — auto-restarted ourliberty-inbox-watcher.service, ourliberty-mirror-bot.service, ourliberty-outbox-notifier.service, ourliberty-pulse-bot.service, ourliberty-spec-review-runner.service. Same root cause as iter ~8182 cascade: PR#1104 modified `alert_triage_state.py` (shared library); stale-daemon healer detected 5 more services with pre-restart mtime. All route=digest in raw JSON; bot log confirms idx=593/594/595 as "route=digest; skipping DM." triage-alert ×5 → Tier 3, route=digest, resolved. Watermark advanced to 596.
+**NOMINAL ✅** (Tier-3 silence, no tier-reset per spec)
+
+**Check 1 — Log noise (~05:37Z UTC):** outbox-notifier.log: last entry [2026-08-05 23:36:27 MDT] = 05:36:27Z UTC — AUTO_MERGE_WORKTREE_TEARDOWN (suite-guardian task) + review-pass completion DM queued. No WARN/ERROR. inbox_watcher.log: no new entries since 04:57:34Z UTC (Forge done). Quiet expected post-build.
+**NOMINAL ✅**
+
+**Check 2 — Telegram sweep (~05:37Z UTC):** beacon_telegram_bot.log: last entries 05:24:32Z UTC (alert digest-skips). Suite-guardian completion DM queued at 05:36:27Z UTC — delivery pending Beacon's next cycle. Larry's last directive message 04:07:09Z UTC (suite-guardian fix direction, now fulfilled). No orphan directives.
+**NOMINAL ✅**
+
+**Check 3 — Pipeline stall (~05:37Z UTC):** heal_pipeline_stall.py --dry-run → **"no stalls detected"** (DRY-RUN=0). FORGE_NO_PR_SKIP: same 5 benign merged PRs. unrouted_open_pr:Larry-Yatch/RSDPM:192 suppressed (cooldown).
+**CLEAN ✅**
+
+**Check 4 — Pending directives (~05:38Z UTC):** beacon-pending-approvals.json: **pending=0**. No open approval_requests.
+**CLEAN ✅**
+
+**Check 5 — Stale daemon code (~05:37Z UTC):** heal-stale-daemon-code.heartbeat: 2026-08-06T05:32:46Z UTC (~5 min before check). Within 60 min threshold. All cascade-restarted services confirmed alive in system-health ts=05:35:00Z UTC.
+**NOMINAL ✅**
+
+**Check A — Source repo (~05:36Z UTC):** branch=main; HEAD=e0cf3c68 BEHIND origin/main (e9f620d2) by 1 commit: `fix(guardian): stop doubling the method name in parse_unittest_failures on Python 3.11+ (#1105)`. Tree clean. On main. **ALWAYS-FIX: git -C ~/agent-core pull --ff-only → e9f620d2 (6 files, +395/-2 lines). TIER RESET.**
+**ALWAYS-FIX ✅ → NOMINAL post-fix**
+**Check B — Sync health (~05:37Z UTC):** agent-core-sync.json: last_sync=2026-08-06T05:26:59Z UTC (~11 min; status=no-change). Within 2h threshold. **NOMINAL ✅**
+**Check C — Agent liveness (~05:35Z UTC):** system-health.json ts=2026-08-06T05:35:00Z UTC (~2 min); overall=healthy. All 4 bots alive (beacon/forge/mirror/pulse). **NOMINAL ✅**
+**Check E — PR/merge state (~05:37Z UTC):** ourliberty-agent-core: **0 open PRs** (PR#1105 already merged). ourliberty-dashboard: 0 open PRs. **CLEAN ✅**
+**Check H — All inboxes (~05:37Z UTC):** forge=0 (build-suite-guardian task completed). beacon=1 (notify-suite-guardian-test-id-doubling-parser-fix-001.json — Mirror PASS notify, source=mirror-result; Beacon processes this to deliver the completion DM → normal post-merge flow). mirror=0. pulse=0. **NOMINAL ✅**
+
+**§5.0 one-shots:** audit_due_nudge → no-op (no committed audit baseline). distill_detector → no-op (no un-distilled audits). audit_cadence_signal → no-op (no post-seed distill artifacts yet). **NOMINAL ✅**
+**§5 periodic — Check I:** Thu Aug 6 UTC weekday=3, off-day. Next firing Fri Aug 7. QUIET ✅
+**§5 periodic — Check XIV:** last=check-xiv-2026-08-04.json. No new artifact. QUIET ✅
+**§5 periodic — Check III:** last=check-iii-2026-07-26.json. 14d gate until 2026-08-09 (3d away). QUIET ✅
+**§5 periodic — Check VIII:** already_deprecated. QUIET ✅
+
+**Rotations (~05:40Z UTC):** SUPABASE_SERVICE_ROLE_KEY: due=2026-08-22 (~16d); last_dm=2026-08-03T22:52:32Z UTC; 14d dedup window active. No new DM. ✅ All other credentials >60d out. ✅
+
+**G-rule tracking:**
+- `suite-guardian-test-id-doubling-parser-fix-001` **CLOSED ✅** (PR#1105 merged e9f620d2, 2026-08-06T05:36Z UTC; 6 files: main_suite_guardian.py, suite_guardian_ledger.py, test_regression_check.py + 3 test files). `systemic_fix` appended 05:40:35Z UTC. Do not reopen.
+- `medic-diagnosis-subject-specific-tier4-no-translation-001` **CLOSED ✅**: PR#1104 merged 24a23653. [carry ✅]
+- `pulse-triage-self-report-should-be-tier3-001` **RESOLVED ✅**: 0 new bounce-backs. [carry ✅]
+- `pulse-check-xiv-tier4-no-translation-001` **CLOSED ✅**: PR#1101 merged (48409e32). [carry ✅]
+- `heal-pipeline-stall-unrouted-pr-stranded-tier4-no-translation-001` **CLOSED ✅**: PR#1103 merged (93ea91f8). [carry ✅]
+- `approvals-informational-cards-spec-001` **SPEC IN MAIN (PR#1102, cd886496)**: 3 impl steps remain. [SPEC IN MAIN; IMPL NEXT]
+- `outbox-notifier-approval-request-tier4-no-translation-001` **CLOSED ✅ FALSE PREMISE**: carry. [carry ✅]
+- `heal-approvals-surface-drift-tier4-nonbinary-001` [1/3]: no new occurrence. [WATCH]
+- `enable-pr-auto-merge-reviewdecision-guard-001` [1/3]: no new occurrence. [WATCH]
+- `heal-pipeline-stall-no-mirror-dispatch-tier4-no-translation-001` [1/3]: no new occurrence. [WATCH]
+- `beacon-review-escalate-tier4-no-translation-001` [1/3]: no new occurrence. [WATCH]
+
+**Actions taken:**
+- alert_triage_state.py repair-watermark → repaired=false (no-op; file_length=596, watermark=591 pre-repair).
+- alert_triage_state.py triage-alert heal-stale-daemon-code-592 → Tier 3, route=digest, resolved.
+- alert_triage_state.py triage-alert heal-stale-daemon-code-593 → Tier 3, route=digest, resolved.
+- alert_triage_state.py triage-alert heal-stale-daemon-code-594 → Tier 3, route=digest, resolved.
+- alert_triage_state.py triage-alert heal-stale-daemon-code-595 → Tier 3, route=digest, resolved.
+- alert_triage_state.py triage-alert heal-stale-daemon-code-596 → Tier 3, route=digest, resolved.
+- alert_triage_state.py set-watermark --line 596 → watermark=596.
+- Check A always-fix: git -C ~/agent-core pull --ff-only → e0cf3c68..e9f620d2 (PR#1105 suite-guardian fix).
+- cycle-actions.jsonl: 1 entry appended (ff-main-when-behind).
+- PRIME DIRECTIVE: `intervention` appended 05:39:22Z UTC (tier=1, template=ff-main-when-behind).
+- PRIME DIRECTIVE: `systemic_fix` appended 05:40:35Z UTC (tier=1, template=suite-guardian-test-id-doubling-parser-fix-001).
+- cycle_tier_state.py record --checks-clean false → **tier reset 2→1; consecutive_clean=0** (last_signal_at=2026-08-06T05:39:24Z UTC).
+
+**Escalations:** None. System healthy post-fast-forward. Suite-guardian completion DM queued for Larry (review-pass; Beacon delivers).
+
+**PRIME DIRECTIVE (post-action):** intervention + systemic_fix appended. Trailing 30d: interventions=~2131, systemic_fixes=51, ratio≈41.8 (stable; 1 new systemic_fix closes suite-guardian G-rule).
+
+**Patterns:**
+- **[blue] PR#1105 suite-guardian fix SHIPPED**: The py3.11+ parse_unittest_failures id-doubling bug is patched (6 files, 395 lines added). The test that was producing false BLOCK signals in the regression gate should now read correctly. Validation: run `python3 -m pytest scripts/tests/test_main_suite_guardian.py -v` if a future gate BLOCK surfaces on suite-guardian output parsing.
+- **[blue] heal-stale-daemon-code second cascade (×5)**: PR#1104 triggered another wave of stale-module restarts for the 5 services that weren't in the first cascade (iter ~8182: beacon/chain-event-shipper/forge; this iter: inbox-watcher/mirror/outbox-notifier/pulse/spec-review-runner). All restarted cleanly. System-health confirms all bots alive. Digest-only, no DM. Expected behavior — healer working as designed.
+
+**Tier end-of-iter:** **Tier 1** (tier reset from Tier 2 due to Check A always-fix; consecutive_clean=0; 3 clean iters → Tier 2).
+
+---
+
