@@ -6,6 +6,12 @@
 
 ---
 
+## G-rule alert-retraction-no-translation-001 — 1/3 (new, iter ~8221)
+
+**Rule:** `source=alert-retraction, subject^=unrouted-pr-nudges-retired:` returns Tier-4 from the triage helper (no translation match). First occurrence: iter ~8221 (2026-08-06T20:47Z UTC), alert line 558, subject=unrouted-pr-nudges-retired:1:c46f117cf436, route=closure. outbox-notifier had already delivered it (idx=557); no second DM sent. Fix: add Tier-3 (silence+journal) translation entry for `source=alert-retraction, subject^=unrouted-pr-nudges-retired:` in config/alert-translations.json. Dispatch to Beacon at 3/3.
+
+---
+
 ## G-rule enable-pr-auto-merge-reviewdecision-guard-001 — 1/3 (new, iter ~7573)
 
 **Rule:** Pulse's `enable-pr-auto-merge` always-allowed action (Check E) fires on `age>30m + MERGEABLE` regardless of `reviewDecision`. In iter ~7572, Pulse triggered `gh pr merge 1095 --auto --squash` on PR#1095 (docs(registry) fix) at 33-min age when `reviewDecision=""` (no Mirror review, intentionally unrouted fix/* no-label PR). The PR merged immediately (no CI, no branch protection blocking). `heal-unreviewed-merge-detector` fired `unreviewed-merge:1095` (Tier-4, never-silence pattern). The specific PR was doc-only with 0 operational impact; no revert needed. Fix: add `reviewDecision=APPROVED` guard before the always-fix fires, OR an explicit skip-review marker for intentionally-unrouted trivial PRs. First occurrence: iter ~7573 (2026-08-04T01:31Z UTC). Dispatch to Beacon at 3/3.
