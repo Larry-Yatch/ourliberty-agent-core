@@ -30,9 +30,9 @@
 
 ---
 
-## G-rule medic-diagnosis-subject-specific-tier4-no-translation-001 — LARRY APPROVED → FORGE IN-FLIGHT (guard-tier4-payload-fidelity-001, iter ~8175, 2026-08-06T04:01Z UTC)
+## G-rule medic-diagnosis-subject-specific-tier4-no-translation-001 — CLOSED ✅ (PR#1104 merged 24a23653, iter ~8180, 2026-08-06T04:55Z UTC)
 
-**Rule:** medic-diagnosis alerts with specific PR subjects return Tier-4 when only the subject=null (or generic) pattern is in the translation table. Occurrence 1: Alert 694 (source=medic, intent=medic-diagnosis, subject=pipeline-stall:unrouted-pr:PR#175, RSDPM-scoped) returned Tier-4 (no translation match). Occurrence 2: iter ~8041 — alert 625 (source=medic, intent=medic-diagnosis, subject=pipeline-stall:unrouted-pr-stranded:PR#176). Occurrence 3: iter ~8172 — alert 585 (source=medic, intent=medic-diagnosis, subject=pipeline-stall:unrouted-pr:PR#192). **BEACON RESPONSE:** Proposed `guard-tier4-payload-fidelity-001` — make guard_tier4 verify alert payload against real larry-alerts.jsonl row before accepting Tier-4. **LARRY APPROVED (2026-08-06T03:58:43Z UTC via larry-approval-d10b62b6, cost $0.57). FORGE IN-FLIGHT:** first phase done 04:01:10Z UTC ($0.62), resumed 04:01:15Z UTC (model=claude-opus-5, branch=forge/guard-tier4-payload-fidelity-001). Await PR open + Mirror review. Do NOT dispatch further; do NOT expect a translation-entry PR — fix path is guard_tier4 payload fidelity check.
+**Rule (CLOSED):** medic-diagnosis alerts with specific PR subjects returned Tier-4 when only subject=null pattern was in the translation table. Fix: `guard-tier4-payload-fidelity-001` — guard_tier4 now verifies alert payload against real larry-alerts.jsonl row before accepting Tier-4. **PR#1104 merged 04:55:46Z UTC (squash 24a23653); 3 files shipped: cycle-prompt.md (enforce paragraph), alert_triage_state.py (+106L payload-fidelity guard), test_alert_triage_state.py (+182L). `systemic_fix` appended 04:59:38Z UTC. G-rule CLOSED.** Do not dispatch further; do not re-open.
 
 ---
 
