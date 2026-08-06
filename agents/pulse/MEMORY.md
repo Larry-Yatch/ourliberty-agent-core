@@ -18,9 +18,9 @@
 
 ---
 
-## G-rule heal-pipeline-stall-unrouted-pr-stranded-tier4-no-translation-001 — DISPATCHED ✅ (iter ~8041); plan approval queued (iter ~8043)
+## G-rule heal-pipeline-stall-unrouted-pr-stranded-tier4-no-translation-001 — CLOSED ✅ (PR#1103 merged 93ea91f8, iter ~8135, 2026-08-06T00:13Z UTC)
 
-**Rule:** `source=heal-pipeline-stall, subject=pipeline-stall:unrouted-pr-stranded:PR#N` returns Tier-4 from the triage helper (no translation match). Occurrence 1: iter ~7876 (2026-08-05T01:17:50Z UTC) — PR#1096 stranded; healer DM idx=669. Occurrence 2: iter ~7883 (2026-08-05T02:04:47Z UTC) — RSDPM:176 stranded; alert line 672. Occurrence 3: iter ~8041 (2026-08-05T18:16Z UTC) — RSDPM:176 healer fired live post-cooldown expiry; guard confirmed authoritative Tier-4. Fix: add prefix match for `source=heal-pipeline-stall, subject^=pipeline-stall:unrouted-pr-stranded:` as Tier-3 (route=escalate) in config/alert-translations.json. **direction-ask dispatched to Beacon inbox at 18:18Z UTC (iter ~8041). Beacon created approval_request `alert-translations-unrouted-pr-stranded-001` at 18:25:22Z UTC; bot delivered at idx=626 at 18:28:03Z UTC. Approval queued — Larry: Approvals tab.** Record `systemic_fix` when Larry approves + PR merges + verified. Note: route=escalate → Tier-3 de-dupes safely (does not gag delivery).
+**Rule:** `source=heal-pipeline-stall, subject=pipeline-stall:unrouted-pr-stranded:PR#N` returns Tier-4 from the triage helper (no translation match). Occurrence 1: iter ~7876 (2026-08-05T01:17:50Z UTC) — PR#1096 stranded. Occurrence 2: iter ~7883 — RSDPM:176 stranded. Occurrence 3: iter ~8041 (3/3) — RSDPM:176 post-cooldown. Fix: add plain key `pipeline-stall:unrouted-pr-stranded` under `heal-pipeline-stall` in config/alert-translations.json. **PR#1103 merged 93ea91f8 at 00:13:23Z UTC. Mirror verified: healer emits this exact subject at heal_pipeline_stall.py:3451; _translation_match strips only :-segments so hyphen variant needs own key (cannot reach sibling). `systemic_fix` appended iter ~8135. G-rule CLOSED.** Do not dispatch further; do not re-open.
 
 ---
 
@@ -42,9 +42,9 @@
 
 ---
 
-## G-rule pulse-check-xiv-tier4-no-translation-001 — DISPATCHED ✅ (iter ~7864); approval `pulse-check-xiv-alert-translations-001` PENDING
+## G-rule pulse-check-xiv-tier4-no-translation-001 — CLOSED ✅ (PR#1101 merged 48409e32, iter ~8135, 2026-08-06T00:13Z UTC)
 
-**Rule:** pulse-check-xiv alerts (subject^=pulse-check-xiv-oversilence: and subject=pulse-check-xiv-digest) return Tier-4 from triage helper. Fix: add Tier-3 translation entries for `source=pulse-check-xiv` in config/alert-translations.json. **direction-ask-pulse-check-xiv-tier4-no-translation-3of3-001.json dispatched to Beacon inbox at 2026-08-05T00:00Z UTC (iter ~7864).** Beacon created approval_request `pulse-check-xiv-alert-translations-001` (now in pending=3 list, created ~00:05Z UTC 2026-08-05, delivered idx=666 at 00:08Z UTC). **Awaiting Larry's sign-off via Approvals tab.** Record `systemic_fix` when approval actioned and PR merges. Occurrences: iter ~7390 (1/3), iter ~7563+ (2/3), iter ~7864 (3/3).
+**Rule:** pulse-check-xiv alerts (subject^=pulse-check-xiv-oversilence: and subject=pulse-check-xiv-digest) return Tier-4 from triage helper. Fix: add Tier-3 translation entries for `source=pulse-check-xiv` in config/alert-translations.json. **PR#1101 merged 48409e32 at 00:13:29Z UTC. Mirror verified: config-only, adds oversilence/digest/dark subjects; classify() returns Tier-3 for oversilence+digest (de-dupes Check 0 duplicate DM; source route=escalate already delivers primary), Tier-4 for dark (stays surfaced via never_silence). Regression gate PASS. `systemic_fix` appended iter ~8135. G-rule CLOSED.** Do not dispatch further; do not re-open. Occurrences: iter ~7390 (1/3), iter ~7563+ (2/3), iter ~7864 (3/3).
 
 ---
 
