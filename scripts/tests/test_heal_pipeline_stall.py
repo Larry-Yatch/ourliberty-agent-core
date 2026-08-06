@@ -5289,10 +5289,13 @@ class _AlertsQueueMixin(_TempAgentsRootMixin):
         """Drive a full `run()` tick with EVERY check neutralised, so the only
         thing under test is the retraction pass.
 
-        Neutralising every check also pins WHERE that pass runs: with no alerts
-        `run()` takes its `if not all_alerts: return 0` early exit, so a
-        retraction placed below that exit would never fire and these tests would
-        fail. Returns `(rc, mock_append_alert, mock_gh_pr_state)`."""
+        Neutralising every check also pins that the pass is not gated on there
+        being alerts: with none, `run()` logs 'no stalls detected' and skips its
+        emit loop, so a retraction placed behind that branch would never fire
+        and every test here would fail. (Where the pass sits RELATIVE to the
+        emit loop is pinned separately, by
+        TestRetractionRunsAfterTheAlerts.) Returns
+        `(rc, mock_append_alert, mock_gh_pr_state)`."""
         with contextlib.ExitStack() as stack:
             for name, value in (
                 ('_all_open_prs', []), ('_all_merged_prs_recent', []),
@@ -5493,8 +5496,14 @@ class TestRetireDeadUnroutedPrNudges(_AlertsQueueMixin, unittest.TestCase):
         self.assertEqual(kwargs['source'], 'alert-retraction')
         self.assertEqual(kwargs['severity'], 'info')
         self.assertEqual(kwargs['route'], 'closure')
-        self.assertEqual(kwargs['subject'],
-                         self.hps.RETIRED_NUDGE_CLOSURE_SUBJECT)
+        # Batch-scoped, not one stable string: a shared bucket would put every
+        # later batch inside the 6h `info` cooldown and remove its rows in
+        # silence (see TestStandDownIsNotSilencedByItsOwnCooldown). Still ONE
+        # DM for the 20 — the anti-toil half is the batching, not the subject.
+        self.assertTrue(
+            kwargs['subject'].startswith(
+                self.hps.RETIRED_NUDGE_CLOSURE_SUBJECT + ':'),
+            kwargs['subject'])
         # NOT an escalate line, so heal_unregistered_approval.is_approval_class
         # can never promote it onto the Approvals tab, and this healer's own scan
         # can never pick it up on the next tick.
@@ -5502,7 +5511,8 @@ class TestRetireDeadUnroutedPrNudges(_AlertsQueueMixin, unittest.TestCase):
         # Human half: how many, which PRs, and that there is nothing to do.
         msg = kwargs['message']
         self.assertIn('Cleared 20 stale', msg)
-        self.assertIn('#900', msg)
+        # Repo-qualified: a bare `#900` is ambiguous across Larry's repos.
+        self.assertIn('ourliberty-agent-core#900', msg)
         self.assertIn('and 8 more', msg)  # capped list stays one readable line
         self.assertIn('Nothing for you to do', msg)
 
@@ -5662,6 +5672,261 @@ class TestNudgeKeyRoundTrip(_AlertsQueueMixin, unittest.TestCase):
         self.assertNotIn('pipeline-stall:unrouted-pr:PR#900', self._subjects())
         self.assertEqual([r['source'] for r in self._queue()],
                          ['alert-retraction'], 'only the stand-down remains')
+
+
+class TestRetractionRunsAfterTheAlerts(_AlertsQueueMixin, unittest.TestCase):
+    """WHERE the retraction pass runs is part of its contract.
+
+    It issues one `gh pr view` per pending nudge URL — 48 measured on the live
+    queue 2026-08-05 — inside a unit whose `TimeoutStartSec=120` kills the whole
+    tick (a current tick runs ~14s). Placed ABOVE the emit loop, that cost lands
+    on the alerts: a slow gh means systemd SIGTERMs the process before a single
+    stall alert Checks 1-12 already computed is ever appended, and they are lost
+    for that tick. Placed BELOW it, the same kill costs only the retraction,
+    which resumes next tick and still converges.
+
+    The pass must nevertheless still run on a QUIET tick (no alerts at all) —
+    dead nudges pile up precisely then — so the move may not hide behind the
+    `not all_alerts` exit."""
+
+    _MERGED = 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/900'
+
+    def _stall_alert(self) -> dict:
+        return {
+            'key': 'forge_built_no_pr:task-x',
+            'message': 'Forge built task-x but opened no PR.',
+            'subject': 'pipeline-stall:forge-built-no-pr:task-x',
+            'suggested_action': 'Check the Forge worktree.',
+        }
+
+    def _tick_recording_order(self, gh_states: dict, *, alerts: list):
+        """One tick with `check_forge_built_no_pr` returning `alerts`, recording
+        the interleaving of appends and retractions."""
+        order: list = []
+        real_resolve = self.la.resolve_alert
+
+        def rec_resolve(key, *a, **kw):
+            order.append(('resolve', key))
+            return real_resolve(key, *a, **kw)
+
+        def rec_append(**kw):
+            order.append(('append', kw.get('source')))
+            return True
+
+        with contextlib.ExitStack() as stack:
+            for name, value in (
+                ('_all_open_prs', []), ('_all_merged_prs_recent', []),
+                ('_all_closed_prs_recent', []), ('_read_recent_log_lines', []),
+                ('_read_recent_routing_events', []),
+            ):
+                stack.enter_context(
+                    patch.object(self.hps, name, return_value=value))
+            for name in [n for n in dir(self.hps) if n.startswith('check_')]:
+                stack.enter_context(
+                    patch.object(self.hps, name, return_value=[]))
+            stack.enter_context(patch.object(
+                self.hps, 'check_forge_built_no_pr', return_value=alerts))
+            stack.enter_context(patch.object(
+                self.hps, '_gh_pr_state',
+                side_effect=lambda url: gh_states.get(url)))
+            stack.enter_context(patch.object(
+                self.la, 'append_alert', side_effect=rec_append))
+            stack.enter_context(patch.object(
+                self.la, 'resolve_alert', side_effect=rec_resolve))
+            stack.enter_context(_allow_alerts())
+            rc = self.hps.run()
+        return rc, order
+
+    def test_stall_alerts_are_appended_before_the_retraction_probes(self) -> None:
+        # THE REPRODUCTION. On unmodified code the retraction pass runs first,
+        # so `order` opens with ('resolve', ...) and the stall alert — already
+        # computed — is appended only afterwards. Any gh stall in between is
+        # paid for by the alert, which is the loss this ordering exists to stop.
+        self._seed(self._nudge_line(900))
+        rc, order = self._tick_recording_order(
+            {self._MERGED: 'MERGED'}, alerts=[self._stall_alert()])
+        self.assertEqual(rc, 0)
+        first_alert = next(i for i, (kind, what) in enumerate(order)
+                           if kind == 'append' and what == 'heal-pipeline-stall')
+        first_resolve = next(i for i, (kind, _) in enumerate(order)
+                             if kind == 'resolve')
+        self.assertLess(
+            first_alert, first_resolve,
+            'the tick must emit its stall alerts BEFORE spending gh calls on '
+            f'the retraction pass; got {order}',
+        )
+
+    def test_quiet_tick_with_no_alerts_still_retracts(self) -> None:
+        # GUARD, not a reproduction: this passes before the fix too. It exists
+        # so the move cannot be made by hiding the pass below the
+        # `if not all_alerts: return 0` exit, which would silently disable
+        # retraction on exactly the ticks the backlog accumulates on.
+        self._seed(self._nudge_line(900))
+        rc, order = self._tick_recording_order({self._MERGED: 'MERGED'},
+                                               alerts=[])
+        self.assertEqual(rc, 0)
+        self.assertEqual(self._subjects(), [])
+        self.assertIn(('resolve', 'heal-pipeline-stall:'
+                       'pipeline-stall:unrouted-pr:PR#900'), order)
+
+    def test_quiet_tick_still_saves_state(self) -> None:
+        # GUARD: the no-alerts path stamps cooldown state via save_state, and
+        # the restructure must not drop that. Passes before the fix.
+        self._seed()
+        with contextlib.ExitStack() as stack:
+            for name, value in (
+                ('_all_open_prs', []), ('_all_merged_prs_recent', []),
+                ('_all_closed_prs_recent', []), ('_read_recent_log_lines', []),
+                ('_read_recent_routing_events', []),
+            ):
+                stack.enter_context(
+                    patch.object(self.hps, name, return_value=value))
+            for name in [n for n in dir(self.hps) if n.startswith('check_')]:
+                stack.enter_context(
+                    patch.object(self.hps, name, return_value=[]))
+            saver = stack.enter_context(patch.object(self.hps, 'save_state'))
+            stack.enter_context(_allow_alerts())
+            self.hps.run()
+        saver.assert_called_once()
+
+    def test_dry_run_quiet_tick_does_not_save_state(self) -> None:
+        # GUARD: dry-run must stay a true no-op on the quiet path too.
+        self._seed()
+        with contextlib.ExitStack() as stack:
+            for name, value in (
+                ('_all_open_prs', []), ('_all_merged_prs_recent', []),
+                ('_all_closed_prs_recent', []), ('_read_recent_log_lines', []),
+                ('_read_recent_routing_events', []),
+            ):
+                stack.enter_context(
+                    patch.object(self.hps, name, return_value=value))
+            for name in [n for n in dir(self.hps) if n.startswith('check_')]:
+                stack.enter_context(
+                    patch.object(self.hps, name, return_value=[]))
+            saver = stack.enter_context(patch.object(self.hps, 'save_state'))
+            stack.enter_context(_allow_alerts())
+            self.hps.run(dry_run=True)
+        saver.assert_not_called()
+
+
+class TestStandDownIsNotSilencedByItsOwnCooldown(_AlertsQueueMixin,
+                                                 unittest.TestCase):
+    """A retraction Larry could SEE must itself be visible.
+
+    `larry_alerts.retract_with_standdown` states the invariant: without a
+    closure line "a wrongful retraction is an invisible event (the red simply
+    vanishes with no trail to dispute)". A single STABLE closure subject shares
+    one cooldown bucket, and `INFO_COOLDOWN_SEC` is 6 hours — so only the first
+    batch in any 6h window is ever announced and every later one removes rows
+    from the Needs You lane in silence."""
+
+    def _url(self, n: int, repo: str = 'Larry-Yatch/ourliberty-agent-core'):
+        return f'https://github.com/{repo}/pull/{n}'
+
+    def _real_append_tick(self, gh_states: dict):
+        """A tick using the REAL append_alert, so the real cooldown applies."""
+        with contextlib.ExitStack() as stack:
+            for name, value in (
+                ('_all_open_prs', []), ('_all_merged_prs_recent', []),
+                ('_all_closed_prs_recent', []), ('_read_recent_log_lines', []),
+                ('_read_recent_routing_events', []),
+            ):
+                stack.enter_context(
+                    patch.object(self.hps, name, return_value=value))
+            for name in [n for n in dir(self.hps) if n.startswith('check_')]:
+                stack.enter_context(
+                    patch.object(self.hps, name, return_value=[]))
+            stack.enter_context(patch.object(
+                self.hps, '_gh_pr_state',
+                side_effect=lambda url: gh_states.get(url)))
+            stack.enter_context(_allow_alerts())
+            self.hps.run()
+
+    def _closures(self) -> list:
+        return [r for r in self._queue() if r['source'] == 'alert-retraction']
+
+    def test_a_second_batch_within_the_window_still_stands_down(self) -> None:
+        # THE REPRODUCTION. Two batches, minutes apart, different PRs. On
+        # unmodified code the second closure is swallowed by the 6h `info`
+        # cooldown on the one shared subject, so PR #901's nudge leaves the lane
+        # with no notice of any kind.
+        self._seed(self._nudge_line(900))
+        self._real_append_tick({self._url(900): 'MERGED'})
+        self.assertEqual(len(self._closures()), 1, 'first batch announces')
+
+        # Second batch: a different nudge, still inside the 6h info window.
+        self._seed(*(self._queue() + [self._nudge_line(901)]))
+        self._real_append_tick({self._url(901): 'MERGED'})
+        closures = self._closures()
+        self.assertEqual(
+            len(closures), 2,
+            'a second retraction batch inside the 6h info cooldown must still '
+            'produce its own stand-down, not vanish silently',
+        )
+        self.assertIn('#901', closures[1]['message'])
+
+    def test_the_identical_batch_repeated_is_still_deduped(self) -> None:
+        # The anti-toil half must survive: the closure subject may vary per
+        # BATCH, never per nudge, so re-announcing the same batch is suppressed.
+        self._seed(self._nudge_line(900))
+        self._real_append_tick({self._url(900): 'MERGED'})
+        first = self._closures()
+        self.assertEqual(len(first), 1)
+        subject = first[0]['subject']
+        self.assertTrue(
+            subject.startswith(self.hps.RETIRED_NUDGE_CLOSURE_SUBJECT),
+            f'closure subject must stay inside its own namespace: {subject!r}')
+        with _allow_alerts():
+            again = self.la.append_alert(
+                source='alert-retraction', severity='info',
+                message='same batch again', subject=subject, route='closure')
+        self.assertFalse(again, 'the same batch must not re-announce')
+
+    def test_one_standdown_per_batch_not_per_nudge(self) -> None:
+        # GUARD: 20 dead nudges in one tick stay ONE DM.
+        self._seed(*[self._nudge_line(n) for n in range(900, 920)])
+        self._real_append_tick(
+            {self._url(n): 'MERGED' for n in range(900, 920)})
+        self.assertEqual(len(self._closures()), 1)
+
+
+class TestStandDownNamesTheRepo(_AlertsQueueMixin, unittest.TestCase):
+    """The nudge subject is repo-blind (`...:PR#156` names no repo) and Larry's
+    queue carries the same PR number under two repos — measured 2026-08-03,
+    `#152/#155/#156` each appeared twice. The retraction already parses the repo
+    out of the URL to make the removal repo-correct; the DM then throws it away
+    and dedupes on the bare number, so the one surface Larry reads both
+    undercounts and cannot say which repo cleared."""
+
+    _A = 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/156'
+    _B = 'https://github.com/Larry-Yatch/RSDPM/pull/156'
+
+    def test_two_repos_one_number_are_counted_and_named_separately(self) -> None:
+        # THE REPRODUCTION. Both lines share ONE retraction key (the subject is
+        # repo-blind), both PRs are terminal, so both are removed — but the DM
+        # says "covering 1 pull request(s) ... : #156" while the line count says
+        # 2, and never says which repo.
+        self._seed(
+            self._nudge_line(156),
+            self._nudge_line(156, repo='Larry-Yatch/RSDPM'),
+        )
+        rc, mock_append, _ = self._run_tick({self._A: 'MERGED',
+                                             self._B: 'MERGED'})
+        self.assertEqual(self._subjects(), [], 'both dead lines are removed')
+        msg = mock_append.call_args.kwargs['message']
+        self.assertIn('covering 2 pull request(s)', msg)
+        self.assertIn('ourliberty-agent-core#156', msg)
+        self.assertIn('RSDPM#156', msg)
+
+    def test_single_repo_batch_still_names_its_repo(self) -> None:
+        # THE REPRODUCTION (second half): even with no collision, a bare `#900`
+        # is ambiguous across Larry's repos, so every named PR carries its repo.
+        self._seed(self._nudge_line(900))
+        rc, mock_append, _ = self._run_tick(
+            {'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/900':
+             'MERGED'})
+        msg = mock_append.call_args.kwargs['message']
+        self.assertIn('ourliberty-agent-core#900', msg)
 
 
 if __name__ == '__main__':
