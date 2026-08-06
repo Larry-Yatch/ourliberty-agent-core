@@ -27,6 +27,7 @@ import time
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Optional
 from unittest.mock import MagicMock, patch
 
 _SCRIPTS_DIR = Path(__file__).resolve().parent.parent
@@ -5195,6 +5196,824 @@ class TestStallRulesConfig(_TempAgentsRootMixin, unittest.TestCase):
         # file the healer reads in production).
         self.assertEqual(self.hps.re_dm_hours_for('unrouted_open_pr'), 24)
         self.assertEqual(self.hps.re_dm_hours_for('forge_built_no_pr'), 24)
+
+
+@contextlib.contextmanager
+def _allow_alerts():
+    """Sanctioned escape hatch so the REAL `larry_alerts.resolve_alert` /
+    `append_alert` run against this test's tmp queue instead of raising
+    TestIsolationBreach. Every root they touch is redirected by
+    `_AlertsQueueMixin`, so nothing reaches the live tree."""
+    import test_isolation_guard
+    with test_isolation_guard.allow('larry-alerts'):
+        yield
+
+
+class _AlertsQueueMixin(_TempAgentsRootMixin):
+    """Redirects the WHOLE larry_alerts side-effect surface at this test's
+    tmpdir so the real `resolve_alert` can run for real.
+
+    `larry_alerts` freezes its roots at IMPORT and the base mixin only
+    re-imports `heal_pipeline_stall`, so without this the queue, the consumer
+    cursors and the cooldown tree would still point at the _bootstrap sandbox
+    root and leak state between tests (a 6h `info` cooldown file written by one
+    test would silently suppress the closure in the next)."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.la = self.hps.larry_alerts
+        root = Path(self._tmpdir.name) / 'queue'
+        (root / 'state').mkdir(parents=True)
+        self.alerts_file = root / 'larry-alerts.jsonl'
+        self.alerts_file.write_text('', encoding='utf-8')
+        for target, value in (
+            ('ALERTS_FILE', self.alerts_file),
+            ('OFFSET_FILE', root / 'state' / 'beacon.txt'),
+            ('MEDIC_OFFSET_FILE', root / 'state' / 'medic.txt'),
+            ('COOLDOWN_ROOT', root / 'state' / 'cooldown'),
+            ('SILENCE_ROOT', root / 'state' / 'silence'),
+            ('SILENCE_COUNTER_ROOT', root / 'state' / 'silence-counts'),
+        ):
+            p = patch.object(self.la, target, value)
+            p.start()
+            self.addCleanup(p.stop)
+
+    # ---- queue helpers ----
+
+    def _nudge_line(self, number: int,
+                    *, repo: str = 'Larry-Yatch/ourliberty-agent-core',
+                    stranded: bool = False, route: str = 'escalate',
+                    source: Optional[str] = None,
+                    suggested_action: Optional[str] = None,
+                    subject: Optional[str] = None, **extra) -> dict:
+        """A record shaped EXACTLY like the ones measured in the live queue on
+        2026-08-03: the PR URL appears ONLY inside `suggested_action`, and there
+        is NO `pr_url` field (0 of 45 live lines carry one, even though the
+        in-memory alert dict sets it before `append_alert`)."""
+        kind = 'unrouted-pr-stranded' if stranded else 'unrouted-pr'
+        url = f'https://github.com/{repo}/pull/{number}'
+        rec = {
+            'ts': datetime.now(timezone.utc).isoformat(),
+            'source': source if source is not None else 'heal-pipeline-stall',
+            'severity': 'warning',
+            'message': f'PR #{number} ({repo}) on branch `x` has NO review.',
+            'route': route,
+            'tier': 'SOON',
+            'tier_source': 'translation',
+            'subject': (subject if subject is not None
+                        else f'pipeline-stall:{kind}:PR#{number}'),
+            'suggested_action': (
+                suggested_action if suggested_action is not None
+                else f'Dispatch a Mirror review via Beacon chat: '
+                     f'`dispatch mirror review pr={url}`.'
+            ),
+            'needs_larry': True,
+        }
+        rec.update(extra)
+        return rec
+
+    def _seed(self, *records: dict) -> None:
+        with open(self.alerts_file, 'w', encoding='utf-8') as f:
+            for r in records:
+                f.write(json.dumps(r, ensure_ascii=False) + '\n')
+
+    def _queue(self) -> list:
+        return [json.loads(x) for x in
+                self.alerts_file.read_text(encoding='utf-8').splitlines()
+                if x.strip()]
+
+    def _subjects(self) -> list:
+        return [r.get('subject') for r in self._queue()]
+
+    def _run_tick(self, gh_states: dict, *, dry_run: bool = False):
+        """Drive a full `run()` tick with EVERY check neutralised, so the only
+        thing under test is the retraction pass.
+
+        Neutralising every check also pins that the pass is not gated on there
+        being alerts: with none, `run()` logs 'no stalls detected' and skips its
+        emit loop, so a retraction placed behind that branch would never fire
+        and every test here would fail. (Where the pass sits RELATIVE to the
+        emit loop is pinned separately, by
+        TestRetractionRunsAfterTheAlerts.) Returns
+        `(rc, mock_append_alert, mock_gh_pr_state)`."""
+        with contextlib.ExitStack() as stack:
+            for name, value in (
+                ('_all_open_prs', []), ('_all_merged_prs_recent', []),
+                ('_all_closed_prs_recent', []), ('_read_recent_log_lines', []),
+                ('_read_recent_routing_events', []),
+            ):
+                stack.enter_context(
+                    patch.object(self.hps, name, return_value=value))
+            for name in [n for n in dir(self.hps) if n.startswith('check_')]:
+                stack.enter_context(
+                    patch.object(self.hps, name, return_value=[]))
+            mock_gh = stack.enter_context(patch.object(
+                self.hps, '_gh_pr_state',
+                side_effect=lambda url: gh_states.get(url)))
+            mock_append = stack.enter_context(
+                patch.object(self.la, 'append_alert', return_value=True))
+            stack.enter_context(_allow_alerts())
+            rc = self.hps.run(dry_run=dry_run)
+        return rc, mock_append, mock_gh
+
+
+class TestRetireDeadUnroutedPrNudges(_AlertsQueueMixin, unittest.TestCase):
+    """The healer must retract its OWN `pipeline-stall:unrouted-pr*` nudges once
+    the PR they name has gone terminal.
+
+    Measured on the live droplet queue 2026-08-03: 45 such lines under 41
+    distinct keys, 40 of those keys naming a MERGED/CLOSED PR, and 41 of the
+    Needs-You lane's 53 unread rows. The fire-time merge-truth gate already
+    suppresses NEW nudges for a terminal PR; nothing ever retracted the ones
+    already fired."""
+
+    _MERGED = 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/900'
+    _OPEN = 'https://github.com/Larry-Yatch/RSDPM/pull/172'
+
+    def test_dead_nudge_retracted_live_nudge_survives(self) -> None:
+        # THE REPRODUCTION. On unmodified code BOTH lines survive the tick.
+        self._seed(
+            self._nudge_line(900),
+            self._nudge_line(172, repo='Larry-Yatch/RSDPM'),
+        )
+        rc, _, _ = self._run_tick({self._MERGED: 'MERGED', self._OPEN: 'OPEN'})
+        self.assertEqual(rc, 0)
+        self.assertEqual(
+            self._subjects(), ['pipeline-stall:unrouted-pr:PR#172'],
+            "the MERGED PR's nudge must be retracted, the OPEN one kept",
+        )
+
+    # ---- every branch of "is this nudge dead?" ----
+
+    def test_closed_not_merged_is_also_dead(self) -> None:
+        # 1 of the 41 live keys is CLOSED-not-merged (agent-core #1071); a gate
+        # that only looked for MERGED would strand it.
+        self._seed(self._nudge_line(900))
+        self._run_tick({self._MERGED: 'CLOSED'})
+        self.assertEqual(self._subjects(), [])
+
+    def test_stranded_shape_is_also_retracted(self) -> None:
+        # 8 of the 45 live lines carry the `-stranded` subject shape.
+        self._seed(self._nudge_line(900, stranded=True))
+        self._run_tick({self._MERGED: 'MERGED'})
+        self.assertEqual(self._subjects(), [])
+
+    def test_gh_outage_keeps_the_nudge(self) -> None:
+        # `_gh_pr_state` -> None (transport error / non-zero exit). An unreadable
+        # state must never read as "dead" — that would silently drop a real ask.
+        self._seed(self._nudge_line(900))
+        self._run_tick({})  # no state for any url
+        self.assertEqual(self._subjects(), ['pipeline-stall:unrouted-pr:PR#900'])
+
+    def test_all_lines_under_one_key_are_removed(self) -> None:
+        # A re-pushed stranded PR gets a fresh nudge per head SHA but the SUBJECT
+        # is head-blind, so several lines share one key (live: 45 lines / 41
+        # keys). resolve_alert removes them all in the single call.
+        self._seed(
+            self._nudge_line(900, stranded=True),
+            self._nudge_line(900, stranded=True),
+            self._nudge_line(900, stranded=True),
+        )
+        rc, mock_append, _ = self._run_tick({self._MERGED: 'MERGED'})
+        self.assertEqual(self._subjects(), [])
+        self.assertEqual(mock_append.call_count, 1)  # still ONE stand-down
+        self.assertIn('Cleared 3 stale',
+                      mock_append.call_args.kwargs['message'])
+
+    # ---- the repo-blind subject: the gates that stop a wrong retraction ----
+
+    def test_subject_number_disagreeing_with_link_keeps_the_nudge(self) -> None:
+        # The subject names no repo, so the linked URL is the only repo-correct
+        # coordinate. If they disagree the line is not understood -> keep it.
+        self._seed(self._nudge_line(
+            900, suggested_action='dispatch mirror review pr='
+                                  'https://github.com/Larry-Yatch/RSDPM/pull/12'))
+        self._run_tick({'https://github.com/Larry-Yatch/RSDPM/pull/12': 'MERGED'})
+        self.assertEqual(self._subjects(), ['pipeline-stall:unrouted-pr:PR#900'])
+
+    def test_same_number_two_repos_one_open_keeps_the_nudge(self) -> None:
+        # PR numbers DO collide across repos in the live queue (#152/#155/#156
+        # each appear under both RSDPM and ourliberty-dashboard). Both lines
+        # share the repo-blind subject, so retracting on one merge would take the
+        # other's live nudge with it.
+        rsdpm = 'https://github.com/Larry-Yatch/RSDPM/pull/156'
+        dash = 'https://github.com/Larry-Yatch/ourliberty-dashboard/pull/156'
+        self._seed(
+            self._nudge_line(156, repo='Larry-Yatch/RSDPM'),
+            self._nudge_line(156, repo='Larry-Yatch/ourliberty-dashboard'),
+        )
+        self._run_tick({rsdpm: 'MERGED', dash: 'OPEN'})
+        self.assertEqual(len(self._subjects()), 2, 'neither line may be removed')
+
+    def test_same_number_two_repos_both_terminal_is_retracted(self) -> None:
+        # Honesty companion: the collision guard is "every URL terminal", not a
+        # blanket refusal to handle multi-URL keys.
+        rsdpm = 'https://github.com/Larry-Yatch/RSDPM/pull/156'
+        dash = 'https://github.com/Larry-Yatch/ourliberty-dashboard/pull/156'
+        self._seed(
+            self._nudge_line(156, repo='Larry-Yatch/RSDPM'),
+            self._nudge_line(156, repo='Larry-Yatch/ourliberty-dashboard'),
+        )
+        self._run_tick({rsdpm: 'MERGED', dash: 'CLOSED'})
+        self.assertEqual(self._subjects(), [])
+
+    def test_nudge_with_no_pr_link_is_kept(self) -> None:
+        # The un-linked nudge is kept, AND the linked dead one beside it is
+        # still retracted — so a gate that let the link-less line through would
+        # be caught by the batch it takes down with it, not just by its own row.
+        url901 = 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/901'
+        self._seed(
+            self._nudge_line(900, suggested_action='Route it.',
+                             message='PR #900 needs routing.'),
+            self._nudge_line(901),
+        )
+        self._run_tick({self._MERGED: 'MERGED', url901: 'MERGED'})
+        self.assertEqual(self._subjects(), ['pipeline-stall:unrouted-pr:PR#900'])
+
+    # ---- scope: only this healer's own unrouted-PR escalate lines ----
+
+    def test_other_sources_and_subjects_are_untouched(self) -> None:
+        self._seed(
+            # another producer that happens to use the same subject shape
+            self._nudge_line(900, source='some-other-healer'),
+            # this healer, a DIFFERENT subject family
+            self._nudge_line(900, subject='pipeline-stall:retry-exhausted:m1-pr2'),
+            # this healer, right subject, NOT an escalate line -> resolve_alert
+            # would not remove it either, so it must not even be probed
+            self._nudge_line(900, route='digest'),
+            self._nudge_line(900, route='closure'),
+        )
+        rc, mock_append, mock_gh = self._run_tick({self._MERGED: 'MERGED'})
+        self.assertEqual(len(self._subjects()), 4, 'nothing may be removed')
+        mock_gh.assert_not_called()  # no gh spend on lines we cannot retract
+        mock_append.assert_not_called()
+
+    def test_notification_and_approval_records_are_untouched(self) -> None:
+        self._seed(
+            self._nudge_line(900, kind='notification'),
+            self._nudge_line(900, kind='approval_request'),
+        )
+        rc, mock_append, mock_gh = self._run_tick({self._MERGED: 'MERGED'})
+        self.assertEqual(len(self._subjects()), 2)
+        # `resolve_alert` would not remove these either, so dropping the filter
+        # would not lose a line — it would burn one `gh pr view` on them every
+        # 15 minutes forever. That is the failure this assertion catches.
+        mock_gh.assert_not_called()
+        mock_append.assert_not_called()
+
+    def test_this_healers_other_pr_shaped_subjects_are_out_of_scope(self) -> None:
+        # `pipeline-stall:mirror-pass-unmerged:PR#<n>` is this healer's alert,
+        # carries a PR link, and ends in the same `PR#<n>` shape — so ONLY the
+        # subject-prefix filter keeps it out of scope. Retracting it would be a
+        # silent behaviour change to a check this PR does not touch (2 such
+        # lines are in the live queue today).
+        self._seed(self._nudge_line(
+            900, subject='pipeline-stall:mirror-pass-unmerged:PR#900'))
+        rc, mock_append, mock_gh = self._run_tick({self._MERGED: 'MERGED'})
+        self.assertEqual(self._subjects(),
+                         ['pipeline-stall:mirror-pass-unmerged:PR#900'])
+        mock_gh.assert_not_called()
+        mock_append.assert_not_called()
+
+    def test_scan_returns_empty_on_an_unreadable_queue(self) -> None:
+        # Function-level: `run()`'s catch-all would otherwise mask a missing
+        # queue as an ERROR log every 15 minutes on a fresh box. The scan owns
+        # its own read failure and returns no candidates.
+        missing = Path(self._tmpdir.name) / 'nope' / 'larry-alerts.jsonl'
+        self.assertEqual(self.hps._pending_unrouted_nudges(missing), {})
+
+    # ---- the artifact Larry receives ----
+
+    def test_one_standdown_for_the_whole_batch(self) -> None:
+        urls = {f'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/{n}':
+                'MERGED' for n in range(900, 920)}
+        self._seed(*[self._nudge_line(n) for n in range(900, 920)])
+        rc, mock_append, _ = self._run_tick(urls)
+        self.assertEqual(self._subjects(), [])
+        self.assertEqual(mock_append.call_count, 1,
+                         '20 retractions must not become 20 DMs')
+        kwargs = mock_append.call_args.kwargs
+        self.assertEqual(kwargs['source'], 'alert-retraction')
+        self.assertEqual(kwargs['severity'], 'info')
+        self.assertEqual(kwargs['route'], 'closure')
+        # Batch-scoped, not one stable string: a shared bucket would put every
+        # later batch inside the 6h `info` cooldown and remove its rows in
+        # silence (see TestStandDownIsNotSilencedByItsOwnCooldown). Still ONE
+        # DM for the 20 — the anti-toil half is the batching, not the subject.
+        self.assertTrue(
+            kwargs['subject'].startswith(
+                self.hps.RETIRED_NUDGE_CLOSURE_SUBJECT + ':'),
+            kwargs['subject'])
+        # NOT an escalate line, so heal_unregistered_approval.is_approval_class
+        # can never promote it onto the Approvals tab, and this healer's own scan
+        # can never pick it up on the next tick.
+        self.assertNotEqual(kwargs['route'], 'escalate')
+        # Human half: how many, which PRs, and that there is nothing to do.
+        msg = kwargs['message']
+        self.assertIn('Cleared 20 stale', msg)
+        # Repo-qualified: a bare `#900` is ambiguous across Larry's repos.
+        self.assertIn('ourliberty-agent-core#900', msg)
+        self.assertIn('and 8 more', msg)  # capped list stays one readable line
+        self.assertIn('Nothing for you to do', msg)
+
+    def test_no_standdown_when_nothing_was_retracted(self) -> None:
+        self._seed(self._nudge_line(172, repo='Larry-Yatch/RSDPM'))
+        rc, mock_append, _ = self._run_tick({self._OPEN: 'OPEN'})
+        mock_append.assert_not_called()
+
+    # ---- dry-run, idempotence, failure paths ----
+
+    def test_dry_run_removes_nothing_and_sends_nothing(self) -> None:
+        self._seed(self._nudge_line(900))
+        rc, mock_append, _ = self._run_tick({self._MERGED: 'MERGED'},
+                                            dry_run=True)
+        self.assertEqual(self._subjects(), ['pipeline-stall:unrouted-pr:PR#900'])
+        mock_append.assert_not_called()
+
+    def test_second_tick_is_a_no_op(self) -> None:
+        # The hundredth run: the removed line cannot be removed again, costs no
+        # further gh call, and never re-DMs. Only the surviving OPEN nudge is
+        # re-probed, which is bounded by the number of genuinely-live nudges.
+        self._seed(
+            self._nudge_line(900),
+            self._nudge_line(172, repo='Larry-Yatch/RSDPM'),
+        )
+        states = {self._MERGED: 'MERGED', self._OPEN: 'OPEN'}
+        self._run_tick(states)
+        rc, mock_append, mock_gh = self._run_tick(states)
+        self.assertEqual(self._subjects(), ['pipeline-stall:unrouted-pr:PR#172'])
+        mock_append.assert_not_called()
+        self.assertEqual([c.args[0] for c in mock_gh.call_args_list],
+                         [self._OPEN])
+
+    def test_unreadable_queue_is_not_fatal(self) -> None:
+        self.alerts_file.unlink()
+        rc, mock_append, _ = self._run_tick({self._MERGED: 'MERGED'})
+        self.assertEqual(rc, 0)
+        mock_append.assert_not_called()
+
+    def test_torn_line_does_not_stop_the_batch(self) -> None:
+        with open(self.alerts_file, 'w', encoding='utf-8') as f:
+            f.write('{"source": "heal-pipeline-stall", "subject": "pipe\n')
+            f.write(json.dumps(self._nudge_line(900)) + '\n')
+        self._run_tick({self._MERGED: 'MERGED'})
+        # The well-formed nudge is gone; only the unparseable fragment survives
+        # (resolve_alert cannot match that one either, so the two agree).
+        survivors = self.alerts_file.read_text(encoding='utf-8').splitlines()
+        self.assertEqual(len(survivors), 1)
+        self.assertNotIn('unrouted-pr:PR#900', survivors[0])
+
+    def test_one_raising_key_does_not_abort_the_batch(self) -> None:
+        self._seed(self._nudge_line(900), self._nudge_line(901))
+        real = self.la.resolve_alert
+        calls = []
+
+        def flaky(key, *a, **kw):
+            calls.append(key)
+            if key.endswith('PR#900'):
+                raise RuntimeError('boom')
+            return real(key, *a, **kw)
+
+        url901 = 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/901'
+        with patch.object(self.la, 'resolve_alert', side_effect=flaky):
+            rc, mock_append, _ = self._run_tick(
+                {self._MERGED: 'MERGED', url901: 'MERGED'})
+        self.assertEqual(len(calls), 2, 'the second key is still attempted')
+        self.assertEqual(self._subjects(), ['pipeline-stall:unrouted-pr:PR#900'])
+        self.assertIn('Cleared 1 stale',
+                      mock_append.call_args.kwargs['message'])
+
+
+class TestRetiredNudgeReachesTheDashboardRow(_AlertsQueueMixin,
+                                             unittest.TestCase):
+    """The local jsonl removal is only half the fix — the tab Larry looks at
+    reads the shipped `chain_events` row, which stays `read_at IS NULL` forever
+    unless the retraction clears it too."""
+
+    _URL = 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/900'
+
+    def test_retraction_fires_the_supabase_clear_leg(self) -> None:
+        self._seed(self._nudge_line(900))
+        with patch.object(self.la, '_retract_shipped_alert_events',
+                          wraps=self.la._retract_shipped_alert_events) as spy:
+            self._run_tick({self._URL: 'MERGED'})
+        spy.assert_called_once()
+        removed = spy.call_args.args[0]
+        self.assertEqual([r['subject'] for r in removed],
+                         ['pipeline-stall:unrouted-pr:PR#900'])
+
+    def test_clear_leg_targets_the_column_the_tab_reads(self) -> None:
+        # Verified at the field the CONSUMER reads: the shipper keys a
+        # larry_alert row's `task_id` off the record's `subject`, so the clear
+        # must fire on `task_id` with that exact subject. A clear on any other
+        # key/column updates 0 rows and the nudge stays live on the tab.
+        rec = self._nudge_line(900)
+        seen = []
+        with _allow_alerts():
+            self.la._retract_shipped_alert_events(
+                [rec], clear_fn=lambda key, by: seen.append((key, by)) or 1)
+        self.assertEqual(seen, [('pipeline-stall:unrouted-pr:PR#900', 'task_id')])
+
+
+class TestNudgeKeyRoundTrip(_AlertsQueueMixin, unittest.TestCase):
+    """A wrong retraction key fails INVISIBLY: `resolve_alert` removes nothing,
+    returns 0, and the caller cannot tell that from "nothing to do". So the key
+    is proven end to end — a nudge written by the REAL producer path is removed
+    by the REAL retraction path, with no hand-built fixture in between."""
+
+    def _pr(self) -> dict:
+        return {
+            'number': 900,
+            'headRefName': 'larry/manual-pr-900',
+            'title': 'feat: x',
+            'createdAt': (datetime.now(timezone.utc)
+                          - timedelta(minutes=180)).isoformat(),
+            '_repo': 'Larry-Yatch/ourliberty-agent-core',
+        }
+
+    def _real_tick(self, gh_state, open_prs) -> None:
+        """One `run()` pass with the REAL append_alert AND the REAL
+        resolve_alert against this test's tmp queue."""
+        with contextlib.ExitStack() as stack:
+            stack.enter_context(patch.object(self.hps, '_all_open_prs',
+                                             return_value=open_prs))
+            for name in ('_all_merged_prs_recent', '_all_closed_prs_recent',
+                         '_read_recent_log_lines',
+                         '_read_recent_routing_events'):
+                stack.enter_context(patch.object(self.hps, name,
+                                                 return_value=[]))
+            # Only the checks that read outside the tmp agents root (journalctl,
+            # Supabase) are neutralised; check_unrouted_open_prs runs FOR REAL.
+            for name in ('check_retry_exhausted',
+                         'check_tier2_fallback_failures'):
+                stack.enter_context(patch.object(self.hps, name,
+                                                 return_value=[]))
+            stack.enter_context(patch.object(
+                self.hps, '_resolution_signal_present',
+                return_value=(False, None)))
+            stack.enter_context(patch.object(
+                self.hps, '_mirror_session_active_for_pr',
+                return_value=(False, None)))
+            # Nudge-only: never let the recovery primitive dispatch a review.
+            stack.enter_context(patch.object(
+                self.hps, '_recover_via_mirror_review', return_value=False))
+            stack.enter_context(patch.object(self.hps, '_gh_pr_state',
+                                             return_value=gh_state))
+            stack.enter_context(_allow_alerts())
+            self.hps.run()
+
+    def test_producer_written_nudge_is_removed_by_the_retraction(self) -> None:
+        # Tick 1: PR OPEN and unrouted -> the REAL append_alert writes the nudge.
+        self._real_tick('OPEN', [self._pr()])
+        self.assertIn('pipeline-stall:unrouted-pr:PR#900', self._subjects())
+        # Tick 2: it merged, so it has left the open list -> the REAL retraction
+        # must find and remove the very line the producer just wrote.
+        self._real_tick('MERGED', [])
+        self.assertNotIn('pipeline-stall:unrouted-pr:PR#900', self._subjects())
+        self.assertEqual([r['source'] for r in self._queue()],
+                         ['alert-retraction'], 'only the stand-down remains')
+
+
+class TestRetractionRunsAfterTheAlerts(_AlertsQueueMixin, unittest.TestCase):
+    """WHERE the retraction pass runs is part of its contract.
+
+    It issues one `gh pr view` per pending nudge URL — 48 measured on the live
+    queue 2026-08-05 — inside a unit whose `TimeoutStartSec=120` kills the whole
+    tick (a current tick runs ~14s). Placed ABOVE the emit loop, that cost lands
+    on the alerts: a slow gh means systemd SIGTERMs the process before a single
+    stall alert Checks 1-12 already computed is ever appended, and they are lost
+    for that tick. Placed BELOW it, the same kill costs only the retraction,
+    which resumes next tick and still converges.
+
+    The pass must nevertheless still run on a QUIET tick (no alerts at all) —
+    dead nudges pile up precisely then — so the move may not hide behind the
+    `not all_alerts` exit."""
+
+    _MERGED = 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/900'
+
+    def _stall_alert(self) -> dict:
+        return {
+            'key': 'forge_built_no_pr:task-x',
+            'message': 'Forge built task-x but opened no PR.',
+            'subject': 'pipeline-stall:forge-built-no-pr:task-x',
+            'suggested_action': 'Check the Forge worktree.',
+        }
+
+    def _tick_recording_order(self, gh_states: dict, *, alerts: list):
+        """One tick with `check_forge_built_no_pr` returning `alerts`, recording
+        the interleaving of appends and retractions."""
+        order: list = []
+        real_resolve = self.la.resolve_alert
+
+        def rec_resolve(key, *a, **kw):
+            order.append(('resolve', key))
+            return real_resolve(key, *a, **kw)
+
+        def rec_append(**kw):
+            order.append(('append', kw.get('source')))
+            return True
+
+        with contextlib.ExitStack() as stack:
+            for name, value in (
+                ('_all_open_prs', []), ('_all_merged_prs_recent', []),
+                ('_all_closed_prs_recent', []), ('_read_recent_log_lines', []),
+                ('_read_recent_routing_events', []),
+            ):
+                stack.enter_context(
+                    patch.object(self.hps, name, return_value=value))
+            for name in [n for n in dir(self.hps) if n.startswith('check_')]:
+                stack.enter_context(
+                    patch.object(self.hps, name, return_value=[]))
+            stack.enter_context(patch.object(
+                self.hps, 'check_forge_built_no_pr', return_value=alerts))
+            stack.enter_context(patch.object(
+                self.hps, '_gh_pr_state',
+                side_effect=lambda url: gh_states.get(url)))
+            stack.enter_context(patch.object(
+                self.la, 'append_alert', side_effect=rec_append))
+            stack.enter_context(patch.object(
+                self.la, 'resolve_alert', side_effect=rec_resolve))
+            stack.enter_context(_allow_alerts())
+            rc = self.hps.run()
+        return rc, order
+
+    def test_stall_alerts_are_appended_before_the_retraction_probes(self) -> None:
+        # THE REPRODUCTION. On unmodified code the retraction pass runs first,
+        # so `order` opens with ('resolve', ...) and the stall alert — already
+        # computed — is appended only afterwards. Any gh stall in between is
+        # paid for by the alert, which is the loss this ordering exists to stop.
+        self._seed(self._nudge_line(900))
+        rc, order = self._tick_recording_order(
+            {self._MERGED: 'MERGED'}, alerts=[self._stall_alert()])
+        self.assertEqual(rc, 0)
+        first_alert = next(i for i, (kind, what) in enumerate(order)
+                           if kind == 'append' and what == 'heal-pipeline-stall')
+        first_resolve = next(i for i, (kind, _) in enumerate(order)
+                             if kind == 'resolve')
+        self.assertLess(
+            first_alert, first_resolve,
+            'the tick must emit its stall alerts BEFORE spending gh calls on '
+            f'the retraction pass; got {order}',
+        )
+
+    def test_quiet_tick_with_no_alerts_still_retracts(self) -> None:
+        # GUARD, not a reproduction: this passes before the fix too. It exists
+        # so the move cannot be made by hiding the pass below the
+        # `if not all_alerts: return 0` exit, which would silently disable
+        # retraction on exactly the ticks the backlog accumulates on.
+        self._seed(self._nudge_line(900))
+        rc, order = self._tick_recording_order({self._MERGED: 'MERGED'},
+                                               alerts=[])
+        self.assertEqual(rc, 0)
+        self.assertEqual(self._subjects(), [])
+        self.assertIn(('resolve', 'heal-pipeline-stall:'
+                       'pipeline-stall:unrouted-pr:PR#900'), order)
+
+    def test_cooldown_state_is_persisted_before_the_retraction(self) -> None:
+        # The other half of the ordering fix. Moving the retraction below the
+        # emit loop puts ~20s of gh calls between "the DM went out" and
+        # "save_state stamped its cooldown". A SIGTERM in that window — the very
+        # kill this reordering exists to survive — loses the stamps for alerts
+        # Larry has ALREADY been DMed, so the next tick re-DMs every one of
+        # them. save_state must land before the pass, never after it.
+        self._seed(self._nudge_line(900))
+        order: list = []
+        real_resolve = self.la.resolve_alert
+
+        def rec_resolve(key, *a, **kw):
+            order.append(('resolve', key))
+            return real_resolve(key, *a, **kw)
+
+        with contextlib.ExitStack() as stack:
+            for name, value in (
+                ('_all_open_prs', []), ('_all_merged_prs_recent', []),
+                ('_all_closed_prs_recent', []), ('_read_recent_log_lines', []),
+                ('_read_recent_routing_events', []),
+            ):
+                stack.enter_context(
+                    patch.object(self.hps, name, return_value=value))
+            for name in [n for n in dir(self.hps) if n.startswith('check_')]:
+                stack.enter_context(
+                    patch.object(self.hps, name, return_value=[]))
+            stack.enter_context(patch.object(
+                self.hps, 'check_forge_built_no_pr',
+                return_value=[self._stall_alert()]))
+            stack.enter_context(patch.object(
+                self.hps, '_gh_pr_state', return_value='MERGED'))
+            stack.enter_context(patch.object(
+                self.la, 'append_alert', return_value=True))
+            stack.enter_context(patch.object(
+                self.la, 'resolve_alert', side_effect=rec_resolve))
+            stack.enter_context(patch.object(
+                self.hps, 'save_state',
+                side_effect=lambda *a, **kw: order.append(('save_state', None))))
+            stack.enter_context(_allow_alerts())
+            self.hps.run()
+        kinds = [k for k, _ in order]
+        # Asserted as membership FIRST so a missing call FAILS with this message
+        # instead of raising StopIteration out of a bare next(). An ERRORING
+        # test is indistinguishable from a caught mutation, which is exactly how
+        # a void-check gets a false 'guarded'.
+        self.assertIn('save_state', kinds, f'state was never persisted: {order}')
+        self.assertIn('resolve', kinds, f'nothing was retracted: {order}')
+        self.assertLess(
+            kinds.index('save_state'), kinds.index('resolve'),
+            'the tick must persist its cooldown stamps BEFORE spending gh calls '
+            f'on the retraction, or a kill re-DMs every alert; got {order}')
+
+    def test_quiet_tick_still_saves_state(self) -> None:
+        # GUARD: the no-alerts path stamps cooldown state via save_state, and
+        # the restructure must not drop that. Passes before the fix.
+        self._seed()
+        with contextlib.ExitStack() as stack:
+            for name, value in (
+                ('_all_open_prs', []), ('_all_merged_prs_recent', []),
+                ('_all_closed_prs_recent', []), ('_read_recent_log_lines', []),
+                ('_read_recent_routing_events', []),
+            ):
+                stack.enter_context(
+                    patch.object(self.hps, name, return_value=value))
+            for name in [n for n in dir(self.hps) if n.startswith('check_')]:
+                stack.enter_context(
+                    patch.object(self.hps, name, return_value=[]))
+            saver = stack.enter_context(patch.object(self.hps, 'save_state'))
+            stack.enter_context(_allow_alerts())
+            self.hps.run()
+        saver.assert_called_once()
+
+    def test_dry_run_quiet_tick_does_not_save_state(self) -> None:
+        # GUARD: dry-run must stay a true no-op on the quiet path too.
+        self._seed()
+        with contextlib.ExitStack() as stack:
+            for name, value in (
+                ('_all_open_prs', []), ('_all_merged_prs_recent', []),
+                ('_all_closed_prs_recent', []), ('_read_recent_log_lines', []),
+                ('_read_recent_routing_events', []),
+            ):
+                stack.enter_context(
+                    patch.object(self.hps, name, return_value=value))
+            for name in [n for n in dir(self.hps) if n.startswith('check_')]:
+                stack.enter_context(
+                    patch.object(self.hps, name, return_value=[]))
+            saver = stack.enter_context(patch.object(self.hps, 'save_state'))
+            stack.enter_context(_allow_alerts())
+            self.hps.run(dry_run=True)
+        saver.assert_not_called()
+
+
+class TestStandDownIsNotSilencedByItsOwnCooldown(_AlertsQueueMixin,
+                                                 unittest.TestCase):
+    """A retraction Larry could SEE must itself be visible.
+
+    `larry_alerts.retract_with_standdown` states the invariant: without a
+    closure line "a wrongful retraction is an invisible event (the red simply
+    vanishes with no trail to dispute)". A single STABLE closure subject shares
+    one cooldown bucket, and `INFO_COOLDOWN_SEC` is 6 hours — so only the first
+    batch in any 6h window is ever announced and every later one removes rows
+    from the Needs You lane in silence."""
+
+    def _url(self, n: int, repo: str = 'Larry-Yatch/ourliberty-agent-core'):
+        return f'https://github.com/{repo}/pull/{n}'
+
+    def _real_append_tick(self, gh_states: dict):
+        """A tick using the REAL append_alert, so the real cooldown applies."""
+        with contextlib.ExitStack() as stack:
+            for name, value in (
+                ('_all_open_prs', []), ('_all_merged_prs_recent', []),
+                ('_all_closed_prs_recent', []), ('_read_recent_log_lines', []),
+                ('_read_recent_routing_events', []),
+            ):
+                stack.enter_context(
+                    patch.object(self.hps, name, return_value=value))
+            for name in [n for n in dir(self.hps) if n.startswith('check_')]:
+                stack.enter_context(
+                    patch.object(self.hps, name, return_value=[]))
+            stack.enter_context(patch.object(
+                self.hps, '_gh_pr_state',
+                side_effect=lambda url: gh_states.get(url)))
+            stack.enter_context(_allow_alerts())
+            self.hps.run()
+
+    def _closures(self) -> list:
+        return [r for r in self._queue() if r['source'] == 'alert-retraction']
+
+    def test_a_second_batch_within_the_window_still_stands_down(self) -> None:
+        # THE REPRODUCTION. Two batches, minutes apart, different PRs. On
+        # unmodified code the second closure is swallowed by the 6h `info`
+        # cooldown on the one shared subject, so PR #901's nudge leaves the lane
+        # with no notice of any kind.
+        self._seed(self._nudge_line(900))
+        self._real_append_tick({self._url(900): 'MERGED'})
+        self.assertEqual(len(self._closures()), 1, 'first batch announces')
+
+        # Second batch: a different nudge, still inside the 6h info window.
+        self._seed(*(self._queue() + [self._nudge_line(901)]))
+        self._real_append_tick({self._url(901): 'MERGED'})
+        closures = self._closures()
+        self.assertEqual(
+            len(closures), 2,
+            'a second retraction batch inside the 6h info cooldown must still '
+            'produce its own stand-down, not vanish silently',
+        )
+        self.assertIn('#901', closures[1]['message'])
+
+    def test_the_identical_batch_repeated_is_still_deduped(self) -> None:
+        # The anti-toil half must survive: the closure subject may vary per
+        # BATCH, never per nudge, so re-announcing the same batch is suppressed.
+        self._seed(self._nudge_line(900))
+        self._real_append_tick({self._url(900): 'MERGED'})
+        first = self._closures()
+        self.assertEqual(len(first), 1)
+        subject = first[0]['subject']
+        self.assertTrue(
+            subject.startswith(self.hps.RETIRED_NUDGE_CLOSURE_SUBJECT),
+            f'closure subject must stay inside its own namespace: {subject!r}')
+        with _allow_alerts():
+            again = self.la.append_alert(
+                source='alert-retraction', severity='info',
+                message='same batch again', subject=subject, route='closure')
+        self.assertFalse(again, 'the same batch must not re-announce')
+
+    def test_one_standdown_per_batch_not_per_nudge(self) -> None:
+        # GUARD: 20 dead nudges in one tick stay ONE DM.
+        self._seed(*[self._nudge_line(n) for n in range(900, 920)])
+        self._real_append_tick(
+            {self._url(n): 'MERGED' for n in range(900, 920)})
+        self.assertEqual(len(self._closures()), 1)
+
+    def test_batch_subject_stays_bounded(self) -> None:
+        # The subject is not only a cooldown key: `chain_event_shipper.
+        # alert_event_task_id` ships it VERBATIM as the chain_events row's
+        # `task_id`, and `larry_alerts._retract_shipped_alert_events` clears
+        # that same column by it. Spelling the whole batch into it put ~700
+        # chars there for 16 PRs, and the live backlog is 55 keys, so a first
+        # run would write a ~2000-char task_id. The longest subject anywhere in
+        # the live queue is 130 chars (measured 2026-08-05), so the batch id
+        # has to be a bounded digest rather than the list itself.
+        self._seed(*[self._nudge_line(n) for n in range(900, 940)])
+        self._real_append_tick(
+            {self._url(n): 'MERGED' for n in range(900, 940)})
+        closures = self._closures()
+        self.assertEqual(len(closures), 1)
+        subject = closures[0]['subject']
+        self.assertLessEqual(
+            len(subject), 120,
+            f'a 40-PR batch must not spell itself into the shipped task_id; '
+            f'got {len(subject)} chars: {subject[:160]}...')
+        self.assertTrue(
+            subject.startswith(self.hps.RETIRED_NUDGE_CLOSURE_SUBJECT + ':'))
+        # ...and the PRs are still named where Larry actually reads them.
+        self.assertIn('ourliberty-agent-core#900', closures[0]['message'])
+
+    def test_two_different_batches_get_different_subjects(self) -> None:
+        # GUARD on the digest: distinct batches must not collide into one
+        # bucket, or the 6h cooldown silences the second one all over again.
+        self._seed(self._nudge_line(900))
+        self._real_append_tick({self._url(900): 'MERGED'})
+        first = self._closures()[0]['subject']
+        self._seed(*(self._queue() + [self._nudge_line(901)]))
+        self._real_append_tick({self._url(901): 'MERGED'})
+        second = self._closures()[1]['subject']
+        self.assertNotEqual(first, second)
+
+
+class TestStandDownNamesTheRepo(_AlertsQueueMixin, unittest.TestCase):
+    """The nudge subject is repo-blind (`...:PR#156` names no repo) and Larry's
+    queue carries the same PR number under two repos — measured 2026-08-03,
+    `#152/#155/#156` each appeared twice. The retraction already parses the repo
+    out of the URL to make the removal repo-correct; the DM then throws it away
+    and dedupes on the bare number, so the one surface Larry reads both
+    undercounts and cannot say which repo cleared."""
+
+    _A = 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/156'
+    _B = 'https://github.com/Larry-Yatch/RSDPM/pull/156'
+
+    def test_two_repos_one_number_are_counted_and_named_separately(self) -> None:
+        # THE REPRODUCTION. Both lines share ONE retraction key (the subject is
+        # repo-blind), both PRs are terminal, so both are removed — but the DM
+        # says "covering 1 pull request(s) ... : #156" while the line count says
+        # 2, and never says which repo.
+        self._seed(
+            self._nudge_line(156),
+            self._nudge_line(156, repo='Larry-Yatch/RSDPM'),
+        )
+        rc, mock_append, _ = self._run_tick({self._A: 'MERGED',
+                                             self._B: 'MERGED'})
+        self.assertEqual(self._subjects(), [], 'both dead lines are removed')
+        msg = mock_append.call_args.kwargs['message']
+        self.assertIn('covering 2 pull request(s)', msg)
+        self.assertIn('ourliberty-agent-core#156', msg)
+        self.assertIn('RSDPM#156', msg)
+
+    def test_single_repo_batch_still_names_its_repo(self) -> None:
+        # THE REPRODUCTION (second half): even with no collision, a bare `#900`
+        # is ambiguous across Larry's repos, so every named PR carries its repo.
+        self._seed(self._nudge_line(900))
+        rc, mock_append, _ = self._run_tick(
+            {'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/900':
+             'MERGED'})
+        msg = mock_append.call_args.kwargs['message']
+        self.assertIn('ourliberty-agent-core#900', msg)
 
 
 if __name__ == '__main__':

@@ -144,6 +144,7 @@ from __future__ import annotations
 
 import argparse
 import functools
+import hashlib
 import json
 import os
 import re
@@ -224,6 +225,13 @@ REPOS = [
 ]
 
 GH_TIMEOUT_S = 30
+
+# The `source` this healer stamps on EVERY alert it emits, and therefore the
+# first half of the `source:subject` retraction key `larry_alerts` joins on
+# (`_line_matches_resolution`). ONE constant for both so the stamp and the key
+# can never drift: a retraction key that misses its own lines removes nothing
+# and still reports success, which is precisely how this defect class hides.
+ALERT_SOURCE = 'heal-pipeline-stall'
 
 # Stall thresholds. All in minutes.
 FORGE_BUILT_NO_PR_MIN = 120          # 2h — Forge done but no PR opened
@@ -3509,6 +3517,254 @@ def check_unrouted_open_prs(open_prs: list[dict],
     return alerts
 
 
+# ---------- Check 7b: retire this healer's OWN dead unrouted-PR nudges ----------
+
+# Both nudge shapes Check 7 emits share this subject prefix
+# (`pipeline-stall:unrouted-pr:PR#<n>` and
+# `pipeline-stall:unrouted-pr-stranded:PR#<n>`).
+UNROUTED_NUDGE_SUBJECT_PREFIX = 'pipeline-stall:unrouted-pr'
+
+# Namespace prefix for the closure stand-down's dedup subject. The subject is
+# this prefix plus a count and a digest of the BATCH's own PR list, which puts
+# each distinct batch in its own cooldown bucket while keeping the string short
+# enough to be a sane `chain_events.task_id`.
+#
+# It was a single stable string, and that silently defeated the stand-down:
+# `append_alert` keys its cooldown on `source:subject` and `INFO_COOLDOWN_SEC`
+# is 6 HOURS, so only the first batch in any 6h window was ever announced and
+# every later one removed rows from the Needs You lane with no notice at all.
+# `larry_alerts.retract_with_standdown` states the invariant that broke:
+# without a closure line "a wrongful retraction is an invisible event (the red
+# simply vanishes with no trail to dispute)". Logging it does not count — the
+# journal is not a surface Larry reads.
+#
+# Anti-toil is preserved by scoping per BATCH, never per nudge: 40 dead nudges
+# cleared in one tick are still exactly ONE DM, and re-announcing the identical
+# batch is still suppressed by the same cooldown.
+RETIRED_NUDGE_CLOSURE_SUBJECT = 'unrouted-pr-nudges-retired'
+
+# Cap on how many PRs the closure DM names inline, so clearing a 40-deep
+# backlog is still one readable line on Larry's phone.
+_CLOSURE_PR_LIST_CAP = 12
+
+# The PR a nudge is about. The PERSISTED line carries NO `pr_url` field —
+# measured 0 of 45 on the live queue 2026-08-03 — because `check_unrouted_open_prs`
+# sets `pr_url` on the in-memory alert dict purely for the fire-time merge-truth
+# gate and `larry_alerts.append_alert` never persists it. The URL survives only
+# inside the human-facing text (45 of 45 carry one in `suggested_action`), so that
+# is where it has to be read from. Reading a `pr_url` field instead would parse
+# nothing, retract nothing, and report success.
+_NUDGE_PR_URL_RE = re.compile(
+    r'https://github\.com/([\w.-]+/[\w.-]+)/pull/(\d+)')
+# The PR number the SUBJECT claims, used to cross-check the parsed URL.
+_NUDGE_SUBJECT_PR_RE = re.compile(r'PR#(\d+)$')
+
+
+def _pending_unrouted_nudges(alerts_file: Path) -> dict[str, set]:
+    """Group this healer's PENDING unrouted-PR nudge lines by retraction key.
+
+    Returns ``{key: {pr_url, ...}}`` where `key` is the ``source:subject`` string
+    `larry_alerts.resolve_alert` joins on, and the set holds every PR URL named
+    by the lines under that key. A line naming NO URL contributes ``None``, which
+    the caller treats as "cannot prove this one dead" and skips the whole key.
+
+    Several lines can share one key: the live queue holds 45 lines under 41 keys
+    (a stranded nudge is re-keyed per head SHA, but its SUBJECT is head-blind, so
+    a re-pushed PR lands two or three lines on one subject). `resolve_alert`
+    removes ALL of them in one call, which is why the grouping is by key and the
+    terminal test must hold for EVERY url under it.
+
+    The route/kind filter mirrors `larry_alerts._line_matches_resolution` — only
+    an `escalate` alert line is retractable. Mirroring it can only NARROW what we
+    probe (a digest-routed twin would otherwise cost one `gh pr view` every tick
+    forever); it can never make us miss a line `resolve_alert` would have removed.
+
+    Never raises: an unreadable queue or a torn/half-written line yields fewer
+    candidates, and the next tick 15 minutes later sees the settled file."""
+    out: dict[str, set] = {}
+    try:
+        raw = alerts_file.read_text(encoding='utf-8')
+    except (OSError, UnicodeDecodeError) as e:
+        log(f'unrouted-nudge scan: cannot read alert queue: '
+            f'{type(e).__name__}: {e}', 'WARN')
+        return out
+    for line in raw.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            rec = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(rec, dict):
+            continue
+        if rec.get('kind') in ('notification', 'approval_request'):
+            continue
+        if rec.get('route', larry_alerts.DEFAULT_ROUTE) != 'escalate':
+            continue
+        if rec.get('source') != ALERT_SOURCE:
+            continue
+        subject = rec.get('subject')
+        if not isinstance(subject, str) or not subject.startswith(
+                UNROUTED_NUDGE_SUBJECT_PREFIX):
+            continue
+        # Built the same way `larry_alerts.append_alert` builds its cooldown key
+        # and `_line_matches_resolution` rebuilds it, from this record's OWN
+        # fields — so the key can only ever match the lines it came from.
+        key = f'{rec["source"]}:{subject}'
+        # `suggested_action` first (where all 45 live lines carry it), `message`
+        # second so a future nudge shape that moves the link is still covered. A
+        # line naming two different PRs lands two URLs and is skipped below —
+        # ambiguity keeps the nudge, it never guesses.
+        urls = {
+            m.group(0) for field in ('suggested_action', 'message')
+            for m in _NUDGE_PR_URL_RE.finditer(str(rec.get(field) or ''))
+        }
+        out.setdefault(key, set()).update(urls or {None})
+    return out
+
+
+def retire_dead_unrouted_pr_nudges(
+    gh_state_cache: dict[str, Optional[str]],
+    dry_run: bool = False,
+) -> int:
+    """Retract this healer's own unrouted-PR nudges whose PR has gone terminal,
+    then emit ONE summary stand-down for the batch. Returns lines removed.
+
+    Check 7 nudges Larry to route a PR only he can route. Its fire-time
+    merge-truth gate already suppresses a NEW nudge for a PR that has since
+    merged, but nothing ever retracted one already fired — so the queue is
+    append-only for this class and the "Needs You" lane fills with asks whose PR
+    landed days ago (measured 2026-08-03: 41 of 53 unread rows, oldest 2026-07-23,
+    still growing). This closes that half. It is a DECIDER over existing
+    primitives — `_pr_is_terminal` for the truth, `larry_alerts.resolve_alert`
+    for the removal (which also clears the shipped `chain_events` row the tab
+    actually reads, via `_retract_shipped_alert_events`) — with no new healer,
+    field or channel.
+
+    Three gates, all failing toward KEEPING the nudge, because a nudge wrongly
+    retracted vanishes with no trail while one wrongly kept is merely the status
+    quo:
+      * EVERY line under the key must name at least one PR URL — one line naming
+        none blocks the whole key, because removal is all-or-nothing per key; and
+      * every URL's number must equal the number the SUBJECT claims — the subject
+        is repo-blind (`...:PR#156` names no repo) and PR numbers DO collide
+        across repos in this very queue, so the URL is the only repo-correct
+        coordinate and the two must agree before it is trusted; and
+      * EVERY distinct URL under the key must be gh-confirmed MERGED/CLOSED
+        (`_pr_is_terminal` returns False on an unreadable state, so a gh outage
+        retracts nothing).
+
+    Residual hole, INHERITED from the primitive and not introduced here: if the
+    Supabase clear inside `resolve_alert` fails on a network blip, the local line
+    is already gone, so no later tick can retry and that one dashboard row stays
+    unread. `larry_alerts._retract_shipped_alert_events` documents the same
+    caveat for every retraction in the codebase; closing it would take a retry
+    ledger — exactly the new machinery this fix exists to avoid.
+
+    ONE stand-down for the whole batch, not one per nudge: `retract_with_standdown`
+    fires a closure DM per call, and 40 of those is the toil this fix exists to
+    remove. But that stand-down is scoped per BATCH rather than to one stable
+    subject, because `append_alert` de-dupes on `source:subject` and the `info`
+    window is 6 HOURS — one shared bucket announced the first batch and then
+    removed every later batch's rows in silence, which is exactly the invisible
+    retraction `retract_with_standdown` exists to prevent.
+
+    `gh_state_cache` is the tick's shared merge-truth cache, so a PR that is both
+    being retracted and being alerted on costs a single `gh pr view`. The caller
+    runs this AFTER its emit loop: the pass spends one gh call per pending nudge
+    inside a 120s systemd start timeout, and that cost must fall on the
+    retraction of dead asks, never on delivering the tick's live ones."""
+    nudges = _pending_unrouted_nudges(larry_alerts.ALERTS_FILE)
+    if not nudges:
+        return 0
+    removed_total = 0
+    # (repo_slug, number) pairs, never bare numbers. The nudge SUBJECT is
+    # repo-blind (`...:PR#156` names no repo) and Larry's queue carries the same
+    # number under two repos — measured 2026-08-03, #152/#155/#156 each appeared
+    # twice — so both lines land on ONE retraction key. Deduping on the number
+    # alone reported "covering 1 pull request(s): #156" for two distinct PRs,
+    # disagreeing with the line count in the same sentence and never saying
+    # which repo cleared. The repo is already parsed out of the URL to make the
+    # removal repo-correct; it is carried to the DM for the same reason.
+    retired_prs: list[tuple] = []
+    for key in sorted(nudges):
+        urls = nudges[key]
+        subject_pr = _NUDGE_SUBJECT_PR_RE.search(key)
+        # `not urls` is load-bearing, not defensive noise: `all()` over an empty
+        # set is vacuously TRUE, so an empty URL set would sail straight through
+        # the terminal gate below and retract on no evidence whatsoever.
+        if subject_pr is None or not urls or None in urls:
+            log(f'UNROUTED_NUDGE_KEEP {key}: no unambiguous PR link on every '
+                f'line', 'INFO')
+            continue
+        number = subject_pr.group(1)
+        if any(_NUDGE_PR_URL_RE.search(u).group(2) != number for u in urls):
+            log(f'UNROUTED_NUDGE_KEEP {key}: linked PR disagrees with the '
+                f'subject ({sorted(urls)})', 'WARN')
+            continue
+        if not all(_pr_is_terminal(u, gh_state_cache) for u in urls):
+            continue
+        if dry_run:
+            log(f'DRY-RUN would retract dead unrouted-PR nudge {key}', 'INFO')
+            continue
+        try:
+            removed = larry_alerts.resolve_alert(key)
+        except Exception as e:  # noqa: BLE001 — contractually no-raise, but one
+            log(f'resolve_alert raised for {key}: '  # bad key must not abort the
+                f'{type(e).__name__}: {e}', 'WARN')  # rest of the batch
+            continue
+        if removed:
+            removed_total += removed
+            # One entry per (repo, number) this key actually covered. The
+            # numbers already agree with the subject (gate 2 above), so the repo
+            # is the only coordinate left that the subject cannot supply.
+            retired_prs.extend(
+                (_NUDGE_PR_URL_RE.search(u).group(1), int(number))
+                for u in urls)
+            log(f'retracted {removed} dead unrouted-PR nudge line(s) for {key}',
+                'INFO')
+    if not retired_prs:
+        return 0
+    shown = sorted(set(retired_prs), key=lambda rn: (rn[1], rn[0]))
+    # Built ONCE and used for both the human list and the dedup subject, so the
+    # DM and the bucket it de-dupes on can never name different batches.
+    labels = [f'{repo.rsplit("/", 1)[-1]}#{n}' for repo, n in shown]
+    listed = ', '.join(labels[:_CLOSURE_PR_LIST_CAP])
+    if len(labels) > _CLOSURE_PR_LIST_CAP:
+        listed += f' and {len(labels) - _CLOSURE_PR_LIST_CAP} more'
+    larry_alerts.append_alert(
+        source='alert-retraction',
+        severity='info',
+        message=(
+            # Two units in one sentence, so state both: LINES left the lane,
+            # and they covered N pull requests. Saying only one makes the count
+            # and the list below it look like they disagree.
+            f'Cleared {removed_total} stale "this PR needs routing" nudge(s) '
+            f'from your Needs You lane, covering {len(labels)} pull request(s) '
+            f'that have all since merged or closed — nothing is left to route '
+            f'on any of them: {listed}. Nothing for you to do.'
+        ),
+        # Scoped to THIS batch, not one stable string: a single bucket put every
+        # batch after the first inside one 6h `info` cooldown and removed its
+        # rows in silence.
+        #
+        # A DIGEST of the batch, not the batch spelled out. `chain_event_shipper
+        # .alert_event_task_id` ships `subject` VERBATIM as the chain_events
+        # row's `task_id` (and `_retract_shipped_alert_events` clears that column
+        # by it), so the listed form wrote a ~700-char task_id for 16 PRs and
+        # would write ~2000 for the 55-key live backlog, against a longest
+        # observed subject of 130 chars. Digest of the WHOLE list, not the capped
+        # display list, so two batches sharing their first 12 PRs still land in
+        # different buckets; the count stays in the clear for a human reading a
+        # log line.
+        subject=(f'{RETIRED_NUDGE_CLOSURE_SUBJECT}:{len(labels)}:'
+                 f'{hashlib.sha256(",".join(labels).encode()).hexdigest()[:12]}'),
+        route='closure',
+    )
+    return removed_total
+
+
 # ---------- Check 8: Tier 1 quota+auth + Tier 2 missing/failed/skipped ----------
 
 def _check8_cursor_key(agent: str, outcome: str, reason: str) -> str:
@@ -4347,19 +4603,19 @@ def run(dry_run: bool = False) -> int:
         log(f'check_red_mirror_status_no_artifact failed: '
             f'{type(e).__name__}: {e}', 'ERROR')
 
+    # Per-tick cache for the merge-truth gate so a PR that would alert from two
+    # checks — or be alerted on AND retracted in the same tick — costs at most
+    # one `gh pr view` (spec §2 batching). Shared with the retraction pass at
+    # the foot of this function.
+    gh_state_cache: dict[str, Optional[str]] = {}
+
     if not all_alerts:
         log('no stalls detected', 'INFO')
-        if not dry_run:
-            save_state(state)
-        return 0
 
     fired = 0
     recovered_count = 0
     would_fire = 0
     would_recover = 0
-    # Per-tick cache for the merge-truth gate so a PR that would alert from two
-    # checks costs at most one `gh pr view` (spec §2 batching).
-    gh_state_cache: dict[str, Optional[str]] = {}
     for alert in all_alerts:
         if _alert_is_fixture(alert):
             log(f'suppressed (fixture task): {alert["key"]}', 'INFO')
@@ -4422,7 +4678,10 @@ def run(dry_run: bool = False) -> int:
                 'land — manual intervention needed.]'
             )
         ok = larry_alerts.append_alert(
-            source='heal-pipeline-stall',
+            # Same constant the retraction key is built from
+            # (retire_dead_unrouted_pr_nudges), so the stamp and the key that
+            # must later match it cannot drift apart.
+            source=ALERT_SOURCE,
             severity='warning',
             message=message,
             subject=alert['subject'],
@@ -4438,14 +4697,50 @@ def run(dry_run: bool = False) -> int:
             log(f'alerted: {alert["key"]}', 'INFO')
         else:
             log(f'larry_alerts append failed for {alert["key"]}', 'WARN')
-    if dry_run:
-        log(f'DRY-RUN: {would_fire + would_recover} alert(s) would fire, '
-            f'{would_recover} recovery(ies) would be attempted; '
-            f'no writes performed', 'INFO')
-        return 0
-    log(f'done: {fired} new alert(s) fired, {recovered_count} recovered, '
-        f'{len(all_alerts) - fired - recovered_count} suppressed', 'INFO')
-    save_state(state)
+    if all_alerts:
+        if dry_run:
+            log(f'DRY-RUN: {would_fire + would_recover} alert(s) would fire, '
+                f'{would_recover} recovery(ies) would be attempted; '
+                f'no writes performed', 'INFO')
+        else:
+            log(f'done: {fired} new alert(s) fired, {recovered_count} '
+                f'recovered, '
+                f'{len(all_alerts) - fired - recovered_count} suppressed',
+                'INFO')
+
+    # Check 7b: retire this healer's own unrouted-PR nudges whose PR has since
+    # gone terminal.
+    #
+    # Placed AFTER the emit loop, and this ordering is load-bearing. The pass
+    # costs one `gh pr view` per pending nudge URL (48 measured on the live
+    # queue 2026-08-05) inside a unit with `TimeoutStartSec=120` against a ~14s
+    # baseline tick. Above the emit loop, a slow gh spends that budget before a
+    # single alert is appended, so systemd's SIGTERM discards every stall
+    # Checks 1-12 already found — the retraction of dead asks costing the
+    # delivery of live ones. Below it, the same kill costs only the retraction,
+    # which resumes next tick and still converges (each `resolve_alert` is its
+    # own atomic rewrite, so a partial batch keeps its progress).
+    #
+    # It is NOT behind the `not all_alerts` branch above: dead nudges pile up
+    # precisely on quiet ticks, so it must run whether or not anything fired.
+    #
+    # The cooldown stamps are persisted FIRST, immediately below, for the same
+    # reason the pass moved down here. `record_alert` only mutates `state` in
+    # memory; until `save_state` lands, a tick killed during the retraction's gh
+    # calls would lose the stamps for alerts Larry has ALREADY been DMed, and
+    # the next tick would re-DM every one of them. Nothing in the retraction
+    # reads or writes `state`, so persisting before it is free.
+    if not dry_run:
+        save_state(state)
+
+    try:
+        retracted = retire_dead_unrouted_pr_nudges(gh_state_cache,
+                                                   dry_run=dry_run)
+        if retracted:
+            log(f'retired {retracted} dead unrouted-PR nudge line(s)', 'INFO')
+    except Exception as e:
+        log(f'retire_dead_unrouted_pr_nudges failed: {type(e).__name__}: {e}',
+            'ERROR')
     return 0
 
 
