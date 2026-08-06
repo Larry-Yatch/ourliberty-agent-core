@@ -17968,7 +17968,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-08-06T21:40:20.224548+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-07-12T10:42:59.661893+00:00"
+      "orphan_last_activity_ts": "2026-07-12T10:42:59.661893+00:00",
+      "briefing": {
+        "what": "Someone on the team drafted a proposal back in July to change one of our internal cutoff levels, and it's still sitting unfinished with no owner or project attached to it.",
+        "why": "Half-finished policy changes tend to either quietly get adopted without anyone signing off, or get forgotten and redone later at cost \u2014 and either way you're carrying a decision nobody made.",
+        "suggest": "Ask for a one-paragraph summary of what the proposal actually changes and who wants it, then either give it an owner and a deadline or close it out \u2014 worth a quick look before it moves further."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-06T21:43:19.929194+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
