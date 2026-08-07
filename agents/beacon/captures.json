@@ -2406,7 +2406,8 @@
         "at": "2026-07-30T00:35:27.604975+00:00",
         "from_state": "parked"
       },
-      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
+      "aging": true
     },
     {
       "id": "cap-closed-pr-step-wedged-forever-by-headless-dispat-37d6",
@@ -2733,7 +2734,8 @@
         "kind": "delegate",
         "task_id": "delegate-cap-promoted-larry-alert-cards-1060-skips-them-and-n-7629",
         "stamped_at": "2026-07-30T19:43:39.379671+00:00"
-      }
+      },
+      "aging": true
     },
     {
       "id": "cap-an-agent-that-renders-a-marker-thinks-it-emitted-1ebd",
