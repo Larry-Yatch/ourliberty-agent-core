@@ -47258,3 +47258,80 @@ G-rule: `source-beacon-review-escalate-tier4-no-translation-001` [1/3] (new, ite
 
 ---
 
+## Iteration ~8294 — 2026-08-07T08:39Z UTC (Larry /cycle chat, Tier 1 [Check 0: watermark 572→573, 1 new alert sync.service/deploy-restart-head-drift Tier-4 CLAIMED ⚠️; Check 1: NOMINAL ✅; Check 2: NOMINAL ✅; Check 3: CLEAN ✅ (0 stalls); Check 4: SIGNAL ⚠️ (pending=2 — dag-preflight ~6h49min + mirror-review-pr-RSDPM-198 ~2h37min); Check 5: NOMINAL ✅; NOT CLEAN → Tier 1])
+
+**Health:** ⚠️ SIGNAL — Check 0: 1 new Tier-4 alert (sync.service/deploy-restart-head-drift; already delivered by outbox-notifier idx=572; self-healing per alert recovery note). Check 4: pending=2 (dag-preflight-approvals-informational-cards-001 ~6h49min; mirror-review-pr-RSDPM-198 ~2h37min). All other checks nominal. Tier 1 (consecutive_clean=0).
+
+**VERIFY-BEFORE-REASSERT (from iter ~8293 at ~08:27Z UTC 2026-08-07):**
+- **"watermark 572=572, 0 new alerts NOMINAL"**: CHANGED → file_length=573, watermark=572; 1 new alert (line 573: sync.service/deploy-restart-head-drift). Check 0 SIGNAL this iter.
+- **"system-health overall=healthy, all 4 bots alive"**: CONFIRMED → ts=2026-08-07T08:31:28Z UTC (fresh ~8min); overall=healthy; all 4 bots alive=True. ✅
+- **"HEAD=80762bcb (Pulse cycle 20260807T081912Z)==origin/main"**: STATE-CHANGE → HEAD=45e75ffc (Pulse cycle 20260807T082847Z)==origin/main. [expected: auto-commit from iter ~8293 ✅]
+- **"Check 3 CLEAN (0 stalls)"**: CONFIRMED → "no stalls detected" (08:36:08Z UTC). ✅
+- **"pending=2 (dag-preflight ~6h38min + mirror-review-pr-RSDPM-198 ~2h26min)"**: CONFIRMED → pending=2, both still status=pending (~6h49min and ~2h37min). ✅
+- **"Tier 1 (consecutive_clean=0)"**: CONFIRMED → tier=1, consecutive_clean=0, last_signal_at=2026-08-07T08:27:07Z UTC. ✅
+
+**Check 0 — Alert triage (~08:37Z UTC):** repair-watermark: repaired=false (old_watermark=572, file_length=573). **1 new alert** — line 573:
+- `sync.service / deploy-restart-head-drift (ts=08:28:52Z UTC, route=escalate, severity=warning)`: "refusing daemon restarts + unit installs because HEAD is 45e75ffc, not deploy target 80762bcb. Recovery: next sync tick + heal_dashboard_api_sha_drift will reconcile." triage-alert → **Tier 4** (novel, no translation match). guard-tier4 accepted (helper_tier=4, same_iter_call=true). Outbox-notifier already delivered (bot log idx=572 at 08:32:16Z UTC) — no duplicate DM. Check A verifies HEAD=45e75ffc==origin/main (clean, on main) — drift appears transient/self-healing. Watermark advanced 572→573.
+**SIGNAL ⚠️** (1 Tier-4 alert claimed; no Pulse DM sent — outbox-notifier covered delivery)
+
+**Check 1 — Log noise (~08:37Z UTC):** journalctl -u ourliberty-*.service last 30min (priority=warning): "No entries". 0 actionable findings.
+**NOMINAL ✅**
+
+**Check 2 — Telegram sweep (~08:37Z UTC):** beacon_telegram_bot.log: last delivery idx=572 (sync.service/deploy-restart-head-drift) at 08:32:16Z UTC. Most recent Larry inbound from 2026-08-05 (no messages in last 4h). No agent-distress keywords.
+**NOMINAL ✅**
+
+**Check 3 — Pipeline stall (~08:36Z UTC):** heal_pipeline_stall.py --dry-run → **"no stalls detected"** (08:36:08Z UTC).
+**CLEAN ✅**
+
+**Check 4 — Pending directives (~08:37Z UTC):** `~/agents/state/beacon-pending-approvals.json`: **pending=2**
+1. `dag-preflight-approvals-informational-cards-001` (DAG preflight for sequence approvals-informational-cards-001, target_agent=mirror, created 2026-08-07T01:48:02Z UTC, status=pending). DM delivered as approval_request idx=565 at 01:48:44Z UTC. 6h reminder sent 07:51:55Z UTC. **~6h49min since DM.** No Pulse action.
+2. `mirror-review-pr-RSDPM-198-d50798f4` (Mirror review for RSDPM PR#198, created 2026-08-07T05:59:50Z UTC, status=pending). Beacon DM'd Larry at 06:05:59Z UTC (idx=570 intent=review-escalate). **~2h37min since DM.** No Pulse action.
+**SIGNAL ⚠️** (pending=2; both awaiting Larry action)
+
+**Check 5 — Stale daemon code (~08:37Z UTC):** heal-stale-daemon-code.heartbeat: 2026-08-07T08:26:20Z UTC (~11min before check). Within 60min threshold.
+**NOMINAL ✅**
+
+**Check A — Source repo (~08:37Z UTC):** branch=main, tree CLEAN, HEAD=45e75ffc (Pulse cycle 20260807T082847Z)==origin/main (behind=0, ahead=0). **NOMINAL ✅**
+**Check B — Sync health (~08:37Z UTC):** agent-core-sync.json: last_sync=2026-08-07T08:28:52Z UTC (~11min; status=success). Sync emitted the deploy-restart-head-drift alert at same timestamp (SHA drift between auto-commit + deploy pointer, per alert self-diagnosis); Check A confirms HEAD now clean. Within 2h threshold. **NOMINAL ✅**
+**Check C — Agent liveness (~08:31Z UTC):** system-health.json ts=2026-08-07T08:31:28Z UTC (fresh ~8min); overall=healthy; all 4 bots alive=True (beacon/forge/mirror/pulse). **NOMINAL ✅**
+**Check E — PR/merge state (~08:37Z UTC):** ourliberty-agent-core: **0 open PRs**. **CLEAN ✅**
+**Check H — All inboxes (~08:37Z UTC):** beacon=0. forge=0. mirror=0. pulse=0. **NOMINAL ✅**
+
+**§5.0 one-shots:** audit_due_nudge → no-op. distill_detector → no-op. audit_cadence_signal → no-op. **NOMINAL ✅**
+**§5 periodic — Check I:** Today is Fri Aug 7 UTC = firing day. Latest artifact=check-i-2026-08-05.json (Wed Aug 5). Timer fires ~14:13 UTC; current ~08:39 UTC (~5h34min away). QUIET (pre-fire) ✅
+**§5 periodic — Check XIV:** last=check-xiv-2026-08-04.json. No new artifact. QUIET ✅
+**§5 periodic — Check III:** last=check-iii-2026-07-26.json. 14d gate until 2026-08-09 (2d away). QUIET ✅
+**§5 periodic — Check VIII:** already_deprecated. QUIET ✅
+
+**Rotations (~08:39Z UTC):** SUPABASE_SERVICE_ROLE_KEY: due=2026-08-22 (~15d); last_dm=2026-08-03T22:52:32Z UTC; 14d dedup active (expires ~2026-08-17). No new DM. ✅
+
+**G-rule tracking:**
+- `pulse-triage-self-report-should-be-tier3-001` **RESOLVED ✅**: 0 bounce-backs. [carry ✅]
+- `pulse-check-xiv-tier4-no-translation-001` **CLOSED ✅**: PR#1101 merged (48409e32). [carry ✅]
+- `heal-pipeline-stall-unrouted-pr-stranded-tier4-no-translation-001` **CLOSED ✅**: PR#1103 merged (93ea91f8). [carry ✅]
+- `medic-diagnosis-subject-specific-tier4-no-translation-001` **CLOSED ✅**: PR#1104 merged (24a23653). [carry ✅]
+- `outbox-notifier-approval-request-tier4-no-translation-001` **FALSE PREMISE CLOSED**: translation present (PR#491). [carry ✅]
+- `approvals-informational-cards-spec-001` **SPEC IN MAIN (PR#1102, cd886496)**: dag-preflight pending Larry approval (~6h49min outstanding; 6h reminder sent 07:51:55Z UTC). [IMPL DISPATCHED → WATCH FOR LARRY APPROVAL]
+- `heal-approvals-surface-drift-tier4-nonbinary-001` **DISPATCHED (iter ~8237)**: dag-preflight pending=1. Missing-card drift continues until step-promote lands. [DISPATCHED → WATCH]
+- `enable-pr-auto-merge-reviewdecision-guard-001` [1/3]: 0 open PRs in agent-core. [WATCH → 2 more for dispatch]
+- `heal-pipeline-stall-no-mirror-dispatch-tier4-no-translation-001` [1/3]: 0 new alerts this iter (watermark 572→573; line 573 is sync.service, not this pattern). [WATCH → 2 more for dispatch]
+- `alert-retraction-no-translation-001` [1/3]: 0 new alerts this iter. [WATCH → 2 more for dispatch]
+- `source-beacon-review-escalate-tier4-no-translation-001` [1/3] (first iter ~8274): 0 new occurrences this iter. [WATCH → 2 more for dispatch]
+- `sync-service-deploy-restart-head-drift-tier4-no-translation-001` **[1/3] (NEW, this iter ~8294)**: source=sync.service, subject=deploy-restart-head-drift fires Tier-4 (no translation match). Appears transient (SHA drift between auto-commit and deploy pointer; Check A NOMINAL; self-healing per alert recovery note). Outbox-notifier delivered (idx=572). Fix: add Tier-3 translation entry for `source=sync.service, subject=deploy-restart-head-drift` in config/alert-translations.json. Dispatch to Beacon at 3/3.
+
+**Actions taken:**
+- Check 0: repair-watermark no-op (file_length=573 > watermark=572, no rotation-gap). 1 alert claimed as Tier-4; watermark advanced 572→573. No DM (outbox-notifier pre-delivered).
+- §5.0 one-shots: all no-ops.
+- PRIME DIRECTIVE: `intervention` appended at 08:39:44Z UTC (tier=1, kind=intervention, template=pending-approval-watch, detail=Check 4 pending=2 + Check 0 Tier-4 claimed).
+- Tier state: `cycle_tier_state.py record --checks-clean false` → **Tier 1** (signal: pending=2 + Tier-4 alert; consecutive_clean=0, last_signal_at=2026-08-07T08:39:45Z UTC).
+
+**Escalations:** No new Pulse-initiated DMs this iter. Larry has: (1) dag-preflight approval_request idx=565 (01:48:44Z UTC, ~6h49min outstanding; 6h automated reminder sent 07:51:55Z UTC); (2) Beacon DM idx=570 re RSDPM#198 coverage floor blocker (06:05:59Z UTC, ~2h37min outstanding); (3) sync.service/deploy-restart-head-drift idx=572 delivered 08:32:16Z UTC (Larry already has this; no Pulse DM needed).
+
+**PRIME DIRECTIVE (post-action):** intervention appended (Check 4 pending=2 watch + Check 0 Tier-4 claim). Trailing 30d: interventions=2125+, systemic_fixes=49, ratio≈43+, trend=worsening.
+
+**Patterns:** dag-preflight-approvals-informational-cards-001: ~6h49min since DM (55th consecutive iter with Check 4 as primary signal; 6h reminder fired 07:51:55Z UTC). mirror-review-pr-RSDPM-198: ~2h37min old. Check I fires today at ~14:13 UTC (~5h34min away). New G-rule: sync-service-deploy-restart-head-drift [1/3] — likely transient, watch for recurrence before dispatching.
+
+**Tier end-of-iter:** **Tier 1** (signal: pending=2 + Tier-4 alert, consecutive_clean=0). De-escalation requires 3 clean iters, gated on pending approvals resolving.
+
+---
+
