@@ -42967,3 +42967,79 @@ Key finding: the translation for `source=outbox-notifier, kind=approval_request`
 
 ---
 
+## Iteration ~8238 — 2026-08-07T01:53Z UTC (Larry /loop /cycle chat, Tier 1 [Check 0: watermark 565→566, 1 new alert TIER-4 ⚠️ (outbox-notifier approval_request delivery confirmation — kind-fallback defeated by non-null subject; G-rule 1/3); Check 1: NOMINAL ✅; Check 2: NOMINAL ✅; Check 3: CLEAN ✅ (DRY-RUN=0, RSDPM PR#196 now closed); Check 4: SIGNAL ⚠️ (pending=1 dag-preflight-approvals-informational-cards-001); Check 5: NOMINAL ✅; NOT CLEAN → Tier 1])
+
+**Health:** ⚠️ SIGNAL — Tier-4 alert (outbox-notifier approval_request, kind-fallback gap) + pending=1 (approvals impl sequence DAG preflight). Both are expected outcomes of iter ~8237 G-rule dispatch. No second DM needed. Tier 1 (consecutive_clean=0).
+
+**VERIFY-BEFORE-REASSERT (from iter ~8237 at ~01:37Z UTC 2026-08-07):**
+- **"watermark=565, 0 new alerts"**: STATE-CHANGE → file_length=566 (line 566: outbox-notifier approval_request delivery confirmation for dag-preflight-approvals-informational-cards-001, appeared after Beacon processed direction-ask). [state-change ⚠️ — expected ✅]
+- **"system-health overall=healthy, all 4 bots alive"**: CONFIRMED → ts=2026-08-07T01:44:50Z UTC; overall=healthy; all 4 bots alive; disk=16%, memory=20%. [confirmed ✅]
+- **"HEAD=ca0695a8 (Pulse cycle 20260807T012531Z)==origin/main"**: STATE-CHANGE → HEAD=7a31a835 (Pulse cycle 20260807T014602Z)==origin/main. [expected auto-commit from iter ~8237 ✅]
+- **"Check 3 DRY-RUN=0 (RSDPM PR#196 cooldown-active)"**: PARTIAL STATE-CHANGE → DRY-RUN=0 still; RSDPM PR#196 now pr_closed (healer would retract dead nudge). Positive resolution. [state-change ✅]
+- **"pending=0"**: STATE-CHANGE → pending=1 (dag-preflight-approvals-informational-cards-001). [state-change ⚠️ — expected, Beacon processed direction-ask ✅]
+- **"Tier 1 (consecutive_clean=0)"**: CONFIRMED → tier=1, consecutive_clean=0. [confirmed ✅]
+
+**Check 0 — Alert triage (~01:47Z UTC):** repair-watermark at cycle start: repaired=false (565=565). Post-check discovery: file_length grew to 566. **1 new alert** at line 566: `source=outbox-notifier, kind=approval_request, approval_id=dag-preflight-approvals-informational-cards-001, subject=dag-preflight-approvals-informational-cards-001`. This is a delivery confirmation — outbox-notifier DM'd Larry the DAG preflight approval request for the approvals-informational-cards-001 sequence (bot log: idx=565 delivered at [2026-08-06T19:48:44-0600]=01:48:44Z UTC). triage-alert called → Tier-4 (guard: accepted=true, genuine novel — non-null subject defeats translation kind-fallback; translation IS present for source=outbox-notifier/kind=approval_request per PR#491, but subject-specific value overrides kind-only lookup). DO NOT DM Larry: delivery already made (idx=565 at 01:48Z UTC). Journal-note only. Watermark advanced 565→566.
+**⚠️ TIER-4 → tier-reset** (no DM — delivery confirmation class; memory discipline)
+
+**Check 1 — Log noise (~01:47Z UTC):** outbox-notifier.log: idle since [2026-08-05 23:43:16] (05:43Z UTC Aug 6; ~20h). journalctl last 30min: routine INFO only — deploy-notifier (tick skipped_already_notified=100), heal-missions-card-gc (0 captures, 8 unprobeable missions flagged for manual reconcile — recurring steady-state), heal-forge-wip-only-redispatch (6 SKIPs, all expected), heal-daemon-restart-manifest-drift (no drift), heal-stale-in-review-reconcile (no stale), rotate-active-tier (disabled), apply-on-merge (HEAD unchanged), heal-claude-json-bind-drift nsenter probes (expected). 0 WARNs or ERRORs. 0 actionable findings.
+**NOMINAL ✅**
+
+**Check 2 — Telegram sweep (~01:47Z UTC):** beacon_telegram_bot.log: last new delivery idx=565 at [2026-08-06T19:48:44-0600]=01:48:44Z UTC Aug 7 (approval_request dag-preflight-approvals-informational-cards-001). No new Larry directives (last was 2026-08-05T22:07:09-0600=04:07Z UTC Aug 6; suite-guardian approval → PR#1105 fulfilled). No agent-distress keywords.
+**NOMINAL ✅**
+
+**Check 3 — Pipeline stall (~01:47Z UTC):** heal_pipeline_stall.py --dry-run → **"DRY-RUN: 0 alert(s) would fire, 0 recovery(ies) would be attempted"** + "DRY-RUN would retract dead unrouted-PR nudge heal-pipeline-stall:pipeline-stall:unrouted-pr:PR#196". FORGE_NO_PR_SKIP: guard-tier4-payload-fidelity-001→PR#1104, suite-guardian-test-id-doubling-parser-fix-001→PR#1105. **RSDPM PR#196 now pr_closed** — healer will retract the dead nudge on next live run. Positive state change.
+**CLEAN ✅**
+
+**Check 4 — Pending directives (~01:47Z UTC initial, re-verified ~01:50Z UTC):** Initial check: pending=0, history=664. Re-verified after Beacon processed direction-ask: **pending=1** — `dag-preflight-approvals-informational-cards-001` (DAG preflight for sequence approvals-informational-cards-001). DM already delivered to Larry (idx=565 at 01:48Z UTC). Expected outcome of iter ~8237 G-rule dispatch to Beacon. No separate Pulse escalation needed.
+**SIGNAL ⚠️** (expected; Larry has the DM)
+
+**Check 5 — Stale daemon code (~01:47Z UTC):** heal-stale-daemon-code.heartbeat: 2026-08-07T01:42:13Z UTC (~5min before check). Within 60min threshold.
+**NOMINAL ✅**
+
+**Check A — Source repo (~01:47Z UTC):** branch=main, tree CLEAN, HEAD=7a31a835 (Pulse cycle 20260807T014602Z)==origin/main (behind=0, ahead=0). **NOMINAL ✅**
+**Check B — Sync health (~01:47Z UTC):** agent-core-sync.json: last_sync=2026-08-07T01:28:17Z UTC (~19min; status=no-change). Within 2h threshold. **NOMINAL ✅**
+**Check C — Agent liveness (~01:47Z UTC):** system-health.json ts=2026-08-07T01:44:50Z UTC (~2min); overall=healthy. All 4 bots alive (beacon/forge/mirror/pulse). disk=16%, memory=20%. **NOMINAL ✅**
+**Check E — PR/merge state (~01:47Z UTC):** ourliberty-agent-core: **0 open PRs**. **CLEAN ✅**
+**Check H — All inboxes (~01:47Z UTC):** beacon=0. forge=0. mirror=0. pulse=0. **NOMINAL ✅**
+
+**§5.0 one-shots:** audit_due_nudge → no-op (no committed audit baseline). distill_detector → no-op. silence_file_auditor → no-op (no new data). **NOMINAL ✅**
+**§5 periodic — Check I:** Today is Fri Aug 7 UTC = firing day. No new artifact (latest=check-i-2026-08-05.json, Wed Aug 5). Timer fires ~14:13 UTC; current ~01:53 UTC. QUIET (pre-fire) ✅
+**§5 periodic — Check XIV:** last=check-xiv-2026-08-04.json. No new artifact. QUIET ✅
+**§5 periodic — Check III:** last=check-iii-2026-07-26.json. 14d gate until 2026-08-09 (2d away). QUIET ✅
+**§5 periodic — Check VIII:** already_deprecated. QUIET ✅
+
+**Rotations (~01:53Z UTC):** SUPABASE_SERVICE_ROLE_KEY: due=2026-08-22 (~15d); last_dm=2026-08-03T22:52:32Z UTC; 14d dedup active (expires ~2026-08-17). No new DM. ✅
+
+**G-rule tracking:**
+- `pulse-triage-self-report-should-be-tier3-001` **RESOLVED ✅**: 0 bounce-backs. [carry ✅]
+- `pulse-check-xiv-tier4-no-translation-001` **CLOSED ✅**: PR#1101 merged (48409e32). [carry ✅]
+- `heal-pipeline-stall-unrouted-pr-stranded-tier4-no-translation-001` **CLOSED ✅**: PR#1103 merged (93ea91f8). [carry ✅]
+- `medic-diagnosis-subject-specific-tier4-no-translation-001` **CLOSED ✅**: PR#1104 merged (24a23653). [carry ✅]
+- `outbox-notifier-approval-request-tier4-no-translation-001` **FALSE PREMISE CLOSED**: translation present (PR#491); guard-tier4-payload-fidelity-001 covers fabricated-subject path. [carry ✅]
+- `approvals-informational-cards-spec-001` **SPEC IN MAIN (PR#1102, cd886496)**: Beacon processed direction-ask-approvals-opt-b-implement-001 → dag-preflight-approvals-informational-cards-001 pending approval. Sequence in motion. [IMPL DISPATCHED → WATCH FOR LARRY APPROVAL]
+- `heal-approvals-surface-drift-tier4-nonbinary-001` [**DISPATCHED iter ~8237**]: Beacon authored sequence + DAG preflight (pending=1). Missing-card drift will continue until step-promote lands. [DISPATCHED → WATCH]
+- `enable-pr-auto-merge-reviewdecision-guard-001` [1/3]: 0 open PRs in agent-core. [WATCH]
+- `heal-pipeline-stall-no-mirror-dispatch-tier4-no-translation-001` [1/3]: 0 new no-mirror-dispatch alerts. [WATCH]
+- `alert-retraction-no-translation-001` [1/3]: 0 new alert-retraction alerts. [WATCH → 2 more for dispatch]
+- `outbox-notifier-approval-request-subject-nonnull-tier4-001` [**NEW G-RULE 1/3**]: source=outbox-notifier, kind=approval_request with non-null subject=dag-preflight-approvals-informational-cards-001 → Tier-4 from helper (guard accepted=true). Cause: non-null subject value defeats translation kind-fallback; the subject-keyed lookup misses the `approval_request` key. Translation IS present (PR#491) but only fires when subject is null/absent — a code-level gap in _translation_match(). Distinct from the FALSE PREMISE CLOSED G-rule (that was about fabricated subjects; this is a real row). [WATCH → 2 more for dispatch]
+
+**Actions taken:**
+- Check 0: repair-watermark no-op (565=565 at cycle start). triage-alert called for line 566 (dag-preflight-approvals-informational-cards-001) → Tier-4 confirmed via guard-tier4 (accepted=true, genuine novel). Watermark advanced 565→566 via set-watermark.
+- §5.0 one-shots: all no-ops.
+- PRIME DIRECTIVE: `intervention` appended at 01:53:12Z UTC (tier=1, kind=intervention, template=outbox-notifier-approval-request-subject-nonnull-tier4-001).
+- Tier state: `cycle_tier_state.py record --checks-clean false` → **Tier 1** (signal found; consecutive_clean=0).
+
+**Escalations:** None directly to Larry. Outbox-notifier already delivered the DAG preflight DM (idx=565 at 01:48Z UTC). Larry has the approval request in his Telegram thread.
+
+**PRIME DIRECTIVE (post-action):** intervention appended (Tier-4 triage, delivery confirmation class). Trailing 30d: interventions≈2122, systemic_fixes≈50, ratio≈42.44, trend=worsening. Systemic fix opportunity: fix _translation_match() to handle kind-only lookup regardless of subject (G-rule 1/3 above).
+
+**Patterns:**
+1. **RSDPM PR#196 closed**: positive state change. The pipeline-stall nudge for PR#196 will be retracted on next healer live run.
+2. **Approvals informational cards sequence in motion**: Beacon processed direction-ask → dag-preflight pending Larry approval. This is the Option B implementation (3 steps: step-verb + step-render + step-promote). Expect Forge activity after Larry approves.
+3. **outbox-notifier approval_request subject-nonnull Tier-4 (1/3)**: translation present but subject defeats kind-fallback. Worth fixing at 3/3.
+
+**Tier end-of-iter:** **Tier 1** (signal found, consecutive_clean=0). De-escalation path: 3 consecutive clean iters at Tier 1 → Tier 2.
+
+---
+
