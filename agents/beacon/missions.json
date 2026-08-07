@@ -18039,7 +18039,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-08-07T05:58:19.784518+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-08-07T05:55:35.777689+00:00"
+      "orphan_last_activity_ts": "2026-08-07T05:55:35.777689+00:00",
+      "briefing": {
+        "what": "A piece of finished work is sitting in the review queue, waiting on a sign-off, and it isn't attached to any of your named initiatives yet.",
+        "why": "Work that nobody owns tends to sit and go stale, and until someone looks at it you can't tell whether it's a quick win or something that needs a closer look.",
+        "suggest": "Have someone give it a quick read this week to confirm what it's for and which initiative it belongs to before it goes any further."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-07T05:58:55.980796+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
