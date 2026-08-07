@@ -12,9 +12,9 @@
 
 ---
 
-## G-rule source-beacon-review-escalate-tier4-no-translation-001 — 1/3 (new, iter ~8274)
+## G-rule source-beacon-notifications-tier4-no-translation — 2/3 (updated iter ~8351)
 
-**Rule:** `source=beacon, kind=notification, intent=review-escalate` returns Tier-4 from the triage helper (no translation entry for source=beacon). First occurrence: iter ~8274 (2026-08-07T06:07Z UTC), alert line 571. Context: RSDPM PR#198 Mirror escalated; coverage floor CI failing on main itself (4 files now covered, must be dropped from exempt allowlist); Beacon DM'd Larry directly via idx=570 at 06:05:59Z UTC because no reply_chat_id on externally-routed PR. No Pulse DM sent (duplicate). Fix: add Tier-3 translation entry for `source=beacon, intent=review-escalate` in config/alert-translations.json (silence+journal: Beacon-authored escalation DMs are already delivered directly). Dispatch to Beacon at 3/3.
+**Rule:** `source=beacon, kind=notification` returns Tier-4 from the triage helper (no translation entry). Two confirmed occurrences: iter ~8274 (2026-08-07T06:07Z UTC, intent=review-escalate, RSDPM PR#198 Mirror escalated, Beacon DM idx=570 already delivered) and iter ~8351 (2026-08-07T15:09Z UTC, intent=review-pass, RSDPM PR#198 merged, Beacon sent manual notification, outbox-notifier idx=559 already delivered). Root cause: source=beacon notification intent variants (review-escalate, review-pass, others TBD) lack translation entries; outbox-notifier delivers them directly making any Pulse DM a duplicate. Fix: add a broad Tier-3 translation entry for `source=beacon, kind=notification` in config/alert-translations.json (silence+journal: Beacon delivers these directly). Dispatch to Beacon at 3/3.
 
 ---
 
