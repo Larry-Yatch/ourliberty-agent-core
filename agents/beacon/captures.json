@@ -3280,6 +3280,36 @@
       "shipped_note": "shipped in PR #1097",
       "closed_at": "2026-08-04T02:36:54.431215+00:00",
       "shipped_pr_url": "https://github.com/Larry-Yatch/ourliberty-agent-core/pull/1097"
+    },
+    {
+      "id": "cap-review-high-anomaly-unidentified-task-from-missi-6964",
+      "title": "Review high-\u03c3 anomaly unidentified task from `missions-narrator` (type: unclassified)",
+      "note": "$0.21 task vs $0.07 baseline (6.9\u03c3 above)\n\nLedger flagged a `missions-narrator` row at 6.9\u03c3 above baseline, but the row carries no task_id \u2014 there is no chain archive to read and no task to fast-path. Triage the cost-attribution gap, or name the task by hand before dispatching.",
+      "state": "parked",
+      "label": "pulse-check-i",
+      "origin": {
+        "source": "agent",
+        "session_id": null,
+        "repo": null,
+        "branch": null,
+        "captured_at": "2026-08-07T14:14:16.579606+00:00"
+      },
+      "last_touched": "2026-08-07T14:14:16.579606+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "One of our automated jobs cost about three times its usual amount, and our records don't say which piece of work it was for.",
+        "why": "If spending spikes can't be traced back to the work that caused them, we can't tell a costly mistake from money well spent \u2014 and small gaps like this get expensive as we run more work.",
+        "suggest": "Worth a short look to close the tracking gap so future spikes are traceable, but the single overrun here is small enough that it doesn't need to jump the queue."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-07T14:23:20.154863+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
