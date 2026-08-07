@@ -6,6 +6,12 @@
 
 ---
 
+## G-rule sync-service-deploy-restart-head-drift-tier4-no-translation-001 — 1/3 (new, iter ~8294)
+
+**Rule:** `source=sync.service, subject=deploy-restart-head-drift` fires Tier-4 from the triage helper (no translation match). First occurrence: iter ~8294 (2026-08-07T08:28:52Z UTC), line 573. Alert: "refusing daemon restarts + unit installs because HEAD is 45e75ffc, not deploy target 80762bcb." Appears transient: emitted immediately after a Pulse auto-commit causes a brief SHA drift between local HEAD and the sync service's deploy-target pointer; self-heals on the next sync tick (Check A confirmed HEAD==origin/main clean at time of triage). Outbox-notifier delivered idx=572 at 08:32:16Z UTC; no Pulse DM needed (already delivered). Fix: add Tier-3 (silence+journal) translation entry for `source=sync.service, subject=deploy-restart-head-drift` in config/alert-translations.json. Dispatch to Beacon at 3/3.
+
+---
+
 ## G-rule source-beacon-review-escalate-tier4-no-translation-001 — 1/3 (new, iter ~8274)
 
 **Rule:** `source=beacon, kind=notification, intent=review-escalate` returns Tier-4 from the triage helper (no translation entry for source=beacon). First occurrence: iter ~8274 (2026-08-07T06:07Z UTC), alert line 571. Context: RSDPM PR#198 Mirror escalated; coverage floor CI failing on main itself (4 files now covered, must be dropped from exempt allowlist); Beacon DM'd Larry directly via idx=570 at 06:05:59Z UTC because no reply_chat_id on externally-routed PR. No Pulse DM sent (duplicate). Fix: add Tier-3 translation entry for `source=beacon, intent=review-escalate` in config/alert-translations.json (silence+journal: Beacon-authored escalation DMs are already delivered directly). Dispatch to Beacon at 3/3.
