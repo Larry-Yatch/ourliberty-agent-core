@@ -51293,3 +51293,56 @@ Watermark advanced 556→559. No DMs sent. No dispatches. G-rule watch: 0 new oc
 
 ---
 
+## Iteration ~8351 — 2026-08-07T15:13Z UTC (Larry /cycle chat, Tier 1 [Check 0: watermark 559→560, 1 alert Tier-4 TRIAGED ✅; Check 1: NOMINAL ✅; Check 2: NOMINAL ✅; Check 3: CLEAN ✅ (0 stalls); Check 4: SIGNAL ⚠️ (pending=1 — dag-preflight ~13h24min); Check 5: NOMINAL ✅; NOT CLEAN → Tier 1])
+
+**Health:** ⚠️ SIGNAL — Check 4 only: pending=1 (dag-preflight-approvals-informational-cards-001, ~13h24min, awaiting Larry). RSDPM PR#198 MERGED 15:08Z UTC — mirror-review-pr-RSDPM-198 cleared from pending (2→1). Alert watermark advanced 559→560. All other checks nominal. Tier 1 (consecutive_clean=0).
+
+**VERIFY-BEFORE-REASSERT (from iter ~8350 at ~15:01Z UTC 2026-08-07):**
+- **"watermark 559=559, 0 new alerts NOMINAL"**: STATE-CHANGE → repair-watermark repaired=false (old_watermark=559, file_length=560); 1 new alert at line 560 (source=beacon, intent=review-pass, RSDPM #198 merged). Triaged Tier-4; already delivered outbox-notifier idx=559 at 15:10:45Z UTC. Watermark advanced to 560. ✅
+- **"system-health overall=healthy, all 4 bots alive"**: CONFIRMED → ts=2026-08-07T15:07:58Z UTC (fresh ~5min); overall=healthy; beacon/forge/mirror/pulse all alive=True. ✅
+- **"HEAD=86703e38==origin/main"**: STATE-CHANGE → HEAD=eb291c03 (Pulse cycle 20260807T150431Z)==origin/main [auto-commit from iter ~8350 wrapper ✅]
+- **"Check 3 CLEAN (0 stalls)"**: CONFIRMED → "no stalls detected" (15:11:29Z UTC). ✅
+- **"pending=2 (dag-preflight ~13h13min + mirror-review-pr-RSDPM-198 ~9h1min)"**: STATE-CHANGE (improvement) → pending=1; dag-preflight age=~13h24min still pending; RSDPM-198 CLEARED (PR#198 merged 15:08Z UTC, line 560 beacon notification confirms). ✅
+- **"Tier 1 (consecutive_clean=0)"**: CONFIRMED → tier=1, consecutive_clean=0, last_signal_at=2026-08-07T15:02:29Z UTC. ✅
+
+**Check 0 — Alert triage (~15:12Z UTC):** repair-watermark: repaired=false (old_watermark=559, file_length=560). **1 new alert** at line 560.
+- `source=beacon, kind=notification, intent=review-pass, ts=2026-08-07T15:09:25Z UTC, task_id=pr-RSDPM-198` — RSDPM PR#198 merged 15:08Z; Mirror PASSed; branch deleted. Beacon sent manually (no reply_chat_id on cross-repo PRs). triage-alert → **Tier 4** (no translation match for source=beacon, intent=review-pass). Payload fidelity verified (exists at line 560). Already delivered outbox-notifier idx=559 at 15:10:45Z UTC. **No Pulse DM** (duplicate). Watermark advanced 559→560.
+- G-rule watch: `source-beacon-notifications-tier4-no-translation` — 2nd occurrence (iter ~8274: review-escalate; iter ~8351: review-pass). Root cause: source=beacon notification intent variants lack translation entries; outbox-notifier delivers them directly. **G-rule now at 2/3.** Will dispatch to Beacon at 3rd occurrence.
+**NOMINAL ✅** (Tier 4 already delivered; no fresh Pulse action)
+
+**Check 1 — Log noise (~15:11Z UTC):** journalctl -u ourliberty-*.service last 30min (priority=warning): "-- No entries --". 0 actionable findings.
+**NOMINAL ✅**
+
+**Check 2 — Telegram sweep (~15:11Z UTC):** beacon_telegram_bot.log: last entry `[2026-08-07T09:10:45-0600]`=15:10:45Z UTC (notification idx=559 delivered, intent=review-pass — the RSDPM merge confirmation). No new Larry inbound. No agent-distress keywords.
+**NOMINAL ✅**
+
+**Check 3 — Pipeline stall (~15:11Z UTC):** heal_pipeline_stall.py --dry-run → **"no stalls detected"** (15:11:29Z UTC).
+**CLEAN ✅**
+
+**Check 4 — Pending directives (~15:12Z UTC):** `~/agents/state/beacon-pending-approvals.json`: **pending=1**
+1. `dag-preflight-approvals-informational-cards-001` (DAG preflight, approvals informational cards Option B, created 2026-08-07T01:48:02Z UTC, status=pending). DM delivered idx=565 at 01:48:44Z UTC. 6h reminder sent 07:51:55Z UTC. **~13h24min since creation.** No Pulse action.
+- `mirror-review-pr-RSDPM-198-d50798f4` CLEARED — RSDPM PR#198 merged 15:08Z UTC.
+**SIGNAL ⚠️** (pending=1; awaiting Larry)
+
+**Check 5 — Stale daemon code (~15:12Z UTC):** `~/agents/blackboard/heal-stale-daemon-code.heartbeat`: 2026-08-07T15:10:36Z UTC (~2min before check). Within 60min threshold.
+**NOMINAL ✅**
+
+**Check A — Source repo (~15:11Z UTC):** branch=main, HEAD=eb291c03 (Pulse cycle 20260807T150431Z)==origin/main (behind=0, ahead=0). Tree clean. **NOMINAL ✅**
+**Check B — Sync health (~15:11Z UTC):** agent-core-sync.json: last_sync=2026-08-07T14:29:48Z UTC (~42min; status=no-change). Within 2h threshold. **NOMINAL ✅**
+**Check C — Agent liveness (~15:07Z UTC):** system-health.json ts=2026-08-07T15:07:58Z UTC (fresh ~5min); overall=healthy; all 4 bots alive=True (beacon/forge/mirror/pulse). **NOMINAL ✅**
+**Check E — PR/merge state (~15:11Z UTC):** ourliberty-agent-core: **0 open PRs**. **CLEAN ✅**
+**Check H — All inboxes (~15:12Z UTC):** beacon=0, forge=0, mirror=0, pulse=0. **NOMINAL ✅**
+
+**§5.0 one-shots:** audit_due_nudge → no-op. distill_detector → no-op. audit_cadence_signal → no-op. **NOMINAL ✅**
+**§5 periodic — Check I:** latest=check-i-2026-08-07.json (timer 14:14Z UTC today, surfaced iter ~8315). No new artifact. QUIET ✅
+**§5 periodic — Check XIV:** latest=check-xiv-2026-08-04.json. No new artifact. QUIET ✅
+**§5 periodic — Check III:** 14d gate until 2026-08-09 (2d away). QUIET ✅
+
+**PRIME DIRECTIVE:** intervention logged (check4-pending-dag-preflight, iter ~8351, tier=1). No systemic_fix this iter.
+
+**Patterns:** G-rule `source-beacon-notifications-tier4-no-translation` at 2/3. Fix: add broad Tier-3 entry for `source=beacon, kind=notification` in config/alert-translations.json. Dispatching to Beacon at 3rd occurrence.
+
+**Tier state:** consecutive_clean=0 recorded (checks_clean=false). Remains Tier 1.
+
+---
+
