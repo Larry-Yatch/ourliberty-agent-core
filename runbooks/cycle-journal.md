@@ -4,6 +4,77 @@
 
 ---
 
+## Iteration ~8231 — 2026-08-07T00:07Z UTC (Larry /cycle chat, Tier 3 [Check 0: watermark 560=560, 0 new alerts; Check 1: NOMINAL ✅; Check 2: NOMINAL ✅; Check 3: CLEAN ✅ (DRY-RUN=0); Check 4: CLEAN ✅ (pending=0); Check 5: NOMINAL ✅; CLEAN → Tier 3 consecutive_clean=4])
+
+**Health:** ✅ CLEAN — All checks nominal. Tier 3 (consecutive_clean=4). 0 new alerts. 0 open PRs. 0 pending approvals. All 4 bots alive. All inboxes empty.
+
+**VERIFY-BEFORE-REASSERT (from iter ~8230 at ~23:32Z UTC 2026-08-06):**
+- **"watermark=560=560, 0 new alerts"**: CONFIRMED → repair-watermark: repaired=false (old_watermark=560, file_length=560). [confirmed ✅]
+- **"system-health overall=healthy, all 4 bots alive"**: CONFIRMED → ts=2026-08-07T00:03:16Z UTC (fresh); overall=healthy; all 4 bots alive (beacon/forge/mirror/pulse). [confirmed ✅]
+- **"HEAD=94d31190 (Pulse cycle 20260806T230452Z)==origin/main"**: STATE-CHANGE → HEAD=9beb1eac (chore(missions): GC healer — commit captures.json delta)==origin/main. [expected auto-commits from iter ~8230: 09233ebc + 9beb1eac ✅]
+- **"Check 3 CLEAN (DRY-RUN=0)"**: CONFIRMED → DRY-RUN=0, no stalls detected. [confirmed ✅]
+- **"pending=0"**: CONFIRMED → pending=0, history=664. [confirmed ✅]
+- **"Tier 3 consecutive_clean=3"**: CONFIRMED → tier=3, consecutive_clean=3 at iter start. [confirmed ✅]
+
+**Check 0 — Alert triage (~00:06Z UTC):** repair-watermark: repaired=false (old_watermark=560, file_length=560). **0 new alerts** — watermark current (560=file_length). No triage actions.
+**NOMINAL ✅**
+
+**Check 1 — Log noise (~00:06Z UTC):** outbox-notifier.log: 0 WARN/ERROR. inbox_watcher.log: 0 WARN/ERROR. journalctl last 30min: "-- No entries --". 0 actionable findings.
+**NOMINAL ✅**
+
+**Check 2 — Telegram sweep (~00:06Z UTC):** beacon_telegram_bot.log: last Larry directive 2026-08-05T22:07:09-0600 (suite-guardian approval → PR#1105; tracked prior iters). No new Larry directives in last 4h. No agent-distress keywords.
+**NOMINAL ✅**
+
+**Check 3 — Pipeline stall (~00:06Z UTC):** heal_pipeline_stall.py --dry-run → **"no stalls detected"**. FORGE_NO_PR_SKIP: guard-tier4-payload-fidelity-001→PR#1104, suite-guardian-test-id-doubling-parser-fix-001→PR#1105. All benign.
+**CLEAN ✅**
+
+**Check 4 — Pending directives (~00:06Z UTC):** `~/agents/state/beacon-pending-approvals.json`: **pending=0**, history=664. No open approval_requests.
+**CLEAN ✅**
+
+**Check 5 — Stale daemon code (~00:06Z UTC):** heal-stale-daemon-code.heartbeat: 2026-08-07T00:01:19Z UTC (~5min before check). Within 60min threshold.
+**NOMINAL ✅**
+
+**Check A — Source repo (~00:06Z UTC):** branch=main, tree CLEAN (0 files), HEAD=9beb1eac (chore(missions): GC healer — commit captures.json delta)==origin/main (behind=0, ahead=0). **NOMINAL ✅**
+**Check B — Sync health (~00:06Z UTC):** agent-core-sync.json: last_sync=2026-08-06T23:28:11Z UTC (~38min; status=no-change). Within 2h threshold. **NOMINAL ✅**
+**Check C — Agent liveness (~00:03Z UTC):** system-health.json ts=2026-08-07T00:03:16Z UTC (fresh); overall=healthy. All 4 bots alive (beacon/forge/mirror/pulse). disk=16%, memory=17%. **NOMINAL ✅**
+**Check E — PR/merge state (~00:06Z UTC):** ourliberty-agent-core: **0 open Forge PRs**. **CLEAN ✅**
+**Check H — All inboxes (~00:07Z UTC):** forge=0. beacon=0. mirror=0. pulse=0. **NOMINAL ✅**
+
+**§5.0 one-shots:** audit_due_nudge → no-op. distill_detector → no-op. audit_cadence_signal → no-op. **NOMINAL ✅**
+**§5 periodic — Check I:** Fri Aug 7 UTC = firing day. No artifact yet (timer fires ~14:13 UTC). Expected: check-i-2026-08-07.json will appear mid-afternoon UTC. QUIET (pre-fire) ✅
+**§5 periodic — Check XIV:** last=check-xiv-2026-08-04.json (Mon Aug 4). No new artifact. QUIET ✅
+**§5 periodic — Check III:** last=check-iii-2026-07-26.json. 14d gate until 2026-08-09 (2d away). QUIET ✅
+**§5 periodic — Check VIII:** already_deprecated. QUIET ✅
+
+**Rotations (~00:07Z UTC):** SUPABASE_SERVICE_ROLE_KEY: due=2026-08-22 (~16d); last_dm=2026-08-03T22:52:32Z UTC (~3d ago); 14d dedup window active (expires ~2026-08-17). No new DM. ✅
+
+**G-rule tracking:**
+- `pulse-triage-self-report-should-be-tier3-001` **RESOLVED ✅**: 0 bounce-backs. [carry ✅]
+- `pulse-check-xiv-tier4-no-translation-001` **CLOSED ✅**: PR#1101 merged (48409e32). [carry ✅]
+- `heal-pipeline-stall-unrouted-pr-stranded-tier4-no-translation-001` **CLOSED ✅**: PR#1103 merged (93ea91f8). [carry ✅]
+- `medic-diagnosis-subject-specific-tier4-no-translation-001` **CLOSED ✅**: PR#1104 merged (24a23653). [carry ✅]
+- `outbox-notifier-approval-request-tier4-no-translation-001` **FALSE PREMISE CLOSED**: translation present (PR#491); 0 real rows since 2026-06-30. [carry ✅]
+- `approvals-informational-cards-spec-001` **SPEC IN MAIN (PR#1102, cd886496)**: 3 impl steps remain. [SPEC IN MAIN; IMPL NEXT]
+- `heal-approvals-surface-drift-tier4-nonbinary-001` [**2/3**]: no new occurrence (0 new alerts). [WATCH → 1 more for dispatch]
+- `enable-pr-auto-merge-reviewdecision-guard-001` [1/3]: no new occurrence. [WATCH]
+- `heal-pipeline-stall-no-mirror-dispatch-tier4-no-translation-001` [1/3]: no new occurrence. [WATCH]
+- `alert-retraction-no-translation-001` [1/3]: no new occurrence (0 new alerts). [WATCH → 2 more for dispatch]
+
+**Actions taken:**
+- Check 0: watermark current (560=560). No new triage actions.
+- PRIME DIRECTIVE: `iter_clean` appended at 00:08:03Z UTC (tier=3; kind=iter_clean).
+- Tier state: `cycle_tier_state.py record --checks-clean true` → **Tier 3 consecutive_clean=4** (Tier 3 sustained; 30-min cadence).
+
+**Escalations:** None.
+
+**PRIME DIRECTIVE (post-action):** iter_clean appended. Trailing 30d: interventions=2126, systemic_fixes=51, ratio≈41.63, trend=worsening.
+
+**Patterns:** None new this iter. System at steady-state. Note: today is Fri Aug 7 UTC — Check I fires ~14:13 UTC today; artifact will appear in the next cycle that runs after that.
+
+**Tier end-of-iter:** **Tier 3** (consecutive_clean=4). At 30-min cadence. Sustained.
+
+---
+
 ## Iteration ~8230 — 2026-08-06T23:32Z UTC (Larry /cycle chat, Tier 3 [Check 0: watermark 560=560, 0 new alerts; Check 1: NOMINAL ✅; Check 2: NOMINAL ✅; Check 3: CLEAN ✅ (DRY-RUN=0); Check 4: CLEAN ✅ (pending=0); Check 5: NOMINAL ✅; CLEAN → Tier 3 consecutive_clean=3])
 
 **Health:** ✅ CLEAN — All checks nominal. Tier 3 (consecutive_clean=3). 0 new alerts. 0 open PRs. 0 pending approvals. All 4 bots alive. All inboxes empty.
@@ -2835,84 +2906,6 @@
 - **[blue] RSDPM:193+192 unrouted-pr**: Both in cooldown, Tier-3 translation working. No new alerts.
 
 **Tier end-of-iter:** **Tier 2**, consecutive_clean=2 (1 more clean iter → Tier 3).
-
----
-
-## Iteration ~8191 — 2026-08-06T06:43Z UTC (Larry /loop /cycle chat, Tier 2 [Check 0: repair-watermark repaired=false (598→600); 2 new alerts (pipeline-stall:unrouted-pr:PR#193 Tier-3 silenced, medic-diagnosis Tier-3 silenced); Check 1: NOMINAL ✅; Check 2: NOMINAL ✅; Check 3: NOMINAL ✅ (DRY-RUN=0, RSDPM:193+192 in cooldown); Check 4: CLEAN ✅ (pending=0); Check 5: NOMINAL ✅; CLEAN → consecutive_clean=1])
-
-**Health:** ✅ CLEAN — All mandatory checks nominal. 2 new alerts (both Tier-3 known-pattern, silenced). 0 open PRs. All bots healthy. Tier 2 steady (1/3 toward Tier 3).
-
-**VERIFY-BEFORE-REASSERT (from iter ~8190 at 06:24Z UTC 2026-08-06):**
-- **"heal-rsdpm-install-drift-recurring-tier4-001 [2/3]"**: CONFIRMED — 0 new rsdpm-install-drift alerts above watermark this iter; line 598 (ts=06:00:04Z) was already processed in a prior iter. G-rule stays [2/3]. [carry ✅]
-- **"0 open PRs"**: CONFIRMED → ourliberty-agent-core: [], ourliberty-dashboard: []. [confirmed ✅]
-- **"system-health overall=healthy, all 4 bots alive"**: CONFIRMED → ts=2026-08-06T06:41:00Z UTC (~2 min before check); overall=healthy; all 4 bots alive. [confirmed ✅]
-- **"Tier 2 consecutive_clean=0"**: STATE-CHANGE → all checks clean this iter; consecutive_clean=1 (2 more clean → Tier 3). [expected ✅]
-
-**Check 0 — Alert triage (~06:43Z UTC):** repair-watermark: repaired=false (old_watermark=598, file_length=600). **2 new alerts (lines 599-600):**
-- Line 599: `source=heal-pipeline-stall, subject=pipeline-stall:unrouted-pr:PR#193` — RSDPM:193 fix/* branch, no labels. Triage-alert → **Tier 3** (known-pattern: `pipeline-stall:unrouted-pr` translation entry). Silenced. No DM.
-- Line 600: `source=medic, intent=medic-diagnosis` — medic diagnosis of PR#193 stall (same root cause; by-design confirmation). Triage-alert → **Tier 3** (known-pattern: medic-diagnosis translation). Silenced. No DM.
-- Watermark advanced to 600.
-**NOMINAL ✅** (both Tier-3; no tier-reset per § 2.3 carve-out)
-
-**Check 1 — Log noise (~06:43Z UTC):** outbox-notifier.log: last meaningful entry ~22:55Z UTC (PR#1104 AUTO_MERGE + worktree teardown). 0 WARN/ERROR in window. journalctl: routine EROFS nsenter checks (heal-claude-json-bind-drift, expected), ourliberty-health tick (✓ branch/clean_tree/sync_freshness/origin_sync), rsdpm-rehearsal no-op, rotate-active-tier disabled. 0 real WARN/ERROR.
-**NOMINAL ✅**
-
-**Check 2 — Telegram sweep (~06:43Z UTC):** beacon_telegram_bot.log: last entry [2026-08-06T00:03:22-0600] = 06:03:22Z UTC (alert idx=597). Larry's last directive [2026-08-05T22:07:09-0600] = 04:07:09Z UTC (suite-guardian fix) — auto-approved, fulfilled by PR#1105 (merged). No new Larry directive messages. Note: outbox-notifier.log shows direction-ask-medic-diagnosis-unrouted-pr-translation-001 APPROVAL_REQUEST had null reply_chat_id at 21:47Z UTC (fell back to Larry's chat) — pending=0 confirms resolved.
-**NOMINAL ✅**
-
-**Check 3 — Pipeline stall (~06:41Z UTC):** heal_pipeline_stall.py --dry-run → **DRY-RUN=0** (0 alerts would fire). unrouted_open_pr:RSDPM:193 in cooldown (alert already fired at line 599, now suppressed). unrouted_open_pr:RSDPM:192 in cooldown. FORGE_NO_PR_SKIP: 7 benign merged PRs.
-**NOMINAL ✅**
-
-**Check 4 — Pending directives (~06:43Z UTC):** beacon-pending-approvals.json: **pending=0**. history=664.
-**CLEAN ✅**
-
-**Check 5 — Stale daemon code (~06:43Z UTC):** heal-stale-daemon-code.heartbeat: 2026-08-06T06:33:29Z UTC (~10 min before check). Within 60 min threshold.
-**NOMINAL ✅**
-
-**Check A — Source repo (~06:43Z UTC):** branch=main; HEAD=116a905f == origin/main (behind=0, ahead=0). Tree clean. **NOMINAL ✅**
-**Check B — Sync health (~06:43Z UTC):** agent-core-sync.json: last_sync=2026-08-06T06:27:09Z UTC (~16 min; status=no-change). Within 2h threshold. **NOMINAL ✅**
-**Check C — Agent liveness (~06:43Z UTC):** system-health.json ts=2026-08-06T06:41:00Z UTC (~2 min); overall=healthy. All 4 bots alive (beacon/forge/mirror/pulse). **NOMINAL ✅**
-**Check E — PR/merge state (~06:43Z UTC):** ourliberty-agent-core: **0 open PRs**. ourliberty-dashboard: 0 open PRs. **CLEAN ✅**
-**Check H — All inboxes (~06:43Z UTC):** forge=0, beacon=0, mirror=0, pulse=0. All idle. **NOMINAL ✅**
-
-**§5 periodic — Check I:** Fri Aug 7 UTC tomorrow. Last artifact=check-i-2026-08-05.json. QUIET ✅
-**§5 periodic — Check XIV:** last=check-xiv-2026-08-04.json. No new artifact. QUIET ✅
-**§5 periodic — Check III:** last=check-iii-2026-07-26.json. 14d gate until 2026-08-09 (3d away). QUIET ✅
-**§5 periodic — Check VIII:** already_deprecated. QUIET ✅
-
-**Rotations (~06:45Z UTC):** SUPABASE_SERVICE_ROLE_KEY: due=2026-08-22 (~16d); last_dm=2026-08-03T22:52:32Z UTC; 14d dedup window active (expires ~2026-08-17). No new DM. ✅ All other credentials >60d out. ✅
-
-**G-rule tracking:**
-- `suite-guardian-test-id-doubling-parser-fix-001` **CLOSED ✅** (PR#1105 merged e9f620d2). [carry ✅]
-- `medic-diagnosis-subject-specific-tier4-no-translation-001` **CLOSED ✅**: PR#1104 merged 24a23653. [carry ✅]
-- `pulse-triage-self-report-should-be-tier3-001` **RESOLVED ✅**. [carry ✅]
-- `pulse-check-xiv-tier4-no-translation-001` **CLOSED ✅**: PR#1101 merged (48409e32). [carry ✅]
-- `heal-pipeline-stall-unrouted-pr-stranded-tier4-no-translation-001` **CLOSED ✅**: PR#1103 merged (93ea91f8). [carry ✅]
-- `approvals-informational-cards-spec-001` **SPEC IN MAIN (PR#1102, cd886496)**: 3 impl steps remain. [SPEC IN MAIN; IMPL NEXT]
-- `outbox-notifier-approval-request-tier4-no-translation-001` **CLOSED ✅ FALSE PREMISE**: carry. [carry ✅]
-- `heal-rsdpm-install-drift-recurring-tier4-001` **[2/3]**: no new occurrence this iter (line 598 was prior-iter processed). [WATCH → dispatch at 3/3]
-- `heal-approvals-surface-drift-tier4-nonbinary-001` [1/3]: no new occurrence. [WATCH]
-- `enable-pr-auto-merge-reviewdecision-guard-001` [1/3]: no new occurrence. [WATCH]
-- `heal-pipeline-stall-no-mirror-dispatch-tier4-no-translation-001` [1/3]: no new occurrence. [WATCH]
-- `beacon-review-escalate-tier4-no-translation-001` [1/3]: no new occurrence. [WATCH]
-
-**Actions taken:**
-- alert_triage_state.py repair-watermark → repaired=false (598=598 initially; file grew to 600).
-- alert_triage_state.py triage-alert → Tier 3 (line 599 pipeline-stall:unrouted-pr:PR#193, silenced).
-- alert_triage_state.py triage-alert → Tier 3 (line 600 medic-diagnosis, silenced).
-- alert_triage_state.py set-watermark --line 600.
-- cycle_prime_ledger.py append --kind iter_clean → appended 06:45:09Z UTC (tier=2, template=iter-clean-8191).
-- cycle_tier_state.py record --checks-clean true → consecutive_clean=1 (2 more clean → Tier 3).
-
-**Escalations:** None.
-
-**PRIME DIRECTIVE (post-action):** iter_clean appended. Trailing 30d: systemic_fixes=51, ratio≈41.8 (stable; 1 clean Tier-2 iter logged).
-
-**Patterns:**
-- **[blue] RSDPM:193 unrouted-pr**: Tier-3 silenced cleanly via the PR#1103 translation entry. The fix is working as designed.
-- **[blue] Tier 2 steady**: consecutive_clean=1/3. System has been quiet for 4+ consecutive iters.
-
-**Tier end-of-iter:** **Tier 2**, consecutive_clean=1 (2 more clean iters → Tier 3).
 
 ---
 
