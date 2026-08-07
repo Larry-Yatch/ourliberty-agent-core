@@ -10939,7 +10939,10 @@
         "at": "2026-07-24T09:31:20.815733+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-08-07T00:11:02.678296+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-rebase-pr874-onto-main-001",
@@ -10970,7 +10973,10 @@
         "at": "2026-07-24T09:31:20.815733+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-08-07T00:11:02.678296+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-deprecate-burn-rate-gate-checkviii-001",
@@ -11023,7 +11029,10 @@
         "at": "2026-07-24T16:04:26.614616+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-08-07T00:11:02.678296+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-sync-push-fail-persistence-gate-dedup-001",
