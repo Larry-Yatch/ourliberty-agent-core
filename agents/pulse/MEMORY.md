@@ -6,6 +6,12 @@
 
 ---
 
+## G-rule source-beacon-review-escalate-tier4-no-translation-001 — 1/3 (new, iter ~8274)
+
+**Rule:** `source=beacon, kind=notification, intent=review-escalate` returns Tier-4 from the triage helper (no translation entry for source=beacon). First occurrence: iter ~8274 (2026-08-07T06:07Z UTC), alert line 571. Context: RSDPM PR#198 Mirror escalated; coverage floor CI failing on main itself (4 files now covered, must be dropped from exempt allowlist); Beacon DM'd Larry directly via idx=570 at 06:05:59Z UTC because no reply_chat_id on externally-routed PR. No Pulse DM sent (duplicate). Fix: add Tier-3 translation entry for `source=beacon, intent=review-escalate` in config/alert-translations.json (silence+journal: Beacon-authored escalation DMs are already delivered directly). Dispatch to Beacon at 3/3.
+
+---
+
 ## G-rule alert-retraction-no-translation-001 — 1/3 (new, iter ~8221)
 
 **Rule:** `source=alert-retraction, subject^=unrouted-pr-nudges-retired:` returns Tier-4 from the triage helper (no translation match). First occurrence: iter ~8221 (2026-08-06T20:47Z UTC), alert line 558, subject=unrouted-pr-nudges-retired:1:c46f117cf436, route=closure. outbox-notifier had already delivered it (idx=557); no second DM sent. Fix: add Tier-3 (silence+journal) translation entry for `source=alert-retraction, subject^=unrouted-pr-nudges-retired:` in config/alert-translations.json. Dispatch to Beacon at 3/3.
