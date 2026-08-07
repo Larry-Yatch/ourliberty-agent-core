@@ -18054,6 +18054,589 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-mirror-review-pr-RSDPM-198-d50798f4",
+      "name": "Mirror Review PR RSDPM 198 D50798f4",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `mirror-review-pr-RSDPM-198-d50798f4`. Last activity 2026-08-07T05:59:50.285908+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "mirror-review-pr-RSDPM-198-d50798f4"
+      ],
+      "repo": null,
+      "created": "2026-08-07",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-07T06:28:34.649945+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-07T05:59:50.285908+00:00"
+    },
+    {
+      "id": "proposed-larry-reject-ef343ce1d56dd9260b64a909016a32db8855ef3e",
+      "name": "Larry Reject Ef343ce1d56dd9260b64a909016a32db8855ef3e",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `larry-reject-ef343ce1d56dd9260b64a909016a32db8855ef3e`. Last activity 2026-08-06T04:09:40.786799+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "larry-reject-ef343ce1d56dd9260b64a909016a32db8855ef3e"
+      ],
+      "repo": null,
+      "created": "2026-08-07",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-07T06:28:34.649945+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-06T04:09:40.786799+00:00"
+    },
+    {
+      "id": "proposed-suite-guardian-run-2026-08-06",
+      "name": "Suite Guardian Run 2026 08 06",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `suite-guardian-run-2026-08-06`. Last activity 2026-08-06T04:06:41.868361+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "suite-guardian-run-2026-08-06"
+      ],
+      "repo": null,
+      "created": "2026-08-07",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-07T06:28:34.649945+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-06T04:06:41.868361+00:00"
+    },
+    {
+      "id": "proposed-mirror-review-pr-ourliberty-agent-core-1096-ff5df116",
+      "name": "Mirror Review PR Ourliberty Agent Core 1096 Ff5df116",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `mirror-review-pr-ourliberty-agent-core-1096-ff5df116`. Last activity 2026-08-05T23:14:54.49116+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "mirror-review-pr-ourliberty-agent-core-1096-ff5df116"
+      ],
+      "repo": null,
+      "created": "2026-08-07",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-07T06:28:34.649945+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-05T23:14:54.49116+00:00"
+    },
+    {
+      "id": "proposed-larry-reject-d558755d84d43ca24fea308239d66ef1169b4b80",
+      "name": "Larry Reject D558755d84d43ca24fea308239d66ef1169b4b80",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `larry-reject-d558755d84d43ca24fea308239d66ef1169b4b80`. Last activity 2026-08-05T23:13:47.876371+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "larry-reject-d558755d84d43ca24fea308239d66ef1169b4b80"
+      ],
+      "repo": null,
+      "created": "2026-08-07",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-07T06:28:34.649945+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-05T23:13:47.876371+00:00"
+    },
+    {
+      "id": "proposed-larry-reject-69837f98e5060470aaaed125ef99a2cfa557d00b",
+      "name": "Larry Reject 69837f98e5060470aaaed125ef99a2cfa557d00b",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `larry-reject-69837f98e5060470aaaed125ef99a2cfa557d00b`. Last activity 2026-08-05T23:11:31.39685+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "larry-reject-69837f98e5060470aaaed125ef99a2cfa557d00b"
+      ],
+      "repo": null,
+      "created": "2026-08-07",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-07T06:28:34.649945+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-05T23:11:31.39685+00:00"
+    },
+    {
+      "id": "proposed-pulse-self-report-tier3-narrow-001",
+      "name": "Pulse Self Report Tier3 Narrow 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pulse-self-report-tier3-narrow-001`. Last activity 2026-08-05T23:03:04.488685+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pulse-self-report-tier3-narrow-001"
+      ],
+      "repo": null,
+      "created": "2026-08-07",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-07T06:28:34.649945+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-05T23:03:04.488685+00:00"
+    },
+    {
+      "id": "proposed-approvals-tab-nonbinary-contract-001",
+      "name": "Approvals Tab Nonbinary Contract 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `approvals-tab-nonbinary-contract-001`. Last activity 2026-08-05T23:02:53.4549+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "approvals-tab-nonbinary-contract-001"
+      ],
+      "repo": null,
+      "created": "2026-08-07",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-07T06:28:34.649945+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-05T23:02:53.4549+00:00"
+    },
+    {
+      "id": "proposed-pr1081-ci-failure-resumed",
+      "name": "Pr1081 CI Failure Resumed",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pr1081-ci-failure-resumed`. Last activity 2026-08-04T12:23:02.008807+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pr1081-ci-failure-resumed"
+      ],
+      "repo": null,
+      "created": "2026-08-07",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-07T06:28:34.649945+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-04T12:23:02.008807+00:00"
+    },
+    {
+      "id": "proposed-outbox-notifier-silence-60min",
+      "name": "Outbox Notifier Silence 60min",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `outbox-notifier-silence-60min`. Last activity 2026-08-04T07:41:49.266148+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "outbox-notifier-silence-60min"
+      ],
+      "repo": null,
+      "created": "2026-08-07",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-07T06:28:34.649945+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-04T07:41:49.266148+00:00"
+    },
+    {
+      "id": "proposed-deep-review-hold-pr1098-406e7e41",
+      "name": "Deep Review Hold Pr1098 406e7e41",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `deep-review-hold-pr1098-406e7e41`. Last activity 2026-08-04T02:17:26.198689+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "deep-review-hold-pr1098-406e7e41"
+      ],
+      "repo": null,
+      "created": "2026-08-07",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-07T06:28:34.649945+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-04T02:17:26.198689+00:00"
+    },
+    {
+      "id": "proposed-cap-flag-work-that-merged-with-no-human-review-as-a-c32c",
+      "name": "Cap Flag Work That Merged With No Human Review As A C32c",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `cap-flag-work-that-merged-with-no-human-review-as-a-c32c`. Last activity 2026-08-04T00:45:58.649737+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "cap-flag-work-that-merged-with-no-human-review-as-a-c32c"
+      ],
+      "repo": null,
+      "created": "2026-08-07",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-07T06:28:34.649945+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-04T00:45:58.649737+00:00"
+    },
+    {
+      "id": "proposed-larry-reject-c3f97822ef4b0b102a549e224e9135883a5e4422",
+      "name": "Larry Reject C3f97822ef4b0b102a549e224e9135883a5e4422",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `larry-reject-c3f97822ef4b0b102a549e224e9135883a5e4422`. Last activity 2026-08-04T00:38:08.116663+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "larry-reject-c3f97822ef4b0b102a549e224e9135883a5e4422"
+      ],
+      "repo": null,
+      "created": "2026-08-07",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-07T06:28:34.649945+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-04T00:38:08.116663+00:00"
+    },
+    {
+      "id": "proposed-deep-review-hold-pr1093-aea59fa3",
+      "name": "Deep Review Hold Pr1093 Aea59fa3",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `deep-review-hold-pr1093-aea59fa3`. Last activity 2026-08-04T00:09:27.076793+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "deep-review-hold-pr1093-aea59fa3"
+      ],
+      "repo": null,
+      "created": "2026-08-07",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-07T06:28:34.649945+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-04T00:09:27.076793+00:00"
+    },
+    {
+      "id": "proposed-delegate-cap-auto-retire-provably-merged-cards-kil",
+      "name": "Delegate Cap Auto Retire Provably Merged Cards Kil",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `delegate-cap-auto-retire-provably-merged-cards-kil`. Last activity 2026-08-04T00:05:46.713222+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "delegate-cap-auto-retire-provably-merged-cards-kil"
+      ],
+      "repo": null,
+      "created": "2026-08-07",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-07T06:28:34.649945+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-04T00:05:46.713222+00:00",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-08-07T06:28:34.649945+00:00",
+      "retired_reason": "orphan-terminal",
+      "retired_signal": "pr_merged:#1094"
+    },
+    {
+      "id": "proposed-delegate-cap-approvals-freshness-retrofit-a-producer-to-autho-6430",
+      "name": "Delegate Cap Approvals Freshness Retrofit A Producer To Autho 6430",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `delegate-cap-approvals-freshness-retrofit-a-producer-to-autho-6430`. Last activity 2026-08-03T23:44:25.278778+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "delegate-cap-approvals-freshness-retrofit-a-producer-to-autho-6430"
+      ],
+      "repo": null,
+      "created": "2026-08-07",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-07T06:28:34.649945+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-03T23:44:25.278778+00:00"
+    },
+    {
+      "id": "proposed-graduation-enable-pr-auto-merge",
+      "name": "Graduation Enable PR Auto Merge",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `graduation-enable-pr-auto-merge`. Last activity 2026-08-03T17:01:00.489259+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "graduation-enable-pr-auto-merge"
+      ],
+      "repo": null,
+      "created": "2026-08-07",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-07T06:28:34.649945+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-03T17:01:00.489259+00:00"
+    },
+    {
+      "id": "proposed-pulse-check-xii-monthly-digest",
+      "name": "Pulse Check Xii Monthly Digest",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pulse-check-xii-monthly-digest`. Last activity 2026-08-03T11:42:33.952207+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pulse-check-xii-monthly-digest"
+      ],
+      "repo": null,
+      "created": "2026-08-07",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-07T06:28:34.649945+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-03T11:42:33.952207+00:00"
+    },
+    {
+      "id": "proposed-pulse-cleanup-audit-cadence-signal-dead-ref-20260801-v2",
+      "name": "Pulse Cleanup Audit Cadence Signal Dead Ref 20260801 V2",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pulse-cleanup-audit-cadence-signal-dead-ref-20260801-v2`. Last activity 2026-08-01T23:48:53.556296+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pulse-cleanup-audit-cadence-signal-dead-ref-20260801-v2"
+      ],
+      "repo": null,
+      "created": "2026-08-07",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-07T06:28:34.649945+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-01T23:48:53.556296+00:00"
+    },
+    {
+      "id": "proposed-deep-review-hold-pr1086-7402d1de",
+      "name": "Deep Review Hold Pr1086 7402d1de",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `deep-review-hold-pr1086-7402d1de`. Last activity 2026-08-01T22:40:57.02846+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "deep-review-hold-pr1086-7402d1de"
+      ],
+      "repo": null,
+      "created": "2026-08-07",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-07T06:28:34.649945+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-01T22:40:57.02846+00:00"
+    },
+    {
+      "id": "proposed-deep-review-hold-pr1085-599bd3a0",
+      "name": "Deep Review Hold Pr1085 599bd3a0",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `deep-review-hold-pr1085-599bd3a0`. Last activity 2026-08-01T22:14:43.743665+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "deep-review-hold-pr1085-599bd3a0"
+      ],
+      "repo": null,
+      "created": "2026-08-07",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-07T06:28:34.649945+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-01T22:14:43.743665+00:00"
+    },
+    {
+      "id": "proposed-delegate-cap-approvals-freshness-retrofit-a-producer-to-autho-9525",
+      "name": "Delegate Cap Approvals Freshness Retrofit A Producer To Autho 9525",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `delegate-cap-approvals-freshness-retrofit-a-producer-to-autho-9525`. Last activity 2026-08-01T21:32:43.576523+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "delegate-cap-approvals-freshness-retrofit-a-producer-to-autho-9525"
+      ],
+      "repo": null,
+      "created": "2026-08-07",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-07T06:28:34.649945+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-01T21:32:43.576523+00:00"
+    },
+    {
+      "id": "proposed-delegate-cap-slice-2b-build-the-approvals-freshness-writer-st-acc6",
+      "name": "Delegate Cap Slice 2b Build The Approvals Freshness Writer St Acc6",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `delegate-cap-slice-2b-build-the-approvals-freshness-writer-st-acc6`. Last activity 2026-08-01T21:25:57.312856+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "delegate-cap-slice-2b-build-the-approvals-freshness-writer-st-acc6"
+      ],
+      "repo": null,
+      "created": "2026-08-07",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-07T06:28:34.649945+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-01T21:25:57.312856+00:00"
+    },
+    {
+      "id": "proposed-test-strength-measurement-INCOMPLETE",
+      "name": "Test Strength Measurement INCOMPLETE",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `test-strength-measurement-INCOMPLETE`. Last activity 2026-08-01T11:41:23.501862+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "test-strength-measurement-INCOMPLETE"
+      ],
+      "repo": null,
+      "created": "2026-08-07",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-07T06:28:34.649945+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-01T11:41:23.501862+00:00"
+    },
+    {
+      "id": "proposed-deep-review-hold-pr156-6f9053bd",
+      "name": "Deep Review Hold Pr156 6f9053bd",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `deep-review-hold-pr156-6f9053bd`. Last activity 2026-08-01T03:54:57.882302+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "deep-review-hold-pr156-6f9053bd"
+      ],
+      "repo": null,
+      "created": "2026-08-07",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-07T06:28:34.649945+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-01T03:54:57.882302+00:00"
+    },
+    {
+      "id": "proposed-deep-review-hold-pr1083-01212dbd",
+      "name": "Deep Review Hold Pr1083 01212dbd",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `deep-review-hold-pr1083-01212dbd`. Last activity 2026-08-01T03:39:51.448864+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "deep-review-hold-pr1083-01212dbd"
+      ],
+      "repo": null,
+      "created": "2026-08-07",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-07T06:28:34.649945+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-01T03:39:51.448864+00:00"
+    },
+    {
+      "id": "proposed-larry-reject-6459c544487b338d4d610ed49fb8e24da1678595",
+      "name": "Larry Reject 6459c544487b338d4d610ed49fb8e24da1678595",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `larry-reject-6459c544487b338d4d610ed49fb8e24da1678595`. Last activity 2026-08-01T03:07:08.34311+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "larry-reject-6459c544487b338d4d610ed49fb8e24da1678595"
+      ],
+      "repo": null,
+      "created": "2026-08-07",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-07T06:28:34.649945+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-01T03:07:08.34311+00:00"
+    },
+    {
+      "id": "proposed-delegate-cap-approvals-freshness-2b-stamp-verification-onto-t-d9a4",
+      "name": "Delegate Cap Approvals Freshness 2b Stamp Verification Onto T D9a4",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `delegate-cap-approvals-freshness-2b-stamp-verification-onto-t-d9a4`. Last activity 2026-08-01T03:01:52.650553+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "delegate-cap-approvals-freshness-2b-stamp-verification-onto-t-d9a4"
+      ],
+      "repo": null,
+      "created": "2026-08-07",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-07T06:28:34.649945+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-01T03:01:52.650553+00:00"
+    },
+    {
+      "id": "proposed-mirror-review-pr-ourliberty-agent-core-1081-e45ff49e",
+      "name": "Mirror Review PR Ourliberty Agent Core 1081 E45ff49e",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `mirror-review-pr-ourliberty-agent-core-1081-e45ff49e`. Last activity 2026-08-01T02:54:19.781759+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "mirror-review-pr-ourliberty-agent-core-1081-e45ff49e"
+      ],
+      "repo": null,
+      "created": "2026-08-07",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-07T06:28:34.649945+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-01T02:54:19.781759+00:00"
+    },
+    {
+      "id": "proposed-delegate-cap-deep-review-fileset-gap-heal-unregistered-approv-eb17",
+      "name": "Delegate Cap Deep Review Fileset Gap Heal Unregistered Approv Eb17",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `delegate-cap-deep-review-fileset-gap-heal-unregistered-approv-eb17`. Last activity 2026-08-01T02:53:52.108745+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "delegate-cap-deep-review-fileset-gap-heal-unregistered-approv-eb17"
+      ],
+      "repo": null,
+      "created": "2026-08-07",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-07T06:28:34.649945+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-01T02:53:52.108745+00:00"
+    },
+    {
+      "id": "proposed-mirror-review-pr-ourliberty-agent-core-1070-7c2c3a81",
+      "name": "Mirror Review PR Ourliberty Agent Core 1070 7c2c3a81",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `mirror-review-pr-ourliberty-agent-core-1070-7c2c3a81`. Last activity 2026-08-01T02:35:11.481376+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "mirror-review-pr-ourliberty-agent-core-1070-7c2c3a81"
+      ],
+      "repo": null,
+      "created": "2026-08-07",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-07T06:28:34.649945+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-01T02:35:11.481376+00:00"
+    },
+    {
+      "id": "proposed-deep-review-hold-pr169-dd372150",
+      "name": "Deep Review Hold Pr169 Dd372150",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `deep-review-hold-pr169-dd372150`. Last activity 2026-08-01T02:25:44.254348+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "deep-review-hold-pr169-dd372150"
+      ],
+      "repo": null,
+      "created": "2026-08-07",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-07T06:28:34.649945+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-01T02:25:44.254348+00:00"
+    },
+    {
+      "id": "proposed-delegate-cap-approvals-freshness-2a-render-the-unverified-bad-4abb",
+      "name": "Delegate Cap Approvals Freshness 2a Render The Unverified Bad 4abb",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `delegate-cap-approvals-freshness-2a-render-the-unverified-bad-4abb`. Last activity 2026-08-01T02:11:12.304455+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "delegate-cap-approvals-freshness-2a-render-the-unverified-bad-4abb"
+      ],
+      "repo": null,
+      "created": "2026-08-07",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-07T06:28:34.649945+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-01T02:11:12.304455+00:00"
+    },
+    {
+      "id": "proposed-deep-review-hold-pr169-0842ba29",
+      "name": "Deep Review Hold Pr169 0842ba29",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `deep-review-hold-pr169-0842ba29`. Last activity 2026-08-01T02:10:35.570139+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "deep-review-hold-pr169-0842ba29"
+      ],
+      "repo": null,
+      "created": "2026-08-07",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-07T06:28:34.649945+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-01T02:10:35.570139+00:00"
     }
   ]
 }
