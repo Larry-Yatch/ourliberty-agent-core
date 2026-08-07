@@ -53239,3 +53239,79 @@ Note: `mirror-review-pr-RSDPM-198-d50798f4` CLEARED since iter ~8317 — Mirror 
 
 ---
 
+## Iteration ~8376 — 2026-08-07T18:19Z UTC (Larry /cycle chat, Tier 1 [Check 0: watermark 563=563, 0 new alerts NOMINAL ✅; Check 1: NOMINAL ✅; Check 2: NOMINAL ✅; Check 3: SIGNAL ⚠️ (RSDPM PR#203 still unrouted ~69min, healer alert pending); Check 4: SIGNAL ⚠️ (pending=1 — dag-preflight ~16h31min); Check 5: NOMINAL ✅; NOT CLEAN → Tier 1])
+
+**Health:** ⚠️ SIGNAL — Check 3: RSDPM PR#203 (feat/picker-add-person) still unrouted ~69min at check time; healer dry-run confirms alert pending (no alert filed yet, watermark 563=563). Check 4: dag-preflight-approvals-informational-cards-001 ~16h31min outstanding, pending=1. All other checks nominal. Tier 1 (consecutive_clean=0).
+
+**VERIFY-BEFORE-REASSERT (from iter ~8375 at ~18:14Z UTC 2026-08-07):**
+- **"watermark 563=563, 0 new alerts NOMINAL ✅"**: CONFIRMED → repair-watermark: repaired=false (old_watermark=563, file_length=563). ✅
+- **"system-health overall=healthy, all 4 bots alive"**: CONFIRMED → ts=2026-08-07T18:16:20Z UTC (fresh ~3min at check time); overall=healthy; all 4 bots alive=True. ✅
+- **"HEAD=b18989f0==origin/main"**: STATE-CHANGE → HEAD=619dfcee (Pulse cycle 20260807T181549Z)==origin/main [auto-commit from iter ~8375 wrapper ✅]. ✅
+- **"Check 3 SIGNAL ⚠️ (RSDPM PR#203 ~64min, healer will fire)"**: CONFIRMED → dry-run at 18:17Z UTC still shows "DRY-RUN would alert: unrouted_open_pr:Larry-Yatch/RSDPM:203". PR#203 ~69min old; healer alert not yet filed (watermark 563=563 still). ✅
+- **"pending=1 (dag-preflight ~16h23min)"**: CONFIRMED with age update → pending=1; dag-preflight created 2026-08-07T01:48:02Z UTC; ~16h31min at 18:19Z UTC. ✅
+- **"Tier 1 (consecutive_clean=0)"**: CONFIRMED → tier=1, consecutive_clean=0, last_signal_at=2026-08-07T18:14:15Z UTC. ✅
+
+**Check 0 — Alert triage (~18:17Z UTC):** repair-watermark: repaired=false (old_watermark=563, file_length=563). **0 new alerts** — watermark current (563=563). No triage actions.
+**NOMINAL ✅**
+
+**Check 1 — Log noise (~18:17Z UTC):** journalctl -u ourliberty-*.service last 30min (priority=warning): "-- No entries --". 0 actionable findings.
+**NOMINAL ✅**
+
+**Check 2 — Telegram sweep (~18:17Z UTC):** beacon_telegram_bot.log: last entry `[2026-08-07T11:57:13-0600]`=17:57:13Z UTC (idx=562, alert-retraction unrouted-pr-nudges-retired). ~20min of silence at check time. No new Larry inbound. No agent-distress keywords.
+**NOMINAL ✅**
+
+**Check 3 — Pipeline stall (~18:17Z UTC):** heal_pipeline_stall.py --dry-run → **"DRY-RUN would alert: unrouted_open_pr:Larry-Yatch/RSDPM:203 (subject='pipeline-stall:unrouted-pr:PR#203'); 1 alert(s) would fire."** PR#203 (feat/picker-add-person) ~69min old; healer DM not yet filed (watermark 563=563 unchanged). Same finding as iter ~8375.
+**SIGNAL ⚠️** (ask-then-do, tier-reset)
+
+**Check 4 — Pending directives (~18:17Z UTC):** `~/agents/state/beacon-pending-approvals.json`: **pending=1**
+1. `dag-preflight-approvals-informational-cards-001` (DAG preflight, approvals informational cards Option B, created 2026-08-07T01:48:02Z UTC, status=pending). DM delivered idx=565 at 2026-08-06T19:48:44-0600. 6h reminder sent 2026-08-07T01:51:55-0600. **~16h31min since creation.** No Pulse action.
+**SIGNAL ⚠️** (pending=1; awaiting Larry)
+
+**Check 5 — Stale daemon code (~18:17Z UTC):** `~/agents/blackboard/heal-stale-daemon-code.heartbeat`: 2026-08-07T18:12:16Z UTC (~5min before check). Within 60min threshold.
+**NOMINAL ✅**
+
+**Check A — Source repo (~18:17Z UTC):** branch=main, tree CLEAN, HEAD=619dfcee (Pulse cycle 20260807T181549Z)==origin/main (behind=0, ahead=0). **NOMINAL ✅**
+**Check B — Sync health (~18:17Z UTC):** agent-core-sync.json: last_sync=2026-08-07T17:30:11Z UTC (~47min; status=no-change, commit=9ef102c84a40). Within 2h threshold. **NOMINAL ✅**
+**Check C — Agent liveness (~18:17Z UTC):** system-health.json ts=2026-08-07T18:16:20Z UTC (fresh ~1min); overall=healthy; all 4 bots alive=True (beacon/forge/mirror/pulse). **NOMINAL ✅**
+**Check E — PR/merge state (~18:17Z UTC):** ourliberty-agent-core: **0 open PRs**. **CLEAN ✅**
+**Check H — All inboxes (~18:17Z UTC):** beacon=0, forge=0, mirror=0, pulse=0. **NOMINAL ✅**
+
+**§5.0 one-shots (~18:18Z UTC):** audit_due_nudge → no-op. distill_detector → no-op. audit_cadence_signal (review/distill/) → no-op ("no post-seed decision-grade distill artifacts yet"). **NOMINAL ✅**
+**§5 periodic — Check I:** latest=check-i-2026-08-07.json (fired today at ~14:13Z UTC). No new artifact this iter. QUIET ✅
+**§5 periodic — Check XIV:** latest=check-xiv-2026-08-04.json. No new artifact. QUIET ✅
+**§5 periodic — Check III:** latest=check-iii-2026-07-26.json. 14d gate until ~2026-08-09 (2d away). QUIET ✅
+**§5 periodic — Check VIII:** already_deprecated. QUIET ✅
+
+**Rotations (~18:18Z UTC):** SUPABASE_SERVICE_ROLE_KEY: due=2026-08-22 (~15d); last_dm=2026-08-03T22:52:32Z UTC; 3d into 14d dedup window. No new DM. ✅
+
+**G-rule tracking:**
+- `pulse-triage-self-report-should-be-tier3-001` **RESOLVED ✅**: 0 bounce-backs. [carry ✅]
+- `pulse-check-xiv-tier4-no-translation-001` **CLOSED ✅**: PR#1101 merged (48409e32). [carry ✅]
+- `heal-pipeline-stall-unrouted-pr-stranded-tier4-no-translation-001` **CLOSED ✅**: PR#1103 merged (93ea91f8). [carry ✅]
+- `medic-diagnosis-subject-specific-tier4-no-translation-001` **CLOSED ✅**: PR#1104 merged (24a23653). [carry ✅]
+- `outbox-notifier-approval-request-tier4-no-translation-001` **FALSE PREMISE CLOSED**: translation present (PR#491). [carry ✅]
+- `approvals-informational-cards-spec-001` **SPEC IN MAIN (PR#1102, cd886496)**: dag-preflight pending Larry approval (~16h31min outstanding). [IMPL DISPATCHED → WATCH FOR LARRY APPROVAL]
+- `heal-approvals-surface-drift-tier4-nonbinary-001` **DISPATCHED (iter ~8237)**: dag-preflight pending=1. Missing-card drift continues until step-promote lands. [DISPATCHED → WATCH]
+- `enable-pr-auto-merge-reviewdecision-guard-001` [1/3]: 0 open PRs agent-core this iter. [WATCH → 2 more for dispatch]
+- `heal-pipeline-stall-no-mirror-dispatch-tier4-no-translation-001` [1/3]: 0 new alerts (watermark 563=563). [WATCH → 2 more for dispatch]
+- `alert-retraction-no-translation-001` [1/3]: 0 new alerts (watermark 563=563). [WATCH → 2 more for dispatch]
+- `source-beacon-notifications-tier4-no-translation` [2/3]: 0 new occurrences this iter (watermark 563=563). [WATCH → 1 more for dispatch]
+- `sync-service-deploy-restart-head-drift-tier4-no-translation-001` [1/3]: 0 new occurrences (watermark 563=563). [WATCH → 2 more for dispatch]
+
+**Actions taken:**
+- Check 0: repair-watermark no-op (563=563). No triage actions.
+- §5.0 one-shots: all no-ops.
+- PRIME DIRECTIVE: `intervention` appended at 18:18:52Z UTC (tier=1, kind=intervention, template=check-3-unrouted-pr-stall, detail=RSDPM PR#203 ~69min still unrouted, healer alert pending).
+- PRIME DIRECTIVE: `intervention` appended at 18:18:53Z UTC (tier=1, kind=intervention, template=check-4-pending-approvals, detail=pending=1 dag-preflight ~16h31min outstanding).
+- Tier state: `cycle_tier_state.py record --checks-clean false` → **Tier 1** at 18:19:00Z UTC (consecutive_clean=0).
+
+**Escalations:** No new Pulse-initiated DMs this iter. Larry has: (1) dag-preflight approval_request idx=565 (delivered 2026-08-06T19:48:44-0600, ~16h31min outstanding; 6h reminder sent 2026-08-07T01:51:55-0600). Healer will file PR#203 unrouted-pr alert on its next scheduled run.
+
+**PRIME DIRECTIVE (post-action):** 2 interventions appended (Check 3 PR#203 stall + Check 4 pending=1). Trailing 30d ratio: interventions=2115, systemic_fixes=48, ratio≈44.1 (stable; same two recurring signals).
+
+**Patterns:** RSDPM PR#203 (feat/picker-add-person) persisting across multiple iters as an unrouted PR — consistent with recurring RSDPM routing pattern. dag-preflight-approvals-informational-cards-001 now ~16h31min outstanding; Larry's approval will unblock the informational-cards impl chain. Check III fires ~2026-08-09 (2d away). `source-beacon-notifications-tier4-no-translation` at 2/3 — one more occurrence dispatches to Beacon.
+
+**Tier end-of-iter:** **Tier 1** (signal: Check 3 PR#203 stall + Check 4 pending=1, consecutive_clean=0). De-escalation requires 3 clean iters.
+
+---
+
