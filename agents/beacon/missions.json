@@ -19084,7 +19084,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-08-07T06:28:34.649945+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-08-01T02:10:35.570139+00:00"
+      "orphan_last_activity_ts": "2026-08-01T02:10:35.570139+00:00",
+      "briefing": {
+        "what": "A piece of work the team started on its own is paused and waiting on your sign-off before it can go any further.",
+        "why": "It's sitting outside any current project, so nobody has confirmed it's worth the team's time or that it won't disturb something that already works.",
+        "suggest": "Ask for a one-line explanation of what it's meant to accomplish before you release it, and hold it if the answer doesn't tie to a priority you care about."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-07T07:09:20.534514+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
