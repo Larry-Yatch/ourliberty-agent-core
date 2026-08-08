@@ -1286,7 +1286,7 @@
       "title": "Approvals Tab Informational Cards",
       "north_star_ref": null,
       "repo": "ourliberty-agent-core",
-      "state": "active",
+      "state": "retired",
       "phases": [
         {
           "id": "approvals-tab-informational-cards",
@@ -1335,10 +1335,17 @@
       ],
       "one_off": true,
       "created_at": "2026-08-06T00:11:30.110568+00:00",
-      "updated_at": "2026-08-06T00:11:30.110568+00:00",
+      "updated_at": "2026-08-08T00:18:46.905800+00:00",
       "promoted_from": {
         "kind": "mission",
         "mission_id": "approvals-tab-informational-cards"
+      },
+      "gc": {
+        "prior_state": "active",
+        "retired_at": "2026-08-08T00:18:46.905800+00:00",
+        "retired_by": "projects-store-gc",
+        "done_at": "2026-08-06T00:11:29.948350+00:00",
+        "window_sec": 172800
       }
     }
   ]
