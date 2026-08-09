@@ -6,9 +6,9 @@
 
 ---
 
-## G-rule sync-service-deploy-restart-head-drift-tier4-no-translation-001 — 2/3 (updated iter ~8886)
+## G-rule sync-service-deploy-restart-head-drift-tier4-no-translation-001 — CLOSED ✅ (iter ~8897, 2026-08-09T23:37Z UTC)
 
-**Rule:** `source=sync.service, subject=deploy-restart-head-drift` fires Tier-4 from the triage helper (no translation match). Occurrences: (1) iter ~8294 (2026-08-07T08:28:52Z UTC), line 573 of that day's alerts — "refusing daemon restarts + unit installs because HEAD is 45e75ffc, not deploy target 80762bcb"; (2) 2026-08-09T16:34Z UTC, line 573 of larry-alerts.jsonl (post-watermark-572), idx=572 delivered 16:36Z UTC. Pattern: emitted immediately after a Pulse auto-commit causes a brief SHA drift between local HEAD and the sync service's deploy-target pointer; self-heals on the next sync tick. Fix: add Tier-3 (silence+journal) translation entry for `source=sync.service, subject=deploy-restart-head-drift` in config/alert-translations.json. Dispatch to Beacon at 3/3.
+**Rule (CLOSED — FALSE PREMISE):** Prior iters counted raw fires of this alert in larry-alerts.jsonl and incremented toward [3/3]. But iter ~8897 confirmed via `triage-alert` helper that `source=sync.service, subject=deploy-restart-head-drift` returns **Tier 3** (known-pattern match in alert-translations.json, `rationale: "known-pattern match in alert-translations.json"`, cached since iter ~6880/2026-07-30). The translation entry was ALREADY in place; no Tier 4 DMs were ever sent. The G-rule counter was counting appearances in larry-alerts.jsonl, not actual Tier 4 escalations — a verify-before-reassert failure. Pattern: emitted immediately after a Pulse auto-commit causes a brief SHA drift; self-heals on the next sync tick. **No dispatch needed. Do NOT reopen this G-rule.**
 
 ---
 
