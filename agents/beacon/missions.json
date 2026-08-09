@@ -19176,7 +19176,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-08-09T10:45:46.084205+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-08-09T10:43:48.566305+00:00"
+      "orphan_last_activity_ts": "2026-08-09T10:43:48.566305+00:00",
+      "briefing": {
+        "what": "The team drafted a proposal to change one of the automatic cutoff levels that decides when something gets flagged for your attention.",
+        "why": "Where that line sits determines how much lands on your desk \u2014 too low and you drown in noise, too high and something real slips past you.",
+        "suggest": "Ask for the before-and-after numbers on how many items would reach you each week, then decide once you can see the trade in plain figures."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-09T10:47:57.493391+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
