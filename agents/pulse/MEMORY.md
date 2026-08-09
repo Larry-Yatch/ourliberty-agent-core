@@ -867,3 +867,13 @@ Occurrences: iter ~6155 (1/3); iter ~6156 (2/3); iter ~6157 (3/3 + meta-loop new
 
 **Rule:** `cycle_prime_ledger.py ratio` reports interventions within a **30-day rolling window**, not a cumulative total. As old rows age out of the window, the interventions count decreases. This is correct behavior. Prior journal entries (iters ~7103–7107) tracked this as a "widening discrepancy" and a "chat-session non-persist" anomaly — that framing was wrong. The CLI count decreasing by 3-5 counts across consecutive 30-min iters means ~3-5 old intervention rows crossed the 30d cutoff in that window; this is routine and expected. `iter_clean` rows do NOT increment the intervention count (by design), so clean iters also cause apparent "decreases" as old intervention rows roll off. The correct read: `ratio = systemic_fixes / interventions_in_30d`; a higher ratio means fewer systemic fixes per intervention (worsening). The rolling window shrinks the intervention pool naturally during quiet periods, which is a signal the system is healthy (fewer recent interventions needed). **Do NOT alarm on count decreases; alarm only on ratio trend (worsening) or systemic_fixes count stagnating.**
 
+---
+
+## Beacon reminder schedule is [6h, 24h] ONLY — no 48h reminder (verified iter ~8720, 2026-08-09T05:21Z UTC)
+
+**Rule:** Beacon's automated approval reminder system sends reminders at 6h and 24h ONLY. There is NO 48h reminder in the schedule. Full text search of `~/agents/logs/beacon_telegram_bot.log` for "48h" returns zero results across all historical entries (only "6h" and "24h" entries exist). Multiple prior Pulse cycles (iters ~8618, ~8619, ~8704–8720) incorrectly predicted "48h reminder due ~01:48Z UTC" for `dag-preflight-approvals-informational-cards-001`. This was a false premise — no such reminder fired because none was scheduled.
+
+**Operational implication:** Once the 24h reminder fires, no further automated nudges will come. If a pending approval ages past 24h without Larry acting, Pulse must note this explicitly in the journal and escalate. Do NOT carry forward "48h reminder due" language.
+
+**Verified:** 2026-08-09T05:21Z UTC, iter ~8720, VERIFY-BEFORE-REASSERT discipline applied.
+
