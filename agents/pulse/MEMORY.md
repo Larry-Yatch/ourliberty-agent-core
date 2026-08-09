@@ -6,9 +6,9 @@
 
 ---
 
-## G-rule sync-service-deploy-restart-head-drift-tier4-no-translation-001 — 1/3 (new, iter ~8294)
+## G-rule sync-service-deploy-restart-head-drift-tier4-no-translation-001 — 2/3 (updated iter ~8886)
 
-**Rule:** `source=sync.service, subject=deploy-restart-head-drift` fires Tier-4 from the triage helper (no translation match). First occurrence: iter ~8294 (2026-08-07T08:28:52Z UTC), line 573. Alert: "refusing daemon restarts + unit installs because HEAD is 45e75ffc, not deploy target 80762bcb." Appears transient: emitted immediately after a Pulse auto-commit causes a brief SHA drift between local HEAD and the sync service's deploy-target pointer; self-heals on the next sync tick (Check A confirmed HEAD==origin/main clean at time of triage). Outbox-notifier delivered idx=572 at 08:32:16Z UTC; no Pulse DM needed (already delivered). Fix: add Tier-3 (silence+journal) translation entry for `source=sync.service, subject=deploy-restart-head-drift` in config/alert-translations.json. Dispatch to Beacon at 3/3.
+**Rule:** `source=sync.service, subject=deploy-restart-head-drift` fires Tier-4 from the triage helper (no translation match). Occurrences: (1) iter ~8294 (2026-08-07T08:28:52Z UTC), line 573 of that day's alerts — "refusing daemon restarts + unit installs because HEAD is 45e75ffc, not deploy target 80762bcb"; (2) 2026-08-09T16:34Z UTC, line 573 of larry-alerts.jsonl (post-watermark-572), idx=572 delivered 16:36Z UTC. Pattern: emitted immediately after a Pulse auto-commit causes a brief SHA drift between local HEAD and the sync service's deploy-target pointer; self-heals on the next sync tick. Fix: add Tier-3 (silence+journal) translation entry for `source=sync.service, subject=deploy-restart-head-drift` in config/alert-translations.json. Dispatch to Beacon at 3/3.
 
 ---
 
