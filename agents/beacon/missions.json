@@ -19299,7 +19299,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-08-10T22:43:29.781444+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-08-10T22:39:18.248951+00:00"
+      "orphan_last_activity_ts": "2026-08-10T22:39:18.248951+00:00",
+      "briefing": {
+        "what": "A finished piece of work on the mission-control system that has passed its quality check and is waiting for your sign-off, but it isn't attached to any project on your roadmap.",
+        "why": "Completed work sitting unclaimed means you're paying for effort you can't yet tie to a business goal, and it stays out of customers' hands until someone releases it.",
+        "suggest": "Ask for a one-line plain-English summary of what it changes before you approve it, so you can confirm it belongs to a priority you actually care about."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-10T22:48:30.224624+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
