@@ -19268,7 +19268,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-08-10T22:28:21.276014+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-08-10T22:21:55.7424+00:00"
+      "orphan_last_activity_ts": "2026-08-10T22:21:55.7424+00:00",
+      "briefing": {
+        "what": "A fix for one faulty quality check that has been wrongly flagging our work as broken, blocking releases from going out.",
+        "why": "That single false alarm has been stalling shipping and sent the team down a wrong diagnosis for five days, so clearing it restores confidence in our release checks and unblocks the queue.",
+        "suggest": "Let the team finish it, but ask for confirmation that the fix actually clears the false alarm before we call it done."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-10T22:38:21.584350+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
