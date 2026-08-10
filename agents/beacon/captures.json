@@ -2867,7 +2867,8 @@
         "at": "2026-07-31T22:12:03.913808+00:00",
         "from_state": "parked"
       },
-      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
+      "aging": true
     },
     {
       "id": "cap-re-land-the-two-real-fixes-from-the-closed-bind-a17b",
@@ -2897,7 +2898,8 @@
         "at": "2026-08-01T01:02:57.410829+00:00",
         "from_state": "parked"
       },
-      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
+      "aging": true
     },
     {
       "id": "cap-approvals-freshness-2a-render-the-unverified-bad-4abb",
@@ -3112,7 +3114,8 @@
       },
       "closed_by": "heal_missions_card_gc:terminal-backstop",
       "shipped_note": "shipped (linked work merged)",
-      "awaiting_ack": true
+      "awaiting_ack": true,
+      "aging": true
     },
     {
       "id": "cap-slice-2b-build-the-approvals-freshness-writer-st-acc6",
