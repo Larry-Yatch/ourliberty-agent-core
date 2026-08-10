@@ -1207,6 +1207,11 @@ class PromoteRaceTest(unittest.TestCase):
         payload = h.build_approval_payload(DEPLOY_NOTIFIER_ALERT, key)
         payload['_source_ts'] = DEPLOY_NOTIFIER_ALERT['ts']
         add_pending = mock.MagicMock(return_value={'id': payload['task_id']})
+        # read_for_larry_records / load_beacon_outbox_markers read live files
+        # ($OURLIBERTY_FOR_LARRY_FEED_FILE, Beacon's outbox archive). Left
+        # unstubbed, an ambient open record promotes an EXTRA payload into
+        # to_promote and the assertions below judge a payload this test never
+        # authored. The other main() drivers in this file stub both.
         with mock.patch.object(h, 'kill_switch',
                                return_value=Path('/nonexistent/kill-switch')), \
              mock.patch.object(h, 'heartbeat'), \
@@ -1215,6 +1220,8 @@ class PromoteRaceTest(unittest.TestCase):
                                return_value=DEFAULT_HEURISTICS), \
              mock.patch.object(h, 'read_alerts',
                                return_value=[DEPLOY_NOTIFIER_ALERT]), \
+             mock.patch.object(h, 'read_for_larry_records', return_value=[]), \
+             mock.patch.object(h, 'load_beacon_outbox_markers', return_value=[]), \
              mock.patch.object(h, 'load_promoted', return_value={}), \
              mock.patch.object(h, 'save_promoted'), \
              mock.patch.object(h, 'reconcile_retire', return_value=([], {})), \
