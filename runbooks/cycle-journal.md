@@ -4,6 +4,85 @@
 
 ---
 
+## Iteration ~8960 — 2026-08-10T07:12Z UTC (Larry /cycle chat, Tier 1 [Check 0: repair-watermark repaired=false (wm=580, fl=580), 0 new alerts NOMINAL ✅; Check 1: NOMINAL ✅; Check 2: NOMINAL ✅; Check 3: CLEAN ✅ (no stalls); Check 4: SIGNAL ⚠️ (pending=1 — dag-preflight ~77.4h, reminders_sent=[6,24,72], Beacon doorbell loop active); Check 5: NOMINAL ✅; NOT CLEAN → Tier 1])
+
+**Health:** ⚠️ SIGNAL — Check 4 only: pending=1 (dag-preflight-approvals-informational-cards-001, ~77.4h outstanding, reminders_sent=[6,24,72]; Beacon doorbell loop active). All other checks nominal. Tier 1 (consecutive_clean=0).
+
+**VERIFY-BEFORE-REASSERT (from iter ~8959 at ~07:08Z UTC 2026-08-10):**
+- **"watermark 580=580, 0 new alerts NOMINAL ✅"**: CONFIRMED → repair-watermark repaired=false (old_watermark=580, file_length=580). ✅
+- **"system-health overall=healthy, all 4 bots alive"**: CONFIRMED → ts=2026-08-10T07:11:10Z UTC (~1min before check); overall=healthy; disk=17%, memory=20%; all bots alive=True (beacon/forge/mirror/pulse, action=noop each). ✅
+- **"HEAD=21e6c1a4==origin/main (behind=0, ahead=0)"**: UPDATED → HEAD=81d04b0f (Pulse cycle 20260810T071038Z)==origin/main (behind=0, ahead=0). ✅
+- **"Check 3 CLEAN ✅ (no stalls)"**: CONFIRMED → "no stalls detected" 07:11:30Z UTC. ✅
+- **"pending=1 (dag-preflight ~77.3h; reminders_sent=[6,24,72]; Beacon doorbell loop active)"**: CONFIRMED with age update → pending=1; dag-preflight-approvals-informational-cards-001; age=~77.4h at ~07:12Z UTC. ✅
+- **"Tier 1 (consecutive_clean=0, last_signal_at=2026-08-10T07:08:09Z UTC)"**: CONFIRMED pre-record → tier=1, consecutive_clean=0. ✅
+- **"0 open PRs"**: CONFIRMED → [] (both repos). ✅
+
+**Check 0 — Alert triage (~07:12Z UTC):** repair-watermark: repaired=false (old_watermark=580, file_length=580). **0 new alerts** — watermark current (580=580). No triage actions.
+**NOMINAL ✅**
+
+**Check 1 — Log noise (~07:11Z UTC):** system-health.json ts=2026-08-10T07:11:10Z UTC (~1min old); overall=healthy; disk=17%, memory=20%; log_growth=ok/idle (seconds_since_write=230447); orphaned_journalctl_followers=0; all service checks=ok (bots=ok, inbox_watcher=ok, outbox_notifier=ok). 0 WARN/ERROR.
+**NOMINAL ✅**
+
+**Check 2 — Telegram sweep (~07:11Z UTC):** system-health.json (same read); all 4 bots alive=True (beacon/forge/mirror/pulse, action=noop each). No new Larry directives. No agent-distress keywords.
+**NOMINAL ✅**
+
+**Check 3 — Pipeline stall (~07:11Z UTC):** heal_pipeline_stall.py --dry-run → "no stalls detected" (07:11:30Z UTC). Pipeline clean.
+**CLEAN ✅**
+
+**Check 4 — Pending directives (~07:12Z UTC):** `~/agents/state/beacon-pending-approvals.json` (key=`pending`): **pending=1**
+1. `dag-preflight-approvals-informational-cards-001` (DAG preflight, approvals informational cards Option B, created 2026-08-07T01:48:02Z UTC, status=pending). reminders_sent=[6, 24, 72]. **~77.4h since creation.** All three milestone reminders (6h/24h/72h) delivered; Beacon doorbell loop active. No Larry response yet. No Pulse action.
+**SIGNAL ⚠️** (pending=1; awaiting Larry; all reminders [6h/24h/72h] delivered; Beacon doorbell loop active)
+
+**Check 5 — Stale daemon code (~07:12Z UTC):** `~/agents/blackboard/heal-stale-daemon-code.heartbeat`: 2026-08-10T07:03:25Z UTC (~9min before check). Within 60min threshold.
+**NOMINAL ✅**
+
+**Check A — Source repo (~07:12Z UTC):** branch=main, tree CLEAN, HEAD=81d04b0f (Pulse cycle 20260810T071038Z)==origin/main (behind=0, ahead=0). **NOMINAL ✅**
+**Check B — Sync health (~07:12Z UTC):** agent-core-sync.json: last_sync=2026-08-10T06:34:57Z UTC (~37min; status=no-change, consecutive_push_failures=0). Within 2h threshold. **NOMINAL ✅**
+**Check C — Agent liveness (~07:11Z UTC):** system-health.json (same read); all 4 bots alive=True (beacon/forge/mirror/pulse, action=noop each). **NOMINAL ✅**
+**Check E — PR/merge state (~07:12Z UTC):** ourliberty-agent-core: **0 open PRs**. ourliberty-dashboard: **0 open PRs**. **CLEAN ✅**
+**Check H — Forge activity (~07:12Z UTC):** 0 open Forge PRs; last merged PR=#1105 (2026-08-06T05:36Z UTC, ~101.6h ago). **NOMINAL ✅**
+
+**§5.0 one-shots (~07:12Z UTC):** audit_due_nudge → no-op (no committed audit baseline). distill_detector → no-op (no un-distilled audits). audit_cadence_signal → script path mismatch (scripts/ vs review/distill/) per MEMORY; no-op. **NOMINAL ✅**
+**§5 periodic — Check I:** latest=check-i-2026-08-09.json (Aug 9 ~14:13Z UTC, proposals=0). Today is Sun Aug 10 → Check I timer fires today ~14:13 UTC (~7h from this iter). No new artifact yet. **QUIET ✅**
+**§5 periodic — Check III:** latest=check-iii-2026-08-09.json (Aug 9). No new artifact. **QUIET ✅**
+**§5 periodic — Check XIV:** latest artifact=check-xiv-2026-08-04.json; heartbeat=2026-08-09T13:11:54Z UTC. No new artifact since Aug 4. **QUIET ✅**
+**§5 periodic — Check VIII:** already_deprecated. **QUIET ✅**
+
+**Rotations (~07:12Z UTC):** SUPABASE_SERVICE_ROLE_KEY: last_dm=2026-08-03T22:52:32Z UTC (~6.7d ago); 14d dedup window expires ~2026-08-17 (~7.3d remaining); next rotation due ~2026-08-22 (~12d). No new DM. ✅
+
+**G-rule tracking:**
+- `sync-service-deploy-restart-head-drift-tier4-no-translation-001` **CLOSED ✅ (iter ~8897)**: 0 new occurrences at watermark 580. [carry ✅]
+- `pulse-triage-self-report-should-be-tier3-001` **RESOLVED ✅**: 0 bounce-backs. [carry ✅]
+- `pulse-check-xiv-tier4-no-translation-001` **CLOSED ✅**: PR#1101 merged. [carry ✅]
+- `heal-pipeline-stall-unrouted-pr-stranded-tier4-no-translation-001` **CLOSED ✅**: PR#1103 merged. [carry ✅]
+- `medic-diagnosis-subject-specific-tier4-no-translation-001` **CLOSED ✅**: PR#1104 merged. [carry ✅]
+- `outbox-notifier-approval-request-tier4-no-translation-001` **FALSE PREMISE CLOSED**: translation present (PR#491). [carry ✅]
+- `approvals-informational-cards-spec-001` **SPEC IN MAIN (PR#1102)**: dag-preflight pending Larry approval (~77.4h; reminders_sent=[6,24,72]; all milestones delivered — Beacon doorbell loop active). [IMPL DISPATCHED → WATCH FOR LARRY APPROVAL]
+- `heal-approvals-surface-drift-tier4-nonbinary-001` **DISPATCHED (iter ~8237)**: 0 new missing_card alerts above watermark 580. [DISPATCHED → WATCH]
+- `isolation-gauge-order-fragile-test-tier4-no-translation-001` **[1/3]**: 0 new occurrences above watermark 580. [WATCH → 2 more for dispatch]
+- `enable-pr-auto-merge-reviewdecision-guard-001` [1/3]: 0 open PRs. [WATCH → 2 more for dispatch]
+- `heal-pipeline-stall-no-mirror-dispatch-tier4-no-translation-001` [1/3]: 0 new occurrences (watermark 580). [WATCH → 2 more for dispatch]
+- `alert-retraction-no-translation-001` [1/3]: 0 new occurrences (watermark 580). [WATCH → 2 more for dispatch]
+- `source-beacon-notifications-tier4-no-translation` [2/3]: 0 new occurrences (watermark 580). [WATCH → 1 more for dispatch]
+- `ourliberty-health-dirty-tree-structural-artifact-001` [1/3]: 0 new dirty-tree alerts (watermark 580). [WATCH → 2 more for dispatch]
+- `journal-write-gap-post-prime-ledger-write-001` [1/3]: no new occurrence this iter. [WATCH → 2 more for dispatch]
+
+**Actions taken:**
+- Check 0: 0 new alerts; watermark confirmed current (580=580). No triage actions.
+- §5.0 one-shots: all no-ops.
+- PRIME DIRECTIVE: 1 `intervention` row appended (ts=2026-08-10T07:13:03Z UTC, iter=~8960, tier=1, kind=intervention, template=check-4-pending-approvals, detail=dag-preflight-approvals-informational-cards-001 ~77.4h; reminders_sent=[6,24,72]; Beacon doorbell loop active; watermark 580=fl 580 (0 new alerts)).
+- Tier state: `cycle_tier_state.py record --checks-clean false` → **Tier 1** (consecutive_clean=0, last_signal_at=2026-08-10T07:13:07Z UTC).
+
+**Escalations:** No new Pulse-initiated DMs this iter. Larry has outstanding: (1) dag-preflight approval_request (~77.4h; reminders [6h/24h/72h] all delivered by Beacon doorbell loop; awaiting Larry response).
+
+**PRIME DIRECTIVE (post-action):** interventions=2530, systemic_fixes=33, ratio=76.67, trend=worsening — gated on dag-preflight resolution.
+
+**Patterns:** dag-preflight-approvals-informational-cards-001 now ~77.4h outstanding (~3 days 5.4h) — all three milestone reminders (6h/24h/72h) delivered; Beacon doorbell loop active; no Larry response yet. All G-rules stable (watermark 580). SUPABASE_SERVICE_ROLE_KEY rotation due 2026-08-22 (~12d). Check I fires today Sun Aug 10 ~14:13 UTC (~7h from this iter).
+
+**Tier end-of-iter:** **Tier 1** (signal: Check 4 pending=1, consecutive_clean=0). De-escalation gated on dag-preflight approval resolution.
+
+---
+
 ## Iteration ~8959 — 2026-08-10T07:08Z UTC (Larry /cycle chat, Tier 1 [Check 0: repair-watermark repaired=false (wm=579, fl=580), alert-580 weekly-ledger Tier-3 silence NOMINAL ✅; Check 1: NOMINAL ✅; Check 2: NOMINAL ✅; Check 3: CLEAN ✅ (no stalls); Check 4: SIGNAL ⚠️ (pending=1 — dag-preflight ~77.3h, reminders_sent=[6,24,72], Beacon doorbell loop active); Check 5: NOMINAL ✅; NOT CLEAN → Tier 1])
 
 **Health:** ⚠️ SIGNAL — Check 4 only: pending=1 (dag-preflight-approvals-informational-cards-001, ~77.3h outstanding, reminders_sent=[6,24,72]; Beacon doorbell loop active). All other checks nominal. Tier 1 (consecutive_clean=0).
@@ -3089,85 +3168,6 @@
 **PRIME DIRECTIVE (post-action):** pre-append: interventions=2496, systemic_fixes=34, ratio=73.41; post-append: interventions=2497, systemic_fixes=34, ratio=73.44, trend=worsening — gated on dag-preflight resolution.
 
 **Patterns:** dag-preflight-approvals-informational-cards-001 now ~72.55h outstanding — all three milestone reminders (6h/24h/72h) delivered; Beacon doorbell loop active; no Larry response yet. All G-rules stable (watermark 577). SUPABASE_SERVICE_ROLE_KEY rotation due 2026-08-22 (~11.9d); dedup window expires ~2026-08-17 (~7.83d remaining). Check I fires today Sun Aug 10 ~14:12 UTC (~12h from this iter).
-
-**Tier end-of-iter:** **Tier 1** (signal: Check 4 pending=1, consecutive_clean=0). De-escalation gated on dag-preflight approval resolution.
-
----
-
-## Iteration ~8919 — 2026-08-10T02:12Z UTC (Larry /cycle chat, Tier 1 [Check 0: watermark 577=577, 0 new alerts NOMINAL ✅; Check 1: NOMINAL ✅; Check 2: NOMINAL ✅; Check 3: CLEAN ✅ (no stalls); Check 4: SIGNAL ⚠️ (pending=1 — dag-preflight ~72.38h, reminders_sent=[6,24,72], Beacon doorbell loop active); Check 5: NOMINAL ✅; NOT CLEAN → Tier 1])
-
-**Health:** ⚠️ SIGNAL — Check 4 only: pending=1 (dag-preflight-approvals-informational-cards-001, ~72.38h outstanding, reminders_sent=[6,24,72]; Beacon doorbell loop active). All other checks nominal. Tier 1 (consecutive_clean=0).
-
-**VERIFY-BEFORE-REASSERT (from iter ~8918 at ~02:08Z UTC 2026-08-10):**
-- **"watermark 577=577, 0 new alerts NOMINAL ✅"**: CONFIRMED → repair-watermark repaired=false (old_watermark=577, file_length=577). ✅
-- **"system-health overall=healthy, all 4 bots alive"**: CONFIRMED → ts=2026-08-10T02:10:40Z UTC (fresh ~2min); all 4 bots alive=True (beacon/forge/mirror/pulse, action=noop each). ✅
-- **"HEAD=8faeb6b6 (Pulse cycle 20260810T020407Z)==origin/main"**: STATE-CHANGE → HEAD=5d476e3e (Pulse cycle 20260810T020851Z)==origin/main [auto-commit from iter ~8918 wrapper]. ✅
-- **"Check 3 CLEAN ✅ (no stalls)"**: CONFIRMED → "no stalls detected" 02:11:06Z UTC. ✅
-- **"pending=1 (dag-preflight ~72.33h; reminders_sent=[6,24,72]; Beacon doorbell loop active)"**: CONFIRMED with age update → pending=1; dag-preflight-approvals-informational-cards-001; age=~72.38h at ~02:12Z UTC; reminders_sent=[6,24,72]. ✅
-- **"Tier 1 (consecutive_clean=0, last_signal_at=2026-08-10T02:07:26Z UTC)"**: CONFIRMED pre-record → tier=1, consecutive_clean=0, last_signal_at=2026-08-10T02:07:26Z UTC. ✅
-- **"0 open PRs"**: CONFIRMED → 0 open PRs (both repos). ✅
-
-**Check 0 — Alert triage (~02:12Z UTC):** alert_triage_state.py repair-watermark: repaired=false (old_watermark=577, file_length=577). **0 new alerts** — watermark current (577=577). No triage actions.
-**NOMINAL ✅**
-
-**Check 1 — Log noise (~02:12Z UTC):** system-health.json ts=2026-08-10T02:10:40Z UTC (fresh ~2min); overall=healthy; disk=17%, memory=20%; log_growth=ok/idle (seconds_since_write=212418); orphaned_journalctl_followers=0; all service checks=ok (bots=ok). 0 WARN/ERROR.
-**NOMINAL ✅**
-
-**Check 2 — Telegram sweep (~02:12Z UTC):** system-health.json (same read); all 4 bots alive=True (beacon/forge/mirror/pulse, action=noop each). No new Larry directives. No agent-distress keywords.
-**NOMINAL ✅**
-
-**Check 3 — Pipeline stall (~02:12Z UTC):** heal_pipeline_stall.py --dry-run → "no stalls detected" (02:11:06Z UTC). Pipeline clean.
-**CLEAN ✅**
-
-**Check 4 — Pending directives (~02:12Z UTC):** `~/agents/state/beacon-pending-approvals.json` (key=`pending`): **pending=1**
-1. `dag-preflight-approvals-informational-cards-001` (DAG preflight, approvals informational cards Option B, created 2026-08-07T01:48:02Z UTC, status=pending). reminders_sent=[6, 24, 72]. **~72.38h since creation.** All three milestone reminders (6h/24h/72h) delivered; Beacon doorbell loop active. No Larry response yet. No Pulse action.
-**SIGNAL ⚠️** (pending=1; awaiting Larry; all reminders [6h/24h/72h] delivered; Beacon doorbell loop active)
-
-**Check 5 — Stale daemon code (~02:12Z UTC):** `~/agents/blackboard/heal-stale-daemon-code.heartbeat`: 2026-08-10T02:11:01Z UTC (~1min before check). Within 60min threshold.
-**NOMINAL ✅**
-
-**Check A — Source repo (~02:12Z UTC):** branch=main, tree CLEAN, HEAD=5d476e3e (Pulse cycle 20260810T020851Z)==origin/main (behind=0, ahead=0). **NOMINAL ✅**
-**Check B — Sync health (~02:12Z UTC):** agent-core-sync.json: last_sync=2026-08-10T01:34:19Z UTC (~37min; status=no-change). Within 2h threshold. **NOMINAL ✅**
-**Check C — Agent liveness (~02:12Z UTC):** system-health.json (same read); all 4 bots alive=True (beacon/forge/mirror/pulse, action=noop each). **NOMINAL ✅**
-**Check E — PR/merge state (~02:12Z UTC):** ourliberty-agent-core: **0 open PRs**. ourliberty-dashboard: **0 open PRs**. **CLEAN ✅**
-**Check H — Forge activity (~02:12Z UTC):** 0 open Forge PRs; last merge was PR #1105 (~100h ago). No Forge activity in last 4h. **NOMINAL ✅**
-
-**§5.0 one-shots (~02:12Z UTC):** audit_due_nudge → no-op (no committed audit baseline). distill_detector → no-op. audit_cadence_signal → no-op. **NOMINAL ✅**
-**§5 periodic — Check I:** latest=check-i-2026-08-09.json (Aug 9 08:12 local MDT = ~14:12 UTC). Already surfaced iter ~8819. Today is Sun Aug 10 → Check I timer fires today ~14:12 UTC (~12h from this iter). No new artifact yet. **QUIET ✅**
-**§5 periodic — Check III:** latest=check-iii-2026-08-09.json (Aug 9 04:43 local). Already journaled iters ~8792/~8793. No new artifact. **QUIET ✅**
-**§5 periodic — Check XIV:** latest artifact=check-xiv-2026-08-04.json. No new artifact. **QUIET ✅**
-**§5 periodic — Check VIII:** already_deprecated. **QUIET ✅**
-
-**Rotations (~02:12Z UTC):** SUPABASE_SERVICE_ROLE_KEY: last_dm=2026-08-03T22:52:32Z UTC (~6.17d ago); 14d dedup window expires ~2026-08-17 (~7.83d remaining); next rotation due ~2026-08-22 (~11.9d). No new DM. ✅
-
-**G-rule tracking:**
-- `sync-service-deploy-restart-head-drift-tier4-no-translation-001` **CLOSED ✅ (iter ~8897)**: 0 new occurrences at watermark 577. [carry ✅]
-- `pulse-triage-self-report-should-be-tier3-001` **RESOLVED ✅**: 0 bounce-backs. [carry ✅]
-- `pulse-check-xiv-tier4-no-translation-001` **CLOSED ✅**: PR#1101 merged. [carry ✅]
-- `heal-pipeline-stall-unrouted-pr-stranded-tier4-no-translation-001` **CLOSED ✅**: PR#1103 merged. [carry ✅]
-- `medic-diagnosis-subject-specific-tier4-no-translation-001` **CLOSED ✅**: PR#1104 merged. [carry ✅]
-- `outbox-notifier-approval-request-tier4-no-translation-001` **FALSE PREMISE CLOSED**: translation present (PR#491). [carry ✅]
-- `approvals-informational-cards-spec-001` **SPEC IN MAIN (PR#1102)**: dag-preflight pending Larry approval (~72.38h; reminders_sent=[6,24,72]; all milestones delivered — Beacon doorbell loop active). [IMPL DISPATCHED → WATCH FOR LARRY APPROVAL]
-- `heal-approvals-surface-drift-tier4-nonbinary-001` **DISPATCHED (iter ~8237)**: 0 new missing_card alerts above watermark 577. [DISPATCHED → WATCH]
-- `isolation-gauge-order-fragile-test-tier4-no-translation-001` **[1/3]**: 0 new occurrences above watermark 577. [WATCH → 2 more for dispatch]
-- `enable-pr-auto-merge-reviewdecision-guard-001` [1/3]: 0 open PRs. [WATCH → 2 more for dispatch]
-- `heal-pipeline-stall-no-mirror-dispatch-tier4-no-translation-001` [1/3]: 0 new occurrences (watermark 577). [WATCH → 2 more for dispatch]
-- `alert-retraction-no-translation-001` [1/3]: 0 new occurrences (watermark 577). [WATCH → 2 more for dispatch]
-- `source-beacon-notifications-tier4-no-translation` [2/3]: 0 new occurrences (watermark 577). [WATCH → 1 more for dispatch]
-- `ourliberty-health-dirty-tree-structural-artifact-001` [1/3]: 0 new dirty-tree alerts (watermark 577). [WATCH → 2 more for dispatch]
-- `journal-write-gap-post-prime-ledger-write-001` [1/3]: no new occurrence this iter. [WATCH → 2 more for dispatch]
-
-**Actions taken:**
-- Check 0: watermark current (577=577). No triage actions.
-- §5.0 one-shots: all no-ops.
-- PRIME DIRECTIVE: 1 `intervention` row appended (ts=2026-08-10T02:12:32Z UTC, tier=1, kind=intervention, template=check-4-pending-approvals, detail=dag-preflight-approvals-informational-cards-001 ~72.38h; reminders_sent=[6,24,72]; Beacon doorbell loop active).
-- Tier state: `cycle_tier_state.py record --checks-clean false` → **Tier 1** (consecutive_clean=0, last_signal_at=2026-08-10T02:12:33Z UTC).
-
-**Escalations:** No new Pulse-initiated DMs this iter. Larry has outstanding: (1) dag-preflight approval_request (~72.38h; reminders [6h/24h/72h] all delivered by Beacon doorbell loop; awaiting Larry response).
-
-**PRIME DIRECTIVE (post-action):** trailing-30d pre-append: interventions=2495, systemic_fixes=34, ratio=73.38; post-append: interventions=2496, systemic_fixes=34, ratio=73.41, trend=worsening — gated on dag-preflight resolution.
-
-**Patterns:** dag-preflight-approvals-informational-cards-001 now ~72.38h outstanding — all three milestone reminders (6h/24h/72h) delivered; Beacon doorbell loop active; no Larry response yet. All G-rules stable (watermark 577). SUPABASE_SERVICE_ROLE_KEY rotation due 2026-08-22 (~11.9d); dedup window expires ~2026-08-17 (~7.83d remaining). Check I fires today Sun Aug 10 ~14:12 UTC (~12h from this iter).
 
 **Tier end-of-iter:** **Tier 1** (signal: Check 4 pending=1, consecutive_clean=0). De-escalation gated on dag-preflight approval resolution.
 
