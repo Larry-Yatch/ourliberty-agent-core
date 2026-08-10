@@ -4,6 +4,91 @@
 
 ---
 
+## Iteration ~9097 — 2026-08-10T22:33Z UTC (Larry /cycle chat, Tier 2 [Check 0: repair-watermark repaired=false (wm=546, fl=546), 0 new alerts NOMINAL ✅; Check 1: NOMINAL ✅; Check 2: NOMINAL ✅; Check 3: CLEAN ✅ (no stalls); Check 4: NOMINAL ✅ (pending=0); Check 5: NOMINAL ✅; ALL CLEAN → Tier 2, consecutive_clean=2])
+
+**Health:** ✅ NOMINAL — all checks clear. Tier 2, consecutive_clean=2.
+
+**VERIFY-BEFORE-REASSERT (from iter ~9096 at ~22:18Z UTC 2026-08-10):**
+- **"watermark 546, 0 new alerts NOMINAL ✅"**: CONFIRMED — repair-watermark repaired=false (wm=546, fl=546). 0 new alerts this iter. ✅
+- **"system-health overall=healthy, all 4 bots alive"**: CONFIRMED — ts=2026-08-10T22:26:16Z UTC (fresh ~7min at check); all 4 bots alive=True (beacon/forge/mirror/pulse, action=noop each). ✅
+- **"HEAD=e08a6132==origin/main"**: UPDATED — HEAD=40a9b98b (chore(missions): autoregister healer — reconcile proposed lane)==origin/main (clean tree, up to date). ✅
+- **"Check 3 CLEAN ✅ (no stalls)"**: CONFIRMED — "no stalls detected" 22:31:02Z UTC. ✅
+- **"pending=0"**: CONFIRMED — pending=0. ✅
+- **"Tier 2 (consecutive_clean=1)"**: UPDATED — consecutive_clean advances to 2 this clean iter. One more clean iter triggers de-escalation to Tier 3. ✅
+- **"0 open PRs"**: CONFIRMED — [] (both repos). ✅
+- **"approvals-informational-cards-spec-001 Forge dispatch in-flight"**: UPDATED — Forge inbox now has `build-promoterace-ambient-feed-isolation-001.json` (PromoteRaceTest ambient-feed flake fix, source=beacon, phase=build; separate from informational cards task); informational cards dispatch still not producing a PR. [WATCH FOR FORGE DISPATCH]
+
+**Check 0 — Alert triage (~22:31Z UTC):** repair-watermark repaired=false (old_watermark=546, file_length=546). Watermark current. **0 new alerts** above watermark 546. No triage actions.
+**NOMINAL ✅**
+
+**Check 1 — Log noise (~22:26Z UTC [system-health ts]):** system-health.json ts=2026-08-10T22:26:16Z UTC (fresh ~7min at check); overall=healthy; all 4 bots alive=True (beacon/forge/mirror/pulse, action=noop each). 0 WARN/ERROR.
+**NOMINAL ✅**
+
+**Check 2 — Telegram sweep (~22:31Z UTC):** beacon_telegram_bot.log tail: most recent entry [2026-08-10T14:20:45-0600]=20:20:45Z UTC (6h reminder for pulse-auto-ddb5d10e28-20260810). No Larry directives in last 4h window (22:31Z back to 18:31Z UTC). No agent-distress keywords.
+**NOMINAL ✅**
+
+**Check 3 — Pipeline stall (~22:31Z UTC):** heal_pipeline_stall.py --dry-run → "no stalls detected" (22:31:02Z UTC). Pipeline clean.
+**CLEAN ✅**
+
+**Check 4 — Pending directives (~22:31Z UTC):** `~/agents/state/beacon-pending-approvals.json` (key=`pending`): **pending=0**. No new approval_requests since last iter.
+**NOMINAL ✅**
+
+**Check 5 — Stale daemon code (~22:31Z UTC):** `~/agents/blackboard/heal-stale-daemon-code.heartbeat`: 2026-08-10T22:30:35Z UTC (~1min before check). Within 60min threshold.
+**NOMINAL ✅**
+
+**Check A — Source repo (~22:31Z UTC):** branch=main, clean tree, HEAD=40a9b98b (chore(missions): autoregister healer — reconcile proposed lane)==origin/main (up to date, behind=0, ahead=0). **NOMINAL ✅**
+**Check B — Sync health (~22:31Z UTC):** agent-core-sync.json: last_sync=2026-08-10T21:36:10Z UTC (~55min ago; status=no-change, consecutive_push_failures=0). Within 2h threshold. **NOMINAL ✅**
+**Check C — Agent liveness (~22:26Z UTC):** system-health.json (same read); all 4 bots alive=True (beacon/forge/mirror/pulse, action=noop each). **NOMINAL ✅**
+**Check E — PR/merge state (~22:31Z UTC):** ourliberty-agent-core: **0 open PRs**. ourliberty-dashboard: **0 open PRs**. **CLEAN ✅**
+**Check H — Forge digest (~22:31Z UTC):** Forge inbox has 1 active task: `build-promoterace-ambient-feed-isolation-001.json` (PromoteRaceTest ambient-feed flake fix; source=beacon, phase=build, target_repo=ourliberty-agent-core; in-flight per MEMORY: PromoteRace false-BLOCK real cause found). No stall detected. **NOMINAL ✅**
+
+**§5.0 one-shots:** audit_due_nudge.py → no committed audit baseline; no-op. distill_detector.py → no un-distilled audits; no-op. audit_cadence_signal.py (review/distill/) → no post-seed decision-grade distill artifacts; no-op (stable pattern). silence_file_auditor.py → 7 silence files (3 expired: transcript-not-persisted tier1/tier2 for agent-runner-forge + tier1 for agent-runner-pulse; 4 permanent heal-pipeline-stall entries), all 0-suppressed. (Same 3 expired as iter ~9096; consistent.) **NOMINAL ✅**
+**§5 periodic — Check I:** check-i-2026-08-10.json already processed (iter ~9034). Next expected ~Aug 12 (Wed). **PROCESSED ✅**
+**§5 periodic — Check III:** latest=check-iii-2026-08-09.json (Aug 9, ON-WEEK). **ACTIVE ⚠️ — 4 proposals (applied=False), DM sent 2026-08-09T10:43:48-0600=16:43:48Z UTC. Awaiting Larry approval.**
+  - (beacon, _default): 232s → 286s (n=632, Δ=+23%)
+  - (forge, _default): 1232s → 1748s (n=16, Δ=+42%)
+  - (mirror, _default): 1311s → 1387s (n=398, Δ=+6%)
+  - (pulse, _default): 262s → 171s (n=16, Δ=-35%)
+  To approve: `approve threshold-update-2026-08-09` on Telegram. Next Check III expected ~2026-08-23.
+**§5 periodic — Check XIV:** check-xiv-2026-08-10.json (latest artifact; processed iter ~9072). **PROCESSED ✅**
+**§5 periodic — Check VIII:** already_deprecated. **QUIET ✅**
+
+**Rotations (~22:33Z UTC):** SUPABASE_SERVICE_ROLE_KEY: last_dm=2026-08-03T22:52:32Z UTC (~7.0d ago); 14d dedup window expires ~2026-08-17 (~6.9d remaining); next rotation due=2026-08-22 (~11.5d). No new DM. All other credentials: 2027+ (>60 days remaining). ✅
+
+**G-rule tracking:**
+- `sync-service-deploy-restart-head-drift-tier4-no-translation-001` **CLOSED ✅ (iter ~8897)**: 0 new occurrences (watermark 546). [carry ✅]
+- `pulse-triage-self-report-should-be-tier3-001` **RESOLVED ✅**: 0 bounce-backs this iter. [carry ✅]
+- `pulse-check-xiv-tier4-no-translation-001` **CLOSED ✅**: PR#1101 merged. [carry ✅]
+- `heal-pipeline-stall-unrouted-pr-stranded-tier4-no-translation-001` **CLOSED ✅**: PR#1103 merged. [carry ✅]
+- `medic-diagnosis-subject-specific-tier4-no-translation-001` **CLOSED ✅**: PR#1104 merged. [carry ✅]
+- `outbox-notifier-approval-request-tier4-no-translation-001` **FALSE PREMISE CLOSED**: translation `approval_request` key exists (PR#491). [carry ✅]
+- `approvals-informational-cards-spec-001` **SPEC IN MAIN (PR#1102)**: Forge inbox now has promoterace flake fix (separate task); informational cards dispatch still not producing a PR. [WATCH FOR FORGE DISPATCH]
+- `heal-approvals-surface-drift-tier4-nonbinary-001` **DISPATCHED (iter ~8237)**: 0 new missing_card alerts above watermark 546. [DISPATCHED → WATCH]
+- `isolation-gauge-order-fragile-test-tier4-no-translation-001` **[1/3]**: 0 new occurrences above watermark 546. [WATCH → 2 more for dispatch]
+- `enable-pr-auto-merge-reviewdecision-guard-001` [1/3]: 0 open PRs. [WATCH → 2 more for dispatch]
+- `heal-pipeline-stall-no-mirror-dispatch-tier4-no-translation-001` [1/3]: 0 new occurrences (watermark 546). [WATCH → 2 more for dispatch]
+- `alert-retraction-no-translation-001` **[2/3]**: repair-watermark repaired=false (no file-shrink this iter); still at [2/3]. [WATCH → 1 more for dispatch]
+- `source-beacon-notifications-tier4-no-translation` [2/3]: 0 new occurrences (watermark 546). [WATCH → 1 more for dispatch]
+- `ourliberty-health-dirty-tree-structural-artifact-001` [1/3]: 0 new dirty-tree alerts (watermark 546). [WATCH → 2 more for dispatch]
+- `journal-write-gap-post-prime-ledger-write-001` [1/3]: no new occurrence. [WATCH → 2 more for dispatch]
+- `outbox-notifier-approval-request-task-id-subject-tier4-001` **[1/3]** (iter ~9035): 0 new occurrences this iter (watermark 546). [WATCH → 2 more for dispatch]
+
+**Actions taken:**
+- Check 0: 0 new alerts; watermark current at 546. No triage actions.
+- §5.0 one-shots: all no-ops.
+- PRIME DIRECTIVE: `iter_clean` liveness heartbeat appended (ts=2026-08-10T22:33:26Z UTC, tier=2, kind=iter_clean). No intervention row (clean iter). Ratio unchanged.
+- Tier state: `cycle_tier_state.py record --checks-clean true` → **Tier 2** (consecutive_clean=2, last_signal_at=2026-08-10T21:38:28Z UTC). One more clean iter needed to de-escalate to Tier 3.
+
+**Escalations:** No new Pulse-initiated DMs this iter. Larry has outstanding: (1) Check III threshold proposals (4 proposals, applied=False, DM sent 2026-08-09T16:43:48Z UTC; `approve threshold-update-2026-08-09`). (2) Check I proposal: `notify-graduation-auto-merge-clean-pr` 12.7σ anomaly (DM delivered idx=543 2026-08-10T14:17:35Z UTC).
+
+**PRIME DIRECTIVE (post-action):** interventions=2633 (trailing 30d), systemic_fixes=26, ratio=101.27, trend=worsening. Clean iter — no new intervention appended. Ratio improvement requires systemic_fix commits.
+
+**Patterns:** Second consecutive clean iter at Tier 2 (consecutive_clean=2; 1 more clean iter to de-escalate to Tier 3). Forge has PromoteRaceTest ambient-feed flake fix in-flight (build-promoterace-ambient-feed-isolation-001.json). Informational cards dispatch still pending Forge PR. Check III threshold proposals (Aug 9) outstanding. SUPABASE_SERVICE_ROLE_KEY rotation due ~2026-08-22 (~11.5d). No new signals.
+
+**Tier end-of-iter:** **Tier 2** (consecutive_clean=2; 1 more clean iter needed to de-escalate to Tier 3).
+
+---
+
 ## Iteration ~9096 — 2026-08-10T22:18Z UTC (Larry /cycle chat, Tier 2 [Check 0: repair-watermark repaired=false (wm=546, fl=546), 0 new alerts NOMINAL ✅; Check 1: NOMINAL ✅; Check 2: NOMINAL ✅; Check 3: CLEAN ✅ (no stalls); Check 4: NOMINAL ✅ (pending=0); Check 5: NOMINAL ✅; ALL CLEAN → Tier 2, consecutive_clean=1])
 
 **Health:** ✅ NOMINAL — all checks clear. Tier 2, consecutive_clean=1.
@@ -3373,95 +3458,6 @@ Downstream Forge dispatch may be in-flight (Forge inbox currently empty; Beacon 
 **PRIME DIRECTIVE (post-action):** interventions=2607 (trailing 30d), systemic_fixes=29, ratio=89.90, trend=worsening. Sustained by Check 4 pending=2.
 
 **Patterns:** All G-rule watches stable. dag-preflight-approvals-informational-cards-001 now ~87.7h outstanding — past all reminder milestones; Beacon doorbell loop active; no further Pulse escalation warranted. pulse-auto-ddb5d10e28-20260810 at ~3.1h; DM delivered; Larry has it. SUPABASE_SERVICE_ROLE_KEY rotation due ~2026-08-22 (~12d). System nominal on all substrates except the pending approvals queue. Note: prior iters reported Check XIV as_of=2026-08-10T05:53Z UTC — this was a timezone misread (MDT local time displayed as UTC); actual UTC was 11:53; same artifact, no new run.
-
-**Tier end-of-iter:** **Tier 1** (signal: Check 4 pending=2, consecutive_clean=0).
-
----
-
-## Iteration ~9056 — 2026-08-10T17:18Z UTC (Larry /cycle chat, Tier 1 [Check 0: repair-watermark repaired=false (wm=547, fl=547), 0 new alerts NOMINAL ✅; Check 1: NOMINAL ✅; Check 2: NOMINAL ✅; Check 3: CLEAN ✅ (no stalls); Check 4: SIGNAL ⚠️ (pending=2 — dag-preflight ~87.5h + pulse-auto ~3.0h); Check 5: NOMINAL ✅; NOT CLEAN → Tier 1])
-
-**Health:** ⚠️ SIGNAL — Check 4 only: pending=2 (dag-preflight-approvals-informational-cards-001 ~87.5h; pulse-auto-ddb5d10e28-20260810 ~3.0h). All other checks nominal. Tier 1 (consecutive_clean=0).
-
-**VERIFY-BEFORE-REASSERT (from iter ~9055 at ~17:08Z UTC 2026-08-10):**
-- **"watermark 547, 0 new alerts NOMINAL ✅"**: CONFIRMED — repair-watermark repaired=false (wm=547, fl=547). 0 new alerts. ✅
-- **"system-health overall=healthy, all 4 bots alive"**: CONFIRMED — ts=2026-08-10T17:14:50Z (fresh ~4min at check); overall=healthy; all bots alive=True (beacon/forge/mirror/pulse, action=noop each). ✅
-- **"HEAD=884cde28==origin/main"**: UPDATED — HEAD=8b2ca754 (Pulse cycle 20260810T170949Z)==origin/main (git diff HEAD origin/main empty). ✅
-- **"Check 3 CLEAN ✅ (no stalls)"**: CONFIRMED — "no stalls detected" 17:16:14Z UTC. ✅
-- **"pending=2 (dag-preflight ~87.3h + pulse-auto ~2.8h)"**: CONFIRMED with age update — pending=2; dag-preflight ~87.5h (reminders_sent=[6,24,72]); pulse-auto ~3.0h (reminders_sent=[]). ✅
-- **"Tier 1 (consecutive_clean=0)"**: CONFIRMED — tier=1, consecutive_clean=0, last_signal_at=2026-08-10T17:08:04Z UTC. ✅
-- **"0 open PRs"**: CONFIRMED — [] (both repos). ✅
-- **"Check I processed in iter ~9034"**: CONFIRMED — check-i-2026-08-10.json present. Next expected ~Aug 12 (Wed). ✅
-- **"Check III ACTIVE ⚠️ — 4 proposals, DM sent 2026-08-09T10:43:48Z UTC"**: CONFIRMED — check-iii-2026-08-09.json (applied=False). ✅
-- **"Check XIV: processed in iter ~9016"**: CONFIRMED — check-xiv-2026-08-10.json (no new artifact since as_of=2026-08-10T05:53Z). ✅
-- **"outbox-notifier-approval-request-task-id-subject-tier4-001 [1/3]"**: 0 new occurrences (watermark 547). ✅
-
-**Check 0 — Alert triage (~17:16Z UTC):** repair-watermark: repaired=false (old_watermark=547, file_length=547). **0 new alerts** — watermark current (547=547).
-**NOMINAL ✅**
-
-**Check 1 — Log noise (~17:14Z UTC):** system-health.json ts=2026-08-10T17:14:50Z (fresh ~4min at check); overall=healthy; disk=17%, mem=18%; inbox_watcher/outbox_notifier/bots all ok; log_growth seconds_since_write=10488 (idle, empty inboxes). 0 WARN/ERROR.
-**NOMINAL ✅**
-
-**Check 2 — Telegram sweep (~17:16Z UTC):** beacon_telegram_bot.log tail: most recent entry [2026-08-10T09:03:00-0600]=15:03Z UTC (idx=546 route=digest, review-ceiling-fit). No Larry directives in last 4h window (17:18Z back to 13:18Z UTC). No agent-distress keywords.
-**NOMINAL ✅**
-
-**Check 3 — Pipeline stall (~17:16Z UTC):** heal_pipeline_stall.py --dry-run → "no stalls detected" (17:16:14Z UTC). Pipeline clean.
-**CLEAN ✅**
-
-**Check 4 — Pending directives (~17:16Z UTC):** `~/agents/state/beacon-pending-approvals.json` (key=`pending`): **pending=2**
-1. `dag-preflight-approvals-informational-cards-001` (DAG preflight, approvals informational cards Option B, created 2026-08-07T01:48:02Z UTC, status=pending). reminders_sent=[6, 24, 72]. **~87.5h since creation.** All milestone reminders delivered; Beacon doorbell loop active.
-2. `pulse-auto-ddb5d10e28-20260810` (Forge preflight: perf(notifier) — suppress Beacon cycle for zero-decision review-pass/ack-proceed notifies, created 2026-08-10T14:20:04Z UTC, status=pending, reminders_sent=[]). ~3.0h old. DM delivered [2026-08-10T08:22:38-0600]=14:22:38Z UTC.
-**SIGNAL ⚠️** (pending=2; both awaiting Larry)
-
-**Check 5 — Stale daemon code (~17:16Z UTC):** `~/agents/blackboard/heal-stale-daemon-code.heartbeat`: 2026-08-10T17:08:15Z UTC (~8min before check). Within 60min threshold.
-**NOMINAL ✅**
-
-**Check A — Source repo (~17:16Z UTC):** branch=main, clean tree, HEAD=8b2ca754 (Pulse cycle 20260810T170949Z)==origin/main (git diff HEAD origin/main empty; behind=0, ahead=0). **NOMINAL ✅**
-**Check B — Sync health (~17:16Z UTC):** agent-core-sync.json: last_sync=2026-08-10T16:35:35Z UTC (~43min ago; status=no-change, consecutive_push_failures=0). Within 2h threshold. **NOMINAL ✅**
-**Check C — Agent liveness (~17:14Z UTC):** system-health.json (same read); all 4 bots alive=True (beacon/forge/mirror/pulse, action=noop each). **NOMINAL ✅**
-**Check E — PR/merge state (~17:16Z UTC):** ourliberty-agent-core: **0 open PRs**. ourliberty-dashboard: **0 open PRs**. **CLEAN ✅**
-
-**§5.0 one-shots:** audit_due_nudge.py → no committed audit baseline; no-op. distill_detector.py → no un-distilled audits; no-op. audit_cadence_signal.py (review/distill/) → no post-seed decision-grade distill artifacts yet; no-op. **NOMINAL ✅**
-**§5 periodic — Check I:** check-i-2026-08-10.json already processed in iter ~9034. Next expected ~Aug 12 (Wed). **PROCESSED ✅**
-**§5 periodic — Check III:** latest=check-iii-2026-08-09.json (Aug 9, ON-WEEK). **ACTIVE ⚠️ — 4 proposals (applied=False), DM sent 2026-08-09T10:43:48Z UTC. Awaiting Larry approval.**
-  - (beacon, _default): 232s → 286s (n=632, Δ=+23%)
-  - (forge, _default): 1232s → 1748s (n=16, Δ=+42%)
-  - (mirror, _default): 1311s → 1387s (n=398, Δ=+6%)
-  - (pulse, _default): 262s → 171s (n=16, Δ=-35%)
-  To approve: `approve threshold-update-2026-08-09` on Telegram. Next Check III expected ~2026-08-23.
-**§5 periodic — Check XIV:** check-xiv-2026-08-10.json already processed in iter ~9016 (as_of=2026-08-10T05:53Z UTC). No new artifact. **PROCESSED ✅**
-**§5 periodic — Check VIII:** already_deprecated. **QUIET ✅**
-
-**Rotations (~17:18Z UTC):** SUPABASE_SERVICE_ROLE_KEY: last_dm=2026-08-03T22:52:32Z UTC (~6.9d ago); 14d dedup window expires ~2026-08-17 (~7.1d remaining); next rotation due=2026-08-22 (~12d). No new DM. All other credentials: 2027+ (270+ days remaining). ✅
-
-**G-rule tracking:**
-- `sync-service-deploy-restart-head-drift-tier4-no-translation-001` **CLOSED ✅ (iter ~8897)**: 0 new occurrences (watermark 547). [carry ✅]
-- `pulse-triage-self-report-should-be-tier3-001` **RESOLVED ✅**: 0 bounce-backs this iter. [carry ✅]
-- `pulse-check-xiv-tier4-no-translation-001` **CLOSED ✅**: PR#1101 merged. [carry ✅]
-- `heal-pipeline-stall-unrouted-pr-stranded-tier4-no-translation-001` **CLOSED ✅**: PR#1103 merged. [carry ✅]
-- `medic-diagnosis-subject-specific-tier4-no-translation-001` **CLOSED ✅**: PR#1104 merged. [carry ✅]
-- `outbox-notifier-approval-request-tier4-no-translation-001` **FALSE PREMISE CLOSED**: translation `approval_request` key exists (PR#491). [carry ✅]
-- `approvals-informational-cards-spec-001` **SPEC IN MAIN (PR#1102)**: dag-preflight pending Larry approval (~87.5h; reminders_sent=[6,24,72]; all milestones delivered; Beacon doorbell loop active). [IMPL DISPATCHED → WATCH FOR LARRY APPROVAL]
-- `heal-approvals-surface-drift-tier4-nonbinary-001` **DISPATCHED (iter ~8237)**: 0 new missing_card alerts above watermark 547. [DISPATCHED → WATCH]
-- `isolation-gauge-order-fragile-test-tier4-no-translation-001` **[1/3]**: 0 new occurrences above watermark 547. [WATCH → 2 more for dispatch]
-- `enable-pr-auto-merge-reviewdecision-guard-001` [1/3]: 0 open PRs. [WATCH → 2 more for dispatch]
-- `heal-pipeline-stall-no-mirror-dispatch-tier4-no-translation-001` [1/3]: 0 new occurrences (watermark 547). [WATCH → 2 more for dispatch]
-- `alert-retraction-no-translation-001` [1/3]: 0 new occurrences (watermark 547). [WATCH → 2 more for dispatch]
-- `source-beacon-notifications-tier4-no-translation` [2/3]: 0 new occurrences (watermark 547). [WATCH → 1 more for dispatch]
-- `ourliberty-health-dirty-tree-structural-artifact-001` [1/3]: 0 new dirty-tree alerts (watermark 547). [WATCH → 2 more for dispatch]
-- `journal-write-gap-post-prime-ledger-write-001` [1/3]: no new occurrence. [WATCH → 2 more for dispatch]
-- `outbox-notifier-approval-request-task-id-subject-tier4-001` **[1/3]** (iter ~9035): 0 new occurrences this iter (watermark 547). [WATCH → 2 more for dispatch]
-
-**Actions taken:**
-- Check 0: 0 new alerts; watermark current at 547. No triage actions.
-- §5.0 one-shots: all no-ops.
-- PRIME DIRECTIVE: 1 `intervention` row appended (ts=2026-08-10T17:18:03Z UTC, tier=1, kind=intervention, template=check-pending, detail=dag-preflight ~87.5h + pulse-auto ~3.0h).
-- Tier state: `cycle_tier_state.py record --checks-clean false` → **Tier 1** (consecutive_clean=0, last_signal_at=2026-08-10T17:18:04Z UTC).
-
-**Escalations:** No new Pulse-initiated DMs this iter. Larry has outstanding: (1) dag-preflight approval_request (~87.5h; all reminders [6h/24h/72h] delivered; Beacon doorbell loop active). (2) pulse-auto-ddb5d10e28-20260810 approval_request (~3.0h; DM delivered 14:22:38Z UTC; reminders_sent=[]). (3) Check III threshold proposals (4 proposals, DM sent 2026-08-09T10:43:48Z UTC; `approve threshold-update-2026-08-09`). (4) Check I proposal: `notify-graduation-auto-merge-clean-pr` 12.7σ anomaly (DM delivered 2026-08-10T14:14Z UTC).
-
-**PRIME DIRECTIVE (post-action):** interventions=2606 (trailing 30d), systemic_fixes=29, ratio=89.86, trend=worsening. Sustained by Check 4 pending=2.
-
-**Patterns:** All G-rule watches stable. dag-preflight-approvals-informational-cards-001 now ~87.5h outstanding — past all reminder milestones; Beacon doorbell loop active; no further Pulse escalation warranted. pulse-auto-ddb5d10e28-20260810 at ~3.0h; DM delivered; Larry has it. SUPABASE_SERVICE_ROLE_KEY rotation due ~2026-08-22 (~12d). System nominal on all substrates except the pending approvals queue.
 
 **Tier end-of-iter:** **Tier 1** (signal: Check 4 pending=2, consecutive_clean=0).
 
