@@ -6,6 +6,12 @@
 
 ---
 
+## G-rule mirror-queue-wait-gauge-third-review-slot-readiness-tier4-no-translation-001 — 1/3 (new, iter ~9111, 2026-08-11T03:06Z UTC)
+
+**Rule:** `source=mirror-queue-wait-gauge, subject=third-review-slot-readiness` returns Tier-4 from the triage helper (no translation match). First occurrence: iter ~9111 (2026-08-11T03:06Z UTC). Alert fires when p95 PR-open→review-start queue-wait exceeds 90min WITH two slots running — signals that two Mirror review slots are saturating during bursts. Fix candidates: (a) raise review_slots to 3 in config/agent-models.json + ConcurrencyGuard RAM re-check, (b) cut per-review service time. Bot delivered directly at idx=560 (route=escalate, tier=FYI, 3-day re-fire cooldown). Fix: add Tier-3 translation entry for source=mirror-queue-wait-gauge in config/alert-translations.json (digest or escalate as appropriate), OR clarify if this alert class needs Larry action before silencing. Dispatch to Beacon at 3/3.
+
+---
+
 ## G-rule sync-service-deploy-restart-head-drift-tier4-no-translation-001 — CLOSED ✅ (iter ~8897, 2026-08-09T23:37Z UTC)
 
 **Rule (CLOSED — FALSE PREMISE):** Prior iters counted raw fires of this alert in larry-alerts.jsonl and incremented toward [3/3]. But iter ~8897 confirmed via `triage-alert` helper that `source=sync.service, subject=deploy-restart-head-drift` returns **Tier 3** (known-pattern match in alert-translations.json, `rationale: "known-pattern match in alert-translations.json"`, cached since iter ~6880/2026-07-30). The translation entry was ALREADY in place; no Tier 4 DMs were ever sent. The G-rule counter was counting appearances in larry-alerts.jsonl, not actual Tier 4 escalations — a verify-before-reassert failure. Pattern: emitted immediately after a Pulse auto-commit causes a brief SHA drift; self-heals on the next sync tick. **No dispatch needed. Do NOT reopen this G-rule.**
