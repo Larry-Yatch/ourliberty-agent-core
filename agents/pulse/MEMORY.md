@@ -30,6 +30,12 @@
 
 ---
 
+## G-rule outbox-notifier-approval-request-task-id-subject-tier4-001 — DISPATCHED ✅ (iter ~9144, 2026-08-11T15:24Z UTC)
+
+**Rule:** `source=outbox-notifier, kind=approval_request, subject=<task_id>` returns Tier-4 from the triage helper. PR#491 added a kind-fallback in `_translation_match` so `kind=approval_request` from outbox-notifier normally classifies Tier-3 (silence). BUT when the row has a non-null subject (outbox-notifier genuinely emits `subject=<task_id>`), the kind-fallback is defeated and the alert falls through to Tier-4. Three real occurrences confirmed: iter ~9101 (1/3), iter ~9113 (2/3), iter ~9144 (3/3, line 544, ts=2026-08-11T15:10:52Z UTC, subject=direction-ask-automated-cycle-journal-gap-001). **DISPATCHED:** direction-ask-outbox-notifier-approval-request-task-id-tier4-translation-002.json written to Beacon inbox (iter ~9144). Fix needed: add Tier-3 translation entry for non-null task_id subjects, OR fix `_translation_match` so kind-key wins over subject when source=outbox-notifier and kind=approval_request. outbox-notifier already DM'd Larry on each occurrence; no duplicate Pulse DM sent. **Do NOT re-dispatch** until Beacon's fix is verified.
+
+---
+
 ## G-rule source-beacon-notifications-tier4-no-translation — 2/3 (updated iter ~8351)
 
 **Rule:** `source=beacon, kind=notification` returns Tier-4 from the triage helper (no translation entry). Two confirmed occurrences: iter ~8274 (2026-08-07T06:07Z UTC, intent=review-escalate, RSDPM PR#198 Mirror escalated, Beacon DM idx=570 already delivered) and iter ~8351 (2026-08-07T15:09Z UTC, intent=review-pass, RSDPM PR#198 merged, Beacon sent manual notification, outbox-notifier idx=559 already delivered). Root cause: source=beacon notification intent variants (review-escalate, review-pass, others TBD) lack translation entries; outbox-notifier delivers them directly making any Pulse DM a duplicate. Fix: add a broad Tier-3 translation entry for `source=beacon, kind=notification` in config/alert-translations.json (silence+journal: Beacon delivers these directly). Dispatch to Beacon at 3/3.
