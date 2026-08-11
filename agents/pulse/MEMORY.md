@@ -6,6 +6,12 @@
 
 ---
 
+## G-rule deploy-notifier-vercel-build-failed-tier4-no-translation-001 — 2/3 (updated iter ~9143, 2026-08-11T15:07Z UTC)
+
+**Rule:** `source=deploy-notifier, subject^=deploy-notifier:ERROR:` (Vercel build failure) returns Tier-4 from the triage helper (no translation match in alert-translations.json). Occurrences: [1/3] prior iter (~9072 per journal G-rule tracking); [2/3] automated cycle at 15:02Z UTC caught up `deploy-notifier:ERROR:dpl_4hpi87jNFfhjuGY6d1uej4E8sCig` (Vercel build FAILED, RSDPM PR#216 feat/m13-transcript-jump, 2026-08-11T05:44Z UTC) as Tier-4. Bot already delivered at idx=565 (05:46Z UTC). Fix: add Tier-3 translation entry for `source=deploy-notifier, subject^=deploy-notifier:ERROR:` OR consider Tier-2 (guarded) if Vercel build failures need Larry action. Note: these ARE actionable (suggested_action points to Vercel build log + env var fix). Consider digest route rather than full silence. Dispatch to Beacon at 3/3.
+
+---
+
 ## G-rule automated-cycle-no-journal-entry-001 — DISPATCHED ✅ (iter ~9137, 2026-08-11T15:02Z UTC)
 
 **Rule:** Automated systemd-driven cycles commit and update cycle-tier.json but write NO journal entry to cycle-journal.md. Additionally confirmed: automated cycles advance larry-alerts.jsonl watermark without running per-alert triage classification (deploy-notifier:ERROR at line ~541 watermark-advanced but never entered alert-triage.json). Both issues share root cause: cycle session exits before completing the Check 0 triage + journal-write phase. 5+ occurrences confirmed (commits 0a94d9cb, d04002a3 per iter ~9136; plus ~13:19Z, ~13:54Z, ~14:24Z UTC 2026-08-11). **DISPATCHED:** direction-ask-automated-cycle-journal-gap-001.json written to Beacon inbox (iter ~9137, 15:02Z UTC). Awaiting Beacon spec + Forge PR. Fix candidates: (a) wrapper verify cycle-journal.md mtime > cycle start before committing; (b) sentinel stub journal write as first cycle action; (c) Check 0 triage loop must run before watermark advance. **Do NOT re-dispatch.**
