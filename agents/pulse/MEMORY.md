@@ -18,9 +18,9 @@
 
 ---
 
-## G-rule alert-retraction-no-translation-001 — 1/3 (new, iter ~8221)
+## G-rule alert-retraction-no-translation-001 — DISPATCHED ✅ (prior automated cycles, iter ~9115)
 
-**Rule:** `source=alert-retraction, subject^=unrouted-pr-nudges-retired:` returns Tier-4 from the triage helper (no translation match). First occurrence: iter ~8221 (2026-08-06T20:47Z UTC), alert line 558, subject=unrouted-pr-nudges-retired:1:c46f117cf436, route=closure. outbox-notifier had already delivered it (idx=557); no second DM sent. Fix: add Tier-3 (silence+journal) translation entry for `source=alert-retraction, subject^=unrouted-pr-nudges-retired:` in config/alert-translations.json. Dispatch to Beacon at 3/3.
+**Rule:** `source=alert-retraction, subject^=unrouted-pr-nudges-retired:` returns Tier-4 from the triage helper (no translation match). First occurrence: iter ~8221 (2026-08-06T20:47Z UTC). Fix: add Tier-3 (silence+journal) translation entry for `source=alert-retraction, subject^=unrouted-pr-nudges-retired:` in config/alert-translations.json. **DISPATCHED by prior automated cycles (3/3 hit between iter ~9076 and ~9115):** pending approval `alert-translations-unrouted-pr-nudges-retired-001` appeared in beacon-pending-approvals.json at ~2026-08-11T00:14Z UTC; doorbell DM delivered 00:31Z UTC. Awaiting Larry approval. **Do NOT re-dispatch.** Verified DISPATCHED at iter ~9115.
 
 ---
 
