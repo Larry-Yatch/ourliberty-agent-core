@@ -3242,7 +3242,8 @@
         "reason": "preflight_reject: Forge rejected the spec at preflight (marker_type=reject)",
         "at": "2026-08-04T00:45:42.164081+00:00",
         "by": "heal_missions_card_gc"
-      }
+      },
+      "aging": true
     },
     {
       "id": "cap-approvals-freshness-retrofit-a-producer-to-autho-6430",
