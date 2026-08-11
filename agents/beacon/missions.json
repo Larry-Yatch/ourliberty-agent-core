@@ -19386,7 +19386,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-08-11T00:59:05.567949+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-08-11T00:54:36.987048+00:00"
+      "orphan_last_activity_ts": "2026-08-11T00:54:36.987048+00:00",
+      "briefing": {
+        "what": "A piece of work someone on the team built that isn't attached to any approved project or goal you've signed off on.",
+        "why": "It's already consumed a full build-and-rework cycle and is now sitting in the review queue, so it's spending team time and attention without a business reason on record.",
+        "suggest": "Before it goes any further, ask what outcome it's meant to deliver \u2014 if there's a clear answer, tie it to a project and let it through; if not, park it."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-11T00:59:50.928064+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
