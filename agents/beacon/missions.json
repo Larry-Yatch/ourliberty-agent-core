@@ -19355,7 +19355,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-08-11T00:28:45.297931+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-08-11T00:20:24.912048+00:00"
+      "orphan_last_activity_ts": "2026-08-11T00:20:24.912048+00:00",
+      "briefing": {
+        "what": "You decided the approvals list should also show items that aren't simple yes/no decisions, and the plan for that is written but the work itself hasn't been built yet.",
+        "why": "Until it's built, anything that needs your attention but isn't a straight approve-or-reject can quietly fall off your list and go unhandled.",
+        "suggest": "Give the team the go-ahead to build it now in small pieces, with a quick check-in from you once the first piece is live to confirm the new items show up the way you expect."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-11T00:29:20.586161+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
