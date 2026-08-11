@@ -6,6 +6,12 @@
 
 ---
 
+## G-rule automated-cycle-no-journal-entry-001 — 1/3 (new, iter ~9135, 2026-08-11T10:35Z UTC)
+
+**Rule:** Automated systemd-driven cycle committed (commit 0a94d9cb, "Pulse cycle 20260811T100250Z", 10:02:50Z UTC) and updated cycle-tier.json (consecutive_clean 4→5, last_updated=09:59:59Z) but wrote NO journal entry to cycle-journal.md. The cycle functioned (Check 0 watermark auto-repair, tier-state update all confirmed), but the journal write was skipped. First occurrence: iter ~9135 (discovered at 2026-08-11T10:35Z UTC). Possible cause: LLM session exited before journal write; or run_cycle.sh committed mid-session before journal was appended. Fix candidates: (a) wrapper should verify journal was written (check that cycle-journal.md mtime > cycle start) before committing; (b) add a sentinel/stub journal line as first write in cycle before expensive checks run. Dispatch to Beacon at 3/3.
+
+---
+
 ## G-rule mirror-queue-wait-gauge-third-review-slot-readiness-tier4-no-translation-001 — 1/3 (new, iter ~9111, 2026-08-11T03:06Z UTC)
 
 **Rule:** `source=mirror-queue-wait-gauge, subject=third-review-slot-readiness` returns Tier-4 from the triage helper (no translation match). First occurrence: iter ~9111 (2026-08-11T03:06Z UTC). Alert fires when p95 PR-open→review-start queue-wait exceeds 90min WITH two slots running — signals that two Mirror review slots are saturating during bursts. Fix candidates: (a) raise review_slots to 3 in config/agent-models.json + ConcurrencyGuard RAM re-check, (b) cut per-review service time. Bot delivered directly at idx=560 (route=escalate, tier=FYI, 3-day re-fire cooldown). Fix: add Tier-3 translation entry for source=mirror-queue-wait-gauge in config/alert-translations.json (digest or escalate as appropriate), OR clarify if this alert class needs Larry action before silencing. Dispatch to Beacon at 3/3.
