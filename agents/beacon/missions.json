@@ -19545,6 +19545,23 @@
       "retired_by": "heal_orphan_autoregister",
       "retired_at": "2026-08-11T22:36:37.829209+00:00",
       "retired_reason": "orphan-terminal"
+    },
+    {
+      "id": "proposed-pending-approvals-wrong-path-guard-001",
+      "name": "Pending Approvals Wrong Path Guard 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pending-approvals-wrong-path-guard-001`. Last activity 2026-08-11T23:44:04.273626+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pending-approvals-wrong-path-guard-001"
+      ],
+      "repo": null,
+      "created": "2026-08-11",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-11T23:52:07.927780+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-11T23:44:04.273626+00:00"
     }
   ]
 }
