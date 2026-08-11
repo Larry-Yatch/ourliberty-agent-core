@@ -4,6 +4,100 @@
 
 ---
 
+## Iteration ~9138 — 2026-08-11T12:09Z UTC (Larry /cycle chat, Tier 3 CLEAN [Check 0: wm=542=fl=542, 0 new alerts; Checks 1-5: NOMINAL ✅; CLEAN → consecutive_clean=9; RSDPM PR#216 "Vercel build FAILED" descriptor stale — corrected to 4/5 checks SUCCESS via verify-before-reassert])
+
+**Health:** ✅ Nominal — all checks clean. Tier 3 (30-min cadence), consecutive_clean=9.
+
+**VERIFY-BEFORE-REASSERT (from iter ~9137 at ~11:37Z UTC + automated cycle commit 54895d91 at ~11:42Z):**
+- **"watermark wm=542=fl=542, 0 new alerts"**: CONFIRMED — repair-watermark: repaired=false (wm=542, fl=542). 0 new alerts. ✅
+- **"system-health all 4 bots alive"**: CONFIRMED — ts=2026-08-11T12:04:30Z UTC (fresh ~4min at check); overall=healthy; all 4 bots alive=True. ✅
+- **"HEAD=54895d91==origin/main"**: CONFIRMED — HEAD=54895d91 ("Pulse cycle 20260811T114245Z")==origin/main (commit verified to include cycle-journal.md, 179 lines changed + archive). ✅
+- **"pending=1 (alert-translations-unrouted-pr-nudges-retired-001)"**: CONFIRMED — 1 pending (created 2026-08-11T00:08:30Z UTC, ~12.0h pending). ✅
+- **"Tier 3, consecutive_clean=8"**: UPDATED — cycle-tier.json confirmed tier=3, consecutive_clean=8 at iter start; this iter CLEAN → consecutive_clean=9. ✅
+- **"0 open PRs (agent-core and dashboard)"**: CONFIRMED — 0 open PRs both repos. ✅
+- **"informational-cards escalation (await Larry response)"**: CONFIRMED CARRY — no impl PRs; awaiting Larry response. ✅
+- **"RSDPM PR#216 Vercel build FAILED (bot idx=565)"**: **UPDATED — descriptor stale.** Current check: checks_total=5; vitest=SUCCESS, write-verb-wall=SUCCESS, python-tests=SUCCESS, Vercel Preview Comments=SUCCESS, 1 unnamed check status=?/conclusion=? (neutral, not FAILURE). No checks in FAILURE/ERROR state. Prior alert idx=565 was from 2026-08-10T23:46Z UTC (deploy-notifier error); build has since cleared. Carrying as "OPEN/MERGEABLE/unrouted, cooldown active" — no longer "Vercel build FAILED." ✅
+- **"automated-cycle-no-journal-entry-001 [1/3]"**: CONFIRMED — commit 54895d91 DID include cycle-journal.md (179 lines changed + archive, confirmed via `git show --stat`). No new occurrence this iter. G-rule remains at [1/3]. ✅
+
+**Check 0 — Alert triage (~12:08Z UTC):** repair-watermark: repaired=false (old_wm=542, fl=542). 0 new alerts above watermark.
+**NOMINAL ✅**
+
+**Check 1 — Log noise (~12:04Z UTC [system-health ts]):** system-health.json ts=2026-08-11T12:04:30Z UTC (fresh ~4min at check); overall=healthy; all 4 bots alive=True (noop each).
+**NOMINAL ✅**
+
+**Check 2 — Telegram sweep (~12:09Z UTC):** Last bot delivery: idx=566 notification (intent=doorbell, 2026-08-11T02:37:35-0600 = 08:37:35Z UTC). No `<- 7998341473` Larry directive messages in active 4h window (last directive 2026-08-05T22:07Z UTC per prior iters). No orphan directives.
+**NOMINAL ✅**
+
+**Check 3 — Pipeline stall (~12:06Z UTC):** heal_pipeline_stall.py --dry-run:
+- FORGE_NO_PR_SKIP: promoterace-ambient-feed-isolation-001 → pr_exists PR#1106 (expected).
+- FORGE_NO_PR_SKIP: pr-RSDPM-214 → pr_task_id_closed_or_merged MERGED (expected).
+- suppressed (cooldown): unrouted_open_pr:Larry-Yatch/RSDPM:216 (prior DM active).
+- DRY-RUN: 0 alerts would fire, 0 recoveries.
+**NOMINAL ✅**
+
+**Check 4 — Pending directives (~12:05Z UTC):** beacon-pending-approvals.json: 1 pending (alert-translations-unrouted-pr-nudges-retired-001, created 2026-08-11T00:08:30Z UTC, ~12.0h pending). heal_unregistered_approval: 1 approval + 0 escalations; promoted=0 (SKIP_PULSE_SOURCE + skip-before-promote on known items). No new untracked directives.
+**NOMINAL ✅**
+
+**Check 5 — Stale daemon code (~12:06Z UTC [heartbeat ts]):** heal-stale-daemon-code.heartbeat = 2026-08-11T12:06:17Z UTC (fresh ~3min at check). Within 60min threshold.
+**NOMINAL ✅**
+
+**Check A — Source repo (~12:08Z UTC):** branch=main, clean tree, HEAD=54895d91==origin/main (ahead=0, behind=0). **NOMINAL ✅**
+**Check B — Sync health (~11:37Z UTC [last_sync]):** agent-core-sync.json: last_sync=2026-08-11T11:37:21Z UTC (~31min at check; status=no-change, consecutive_push_failures=0). Within 2h threshold. **NOMINAL ✅**
+**Check C — Agent liveness (~12:04Z UTC):** system-health.json: all 4 bots alive=True. **NOMINAL ✅**
+**Check E — PR/merge state:** 0 open PRs in ourliberty-agent-core. 0 open PRs in ourliberty-dashboard. **CLEAN ✅**
+**Check H — Forge digest:** Last merged: PR#1106 (fix(tests) stub ambient for-Larry feed, 2026-08-10T23:06:06Z). 0 open Forge PRs. **NOMINAL ✅**
+
+**§5.0 one-shots (~12:06Z UTC):** audit_due_nudge → no-op. distill_detector → no-op. audit_cadence_signal (review/distill/) → no-op. silence_file_auditor → entries present (3 expired [agent-runner transcript-not-persisted], 4 permanent; 0 active suppressions). **NOMINAL ✅**
+**§5 periodic — Check I:** latest=check-i-2026-08-10.json. Next firing ~Aug 12 (Wed, ~14:13 UTC). Not due. **PENDING ✅**
+**§5 periodic — Check III:** latest=check-iii-2026-08-09.json (ON-WEEK). 4 proposals pending. Next ON-WEEK Sunday = Aug 23. Awaiting Larry approval (`approve threshold-update-2026-08-09`). **ACTIVE ⚠️**
+**§5 periodic — Check XIV:** check-xiv-2026-08-10.json processed iter ~9072. **PROCESSED ✅**
+**§5 periodic — Check VIII:** already_deprecated. **QUIET ✅**
+
+**Rotations:** SUPABASE_SERVICE_ROLE_KEY: last_dm=2026-08-03T22:52:32Z UTC (~7.3d from check); dedup window expires ~2026-08-17 (~5.7d remaining); next rotation due=2026-08-22. No new DM. All others 2027+ (>60d). ✅
+
+**G-rule tracking:**
+- `sync-service-deploy-restart-head-drift-tier4-no-translation-001` **CLOSED ✅**: 0 new occurrences. [carry ✅]
+- `pulse-triage-self-report-should-be-tier3-001` **RESOLVED ✅**: 0 bounce-backs. [carry ✅]
+- `pulse-check-xiv-tier4-no-translation-001` **CLOSED ✅**: PR#1101 merged. [carry ✅]
+- `heal-pipeline-stall-unrouted-pr-stranded-tier4-no-translation-001` **CLOSED ✅**: PR#1103 merged. [carry ✅]
+- `medic-diagnosis-subject-specific-tier4-no-translation-001` **CLOSED ✅**: PR#1104 merged. [carry ✅]
+- `outbox-notifier-approval-request-tier4-no-translation-001` **FALSE PREMISE CLOSED**: translation key exists (PR#491). [carry ✅]
+- `approvals-informational-cards-spec-001` **ESCALATED (iter ~9102)**: 0 impl PRs; awaiting Larry response. [ESCALATED → AWAIT LARRY RESPONSE]
+- `heal-approvals-surface-drift-tier4-nonbinary-001` **DISPATCHED (iter ~8237)**: 0 new missing_card alerts above watermark. [DISPATCHED → WATCH]
+- `isolation-gauge-order-fragile-test-tier4-no-translation-001` [1/3]: 0 new occurrences. [WATCH → 2 more for dispatch]
+- `enable-pr-auto-merge-reviewdecision-guard-001` [1/3]: 0 open T0 PRs this iter. [WATCH → 2 more for dispatch]
+- `heal-pipeline-stall-no-mirror-dispatch-tier4-no-translation-001` [1/3]: 0 new occurrences. [WATCH → 2 more for dispatch]
+- `alert-retraction-no-translation-001` **[3/3] → DISPATCHED (iter ~9100)**: approval_request alert-translations-unrouted-pr-nudges-retired-001 pending Larry approval (~12.0h). [DISPATCHED → PENDING LARRY APPROVAL]
+- `source-beacon-notifications-tier4-no-translation` [2/3]: 0 new occurrences (wm=542). [WATCH → 1 more for dispatch]
+- `ourliberty-health-dirty-tree-structural-artifact-001` [1/3]: 0 new dirty-tree alerts. [WATCH → 2 more for dispatch]
+- `journal-write-gap-post-prime-ledger-write-001` [1/3]: no new occurrence. [WATCH → 2 more for dispatch]
+- `outbox-notifier-approval-request-task-id-subject-tier4-001` [2/3]: 0 new occurrences this iter. [WATCH → 1 more for dispatch]
+- `mirror-queue-wait-gauge-third-review-slot-readiness-tier4-no-translation-001` [1/3]: 0 new occurrences. [WATCH → 2 more for dispatch]
+- `deploy-notifier-vercel-build-failed-tier4-no-translation-001` [1/3]: 0 new occurrences (wm=542). [WATCH → 2 more for dispatch]
+- `automated-cycle-no-journal-entry-001` [1/3]: commit 54895d91 included cycle-journal.md (verified via git show --stat). No new occurrence. [WATCH → 2 more for dispatch]
+
+**Actions taken:**
+- Check 0: watermark no-op (wm=542=fl=542, 0 new alerts).
+- §5.0 one-shots: all no-op.
+- PRIME DIRECTIVE: iter_clean liveness heartbeat appended (ts=2026-08-11T12:08:52Z UTC, iter=9138, tier=3, kind=iter_clean).
+- Tier state: `cycle_tier_state.py record --checks-clean true` → **Tier 3**, consecutive_clean=9.
+
+**Escalations:** None this iter. Outstanding items (carried from iter ~9137):
+1. RSDPM PR#216 (feat/m13-transcript-jump) — OPEN, MERGEABLE, 4/5 checks SUCCESS (1 unknown/neutral). Prior Vercel build FAILED alert (idx=565, 2026-08-10T23:46Z UTC) — build has since cleared per current check. DM'd idx=561 (03:19:47Z UTC, prior iter). Cooldown active. **Updated: no longer "Vercel build FAILED"; carrying as open/unrouted with active cooldown.**
+2. Check III threshold proposals (`approve threshold-update-2026-08-09`). Carry.
+3. Check I proposal: notify-graduation-auto-merge-clean-pr 12.7σ anomaly (DM idx=543). Carry.
+4. alert-translations-unrouted-pr-nudges-retired-001 approval (`approve alert-translations-unrouted-pr-nudges-retired-001`). Carry.
+5. Informational-cards impl gap (escalated iter ~9102; awaiting Larry response). Carry.
+6. mirror-queue-wait-gauge readiness signal (idx=560) — decide: raise Mirror review_slots to 3 OR cut per-review service time. Carry.
+
+**PRIME DIRECTIVE (post-action):** ratio=~125 (systemic_fixes=21, interventions=~2625+), trend=worsening. iter_clean heartbeat appended. No new intervention rows this iter.
+
+**Patterns:** Ninth consecutive clean Tier-3 iter (consecutive_clean=9). Key verify-before-reassert correction this iter: RSDPM PR#216 "Vercel build FAILED" descriptor was stale — the 2026-08-10T23:46Z alert has resolved; current check shows 4/5 checks SUCCESS, 1 neutral. The carry escalation is updated to reflect actual current state (open/unrouted, not build-failed). Discipline 1 enforced.
+
+**Tier end-of-iter:** **Tier 3**, consecutive_clean=9 (Tier-3 cadence stable; any non-clean iter resets to Tier 1).
+
+---
+
 ## Iteration ~9137 — 2026-08-11T11:37Z UTC (Larry /cycle chat, Tier 3 CLEAN [Check 0: wm=542=fl=542, 0 new alerts; Checks 1-5: NOMINAL ✅; CLEAN → consecutive_clean=8; G-rule automated-cycle-no-journal-entry-001 RESET to [1/3] via verify-before-reassert])
 
 **Health:** ✅ Nominal — all checks clean. Tier 3 (30-min cadence), consecutive_clean=8.
@@ -3558,91 +3652,6 @@ Watermark advanced 546→550. No dispatches. **NOMINAL ✅**
 **Patterns:** Third consecutive clean iter at Tier 2 → **Tier 2→3 de-escalation**. System now at Tier 3 (30-min cadence). Forge opened PR #1106 (PromoteRaceTest ambient-feed isolation fix; full suite PASS, 10274 tests, 0 new failures). Mirror dispatch expected imminently; PR age will cross 30min threshold in next cycle if Mirror not dispatched. Check III threshold proposals (Aug 9) still outstanding. SUPABASE_SERVICE_ROLE_KEY rotation due ~2026-08-22 (~11.5d).
 
 **Tier end-of-iter:** **Tier 3** (de-escalated from Tier 2; consecutive_clean=0; no further de-escalation tier exists).
-
----
-
-## Iteration ~9097 — 2026-08-10T22:33Z UTC (Larry /cycle chat, Tier 2 [Check 0: repair-watermark repaired=false (wm=546, fl=546), 0 new alerts NOMINAL ✅; Check 1: NOMINAL ✅; Check 2: NOMINAL ✅; Check 3: CLEAN ✅ (no stalls); Check 4: NOMINAL ✅ (pending=0); Check 5: NOMINAL ✅; ALL CLEAN → Tier 2, consecutive_clean=2])
-
-**Health:** ✅ NOMINAL — all checks clear. Tier 2, consecutive_clean=2.
-
-**VERIFY-BEFORE-REASSERT (from iter ~9096 at ~22:18Z UTC 2026-08-10):**
-- **"watermark 546, 0 new alerts NOMINAL ✅"**: CONFIRMED — repair-watermark repaired=false (wm=546, fl=546). 0 new alerts this iter. ✅
-- **"system-health overall=healthy, all 4 bots alive"**: CONFIRMED — ts=2026-08-10T22:26:16Z UTC (fresh ~7min at check); all 4 bots alive=True (beacon/forge/mirror/pulse, action=noop each). ✅
-- **"HEAD=e08a6132==origin/main"**: UPDATED — HEAD=40a9b98b (chore(missions): autoregister healer — reconcile proposed lane)==origin/main (clean tree, up to date). ✅
-- **"Check 3 CLEAN ✅ (no stalls)"**: CONFIRMED — "no stalls detected" 22:31:02Z UTC. ✅
-- **"pending=0"**: CONFIRMED — pending=0. ✅
-- **"Tier 2 (consecutive_clean=1)"**: UPDATED — consecutive_clean advances to 2 this clean iter. One more clean iter triggers de-escalation to Tier 3. ✅
-- **"0 open PRs"**: CONFIRMED — [] (both repos). ✅
-- **"approvals-informational-cards-spec-001 Forge dispatch in-flight"**: UPDATED — Forge inbox now has `build-promoterace-ambient-feed-isolation-001.json` (PromoteRaceTest ambient-feed flake fix, source=beacon, phase=build; separate from informational cards task); informational cards dispatch still not producing a PR. [WATCH FOR FORGE DISPATCH]
-
-**Check 0 — Alert triage (~22:31Z UTC):** repair-watermark repaired=false (old_watermark=546, file_length=546). Watermark current. **0 new alerts** above watermark 546. No triage actions.
-**NOMINAL ✅**
-
-**Check 1 — Log noise (~22:26Z UTC [system-health ts]):** system-health.json ts=2026-08-10T22:26:16Z UTC (fresh ~7min at check); overall=healthy; all 4 bots alive=True (beacon/forge/mirror/pulse, action=noop each). 0 WARN/ERROR.
-**NOMINAL ✅**
-
-**Check 2 — Telegram sweep (~22:31Z UTC):** beacon_telegram_bot.log tail: most recent entry [2026-08-10T14:20:45-0600]=20:20:45Z UTC (6h reminder for pulse-auto-ddb5d10e28-20260810). No Larry directives in last 4h window (22:31Z back to 18:31Z UTC). No agent-distress keywords.
-**NOMINAL ✅**
-
-**Check 3 — Pipeline stall (~22:31Z UTC):** heal_pipeline_stall.py --dry-run → "no stalls detected" (22:31:02Z UTC). Pipeline clean.
-**CLEAN ✅**
-
-**Check 4 — Pending directives (~22:31Z UTC):** `~/agents/state/beacon-pending-approvals.json` (key=`pending`): **pending=0**. No new approval_requests since last iter.
-**NOMINAL ✅**
-
-**Check 5 — Stale daemon code (~22:31Z UTC):** `~/agents/blackboard/heal-stale-daemon-code.heartbeat`: 2026-08-10T22:30:35Z UTC (~1min before check). Within 60min threshold.
-**NOMINAL ✅**
-
-**Check A — Source repo (~22:31Z UTC):** branch=main, clean tree, HEAD=40a9b98b (chore(missions): autoregister healer — reconcile proposed lane)==origin/main (up to date, behind=0, ahead=0). **NOMINAL ✅**
-**Check B — Sync health (~22:31Z UTC):** agent-core-sync.json: last_sync=2026-08-10T21:36:10Z UTC (~55min ago; status=no-change, consecutive_push_failures=0). Within 2h threshold. **NOMINAL ✅**
-**Check C — Agent liveness (~22:26Z UTC):** system-health.json (same read); all 4 bots alive=True (beacon/forge/mirror/pulse, action=noop each). **NOMINAL ✅**
-**Check E — PR/merge state (~22:31Z UTC):** ourliberty-agent-core: **0 open PRs**. ourliberty-dashboard: **0 open PRs**. **CLEAN ✅**
-**Check H — Forge digest (~22:31Z UTC):** Forge inbox has 1 active task: `build-promoterace-ambient-feed-isolation-001.json` (PromoteRaceTest ambient-feed flake fix; source=beacon, phase=build, target_repo=ourliberty-agent-core; in-flight per MEMORY: PromoteRace false-BLOCK real cause found). No stall detected. **NOMINAL ✅**
-
-**§5.0 one-shots:** audit_due_nudge.py → no committed audit baseline; no-op. distill_detector.py → no un-distilled audits; no-op. audit_cadence_signal.py (review/distill/) → no post-seed decision-grade distill artifacts; no-op (stable pattern). silence_file_auditor.py → 7 silence files (3 expired: transcript-not-persisted tier1/tier2 for agent-runner-forge + tier1 for agent-runner-pulse; 4 permanent heal-pipeline-stall entries), all 0-suppressed. (Same 3 expired as iter ~9096; consistent.) **NOMINAL ✅**
-**§5 periodic — Check I:** check-i-2026-08-10.json already processed (iter ~9034). Next expected ~Aug 12 (Wed). **PROCESSED ✅**
-**§5 periodic — Check III:** latest=check-iii-2026-08-09.json (Aug 9, ON-WEEK). **ACTIVE ⚠️ — 4 proposals (applied=False), DM sent 2026-08-09T10:43:48-0600=16:43:48Z UTC. Awaiting Larry approval.**
-  - (beacon, _default): 232s → 286s (n=632, Δ=+23%)
-  - (forge, _default): 1232s → 1748s (n=16, Δ=+42%)
-  - (mirror, _default): 1311s → 1387s (n=398, Δ=+6%)
-  - (pulse, _default): 262s → 171s (n=16, Δ=-35%)
-  To approve: `approve threshold-update-2026-08-09` on Telegram. Next Check III expected ~2026-08-23.
-**§5 periodic — Check XIV:** check-xiv-2026-08-10.json (latest artifact; processed iter ~9072). **PROCESSED ✅**
-**§5 periodic — Check VIII:** already_deprecated. **QUIET ✅**
-
-**Rotations (~22:33Z UTC):** SUPABASE_SERVICE_ROLE_KEY: last_dm=2026-08-03T22:52:32Z UTC (~7.0d ago); 14d dedup window expires ~2026-08-17 (~6.9d remaining); next rotation due=2026-08-22 (~11.5d). No new DM. All other credentials: 2027+ (>60 days remaining). ✅
-
-**G-rule tracking:**
-- `sync-service-deploy-restart-head-drift-tier4-no-translation-001` **CLOSED ✅ (iter ~8897)**: 0 new occurrences (watermark 546). [carry ✅]
-- `pulse-triage-self-report-should-be-tier3-001` **RESOLVED ✅**: 0 bounce-backs this iter. [carry ✅]
-- `pulse-check-xiv-tier4-no-translation-001` **CLOSED ✅**: PR#1101 merged. [carry ✅]
-- `heal-pipeline-stall-unrouted-pr-stranded-tier4-no-translation-001` **CLOSED ✅**: PR#1103 merged. [carry ✅]
-- `medic-diagnosis-subject-specific-tier4-no-translation-001` **CLOSED ✅**: PR#1104 merged. [carry ✅]
-- `outbox-notifier-approval-request-tier4-no-translation-001` **FALSE PREMISE CLOSED**: translation `approval_request` key exists (PR#491). [carry ✅]
-- `approvals-informational-cards-spec-001` **SPEC IN MAIN (PR#1102)**: Forge inbox now has promoterace flake fix (separate task); informational cards dispatch still not producing a PR. [WATCH FOR FORGE DISPATCH]
-- `heal-approvals-surface-drift-tier4-nonbinary-001` **DISPATCHED (iter ~8237)**: 0 new missing_card alerts above watermark 546. [DISPATCHED → WATCH]
-- `isolation-gauge-order-fragile-test-tier4-no-translation-001` **[1/3]**: 0 new occurrences above watermark 546. [WATCH → 2 more for dispatch]
-- `enable-pr-auto-merge-reviewdecision-guard-001` [1/3]: 0 open PRs. [WATCH → 2 more for dispatch]
-- `heal-pipeline-stall-no-mirror-dispatch-tier4-no-translation-001` [1/3]: 0 new occurrences (watermark 546). [WATCH → 2 more for dispatch]
-- `alert-retraction-no-translation-001` **[2/3]**: repair-watermark repaired=false (no file-shrink this iter); still at [2/3]. [WATCH → 1 more for dispatch]
-- `source-beacon-notifications-tier4-no-translation` [2/3]: 0 new occurrences (watermark 546). [WATCH → 1 more for dispatch]
-- `ourliberty-health-dirty-tree-structural-artifact-001` [1/3]: 0 new dirty-tree alerts (watermark 546). [WATCH → 2 more for dispatch]
-- `journal-write-gap-post-prime-ledger-write-001` [1/3]: no new occurrence. [WATCH → 2 more for dispatch]
-- `outbox-notifier-approval-request-task-id-subject-tier4-001` **[1/3]** (iter ~9035): 0 new occurrences this iter (watermark 546). [WATCH → 2 more for dispatch]
-
-**Actions taken:**
-- Check 0: 0 new alerts; watermark current at 546. No triage actions.
-- §5.0 one-shots: all no-ops.
-- PRIME DIRECTIVE: `iter_clean` liveness heartbeat appended (ts=2026-08-10T22:33:26Z UTC, tier=2, kind=iter_clean). No intervention row (clean iter). Ratio unchanged.
-- Tier state: `cycle_tier_state.py record --checks-clean true` → **Tier 2** (consecutive_clean=2, last_signal_at=2026-08-10T21:38:28Z UTC). One more clean iter needed to de-escalate to Tier 3.
-
-**Escalations:** No new Pulse-initiated DMs this iter. Larry has outstanding: (1) Check III threshold proposals (4 proposals, applied=False, DM sent 2026-08-09T16:43:48Z UTC; `approve threshold-update-2026-08-09`). (2) Check I proposal: `notify-graduation-auto-merge-clean-pr` 12.7σ anomaly (DM delivered idx=543 2026-08-10T14:17:35Z UTC).
-
-**PRIME DIRECTIVE (post-action):** interventions=2633 (trailing 30d), systemic_fixes=26, ratio=101.27, trend=worsening. Clean iter — no new intervention appended. Ratio improvement requires systemic_fix commits.
-
-**Patterns:** Second consecutive clean iter at Tier 2 (consecutive_clean=2; 1 more clean iter to de-escalate to Tier 3). Forge has PromoteRaceTest ambient-feed flake fix in-flight (build-promoterace-ambient-feed-isolation-001.json). Informational cards dispatch still pending Forge PR. Check III threshold proposals (Aug 9) outstanding. SUPABASE_SERVICE_ROLE_KEY rotation due ~2026-08-22 (~11.5d). No new signals.
-
-**Tier end-of-iter:** **Tier 2** (consecutive_clean=2; 1 more clean iter needed to de-escalate to Tier 3).
 
 ---
 
