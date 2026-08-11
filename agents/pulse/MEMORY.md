@@ -6,9 +6,9 @@
 
 ---
 
-## G-rule automated-cycle-no-journal-entry-001 — 1/3 (new, iter ~9135, 2026-08-11T10:35Z UTC)
+## G-rule automated-cycle-no-journal-entry-001 — 2/3 (updated iter ~9136, 2026-08-11T11:03Z UTC)
 
-**Rule:** Automated systemd-driven cycle committed (commit 0a94d9cb, "Pulse cycle 20260811T100250Z", 10:02:50Z UTC) and updated cycle-tier.json (consecutive_clean 4→5, last_updated=09:59:59Z) but wrote NO journal entry to cycle-journal.md. The cycle functioned (Check 0 watermark auto-repair, tier-state update all confirmed), but the journal write was skipped. First occurrence: iter ~9135 (discovered at 2026-08-11T10:35Z UTC). Possible cause: LLM session exited before journal write; or run_cycle.sh committed mid-session before journal was appended. Fix candidates: (a) wrapper should verify journal was written (check that cycle-journal.md mtime > cycle start) before committing; (b) add a sentinel/stub journal line as first write in cycle before expensive checks run. Dispatch to Beacon at 3/3.
+**Rule:** Automated systemd-driven cycles commit and update cycle-tier.json but write NO journal entry to cycle-journal.md. Two confirmed occurrences: (1) commit 0a94d9cb ("Pulse cycle 20260811T100250Z", 10:02:50Z UTC) — consecutive_clean 4→5 recorded, no journal entry; (2) commit d04002a3 ("Pulse cycle 20260811T103900Z", 10:39Z UTC) — consecutive_clean 6 recorded (iter ~9135 was last written by Larry /cycle at 10:35Z), no journal entry. The cycles function correctly (Check 0 watermark auto-repair, tier-state update confirmed), but journal write is skipped. Possible cause: LLM session exits before journal write; or run_cycle.sh commits mid-session before journal is appended. Fix candidates: (a) wrapper should verify cycle-journal.md mtime > cycle start before committing; (b) add a sentinel/stub journal line as first write in cycle before expensive checks run. Dispatch to Beacon at 3/3.
 
 ---
 
