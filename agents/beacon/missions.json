@@ -19460,7 +19460,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-08-11T15:34:17.473260+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-08-11T15:31:39.332387+00:00"
+      "orphan_last_activity_ts": "2026-08-11T15:31:39.332387+00:00",
+      "briefing": {
+        "what": "A fix that stops your alert system from re-flagging things it already sent you, which had been generating 99 duplicate escalations.",
+        "why": "Duplicate alerts bury the notifications that actually need you, so you either waste time re-reading the same item or miss a real one.",
+        "suggest": "Approve it, but ask for confirmation afterward that genuinely new alerts still reach you \u2014 the change works by suppressing messages, so it's worth verifying nothing real got silenced."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-11T15:38:03.523904+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
