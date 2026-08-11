@@ -19339,6 +19339,23 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-approvals-informational-cards-impl-gap",
+      "name": "Approvals Informational Cards Impl Gap",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `approvals-informational-cards-impl-gap`. Last activity 2026-08-11T00:20:24.912048+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "approvals-informational-cards-impl-gap"
+      ],
+      "repo": null,
+      "created": "2026-08-11",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-11T00:28:45.297931+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-11T00:20:24.912048+00:00"
     }
   ]
 }
