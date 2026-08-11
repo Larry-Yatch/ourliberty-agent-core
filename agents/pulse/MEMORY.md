@@ -6,9 +6,9 @@
 
 ---
 
-## G-rule automated-cycle-no-journal-entry-001 — 2/3 (updated iter ~9136, 2026-08-11T11:03Z UTC)
+## G-rule automated-cycle-no-journal-entry-001 — DISPATCHED ✅ (iter ~9137, 2026-08-11T15:02Z UTC)
 
-**Rule:** Automated systemd-driven cycles commit and update cycle-tier.json but write NO journal entry to cycle-journal.md. Two confirmed occurrences: (1) commit 0a94d9cb ("Pulse cycle 20260811T100250Z", 10:02:50Z UTC) — consecutive_clean 4→5 recorded, no journal entry; (2) commit d04002a3 ("Pulse cycle 20260811T103900Z", 10:39Z UTC) — consecutive_clean 6 recorded (iter ~9135 was last written by Larry /cycle at 10:35Z), no journal entry. The cycles function correctly (Check 0 watermark auto-repair, tier-state update confirmed), but journal write is skipped. Possible cause: LLM session exits before journal write; or run_cycle.sh commits mid-session before journal is appended. Fix candidates: (a) wrapper should verify cycle-journal.md mtime > cycle start before committing; (b) add a sentinel/stub journal line as first write in cycle before expensive checks run. Dispatch to Beacon at 3/3.
+**Rule:** Automated systemd-driven cycles commit and update cycle-tier.json but write NO journal entry to cycle-journal.md. Additionally confirmed: automated cycles advance larry-alerts.jsonl watermark without running per-alert triage classification (deploy-notifier:ERROR at line ~541 watermark-advanced but never entered alert-triage.json). Both issues share root cause: cycle session exits before completing the Check 0 triage + journal-write phase. 5+ occurrences confirmed (commits 0a94d9cb, d04002a3 per iter ~9136; plus ~13:19Z, ~13:54Z, ~14:24Z UTC 2026-08-11). **DISPATCHED:** direction-ask-automated-cycle-journal-gap-001.json written to Beacon inbox (iter ~9137, 15:02Z UTC). Awaiting Beacon spec + Forge PR. Fix candidates: (a) wrapper verify cycle-journal.md mtime > cycle start before committing; (b) sentinel stub journal write as first cycle action; (c) Check 0 triage loop must run before watermark advance. **Do NOT re-dispatch.**
 
 ---
 
