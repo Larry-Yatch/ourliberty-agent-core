@@ -32905,3 +32905,31 @@ Watermark advanced 557→558. **CLEAN** (Tier-3 carve-out; no tier-reset).
 
 ---
 
+## Iteration ~9143 — 2026-08-11T15:07Z UTC (Larry /cycle chat, Tier 2 NON-CLEAN [Check 0: wm=566=fl=566, 0 new alerts; Checks 1-5: NOMINAL; G-rule outbox-notifier-approval-request-task-id-subject-tier4-001 3/3 → DISPATCH; deploy-notifier G-rule 2/3])
+
+**Health:** ⚠️ Non-clean — G-rule `outbox-notifier-approval-request-task-id-subject-tier4-001` hit 3/3 → dispatched to Beacon. `deploy-notifier-vercel-build-failed-tier4-no-translation-001` hit 2/3.
+
+- `deploy-notifier-vercel-build-failed-tier4-no-translation-001` [2/3]: 0 new occurrences (wm=566=fl=566). [WATCH → 2 more for dispatch]
+
+**Actions taken:**
+- Check 0: watermark no-op (wm=566=fl=566, 0 new alerts).
+- §5.0 one-shots: all no-op.
+- PRIME DIRECTIVE: iter_clean liveness heartbeat appended (ts=2026-08-11T07:08:20Z UTC, tier=2, kind=iter_clean).
+- Tier state: `cycle_tier_state.py record --checks-clean true` → **Tier 2**, consecutive_clean=2 (1 more clean Tier-2 iter needed for Tier 3 de-escalation).
+
+**Escalations:** None this iter. Outstanding items (carried from iter ~9127):
+1. RSDPM PR#216 (feat/m13-transcript-jump) — Vercel build FAILED (bot idx=565, 05:46Z UTC) + OPEN, reviewDecision="". DM'd idx=561 (03:19:47Z UTC). Cooldown active. Carry.
+2. Check III threshold proposals (`approve threshold-update-2026-08-09`). Carry.
+3. Check I proposal: notify-graduation-auto-merge-clean-pr 12.7σ anomaly (DM idx=543). Carry.
+4. alert-translations-unrouted-pr-nudges-retired-001 approval (`approve alert-translations-unrouted-pr-nudges-retired-001`). Carry.
+5. Informational-cards impl gap (escalated iter ~9102; awaiting Larry response). Carry.
+6. mirror-queue-wait-gauge readiness signal (idx=560) — decide: raise Mirror review_slots to 3 OR cut per-review service time. Carry.
+
+**PRIME DIRECTIVE (post-action):** ratio=125.05 (systemic_fixes=21, interventions=~2626), trend=worsening. iter_clean heartbeat appended. No new intervention rows this iter.
+
+**Patterns:** Second clean iter at Tier 2 (consecutive_clean=2; 1 more needed for Tier 3). Note: silence_file_auditor now shows 7 entries (was "5" in prior iters — 3 expired transcript files now showing; no active suppressions, classification unchanged). All infra nominal. 6 outstanding Larry action-items stable.
+
+**Tier end-of-iter:** **Tier 2**, consecutive_clean=2 (1 more consecutive clean Tier-2 iter needed to de-escalate to Tier 3; any non-clean iter resets to Tier 1).
+
+---
+
