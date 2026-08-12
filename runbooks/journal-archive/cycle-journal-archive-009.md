@@ -38312,3 +38312,62 @@ Note: alert-retraction at line 559 (ts=01:09:49Z UTC, source=alert-retraction, s
 
 ---
 
+## Iteration ~9200 — 2026-08-12T20:20Z UTC (Larry /cycle chat, Tier 2 consecutive_clean=1→2 [Check 0: wm=509→510, 1 new alert (doorbell Tier-3 silence); Checks 1-5: NOMINAL ✅; PRs: 0 open; pending=4 unchanged])
+
+**Health:** ✅ Nominal — all checks clean.
+
+**VERIFY-BEFORE-REASSERT (from iter ~9185/~9186 at 04:33/05:08Z UTC):**
+- **"RSDPM PRs #228/#229/#231 MERGEABLE/CONFLICTING, label-gated"**: RE-CHECKED — 0 open PRs in ourliberty-agent-core (last merged PR#1106 2026-08-10), 0 open PRs in ourliberty-dashboard (last merged PR#161 2026-08-01), pipeline healer stalls=0. Finding is resolved; NOT carried forward. ✅
+- **"4 pending approvals aging"**: CONFIRMED — same 4 IDs (alert-translations-unrouted-pr-nudges-retired-001 ~44h, direction-ask-automated-cycle-journal-gap-001 ~29h, check0-delivered-kinds-tier3-001 ~29h, pending-approvals-wrong-path-guard-001 ~20.5h). No change. ✅
+- **"All 4 bots alive"**: CONFIRMED — system-health ts=2026-08-12T20:11:10Z, overall=healthy. ✅
+- **"wm=565→566"**: NOT VERIFIED as stated — automated cycles ran since ~9186; current state is wm=509→510 (file was compacted, watermark advanced by automated cycles). ✅ (state is correct and current)
+
+**Check 0 (Alert triage):** repair-watermark repaired=false (old_wm=509, fl=510). 1 new alert at line 510: `source=doorbell, kind=notification, intent=doorbell` — "4 items need your call" (4 pending approvals). `triage-alert` → Tier 3 (known-pattern silence). Watermark advanced to 510. `nominal`.
+
+**Check 1 (Log noise):** No WARN/ERROR in systemd logs (1h scan). `nominal`.
+
+**Check 2 (Telegram sweep):** Last bot errors are 2026-08-10T19:16-19:19 MDT (~48h+ ago — HTTP 429/502 self-resolved). No Larry directives or agent distress in last 4h. `nominal`.
+
+**Check 3 (Chain events / stall):** heal-pipeline-stall-state.json — stalls=0. `nominal`.
+
+**Check 4 (Pending directives):** 4 pending approvals in beacon-pending-approvals.json (same 4 as above). No orphan Larry directives. Doorbell already fired at 20:08Z. `nominal`.
+
+**Check 5 (Stale daemon):** heal-stale-daemon-code.heartbeat=2026-08-12T20:06:07Z (~14 min old). Fresh. `nominal`.
+
+**Check A (Repo):** On main, clean, up-to-date with origin/main (HEAD=e7e5d475). `nominal`.
+
+**Check B (Sync):** last_sync=2026-08-12T19:39:36Z (~41 min ago), status=no-change. Under 2h threshold. `nominal`.
+
+**Check C (Bot liveness):** All 4 bots alive (beacon, forge, mirror, pulse). disk=21%, memory=17%. `nominal`.
+
+**Check E (PR state):** 0 open PRs in ourliberty-agent-core, 0 open PRs in ourliberty-dashboard. `nominal`.
+
+**§5.0 one-shots:** audit_due_nudge=no-op. distill_detector=no-op. silence_file_auditor=7 files, 3 expired TTL (agent-runner-forge:transcript-not-persisted:tier1/tier2, agent-runner-pulse:transcript-not-persisted:tier1, 62.6d old, 0 suppressions — non-urgent cleanup). `nominal`.
+
+**G-rules (carry-forward, no new triggers this iter):**
+- `deploy-notifier-vercel-build-failed` [2/3]: 0 new occurrences. Dispatch at 3/3.
+- `mirror-queue-wait-gauge-third-review-slot-readiness` [1/3]: 0 new occurrences.
+- `source-beacon-notifications-tier4` [2/3]: 0 new occurrences.
+- `enable-pr-auto-merge-reviewdecision-guard` [1/3]: 0 open T0 PRs this iter.
+- `heal-pipeline-stall-no-mirror-dispatch` [1/3]: 0 new occurrences.
+
+**Actions taken:**
+- Check 0: repair-watermark no-op. 1 new alert (doorbell-20260812T200823Z) triaged Tier 3, resolved; watermark advanced 509→510.
+- §5.0 one-shots: all no-op.
+- PRIME DIRECTIVE: iter_clean heartbeat appended (ts=2026-08-12T20:20:23Z UTC, tier=2, kind=iter_clean).
+- Tier state: `cycle_tier_state.py record --checks-clean true` → consecutive_clean=1→2, Tier 2.
+
+**Escalations:** None this iter. Outstanding items (carried):
+1. `alert-translations-unrouted-pr-nudges-retired-001`: ~44h pending. Awaiting Larry approval.
+2. `direction-ask-automated-cycle-journal-gap-001`: ~29h pending. Awaiting Larry approval.
+3. `check0-delivered-kinds-tier3-001`: ~29h pending. Awaiting Larry approval.
+4. `pending-approvals-wrong-path-guard-001`: ~20.5h pending. Awaiting Larry approval.
+
+**PRIME DIRECTIVE (post-action):** ratio=131.3 (30d: systemic_fixes=20, trend=worsening). iter_clean heartbeat appended. No new intervention or systemic_fix rows this iter.
+
+**Patterns:** System clean and holding. RSDPM PRs from prior iter fully resolved (0 open PRs in both T0 repos). 4 pending approvals aging on dashboard awaiting Larry action. Tier 2 consecutive_clean=2; one more clean iter → Tier 3.
+
+**Tier end-of-iter:** **Tier 2**, consecutive_clean=2 (1 more clean Tier-2 iter → de-escalate to Tier 3).
+
+---
+
