@@ -16153,7 +16153,10 @@
         "at": "2026-07-30T00:15:21.218871+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-08-13T00:03:06.704661+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-larry-reject-81b53b9223a5276d905572d405b835ac4a2e56c5",
@@ -16184,7 +16187,10 @@
         "at": "2026-07-30T00:35:27.604975+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-08-13T00:03:06.704661+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-pr-ourliberty-agent-core-1060",
@@ -16285,7 +16291,10 @@
         "at": "2026-07-30T01:05:34.512811+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-08-13T00:03:06.704661+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-deep-review-hold-pr161-d4827b88",
@@ -16351,7 +16360,10 @@
         "at": "2026-07-30T01:15:34.216788+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-08-13T00:03:06.704661+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-larry-reject-e0d5ca1b372a8ebebe488d5b36870c673ded8296",
@@ -16382,7 +16394,10 @@
         "at": "2026-07-30T01:15:34.216788+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-08-13T00:03:06.704661+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-pr-RSDPM-167",
@@ -16483,7 +16498,10 @@
         "at": "2026-07-30T01:35:40.541993+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-08-13T00:03:06.704661+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-pr-RSDPM-164",
@@ -16549,7 +16567,10 @@
         "at": "2026-07-30T02:16:17.117310+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-08-13T00:03:06.704661+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-pr-RSDPM-166",
@@ -16615,7 +16636,10 @@
         "at": "2026-07-30T02:16:17.117310+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-08-13T00:03:06.704661+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-gh-unavailable",
@@ -16646,7 +16670,10 @@
         "at": "2026-07-30T02:16:17.117310+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-08-13T00:03:06.704661+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-deep-review-hold-pr1060-c9eb3c85",
@@ -16677,7 +16704,10 @@
         "at": "2026-07-30T02:36:18.813954+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-08-13T00:03:06.704661+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "merge-verb-operator-action",
@@ -16724,7 +16754,10 @@
         "at": "2026-07-30T02:46:20.035187+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-08-13T00:03:06.704661+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-pr-ourliberty-agent-core-1066",
@@ -16790,7 +16823,10 @@
         "at": "2026-07-30T04:07:06.518084+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-08-13T00:03:06.704661+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-delegate-died-surface-001",
@@ -16856,7 +16892,10 @@
         "at": "2026-07-30T16:56:17.821785+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-08-13T00:03:06.704661+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-deep-review-hold-pr1067-8113067f",
@@ -16887,7 +16926,10 @@
         "at": "2026-07-30T17:36:23.549722+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-08-13T00:03:06.704661+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-deep-review-hold-pr1068-35e8f434",
@@ -16918,7 +16960,10 @@
         "at": "2026-07-30T18:36:44.489918+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-08-13T00:03:06.704661+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-deep-review-hold-pr1068-b6cbae9e",
@@ -16949,7 +16994,10 @@
         "at": "2026-07-30T19:37:06.411989+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-08-13T00:03:06.704661+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-delegate-cap-approvals-freshness-1-3-add-an-optional-freshnes-582f",
@@ -16980,7 +17028,10 @@
         "at": "2026-07-30T19:57:17.881193+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-08-13T00:03:06.704661+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-delegate-cap-promoted-larry-alert-cards-1060-skips-them-and-n-7629",
@@ -17011,7 +17062,10 @@
         "at": "2026-07-30T19:57:17.881193+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-08-13T00:03:06.704661+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-approvals-freshness-1-schema-evaluator-001",
