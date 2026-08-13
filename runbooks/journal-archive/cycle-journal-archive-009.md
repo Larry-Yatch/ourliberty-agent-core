@@ -42254,3 +42254,99 @@ Watermark set to 508. **CLEAN ✅** (no tier-reset from Check 0)
 
 ---
 
+## Iteration ~9223 — 2026-08-12T20:03Z UTC (Larry /cycle chat, Tier 2 consecutive_clean=0→1 [Check 0: wm=509=fl=509, 0 new alerts; Checks 1-5: NOMINAL ✅; Check E: RSDPM PR#233 CLEAN label-gated cooldown-active; pending=4, item-1 at ~43.9h critical])
+
+**Health:** ✅ Nominal — all checks clean. **Tier 2**, consecutive_clean=0→1 (2 more clean iters needed to de-escalate to Tier 3).
+
+**VERIFY-BEFORE-REASSERT (from iter ~9222 at 19:43Z UTC):**
+- **"wm=509=fl=509, 0 new alerts"**: CONFIRMED — repair-watermark: repaired=false (old_wm=509, fl=509). ✅
+- **"system-health all 4 bots alive"**: CONFIRMED — ts=2026-08-12T20:00:44Z UTC (~3 min at check), all 4 bots alive=True (beacon, forge, mirror, pulse). ✅
+- **"HEAD=7a71b013=origin/main"**: UPDATED → HEAD=84f3acd1=origin/main (Pulse cycle 20260812T194444Z — automated cycle; G-rule `automated-cycle-no-journal-entry-001` CONFIRMED ACTIVE). ✅
+- **"beacon-pending-approvals.json: PRESENT, pending=4"**: CONFIRMED — pending=4 (item-1 now ~43.9h). ✅
+- **"Tier 1→2 DE-ESCALATED, consecutive_clean=0"**: CONFIRMED — tier=2, consecutive_clean=0 at iter start. ✅
+- **"PR#233 CLEAN label-gated cooldown-active"**: CONFIRMED — MERGEABLE (rd='', labels=[], updatedAt=2026-08-12T19:52:54Z UTC). Cooldown active. ✅
+- **"heal-stale-daemon-code heartbeat 19:35:35Z UTC"**: UPDATED — heartbeat ts=2026-08-12T19:55:44Z UTC (~7 min at check). ✅
+- All other DISPATCHED/CLOSED G-rules: CONFIRMED via 0 new alerts above watermark. ✅
+
+**Check 0 — Alert triage (~20:03Z UTC):** repair-watermark: repaired=false (old_wm=509, fl=509). 0 new alerts above watermark. No triage action.
+**CLEAN ✅** (no tier-reset from Check 0)
+
+**Check 1 — Log noise (~20:03Z UTC):** outbox-notifier.log last entry [2026-08-12 12:18:18 MDT = 18:18:18Z UTC] — marker-notified beacon <- mirror (review-pass, notify-pr-RSDPM-231.json). ~102 min old. No new WARNs/ERRORs. Idleness expected post-RSDPM#231 merge.
+**NOMINAL ✅**
+
+**Check 2 — Telegram sweep (~20:03Z UTC):** beacon_telegram_bot.log last entry [2026-08-12T13:10:45-0600 = 19:10:45Z UTC] — alert idx=508 delivered (heal-approvals-surface-drift:missing_card). ~52 min old. No Larry directives in last 4h.
+**NOMINAL ✅**
+
+**Check 3 — Pipeline stall (~20:03Z UTC):** heal_pipeline_stall.py --dry-run: suppressed (cooldown): unrouted_open_pr:Larry-Yatch/RSDPM:233. DRY-RUN: 0 alert(s) would fire.
+**NOMINAL ✅**
+
+**Check 4 — Pending directives (~20:03Z UTC):** beacon-pending-approvals.json: PRESENT, pending=4:
+1. **~43.9h pending** ← CRITICAL AGE (alert-translations-unrouted-pr-nudges-retired-001, created 2026-08-11T00:08:30Z)
+2. ~28.8h pending (direction-ask-automated-cycle-journal-gap-001)
+3. ~28.5h pending (check0-delivered-kinds-tier3-001)
+4. ~20.3h pending (pending-approvals-wrong-path-guard-001)
+**NOMINAL ✅**
+
+**Check 5 — Stale daemon code (~20:03Z UTC):** heal-stale-daemon-code.heartbeat ts=2026-08-12T19:55:44Z UTC (~7 min at check; within expected 10-min timer interval).
+**NOMINAL ✅**
+
+**Check A — Source repo (~20:03Z UTC):** branch=main, clean tree, HEAD=84f3acd1=origin/main (ahead=0, behind=0). **NOMINAL ✅**
+**Check B — Sync health:** agent-core-sync.json: last_sync=2026-08-12T19:39:36Z (~23 min at check; status=no-change). Within 2h threshold. **NOMINAL ✅**
+**Check C — Agent liveness (~20:03Z UTC):** system-health.json ts=2026-08-12T20:00:44Z UTC (~3 min at check), all checks ok, disk=21%, memory=20%. All 4 bots alive=True (beacon, forge, mirror, pulse). **NOMINAL ✅**
+**Check E — PR/merge state:** 0 open PRs in ourliberty-agent-core. RSDPM: PR#233 (`M17: the rejected workbench`, feat/m17-rejected-workbench) **MERGEABLE** (rd='', labels=[], updatedAt=2026-08-12T19:52:54Z UTC). Label-gated; reviewDecision guard blocks Pulse auto-merge (G-rule `enable-pr-auto-merge-reviewdecision-guard-001`). Stall alert delivered (idx=506, 2026-08-12T18:35:26Z UTC), cooldown active. **CLEAN ✅**
+
+**§5.0 one-shots:** audit_due_nudge → no-op. distill_detector → no-op. audit_cadence_signal (review/distill/) → no-op. **NOMINAL ✅**
+**§5 periodic — Check I:** check-i-2026-08-12.json already fired today (08:11 local). No new artifact. **FIRED ✅ (prior iter)**
+**§5 periodic — Check III:** latest=check-iii-2026-08-09.json (ON-WEEK, 4 proposals). Awaiting Larry approval (`approve threshold-update-2026-08-09`). **ACTIVE ⚠️**
+**§5 periodic — Check VIII:** already_deprecated. **QUIET ✅**
+
+**Rotations:** SUPABASE_SERVICE_ROLE_KEY next_rotation_due=2026-08-22 (~10d). Dedup window expires ~2026-08-17 (~5d). No new DM. All others 2027+ or revocation_only. ✅
+
+**G-rule tracking:**
+- `sync-service-deploy-restart-head-drift-tier4-no-translation-001` **CLOSED ✅**: 0 new occurrences. [carry ✅]
+- `pulse-triage-self-report-should-be-tier3-001` **RESOLVED ✅**: 0 bounce-backs. [carry ✅]
+- `pulse-check-xiv-tier4-no-translation-001` **CLOSED ✅**: PR#1101 merged. [carry ✅]
+- `heal-pipeline-stall-unrouted-pr-stranded-tier4-no-translation-001` **CLOSED ✅**: PR#1103 merged. [carry ✅]
+- `medic-diagnosis-subject-specific-tier4-no-translation-001` **CLOSED ✅**: PR#1104 merged. [carry ✅]
+- `outbox-notifier-approval-request-tier4-no-translation-001` **FALSE PREMISE CLOSED**: translation key exists (PR#491). [carry ✅]
+- `approvals-informational-cards-spec-001` **ESCALATED (iter ~9102)**: 0 impl PRs; awaiting Larry response. [ESCALATED → AWAIT LARRY RESPONSE]
+- `heal-approvals-surface-drift-tier4-nonbinary-001` **DISPATCHED (iter ~8237)**: 0 new missing_card alerts above watermark (wm=509). [DISPATCHED → WATCH FOR IMPL]
+- `isolation-gauge-order-fragile-test-tier4-no-translation-001` [1/3]: 0 new occurrences. [WATCH → 2 more for dispatch]
+- `enable-pr-auto-merge-reviewdecision-guard-001` [1/3]: 0 new T0 unreviewed auto-merges this iter. [WATCH → 2 more for dispatch]
+- `heal-pipeline-stall-no-mirror-dispatch-tier4-no-translation-001` [1/3]: 0 new occurrences. [WATCH → 2 more for dispatch]
+- `alert-retraction-no-translation-001` **[3/3] → DISPATCHED (iter ~9100)**: 0 new occurrences above watermark. Approval `alert-translations-unrouted-pr-nudges-retired-001` pending ~43.9h. [DISPATCHED → PENDING LARRY APPROVAL ← CRITICAL AGE]
+- `source-beacon-notifications-tier4-no-translation` [2/3]: 0 new occurrences. [WATCH → 1 more for dispatch]
+- `ourliberty-health-dirty-tree-structural-artifact-001` [1/3]: 0 new dirty-tree alerts. [WATCH → 2 more for dispatch]
+- `journal-write-gap-post-prime-ledger-write-001` [1/3]: no new occurrence. [WATCH → 2 more for dispatch]
+- `outbox-notifier-approval-request-task-id-subject-tier4-001` **[DISPATCHED ✅ iter ~9144]**: 0 new occurrences. [DISPATCHED → WATCH FOR FIX]
+- `mirror-queue-wait-gauge-third-review-slot-readiness-tier4-no-translation-001` [1/3]: 0 new occurrences. [WATCH → 1 more for dispatch]
+- `deploy-notifier-vercel-build-failed-tier4-no-translation-001` [2/3]: 0 new occurrences. [WATCH → 1 more for dispatch]
+- `automated-cycle-no-journal-entry-001` **DISPATCHED ✅**: CONFIRMED ACTIVE — HEAD=84f3acd1 is an automated cycle commit (20260812T194444Z; no new iter entry). direction-ask-automated-cycle-journal-gap-001 pending ~28.8h. [DISPATCHED → PENDING LARRY APPROVAL]
+- `beacon-pending-approvals-transient-missing-001` **DISPATCHED ✅ (iter ~9165)**: FILE PRESENT this iter. [DISPATCHED → PENDING LARRY DECISION]
+- `heal-stale-daemon-code-heartbeat-substrate-missing-001` **CLOSED — FALSE PREMISE**: heartbeat PRESENT at blackboard/ (ts=19:55:44Z UTC). [CLOSED ✅]
+
+**Actions taken:**
+- Check 0: repair-watermark no-op (old_wm=509, fl=509). 0 new alerts; watermark unchanged at 509.
+- §5.0 one-shots: all no-op.
+- PRIME DIRECTIVE: iter_clean heartbeat appended (ts=2026-08-12T20:03:06Z UTC, tier=2, kind=iter_clean).
+- Tier state: `cycle_tier_state.py record --checks-clean true` → **tier=2, consecutive_clean=0→1**.
+
+**Escalations:** None new this iter. Outstanding items (carried):
+1. Check III threshold proposals (`approve threshold-update-2026-08-09`). Carry.
+2. Check I proposal: notify-graduation-auto-merge-clean-pr 12.7σ anomaly (DM via digest). Carry.
+3. **alert-translations-unrouted-pr-nudges-retired-001: ~43.9h pending — CRITICAL AGE.** Awaiting Larry approval. Carry.
+4. direction-ask-automated-cycle-journal-gap-001 (~28.8h pending). Carry.
+5. check0-delivered-kinds-tier3-001 (~28.5h pending). Carry.
+6. Informational-cards impl gap (escalated iter ~9102; awaiting Larry response). Carry.
+7. mirror-queue-wait-gauge readiness signal (idx=560). Carry.
+8. G-rule fix `outbox-notifier-approval-request-task-id-subject-tier4-001`: Beacon inbox dispatch (iter ~9144). Watch for fix. Carry.
+9. pending-approvals-wrong-path-guard-001 (~20.3h pending). Carry.
+
+**PRIME DIRECTIVE (post-action):** ratio=125.1 (30d: interventions=2627, systemic_fixes=21, trend=worsening). iter_clean heartbeat appended (ts=2026-08-12T20:03:06Z UTC).
+
+**Patterns:** System steady-state. Automated cycle advanced HEAD to 84f3acd1 (Pulse cycle 20260812T194444Z) without a journal entry (G-rule `automated-cycle-no-journal-entry-001` confirmed active; dispatch pending ~28.8h). PR#233 MERGEABLE/label-gated, stall cooldown active. Pending approvals queue at 4 items; item-1 now 43.9h critical. No new G-rule occurrences.
+
+**Tier end-of-iter:** **Tier 2**, consecutive_clean=1 (2 more clean iters needed to de-escalate to Tier 3).
+
+---
+
