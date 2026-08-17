@@ -18041,7 +18041,10 @@
         "at": "2026-08-03T23:55:20.938939+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-08-17T00:11:59.869596+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-delegate-cap-auto-retire-provably-merged-cards-kill-the-ack-b-9ae0",
