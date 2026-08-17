@@ -19729,6 +19729,174 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "retrospective-beacon-unknown-subject-2026-08-17",
+      "name": "retrospective beacon-unknown-subject 2026-08-17",
+      "phase": "proposed",
+      "brief": "Weekly elevation retrospective (2026-08-17) \u2014 FIX-PERMANENTLY.\n\nSignature: beacon::unknown-subject\nSource: beacon  \u00b7  subject: \nThis period: 5 fire(s), 7 week(s) recurring, trend=falling.\nResolution histogram: {'approve': 0, 'reject': 0, 'silence': 0, 'ack': 0, 'none': 5}.\n\nRationale: Approval requests arriving with an empty subject cannot route or escalate correctly; this is a beacon defect in subject stamping and silencing it would silently swallow legitimate approval flows.\n\nRecurring problem with no safe templated auto-fix \u2014 build an objective fix (spec, no code in this card). Accept to start drafting; dismiss to silence.",
+      "spec_docs": [
+        "agents/beacon/specs/alert-pipeline-rework.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-08-17",
+      "deferred_reason": null,
+      "proposed_by": "retrospective-author",
+      "proposed_at": "2026-08-17T13:03:38.809607+00:00",
+      "predraft": {
+        "classification": "fix-permanently",
+        "root_signature": "beacon::unknown-subject",
+        "count_at_proposal": 5,
+        "rationale": "Approval requests arriving with an empty subject cannot route or escalate correctly; this is a beacon defect in subject stamping and silencing it would silently swallow legitimate approval flows."
+      }
+    },
+    {
+      "id": "retrospective-deploy-notifier-deploy-notifier-2026-08-17",
+      "name": "retrospective deploy-notifier-deploy-notifier 2026-08-17",
+      "phase": "proposed",
+      "brief": "Weekly elevation retrospective (2026-08-17) \u2014 FIX-PERMANENTLY.\n\nSignature: deploy-notifier::deploy-notifier\nSource: deploy-notifier  \u00b7  subject: deploy-notifier\nThis period: 1 fire(s), 3 week(s) recurring, trend=rising.\nResolution histogram: {'approve': 0, 'reject': 0, 'silence': 0, 'ack': 0, 'none': 1}.\n\nRationale: Pure deploy-event notifications the operator has never acted on across 3 weeks; reclassifying to info suppresses elevation without losing the audit record.\n\nRecurring problem with no safe templated auto-fix \u2014 build an objective fix (spec, no code in this card). Accept to start drafting; dismiss to silence.",
+      "spec_docs": [
+        "agents/beacon/specs/alert-pipeline-rework.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-08-17",
+      "deferred_reason": null,
+      "proposed_by": "retrospective-author",
+      "proposed_at": "2026-08-17T13:03:38.834296+00:00",
+      "predraft": {
+        "classification": "fix-permanently",
+        "root_signature": "deploy-notifier::deploy-notifier",
+        "count_at_proposal": 1,
+        "rationale": "Pure deploy-event notifications the operator has never acted on across 3 weeks; reclassifying to info suppresses elevation without losing the audit record."
+      }
+    },
+    {
+      "id": "retrospective-heal-approvals-surface-drift-heal-approvals-surface-drift-2026-08-17",
+      "name": "retrospective heal-approvals-surface-drift-heal-approvals-surface-drift 2026-08-17",
+      "phase": "proposed",
+      "brief": "Weekly elevation retrospective (2026-08-17) \u2014 FIX-PERMANENTLY.\n\nSignature: heal-approvals-surface-drift::heal-approvals-surface-drift\nSource: heal-approvals-surface-drift  \u00b7  subject: heal-approvals-surface-drift\nThis period: 7 fire(s), 3 week(s) recurring, trend=falling.\nResolution histogram: {'approve': 0, 'reject': 0, 'silence': 0, 'ack': 0, 'none': 7}.\n\nRationale: The healer is correctly detecting real drift in the approvals surface caused by the still-unshipped informational-cards implementation (spec #1102 merged, three impl steps outstanding); routing it away would mask a genuine open build obligation.\n\nRecurring problem with no safe templated auto-fix \u2014 build an objective fix (spec, no code in this card). Accept to start drafting; dismiss to silence.",
+      "spec_docs": [
+        "agents/beacon/specs/alert-pipeline-rework.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-08-17",
+      "deferred_reason": null,
+      "proposed_by": "retrospective-author",
+      "proposed_at": "2026-08-17T13:03:38.782717+00:00",
+      "predraft": {
+        "classification": "fix-permanently",
+        "root_signature": "heal-approvals-surface-drift::heal-approvals-surface-drift",
+        "count_at_proposal": 7,
+        "rationale": "The healer is correctly detecting real drift in the approvals surface caused by the still-unshipped informational-cards implementation (spec #1102 merged, three impl steps outstanding); routing it away would mask a genuine open build obligation."
+      }
+    },
+    {
+      "id": "retrospective-heal-pipeline-stall-pipeline-stall-2026-08-17",
+      "name": "retrospective heal-pipeline-stall-pipeline-stall 2026-08-17",
+      "phase": "proposed",
+      "brief": "Weekly elevation retrospective (2026-08-17) \u2014 FIX-PERMANENTLY.\n\nSignature: heal-pipeline-stall::pipeline-stall\nSource: heal-pipeline-stall  \u00b7  subject: pipeline-stall\nThis period: 14 fire(s), 9 week(s) recurring, trend=falling.\nResolution histogram: {'approve': 0, 'reject': 0, 'silence': 0, 'ack': 0, 'none': 14}.\n\nRationale: The healer self-resolves every instance across 9 weeks (live_unresolved=false, falling trend) and the operator has never taken any action; routing to hold removes DM noise while preserving dashboard visibility.\n\nRecurring problem with no safe templated auto-fix \u2014 build an objective fix (spec, no code in this card). Accept to start drafting; dismiss to silence.",
+      "spec_docs": [
+        "agents/beacon/specs/alert-pipeline-rework.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-08-17",
+      "deferred_reason": null,
+      "proposed_by": "retrospective-author",
+      "proposed_at": "2026-08-17T13:03:38.747005+00:00",
+      "predraft": {
+        "classification": "fix-permanently",
+        "root_signature": "heal-pipeline-stall::pipeline-stall",
+        "count_at_proposal": 14,
+        "rationale": "The healer self-resolves every instance across 9 weeks (live_unresolved=false, falling trend) and the operator has never taken any action; routing to hold removes DM noise while preserving dashboard visibility."
+      }
+    },
+    {
+      "id": "retrospective-mirror-queue-wait-gauge-third-review-slot-readiness-2026-08-17",
+      "name": "retrospective mirror-queue-wait-gauge-third-review-slot-readiness 2026-08-17",
+      "phase": "proposed",
+      "brief": "Weekly elevation retrospective (2026-08-17) \u2014 FIX-PERMANENTLY.\n\nSignature: mirror-queue-wait-gauge::third-review-slot-readiness\nSource: mirror-queue-wait-gauge  \u00b7  subject: third-review-slot-readiness\nThis period: 1 fire(s), 7 week(s) recurring, trend=steady.\nResolution histogram: {'approve': 0, 'reject': 0, 'silence': 0, 'ack': 0, 'none': 1}.\n\nRationale: A steady queue-depth gauge that has triggered zero operator action across 7 weeks is informational telemetry, not an alert; reclassifying to info stops it from elevating.\n\nRecurring problem with no safe templated auto-fix \u2014 build an objective fix (spec, no code in this card). Accept to start drafting; dismiss to silence.",
+      "spec_docs": [
+        "agents/beacon/specs/alert-pipeline-rework.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-08-17",
+      "deferred_reason": null,
+      "proposed_by": "retrospective-author",
+      "proposed_at": "2026-08-17T13:03:38.860569+00:00",
+      "predraft": {
+        "classification": "fix-permanently",
+        "root_signature": "mirror-queue-wait-gauge::third-review-slot-readiness",
+        "count_at_proposal": 1,
+        "rationale": "A steady queue-depth gauge that has triggered zero operator action across 7 weeks is informational telemetry, not an alert; reclassifying to info stops it from elevating."
+      }
+    },
+    {
+      "id": "retrospective-outbox-notifier-auto-merge-conflict-2026-08-17",
+      "name": "retrospective outbox-notifier-auto-merge-conflict 2026-08-17",
+      "phase": "proposed",
+      "brief": "Weekly elevation retrospective (2026-08-17) \u2014 FIX-PERMANENTLY.\n\nSignature: outbox-notifier::auto-merge-conflict\nSource: outbox-notifier  \u00b7  subject: auto-merge-conflict\nThis period: 1 fire(s), 8 week(s) recurring, trend=rising.\nResolution histogram: {'approve': 0, 'reject': 0, 'silence': 0, 'ack': 0, 'none': 1}.\n\nRationale: Eight weeks at a rising frequency means the structural merge-conflict rate is increasing; silencing would mask a worsening branching or sequencing defect rather than address it.\n\nRecurring problem with no safe templated auto-fix \u2014 build an objective fix (spec, no code in this card). Accept to start drafting; dismiss to silence.",
+      "spec_docs": [
+        "agents/beacon/specs/alert-pipeline-rework.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-08-17",
+      "deferred_reason": null,
+      "proposed_by": "retrospective-author",
+      "proposed_at": "2026-08-17T13:03:38.891472+00:00",
+      "predraft": {
+        "classification": "fix-permanently",
+        "root_signature": "outbox-notifier::auto-merge-conflict",
+        "count_at_proposal": 1,
+        "rationale": "Eight weeks at a rising frequency means the structural merge-conflict rate is increasing; silencing would mask a worsening branching or sequencing defect rather than address it."
+      }
+    },
+    {
+      "id": "retrospective-pulse-approvals-informational-cards-impl-gap-2026-08-17",
+      "name": "retrospective pulse-approvals-informational-cards-impl-gap 2026-08-17",
+      "phase": "proposed",
+      "brief": "Weekly elevation retrospective (2026-08-17) \u2014 FIX-PERMANENTLY.\n\nSignature: pulse::approvals-informational-cards-impl-gap\nSource: pulse  \u00b7  subject: approvals-informational-cards-impl-gap\nThis period: 1 fire(s), 2 week(s) recurring, trend=new.\nResolution histogram: {'approve': 0, 'reject': 0, 'silence': 0, 'ack': 0, 'none': 1}.\n\nRationale: Pulse is correctly self-diagnosing an open build obligation (spec #1102 merged, three impl steps not yet shipped); the fix mission is completing the approvals informational-cards implementation.\n\nRecurring problem with no safe templated auto-fix \u2014 build an objective fix (spec, no code in this card). Accept to start drafting; dismiss to silence.",
+      "spec_docs": [
+        "agents/beacon/specs/alert-pipeline-rework.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-08-17",
+      "deferred_reason": null,
+      "proposed_by": "retrospective-author",
+      "proposed_at": "2026-08-17T13:03:38.934415+00:00",
+      "predraft": {
+        "classification": "fix-permanently",
+        "root_signature": "pulse::approvals-informational-cards-impl-gap",
+        "count_at_proposal": 1,
+        "rationale": "Pulse is correctly self-diagnosing an open build obligation (spec #1102 merged, three impl steps not yet shipped); the fix mission is completing the approvals informational-cards implementation."
+      }
+    },
+    {
+      "id": "retrospective-pulse-auto-merge-conflict-2026-08-17",
+      "name": "retrospective pulse-auto-merge-conflict 2026-08-17",
+      "phase": "proposed",
+      "brief": "Weekly elevation retrospective (2026-08-17) \u2014 FIX-PERMANENTLY.\n\nSignature: pulse::auto-merge-conflict\nSource: pulse  \u00b7  subject: auto-merge-conflict\nThis period: 1 fire(s), 2 week(s) recurring, trend=new.\nResolution histogram: {'approve': 0, 'reject': 0, 'silence': 0, 'ack': 0, 'none': 1}.\n\nRationale: Pulse independently corroborating the outbox-notifier auto-merge-conflict class confirms a structural conflict source that should be reduced, not routed around.\n\nRecurring problem with no safe templated auto-fix \u2014 build an objective fix (spec, no code in this card). Accept to start drafting; dismiss to silence.",
+      "spec_docs": [
+        "agents/beacon/specs/alert-pipeline-rework.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-08-17",
+      "deferred_reason": null,
+      "proposed_by": "retrospective-author",
+      "proposed_at": "2026-08-17T13:03:38.995078+00:00",
+      "predraft": {
+        "classification": "fix-permanently",
+        "root_signature": "pulse::auto-merge-conflict",
+        "count_at_proposal": 1,
+        "rationale": "Pulse independently corroborating the outbox-notifier auto-merge-conflict class confirms a structural conflict source that should be reduced, not routed around."
+      }
     }
   ]
 }
