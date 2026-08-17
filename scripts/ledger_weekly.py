@@ -82,6 +82,7 @@ class WeeklyReport:
     top_5_tasks: list[dict[str, Any]]
     delta_vs_prior_week: Optional[dict[str, Any]]
     sigma_flagging_active: bool
+    by_cohort: dict[str, dict[str, Any]] = field(default_factory=dict)
     rows: list[CostRow] = field(default_factory=list)
 
 
@@ -215,6 +216,62 @@ def compute_by_task_type(rows: list[CostRow]) -> dict[str, dict[str, float | int
     return out
 
 
+def cohort_key(agent: str, task_type: str) -> str:
+    """Render an (agent, task_type) cohort as a JSON-safe key.
+
+    Mirrors the `{agent}/{task_type}` form already used in the anomaly context
+    string. Consumers should read the `agent` / `task_type` fields inside each
+    bucket rather than splitting this key — an agent name containing `/` would
+    make the split ambiguous, the fields never are.
+    """
+    return f"{agent}/{task_type}"
+
+
+def compute_by_cohort(
+    rows: list[CostRow], total_usd: float
+) -> dict[str, dict[str, Any]]:
+    """Aggregate spend per (agent, task_type) cohort, with share of the week.
+
+    Why this exists (2026-08-17): σ is blind to a uniformly-expensive cohort,
+    because such a cohort IS its own baseline and every row sits at ~0σ. In the
+    week ending 2026-08-17, `pulse/cycle` was 75.7% of a $545.71 week and
+    `missions-narrator` another 18.1% — 93.8% of spend, entirely unflagged —
+    while the row that did get flagged was 0.51% of the week. `by_agent` and
+    `by_task_type` each cut one axis, so neither can express that; the cohort is
+    the grain σ already baselines on (see compute_baselines), which makes it the
+    honest unit for "where did the money actually go".
+
+    Reporting-only: nothing alerts or dispatches off this.
+    """
+    out: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        bucket = out.setdefault(
+            cohort_key(row.agent, row.task_type),
+            {
+                "agent": row.agent,
+                "task_type": row.task_type,
+                "usd": 0.0,
+                "task_count": 0,
+                "percent_of_total": 0.0,
+            },
+        )
+        bucket["usd"] += row.cost_usd
+        bucket["task_count"] += 1
+    if total_usd:
+        for bucket in out.values():
+            bucket["percent_of_total"] = bucket["usd"] / total_usd * 100.0
+    return out
+
+
+def dominant_cohort(
+    by_cohort: dict[str, dict[str, Any]]
+) -> Optional[tuple[str, dict[str, Any]]]:
+    """The cohort with the largest share, or None when there are no rows."""
+    if not by_cohort:
+        return None
+    return max(by_cohort.items(), key=lambda kv: kv[1]["usd"])
+
+
 def _load_prior_sidecars(
     output_dir: Path, week_ending: datetime, n_weeks: int
 ) -> list[dict[str, Any]]:
@@ -274,11 +331,16 @@ def compute_anomalies(
     baselines: dict[tuple[str, str], tuple[float, float, int]],
     sigma_flagging_active: bool,
     ramp_up_weeks_observed: int,
+    by_cohort: Optional[dict[str, dict[str, Any]]] = None,
 ) -> list[dict[str, Any]]:
     """Return anomaly list.
 
     When σ-flagging is suspended (insufficient baseline), returns a single
     informational entry rather than emitting potentially false-positive σ rows.
+
+    When `by_cohort` is supplied, each σ entry also carries `cohort_total_usd`
+    and `cohort_share_pct` — the context σ itself cannot provide, since a row's
+    z-score says nothing about whether its cohort is 0.8% or 75% of the week.
     """
     if not sigma_flagging_active:
         return [
@@ -306,22 +368,25 @@ def compute_anomalies(
             continue
         sigma_above = (row.cost_usd - mean) / stdev
         if sigma_above >= SIGMA_THRESHOLD:
-            out.append(
-                {
-                    "task_id": row.task_id,
-                    "agent": row.agent,
-                    "task_type": row.task_type,
-                    "cost_usd": row.cost_usd,
-                    "baseline_usd": mean,
-                    "baseline_n": baseline_n,
-                    "sigma_above": sigma_above,
-                    "context": (
-                        f"task cost ${row.cost_usd:.2f} vs ${mean:.2f} "
-                        f"baseline for {row.agent}/{row.task_type} "
-                        f"(n={baseline_n} tasks over {BASELINE_WEEKS}wk)"
-                    ),
-                }
-            )
+            entry = {
+                "task_id": row.task_id,
+                "agent": row.agent,
+                "task_type": row.task_type,
+                "cost_usd": row.cost_usd,
+                "baseline_usd": mean,
+                "baseline_n": baseline_n,
+                "sigma_above": sigma_above,
+                "context": (
+                    f"task cost ${row.cost_usd:.2f} vs ${mean:.2f} "
+                    f"baseline for {row.agent}/{row.task_type} "
+                    f"(n={baseline_n} tasks over {BASELINE_WEEKS}wk)"
+                ),
+            }
+            cohort = (by_cohort or {}).get(cohort_key(row.agent, row.task_type))
+            if cohort is not None:
+                entry["cohort_total_usd"] = cohort["usd"]
+                entry["cohort_share_pct"] = cohort["percent_of_total"]
+            out.append(entry)
     out.sort(key=lambda a: a["sigma_above"], reverse=True)
     return out
 
@@ -464,6 +529,7 @@ def compute_weekly_report(
     total_usd = sum(r.cost_usd for r in rows)
     by_agent = compute_by_agent(rows)
     by_task_type = compute_by_task_type(rows)
+    by_cohort = compute_by_cohort(rows, total_usd)
 
     prior_sidecars = _load_prior_sidecars(output_dir, week_ending, BASELINE_WEEKS)
     # The ramp-up gate still keys off prior sidecars — "has this system been
@@ -479,7 +545,9 @@ def compute_weekly_report(
         attribute_task_types(baseline_rows, outbox_root)
         baselines = compute_baselines(baseline_rows)
 
-    anomalies = compute_anomalies(rows, baselines, sigma_active, len(prior_sidecars))
+    anomalies = compute_anomalies(
+        rows, baselines, sigma_active, len(prior_sidecars), by_cohort
+    )
     retry_overhead = compute_retry_overhead(rows, total_usd)
     top_5 = compute_top_5(rows)
     # _load_prior_sidecars skips missing/corrupt weeks, so prior_sidecars[0] is
@@ -497,6 +565,7 @@ def compute_weekly_report(
         total_usd=total_usd,
         by_agent=by_agent,
         by_task_type=by_task_type,
+        by_cohort=by_cohort,
         anomalies=anomalies,
         retry_overhead=retry_overhead,
         top_5_tasks=top_5,
@@ -512,6 +581,7 @@ def compute_weekly_report(
         "delta_vs_prior_week": report.delta_vs_prior_week,
         "by_agent": report.by_agent,
         "by_task_type": report.by_task_type,
+        "by_cohort": report.by_cohort,
         "anomalies": report.anomalies,
         "retry_overhead": report.retry_overhead,
         "top_5_tasks": report.top_5_tasks,
@@ -566,6 +636,31 @@ def render_markdown(report: WeeklyReport, skipped_rows: int) -> str:
         for tt in sorted(report.by_task_type.keys()):
             b = report.by_task_type[tt]
             lines.append(f"| {tt} | ${_round2(b['usd']):.2f} | {b['task_count']} |")
+    else:
+        lines.append("_no rows_")
+    lines.append("")
+
+    lines.append("## By cohort (agent + task_type)")
+    lines.append("")
+    _dominant = dominant_cohort(report.by_cohort)
+    if _dominant is not None:
+        _key, _bucket = _dominant
+        lines.append(
+            f"**Dominant cohort:** `{_key}` — "
+            f"${_round2(_bucket['usd']):.2f} "
+            f"({_round2(_bucket['percent_of_total']):.1f}% of the week, "
+            f"{_bucket['task_count']} tasks)"
+        )
+        lines.append("")
+        lines.append("| Cohort | USD | % of total | Tasks |")
+        lines.append("|---|---:|---:|---:|")
+        for key, b in sorted(
+            report.by_cohort.items(), key=lambda kv: kv[1]["usd"], reverse=True
+        ):
+            lines.append(
+                f"| {key} | ${_round2(b['usd']):.2f} | "
+                f"{_round2(b['percent_of_total']):.1f}% | {b['task_count']} |"
+            )
     else:
         lines.append("_no rows_")
     lines.append("")

@@ -262,7 +262,8 @@ class SchemaConformanceTests(unittest.TestCase):
 
     REQUIRED_TOP_LEVEL = {
         "schema_version", "week_ending", "total_usd", "delta_vs_prior_week",
-        "by_agent", "by_task_type", "anomalies", "retry_overhead", "top_5_tasks",
+        "by_agent", "by_task_type", "by_cohort", "anomalies", "retry_overhead",
+        "top_5_tasks",
     }
 
     def setUp(self):
@@ -870,6 +871,209 @@ class DmSeverityRoutingTests(unittest.TestCase):
         }])
         _write_archive(self.outbox, "forge", "t-spike", "feature-development")
         self.assertEqual(self._run_and_capture_severity(), "warning")
+
+
+class ByCohortTests(unittest.TestCase):
+    """`by_cohort` — per-(agent, task_type) spend with share of the week."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.costs = self.root / "costs.jsonl"
+        self.outbox = self.root / "outboxes"
+        self.output_dir = self.root / "ledger"
+
+    def _multi_cohort_week(self):
+        """Three cohorts across two agents, so agent and task_type both split."""
+        rows = [
+            ("pulse", "p1", 3.0, "cycle"),
+            ("pulse", "p2", 5.0, "cycle"),
+            ("beacon", "b1", 1.0, "feature-development"),
+            ("beacon", "b2", 0.5, "notification"),
+        ]
+        _write_costs(self.costs, [{
+            "ts": "2026-05-12T10:00:00+00:00", "agent": agent,
+            "task_id": tid, "model": "claude-opus-4-7",
+            "cost_usd": cost, "source": "inbox-watcher",
+        } for agent, tid, cost, _tt in rows])
+        for agent, tid, _cost, tt in rows:
+            _write_archive(self.outbox, agent, tid, tt)
+
+    def test_percentages_sum_to_100(self):
+        self._multi_cohort_week()
+        _report, sidecar, _ = lw.compute_weekly_report(
+            WEEK_ENDING, self.costs, self.outbox, self.output_dir,
+        )
+        by_cohort = sidecar["by_cohort"]
+        self.assertEqual(len(by_cohort), 3)
+        total_pct = sum(b["percent_of_total"] for b in by_cohort.values())
+        self.assertAlmostEqual(total_pct, 100.0, places=6)
+        total_usd = sum(b["usd"] for b in by_cohort.values())
+        self.assertAlmostEqual(total_usd, sidecar["total_usd"], places=6)
+
+    def test_cohort_buckets_carry_identity_and_counts(self):
+        self._multi_cohort_week()
+        _report, sidecar, _ = lw.compute_weekly_report(
+            WEEK_ENDING, self.costs, self.outbox, self.output_dir,
+        )
+        bucket = sidecar["by_cohort"]["pulse/cycle"]
+        # agent/task_type are explicit fields — consumers never split the key.
+        self.assertEqual(bucket["agent"], "pulse")
+        self.assertEqual(bucket["task_type"], "cycle")
+        self.assertEqual(bucket["task_count"], 2)
+        self.assertAlmostEqual(bucket["usd"], 8.0, places=6)
+        self.assertAlmostEqual(
+            bucket["percent_of_total"], 8.0 / 9.5 * 100.0, places=6
+        )
+
+    def test_dominant_cohort_is_named_in_markdown(self):
+        self._multi_cohort_week()
+        report, sidecar, skipped = lw.compute_weekly_report(
+            WEEK_ENDING, self.costs, self.outbox, self.output_dir,
+        )
+        dominant = lw.dominant_cohort(sidecar["by_cohort"])
+        self.assertIsNotNone(dominant)
+        self.assertEqual(dominant[0], "pulse/cycle")
+        md = lw.render_markdown(report, skipped)
+        self.assertIn("**Dominant cohort:** `pulse/cycle`", md)
+        self.assertIn("84.2% of the week", md)  # 8.0 / 9.5
+
+    def test_empty_week_has_no_dominant_cohort(self):
+        _write_costs(self.costs, [])
+        report, sidecar, skipped = lw.compute_weekly_report(
+            WEEK_ENDING, self.costs, self.outbox, self.output_dir,
+        )
+        self.assertEqual(sidecar["by_cohort"], {})
+        self.assertIsNone(lw.dominant_cohort(sidecar["by_cohort"]))
+        lw.render_markdown(report, skipped)  # must not raise
+
+    def test_sidecar_by_cohort_is_json_serializable(self):
+        # Cohort keys are (agent, task_type) conceptually; a tuple key would
+        # make json.dumps raise, so the string form is load-bearing.
+        self._multi_cohort_week()
+        _report, sidecar, _ = lw.compute_weekly_report(
+            WEEK_ENDING, self.costs, self.outbox, self.output_dir,
+        )
+        json.loads(json.dumps(sidecar))
+
+
+class RealWindowCohortReplayTests(unittest.TestCase):
+    """Replay of the real 2026-08-17 window that motivated `by_cohort`.
+
+    Fixture figures are the measured aggregates from ~/agents/blackboard/
+    costs.jsonl for [2026-08-10, 2026-08-17): $545.71 total, pulse/cycle
+    $413.09 (75.7%, n=496), missions-narrator $98.67 (18.1%, n=1262), and the
+    flagged beacon/feature-development cohort $4.20 (0.8%, n=2). Rows are
+    collapsed to per-cohort synthetic rows — the point is that the new field
+    surfaces the 75.7% that σ structurally could not.
+    """
+
+    def test_dominant_cohort_reproduces_measured_shares(self):
+        rows = [
+            lw.CostRow(
+                ts=datetime(2026, 8, 11, tzinfo=timezone.utc),
+                agent="pulse", task_id="cycle-x", model="claude-opus-4-7",
+                cost_usd=413.09, duration_sec=None, source="inbox-watcher",
+                task_type="cycle",
+            ),
+            lw.CostRow(
+                ts=datetime(2026, 8, 11, tzinfo=timezone.utc),
+                agent="missions-narrator", task_id="unknown",
+                model="claude-haiku-4-5", cost_usd=98.67, duration_sec=None,
+                source="inbox-watcher", task_type="unclassified",
+            ),
+            lw.CostRow(
+                ts=datetime(2026, 8, 11, tzinfo=timezone.utc),
+                agent="mirror", task_id="m", model="claude-opus-4-7",
+                cost_usd=9.26, duration_sec=None, source="inbox-watcher",
+                task_type="unclassified",
+            ),
+            lw.CostRow(
+                ts=datetime(2026, 8, 11, tzinfo=timezone.utc),
+                agent="beacon", task_id="notify-pr-RSDPM-231",
+                model="claude-opus-4-7", cost_usd=7.46, duration_sec=None,
+                source="inbox-watcher", task_type="notification",
+            ),
+            lw.CostRow(
+                ts=datetime(2026, 8, 11, tzinfo=timezone.utc),
+                agent="beacon", task_id="b-unc", model="claude-opus-4-7",
+                cost_usd=6.36, duration_sec=None, source="inbox-watcher",
+                task_type="unclassified",
+            ),
+            lw.CostRow(
+                ts=datetime(2026, 8, 10, 22, 19, tzinfo=timezone.utc),
+                agent="beacon", task_id="fix-promoterace-order-fragile-gate-001",
+                model="claude-opus-4-7", cost_usd=2.77, duration_sec=None,
+                source="inbox-watcher", task_type="feature-development",
+            ),
+            lw.CostRow(
+                ts=datetime(2026, 8, 10, tzinfo=timezone.utc),
+                agent="beacon", task_id="pulse-auto-ddb5d10e28-20260810",
+                model="claude-opus-4-7", cost_usd=1.43, duration_sec=None,
+                source="inbox-watcher", task_type="feature-development",
+            ),
+            lw.CostRow(
+                ts=datetime(2026, 8, 11, tzinfo=timezone.utc),
+                agent="_other", task_id="rest", model="claude-haiku-4-5",
+                cost_usd=6.67, duration_sec=None, source="inbox-watcher",
+                task_type="unclassified",
+            ),
+        ]
+        total = sum(r.cost_usd for r in rows)
+        self.assertAlmostEqual(total, 545.71, places=2)
+
+        by_cohort = lw.compute_by_cohort(rows, total)
+        self.assertAlmostEqual(
+            by_cohort["pulse/cycle"]["percent_of_total"], 75.7, places=1
+        )
+        self.assertAlmostEqual(
+            by_cohort["missions-narrator/unclassified"]["percent_of_total"],
+            18.1, places=1,
+        )
+        # The cohort the dispatched anomaly belonged to — 0.8% of the week.
+        self.assertAlmostEqual(
+            by_cohort["beacon/feature-development"]["percent_of_total"],
+            0.8, places=1,
+        )
+        self.assertAlmostEqual(
+            sum(b["percent_of_total"] for b in by_cohort.values()),
+            100.0, places=6,
+        )
+        self.assertEqual(lw.dominant_cohort(by_cohort)[0], "pulse/cycle")
+
+    def test_anomaly_entries_carry_cohort_share(self):
+        rows = [
+            lw.CostRow(
+                ts=datetime(2026, 8, 10, 22, 19, tzinfo=timezone.utc),
+                agent="beacon", task_id="fix-promoterace-order-fragile-gate-001",
+                model="claude-opus-4-7", cost_usd=2.77, duration_sec=None,
+                source="inbox-watcher", task_type="feature-development",
+            ),
+        ]
+        by_cohort = lw.compute_by_cohort(rows, 545.71)
+        baselines = {("beacon", "feature-development"): (0.38, 0.477, 12)}
+        anomalies = lw.compute_anomalies(rows, baselines, True, 4, by_cohort)
+        self.assertEqual(len(anomalies), 1)
+        entry = anomalies[0]
+        self.assertAlmostEqual(entry["cohort_total_usd"], 2.77, places=2)
+        self.assertAlmostEqual(entry["cohort_share_pct"], 0.51, places=2)
+
+    def test_cohort_fields_omitted_when_by_cohort_absent(self):
+        # Back-compat: the parameter is optional and the entry shape is
+        # unchanged when it is not supplied.
+        rows = [
+            lw.CostRow(
+                ts=datetime(2026, 8, 10, tzinfo=timezone.utc),
+                agent="beacon", task_id="t", model="claude-opus-4-7",
+                cost_usd=2.77, duration_sec=None, source="inbox-watcher",
+                task_type="feature-development",
+            ),
+        ]
+        baselines = {("beacon", "feature-development"): (0.38, 0.477, 12)}
+        entry = lw.compute_anomalies(rows, baselines, True, 4)[0]
+        self.assertNotIn("cohort_total_usd", entry)
+        self.assertNotIn("cohort_share_pct", entry)
 
 
 if __name__ == "__main__":
