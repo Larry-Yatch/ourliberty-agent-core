@@ -2420,5 +2420,184 @@ class DispatchEnvelopeChatIdTests(unittest.TestCase):
         self.assertNotIn("reply_chat_id", env)
 
 
+class SigmaMaterialityFloorTests(unittest.TestCase):
+    """σ is scale-free; spend is not. A 4σ row can be worth $0.08.
+
+    The floor governs what DISPATCHES, never what is reported: a sub-materiality
+    hit keeps its digest slot via the existing `digest_only` flag, so Larry
+    still sees it while no paid Beacon cycle opens.
+    """
+
+    @staticmethod
+    def _anomaly(cost, baseline, sigma=4.09, task_id="cheap-task-001"):
+        return {
+            "task_id": task_id,
+            "agent": "missions-narrator",
+            "task_type": "unclassified",
+            "cost_usd": cost,
+            "baseline_usd": baseline,
+            "sigma_above": sigma,
+            "context": "...",
+        }
+
+    def test_sub_materiality_hit_does_not_dispatch_but_keeps_digest_slot(self):
+        # The real 2026-08-17 rank-4 row: $0.15 vs $0.07 at 4.09σ — well above
+        # the σ threshold, $0.08 of excess, against a ~$1.67 review cycle.
+        s = _sidecar(anomalies=[self._anomaly(0.15, 0.07)])
+        proposals = pci.synthesize_proposals(s, repeats=[])
+        # Half one: it is NOT dropped — it still occupies a digest slot.
+        self.assertEqual(len(proposals), 1)
+        p = proposals[0]
+        self.assertIn("cheap-task-001", p["title"])
+        # Half two: it does not open a paid cycle.
+        self.assertTrue(p["digest_only"])
+        self.assertFalse(pci._is_auto_dispatch_eligible(p))
+        self.assertIn("materiality floor", p["rationale"])
+        self.assertNotIn("chain archive and propose", p["rationale"])
+
+    def test_material_hit_still_auto_dispatches(self):
+        """Regression fixture: the real 2026-08-17 dispatch must survive.
+
+        $2.77 vs $0.38 baseline at 5.01σ — $2.39 of excess, above the $1.50
+        floor. That row's depth was warranted (it shipped PR #1106), so the
+        gate must demonstrably not be a blanket mute.
+        """
+        s = _sidecar(anomalies=[{
+            "task_id": "fix-promoterace-order-fragile-gate-001",
+            "agent": "beacon",
+            "task_type": "feature-development",
+            "cost_usd": 2.77,
+            "baseline_usd": 0.38,
+            "sigma_above": 5.01,
+            "context": "...",
+        }])
+        p = pci.synthesize_proposals(s, repeats=[])[0]
+        self.assertFalse(p["digest_only"])
+        self.assertTrue(pci._is_auto_dispatch_eligible(p))
+        self.assertIn("chain archive", p["rationale"])
+
+    def test_floor_boundary_is_inclusive(self):
+        exactly_at = self._anomaly(
+            pci.SIGMA_MATERIALITY_FLOOR_USD + 1.0, 1.0, task_id="edge-001")
+        p = pci.synthesize_proposals(
+            _sidecar(anomalies=[exactly_at]), repeats=[])[0]
+        self.assertFalse(p["digest_only"])
+
+        just_under = self._anomaly(
+            pci.SIGMA_MATERIALITY_FLOOR_USD + 1.0 - 0.01, 1.0,
+            task_id="edge-002")
+        p = pci.synthesize_proposals(
+            _sidecar(anomalies=[just_under]), repeats=[])[0]
+        self.assertTrue(p["digest_only"])
+
+    def test_floor_is_a_constant_not_derived(self):
+        # Deriving the floor from the loop's own trailing cost would let
+        # expensive reviews raise the bar and suppress the next review.
+        self.assertIsInstance(pci.SIGMA_MATERIALITY_FLOOR_USD, float)
+        self.assertAlmostEqual(pci.SIGMA_MATERIALITY_FLOOR_USD, 1.50, places=2)
+
+
+class SigmaSelfExclusionTests(unittest.TestCase):
+    """The detector must not feed on its own output.
+
+    Five of the six priciest rows in the flagged beacon/feature-development
+    cohort (4wk window ending 2026-08-17) were themselves `pulse-auto-*`
+    σ-review dispatches, and one sat at rank 17 of that week's sidecar. Without
+    this exclusion Check I eventually opens an Opus cycle to review the cost of
+    a prior Opus cycle that reviewed a cost.
+    """
+
+    @staticmethod
+    def _auto_anomaly(task_id, cost=2.40, sigma=6.0):
+        return {
+            "task_id": task_id,
+            "agent": "beacon",
+            "task_type": "feature-development",
+            "cost_usd": cost,
+            "baseline_usd": 0.38,
+            "sigma_above": sigma,
+            "context": "...",
+        }
+
+    def test_pulse_auto_task_id_is_never_a_candidate(self):
+        # A realistic minted id — including this very task's own.
+        for tid in ("pulse-auto-d8a5df460d-20260817",
+                    "pulse-auto-ddb5d10e28-20260810",
+                    "pulse-auto-4c6c74f626-20260805"):
+            s = _sidecar(anomalies=[self._auto_anomaly(tid)])
+            self.assertEqual(
+                pci.synthesize_proposals(s, repeats=[]), [], tid)
+
+    def test_self_exclusion_is_material_and_high_sigma_agnostic(self):
+        # Even a large, high-σ self-review is excluded — the exclusion is about
+        # identity, not size, so it cannot be argued past by cost.
+        s = _sidecar(anomalies=[
+            self._auto_anomaly("pulse-auto-4c6c74f626-20260805",
+                               cost=7.61, sigma=99.0)])
+        self.assertEqual(pci.synthesize_proposals(s, repeats=[]), [])
+
+    def test_non_self_row_in_same_cohort_still_flags(self):
+        # Scoped to the loop's own ids, not to the cohort they live in.
+        s = _sidecar(anomalies=[self._auto_anomaly(
+            "fix-promoterace-order-fragile-gate-001", cost=2.77, sigma=5.01)])
+        proposals = pci.synthesize_proposals(s, repeats=[])
+        self.assertEqual(len(proposals), 1)
+        self.assertFalse(proposals[0]["digest_only"])
+
+    def test_self_review_yields_to_the_next_real_anomaly(self):
+        # A self-review at rank 1 must not consume the slot — the genuine
+        # anomaly behind it should still surface.
+        s = _sidecar(anomalies=[
+            self._auto_anomaly("pulse-auto-d8a5df460d-20260817",
+                               cost=9.99, sigma=50.0),
+            {
+                "task_id": "real-anomaly-001", "agent": "forge",
+                "task_type": "feature-development", "cost_usd": 4.00,
+                "baseline_usd": 0.50, "sigma_above": 4.0, "context": "...",
+            },
+        ])
+        proposals = pci.synthesize_proposals(s, repeats=[])
+        self.assertEqual(len(proposals), 1)
+        self.assertIn("real-anomaly-001", proposals[0]["title"])
+
+    def test_minted_task_ids_carry_the_excluded_prefix(self):
+        # Minting and exclusion share one constant; this pins them together so
+        # a future rename of the id scheme cannot silently reopen the loop.
+        proposal = {
+            "title": "Review high-σ anomaly task `x`",
+            "effort": "small", "impact": "$1.00", "rationale": "r",
+        }
+        env = pci._build_dispatch_envelope(proposal, FIRED_AT)
+        self.assertTrue(
+            env["task_id"].startswith(pci.AUTO_DISPATCH_TASK_ID_PREFIX))
+
+
+class SigmaCohortShareTests(unittest.TestCase):
+    """Cohort share is the context σ structurally cannot see."""
+
+    def test_cohort_share_is_threaded_into_the_rationale(self):
+        s = _sidecar(anomalies=[{
+            "task_id": "fix-promoterace-order-fragile-gate-001",
+            "agent": "beacon", "task_type": "feature-development",
+            "cost_usd": 2.77, "baseline_usd": 0.38, "sigma_above": 5.01,
+            "cohort_total_usd": 4.20, "cohort_share_pct": 0.77,
+            "context": "...",
+        }])
+        p = pci.synthesize_proposals(s, repeats=[])[0]
+        self.assertIn("0.8% of the week's spend", p["rationale"])
+        self.assertIn("beacon/feature-development", p["rationale"])
+
+    def test_rationale_omits_share_when_sidecar_predates_the_field(self):
+        # Older sidecars carry no cohort keys; the proposal must still render.
+        s = _sidecar(anomalies=[{
+            "task_id": "legacy-sidecar-row-001", "agent": "beacon",
+            "task_type": "feature-development", "cost_usd": 2.77,
+            "baseline_usd": 0.38, "sigma_above": 5.01, "context": "...",
+        }])
+        p = pci.synthesize_proposals(s, repeats=[])[0]
+        self.assertNotIn("of the week's spend", p["rationale"])
+        self.assertTrue(pci._is_auto_dispatch_eligible(p))
+
+
 if __name__ == "__main__":
     unittest.main()

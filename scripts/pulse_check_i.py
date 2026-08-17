@@ -81,6 +81,26 @@ HIGH_REPEAT_COUNT_THRESHOLD = 3  # >= N retry suffixes for same task_id
 SIGMA_ANOMALY_ESCALATE_THRESHOLD = 3.0
 MAX_PROPOSALS_PER_DIGEST = 3
 
+# Materiality floor for σ auto-dispatch: a hit only opens a paid Beacon cycle
+# when its excess over baseline (cost_usd − baseline_usd) clears this. σ is
+# scale-free; spend is not, so a 4σ row can be worth $0.08. Measured loop unit
+# cost is $1.67 — the trailing-4wk mean of the 8 `pulse-auto-*` rows in
+# costs.jsonl ($13.35 total, window ending 2026-08-17) — so anything under
+# ~$1.50 of excess is a review that costs more than the waste it inspects.
+# Sub-floor hits are NOT dropped: they keep their digest slot via `digest_only`.
+#
+# Deliberately a CONSTANT, not self-derived from the loop's own trailing cost —
+# this departs from the self-tuning convention of the MARKER_DISCIPLINE_* block
+# below, and the departure is the point. Deriving the floor from review cost
+# creates a perverse feedback loop: expensive reviews raise the floor, which
+# suppresses the next review, which is exactly backwards.
+SIGMA_MATERIALITY_FLOOR_USD = 1.50
+
+# Prefix of the task_ids this module mints for its own auto-dispatches (see
+# _build_dispatch_envelope). Shared so minting and the σ self-exclusion below
+# cannot drift apart.
+AUTO_DISPATCH_TASK_ID_PREFIX = "pulse-auto-"
+
 # preflight-marker-discipline signal (task forge-marker-error-retry-fillin-001).
 # Self-optimizing per the repo pattern: the alert condition is NOT a hand-picked
 # magic miss count — it's derived from a trailing-window baseline, exactly like
@@ -586,11 +606,18 @@ def synthesize_proposals(
     # σ anomalies above the escalate threshold get their own proposal slot.
     # Fixture-pattern allowlist (2026-05-27): drop test-artifact task_ids so a
     # leaked fixture σ outlier can't trigger a hallucinated proposal.
+    # Self-exclusion: this loop's own dispatches are among the priciest rows in
+    # the beacon/feature-development cohort (5 of the top 6 over the 4wk window
+    # ending 2026-08-17), so without this the detector eventually opens an Opus
+    # cycle to review the cost of a prior Opus cycle that reviewed a cost.
     sigma_hits = [
         a for a in (sidecar.get("anomalies") or [])
         if isinstance(a, dict)
         and a.get("task_id") != "_ramp_up_notice"
         and not is_fixture_task_id(a.get("task_id"))
+        and not str(a.get("task_id") or "").startswith(
+            AUTO_DISPATCH_TASK_ID_PREFIX
+        )
         and float(a.get("sigma_above", 0.0) or 0.0)
         >= SIGMA_ANOMALY_ESCALATE_THRESHOLD
     ]
@@ -604,14 +631,45 @@ def synthesize_proposals(
         _agent = top.get("agent") or "unknown"
         _ttype = top.get("task_type") or "unclassified"
         _identified = bool(_tid) and _tid != "unknown"
-        if _identified:
+        _excess = (
+            float(top.get("cost_usd", 0.0) or 0.0)
+            - float(top.get("baseline_usd", 0.0) or 0.0)
+        )
+        _material = _excess >= SIGMA_MATERIALITY_FLOOR_USD
+        # Cohort share is what σ structurally cannot see: a row can be the
+        # week's top σ hit and still be a rounding error, while the cohort that
+        # IS the week carries near-zero z because it sets its own mean.
+        _cohort_share = top.get("cohort_share_pct")
+        _share_txt = (
+            f" Its cohort ({_agent}/{_ttype}) is "
+            f"{float(_cohort_share):.1f}% of the week's spend."
+            if isinstance(_cohort_share, (int, float))
+            else ""
+        )
+        if _identified and not _material:
+            # Above the σ threshold but below the materiality floor: reviewing
+            # it costs more than the excess it would recover. Keep the digest
+            # slot (Larry still sees it); don't open a paid cycle.
             _what = f"task `{_tid}`"
             _rationale = (
                 f"Ledger flagged this task at "
-                f"{float(top.get('sigma_above', 0.0)):.1f}σ above baseline. "
+                f"{float(top.get('sigma_above', 0.0)):.1f}σ above baseline, but "
+                f"its excess over baseline is only ${_excess:.2f} — below the "
+                f"${SIGMA_MATERIALITY_FLOOR_USD:.2f} materiality floor, and "
+                f"under the ~$1.67 cost of the review cycle itself. Surfaced "
+                f"for visibility; not worth a dispatch unless it recurs."
+                f"{_share_txt}"
+            )
+        elif _identified:
+            _what = f"task `{_tid}`"
+            _rationale = (
+                f"Ledger flagged this task at "
+                f"{float(top.get('sigma_above', 0.0)):.1f}σ above baseline "
+                f"(${_excess:.2f} over). "
                 f"Read the chain archive and propose either: a fast-path "
                 f"for the shape, a prompt-discipline fix, or a model "
                 f"downgrade if the depth wasn't warranted."
+                f"{_share_txt}"
             )
         else:
             _what = f"unidentified task from `{_agent}` (type: {_ttype})"
@@ -624,6 +682,7 @@ def synthesize_proposals(
                 f"the row carries no task_id — there is no chain archive to read "
                 f"and no task to fast-path. Triage the cost-attribution gap, or "
                 f"name the task by hand before dispatching."
+                f"{_share_txt}"
             )
         proposals.append({
             "title": f"Review high-σ anomaly {_what}",
@@ -638,7 +697,7 @@ def synthesize_proposals(
             # reset its dedup key and let the same anomaly re-dispatch two days
             # later. The cohort + task identity is what "same anomaly" means.
             "dedup_identity": f"sigma-anomaly␟{_agent}␟{_ttype}␟{_tid or 'unknown'}",
-            "digest_only": not _identified,
+            "digest_only": not _identified or not _material,
         })
 
     # preflight-marker-discipline regression — surfaced only when the trailing-
@@ -795,7 +854,9 @@ def _build_dispatch_envelope(
     need to re-derive the optimization candidate from sidecar files.
     """
     slug = _short_proposal_slug(proposal)
-    task_id = f"pulse-auto-{slug}-{fired_at.strftime('%Y%m%d')}"
+    task_id = (
+        f"{AUTO_DISPATCH_TASK_ID_PREFIX}{slug}-{fired_at.strftime('%Y%m%d')}"
+    )
     title = str(proposal.get("title") or "(untitled proposal)")
     rationale = str(proposal.get("rationale") or "")
     impact = str(proposal.get("impact") or "")
