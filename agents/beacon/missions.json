@@ -19749,6 +19749,19 @@
         "root_signature": "beacon::unknown-subject",
         "count_at_proposal": 5,
         "rationale": "Approval requests arriving with an empty subject cannot route or escalate correctly; this is a beacon defect in subject stamping and silencing it would silently swallow legitimate approval flows."
+      },
+      "briefing": {
+        "what": "A look-back review the team kicked off on its own, examining a recent stretch of work that hasn't been tied to any active project.",
+        "why": "Reviews like this surface what's quietly going wrong or right before it shows up as a missed deadline, but one that isn't attached to a goal can also just soak up time.",
+        "suggest": "Let it finish and ask for the takeaways in a sentence or two \u2014 it's low-stakes either way, and worth a quick skim before deciding if it deserves follow-up."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-17T13:24:11.590078+00:00",
+        "from_state": "proposed"
       }
     },
     {
@@ -19770,7 +19783,21 @@
         "root_signature": "deploy-notifier::deploy-notifier",
         "count_at_proposal": 1,
         "rationale": "Pure deploy-event notifications the operator has never acted on across 3 weeks; reclassifying to info suppresses elevation without losing the audit record."
-      }
+      },
+      "briefing": {
+        "what": "A look-back review of the recent deployment alert work, opened on its own without being attached to any active project.",
+        "why": "Unassigned work quietly consumes team time and can drift away from the priorities you've actually set.",
+        "suggest": "Hold off on greenlighting it until someone confirms which project it belongs to and what decision it's meant to inform."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-17T13:24:11.590078+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     },
     {
       "id": "retrospective-heal-approvals-surface-drift-heal-approvals-surface-drift-2026-08-17",
@@ -19791,6 +19818,19 @@
         "root_signature": "heal-approvals-surface-drift::heal-approvals-surface-drift",
         "count_at_proposal": 7,
         "rationale": "The healer is correctly detecting real drift in the approvals surface caused by the still-unshipped informational-cards implementation (spec #1102 merged, three impl steps outstanding); routing it away would mask a genuine open build obligation."
+      },
+      "briefing": {
+        "what": "A routine internal review the team kicked off on its own to look back at how a recent fix to the approvals view went.",
+        "why": "It's housekeeping that keeps the approvals list you rely on trustworthy, but it isn't attached to any goal you've set, so it's quietly consuming team time.",
+        "suggest": "Let it finish as-is \u2014 it's low-stakes and self-contained \u2014 but ask for the takeaway in a line or two so it doesn't turn into ongoing work."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-17T13:24:11.590078+00:00",
+        "from_state": "proposed"
       }
     },
     {
@@ -19812,6 +19852,19 @@
         "root_signature": "heal-pipeline-stall::pipeline-stall",
         "count_at_proposal": 14,
         "rationale": "The healer self-resolves every instance across 9 weeks (live_unresolved=false, falling trend) and the operator has never taken any action; routing to hold removes DM noise while preserving dashboard visibility."
+      },
+      "briefing": {
+        "what": "A write-up looking back at a recent slowdown in our automated work pipeline and what caused it.",
+        "why": "Knowing why the line stalled is how we stop it from happening again and keep work flowing without your attention.",
+        "suggest": "Wave this through \u2014 it's a low-stakes look-back, and you can skim the findings later if you're curious."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-17T13:24:11.590078+00:00",
+        "from_state": "proposed"
       }
     },
     {
@@ -19833,6 +19886,19 @@
         "root_signature": "mirror-queue-wait-gauge::third-review-slot-readiness",
         "count_at_proposal": 1,
         "rationale": "A steady queue-depth gauge that has triggered zero operator action across 7 weeks is informational telemetry, not an alert; reclassifying to info stops it from elevating."
+      },
+      "briefing": {
+        "what": "A look-back review the team ran on whether adding a third quality-check reviewer would speed up how long work waits in line before someone checks it.",
+        "why": "Waiting time before review is a major reason finished work sits idle instead of shipping, so knowing whether more review capacity helps tells us where to spend effort next.",
+        "suggest": "Skim the findings when convenient and let the team proceed on their recommendation \u2014 this is low-stakes learning, not a decision that needs your sign-off."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-17T13:24:11.590078+00:00",
+        "from_state": "proposed"
       }
     },
     {
@@ -19854,6 +19920,19 @@
         "root_signature": "outbox-notifier::auto-merge-conflict",
         "count_at_proposal": 1,
         "rationale": "Eight weeks at a rising frequency means the structural merge-conflict rate is increasing; silencing would mask a worsening branching or sequencing defect rather than address it."
+      },
+      "briefing": {
+        "what": "A short write-up looking back at a recent hiccup where two automated updates to the notification system stepped on each other, and what was learned from it.",
+        "why": "The notification system is how you find out what needs your attention, so understanding why it briefly tripped keeps that channel dependable.",
+        "suggest": "No action needed from you \u2014 let the team file the lessons learned and move on."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-17T13:24:11.590078+00:00",
+        "from_state": "proposed"
       }
     },
     {
@@ -19875,6 +19954,19 @@
         "root_signature": "pulse::approvals-informational-cards-impl-gap",
         "count_at_proposal": 1,
         "rationale": "Pulse is correctly self-diagnosing an open build obligation (spec #1102 merged, three impl steps not yet shipped); the fix mission is completing the approvals informational-cards implementation."
+      },
+      "briefing": {
+        "what": "A review of work the team began on making your approvals list show helpful updates alongside the items that actually need your decision, which isn't yet attached to a formal project.",
+        "why": "Your approvals list is where you spend your decision time, so cleaning up what does and doesn't demand your attention directly reduces how much you have to wade through each day.",
+        "suggest": "Let it proceed as planned and fold it into the approvals work already underway \u2014 no decision needed from you right now."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-17T13:24:11.590078+00:00",
+        "from_state": "proposed"
       }
     },
     {
@@ -19896,6 +19988,19 @@
         "root_signature": "pulse::auto-merge-conflict",
         "count_at_proposal": 1,
         "rationale": "Pulse independently corroborating the outbox-notifier auto-merge-conflict class confirms a structural conflict source that should be reduced, not routed around."
+      },
+      "briefing": {
+        "what": "A short review of a hiccup that happened this morning when two pieces of automated work tried to update the same thing at once.",
+        "why": "Catching why it happened now keeps the automated work from stalling later and quietly eating time.",
+        "suggest": "Let it proceed as a routine cleanup \u2014 no decision needed from you unless it turns up something bigger."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-17T13:24:11.590078+00:00",
+        "from_state": "proposed"
       }
     }
   ]
