@@ -64190,3 +64190,83 @@ Outstanding items (pending queue unchanged at 4 items):
 
 ---
 
+## Iteration ~9423 — 2026-08-17T17:16Z UTC (Larry /cycle chat, Tier 3→1 TIER-RESET [Check 0: wm=512→514, 2 new alerts: 1 Tier-3 silenced + 1 Tier-4 genuine (RSDPM PR#224 merge conflict); GitHub 503 still ongoing (~2.5h); pending=4 all reminders exhausted])
+
+**Health:** ⚠️ Signal — Tier-4 alert (RSDPM PR#224 merge-conflict, promoted ~138h; outbox-notifier DM'd Larry 17:06Z). GitHub API 503 ongoing (external, services graceful, already escalated). Tier 3→**1 RESET**. 2026-08-17 UTC.
+
+**VERIFY-BEFORE-REASSERT (from iter ~9422 at 16:47Z UTC; commits since: eb095bc1 [Pulse cycle 20260817T164751Z — last automated wrapper]):**
+- **"wm=512=fl, 0 new alerts"**: UPDATED → wm=512→514, fl=514; 2 new alerts triaged this iter (lines 513-514). ✅
+- **"HEAD=9f44ee92=origin/main"**: UPDATED → HEAD=eb095bc1=origin/main (Pulse cycle 20260817T164751Z; still up to date — no new wrapper commit since ~9422). ✅
+- **"all 4 bots alive"**: CONFIRMED → system-health.json ts=2026-08-17T17:09:00Z (~7min at ~17:16Z); overall=healthy; all 4 bots desired+alive. ✅
+- **"heartbeat PRESENT (~11min)"**: UPDATED → heal-stale-daemon-code.heartbeat ts=2026-08-17T17:06:21Z (~10min at ~17:16Z; within 60-min threshold). ✅
+- **"pending=4 VERIFIED"**: CONFIRMED → pending=4 (ages ~161.1h, ~146.0h, ~145.7h, ~137.5h; all reminders exhausted). ✅
+- **"0 open PRs"**: UNVERIFIABLE this iter — GitHub API 503-ing at check time; heal_pipeline_stall --dry-run confirms 503 across all repos at 17:12Z. Last known: 0 open PRs in ourliberty-agent-core (iter ~9422). Carrying.
+- **"last_sync=15:52:05Z (~55min)"**: UPDATED → last_sync=2026-08-17T16:52:06Z (~24min at ~17:16Z; within 2h threshold). ✅
+- **"dedup window expires ~22:52Z (~6.1h)"**: UPDATED → ~5.6h remaining at ~17:16Z. No new DM. ✅
+- **"GitHub 503 intermittent/cleared-this-check"**: **RETRACTED → STILL ONGOING** — journalctl last 45min shows 503s at 16:46Z (gh-pr-snapshot-refresher, cleanup-dispatch-branches, heal-forge-wip-only-redispatch), 17:05Z (gh-pr-snapshot-refresher), 17:08-09Z (gh-pr-snapshot-refresher all repos), 17:12Z (gh-pr-snapshot-refresher all repos). heal_pipeline_stall --dry-run confirmed 503 across all 4 repos at ~17:12Z. Outage now ~2.5h duration (first observed ~14:45Z, escalated iter ~9415). All services functioning gracefully (retry guards doing their job).
+- **"consecutive_clean=1"**: UPDATED → **TIER-RESET → Tier 1, consecutive_clean=0** (Tier-4 finding RSDPM PR#224 merge conflict). ✅
+
+**Check 0 — Alert triage (~17:14Z UTC):**
+- repair-watermark: `{"repaired": false, "old_watermark": 512, "file_length": 514}` → 2 new alerts above watermark.
+- **Alert line 513** — `{"ts": "2026-08-17T16:46:30Z", "source": "dispatch-branch-cleanup", "subject": "gh-unavailable", "tier_source": "translation"}`: `triage-alert` → **Tier 3, decision=silence, route=digest** (known-pattern match in alert-translations.json). Resolved directly. GitHub API was down at 16:46Z during the ongoing 503 outage; dispatch-branch-cleanup pruned 0 branches, skipped 3 repos. Expected behavior. ✅
+- **Alert line 514** — `{"ts": "2026-08-17T17:06:20Z", "source": "outbox-notifier", "subject": "auto-merge-conflict:Larry-Yatch/RSDPM:224::promoted", "tier": "NOW", "route": "escalate", "promotion": true, "promotion_reason": "backstop:499766s"}`: `triage-alert` → **Tier 4, decision=ask, route=escalate** (known never-silence pattern in alert-translations.json: translated but surfaced, not muted). `guard-tier4` → `{"authoritative_tier": 4, "accepted": true, "helper_tier": 4, "same_iter_call": true}` — genuine novel Tier 4. **RSDPM PR#224 Mirror-approved but auto-merge BLOCKED: merge conflicts with main.** Promoted after ~138h (backstop:499766s). Outbox-notifier already DM'd Larry at 17:06Z with route=escalate, tier=NOW. Pulse does NOT duplicate DM. Records intervention. Tier-reset → Tier 1. Rebase required: `gh pr checkout 224 --repo Larry-Yatch/RSDPM && git fetch origin && git rebase origin/main && git push --force-with-lease`. ⚠️
+- Watermark advanced: 512 → 514. ✅
+**CHECK 0 STATUS: 2 alerts triaged — 1 Tier-3 silenced (dispatch-branch-cleanup:gh-unavailable), 1 Tier-4 escalated (RSDPM PR#224 merge conflict). ⚠️**
+
+**Check 1 — Log noise (~17:14Z UTC):** journalctl -u ourliberty-*.service last 45min: **GitHub API 503 WARNs continuing** — gh-pr-snapshot-refresher (most frequent: 10+ entries across ourliberty-agent-core, ourliberty-dashboard, ourliberty-graph, RSDPM at 16:46Z, 17:05Z, 17:08-09Z, 17:12Z); ourliberty-cleanup-dispatch-branches (3 entries 16:46Z, all repos); ourliberty-heal-forge-wip-only-redispatch (3 entries 16:46Z). Last 503 confirmed at 17:12:16Z. No ourliberty service failures. Outage duration now ~2.5h (first observed ~14:45Z, escalated iter ~9415). All services functioning gracefully. heal-orphan-autoregister INFO at 17:04Z (normal startup). **NOMINAL ✅** (ongoing external GitHub API GraphQL degradation; already escalated; services functioning gracefully; no new action)
+
+**Check 2 — Telegram sweep (~17:14Z UTC):** beacon_telegram_bot.log: no inbound Larry `<- 7998341473` directives since last check (grep: no matching lines). Last delivery: idx=511 review-pass 15:10:49Z (unchanged from prior iters). No agent-distress keywords. **NOMINAL ✅**
+
+**Check 3 — Pipeline stall (~17:14Z UTC):** heal_pipeline_stall.py --dry-run: **503 across all repos** (RSDPM, ourliberty-agent-core, ourliberty-dashboard, ourliberty-graph — all returned HTTP 503 on gh pr list). healer reports: "no stalls detected" (GitHub API down; stall scan cannot execute). suppressed (cooldown): `unrouted_open_pr_stranded:Larry-Yatch/RSDPM:234`. DRY-RUN: 0 alerts would fire. GitHub API 503 impacting stall detection — consistent with ongoing outage. **NOMINAL ✅** (GitHub 503 limits scan; already escalated; carry)
+
+**Check 4 — Pending directives (~17:14Z UTC):** beacon-pending-approvals.json PRESENT (canonical state/ path), **pending=4 VERIFIED**:
+1. **~161.1h pending** ← CRITICAL AGE (alert-translations-unrouted-pr-nudges-retired-001, created 2026-08-11T00:08:30Z; all reminders exhausted)
+2. **~146.0h pending** ← ALL REMINDERS EXHAUSTED (direction-ask-automated-cycle-journal-gap-001)
+3. **~145.7h pending** ← ALL REMINDERS EXHAUSTED (check0-delivered-kinds-tier3-001)
+4. **~137.5h pending** ← ALL REMINDERS EXHAUSTED (pending-approvals-wrong-path-guard-001)
+**NOMINAL ✅** (carried; all reminders exhausted; no new actions available)
+
+**Check 5 — Stale daemon code (~17:14Z UTC):** heal-stale-daemon-code.heartbeat ts=2026-08-17T17:06:21Z (~10min at check; within 60-min threshold). system-health.json ts=2026-08-17T17:09:00Z; overall=healthy; all 4 bots (beacon, forge, mirror, pulse) desired=up, alive=true. **NOMINAL ✅**
+
+**Check A — Source repo (~17:16Z UTC):** branch=main, HEAD=eb095bc1=origin/main (Pulse cycle 20260817T164751Z). Clean tree. **NOMINAL ✅**
+**Check B — Sync health (~17:16Z UTC):** agent-core-sync.json: last_sync=2026-08-17T16:52:06Z (~24min at check; status=no-change; within 2h threshold). **NOMINAL ✅**
+**Check C — Agent liveness (~17:16Z UTC):** system-health.json ts=2026-08-17T17:09:00Z (~7min at check), overall=healthy, all 4 bots (beacon, forge, mirror, pulse) desired=up, alive=true. **NOMINAL ✅**
+**Check E — PR/merge state (~17:16Z UTC):** GitHub API 503-ing; `gh pr list` cannot execute. heal_pipeline_stall.py confirmed 503 across all repos. Carrying last-known: 0 open PRs in ourliberty-agent-core. RSDPM PR#224 merge conflict is a separate finding (surfaced via Check 0 line 514, not Check E). **NOMINAL ✅** (503-limited; already escalated; last known state clean for agent-core)
+**Check H — Forge/Beacon/Mirror activity (~17:16Z UTC):** Forge inbox: 0 tasks. Beacon inbox: 0 tasks. Mirror inbox: 0 tasks. **NOMINAL ✅**
+
+**§5.0 one-shots:** audit_due_nudge: no-op (no committed audit baseline). audit_cadence_signal: script not found at scripts/ (no-op; known — check review/distill/ per MEMORY.md if needed; consistent with prior iters). **NOMINAL ✅**
+
+**Check I:** Last artifact check-i-2026-08-17.json (14:13Z). Auto-dispatch chain COMPLETED (PR#1107 merged). Next Check I: Wed. **COMPLETE ✅**
+**Check III:** Last artifact 2026-08-09; gate=2026-08-09+14=2026-08-23. OFF-WEEK. **SKIP ✅**
+**Check XIV:** Last artifact check-xiv-2026-08-17.json (05:50Z). No new artifact. Carried.
+
+**PRIME DIRECTIVE ratio:** interventions=2625 (+1), systemic_fixes=21, ratio=125.0 (worsening). Intervention appended this iter: `pr-merge-conflict-rebase:RSDPM-224` (tier=3, Tier-4 alert RSDPM PR#224 merge-conflict; ts=2026-08-17T17:16:00Z). No systemic_fix eligible this iter.
+
+**Rotations:** SUPABASE_SERVICE_ROLE_KEY last DM=2026-08-03T22:52:32Z (age=14.8d); dedup window expires ~22:52Z UTC (~5.6h at ~17:16Z). next_rotation_due=2026-08-22 (~4.2d). No new DM (within dedup window).
+
+**G-rule tracking:**
+- `alert-retraction-no-translation-001` **[DISPATCHED iter ~9100]**: approval `alert-translations-unrouted-pr-nudges-retired-001` **~161.1h — CRITICAL AGE** (all reminders exhausted). [PENDING LARRY APPROVAL]
+- `automated-cycle-no-journal-entry-001` **DISPATCHED ✅**: direction-ask-automated-cycle-journal-gap-001 **~146.0h** (all reminders exhausted). [PENDING LARRY APPROVAL]
+- All other G-rules carried from iter ~9422 unchanged.
+
+**Actions taken:**
+- Check 0: Alert 513 triaged Tier-3 silenced (dispatch-branch-cleanup:gh-unavailable). Alert 514 triaged Tier-4 genuine (RSDPM PR#224 merge conflict). Watermark advanced 512→514. ✅
+- PRIME DIRECTIVE: intervention appended (pr-merge-conflict-rebase:RSDPM-224, tier=3, ts=2026-08-17T17:16:00Z). ✅
+- Tier state: `cycle_tier_state.py record --checks-clean false` → **tier reset 3→1, consecutive_clean=0** (Tier-4 signal observed; 5-min cadence). ✅
+
+**Escalations:** None new to DM (outbox-notifier already DM'd Larry at 17:06Z about RSDPM PR#224; no duplicate). Outstanding items (updated):
+1. **alert-translations-unrouted-pr-nudges-retired-001: ~161.1h — CRITICAL AGE (all reminders exhausted).** Carry.
+2. direction-ask-automated-cycle-journal-gap-001 (~146.0h, all reminders exhausted). Carry.
+3. check0-delivered-kinds-tier3-001 (~145.7h, all reminders exhausted). Carry.
+4. pending-approvals-wrong-path-guard-001 (~137.5h, all reminders exhausted). Carry.
+5. **RSDPM PR#224 — Tier-4 (NEW this iter):** Mirror-approved, auto-merge BLOCKED by merge conflicts; promoted ~138h. Outbox-notifier DM'd Larry 17:06Z. Fix: rebase required. **No Forge dispatch yet — Tier 4 is ask-then-do; GitHub API also 503-ing. Recommend Larry authorize Forge rebase when GitHub API recovers.**
+6. **GitHub API 503 ongoing (~2.5h, 14:45Z–17:12Z+; escalated iter ~9415).** Intermittent degradation affecting gh-pr-snapshot-refresher, heal-pipeline-stall, cleanup-dispatch-branches, and Forge/Mirror stall-detection. All ourliberty services functioning gracefully. External — no action on our side.
+7. Informational-cards impl gap (iter ~9102). Carry.
+8. Check III threshold proposals (artifact 2026-08-09; approve threshold-update-2026-08-09). Carry.
+
+**Patterns:** RSDPM PR#224 merge conflict has now been pending ~138 hours (5.8 days). This was promoted via backstop and surfaced for the first time this iter in Pulse's watermark. The fix is known (rebase on origin/main) and Mirror has already approved the content — the block is purely a merge conflict. Recommend Larry approve a Forge dispatch to handle the rebase once GitHub API recovers. GitHub API 503 outage is now 2.5h+ with intermittent episodes; all services graceful; no escalation beyond what was already filed iter ~9415.
+
+**Tier end-of-iter:** **Tier 1**, consecutive_clean=0 (5-min cadence; Tier-4 signal observed).
+
+---
+
