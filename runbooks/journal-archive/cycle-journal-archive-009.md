@@ -65863,3 +65863,82 @@ NOTE: GitHub API 503 outage CLEARED at 18:36:49Z UTC (~3.85h duration). RSDPM PR
 
 ---
 
+## Iteration ~9407 — 2026-08-18T01:32Z UTC (Larry /cycle chat, Tier 3 consecutive_clean=11→12 [Check 0: fl=521 wm=520→521, 1 new alert (doorbell Tier-3 silenced); all mandatory checks NOMINAL; 0 open PRs agent-core/dashboard; RSDPM PR#234 open (stall cooldown); pending=4 all reminders exhausted; rotation dedup window active (last_dm=23:23Z)])
+
+**Health:** ✅ Nominal — all mandatory checks clean. **Tier 3**, consecutive_clean=11→12 (this iter clean; Tier 3 is already the quietest tier). Tuesday 2026-08-18 UTC.
+
+**VERIFY-BEFORE-REASSERT (from iter ~9406 at 01:01Z UTC; wrapper commits since: 1e0f8ab3 [20260818T010320Z]):**
+- **"fl=520 wm=520, 0 new alerts"**: UPDATED → repair-watermark: repaired=false (old_watermark=520, file_length=521). 1 new alert (doorbell, Tier-3 silenced). Watermark advanced to 521. ✅
+- **"HEAD=966589a0=origin/main"**: UPDATED → HEAD=1e0f8ab3=origin/main (Pulse cycle 20260818T010320Z; wrapper committed after iter ~9406). ✅
+- **"all 4 bots alive"**: CONFIRMED → system-health.json ts=2026-08-18T01:26:23Z; overall=healthy; all 4 bots desired=up, alive=true. ✅
+- **"heal-stale-daemon-code.heartbeat PRESENT (~1m)"**: UPDATED → heartbeat mtime=2026-08-18T01:21:20Z (~10m at ~01:31Z check; within 60-min threshold). ✅
+- **"pending=4 CONFIRMED"**: CONFIRMED → pending=4 (ages ~169.4h, ~154.3h, ~154.0h, ~145.8h; all reminders exhausted). ✅
+- **"Tier 3, consecutive_clean=10→11"**: UPDATED → consecutive_clean=11→12 this iter. ✅
+- **"0 open PRs all repos (RSDPM PR#234 stall cooldown)"**: CONFIRMED → live gh query (~01:31Z): agent-core 0, dashboard 0. RSDPM PR#234 OPEN (stall cooldown). ✅
+- **"sync ~8m ago → within 2h"**: UPDATED → last_sync=2026-08-18T00:53:19Z (~38m at ~01:32Z check; status=no-change; within 2h threshold). ✅
+- **"rotation DM sent (digest)"**: CONFIRMED → pulse-rotation-window-dms.json: SUPABASE_SERVICE_ROLE_KEY last_dm=2026-08-17T23:23:16Z UTC. Dedup window active (~14d; expires ~2026-08-31). ✅
+- **"Check I artifact check-i-2026-08-17.json"**: CONFIRMED — no newer artifact. Next: Wednesday 2026-08-19. ✅
+- **"Check III OFF-WEEK"**: CONFIRMED (gate=2026-08-23; latest artifact check-iii-2026-08-09.json). ✅
+- **"G-rule pulse-rotation-check [1/3]"**: CONFIRMED — doorbell alert not a rotation source occurrence. Still [1/3]. ✅
+- **"rsdpm-rehearseprs G-rule [2/3]"**: CONFIRMED — 0 new alerts matching pattern this iter. Still [2/3]. ✅
+
+**Check 0 — Alert triage (~01:31Z UTC):** repair-watermark: repaired=false (old_watermark=520, file_length=521). **1 new alert (line 521):** `source=doorbell, kind=notification, intent=doorbell` — 4 pending approvals doorbell delivered by outbox-notifier as idx=520 at 19:31 MDT (01:31Z UTC). Triage helper: **Tier-3 silence** (known-pattern match in alert-translations.json). Watermark advanced to 521. No Pulse DM (outbox-notifier already delivered).
+**NOMINAL ✅**
+
+**Check 1 — Log noise (~01:31Z UTC):** journalctl -u ourliberty-*.service last 90 min: brief Telegram API 502/429/timeout errors for mirror-bot and pulse-bot at ~01:11-01:17Z UTC. ~8 error lines over 6 minutes, all self-resolved (idx=520 doorbell delivered at 01:31Z UTC without issue; all 4 bots alive at 01:26Z). Sub-threshold (~1.3/h for 6 min). Transient API hiccup, no sustained pattern.
+**NOMINAL ✅**
+
+**Check 2 — Telegram sweep (~01:31Z UTC):** beacon_telegram_bot.log: last delivery idx=520 at 19:31 MDT (01:31Z UTC; intent=doorbell). No inbound Larry directives today.
+**NOMINAL ✅**
+
+**Check 3 — Pipeline stall (~01:31Z UTC):** heal_pipeline_stall.py --dry-run: FORGE_NO_PR_SKIP (pulse-auto-d8a5df460d-20260817, reason=pr_exists, match=branch, pr=#1107; PR#1107 MERGED). Suppressed (cooldown): unrouted_open_pr_stranded:RSDPM:234. 0 alerts would fire.
+**NOMINAL ✅**
+
+**Check 4 — Pending directives (~01:32Z UTC):** beacon-pending-approvals.json PRESENT (state/ path), **pending=4 CONFIRMED**:
+1. **~169.4h pending** ← CRITICAL AGE (alert-translations-unrouted-pr-nudges-retired-001, created 2026-08-11T00:08:30Z; all reminders exhausted)
+2. **~154.3h pending** ← ALL REMINDERS EXHAUSTED (direction-ask-automated-cycle-journal-gap-001)
+3. **~154.0h pending** ← ALL REMINDERS EXHAUSTED (check0-delivered-kinds-tier3-001)
+4. **~145.8h pending** ← ALL REMINDERS EXHAUSTED (pending-approvals-wrong-path-guard-001)
+**NOMINAL ✅** (carried; no new Pulse actions available)
+
+**Check 5 — Stale daemon code (~01:31Z UTC):** heal-stale-daemon-code.heartbeat mtime=2026-08-18T01:21:20Z (~10m at check; within 60-min threshold). system-health.json ts=2026-08-18T01:26:23Z; overall=healthy; all 4 bots desired=up, alive=true.
+**NOMINAL ✅**
+
+**Check A — Source repo (~01:31Z UTC):** branch=main, HEAD=1e0f8ab3=origin/main (Pulse cycle 20260818T010320Z), clean tree. **NOMINAL ✅**
+**Check B — Sync health (~01:32Z UTC):** last_sync=2026-08-18T00:53:19Z (~38m at check; status=no-change; within 2h threshold). **NOMINAL ✅**
+**Check C — Agent liveness (~01:26Z UTC):** system-health.json ts=2026-08-18T01:26:23Z; overall=healthy; all 4 bots desired=up, alive=true. **NOMINAL ✅**
+**Check E — PR/merge state (~01:31Z UTC — LIVE GH QUERY):** ourliberty-agent-core 0, ourliberty-dashboard 0 open PRs. RSDPM PR#234 OPEN (stall cooldown). **NOMINAL ✅**
+**Check H — Forge/Beacon/Mirror activity:** Beacon inbox: 0. Forge inbox: 0. Mirror inbox: 0. **NOMINAL ✅**
+
+**§5.0 one-shots:** no new signals (carried from iter ~9406). **NOMINAL ✅**
+
+**Check I:** Latest artifact check-i-2026-08-17.json (14:13Z; Monday firing). No new artifact. Next: Wednesday 2026-08-19. **CARRY ✅**
+**Check III:** OFF-WEEK (gate=2026-08-23; latest check-iii-2026-08-09.json). **SKIP ✅**
+**Check XIV:** No new artifact since check-xiv-2026-08-17.json. **CARRY ✅**
+
+**Rotations:** SUPABASE_SERVICE_ROLE_KEY last_dm=2026-08-17T23:23:16Z UTC. Dedup window active; expires ~2026-08-31. next_rotation_due=2026-08-22 (4 days). No new action this iter.
+
+**G-rule tracking:**
+- `pulse-rotation-check-source-no-translation-001` **[1/3]**: no new occurrence this iter. Still [1/3]. [WATCH]
+- `rsdpm-rehearseprs-gh-unavailable-tier4-no-translation-001` **[2/3]**: no new occurrence this iter. [WATCH]
+- All other G-rules carried unchanged from iter ~9406.
+
+**Actions taken:**
+- Check 0: watermark advanced 520→521 (1 alert Tier-3 resolved). ✅
+- PRIME DIRECTIVE: iter_clean row appended (ts=2026-08-18T01:32:43Z, tier=3, kind=iter_clean). ✅
+- Tier state: `cycle_tier_state.py record --checks-clean true` → **tier=3, consecutive_clean=12**. ✅
+
+**Escalations:** None new this iter. Outstanding (carried):
+1. alert-translations-unrouted-pr-nudges-retired-001: ~169.4h — CRITICAL AGE (all reminders exhausted). Carry.
+2. direction-ask-automated-cycle-journal-gap-001 (~154.3h). Carry.
+3. check0-delivered-kinds-tier3-001 (~154.0h). Carry.
+4. pending-approvals-wrong-path-guard-001 (~145.8h). Carry.
+
+**PRIME DIRECTIVE (post-action):** interventions=2630, systemic_fixes=21, ratio=125.24 (unchanged). No systemic_fix eligible this iter. NOTE: invoked via Larry /cycle chat (direct); wrapper commit not expected from this session.
+
+**Patterns:** System fully nominal. Tier 3 (30-min cadence), consecutive_clean=12. Brief Telegram API hiccup ~01:11-01:17Z UTC self-resolved; all bots healthy. One Tier-3 doorbell alert processed (already delivered by outbox-notifier). Four long-pending approvals (6–7+ days old, all reminders exhausted) remain the primary operator backlog — no Pulse action available. Rotation for SUPABASE_SERVICE_ROLE_KEY due 2026-08-22 (4 days); dedup window active until ~2026-08-31. Check I next Wednesday 2026-08-19.
+
+**Tier end-of-iter:** **Tier 3**, consecutive_clean=12 (30-min cadence).
+
+---
+
