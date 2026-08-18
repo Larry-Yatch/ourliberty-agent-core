@@ -4,6 +4,80 @@
 
 ---
 
+## Iteration ~9466 — 2026-08-18T16:00Z UTC (Larry /cycle chat, Tier 3 consecutive_clean=37→38 [Check 0: wm=fl=501, 0 new alerts; all mandatory checks NOMINAL ✅; 0 open PRs; 4 pending approvals CRITICAL-AGE])
+
+**Health:** ✅ Nominal — all checks clean. **Tier 3**, consecutive_clean=37→38 (30-min cadence). 2026-08-18 UTC.
+
+**VERIFY-BEFORE-REASSERT (from iter ~9465 at ~15:24Z UTC; commits since: 9e397421 [Pulse cycle 20260818T152559Z — most recent automated]):**
+- **"Tier 3, consecutive_clean=36→37"**: UPDATED → consecutive_clean=37→38 this iter. ✅
+- **"PR#1107 MERGED, 0 open PRs"**: CONFIRMED → 0 open PRs (gh query ~15:59Z). ✅
+- **"pending=4 (~159.6h–183.2h; all reminders exhausted)"**: UPDATED → ages now ~160.2h–183.8h (consistent with ~36min elapsed since ~15:24Z). ✅
+- **"last_sync=2026-08-18T14:55:11Z"**: UPDATED → last_sync=2026-08-18T15:55:16Z (~3min at check; status=no-change; commit=9e397421; within 2h threshold). ✅
+- **"wm=fl=501 post-compaction, 0 new alerts"**: CONFIRMED → repair-watermark: `{"repaired": false, "old_watermark": 501, "file_length": 501}`. wm=501=fl=501. ✅
+- **"heal-stale-daemon-code.heartbeat NOT PRESENT"**: UPDATED → heartbeat present at correct path `/home/larry/agents/blackboard/heal-stale-daemon-code.heartbeat` ts=2026-08-18T15:49:15Z (~11min at check; within 60-min threshold). Path correction: file is at blackboard/, not state/. ✅
+- **"all 4 bots alive"**: CONFIRMED → system-health.json ts=2026-08-18T15:53:38Z (~7min); overall=healthy; all 4 bots (beacon, forge, mirror, pulse) desired=up, alive=True. ✅
+- **"SUPABASE rotation dedup window active"**: CONFIRMED → last_dm=2026-08-17T23:23:16Z (~16.8h); dedup window active; next_rotation_due=2026-08-22 (~3.3d). ✅
+
+**Check 0 — Alert triage (~15:58Z UTC):** repair-watermark: `{"repaired": false, "old_watermark": 501, "file_length": 501}`. wm=501=fl=501. 0 new alerts above watermark. No tier-reset.
+**CHECK 0 STATUS: NOMINAL ✅**
+
+**Check 1 — Log noise (~15:58Z UTC):** journalctl -u ourliberty-*.service last 45min: **0 WARN/ERROR/CRITICAL**. **NOMINAL ✅**
+
+**Check 2 — Telegram sweep (~15:58Z UTC):** beacon_telegram_bot.log: last delivery idx=500 (doorbell, 2026-08-18T07:37:27-0600 = 13:37:27Z UTC — prior iter). No new deliveries. No inbound Larry `<- 7998341473` directives today (last directive 2026-08-05). **NOMINAL ✅**
+
+**Check 3 — Pipeline stall (~15:58Z UTC):** heal_pipeline_stall.py --dry-run: FORGE_NO_PR_SKIP (pulse-auto-d8a5df460d-20260817, reason=pr_exists, pr=#1107 MERGED — correct skip). Suppressed (cooldown): unrouted_open_pr_stranded:Larry-Yatch/RSDPM:234. DRY-RUN: 0 alerts would fire, 0 recoveries attempted. **NOMINAL ✅**
+
+**Check 4 — Pending directives (~15:59Z UTC):** beacon-pending-approvals.json PRESENT (canonical state/ path, key=`pending`, len=4, history=668), **pending=4 VERIFIED**:
+1. **~183.8h pending** ← CRITICAL AGE (alert-translations-unrouted-pr-nudges-retired-001, created 2026-08-11T00:08:30Z; reminders_sent=[6, 24, 72], all exhausted)
+2. **~168.8h pending** ← ALL REMINDERS EXHAUSTED (direction-ask-automated-cycle-journal-gap-001)
+3. **~168.4h pending** ← ALL REMINDERS EXHAUSTED (check0-delivered-kinds-tier3-001)
+4. **~160.2h pending** ← ALL REMINDERS EXHAUSTED (pending-approvals-wrong-path-guard-001)
+**NOMINAL ✅** (carried; all reminders exhausted; requires Larry Telegram attention)
+
+**Check 5 — Stale daemon code (~15:59Z UTC):** heal-stale-daemon-code.heartbeat ts=2026-08-18T15:49:15Z (~11min at check; within 60-min threshold). Note: file is at `/home/larry/agents/blackboard/heal-stale-daemon-code.heartbeat` (not state/). system-health.json ts=2026-08-18T15:53:38Z (~7min); overall=healthy; all 4 bots (beacon, forge, mirror, pulse) desired=up, alive=True. **NOMINAL ✅**
+
+**Check A — Source repo (~15:59Z UTC):** branch=main, HEAD=9e397421=origin/main (Pulse cycle 20260818T152559Z). Clean tree. 0 commits behind. **NOMINAL ✅**
+**Check B — Sync health (~15:59Z UTC):** agent-core-sync.json: last_sync=2026-08-18T15:55:16Z (~3min; status=no-change; commit=9e397421; within 2h threshold). **NOMINAL ✅**
+**Check C — Agent liveness (~15:59Z UTC):** system-health.json ts=2026-08-18T15:53:38Z (~7min); overall=healthy; all 4 bots desired=up, alive=True. **NOMINAL ✅**
+**Check E — PR/merge state (~15:59Z UTC):** **0 open PRs** in ourliberty-agent-core (gh query). **NOMINAL ✅**
+**Check H — Forge/Beacon/Mirror/Pulse activity (~16:00Z UTC):** All inboxes empty (beacon=0, forge=0, mirror=0, pulse=0). **NOMINAL ✅**
+
+**§5.0 one-shots:** audit_due_nudge: no-op. distill_detector: no-op. audit_cadence_signal: path lookup blocked this iter (prior cycles: no-op; informational). **NOMINAL ✅**
+
+**Check I:** Today is Tuesday 2026-08-18. Next firing: Wednesday 2026-08-19 ~14:13Z UTC. **OFF-DAY. SKIP ✅**
+**Check III:** Latest artifact 2026-08-09; gate=2026-08-09+14=2026-08-23. **OFF-WEEK. SKIP ✅**
+**Check XIV:** Latest artifact 2026-08-17 (no new artifact since iter ~9465). **CARRY ✅**
+
+**PRIME DIRECTIVE ratio:** ratio=125.24 (unchanged — 0 new interventions or systemic_fixes this iter; iter_clean heartbeat appended ts=2026-08-18T16:00Z UTC, tier=3). Pending approval queue (4 items, ~160.2h–183.8h, all reminders exhausted) remains the blocker. ✅
+
+**Rotations:** SUPABASE_SERVICE_ROLE_KEY last_dm=2026-08-17T23:23:16Z (~16.8h); dedup window active; next_rotation_due=2026-08-22 (~3.3d). No new DM this iter. ✅
+
+**G-rule tracking:** (0 new alerts; no G-rule occurrence changes)
+- `alert-retraction-no-translation-001` **[DISPATCHED iter ~9100]**: approval `alert-translations-unrouted-pr-nudges-retired-001` **~183.8h — CRITICAL AGE** (all reminders exhausted). [PENDING LARRY APPROVAL]
+- `automated-cycle-no-journal-entry-001` **DISPATCHED ✅**: direction-ask-automated-cycle-journal-gap-001 **~168.8h** (all reminders exhausted). [PENDING LARRY APPROVAL]
+- `check0-delivered-kinds-tier3-001` **DISPATCHED ✅**: **~168.4h** (all reminders exhausted). [PENDING LARRY APPROVAL]
+- `pending-approvals-wrong-path-guard-001` **DISPATCHED ✅**: **~160.2h** (all reminders exhausted). [PENDING LARRY APPROVAL]
+- All other G-rules carried unchanged.
+
+**Actions taken:**
+- Check 0: watermark verified (wm=fl=501; 0 new alerts). ✅
+- PRIME DIRECTIVE: iter_clean heartbeat appended (ts=2026-08-18T16:00Z UTC, tier=3, kind=iter_clean). ✅
+- Tier state: `cycle_tier_state.py record --checks-clean true` → **tier=3, consecutive_clean=37→38**. ✅
+
+**Escalations:** None new this iter. Outstanding items (carried):
+1. **alert-translations-unrouted-pr-nudges-retired-001: ~183.8h — CRITICAL AGE (all reminders exhausted).** Carry.
+2. direction-ask-automated-cycle-journal-gap-001 (~168.8h, all reminders exhausted). Carry.
+3. check0-delivered-kinds-tier3-001 (~168.4h, all reminders exhausted). Carry.
+4. pending-approvals-wrong-path-guard-001 (~160.2h, all reminders exhausted). Carry.
+5. Informational-cards impl gap (iter ~9102). Carry.
+6. Check III threshold proposals (artifact 2026-08-09; approve threshold-update-2026-08-09). Carry.
+
+**Patterns:** System steady-state. 38 consecutive clean cycles since last signal (2026-08-17T17:57:48Z); Tier 3/30-min cadence. 0 new alerts (wm=fl=501). PRIME DIRECTIVE ratio 125.24 (flat; blocked on 4-item pending approval queue, all ~160.2h–183.8h, all reminders exhausted — requires direct Larry Telegram action). SUPABASE rotation due 2026-08-22 (~3.3d). Check I next Wed 2026-08-19 ~14:13Z UTC. Path note: heal-stale-daemon-code.heartbeat lives at blackboard/ not state/ (informational; service healthy).
+
+**Tier end-of-iter:** **Tier 3**, consecutive_clean=38 (30-min cadence).
+
+---
+
 ## Iteration ~9465 — 2026-08-18T15:24Z UTC (Larry /cycle chat, Tier 3 consecutive_clean=36→37 [Check 0: wm=fl=501, 0 new alerts; all mandatory checks NOMINAL ✅; 0 open PRs; 4 pending approvals CRITICAL-AGE])
 
 **Health:** ✅ Nominal — all checks clean. **Tier 3**, consecutive_clean=36→37 (30-min cadence). 2026-08-18 UTC.
@@ -2932,85 +3006,6 @@
 **Patterns:** System fully recovered from the ~3.85h GitHub API 503 outage (cleared 18:36:49Z UTC). All services nominal, all repos at 0 open PRs. SUPABASE_SERVICE_ROLE_KEY dedup window expires ~22:52Z UTC tonight but rotation not due until 2026-08-22. The 4 long-pending approvals (6–7 days old, all reminders exhausted) remain the primary operator backlog.
 
 **Tier end-of-iter:** **Tier 2**, consecutive_clean=2 (15-min cadence; 1 more clean iter needed for Tier 3).
-
----
-
-## Iteration ~9393 — 2026-08-17T18:36Z UTC (Larry /cycle chat, Tier 2 consecutive_clean=0→1 [Check 0: fl=518 wm=518, 0 new alerts; all mandatory checks NOMINAL; GitHub API RECOVERED at 18:36:49Z UTC (~3.85h outage cleared); RSDPM PR#234 CLEARED (0 open PRs per fresh snapshot); pending=4 all reminders exhausted; SUPABASE_SERVICE_ROLE_KEY dedup window expires ~22:52Z UTC (~4.3h)])
-
-**Health:** ✅ Nominal — all mandatory checks clean. **Tier 2**, consecutive_clean=0→1 (this iter clean; 2 more needed for Tier 3). Monday 2026-08-17 UTC.
-
-**VERIFY-BEFORE-REASSERT (from iter ~9392 at 18:17Z UTC; automated wrapper commits since: 888da764 [20260817T181915Z]):**
-- **"fl=518, wm=518, 0 new alerts"**: CONFIRMED → repair-watermark: repaired=false (old_watermark=518, file_length=518). 0 new alerts. ✅
-- **"HEAD=b5fdd40e=origin/main"**: UPDATED → HEAD=888da764=origin/main (Pulse cycle 20260817T181915Z; wrapper committed after iter ~9392). ✅
-- **"all 4 bots alive"**: CONFIRMED → system-health.json ts=2026-08-17T18:35:03Z (~1m at check); overall=healthy; all 4 bots desired+alive. disk=22%, memory=21%. ✅
-- **"heal-stale-daemon-code.heartbeat PRESENT (~9m)"**: CONFIRMED → ts=2026-08-17T18:27:22Z at /home/larry/agents/blackboard/heal-stale-daemon-code.heartbeat (~9m at ~18:36Z check; within 60-min threshold). ✅
-- **"pending=4 CONFIRMED"**: CONFIRMED → pending=4 (ages ~162.5h, ~147.4h, ~147.1h, ~138.9h; all reminders exhausted). ✅
-- **"Tier 1→2 DE-ESCALATED, consecutive_clean=0"**: CONFIRMED → cycle_tier_state.py read: tier=2, consecutive_clean=0. ✅
-- **"0 open PRs (ourliberty-agent-core)"**: CONFIRMED via fresh snapshot (18:36:49Z) → 0 open PRs. ✅
-- **"sync ~25m ago"**: UPDATED → last_sync=2026-08-17T17:52:07Z (~44m at ~18:36Z check; status=no-change; within 2h threshold). ✅
-- **"dedup window expires ~22:52Z UTC (~4.6h remaining)"**: UPDATED → ~4.3h remaining at ~18:36Z. No new DM needed (within window; next_rotation_due=2026-08-22). ✅
-- **"GitHub API 503 still ongoing (~3.5h+)"**: **CLEARED** → GitHub API RECOVERED at 18:36:49Z UTC. gh-pr-snapshot-refresher wrote fresh snapshot 4/4 repos (18:36:49Z). Outage duration: ~14:45Z–18:36Z UTC (~3.85h). ✅ **OUTAGE CLEARED**
-- **"RSDPM PR#234 open/unrouted (stall cooldown)"**: **CLEARED** → fresh snapshot (18:36:49Z) shows RSDPM: 0 open PRs. PR#234 (Mission Control theme) merged or closed between 18:01Z and 18:36Z today. No Forge action needed. STALE FINDING CLEARED. ✅
-- **"Check I artifact check-i-2026-08-17.json"**: CONFIRMED — no newer artifact; still most recent. Next: Wednesday 2026-08-19. ✅
-- **"Check III OFF-WEEK"**: CONFIRMED (gate=2026-08-23). ✅
-- **"rsdpm-rehearseprs G-rule [2/3]"**: CONFIRMED — 0 new alerts this iter. Still [2/3]. ✅
-
-**Check 0 — Alert triage (~18:36Z UTC):** repair-watermark: repaired=false (old_watermark=518, file_length=518). **0 new alerts.** Watermark holds at 518.
-**NOMINAL ✅**
-
-**Check 1 — Log noise (~18:36Z UTC):** journalctl -u ourliberty-*.service last 60 min: all WARN lines are GitHub 503 from gh-pr-snapshot-refresher and heal-pipeline-stall (known ongoing outage, now recovered). No novel WARN/ERROR patterns. heal-stale-daemon-code INFO lines (ActiveEnterTimestamp unparseable for timer-only units) — routine/known.
-**NOMINAL ✅**
-
-**Check 2 — Telegram sweep (~18:36Z UTC):** Bot log: no new deliveries since idx=517 (dispatch-branch-cleanup:gh-unavailable, 11:47 MDT). No inbound Larry directives today.
-**NOMINAL ✅**
-
-**Check 3 — Pipeline stall (~18:36Z UTC):** heal_pipeline_stall.py --dry-run (18:36:14Z, pre-snapshot-recovery): FORGE_NO_PR_SKIP (pulse-auto-d8a5df460d-20260817, reason=pr_exists PR#1107). Suppressed (cooldown): unrouted_open_pr_stranded:RSDPM:234. 0 alerts would fire. NOTE: healer ran before fresh snapshot (18:36:49Z); on next fire it will see RSDPM 0 open PRs and will not see PR#234 as strandable.
-**NOMINAL ✅**
-
-**Check 4 — Pending directives (~18:36Z UTC):** beacon-pending-approvals.json PRESENT (state/ path), **pending=4 CONFIRMED**:
-1. **~162.5h pending** ← CRITICAL AGE (alert-translations-unrouted-pr-nudges-retired-001, created 2026-08-11T00:08:30Z; all reminders exhausted)
-2. **~147.4h pending** ← ALL REMINDERS EXHAUSTED (direction-ask-automated-cycle-journal-gap-001)
-3. **~147.1h pending** ← ALL REMINDERS EXHAUSTED (check0-delivered-kinds-tier3-001)
-4. **~138.9h pending** ← ALL REMINDERS EXHAUSTED (pending-approvals-wrong-path-guard-001)
-**NOMINAL ✅** (carried; no new Pulse actions available)
-
-**Check 5 — Stale daemon code (~18:36Z UTC):** heal-stale-daemon-code.heartbeat ts=2026-08-17T18:27:22Z at /home/larry/agents/blackboard/ (~9m at check; within 60-min threshold). system-health.json ts=2026-08-17T18:35:03Z; overall=healthy; all 4 bots alive.
-**NOMINAL ✅**
-
-**Check A — Source repo (~18:36Z UTC):** branch=main, HEAD=888da764=origin/main (Pulse cycle 20260817T181915Z), clean tree. **NOMINAL ✅**
-**Check B — Sync health (~18:36Z UTC):** last_sync=2026-08-17T17:52:07Z (~44m at check; status=no-change; within 2h threshold). **NOMINAL ✅**
-**Check C — Agent liveness (~18:35Z UTC):** system-health.json ts=2026-08-17T18:35:03Z; overall=healthy; all 4 bots desired=up, alive=true; disk=22%, memory=21%. **NOMINAL ✅**
-**Check E — PR/merge state (~18:36:49Z UTC — FRESH SNAPSHOT):** GitHub API RECOVERED. gh-pr-snapshot-refresher wrote 4/4 repos fresh at 18:36:49Z: ourliberty-agent-core 0 open PRs, ourliberty-dashboard 0 open PRs, ourliberty-graph 0 open PRs, RSDPM 0 open PRs. **RSDPM PR#234 no longer open** (merged or closed between 18:01Z and 18:36Z). **RECOVERED ✅**
-**Check H — Forge/Beacon/Mirror activity:** Beacon inbox: 0. Forge inbox: 0. **NOMINAL ✅**
-
-**§5.0 one-shots:** audit_due_nudge: no-op ✅. distill_detector: no-op ✅. audit_cadence_signal (review/distill/ path): no-op ✅. **NOMINAL ✅**
-
-**Check I:** Latest artifact check-i-2026-08-17.json (14:13Z; Monday firing). No new artifact. Next: Wednesday 2026-08-19. **CARRY ✅**
-**Check III:** OFF-WEEK (gate=2026-08-23). **SKIP ✅**
-**Check XIV:** Latest artifact check-xiv-2026-08-17.json (today). No new artifact. **CARRY ✅**
-
-**Rotations:** SUPABASE_SERVICE_ROLE_KEY last_dm=2026-08-03T22:52:32Z (~13.83d); dedup window expires **2026-08-17T22:52Z UTC (~4.3h remaining at ~18:36Z check)**. next_rotation_due=2026-08-22 (4.2d). No new DM needed.
-
-**G-rule tracking:**
-- `rsdpm-rehearseprs-gh-unavailable-tier4-no-translation-001` **[2/3]**: no new occurrence this iter (0 new alerts). GitHub API now recovered — this G-rule is unlikely to hit 3/3 absent another gh outage. [WATCH]
-- All other G-rules carried unchanged from iter ~9392.
-
-**Actions taken:**
-- PRIME DIRECTIVE: iter_clean row appended (ts=2026-08-17T18:39:53Z, tier=2, kind=iter_clean). ✅
-- Tier state: `cycle_tier_state.py record --checks-clean true` → **tier=2, consecutive_clean=1** (this iter clean; 2 more needed for Tier 3). ✅
-
-**Escalations:** None new this iter. Outstanding (carried):
-1. alert-translations-unrouted-pr-nudges-retired-001: ~162.5h — CRITICAL AGE (all reminders exhausted). Carry.
-2. direction-ask-automated-cycle-journal-gap-001 (~147.4h). Carry.
-3. check0-delivered-kinds-tier3-001 (~147.1h). Carry.
-4. pending-approvals-wrong-path-guard-001 (~138.9h). Carry.
-NOTE: GitHub API 503 outage CLEARED at 18:36:49Z UTC (~3.85h duration). RSDPM PR#234 also CLEARED (per fresh snapshot). No escalation needed for either — both resolved without intervention.
-
-**PRIME DIRECTIVE (post-action):** interventions=2630, systemic_fixes=21, ratio=125.24 (worsening). No systemic_fix eligible this iter. NOTE: invoked via Larry /cycle chat (direct); wrapper commit not expected from this session.
-
-**Patterns:** GitHub API 503 outage (~3.85h, 14:45Z–18:36Z UTC) cleared naturally — all services degraded gracefully throughout (no alerts, no cascades, no data loss; healers carried stale cached snapshot). RSDPM PR#234 (Mission Control theme) resolved: 0 open PRs in RSDPM per fresh snapshot. The 4 long-pending approvals (6–7 days, all reminders exhausted) remain the primary operator backlog. SUPABASE_SERVICE_ROLE_KEY dedup window expires in ~4.3h; next rotation due 2026-08-22.
-
-**Tier end-of-iter:** **Tier 2**, consecutive_clean=1 (15-min cadence; 2 more clean iters needed for Tier 3).
 
 ---
 
