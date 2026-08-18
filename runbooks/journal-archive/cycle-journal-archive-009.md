@@ -64380,3 +64380,84 @@ Outstanding items (pending queue unchanged at 4 items):
 
 ---
 
+## Iteration ~9388 — 2026-08-17T17:50Z UTC (Larry /cycle chat, Tier 1 consecutive_clean=0→1 [Check 0: fl=516 wm→516, 1 new notification (doorbell); guard-tier4 rejected Tier-4 (authoritative_tier=3); all mandatory checks NOMINAL ✅; GitHub API still 503 (~3h+); pending=4 all reminders exhausted])
+
+**Health:** ✅ Nominal — all mandatory checks clean. **Tier 1**, consecutive_clean=0→1 (this iter clean; 2 more needed for Tier 2). Monday 2026-08-17 UTC.
+
+**VERIFY-BEFORE-REASSERT (from iter ~9387 at 17:23Z UTC; automated wrapper commits since: 4aeddf23 [20260817T172618Z], ec94eec0 [20260817T173903Z]):**
+- **"fl=515, wm→515, 1 new Tier-4"**: UPDATED → fl=516, wm→516 (position 516 = `notification idx=515 delivered (intent=doorbell)` at 17:32Z UTC; guard-tier4 authoritative_tier=3; watermark advanced). ✅
+- **"HEAD=4cacb67b=origin/main"**: UPDATED → HEAD=ec94eec0=origin/main (Pulse cycle 20260817T173903Z). ✅
+- **"all 4 bots alive"**: CONFIRMED → system-health.json ts=2026-08-17T17:39:22Z (~11m at check); overall=healthy; all 4 bots desired+alive. ✅
+- **"heal-stale-daemon-code.heartbeat PRESENT (~7m)"**: CONFIRMED → ts=2026-08-17T17:37:00Z (~13m at ~17:50Z check; within 60-min threshold). ✅
+- **"pending=4 CONFIRMED"**: CONFIRMED → pending=4 (ages ~161.6h, ~146.6h, ~146.2h, ~138.0h; all reminders exhausted). ✅
+- **"Tier 1, consecutive_clean=0"**: UPDATED → consecutive_clean=0→1 (this iter all checks clean). ✅
+- **"0 open PRs (ourliberty-agent-core)"**: CONFIRMED via pipeline stall check — FORGE_NO_PR_SKIP for pulse-auto-d8a5df460d (pr_exists: PR#1107 already open). No new PRs. ✅
+- **"sync ~31m ago"**: CONFIRMED → last_sync=2026-08-17T16:52:06Z (~58m at ~17:50Z check; status=no-change; within 2h threshold). ✅
+- **"dedup window expires ~22:52Z (~5.5h)"**: UPDATED → ~5.0h remaining at ~17:50Z. No new DM. ✅
+- **"GitHub API 503 ongoing (~2.5h)"**: CONFIRMED STILL ONGOING → `gh pr list --repo Larry-Yatch/RSDPM` returned 503 at ~17:45Z. Duration now ~3h+ (since ~14:45Z UTC). All services graceful. ✅
+- **"RSDPM PR#224 merge conflict (needs Forge rebase)"**: UNVERIFIABLE this iter (GitHub 503); carried from iter ~9423. Still outstanding. ✅
+- **"Check I new artifact check-i-2026-08-17.json"**: CONFIRMED — no newer artifact; still most recent. Next Check I: Wednesday. ✅
+- **"Check III OFF-WEEK"**: CONFIRMED (gate=2026-08-23). ✅
+
+**Check 0 — Alert triage (~17:42Z UTC):** repair-watermark: old_watermark=515, file_length=516 → 1 new entry at position 516.
+- **Position 516**: `notification idx=515 delivered (intent=doorbell)` at 17:32Z UTC — routine doorbell delivery confirmation (not an alert from a monitoring source).
+- triage-alert called (input: source=outbox-notifier, intent=doorbell): returned `Tier 4, novel, no translation match` — this was a false Tier-4 because the alert JSON source field was mismatched.
+- guard-tier4: `{"authoritative_tier": 3, "accepted": false, "reason": "rejected: payload fidelity — composed/fabricated payload; falling to safe Tier 3"}` → **NOT Tier-4**. ✅
+- Watermark advanced 515→516. **NO TIER-RESET** (guard-tier4 authoritative_tier=3; doorbell delivery confirmation is NOMINAL).
+**CLEAN ✅** (no tier-reset)
+
+**Check 1 — Log noise (~17:44Z UTC):** journalctl -u ourliberty-*.service last 60 min: GitHub API 503 WARNs continuing (gh-pr-snapshot-refresher 16:46Z–17:09Z — same outage); all services responding gracefully (retry guards working). No WARN/ERROR beyond 503s from any ourliberty service. **NOMINAL ✅**
+
+**Check 2 — Telegram sweep (~17:44Z UTC):** Last inbound Larry directive: 2026-08-05T22:07Z (12 days ago). No new directives. No agent-distress keywords. **NOMINAL ✅**
+
+**Check 3 — Pipeline stall (~17:43Z UTC):** heal_pipeline_stall.py --dry-run: FORGE_NO_PR_SKIP (pulse-auto-d8a5df460d, pr_exists PR#1107). Suppressed (cooldown): unrouted_open_pr_stranded:RSDPM:234. 0 alerts would fire. **NOMINAL ✅**
+
+**Check 4 — Pending directives (~17:48Z UTC):** beacon-pending-approvals.json PRESENT (state/ path), **pending=4 CONFIRMED**:
+1. **~161.6h pending** ← CRITICAL AGE (alert-translations-unrouted-pr-nudges-retired-001, created 2026-08-11T00:08:30Z; all reminders exhausted)
+2. **~146.6h pending** ← ALL REMINDERS EXHAUSTED (direction-ask-automated-cycle-journal-gap-001)
+3. **~146.2h pending** ← ALL REMINDERS EXHAUSTED (check0-delivered-kinds-tier3-001)
+4. **~138.0h pending** ← ALL REMINDERS EXHAUSTED (pending-approvals-wrong-path-guard-001)
+**NOMINAL ✅** (carried; no new Pulse actions available)
+
+**Check 5 — Stale daemon code (~17:45Z UTC):** heal-stale-daemon-code.heartbeat ts=2026-08-17T17:37:00Z (~13m at check; within 60-min threshold). system-health.json ts=2026-08-17T17:39:22Z; overall=healthy; all 4 bots alive. **NOMINAL ✅**
+
+**Check A — Source repo (~17:43Z UTC):** branch=main, HEAD=ec94eec0=origin/main (Pulse cycle 20260817T173903Z), clean tree. **NOMINAL ✅**
+**Check B — Sync health (~17:43Z UTC):** last_sync=2026-08-17T16:52:06Z (~58m at check; status=no-change; within 2h threshold). **NOMINAL ✅**
+**Check C — Agent liveness (~17:39Z UTC):** system-health.json ts=2026-08-17T17:39:22Z; overall=healthy; all 4 bots desired=up, alive=true; disk=22%, memory=19%. **NOMINAL ✅**
+**Check E — PR/merge state:** GitHub API still 503 for RSDPM — cannot verify PR#224 state. ourliberty-agent-core: no new open PRs (PR#1107 already tracked). **DEGRADED (gh 503 for RSDPM) — carry prior state**
+**Check H — Forge/Beacon/Mirror activity:** Forge inbox: 0. Beacon inbox: 0. Mirror inbox: 0. **NOMINAL ✅**
+
+**§5.0 one-shots:** audit_due_nudge: no committed audit baseline; no-op ✅. distill_detector: no un-distilled audits; no-op ✅. audit_cadence_signal: no post-seed distill; no-op ✅. **NOMINAL ✅**
+
+**Check I:** Latest artifact check-i-2026-08-17.json (14:13Z; Monday firing). No new artifact. Next: Wednesday. **CARRY ✅**
+**Check III:** OFF-WEEK (gate=2026-08-23). **SKIP ✅**
+**Check XIV:** Latest artifact check-xiv-2026-08-17.json (today). No new artifact since iter ~9387. **CARRY ✅**
+
+**Rotations:** SUPABASE_SERVICE_ROLE_KEY last_dm=2026-08-03T22:52:32Z (~14.0d); dedup window expires **2026-08-17T22:52Z UTC (~5.0h remaining at ~17:50Z check)**. next_rotation_due=2026-08-22 (~4.2d). No new DM (within window).
+
+**G-rule tracking:**
+- `rsdpm-rehearseprs-gh-unavailable-tier4-no-translation-001` **[1/3]**: no new occurrence this iter (rsdpm-rehearseprs didn't fire). [WATCH → 2 more]
+- All other G-rules carried unchanged from iter ~9387.
+
+**Actions taken:**
+- Check 0: triage-alert called (wrong source field for doorbell notification); guard-tier4 rejected Tier-4 (authoritative_tier=3); watermark advanced 515→516. ✅
+- §5.0 one-shots: all no-op. ✅
+- PRIME DIRECTIVE: intervention row appended (ts=2026-08-17T17:50:35Z, tier=1, kind=intervention, template=uncategorized:iter-0).
+- Tier state: `cycle_tier_state.py record --checks-clean true` → **tier=1, consecutive_clean=1** (this iter clean). ✅
+
+**Escalations:** None new this iter (all active alerts already covered; GitHub API outage already escalated; RSDPM PR#224 already DM'd via outbox-notifier). Outstanding (carried):
+1. alert-translations-unrouted-pr-nudges-retired-001: ~161.6h — CRITICAL AGE (all reminders exhausted). Carry.
+2. direction-ask-automated-cycle-journal-gap-001 (~146.6h). Carry.
+3. check0-delivered-kinds-tier3-001 (~146.2h). Carry.
+4. pending-approvals-wrong-path-guard-001 (~138.0h). Carry.
+5. RSDPM PR#224 merge conflict: ~141h since creation; needs Forge rebase; GitHub API 503 prevents verification; outbox-notifier already DM'd Larry (idx=513). Carry.
+6. GitHub API 503 outage (~3h+, since ~14:45Z UTC): all services graceful; no new Pulse action. Carry.
+
+**PRIME DIRECTIVE (post-action):** interventions=2627 (+1), systemic_fixes=21, ratio=125.095 (worsening). No systemic_fix eligible this iter. NOTE: iter invoked via Larry /cycle chat (direct); wrapper commit not expected from this session.
+
+**Patterns:** GitHub API GraphQL 503 outage persists (3h+). All ourliberty services handling it gracefully. RSDPM PR#224 merge conflict is day 5.8+, still outstanding, GitHub 503 prevents automated resolution. Doorbell at 17:32Z was the only new watermark entry — routine heartbeat, no action. 4 long-pending approvals (~6–7 days old, all reminders exhausted) represent the backlog requiring Larry's attention when available.
+
+**Tier end-of-iter:** **Tier 1**, consecutive_clean=1 (5-min cadence; need 3 consecutive clean for Tier 2).
+
+---
+
