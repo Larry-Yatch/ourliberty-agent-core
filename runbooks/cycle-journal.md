@@ -4,6 +4,78 @@
 
 ---
 
+## Iteration ~9513 — 2026-08-19T17:02Z UTC (Larry /cycle chat, Tier 3 consecutive_clean=83→84 [Check 0: wm=503=fl, 0 new alerts; all mandatory checks NOMINAL ✅; 0 open PRs; pending=3 carried])
+
+**Health:** ✅ Nominal — all checks clean. **Tier 3**, consecutive_clean=83→84 (30-min cadence). 2026-08-19 UTC.
+
+**VERIFY-BEFORE-REASSERT (from iter ~9511 at ~16:31Z UTC; commits since: ff30822f [Pulse cycle 20260819T163413Z — automated cycle, no journal entry per known bug]):**
+- **"Tier 3, consecutive_clean=82→83"**: UPDATED → consecutive_clean=83→84 this iter (automated cycle ff30822f did not update tier state per automated-cycle-no-journal-entry-001 bug). ✅
+- **"0 open PRs"**: CONFIRMED → gh returned [] (~17:02Z). ✅
+- **"pending=3 (~193.0h–208.4h; all reminders exhausted)"**: UPDATED → ages now ~193.5h–208.9h. ✅
+- **"last_sync=2026-08-19T15:57:19Z (~34min)"**: UPDATED → last_sync=2026-08-19T16:57:20Z (~6min at check; status=no-change; within 2h threshold). ✅
+- **"wm=503=fl, 0 new alerts"**: CONFIRMED → repair=no-op; wm=fl=503; 0 new alerts. ✅
+- **"heal-stale-daemon-code.heartbeat ts=2026-08-19T16:23:19Z (~8min)"**: UPDATED → ts=2026-08-19T16:53:20Z (~10min at check; within 60-min threshold). ✅
+- **"all 4 bots alive"**: CONFIRMED → system-health ts=2026-08-19T17:01:11Z (~2min); overall=healthy; all 4 bots (beacon, forge, mirror, pulse) desired=up, alive=True. ✅
+- **"SUPABASE rotation last_dm=2026-08-17T23:23:16Z (~41.1h ago)"**: UPDATED → ~41.7h ago; 14-day dedup window active; next_rotation_due=2026-08-22 ~2.1d; no new DM. ✅
+
+**Check 0 — Alert triage (~17:02Z UTC):** repair-watermark: `{"repaired": false, "old_watermark": 503, "file_length": 503}` — no repair needed. wm=fl=503; 0 new alerts above watermark. No tier-reset.
+**CHECK 0 STATUS: NOMINAL ✅**
+
+**Check 1 — Log noise (~17:02Z UTC):** journalctl --user -u ourliberty-*.service: no data available (services not registered with journald; all 4 bots confirmed alive via system-health ts=17:01:11Z). **NOMINAL ✅**
+
+**Check 2 — Telegram sweep (~17:02Z UTC):** beacon_telegram_bot.log: most recent delivery — idx=503 dispatch-branch-cleanup digest (08:55 MDT / 14:55Z UTC 2026-08-19). No inbound from Larry `<- 7998341473` (last directive 2026-08-05T22:09Z MDT; no new directives). Bot alive per system-health. **NOMINAL ✅**
+
+**Check 3 — Pipeline stall (~17:02Z UTC):** heal_pipeline_stall.py --dry-run: suppressed (cooldown): unrouted_open_pr_stranded:Larry-Yatch/RSDPM:234. DRY-RUN: 0 alerts would fire, 0 recoveries attempted. **NOMINAL ✅**
+
+**Check 4 — Pending directives (~17:02Z UTC):** beacon-pending-approvals.json PRESENT (canonical state/ path, key=`pending`, len=3), **pending=3 VERIFIED**:
+1. **~208.9h pending** ← CRITICAL AGE (alert-translations-unrouted-pr-nudges-retired-001, created 2026-08-11T00:08:30Z; reminders_sent=[6, 24, 72], all exhausted)
+2. **~193.8h pending** ← ALL REMINDERS EXHAUSTED (direction-ask-automated-cycle-journal-gap-001, created 2026-08-11T15:10:52Z)
+3. **~193.5h pending** ← ALL REMINDERS EXHAUSTED (check0-delivered-kinds-tier3-001, created 2026-08-11T15:31:39Z)
+**NOMINAL ✅** (carried; all reminders exhausted; requires Larry Telegram attention)
+
+**Check 5 — Stale daemon code (~17:02Z UTC):** heal-stale-daemon-code.heartbeat ts=2026-08-19T16:53:20Z (~10min at check; within 60-min threshold). system-health ts=2026-08-19T17:01:11Z (~2min); overall=healthy; all 4 bots desired=up, alive=True. **NOMINAL ✅**
+
+**Check A — Source repo (~17:02Z UTC):** branch=main, HEAD=ff30822f=origin/main. Clean tree (Pulse-owned cycle-journal.md modification; wrapper handles commit). 0 commits behind/ahead. **NOMINAL ✅**
+**Check B — Sync health (~17:02Z UTC):** agent-core-sync.json: last_sync=2026-08-19T16:57:20Z (~6min; status=no-change; within 2h threshold). **NOMINAL ✅**
+**Check C — Agent liveness (~17:02Z UTC):** system-health ts=2026-08-19T17:01:11Z (~2min); overall=healthy; all 4 bots desired=up, alive=True. **NOMINAL ✅**
+**Check E — PR/merge state (~17:02Z UTC):** **0 open PRs** in ourliberty-agent-core. **NOMINAL ✅**
+**Check H — Forge/Beacon/Mirror/Pulse activity (~17:02Z UTC):** All inboxes empty. **NOMINAL ✅**
+
+**§5.0 one-shots:** audit_due_nudge: no committed audit baseline; no-op. distill_detector: no un-distilled audits; no-op. audit_cadence_signal (review/distill/): no post-seed decision-grade distill artifacts yet; no-op. **NOMINAL ✅**
+
+**Check I:** Wednesday 2026-08-19. Already fired at ~14:13Z UTC and processed in iter ~9507 (artifact check-i-2026-08-19.json). No re-trigger needed. **FIRED AND LOGGED ✅**
+**Check III:** Latest artifact 2026-08-09; gate=2026-08-09+14=2026-08-23. **OFF-WEEK. SKIP ✅**
+**Check XIV:** No new artifact since 2026-08-17. **CARRY ✅**
+
+**PRIME DIRECTIVE ratio:** ratio=125.14 (30d window: unchanged — 0 new interventions or systemic_fixes this iter; iter_clean heartbeat appended ts=2026-08-19T17:02:39Z UTC, tier=3, kind=iter_clean). Pending approval queue (3 items, ~193.5h–208.9h, all reminders exhausted) remains the blocker. ✅
+
+**Rotations:** SUPABASE_SERVICE_ROLE_KEY last_dm=2026-08-17T23:23:16Z (~41.7h ago; 14-day dedup window active; next_rotation_due=2026-08-22 ~2.1d). No new DM this iter. ✅
+
+**G-rule tracking:**
+- `alert-retraction-no-translation-001` **[DISPATCHED iter ~9100]**: approval `alert-translations-unrouted-pr-nudges-retired-001` **~208.9h — CRITICAL AGE** (all reminders exhausted). [PENDING LARRY APPROVAL]
+- `automated-cycle-no-journal-entry-001` **DISPATCHED ✅**: direction-ask-automated-cycle-journal-gap-001 **~193.8h** (all reminders exhausted). [PENDING LARRY APPROVAL]
+- `check0-delivered-kinds-tier3-001` **DISPATCHED ✅**: **~193.5h** (all reminders exhausted). [PENDING LARRY APPROVAL]
+- `pending-approvals-wrong-path-guard-001` **RESOLVED — REJECTED ✅** (Larry 2026-08-19T15:11:05Z; G-rule CLOSED iter ~9509).
+- All other G-rules carried unchanged.
+
+**Actions taken:**
+- Check 0: watermark no-repair needed (wm=503=fl=503); 0 new alerts processed. ✅
+- PRIME DIRECTIVE: iter_clean heartbeat appended (ts=2026-08-19T17:02:39Z UTC, tier=3, kind=iter_clean). ✅
+- Tier state: `cycle_tier_state.py record --checks-clean true` → **tier=3, consecutive_clean=83→84**. ✅
+
+**Escalations:** None new this iter. Outstanding items (carried):
+1. **alert-translations-unrouted-pr-nudges-retired-001: ~208.9h — CRITICAL AGE (all reminders exhausted).** Carry.
+2. direction-ask-automated-cycle-journal-gap-001 (~193.8h, all reminders exhausted). Carry.
+3. check0-delivered-kinds-tier3-001 (~193.5h, all reminders exhausted). Carry.
+4. Informational-cards impl gap (iter ~9102). Carry.
+5. Check III threshold proposals (artifact 2026-08-09; approve threshold-update-2026-08-09). Carry.
+
+**Patterns:** System steady-state. 84 consecutive clean cycles; Tier 3/30-min cadence. Check I fired as scheduled today (~14:13Z UTC, Wednesday). PRIME DIRECTIVE ratio 125.14 (flat; blocked on 3-item pending approval queue, all ~193.5h–208.9h, all reminders exhausted — requires direct Larry Telegram action). SUPABASE rotation due 2026-08-22 (~2.1d). No new alerts, no open PRs, all bots healthy.
+
+**Tier end-of-iter:** **Tier 3**, consecutive_clean=84 (30-min cadence).
+
+---
+
 ## Iteration ~9511 — 2026-08-19T16:31Z UTC (Larry /cycle chat, Tier 3 consecutive_clean=82→83 [Check 0: wm=503=fl, 0 new alerts; all mandatory checks NOMINAL ✅; 0 open PRs; pending=3 carried])
 
 **Health:** ✅ Nominal — all checks clean. **Tier 3**, consecutive_clean=82→83 (30-min cadence). 2026-08-19 UTC.
@@ -2884,79 +2956,6 @@ Watermark advanced 501→503. No tier-reset (all Tier-3 silences).
 **Patterns:** System steady-state. 45 consecutive clean cycles since last signal (2026-08-17T17:57:48Z); Tier 3/30-min cadence. 0 new alerts (wm=fl=502). PRIME DIRECTIVE ratio 125.24 (flat; blocked on 4-item pending approval queue, all ~164.1h–187.7h, all reminders exhausted — requires direct Larry Telegram action). SUPABASE rotation due 2026-08-22 (~3.1d). Check I next Wed 2026-08-19 ~14:13Z UTC.
 
 **Tier end-of-iter:** **Tier 3**, consecutive_clean=45 (30-min cadence).
-
----
-
-## Iteration ~9472 — 2026-08-18T19:13Z UTC (Larry /cycle chat, Tier 3 consecutive_clean=43→44 [Check 0: wm=fl=502, 0 new alerts; all mandatory checks NOMINAL ✅; 0 open PRs; 4 pending approvals CRITICAL-AGE])
-
-**Health:** ✅ Nominal — all checks clean. **Tier 3**, consecutive_clean=43→44 (30-min cadence). 2026-08-18 UTC.
-
-**VERIFY-BEFORE-REASSERT (from iter ~9471 at ~18:36Z UTC; commits since: f4d9d664 [Pulse cycle 20260818T183851Z — most recent automated; no new commits]):**
-- **"Tier 3, consecutive_clean=42→43"**: UPDATED → consecutive_clean=43→44 this iter. ✅
-- **"PR#1107 MERGED, 0 open PRs"**: CONFIRMED → 0 open PRs (gh query ~19:12Z). ✅
-- **"pending=4 (~162.9h–186.5h; all reminders exhausted)"**: UPDATED → ages now ~163.5h–187.1h (consistent with ~37min elapsed since ~18:36Z). ✅
-- **"last_sync=2026-08-18T17:55:16Z (~41min)"**: UPDATED → last_sync=2026-08-18T18:55:16Z (~17min at check; status=no-change; commit=f4d9d664; within 2h threshold). ✅
-- **"wm=fl=502, 0 new alerts"**: CONFIRMED → repair-watermark: `{"repaired": false, "old_watermark": 502, "file_length": 502}`. wm=fl=502. 0 new alerts. ✅
-- **"heal-stale-daemon-code.heartbeat ts=2026-08-18T18:31:17Z (~5min)"**: UPDATED → heartbeat ts=2026-08-18T19:11:37Z (~2min at check; at blackboard/ path; within 60-min threshold). ✅
-- **"all 4 bots alive"**: CONFIRMED → system-health.json (blackboard/) ts=2026-08-18T19:07:50Z (~5min); overall=healthy; all 4 bots (beacon, forge, mirror, pulse) desired=up, alive=True. ✅
-- **"SUPABASE rotation dedup window active"**: CONFIRMED → pulse-rotation-window-dms.json: SUPABASE_SERVICE_ROLE_KEY last_dm=2026-08-17T23:23:16Z (~19.8h); dedup window active; next_rotation_due=2026-08-22 (~3.1d). ✅
-
-**Check 0 — Alert triage (~19:12Z UTC):** repair-watermark: `{"repaired": false, "old_watermark": 502, "file_length": 502}`. wm=fl=502. 0 new alerts above watermark. No tier-reset.
-**CHECK 0 STATUS: NOMINAL ✅**
-
-**Check 1 — Log noise (~19:12Z UTC):** journalctl -u ourliberty-*.service last 45min: 0 WARN/ERROR/CRITICAL from ourliberty services. **NOMINAL ✅**
-
-**Check 2 — Telegram sweep (~19:12Z UTC):** beacon_telegram_bot.log: last delivery idx=501 (doorbell, 2026-08-18T11:34:30 MDT = 17:34:30Z UTC — carried). No inbound Larry `<- 7998341473` directives today (last directive 2026-08-05). **NOMINAL ✅**
-
-**Check 3 — Pipeline stall (~19:11Z UTC):** heal_pipeline_stall.py --dry-run: suppressed (cooldown): unrouted_open_pr_stranded:Larry-Yatch/RSDPM:234. DRY-RUN: 0 alerts would fire, 0 recoveries attempted. **NOMINAL ✅**
-
-**Check 4 — Pending directives (~19:12Z UTC):** beacon-pending-approvals.json PRESENT (canonical state/ path, key=`pending`, len=4, history=668), **pending=4 VERIFIED**:
-1. **~187.1h pending** ← CRITICAL AGE (alert-translations-unrouted-pr-nudges-retired-001, created 2026-08-11T00:08:30Z; reminders_sent=[6, 24, 72], all exhausted)
-2. **~172.0h pending** ← ALL REMINDERS EXHAUSTED (direction-ask-automated-cycle-journal-gap-001)
-3. **~171.7h pending** ← ALL REMINDERS EXHAUSTED (check0-delivered-kinds-tier3-001)
-4. **~163.5h pending** ← ALL REMINDERS EXHAUSTED (pending-approvals-wrong-path-guard-001)
-**NOMINAL ✅** (carried; all reminders exhausted; requires Larry Telegram attention)
-
-**Check 5 — Stale daemon code (~19:12Z UTC):** heal-stale-daemon-code.heartbeat ts=2026-08-18T19:11:37Z (~2min at check; at blackboard/ path; within 60-min threshold). system-health.json (blackboard/) ts=2026-08-18T19:07:50Z (~5min); overall=healthy; all 4 bots (beacon, forge, mirror, pulse) desired=up, alive=True. **NOMINAL ✅**
-
-**Check A — Source repo (~19:12Z UTC):** branch=main, HEAD=f4d9d664=origin/main (Pulse cycle 20260818T183851Z). Clean tree. 0 commits behind. **NOMINAL ✅**
-**Check B — Sync health (~19:12Z UTC):** agent-core-sync.json: last_sync=2026-08-18T18:55:16Z (~17min; status=no-change; commit=f4d9d664; within 2h threshold). **NOMINAL ✅**
-**Check C — Agent liveness (~19:12Z UTC):** system-health.json (blackboard/) ts=2026-08-18T19:07:50Z (~5min); overall=healthy; all 4 bots desired=up, alive=True. **NOMINAL ✅**
-**Check E — PR/merge state (~19:12Z UTC):** **0 open PRs** in ourliberty-agent-core (gh query). **NOMINAL ✅**
-**Check H — Forge/Beacon/Mirror/Pulse activity (~19:12Z UTC):** All inboxes empty (beacon=0, forge=0, mirror=0, pulse=0). **NOMINAL ✅**
-
-**§5.0 one-shots:** audit_due_nudge: no-op. distill_detector: no-op. audit_cadence_signal: no-op. **NOMINAL ✅**
-
-**Check I:** Today is Tuesday 2026-08-18. Next firing: Wednesday 2026-08-19 ~14:13Z UTC. **OFF-DAY. SKIP ✅**
-**Check III:** Latest artifact 2026-08-09; gate=2026-08-09+14=2026-08-23. **OFF-WEEK. SKIP ✅**
-**Check XIV:** Latest artifact 2026-08-17 (no new artifact since iter ~9469). **CARRY ✅**
-
-**PRIME DIRECTIVE ratio:** ratio=125.24 (unchanged — 0 new interventions or systemic_fixes this iter; iter_clean heartbeat appended ts=2026-08-18T19:13:29Z UTC, iter=9472, tier=3). Pending approval queue (4 items, ~163.5h–187.1h, all reminders exhausted) remains the blocker. ✅
-
-**Rotations:** SUPABASE_SERVICE_ROLE_KEY last_dm=2026-08-17T23:23:16Z (~19.8h); dedup window active; next_rotation_due=2026-08-22 (~3.1d). No new DM this iter. ✅
-
-**G-rule tracking:** (0 new alerts; no G-rule occurrence changes)
-- `alert-retraction-no-translation-001` **[DISPATCHED iter ~9100]**: approval `alert-translations-unrouted-pr-nudges-retired-001` **~187.1h — CRITICAL AGE** (all reminders exhausted). [PENDING LARRY APPROVAL]
-- `automated-cycle-no-journal-entry-001` **DISPATCHED ✅**: direction-ask-automated-cycle-journal-gap-001 **~172.0h** (all reminders exhausted). [PENDING LARRY APPROVAL]
-- `check0-delivered-kinds-tier3-001` **DISPATCHED ✅**: **~171.7h** (all reminders exhausted). [PENDING LARRY APPROVAL]
-- `pending-approvals-wrong-path-guard-001` **DISPATCHED ✅**: **~163.5h** (all reminders exhausted). [PENDING LARRY APPROVAL]
-- All other G-rules carried unchanged.
-
-**Actions taken:**
-- PRIME DIRECTIVE: iter_clean heartbeat appended (ts=2026-08-18T19:13:29Z UTC, iter=9472, tier=3, kind=iter_clean). ✅
-- Tier state: `cycle_tier_state.py record --checks-clean true` → **tier=3, consecutive_clean=43→44**. ✅
-
-**Escalations:** None new this iter. Outstanding items (carried):
-1. **alert-translations-unrouted-pr-nudges-retired-001: ~187.1h — CRITICAL AGE (all reminders exhausted).** Carry.
-2. direction-ask-automated-cycle-journal-gap-001 (~172.0h, all reminders exhausted). Carry.
-3. check0-delivered-kinds-tier3-001 (~171.7h, all reminders exhausted). Carry.
-4. pending-approvals-wrong-path-guard-001 (~163.5h, all reminders exhausted). Carry.
-5. Informational-cards impl gap (iter ~9102). Carry.
-6. Check III threshold proposals (artifact 2026-08-09; approve threshold-update-2026-08-09). Carry.
-
-**Patterns:** System steady-state. 44 consecutive clean cycles since last signal (2026-08-17T17:57:48Z); Tier 3/30-min cadence. 0 new alerts (wm=fl=502). PRIME DIRECTIVE ratio 125.24 (flat; blocked on 4-item pending approval queue, all ~163.5h–187.1h, all reminders exhausted — requires direct Larry Telegram action). SUPABASE rotation due 2026-08-22 (~3.1d). Check I next Wed 2026-08-19 ~14:13Z UTC.
-
-**Tier end-of-iter:** **Tier 3**, consecutive_clean=44 (30-min cadence).
 
 ---
 
