@@ -20058,7 +20058,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-08-20T03:44:38.803111+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-08-20T03:43:59.404496+00:00"
+      "orphan_last_activity_ts": "2026-08-20T03:43:59.404496+00:00",
+      "briefing": {
+        "what": "The team ran a routine health check on our systems this morning and is waiting on your go-ahead before acting on what it found.",
+        "why": "These checks are how we catch problems before customers do, but the work isn't attached to any current priority, so it could quietly pull time away from what matters most.",
+        "suggest": "Give it a quick look and approve it if the findings look worth fixing \u2014 otherwise park it until we know which priority it serves."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-20T03:50:17.868255+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
