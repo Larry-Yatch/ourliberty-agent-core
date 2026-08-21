@@ -20188,7 +20188,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-08-21T11:55:35.927476+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-08-21T11:50:38.600446+00:00"
+      "orphan_last_activity_ts": "2026-08-21T11:50:38.600446+00:00",
+      "briefing": {
+        "what": "A fix to our monitoring so it can tell the difference between a report that's genuinely missing and one it simply looked for in the wrong place.",
+        "why": "The same false alarm has pulled attention three separate times, and every repeat costs review time and erodes trust in the alerts we do act on.",
+        "suggest": "Worth approving, but ask for confirmation that it silences only the wrong-place alarms and still raises a flag when something is truly missing."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-21T11:57:18.534347+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
