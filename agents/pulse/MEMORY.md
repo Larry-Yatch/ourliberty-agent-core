@@ -6,6 +6,12 @@
 
 ---
 
+## G-rule heal-lost-marker-tier4-no-translation-001 — 1/3 (new, iter ~9631, 2026-08-22T02:16Z UTC)
+
+**Rule:** `source=heal-lost-marker` returns Tier-4 from the triage helper (no translation match). First occurrence: iter ~9631 (line 506, subject=lost-marker:nightly-502-cluster-note-001, ts=2026-08-22T02:05:09Z UTC). Alert fired because nightly-502-cluster-note-001 approval marker was RENDERED by Beacon at 01:48:06Z UTC but never emitted (not in beacon-pending-approvals.json). Route=escalate, tier=FYI, outbox-notifier delivered at idx=505. Fix: add Tier-3 (or Tier-2 if FYI-tier alerts of this class need Larry action) translation entry for `source=heal-lost-marker` in config/alert-translations.json. Dispatch to Beacon at 3/3.
+
+---
+
 ## G-rule nightly-502-cluster-001 — DISPATCHED ✅ (iter ~9627 + dead-letter recovery 2026-08-22T~02:00Z UTC)
 
 **Rule:** Nightly Telegram getUpdates 502 cluster at ~01:15-01:17 UTC. Observed 3 consecutive nights: [1] 2026-08-20T01:15Z UTC (~3 502s), [2] 2026-08-21T01:16Z UTC (~3 502s), [3] 2026-08-22T01:17Z UTC (~6 502s). Bot auto-recovers each time (native retry loop). Pattern: likely nightly Telegram maintenance window.
