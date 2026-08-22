@@ -6,9 +6,15 @@
 
 ---
 
-## G-rule nightly-502-cluster-001 — DISPATCHED ✅ (iter ~9627, 2026-08-22T01:42Z UTC)
+## G-rule nightly-502-cluster-001 — DISPATCHED ✅ (iter ~9627 + dead-letter recovery 2026-08-22T~02:00Z UTC)
 
-**Rule:** Nightly Telegram getUpdates 502 cluster at ~01:15-01:17 UTC. Observed 3 consecutive nights: [1] 2026-08-20T01:15Z UTC (~3 502s), [2] 2026-08-21T01:16Z UTC (~3 502s), [3] 2026-08-22T01:17Z UTC (~6 502s). Bot auto-recovers each time (native retry loop). Pattern: likely nightly Telegram maintenance window. **DISPATCHED at 3/3:** `direction-ask-nightly-telegram-502-cluster-add-known-pattern-001.json` written to Beacon inbox (01:41:58Z UTC iter ~9627). Fix: Beacon to add known-pattern note to cycle-prompt.md Check 2 section + trivial cycle-prompt.md update so future cycles classify this as nominal. **Do NOT re-open or re-dispatch this G-rule** until Beacon's fix is verified.
+**Rule:** Nightly Telegram getUpdates 502 cluster at ~01:15-01:17 UTC. Observed 3 consecutive nights: [1] 2026-08-20T01:15Z UTC (~3 502s), [2] 2026-08-21T01:16Z UTC (~3 502s), [3] 2026-08-22T01:17Z UTC (~6 502s). Bot auto-recovers each time (native retry loop). Pattern: likely nightly Telegram maintenance window.
+
+**DISPATCH HISTORY:** First dispatch at 01:41:58Z UTC (iter ~9627 automated cycle) was REJECTED by Beacon's dispatch_validator — F24 empty-prompt bug: automated cycle wrote `body` field instead of `prompt`. Dead-letter delivered to Pulse. **Corrected dispatch written to Beacon inbox at ~02:00Z UTC** with correct schema (`prompt` field). Fix: Beacon to add known-pattern note to cycle-prompt.md Check 2 so future cycles classify nightly 502 clusters at ~01:00-02:00 UTC as nominal.
+
+**Do NOT re-open or re-dispatch.** Verify fix when Beacon's spec lands.
+
+**F24 envelope bug note:** The automated cycle's direction-ask envelope writer uses `body` instead of `prompt`. If this class of dead-letter recurs (wrong field name in auto-generated direction-ask envelopes), dispatch to Forge to fix the envelope writer in the automated cycle path.
 
 ---
 
