@@ -20219,7 +20219,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-08-22T01:47:20.632085+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-08-22T01:43:37.379395+00:00"
+      "orphan_last_activity_ts": "2026-08-22T01:43:37.379395+00:00",
+      "briefing": {
+        "what": "The team is asking you to weigh in on a nightly burst of failed message deliveries that keeps showing up around the same time each night.",
+        "why": "If those messages are the ones meant to reach you, alerts and updates can quietly go missing overnight, and you'd only find out after something has already slipped.",
+        "suggest": "Give the team a short window to confirm what's actually causing the nightly failures before signing off on any fix, since the early explanation looks incomplete and a rushed change could mask the real problem."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-22T01:56:18.087219+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
