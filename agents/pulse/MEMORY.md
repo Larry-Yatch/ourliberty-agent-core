@@ -907,3 +907,9 @@ Occurrences: iter ~6155 (1/3); iter ~6156 (2/3); iter ~6157 (3/3 + meta-loop new
 
 **Verified:** 2026-08-09T05:21Z UTC, iter ~8720, VERIFY-BEFORE-REASSERT discipline applied.
 
+---
+
+## heal-pipeline-stall-state.json correct path is ~/agents/blackboard/ NOT ~/agents/state/ (learned iter ~9626, 2026-08-22T01:05Z UTC)
+
+**Rule:** `heal-pipeline-stall-state.json` lives at `/home/larry/agents/blackboard/heal-pipeline-stall-state.json` (blackboard dir), NOT `~/agents/state/`. The `heal-pipeline-stall.heartbeat` file also lives in blackboard: `/home/larry/agents/blackboard/heal-pipeline-stall.heartbeat`. Prior iter Check 3 parse code was checking `~/agents/state/heal-pipeline-stall-state.json` and getting "MISSING" — incorrect. The root dict IS the entries container (keyed by `{stall_type}:{task_id}`) — there is no nested 'stalls' or 'entries' key. The healer's operational cursor lives separately at `~/agents/state/heal-pipeline-stall-check-8-cursor.json`. Always verify Check 3 via blackboard path + heartbeat freshness.
+
