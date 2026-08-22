@@ -6,6 +6,12 @@
 
 ---
 
+## G-rule nightly-502-cluster-001 — DISPATCHED ✅ (iter ~9627, 2026-08-22T01:42Z UTC)
+
+**Rule:** Nightly Telegram getUpdates 502 cluster at ~01:15-01:17 UTC. Observed 3 consecutive nights: [1] 2026-08-20T01:15Z UTC (~3 502s), [2] 2026-08-21T01:16Z UTC (~3 502s), [3] 2026-08-22T01:17Z UTC (~6 502s). Bot auto-recovers each time (native retry loop). Pattern: likely nightly Telegram maintenance window. **DISPATCHED at 3/3:** `direction-ask-nightly-telegram-502-cluster-add-known-pattern-001.json` written to Beacon inbox (01:41:58Z UTC iter ~9627). Fix: Beacon to add known-pattern note to cycle-prompt.md Check 2 section + trivial cycle-prompt.md update so future cycles classify this as nominal. **Do NOT re-open or re-dispatch this G-rule** until Beacon's fix is verified.
+
+---
+
 ## G-rule deploy-notifier-vercel-build-failed-tier4-no-translation-001 — 2/3 (updated iter ~9143, 2026-08-11T15:07Z UTC)
 
 **Rule:** `source=deploy-notifier, subject^=deploy-notifier:ERROR:` (Vercel build failure) returns Tier-4 from the triage helper (no translation match in alert-translations.json). Occurrences: [1/3] prior iter (~9072 per journal G-rule tracking); [2/3] automated cycle at 15:02Z UTC caught up `deploy-notifier:ERROR:dpl_4hpi87jNFfhjuGY6d1uej4E8sCig` (Vercel build FAILED, RSDPM PR#216 feat/m13-transcript-jump, 2026-08-11T05:44Z UTC) as Tier-4. Bot already delivered at idx=565 (05:46Z UTC). Fix: add Tier-3 translation entry for `source=deploy-notifier, subject^=deploy-notifier:ERROR:` OR consider Tier-2 (guarded) if Vercel build failures need Larry action. Note: these ARE actionable (suggested_action points to Vercel build log + env var fix). Consider digest route rather than full silence. Dispatch to Beacon at 3/3.
