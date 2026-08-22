@@ -171,3 +171,90 @@
 
 ---
 
+## Iteration ~9599 — 2026-08-21T12:24Z UTC (Larry /cycle chat, Tier 1 consecutive_clean=0→0 [Check 0: wm=501→502, 1 new alert (idx=501 notification/doorbell Tier-4 false-positive, known-class check0-delivered-kinds-tier3-001; NO DM); all other checks NOMINAL ✅; 0 open PRs; pending=5 (3 exhausted ~252.2h–236.8h + suite-guardian ~32.6h + check1-missing-substrate-branch-001 ~0.5h); PRIME DIRECTIVE ratio 157.375; Check I pre-fire ~14:13Z UTC; SUPABASE ~11.6h; nightly-502-cluster 2/3])
+
+**Health:** ⚠️ Check 0 Tier-4 doorbell false-positive — tier stays at 1/consecutive_clean=0. All other checks NOMINAL. 2026-08-21 UTC.
+
+**VERIFY-BEFORE-REASSERT (from iter ~9598 at ~12:15Z UTC; commits since: bde82185 [Pulse cycle 20260821T121713Z — automated]; tier=1, consecutive_clean=0 entering this iter):**
+- **"Tier 1, consecutive_clean=0"**: CONFIRMED → tier=1, consecutive_clean=0 at start per cycle_tier_state.py read. ✅
+- **"0 open PRs"**: CONFIRMED → gh returned [] (~12:22Z UTC). ✅
+- **"pending=5 (~252.1h / ~237.0h / ~236.7h / ~32.5h / ~0.4h)"**: UPDATED → ages now ~252.2h / ~237.1h / ~236.8h / ~32.6h / ~0.5h (~12:22Z UTC). ✅
+- **"wm advanced 500→501 (approval_request idx=500)"**: CONFIRMED → repair-watermark shows old_watermark=501 (1 new entry at position 502). ✅
+- **"heal-stale-daemon-code.heartbeat ts=2026-08-21T12:07:18Z (~8min)"**: UPDATED → ts=2026-08-21T12:17:19Z (~5min at ~12:22Z; within 60-min threshold). ✅
+- **"all 4 bots alive"**: CONFIRMED → system-health.json ts=2026-08-21T12:18:21Z (~4min), overall=healthy, all 4 bots alive=True. ✅
+- **"SUPABASE next_rotation_due=2026-08-22 midnight UTC (~11.8h)"**: UPDATED → ~11.6h remaining from ~12:22Z UTC. ✅
+- **"Check I pre-fire Friday ~14:13Z UTC"**: CONFIRMED → No check-i-2026-08-21.json yet; it is ~12:22Z — PRE-FIRE. ✅
+- **"PRIME DIRECTIVE ratio 157.375 (iter ~9598)"**: CONFIRMED → ratio=157.375 (unchanged). ✅
+- **"suite-guardian-run-2026-08-20 ~32.5h pending, reminders_sent=[]"**: UPDATED → ~32.6h; reminders_sent=[]. G-rule suite-guardian-reminder-gap-001 at 1/3 (carried). ✅
+- **"nightly-502-cluster-001 2/3, 3rd watch tonight ~01:15Z UTC 2026-08-22"**: CONFIRMED → No new 502 cluster in bot log. Carry 2/3. ✅
+- **"outbox-notifier-log-missing-001 DISPATCHED — Beacon responded; check1-missing-substrate-branch-001 ~0.4h pending"**: UPDATED → ~0.5h; service healthy (outbox_notifier: ok per system-health.json); NOT FOUND at /home/larry/agents/logs/outbox_notifier.log (consistent). ✅
+
+**Check 0 — Alert triage (~12:22Z UTC):** `repair-watermark` → `{"repaired": false, "old_watermark": 501, "file_length": 502}`. 1 new alert at position 502.
+- **Alert 502:** `[2026-08-21T06:20:06-0600] notification idx=501 delivered (intent=doorbell)` (12:20:06Z UTC). Classify helper → **Tier-4** (route=escalate; "novel: no registry template and no translation match"). Guard-tier4 review: this is a routine automated doorbell notification. Tier-4 is a **known false-positive of the same root cause class** as `check0-delivered-kinds-tier3-001` (kind-only alerts falling through to Tier-4 after PR #1093 voided the kind-fallback). No actionable content. **No DM** (routine, would-have-been-silenced with proper template). Watermark advanced 501→502. G-rule `check0-notification-doorbell-tier4-001` → **1/3** (new sub-case of same root; check0-delivered-kinds-tier3-001 fix covers the broader class — pending Larry approval at 236.8h+).
+**CHECK 0 STATUS: NON-NOMINAL (Tier-4 false-positive triaged; no DM) → tier stays at 1/consecutive_clean=0**
+
+**Check 1 — Log noise (~12:22Z UTC):** journalctl --user 30-min window: 0 WARN/ERROR from ourliberty-* units. outbox_notifier.log: NOT FOUND at /home/larry/agents/logs/outbox_notifier.log (consistent with pending fix check1-missing-substrate-branch-001; service healthy per system-health.json outbox_notifier: ok). **NOMINAL ✅**
+
+**Check 2 — Telegram sweep (~12:22Z UTC):** beacon_telegram_bot.log: last delivery idx=501 at [2026-08-21T06:20:06-0600]=12:20:06Z UTC (intent=doorbell). Last inbound from Larry `<- 7998341473`: [2026-08-05T22:07:09-0600]=2026-08-06T04:07Z UTC. No new directives. No new 502 cluster (nightly-502-cluster-001 2/3; 3rd watch tonight ~01:15Z UTC 2026-08-22). Bot alive per system-health ts=12:18:21Z. **NOMINAL ✅**
+
+**Check 3 — Pipeline stall (~12:22Z UTC):** heal_pipeline_stall.py --dry-run ts=2026-08-21T12:18:49Z: suppressed (cooldown): unrouted_open_pr_stranded:Larry-Yatch/RSDPM:234. DRY-RUN: 0 alerts would fire, 0 recoveries attempted. **NOMINAL ✅**
+
+**Check 4 — Pending directives (~12:22Z UTC):** beacon-pending-approvals.json PRESENT (canonical state/ path), **pending=5 VERIFIED**:
+1. **~252.2h pending** ← CRITICAL AGE (alert-translations-unrouted-pr-nudges-retired-001, created 2026-08-11T00:08:30Z; reminders_sent=[6, 24, 72], all exhausted)
+2. **~237.1h pending** ← ALL REMINDERS EXHAUSTED (direction-ask-automated-cycle-journal-gap-001, created 2026-08-11T15:10:52Z; reminders_sent=[6, 24, 72])
+3. **~236.8h pending** ← ALL REMINDERS EXHAUSTED (check0-delivered-kinds-tier3-001, created 2026-08-11T15:31:39Z; reminders_sent=[6, 24, 72])
+4. **~32.6h pending** (suite-guardian-run-2026-08-20, created 2026-08-20T03:43:59Z; reminders_sent=[]; target_agent=forge; genuine-break: test_flip_readiness_gauge.TestMainIntegration.test_all_green_writes_artifact_and_rings)
+5. **~0.5h pending** (check1-missing-substrate-branch-001, created 2026-08-21T11:50:38Z; reminders_sent=[]; plan approval DM delivered at 11:54Z UTC)
+**NOMINAL ✅** (items 1–5 carried unchanged)
+
+**Check 5 — Stale daemon code (~12:22Z UTC):** heal-stale-daemon-code.heartbeat ts=2026-08-21T12:17:19Z UTC (~5min at check; within 60-min threshold). system-health.json ts=2026-08-21T12:18:21Z UTC, overall=healthy; all 4 bots (beacon, forge, mirror, pulse) desired=up, alive=True, all action=noop. **NOMINAL ✅**
+
+**Check A — Source repo (~12:22Z UTC):** branch=main, HEAD=bde82185=origin/main (automated Pulse cycle commit since iter ~9598). Clean tree. 0 commits behind/ahead. **NOMINAL ✅**
+**Check B — Sync health (~12:22Z UTC):** agent-core-sync.json: last_sync=2026-08-21T12:01:06Z (~21min; status=no-change; within 2h threshold). **NOMINAL ✅**
+**Check C — Agent liveness (~12:22Z UTC):** system-health.json ts=2026-08-21T12:18:21Z (~4min), overall=healthy; all 4 bots (beacon, forge, mirror, pulse) desired=up, alive=True. **NOMINAL ✅**
+**Check E — PR/merge state (~12:22Z UTC):** **0 open PRs** in ourliberty-agent-core. **NOMINAL ✅**
+**Check H — Forge/Beacon/Mirror/Pulse activity (~12:22Z UTC):** All inboxes empty (beacon=0, forge=0, mirror=0, pulse=0). **NOMINAL ✅**
+
+**§5.0 one-shots:** audit_due_nudge: no committed audit baseline; no-op. distill_detector: no un-distilled audits; no-op. audit_cadence_signal: no post-seed decision-grade distill artifacts; no-op. **NOMINAL ✅**
+
+**Check I — (~12:22Z UTC):** Friday 2026-08-21 is a firing day (Mon/Wed/Fri/Sun). Latest artifact: check-i-2026-08-19.json (Wednesday). No check-i-2026-08-21.json yet (timer fires ~14:13Z UTC; it is ~12:22Z — PRE-FIRE). **PRE-FIRE — SKIP this iter.** ✅
+**Check III:** Latest artifact 2026-08-09; gate=2026-08-09+14=2026-08-23. **OFF-WEEK. SKIP ✅**
+**Check XIV:** Latest artifact check-xiv-2026-08-17.json (no new artifact). **CARRY ✅**
+
+**PRIME DIRECTIVE ratio:** ratio=157.375 (unchanged; 2518 interventions / 16 systemic_fixes; trend=worsening per script; intervention appended ts=2026-08-21T12:24:41Z UTC, iter=~9599, tier=1, kind=intervention, template=alert-triage-tier4-novel, detail=check0-notification-doorbell-tier4-001:1/3). ✅
+
+**Rotations:** SUPABASE_SERVICE_ROLE_KEY next_rotation_due=2026-08-22 midnight UTC (~11.6h remaining from ~12:22Z UTC). last_dm=2026-08-17T23:23:16Z (~109.0h ago); 14-day dedup window active. No new DM this iter — dedup window prevents it. **⚠️ Larry must rotate before 2026-08-22 midnight UTC (~11.6h remaining).**
+
+**G-rule tracking:**
+- `alert-retraction-no-translation-001` **[DISPATCHED iter ~9100]**: approval `alert-translations-unrouted-pr-nudges-retired-001` **~252.2h — CRITICAL AGE** (all reminders exhausted). [PENDING LARRY APPROVAL]
+- `automated-cycle-no-journal-entry-001` **DISPATCHED ✅**: direction-ask-automated-cycle-journal-gap-001 **~237.1h** (all reminders exhausted). [PENDING LARRY APPROVAL]
+- `check0-delivered-kinds-tier3-001` **DISPATCHED ✅**: **~236.8h** (all reminders exhausted). [PENDING LARRY APPROVAL] — Note: fix covers the root cause that also drives check0-notification-doorbell-tier4-001.
+- `heal-approvals-surface-drift-missing-card-cooldown-collision-001` **DISPATCHED ✅** (iter ~8237): impl in pending queue (direction-ask-approvals-opt-b-implement-001). Continues firing until step-promote merges. [KNOWN RECURRING — NO ACTION]
+- `pending-approvals-wrong-path-guard-001` **CLOSED — REJECTED** by Larry (iter ~9518). No further tracking.
+- `suite-guardian-reminder-gap-001` **1/3** (carried from iter ~9576): suite-guardian-run-2026-08-20 at ~32.6h with reminders_sent=[]; 6h, 24h, 32h+ marks all passed without automated reminder. Watching for 3/3.
+- `nightly-502-cluster-001` **2/3** (from iter ~9594): Telegram API HTTP 502 cluster at 2026-08-19T19:15 MDT and 2026-08-20T19:15 MDT (each self-recovered). 3rd watch tonight (~01:15Z UTC 2026-08-22). No action yet.
+- `outbox-notifier-log-missing-001` **DISPATCHED ✅ (iter ~9597) — BEACON RESPONDED**: check1-missing-substrate-branch-001 (~0.5h pending Larry approval). Service healthy (system-health outbox_notifier: ok). G-rule closed pending fix merge.
+- `outbox-notifier-approval-request-task-id-subject-tier4-001` **KNOWN RECURRING** (DISPATCHED iter ~9144): fix pending (check0-delivered-kinds-tier3-001 at 236.8h+). [PENDING LARRY APPROVAL]
+- `check0-notification-doorbell-tier4-001` **NEW 1/3** (this iter): idx=501 doorbell notification at 12:20:06Z UTC classified Tier-4 (no template match). Same root cause as check0-delivered-kinds-tier3-001. Fix already in pending queue. Watching for 3/3.
+- All other G-rules carried unchanged.
+
+**Actions taken:**
+- Check 0: watermark advanced 501→502 (claimed doorbell notification at position 502; Tier-4 false-positive triaged; no DM). ✅
+- PRIME DIRECTIVE: intervention appended (ts=2026-08-21T12:24:41Z UTC, iter=~9599, tier=1, kind=intervention, template=alert-triage-tier4-novel, detail=check0-notification-doorbell-tier4-001:1/3). ✅
+- Tier state: `cycle_tier_state.py record --checks-clean false` → **tier=1, consecutive_clean=0** (remains at Tier 1; Check 0 non-clean). ✅
+
+**Escalations:** None new. Outstanding items (carried):
+1. **alert-translations-unrouted-pr-nudges-retired-001: ~252.2h — CRITICAL AGE (all reminders exhausted).** Carry.
+2. direction-ask-automated-cycle-journal-gap-001 (~237.1h, all reminders exhausted). Carry.
+3. check0-delivered-kinds-tier3-001 (~236.8h, all reminders exhausted). Carry.
+4. Informational-cards impl gap (iter ~9102). Carry.
+5. Check III threshold proposals (artifact 2026-08-09; approve threshold-update-2026-08-09). Carry.
+6. suite-guardian-run-2026-08-20: ~32.6h, reminders_sent=[] — Forge dispatch pending Larry's approval. G-rule suite-guardian-reminder-gap-001 at 1/3. Carry.
+7. **check1-missing-substrate-branch-001: ~0.5h — plan approval DM delivered at 11:54Z UTC.** Pending Larry action.
+
+**Patterns:** Another Check 0 Tier-4 false-positive (doorbell notification idx=501 at 12:20Z UTC) — same root cause class as check0-delivered-kinds-tier3-001 which is pending Larry approval at 236.8h+. New G-rule check0-notification-doorbell-tier4-001 at 1/3. Tier stays at 1/consecutive_clean=0. All other checks NOMINAL. 0 open PRs. All 4 bots alive. SUPABASE rotation due 2026-08-22 midnight UTC (~11.6h — URGENT). Check I fires today ~14:13Z UTC (pre-fire). PRIME DIRECTIVE ratio 157.375 (stable). Nightly Telegram 502 cluster 2/3 (watching for 3rd tonight ~01:15Z UTC 2026-08-22). 3 approval items blocked at 236h+ (Larry action required). Pattern note: the 3 stalled approvals at 236h+ are blocking multiple G-rule fixes — check0-delivered-kinds-tier3-001 alone would eliminate these recurring doorbell false-Tier-4 tier resets.
+
+**Tier end-of-iter:** **Tier 1**, consecutive_clean=0 (tier stays at 1; Check 0 non-clean).
+
+---
+
