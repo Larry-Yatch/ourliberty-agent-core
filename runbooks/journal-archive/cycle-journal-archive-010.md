@@ -2731,3 +2731,97 @@ Note: triage-alert returned stale cached entry for alert-id `larry-alerts-502` (
 
 ---
 
+## Iteration ~9628 — 2026-08-22T01:48Z UTC (Larry /cycle chat, Tier 1 consecutive_clean=0→1 [Check 0: wm=fl=505, 0 new alerts; all checks NOMINAL ✅; 0 open PRs; pending=5 (~265.7h–~250.3h + suite-guardian ~46.1h + check1-missing-substrate-branch-001 ~14.0h reminders=[6]); nightly-502-cluster Beacon dispatch CONFIRMED in inbox (correct schema, prompt_len=1219); dead-letter recovery changes in working tree (wrapper will commit); SUPABASE OVERDUE >108min ⚠️ [red]])
+
+**Health:** ✅ Nominal — all checks clean. **Tier 1**, consecutive_clean=0→1. 2026-08-22 UTC.
+
+**VERIFY-BEFORE-REASSERT (from iter ~9627 at ~01:37Z UTC + dead-letter recovery session at ~01:44-01:48Z UTC; commits since: 8ff996ad [Pulse cycle 20260822T014416Z — automated, committed after iter ~9627]; tier=1, consecutive_clean=0 entering this iter):**
+- **"Tier 3→1 at end of iter ~9627"**: CONFIRMED → tier=1, consecutive_clean=0 at start per cycle_tier_state.py read. ✅
+- **"0 open PRs"**: CONFIRMED → gh returned [] (~01:48Z UTC). ✅
+- **"pending=5 (~265.5h–~250.1h + suite-guardian ~45.9h + check1-missing-substrate-branch-001 ~13.8h reminders=[6])"**: UPDATED → ages now ~265.7h / ~250.6h / ~250.3h / ~46.1h / ~14.0h (~01:48Z UTC). reminders_sent=[6] on check1 (unchanged; next 24h reminder ~2026-08-22T11:50Z UTC). ✅
+- **"wm=fl=505, 0 new alerts"**: CONFIRMED → repair-watermark repaired=false, old_watermark=505, file_length=505. 0 new alerts. ✅
+- **"heal-stale-daemon-code.heartbeat ~1min"**: UPDATED → ts=2026-08-22T01:36:16Z UTC (~12min at ~01:48Z UTC; within 60-min threshold). ✅
+- **"all 4 bots alive"**: CONFIRMED → system-health.json ts=2026-08-22T01:44:20Z UTC (~4min), overall=healthy, all 4 bots alive=True. ✅
+- **"SUPABASE OVERDUE >97min"**: CONFIRMED → still OVERDUE (>108min past 2026-08-22T00:00Z UTC deadline at ~01:48Z UTC). last_rotated_at=2026-05-24 confirmed in config/token-rotation-schedule.json. Dedup window active until ~2026-08-31 (last DM 2026-08-17T23:23Z UTC) — no automatic re-DM. ⚠️ [red] ✅
+- **"nightly-502-cluster-001 DISPATCHED — direction-ask to Beacon"**: VERIFY → Beacon inbox has `direction-ask-nightly-telegram-502-cluster-add-known-pattern-001.json` with correct schema: keys=['task_id','source','dedup_identity','prompt','timeout'], prompt_len=1219 (>100, will pass validator). ✅ Dead-letter recovery corrected the F24 empty-prompt bug from the automated cycle's envelope writer.
+- **"check1-missing-substrate-branch-001 ~13.8h"**: UPDATED → ~14.0h; reminders_sent=[6]. No new reminders this iter (next 24h reminder ~2026-08-22T11:50Z UTC). ✅
+- **"PRIME DIRECTIVE ratio ~216.36 marginal-improvement"**: UPDATED → 215.36 (2369 interventions / 11 systemic_fixes, trailing 30d; additional rows aged out; trend=worsening). ✅
+- **"dirty tree: M agents/pulse/MEMORY.md + M runbooks/cycle-journal.md"**: CONFIRMED → dead-letter recovery changes are staged/unstaged in working tree. These are Pulse-managed files; wrapper will commit on exit. Check A: NOMINAL (branch=main, HEAD=8ff996ad, only Pulse-owned files dirty). ✅
+
+**Check 0 — Alert triage (~01:48Z UTC):** `repair-watermark` → `{"repaired": false, "old_watermark": 505, "file_length": 505}`. 0 new alerts above watermark. Watermark stable at 505.
+**CHECK 0 STATUS: NOMINAL ✅**
+
+**Check 1 — Log noise (~01:48Z UTC):** journalctl --user last 60min (WARN/ERROR filter): "No entries" — consistent behavior; system-health overall=healthy. 0 patterns above threshold. **NOMINAL ✅**
+
+**Check 2 — Telegram sweep (~01:48Z UTC):** Bot log: last delivery [2026-08-21T18:21:23-0600]=2026-08-22T00:21Z UTC (notification idx=504, intent=doorbell). No new deliveries since 00:21Z UTC. No new inbound from Larry `<- 7998341473` since [2026-08-05T22:07:09-0600]=2026-08-06T04:07Z UTC. No new directives. nightly-502-cluster-001: DISPATCHED ✅ — corrected Beacon dispatch confirmed in inbox. Bot alive. **NOMINAL ✅**
+
+**Check 3 — Pipeline stall (~01:48Z UTC):** heal-pipeline-stall.heartbeat=2026-08-22T01:29:10Z UTC (~19min; within threshold). PATH: `~/agents/blackboard/`. system-health.json overall=healthy. **NOMINAL ✅**
+
+**Check 4 — Pending directives (~01:48Z UTC):** beacon-pending-approvals.json PRESENT (canonical state/ path), **pending=5 VERIFIED**:
+1. **~265.7h pending** ← CRITICAL AGE (alert-translations-unrouted-pr-nudges-retired-001, created 2026-08-11T00:08:30Z; reminders_sent=[6, 24, 72], all exhausted)
+2. **~250.6h pending** ← ALL REMINDERS EXHAUSTED (direction-ask-automated-cycle-journal-gap-001, created 2026-08-11T15:10:52Z; reminders_sent=[6, 24, 72])
+3. **~250.3h pending** ← ALL REMINDERS EXHAUSTED (check0-delivered-kinds-tier3-001, created 2026-08-11T15:31:39Z; reminders_sent=[6, 24, 72])
+4. **~46.1h pending** (suite-guardian-run-2026-08-20, created 2026-08-20T03:43:59Z; reminders_sent=[]; target_agent=forge; genuine-break: test_flip_readiness_gauge.TestMainIntegration.test_all_green_writes_artifact_and_rings)
+5. **~14.0h pending** (check1-missing-substrate-branch-001, created 2026-08-21T11:50:38Z; reminders_sent=[6]; next 24h reminder ~2026-08-22T11:50Z UTC)
+**NOMINAL ✅** (items 1–5 carried unchanged)
+
+**Check 5 — Stale daemon code (~01:48Z UTC):** heal-stale-daemon-code.heartbeat raw ts=2026-08-22T01:36:16Z UTC (~12min at check; within 60-min threshold). PATH: `blackboard/heal-stale-daemon-code.heartbeat`. system-health.json ts=2026-08-22T01:44:20Z UTC (~4min), overall=healthy; all 4 bots (beacon, forge, mirror, pulse) desired=up, alive=True, action=noop. **NOMINAL ✅**
+
+**Check A — Source repo (~01:48Z UTC):** branch=main, HEAD=8ff996ad (Pulse cycle 20260822T014416Z). Dirty tree: `M agents/pulse/MEMORY.md` (staged) + ` M runbooks/cycle-journal.md` (unstaged) — both are dead-letter recovery changes from prior session. Only Pulse-owned files; wrapper commits on exit. **NOMINAL ✅** (dirty = expected mid-cycle state for Pulse-managed files)
+**Check B — Sync health (~01:48Z UTC):** agent-core-sync.json: last_sync=2026-08-22T01:02:16Z (~46min; status=no-change; within 2h threshold). **NOMINAL ✅**
+**Check C — Agent liveness (~01:48Z UTC):** system-health.json ts=2026-08-22T01:44:20Z UTC (~4min), overall=healthy; all 4 bots alive=True. **NOMINAL ✅**
+**Check E — PR/merge state (~01:48Z UTC):** **0 open PRs** in ourliberty-agent-core. **NOMINAL ✅**
+**Check H — Forge/Beacon/Mirror/Pulse inboxes (~01:48Z UTC):** beacon=1 (direction-ask-nightly-telegram-502-cluster-add-known-pattern-001 — expected, pending Beacon pickup), forge=0, mirror=0, pulse=0, bsa=0. **NOMINAL ✅**
+
+**§5.0 one-shots:** audit_due_nudge: no committed audit baseline; no-op. distill_detector: no un-distilled audits; no-op. audit_cadence_signal: no post-seed distill artifacts; no-op. **NOMINAL ✅**
+
+**Check I — (~01:48Z UTC):** artifact check-i-2026-08-21.json present (fired ~14:10Z UTC 2026-08-21; 1 proposal: "Review high-σ anomaly task `fix-promoterace-order-fragile-gate-001`" effort=small). Today is Saturday 2026-08-22 UTC — not a Check I firing day (Mon/Wed/Fri/Sun). **CARRY ✅**
+**Check III:** Latest artifact 2026-08-09; gate=2026-08-09+14=2026-08-23 (fires tomorrow Sunday 2026-08-23 UTC via systemd timer). **OFF-WEEK. SKIP ✅**
+**Check XIV:** Latest artifact check-xiv-2026-08-17.json (no new artifact). **CARRY ✅**
+
+**Credential rotation watch:** SUPABASE_SERVICE_ROLE_KEY: last_rotated_at=2026-05-24, cadence_days=90, next_rotation_due=2026-08-22 (confirmed in config/token-rotation-schedule.json). **OVERDUE >108min** (current time ~2026-08-22T01:48Z UTC). NOT ROTATED. Dedup window active until ~2026-08-31 (last DM 2026-08-17T23:23Z UTC) — no automatic re-DM. **[red] CRITICAL: SUPABASE_SERVICE_ROLE_KEY is OVERDUE. Larry must rotate per docs/runbooks/rotate-supabase-keys.md.**
+
+**G-rules (no new occurrences this iter — 0 new alerts above watermark):**
+- nightly-502-cluster-001: **DISPATCHED ✅** — corrected envelope in Beacon inbox, prompt_len=1219, correct schema
+- deploy-notifier-vercel-build-failed-tier4-no-translation-001: 2/3 (carried)
+- mirror-queue-wait-gauge-third-review-slot-readiness-tier4-no-translation-001: 1/3 (carried)
+- source-beacon-notifications-tier4-no-translation: 2/3 (carried)
+- enable-pr-auto-merge-reviewdecision-guard-001: 1/3 (carried)
+- heal-pipeline-stall-no-mirror-dispatch-tier4-no-translation-001: 1/3 (carried)
+- suite-guardian-reminder-gap-001: 1/3 (carried)
+
+**PRIME DIRECTIVE ratio:** 215.36 (2369 interventions / 11 systemic_fixes, trailing 30d). Marginal improvement from 216.36 (rows aging out of 30d window; no new systemic fixes — structural worsening trend continues). iter_clean heartbeat appended ts=2026-08-22T01:48:43Z UTC, iter=~9628, tier=1.
+
+**Actions taken:**
+- PRIME DIRECTIVE: iter_clean heartbeat appended (ts=2026-08-22T01:48:43Z UTC, iter=~9628, tier=1, kind=iter_clean). ✅
+- Tier state: `cycle_tier_state.py record --checks-clean true` → **tier=1, consecutive_clean=0→1** (last_updated=2026-08-22T01:48:45Z UTC). ✅
+
+**Escalations:** None new. Outstanding items (carried):
+1. **alert-translations-unrouted-pr-nudges-retired-001: ~265.7h — CRITICAL AGE (all reminders exhausted).** Carry.
+2. direction-ask-automated-cycle-journal-gap-001 (~250.6h, all reminders exhausted). Carry.
+3. check0-delivered-kinds-tier3-001 (~250.3h, all reminders exhausted). Carry.
+4. Informational-cards impl gap (iter ~9102). Carry.
+5. Check III threshold proposals (artifact 2026-08-09; approve threshold-update-2026-08-09). Carry.
+6. suite-guardian-run-2026-08-20: ~46.1h, reminders_sent=[] — Forge dispatch pending Larry's approval. Carry.
+7. check1-missing-substrate-branch-001: ~14.0h — 6h reminder sent. Next 24h reminder ~2026-08-22T11:50Z UTC.
+8. Check I proposal [1]: `fix-promoterace-order-fragile-gate-001` σ-anomaly (5.0σ, $2.39 over baseline). Review and `/dispatch 1` if warranted.
+9. **SUPABASE rotation: OVERDUE >108min (past 2026-08-22T00:00Z UTC). [red] Dedup window prevents repeat DM (last DM 2026-08-17). Larry must rotate IMMEDIATELY per docs/runbooks/rotate-supabase-keys.md.**
+
+**Patterns:** Clean iter. 0 new alerts. All checks NOMINAL. System fully healthy (4/4 bots up, no stalls, 0 open PRs). nightly-502-cluster-001 Beacon dispatch confirmed with correct schema — G-rule closed pending Beacon's fix. Dead-letter recovery changes (MEMORY.md + cycle-journal.md) uncommitted in working tree from prior session; wrapper will commit this session. PRIME DIRECTIVE ratio 215.36 (marginal improvement from row aging; no new systemic fixes). **SUPABASE_SERVICE_ROLE_KEY OVERDUE >108min — dedup window prevents further DMs; Larry must act immediately.** 3 approvals blocked 250h+ (Larry action required). Check III fires tomorrow Sunday 2026-08-23.
+
+**Tier end-of-iter:** **Tier 1**, consecutive_clean=1 (need 2 more clean iters to de-escalate to Tier 2).
+
+---
+
+## Dead-letter recovery: direction-ask-nightly-telegram-502-cluster-add-known-pattern-001 — 2026-08-22T~02:00Z UTC
+
+**Event:** Beacon dead-letter notification delivered to Pulse. Automated iter ~9627 dispatched `direction-ask-nightly-telegram-502-cluster-add-known-pattern-001.json` at 2026-08-22T01:41:58Z UTC; Beacon's dispatch_validator immediately rejected it at 01:42:02Z UTC — file moved to `.invalid/`. Reason: `prompt too short (0 chars, min 100) — likely F24 empty-prompt bug`.
+
+**Root cause:** The automated cycle wrote the envelope with `body`, `title`, `subject`, `effort`, `priority`, `g_rule_id` metadata fields but no `prompt` field. Beacon's watcher schema requires exactly `{task_id, source, dedup_identity, prompt, timeout}`; the validator enforces `len(prompt) >= 100`. The full direction-ask text was in `body` instead of `prompt`.
+
+**Fix:** Rewrote the envelope with correct schema — `prompt` field containing the full direction-ask text. Written to `/home/larry/agents/inboxes/beacon/direction-ask-nightly-telegram-502-cluster-add-known-pattern-001.json`. Same task_id/dedup_identity (idempotent; `.invalid/` is separate from active inbox). **DISPATCHED ✅**
+
+**Secondary finding:** The automated cycle's envelope-writer uses the wrong field name for direction-ask envelopes (F24 empty-prompt class). Flagging as a potential G-rule: if this recurs, dispatch to Beacon/Forge to standardize the envelope writer in the automated cycle path.
+
+---
+
