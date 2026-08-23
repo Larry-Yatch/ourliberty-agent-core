@@ -20,7 +20,7 @@
 
 ## G-rule nightly-502-cluster-001 — DISPATCHED ✅ (iter ~9627 + dead-letter recovery 2026-08-22T~02:00Z UTC)
 
-**Rule:** Nightly Telegram getUpdates 502 cluster at ~01:15-01:17 UTC. Observed 3 consecutive nights: [1] 2026-08-20T01:15Z UTC (~3 502s), [2] 2026-08-21T01:16Z UTC (~3 502s), [3] 2026-08-22T01:17Z UTC (~6 502s). Bot auto-recovers each time (native retry loop). Pattern: likely nightly Telegram maintenance window.
+**Rule:** Nightly Telegram getUpdates 502 cluster at ~01:15-01:24 UTC. Observed 5 consecutive nights: [1] 2026-08-20T01:15Z UTC (~3 502s), [2] 2026-08-21T01:16Z UTC (~3 502s), [3] 2026-08-22T01:17Z UTC (~6 502s), [4] night not separately counted in bot log, [5] 2026-08-23T01:17-01:24Z UTC (4× HTTP 502 + 8× read timeout, ~7 min total). Bot auto-recovers each time (native retry loop). Per user cross-memory: host-wide event (all 4 bots same minute), fires off-window, offset=0 ≠ restart artifact. Pattern: likely nightly host-level or upstream event, NOT Telegram maintenance (original hypothesis was false).
 
 **DISPATCH HISTORY:** First dispatch at 01:41:58Z UTC (iter ~9627 automated cycle) was REJECTED by Beacon's dispatch_validator — F24 empty-prompt bug: automated cycle wrote `body` field instead of `prompt`. Dead-letter delivered to Pulse. **Corrected dispatch written to Beacon inbox at ~02:00Z UTC** with correct schema (`prompt` field). Fix: Beacon to add known-pattern note to cycle-prompt.md Check 2 so future cycles classify nightly 502 clusters at ~01:00-02:00 UTC as nominal.
 
