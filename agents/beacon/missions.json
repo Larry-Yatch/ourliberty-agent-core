@@ -19502,7 +19502,10 @@
         "at": "2026-08-09T10:47:57.493391+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-08-23T00:10:15.809066+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-fix-promoterace-order-fragile-gate-001",
