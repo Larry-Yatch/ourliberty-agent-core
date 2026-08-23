@@ -6,6 +6,12 @@
 
 ---
 
+## G-rule ourliberty-health-sync-freshness-tier4-no-translation-001 — 1/3 (new, iter ~9685, 2026-08-23T05:09Z UTC)
+
+**Rule:** `source=ourliberty-health, subject=ourliberty-agent-core health: 1 issue(s) need attention` returns Tier-4 from the triage helper (no translation match). First occurrence: iter ~9685 (line 507, ts=2026-08-23T04:53:41Z UTC). Alert fired because sync_freshness reported last sync ERRORED ~0.8h prior (04:04Z UTC) due to "Uncommitted changes in working tree" — the transient dirty-tree state during Pulse's journal write phase. Issue SELF-RESOLVED by 05:04Z UTC (next sync tick, status=no-change). Outbox-notifier already delivered as idx=506 at 04:56:56Z UTC; no duplicate DM sent. Fix: add Tier-3 (digest or silence route) translation entry for `source=ourliberty-health` with sync_freshness subject in config/alert-translations.json, OR more specifically detect the Pulse-write-timing pattern so these alerts auto-resolve without a Tier-4 triage. Dispatch to Beacon at 3/3. Pattern: this alert class fires whenever the hourly sync runs during Pulse's journal write (which creates a briefly dirty tree), then self-heals on the next sync tick.
+
+---
+
 ## G-rule heal-lost-marker-tier4-no-translation-001 — 1/3 (new, iter ~9631, 2026-08-22T02:16Z UTC)
 
 **Rule:** `source=heal-lost-marker` returns Tier-4 from the triage helper (no translation match). First occurrence: iter ~9631 (line 506, subject=lost-marker:nightly-502-cluster-note-001, ts=2026-08-22T02:05:09Z UTC). Alert fired because nightly-502-cluster-note-001 approval marker was RENDERED by Beacon at 01:48:06Z UTC but never emitted (not in beacon-pending-approvals.json). Route=escalate, tier=FYI, outbox-notifier delivered at idx=505. Fix: add Tier-3 (or Tier-2 if FYI-tier alerts of this class need Larry action) translation entry for `source=heal-lost-marker` in config/alert-translations.json. Dispatch to Beacon at 3/3.
