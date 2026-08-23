@@ -5969,3 +5969,93 @@ Alert line 506: `source=heal-lost-marker, subject=lost-marker:nightly-502-cluste
 
 ---
 
+## Iteration ~9708 — 2026-08-23T15:36Z UTC (Larry /cycle chat, Tier 3 [Check 0: wm=fl=504, 0 new alerts; all checks NOMINAL ✅; 0 open PRs; pending=5; consecutive_clean 15→16; Check I+III both fired today (Sunday)])
+
+**Health:** ✅ Nominal — all checks clean. **Tier 3**, consecutive_clean 15→16. 2026-08-23 UTC (Sunday).
+
+**VERIFY-BEFORE-REASSERT (from iter ~9667 at ~19:28Z UTC 2026-08-22; commits since: 4daf048b, dd8c819a [two Pulse cycles 20260823T14xx/20260823T15xx]; automated cycles ~9668–9707 ran without journal entries per known G-rule automated-cycle-no-journal-entry-001; tier=3, consecutive_clean=15 entering this iter after last_signal_at=2026-08-23T05:09Z UTC [tier reset from ourliberty-health Tier-4 alert] and re-climb to Tier 3):**
+- **"tier=3, consecutive_clean=30"**: PARTIALLY CONFIRMED → tier=3 ✅; consecutive_clean dropped to 0 at 05:09Z UTC (ourliberty-health Tier-4 reset), climbed to 15 by iter 9707 (15:02Z UTC). Entering this iter: consecutive_clean=15. The prior chat iter's "30" reflected pre-reset state; the reset was triggered by the sync_freshness alert documented in MEMORY.md G-rule ourliberty-health-sync-freshness-tier4-no-translation-001 (1/3 new, iter ~9685). ✅
+- **"wm=fl=502, 0 new alerts"**: UPDATED → wm=fl=504. 2 new alerts added at ~14:14Z UTC (ledger weekly-2026-08-17, check-i-2026-08-17); both processed by automated cycles at 14:37Z and 15:02Z UTC; watermark now stable at 504. 0 new alerts above current watermark. ✅
+- **"0 open Forge PRs"**: CONFIRMED → `gh pr list --search "head:forge/"` returned []. ✅
+- **"pending=5 unchanged"**: CONFIRMED → 5 items (same IDs), same order. ✅
+- **"nightly-502-cluster-note-001 absent 36th iter"**: CONFIRMED absence (conclusively lost — 37th+ iter absent). 6th nightly 502 cluster occurred 2026-08-23T01:17-01:24 UTC (auto-recovered, bot log confirmed); G-rule nightly-502-cluster-001 DISPATCHED per MEMORY.md. ✅
+- **"all 4 bots alive"**: CONFIRMED → system-health.json ts=2026-08-23T15:30Z UTC (~6 min), overall=healthy, all 4 bots alive=True, action=noop. ✅
+- **"heal-stale-daemon-code.heartbeat fresh"**: CONFIRMED → ts=2026-08-23T15:25Z UTC (~11 min; within threshold). ✅
+- **"PRIME DIRECTIVE ratio ~204.18"**: CONFIRMED → ledger tail shows all iter_clean rows for iters ~9700–9707; no new interventions or systemic_fixes. Ratio unchanged. ✅
+- **"Check III fires TOMORROW 2026-08-23"**: CONFIRMED FIRED → check-iii-2026-08-23.json artifact present (as_of=2026-08-23T10:44Z UTC), 2 proposals. DM delivered idx=500 at ~10:44Z UTC. ✅
+- **"Check I last artifact check-i-2026-08-21.json"**: UPDATED → check-i-2026-08-23.json now exists (fired today 14:14Z UTC, mode=digest, 1 proposal). ✅
+
+**Check 0 — Alert triage (~15:36Z UTC):** `alert_triage_state.py repair-watermark` → `{"repaired": false, "old_watermark": 504, "file_length": 504}`. 0 new alerts above watermark. Watermark stable at 504.
+**CHECK 0 STATUS: NOMINAL ✅**
+
+**Check 1 — Log noise (~15:36Z UTC):** journalctl --user last 60min: no WARN or ERROR from any agent process (ourliberty-*.service). All healer one-shots reported INFO/ok (heal-stale-daemon-code, heal-phantom-dispatch-claim, heal-lost-marker, deploy-notifier, watchdog — all nominal per last automated cycle logs). **NOMINAL ✅**
+
+**Check 2 — Telegram sweep (~15:36Z UTC):** 6th nightly 502 cluster: 2026-08-22T19:17–19:24 MDT = 2026-08-23T01:17–01:24 UTC (3 HTTP 502s + ~8 read timeouts; bot auto-recovered, native retry loop). G-rule nightly-502-cluster-001 DISPATCHED per MEMORY.md — no new action. Deliveries since last chat iter: idx=505 (doorbell, 04:26Z), idx=506 (ourliberty-health sync_freshness alert, 04:56Z — processed by automated cycle ~9685, Tier-4, G-rule 1/3), idx=507 (doorbell, 08:28Z), idx=500 (pulse threshold-proposal-2026-08-23 / Check III, 10:44Z), idx=501 (doorbell, 12:30Z), idx=502 (ledger weekly-2026-08-17, 14:16Z), idx=503 (pulse check-i-2026-08-17, route=digest, NOT DM'd). No new inbound from Larry ← 7998341473 (last: 2026-08-06T04:07Z UTC). All 4 bots alive. **NOMINAL ✅**
+
+**Check 3 — Pipeline stall (~15:36Z UTC):** heal-pipeline-stall.heartbeat ts=2026-08-23T15:16:54Z UTC (~19 min; within threshold). **NOMINAL ✅**
+
+**Check 4 — Pending directives (~15:36Z UTC):** beacon-pending-approvals.json present (canonical state/ path), **pending=5 VERIFIED**:
+1. **~303.5h pending** ← CRITICAL AGE (alert-translations-unrouted-pr-nudges-retired-001, created 2026-08-11T00:08:30Z; reminders_sent=[6, 24, 72], all exhausted)
+2. **~288.5h pending** ← ALL REMINDERS EXHAUSTED (direction-ask-automated-cycle-journal-gap-001, created 2026-08-11T15:10:52Z; reminders_sent=[6, 24, 72])
+3. **~288h pending** ← ALL REMINDERS EXHAUSTED (check0-delivered-kinds-tier3-001, created 2026-08-11T15:31:39Z; reminders_sent=[6, 24, 72])
+4. **~84h pending** ← 72h REMINDER OVERDUE (suite-guardian-run-2026-08-20, created 2026-08-20T03:43:59Z; reminders_sent=[])
+5. **~52h pending** (check1-missing-substrate-branch-001, created 2026-08-21T11:50:38Z; reminders_sent=[6, 24]; next at 72h = 2026-08-24T11:50Z UTC)
+**NOMINAL ✅** (nightly-502-cluster-note-001 absent — conclusively lost; G-rule dispatched)
+
+**Check 5 — Stale daemon code (~15:36Z UTC):** heal-stale-daemon-code.heartbeat ts=2026-08-23T15:25:20Z UTC (~11 min; within 60-min threshold). system-health.json ts=2026-08-23T15:30:29Z UTC (~6 min), overall=healthy; all 4 bots (beacon, forge, mirror, pulse) desired=up, alive=True, action=noop. **NOMINAL ✅**
+
+**Check A — Source repo (~15:36Z UTC):** branch=main, HEAD=dd8c819a=origin/main (Pulse cycle 20260823T150410Z). Clean tree. Not ahead, not behind origin. **NOMINAL ✅**
+**Check B — Sync health (~15:36Z UTC):** agent-core-sync.json: last_sync=2026-08-23T15:05:10Z UTC (age=~31 min; status=no-change; within 2h threshold). **NOMINAL ✅**
+**Check C — Agent liveness (~15:36Z UTC):** system-health.json: all 4 bots alive=True (ts=15:30Z UTC, ~6 min). **NOMINAL ✅**
+**Check E — PR/merge state (~15:36Z UTC):** 0 open Forge PRs (ourliberty-agent-core). 0 recently merged Forge PRs in last 4h. **NOMINAL ✅**
+**Check H — Inboxes (~15:36Z UTC):** beacon=0, forge=0, mirror=0, pulse=0. **NOMINAL ✅**
+
+**§5.0 one-shots:** audit_due_nudge: no committed audit baseline; no-op. distill_detector: no un-distilled audits; no-op. audit_cadence_signal: no-op. **NOMINAL ✅**
+
+**Check I — (~15:36Z UTC):** Today is SUNDAY 2026-08-23 UTC — IS a firing day. Check I fired via systemd timer at ~14:14Z UTC. Artifact: check-i-2026-08-23.json (mode=digest, week_ending=2026-08-17, fired_at=14:14Z). Ledger: $545.71 total (−59.0% vs prior week), 22 σ-anomalies. 1 proposal: `fix-promoterace-order-fragile-gate-001` — $2.77 vs $0.38 baseline, 5.0σ above (effort=small). Bot: ledger delivered idx=502 at 14:16Z UTC; check-i idx=503 route=digest — skipped DM (normal: digest route). **CARRY ✅** (proposal unchanged from prior 8/21 artifact — same task, same 5.0σ reading)
+
+**Check III — (~15:36Z UTC):** Check III fired ON-WEEK (14 days since 2026-08-09). Artifact: check-iii-2026-08-23.json (as_of=2026-08-23T10:44Z UTC, lookback=30d). **2 proposals:**
+1. **(beacon, _default):** loosen 232s → 336s (p90=335s, p99=603s, median=40s, n=353, Δ=44.8%) — NOT high-attention (Δ<50%)
+2. **(mirror, _default):** loosen 1311s → 1448s (p90=1448s, p99=2052s, median=215s, n=238, Δ=10.4%) — NOT high-attention
+- DM delivered: idx=500 (source=pulse, subject=threshold-proposal-2026-08-23) at ~10:44Z UTC. Approve via `approve threshold-update-2026-08-23` → Beacon → Forge config-only PR on system_tab_thresholds.json. **NEW FINDING** (first Check III result this session). Do NOT auto-apply.
+
+**Check XIV:** Latest artifact check-xiv-2026-08-17.json (no new artifact since Aug 17; next expected ~2026-08-24). **CARRY ✅**
+
+**Credential rotation watch:** SUPABASE_SERVICE_ROLE_KEY: next_rotation_due=2026-08-22 (UTC, overdue), last_rotated_at=2026-05-24. Dedup window active until ~2026-08-31T23:23Z UTC — no re-DM. Carry.
+
+**G-rules (0 new Tier-4 occurrences this iter — wm=fl=504, 0 new alerts above watermark):**
+- **ourliberty-health-sync-freshness-tier4-no-translation-001: 1/3** (new since last chat iter, iter ~9685 at 05:09Z UTC; alert at ~04:53Z UTC; self-resolved by next sync tick ~05:04Z UTC per MEMORY.md; bot delivered idx=506 at 04:56Z UTC; current sync healthy at 15:05Z UTC ✅). CARRY.
+- heal-lost-marker-tier4-no-translation-001: 1/3 (carried)
+- deploy-notifier-vercel-build-failed-tier4-no-translation-001: 2/3 (carried)
+- mirror-queue-wait-gauge-third-review-slot-readiness-tier4-no-translation-001: 1/3 (carried)
+- source-beacon-notifications-tier4-no-translation: 2/3 (carried)
+- enable-pr-auto-merge-reviewdecision-guard-001: 1/3 (carried)
+- heal-pipeline-stall-no-mirror-dispatch-tier4-no-translation-001: 1/3 (carried)
+- suite-guardian-reminder-gap-001: 1/3 (carried)
+
+**PRIME DIRECTIVE ratio:** ~204.18 (unchanged; all iter_clean since last intervention). iter_clean appended (ts=2026-08-23T15:36:09Z UTC, iter=9708, tier=3). No new systemic_fixes.
+
+**Actions taken:**
+- Check 0: 0 new alerts; watermark stable at 504. ✅
+- PRIME DIRECTIVE: iter_clean appended (ts=2026-08-23T15:36:09Z UTC, iter=9708, tier=3). ✅
+- Tier state: `cycle_tier_state.py record --checks-clean true` → **consecutive_clean 15→16**, tier stays 3. ✅
+
+**Escalations:** None new. Outstanding items (carried):
+1. **alert-translations-unrouted-pr-nudges-retired-001: ~303.5h — CRITICAL AGE (all reminders exhausted).** Carry.
+2. direction-ask-automated-cycle-journal-gap-001 (~288.5h, all reminders exhausted). Carry.
+3. check0-delivered-kinds-tier3-001 (~288h, all reminders exhausted). Carry.
+4. Informational-cards impl gap (iter ~9102). Carry.
+5. **Check III threshold proposals LANDED (2026-08-23):** beacon 232→336s, mirror 1311→1448s. DM delivered idx=500. Larry: `approve threshold-update-2026-08-23` to proceed.
+6. suite-guardian-run-2026-08-20: ~84h, reminders_sent=[] (72h reminder overdue per Beacon reminder schedule; Forge dispatch pending Larry approval). Carry.
+7. check1-missing-substrate-branch-001: ~52h — reminders=[6, 24]; next at 72h = 2026-08-24T11:50Z UTC. Carry.
+8. Check I proposal [1]: `fix-promoterace-order-fragile-gate-001` σ-anomaly (5.0σ, $2.77 vs $0.38 baseline; confirmed in today's check-i-2026-08-23.json). `/dispatch 1` if warranted.
+9. **SUPABASE rotation: OVERDUE (since 2026-08-22 UTC). Dedup window prevents repeat DM (expires ~2026-08-31). Larry must rotate per docs/runbooks/rotate-supabase-keys.md.**
+10. nightly-502-cluster-note-001: **conclusively lost** (G-rule dispatched; 6th nightly cluster occurred 01:17-01:24Z UTC today, auto-recovered). Larry to approve or re-emit via Beacon.
+11. ourliberty-health-sync-freshness-tier4-no-translation-001: 1/3. Self-resolving pattern (sync dirty-tree during Pulse write). Carry; dispatch to Beacon at 3/3.
+
+**Patterns:** Clean iter. 0 new alerts. All checks nominal. 4/4 bots up, no pipeline stalls, 0 open Forge PRs, all inboxes empty. Check III fired ON-WEEK with 2 threshold-loosening proposals (beacon + mirror). Check I fired (Sunday) confirming same fix-promoterace σ-anomaly at 5.0σ. SUPABASE rotation overdue; 3 approvals still blocked 288h+.
+
+**Tier end-of-iter:** **Tier 3**, consecutive_clean=16.
+
+---
+
