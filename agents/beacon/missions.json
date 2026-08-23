@@ -20257,7 +20257,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-08-23T10:44:40.675444+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-08-23T10:44:18.225323+00:00"
+      "orphan_last_activity_ts": "2026-08-23T10:44:18.225323+00:00",
+      "briefing": {
+        "what": "The team drafted a proposal to change one of the internal thresholds that governs when work gets flagged for your attention, but it isn't attached to any active initiative yet.",
+        "why": "Where that line sits decides how much reaches your desk \u2014 set it too low and you drown in noise, too high and something real slips past unnoticed.",
+        "suggest": "Ask for the before-and-after numbers on how many items you'd see per week, and hold off on approving until you've seen that comparison."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-23T10:52:41.232194+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
