@@ -3315,6 +3315,36 @@
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
       "aging": true
+    },
+    {
+      "id": "cap-review-high-anomaly-task-cycle-20260819203537000-9c6b",
+      "title": "Review high-\u03c3 anomaly task `cycle-202608192035370000`",
+      "note": "$1.81 task vs $0.85 baseline (4.7\u03c3 above)\n\nLedger flagged this task at 4.7\u03c3 above baseline, but its excess over baseline is only $0.96 \u2014 below the $1.50 materiality floor, and under the ~$1.67 cost of the review cycle itself. Surfaced for visibility; not worth a dispatch unless it recurs. Its cohort (pulse/cycle) is 73.3% of the week's spend.",
+      "state": "parked",
+      "label": "pulse-check-i",
+      "origin": {
+        "source": "agent",
+        "session_id": null,
+        "repo": null,
+        "branch": null,
+        "captured_at": "2026-08-24T14:14:23.529595+00:00"
+      },
+      "last_touched": "2026-08-24T14:14:23.529595+00:00",
+      "promoted_to": null,
+      "briefing": {
+        "what": "One routine automated job cost about a dollar more than usual, which our cost monitor flagged as unusually high.",
+        "why": "The extra dollar is too small to matter on its own \u2014 checking it would cost more than we'd save \u2014 but this family of jobs is nearly three-quarters of the week's spend, so the pattern is worth watching.",
+        "suggest": "Let it go for now, but keep an eye out: if the same kind of overage shows up again, that's the point to look into where the money in this category is going."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-24T14:17:03.029310+00:00",
+        "from_state": "parked"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     }
   ]
 }
