@@ -19536,7 +19536,10 @@
         "at": "2026-08-10T22:18:20.077232+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-08-24T00:05:13.350024+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "proposed-promoterace-ambient-feed-isolation-001",
