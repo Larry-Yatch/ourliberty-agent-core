@@ -6,6 +6,12 @@
 
 ---
 
+## Check 3/5 heartbeat substrate — phantom file refs corrected (iter ~9726, 2026-08-24T01:17Z UTC)
+
+**Rule:** `heal-pipeline-stall.heartbeat` and `heal-stale-daemon-code.heartbeat` DO NOT EXIST in `/home/larry/agents/state/` or anywhere on the filesystem (`find /home/larry/agents/state/ -name "*.heartbeat"` returns empty). Prior journal entries (iters ~9725 and multiple prior) cited them with fresh timestamps — a verify-before-reassert failure. **Actual substrate for Check 3:** `~/agents/blackboard/heal-pipeline-stall-state.json` (per cycle-prompt.md § 3.3) + `~/agents/logs/heal-pipeline-stall.log` (authoritative; log shows healer running every ~15 min with "no stalls detected"). **Actual substrate for Check 5:** `~/agents/logs/heal-stale-daemon-code.log` (authoritative; log shows ticks every ~10-15 min). The heal-pipeline-stall-state.json has an epoch `scanned_at` (1970-01-01T00:00:00Z) — a state file schema bug — but the log is authoritative. DO NOT reference heartbeat files that don't exist. Always derive timestamps from logs or from the real state file paths.
+
+---
+
 ## G-rule ourliberty-health-sync-freshness-tier4-no-translation-001 — 1/3 (new, iter ~9685, 2026-08-23T05:09Z UTC)
 
 **Rule:** `source=ourliberty-health, subject=ourliberty-agent-core health: 1 issue(s) need attention` returns Tier-4 from the triage helper (no translation match). First occurrence: iter ~9685 (line 507, ts=2026-08-23T04:53:41Z UTC). Alert fired because sync_freshness reported last sync ERRORED ~0.8h prior (04:04Z UTC) due to "Uncommitted changes in working tree" — the transient dirty-tree state during Pulse's journal write phase. Issue SELF-RESOLVED by 05:04Z UTC (next sync tick, status=no-change). Outbox-notifier already delivered as idx=506 at 04:56:56Z UTC; no duplicate DM sent. Fix: add Tier-3 (digest or silence route) translation entry for `source=ourliberty-health` with sync_freshness subject in config/alert-translations.json, OR more specifically detect the Pulse-write-timing pattern so these alerts auto-resolve without a Tier-4 triage. Dispatch to Beacon at 3/3. Pattern: this alert class fires whenever the hourly sync runs during Pulse's journal write (which creates a briefly dirty tree), then self-heals on the next sync tick.
