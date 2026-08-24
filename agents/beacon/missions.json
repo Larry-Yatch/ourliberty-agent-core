@@ -20275,6 +20275,153 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "retrospective-dispatch-branch-cleanup-gh-unavailable-2026-08-24",
+      "name": "retrospective dispatch-branch-cleanup-gh-unavailable 2026-08-24",
+      "phase": "proposed",
+      "brief": "Weekly elevation retrospective (2026-08-24) \u2014 FIX-PERMANENTLY.\n\nSignature: dispatch-branch-cleanup::gh-unavailable\nSource: dispatch-branch-cleanup  \u00b7  subject: gh-unavailable\nThis period: 2 fire(s), 6 week(s) recurring, trend=rising.\nResolution histogram: {'approve': 0, 'reject': 0, 'silence': 0, 'ack': 0, 'none': 2}.\n\nRationale: Six weeks of transient GitHub-unavailability errors during branch cleanup with zero operator action of any kind; the cleanup self-retries next sweep, so this is pure noise that should not DM.\n\nRecurring problem with no safe templated auto-fix \u2014 build an objective fix (spec, no code in this card). Accept to start drafting; dismiss to silence.",
+      "spec_docs": [
+        "agents/beacon/specs/alert-pipeline-rework.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-08-24",
+      "deferred_reason": null,
+      "proposed_by": "retrospective-author",
+      "proposed_at": "2026-08-24T13:03:52.789406+00:00",
+      "predraft": {
+        "classification": "fix-permanently",
+        "root_signature": "dispatch-branch-cleanup::gh-unavailable",
+        "count_at_proposal": 2,
+        "rationale": "Six weeks of transient GitHub-unavailability errors during branch cleanup with zero operator action of any kind; the cleanup self-retries next sweep, so this is pure noise that should not DM."
+      }
+    },
+    {
+      "id": "retrospective-heal-lost-marker-lost-marker-2026-08-24",
+      "name": "retrospective heal-lost-marker-lost-marker 2026-08-24",
+      "phase": "proposed",
+      "brief": "Weekly elevation retrospective (2026-08-24) \u2014 FIX-PERMANENTLY.\n\nSignature: heal-lost-marker::lost-marker\nSource: heal-lost-marker  \u00b7  subject: lost-marker\nThis period: 1 fire(s), 4 week(s) recurring, trend=rising.\nResolution histogram: {'approve': 0, 'reject': 0, 'silence': 0, 'ack': 0, 'none': 1}.\n\nRationale: A healer firing every week for 4 weeks means the upstream defect that drops markers recurs faster than the healer suppresses the alert; silencing the healer signal would mask a real reliability gap that needs root-cause investigation.\n\nRecurring problem with no safe templated auto-fix \u2014 build an objective fix (spec, no code in this card). Accept to start drafting; dismiss to silence.",
+      "spec_docs": [
+        "agents/beacon/specs/alert-pipeline-rework.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-08-24",
+      "deferred_reason": null,
+      "proposed_by": "retrospective-author",
+      "proposed_at": "2026-08-24T13:03:52.814007+00:00",
+      "predraft": {
+        "classification": "fix-permanently",
+        "root_signature": "heal-lost-marker::lost-marker",
+        "count_at_proposal": 1,
+        "rationale": "A healer firing every week for 4 weeks means the upstream defect that drops markers recurs faster than the healer suppresses the alert; silencing the healer signal would mask a real reliability gap that needs root-cause investigation."
+      }
+    },
+    {
+      "id": "retrospective-ourliberty-health-ourliberty-agent-core-health-2026-08-24",
+      "name": "retrospective ourliberty-health-ourliberty-agent-core-health 2026-08-24",
+      "phase": "proposed",
+      "brief": "Weekly elevation retrospective (2026-08-24) \u2014 FIX-PERMANENTLY.\n\nSignature: ourliberty-health::ourliberty-agent-core-health\nSource: ourliberty-health  \u00b7  subject: ourliberty-agent-core-health\nThis period: 1 fire(s), 10 week(s) recurring, trend=rising.\nResolution histogram: {'approve': 0, 'reject': 0, 'silence': 0, 'ack': 0, 'none': 1}.\n\nRationale: Ten weeks of weekly health alerts with zero operator response indicates a chronic structural issue (untracked files in /home/larry/agent-core that Forge cannot clean up); the proper fix is an automated healer or a one-time pruning step, not suppression of a real health signal.\n\nRecurring problem with no safe templated auto-fix \u2014 build an objective fix (spec, no code in this card). Accept to start drafting; dismiss to silence.",
+      "spec_docs": [
+        "agents/beacon/specs/alert-pipeline-rework.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-08-24",
+      "deferred_reason": null,
+      "proposed_by": "retrospective-author",
+      "proposed_at": "2026-08-24T13:03:52.839056+00:00",
+      "predraft": {
+        "classification": "fix-permanently",
+        "root_signature": "ourliberty-health::ourliberty-agent-core-health",
+        "count_at_proposal": 1,
+        "rationale": "Ten weeks of weekly health alerts with zero operator response indicates a chronic structural issue (untracked files in /home/larry/agent-core that Forge cannot clean up); the proper fix is an automated healer or a one-time pruning step, not suppression of a real health signal."
+      }
+    },
+    {
+      "id": "retrospective-pulse-rsdpm-rehearseprs-2026-08-24",
+      "name": "retrospective pulse-rsdpm-rehearseprs 2026-08-24",
+      "phase": "proposed",
+      "brief": "Weekly elevation retrospective (2026-08-24) \u2014 FIX-PERMANENTLY.\n\nSignature: pulse::rsdpm-rehearseprs\nSource: pulse  \u00b7  subject: rsdpm-rehearseprs\nThis period: 1 fire(s), 2 week(s) recurring, trend=new.\nResolution histogram: {'approve': 0, 'reject': 0, 'silence': 0, 'ack': 0, 'none': 1}.\n\nRationale: Same root defect as rsdpm-rehearseprs::rsdpm \u2014 Pulse is independently detecting that the rehearse-PRs checker keeps re-triggering post-completion; two independent alert sources pointing at the same unfixed bug strengthens the case for a build mission.\n\nRecurring problem with no safe templated auto-fix \u2014 build an objective fix (spec, no code in this card). Accept to start drafting; dismiss to silence.",
+      "spec_docs": [
+        "agents/beacon/specs/alert-pipeline-rework.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-08-24",
+      "deferred_reason": null,
+      "proposed_by": "retrospective-author",
+      "proposed_at": "2026-08-24T13:03:52.862974+00:00",
+      "predraft": {
+        "classification": "fix-permanently",
+        "root_signature": "pulse::rsdpm-rehearseprs",
+        "count_at_proposal": 1,
+        "rationale": "Same root defect as rsdpm-rehearseprs::rsdpm \u2014 Pulse is independently detecting that the rehearse-PRs checker keeps re-triggering post-completion; two independent alert sources pointing at the same unfixed bug strengthens the case for a build mission."
+      }
+    },
+    {
+      "id": "retrospective-pulse-threshold-proposal-2026-08-24",
+      "name": "retrospective pulse-threshold-proposal 2026-08-24",
+      "phase": "proposed",
+      "brief": "Weekly elevation retrospective (2026-08-24) \u2014 FIX-PERMANENTLY.\n\nSignature: pulse::threshold-proposal\nSource: pulse  \u00b7  subject: threshold-proposal\nThis period: 1 fire(s), 8 week(s) recurring, trend=rising.\nResolution histogram: {'approve': 0, 'reject': 0, 'silence': 0, 'ack': 0, 'none': 1}.\n\nRationale: Eight weeks of automated threshold-proposal alerts with zero operator action of any kind; proposals are informational suggestions, not actionable decisions, and should land on the dashboard without generating a DM.\n\nRecurring problem with no safe templated auto-fix \u2014 build an objective fix (spec, no code in this card). Accept to start drafting; dismiss to silence.",
+      "spec_docs": [
+        "agents/beacon/specs/alert-pipeline-rework.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-08-24",
+      "deferred_reason": null,
+      "proposed_by": "retrospective-author",
+      "proposed_at": "2026-08-24T13:03:52.887483+00:00",
+      "predraft": {
+        "classification": "fix-permanently",
+        "root_signature": "pulse::threshold-proposal",
+        "count_at_proposal": 1,
+        "rationale": "Eight weeks of automated threshold-proposal alerts with zero operator action of any kind; proposals are informational suggestions, not actionable decisions, and should land on the dashboard without generating a DM."
+      }
+    },
+    {
+      "id": "retrospective-rsdpm-rehearseprs-rsdpm-2026-08-24",
+      "name": "retrospective rsdpm-rehearseprs-rsdpm 2026-08-24",
+      "phase": "proposed",
+      "brief": "Weekly elevation retrospective (2026-08-24) \u2014 FIX-PERMANENTLY.\n\nSignature: rsdpm-rehearseprs::rsdpm\nSource: rsdpm-rehearseprs  \u00b7  subject: rsdpm\nThis period: 3 fire(s), 4 week(s) recurring, trend=rising.\nResolution histogram: {'approve': 0, 'reject': 0, 'silence': 0, 'ack': 0, 'none': 3}.\n\nRationale: RSDPM V0 is fully complete (all 20/20 PRs merged 2026-07-23) yet the rehearse-PRs subsystem keeps firing weekly for 4 weeks \u2014 this is a real defect where a completed initiative's checker was never retired or gated on completion state.\n\nRecurring problem with no safe templated auto-fix \u2014 build an objective fix (spec, no code in this card). Accept to start drafting; dismiss to silence.",
+      "spec_docs": [
+        "agents/beacon/specs/alert-pipeline-rework.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-08-24",
+      "deferred_reason": null,
+      "proposed_by": "retrospective-author",
+      "proposed_at": "2026-08-24T13:03:52.763725+00:00",
+      "predraft": {
+        "classification": "fix-permanently",
+        "root_signature": "rsdpm-rehearseprs::rsdpm",
+        "count_at_proposal": 3,
+        "rationale": "RSDPM V0 is fully complete (all 20/20 PRs merged 2026-07-23) yet the rehearse-PRs subsystem keeps firing weekly for 4 weeks \u2014 this is a real defect where a completed initiative's checker was never retired or gated on completion state."
+      }
+    },
+    {
+      "id": "retrospective-suite-guardian-test-flip-readiness-gauge-testmainintegration-test-all-green-writes-artifact-and-rings-2026-08-24",
+      "name": "retrospective suite-guardian-test-flip-readiness-gauge-testmainintegration-test-all-green-writes-artifact-and-rings 2026-08-24",
+      "phase": "proposed",
+      "brief": "Weekly elevation retrospective (2026-08-24) \u2014 FIX-PERMANENTLY.\n\nSignature: suite-guardian::test-flip-readiness-gauge.testmainintegration.test-all-green-writes-artifact-and-rings\nSource: suite-guardian  \u00b7  subject: test-flip-readiness-gauge.testmainintegration.test-all-green-writes-artifact-and-rings\nThis period: 1 fire(s), 2 week(s) recurring, trend=new.\nResolution histogram: {'approve': 0, 'reject': 0, 'silence': 0, 'ack': 0, 'none': 1}.\n\nRationale: A specific integration test flagged by suite-guardian for two consecutive weeks with no operator action suggests a real test regression (not a known order-flake class) that needs diagnosis and a targeted fix.\n\nRecurring problem with no safe templated auto-fix \u2014 build an objective fix (spec, no code in this card). Accept to start drafting; dismiss to silence.",
+      "spec_docs": [
+        "agents/beacon/specs/alert-pipeline-rework.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-08-24",
+      "deferred_reason": null,
+      "proposed_by": "retrospective-author",
+      "proposed_at": "2026-08-24T13:03:52.912601+00:00",
+      "predraft": {
+        "classification": "fix-permanently",
+        "root_signature": "suite-guardian::test-flip-readiness-gauge.testmainintegration.test-all-green-writes-artifact-and-rings",
+        "count_at_proposal": 1,
+        "rationale": "A specific integration test flagged by suite-guardian for two consecutive weeks with no operator action suggests a real test regression (not a known order-flake class) that needs diagnosis and a targeted fix."
+      }
     }
   ]
 }
