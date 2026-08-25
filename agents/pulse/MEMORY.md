@@ -54,9 +54,11 @@
 
 ---
 
-## G-rule sync-service-deploy-restart-head-drift-tier4-no-translation-001 — CLOSED ✅ (iter ~8897, 2026-08-09T23:37Z UTC)
+## G-rule sync-service-deploy-restart-head-drift-tier4-no-translation-001 — RE-OPENED 1/3 (iter ~9780, 2026-08-25T07:40Z UTC)
 
-**Rule (CLOSED — FALSE PREMISE):** Prior iters counted raw fires of this alert in larry-alerts.jsonl and incremented toward [3/3]. But iter ~8897 confirmed via `triage-alert` helper that `source=sync.service, subject=deploy-restart-head-drift` returns **Tier 3** (known-pattern match in alert-translations.json, `rationale: "known-pattern match in alert-translations.json"`, cached since iter ~6880/2026-07-30). The translation entry was ALREADY in place; no Tier 4 DMs were ever sent. The G-rule counter was counting appearances in larry-alerts.jsonl, not actual Tier 4 escalations — a verify-before-reassert failure. Pattern: emitted immediately after a Pulse auto-commit causes a brief SHA drift; self-heals on the next sync tick. **No dispatch needed. Do NOT reopen this G-rule.**
+**Rule:** `source=sync.service, subject=deploy-restart-head-drift` returns Tier-4 from the triage helper (no translation match in config/alert-translations.json). Iter ~9780 (2026-08-25T07:40Z UTC): guard-tier4 confirmed authoritative Tier-4 (same-iter triage-alert call + classify()==4). Alert fires each Pulse-commit cycle when sync.service sees local HEAD moved to new commit (e.g., 1a446bd6) but deploy target is still the prior commit (b8e17129) — condition self-resolves on the same sync tick. Outbox_notifier already delivers the alert directly (Larry sees it as a raw FYI). Fix: add Tier-3 (digest/silence) translation entry for `source=sync.service, subject=deploy-restart-head-drift` in config/alert-translations.json. Dispatch to Beacon at 3/3.
+
+**Prior CLOSED status was a FALSE PREMISE (iter ~8897):** the CLOSED claimed "translation was already in place" but config/alert-translations.json does NOT contain a `deploy-restart-head-drift` key under `sync.service` (verified iter ~9780). The triage helper must have returned Tier-3 at iter ~8897 via a different mechanism (possibly cached state or transient classification). The "CLOSED" ruling was a verify-before-reassert failure; the alert still fires as Tier-4. **Do NOT re-close without verifying the translation entry actually exists.**
 
 ---
 
