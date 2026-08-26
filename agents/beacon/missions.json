@@ -20522,6 +20522,23 @@
         "at": "2026-08-24T13:16:18.030560+00:00",
         "from_state": "proposed"
       }
+    },
+    {
+      "id": "proposed-larry-reject-c08d6df91217ff20c8145534fb431adb10237c61",
+      "name": "Larry Reject C08d6df91217ff20c8145534fb431adb10237c61",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `larry-reject-c08d6df91217ff20c8145534fb431adb10237c61`. Last activity 2026-08-26T17:12:46.564172+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "larry-reject-c08d6df91217ff20c8145534fb431adb10237c61"
+      ],
+      "repo": null,
+      "created": "2026-08-26",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-26T17:14:15.073297+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-26T17:12:46.564172+00:00"
     }
   ]
 }
