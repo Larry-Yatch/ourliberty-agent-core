@@ -20538,7 +20538,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-08-26T17:14:15.073297+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-08-26T17:12:46.564172+00:00"
+      "orphan_last_activity_ts": "2026-08-26T17:12:46.564172+00:00",
+      "briefing": {
+        "what": "Someone on the team started a piece of work that you turned down, and it isn't attached to any active project or goal right now.",
+        "why": "Unassigned work quietly eats hours and can drift back into the queue if nobody closes it out, so loose ends like this are worth settling early.",
+        "suggest": "Confirm the decision to drop it and have the work formally closed, but ask for a one-line reason first in case there was a real need behind it."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-26T17:23:18.361332+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
