@@ -818,5 +818,126 @@ class SystemHealthGitShaTest(unittest.TestCase):
         self.assertEqual(body['git_sha'], 'b' * 40)
 
 
+class DashboardActionRouteLegalityTest(unittest.TestCase):
+    """TARGET-parity guard: every envelope the dashboard BUILDS must be one the
+    routing layer will DELIVER.
+
+    `test_dispatch_route_parity` guards the SOURCE dimension — that a source in
+    ALLOWED_SOURCES has *an* entry in FRESH_DISPATCH_ROUTES. It was green
+    through all three live losses, because in each one 'dashboard' had an entry;
+    the TARGET the code path actually built for was simply not in it:
+
+      2026-06-10  dashboard -> beacon  entry absent entirely   2 rejections lost
+      2026-07-22  dashboard -> forge   clarify answer denied   1 answer lost
+                  (`resume-m3-pr1-r1.json`, the clarify_request branch below)
+      2026-08-26  dashboard -> mirror  recheck dispatch denied 2 approvals lost
+                  (`review-check0-delivered-kinds-tier3-001-rev1.json`)
+
+    Every one failed the same way: layer-1 source validation PASSED, the API
+    returned success, and the envelope was dead-lettered to `<agent>/.invalid`
+    with no auto-replay. The operator is told nothing.
+
+    This drives the REAL builder for every (event_type, action) pair the
+    dashboard supports and asserts the target it returns is permitted — it does
+    not restate the route table, and it does not pattern-match the source. A new
+    action, or a change to an existing one's target, fails here at the seam.
+    """
+
+    ALLOWED = None  # resolved in setUp so a route-table edit is picked up live
+
+    def setUp(self):
+        import routing_validator as rv
+        self.ALLOWED = rv.FRESH_DISPATCH_ROUTES['dashboard']
+
+    @staticmethod
+    def _recheck_target():
+        return {
+            'task_id': 'some-review-task-001',
+            'pr_url': 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/1108',
+            'target_repo': 'ourliberty-agent-core',
+            'round': 1,
+            'replan_count': 0,
+            'head_sha': 'a' * 40,
+        }
+
+    def _cases(self):
+        """(label, source_row, action) for every dashboard-buildable envelope."""
+        promoted = {
+            'event_type': 'approval_request',
+            'task_id': f'{da.PROMOTED_STRANDED_ESCALATION_ID_PREFIX}deadbeef',
+            'event_id': 'evt-promoted',
+            'payload': {
+                'promoted_source': da.PROMOTED_STRANDED_ESCALATION_SOURCE,
+                'prompt': 'healer narration',
+                'recheck_target': self._recheck_target(),
+            },
+        }
+        generic = {
+            'event_type': 'approval_request',
+            'task_id': 'ordinary-task-001',
+            'event_id': 'evt-generic',
+            'payload': {'suggested_envelope_for_approve': {}},
+        }
+        recheckable = {
+            'event_type': 'approval_request',
+            'task_id': 'ordinary-task-002',
+            'event_id': 'evt-recheckable',
+            'payload': {'recheck_target': self._recheck_target()},
+        }
+        cases = [
+            ('approval_request/approve (generic)', generic, 'approve'),
+            ('approval_request/reject', generic, 'reject'),
+            ('approval_request/approve (promoted stranded escalation)',
+             promoted, 'approve'),
+            ('approval_request/recheck', recheckable, 'recheck'),
+        ]
+        # clarify_request returns `asking_agent` STRAIGHT FROM THE PAYLOAD, so
+        # the target is data, not a constant. outbox_notifier documents the
+        # writers as 'forge' or (future) 'mirror'; both must be deliverable or
+        # the reply is lost exactly as it was on 2026-07-22.
+        for agent in ('forge', 'mirror'):
+            cases.append((
+                f'clarify_request/comment (asking_agent={agent})',
+                {'event_type': 'clarify_request',
+                 'task_id': f'clarify-task-{agent}',
+                 'event_id': f'evt-clarify-{agent}',
+                 'payload': {'asking_agent': agent,
+                             'resume_session_id': 'sess-1'}},
+                'comment',
+            ))
+        return cases
+
+    def test_dashboard_action_targets_are_route_legal(self):
+        for label, source, action in self._cases():
+            with self.subTest(case=label):
+                with mock.patch.object(da, '_gh_pr_head_sha_for_recheck',
+                                       return_value='b' * 40):
+                    target, _filename, _envelope = da._build_envelope_for_action(
+                        source=source, action=action, comment='ack',
+                        actor='larry@example.com')
+                self.assertIn(
+                    target, self.ALLOWED,
+                    f'{label}: the dashboard builds an envelope for '
+                    f'{target!r}, but routing permits only '
+                    f'{sorted(self.ALLOWED)} from "dashboard" — this envelope '
+                    f'is dead-lettered to {target}/.invalid with no replay '
+                    f'while the API returns success')
+
+    def test_every_case_actually_built_an_envelope(self):
+        """The guard above is vacuous if a case silently stops producing an
+        envelope (a 400 would skip the assertion by raising). Pin that all six
+        cases still reach a target, so the coverage cannot quietly shrink."""
+        built = 0
+        for label, source, action in self._cases():
+            with mock.patch.object(da, '_gh_pr_head_sha_for_recheck',
+                                   return_value='b' * 40):
+                target, _f, _e = da._build_envelope_for_action(
+                    source=source, action=action, comment='ack',
+                    actor='larry@example.com')
+            self.assertTrue(target, f'{label} produced an empty target')
+            built += 1
+        self.assertEqual(built, 6)
+
+
 if __name__ == '__main__':
     unittest.main()
