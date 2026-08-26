@@ -163,13 +163,25 @@ def _parse_ts(s: object) -> Optional[datetime]:
     return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
 
 
-def _board_link(approvals: int, escalations: int) -> str:
+def _board_link() -> str:
     """The clickable destination that replaces the dead words "check the board".
-    Pure approvals land on the surface where you act on them (/approvals);
-    anything with an escalation goes to the umbrella board (/where-we-are),
-    which shows both kinds."""
-    path = '/approvals' if escalations == 0 else '/where-we-are'
-    return f'{DASHBOARD_BASE}{path}'
+
+    ONE destination: /approvals. The escalation branch used to send Larry to an
+    "umbrella board" at /where-we-are, but the dashboard DELETED that page in
+    a86aa6f (2026-07-03, "migrate Where-Are-We panels + retire the tab" — page,
+    helpers, tests and nav entry all removed). Because the branch only fired when
+    escalations > 0, the link worked on ordinary days and broke precisely on the
+    days something extra was waiting, which is why it survived 132 DMs across 24
+    days before Larry hit it.
+
+    /approvals is the canonical waiting-on-you surface: the dashboard's own /live
+    top glance routes its waiting-on-you count there, and an escalation reaches
+    the dashboard only once heal_unregistered_approval promotes it into an
+    approval card on that tab — so /approvals is where the actionable item
+    actually is. The unpromoted escalation row has no dashboard page at all, and
+    never did after 2026-07-03.
+    """
+    return f'{DASHBOARD_BASE}/approvals'
 
 
 def _blocking_items(items: object) -> list[dict]:
@@ -211,7 +223,7 @@ def format_message(
     so "where to go" is never missing."""
     verb = 'needs' if needs == 1 else 'need'
     noun = 'item' if needs == 1 else 'items'
-    link = _board_link(approvals, escalations)
+    link = _board_link()
     blocking = _blocking_items(items)
 
     if not blocking:
