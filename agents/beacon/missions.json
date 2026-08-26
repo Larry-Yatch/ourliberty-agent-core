@@ -20569,7 +20569,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-08-26T17:29:15.846213+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-08-26T17:21:34.127692+00:00"
+      "orphan_last_activity_ts": "2026-08-26T17:21:34.127692+00:00",
+      "briefing": {
+        "what": "Someone on the team spent a work session acting on a request you turned down, and it isn't attached to any active project.",
+        "why": "Effort spent outside your approved priorities is time not spent on the work you actually asked for, and untracked work tends to resurface later as surprise cost.",
+        "suggest": "Ask what this session was for before anything more goes into it \u2014 either tie it to a real priority or stop it."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-26T17:33:18.565822+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
