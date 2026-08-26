@@ -3393,3 +3393,10 @@ NOMINAL (carry; Larry holds approval gate).
 
 ---
 
+
+**Check I (2026-08-24):**
+
+- Ledger total: $416.17; 21 anomaly(ies)
+- Retry overhead: $0.00 (0.0%)
+- Forge marker-discipline: 0 misses (retry-depth 0/0/0, 0% retry-2+), trend flat (+0 vs prior wk)
+- Mode: heartbeat (no proposed optimizations)
