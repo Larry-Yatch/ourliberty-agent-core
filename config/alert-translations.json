@@ -203,6 +203,14 @@
       "recommended_action": "Check the sequence file is writable: `ls -l ~/agents/blackboard/build-sequences/<seq-id>.json`, plus disk space (`df -h`) and whether a concurrent writer (the advancer, or a Beacon session) is holding it. No action is needed on the dispatch itself. Runbook: runbooks/heal-pipeline-stall.md."
     }
   },
+  "alert-retraction": {
+    "unrouted-pr-nudges-retired": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "Stale \"this PR needs routing\" nudges were cleared from the Needs You lane because every pull request they covered has since merged or closed. The chain retracted its own obsolete flags; the routing work is finished, not pending.",
+      "recommended_action": "No action needed. The alert queue already delivered its own closure DM for this batch; this entry only stops Pulse Check 0 from re-escalating the same cleared batch a second time."
+    }
+  },
   "heal-systemd-install-drift": {
     "install-healed": {
       "severity": "INFO",

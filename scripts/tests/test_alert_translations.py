@@ -734,6 +734,7 @@ class OutcomeLanguageTest(unittest.TestCase):
         ('heal-systemd-install-drift', 'install-healed'),
         ('heal-systemd-install-drift', 'stuck-timer-healed'),
         ('heal-stale-daemon-code', 'auto-restarted'),
+        ('alert-retraction', 'unrouted-pr-nudges-retired'),
     ]
 
     # Tokens that signal an operator imperative — none belongs in an
