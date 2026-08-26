@@ -232,12 +232,13 @@ class DoorbellMessageTest(_Base):
             f'2 items need your call.\n→ {self.BASE}/approvals',
         )
 
-    def test_fallback_breakdown_and_escalation_routes_to_board(self):
-        # Mixed kinds → light breakdown + the umbrella board (/where-we-are).
+    def test_fallback_breakdown_and_escalation_routes_to_approvals(self):
+        # Mixed kinds → light breakdown + /approvals. The old umbrella board
+        # (/where-we-are) was DELETED from the dashboard in a86aa6f 2026-07-03.
         self.assertEqual(
             self.dn.format_message(3, 2, 1),
             '3 items need your call. (2 to approve, 1 escalated)\n'
-            f'→ {self.BASE}/where-we-are',
+            f'→ {self.BASE}/approvals',
         )
 
     # ---- itemized path: names WHAT + links WHERE ----
@@ -252,12 +253,25 @@ class DoorbellMessageTest(_Base):
             f'→ {self.BASE}/approvals',
         )
 
-    def test_escalation_present_routes_to_where_we_are(self):
+    def test_escalation_present_still_routes_to_approvals(self):
         items = [self.item('approval', 'a'), self.item('escalation', 'b')]
         msg = self.dn.format_message(2, 1, 1, items)
         self.assertIn('• Approve — a', msg)
         self.assertIn('• Escalation — b', msg)
-        self.assertTrue(msg.endswith(f'→ {self.BASE}/where-we-are'))
+        self.assertTrue(msg.endswith(f'→ {self.BASE}/approvals'))
+
+    def test_board_link_has_exactly_one_destination(self):
+        # THE REGRESSION GUARD. A second destination is how the dead link hid
+        # for 132 DMs across 24 days: the escalations==0 branch stayed correct,
+        # so the link only broke when an escalation was open — the days it was
+        # needed most. Escalations have no dashboard page of their own; they
+        # reach the tab only once promoted into an approval card.
+        for esc in (0, 1, 7):
+            with self.subTest(escalations=esc):
+                self.assertEqual(self.dn._board_link(),
+                                 f'{self.BASE}/approvals')
+                self.assertNotIn('where-we-are',
+                                 self.dn.format_message(2, 1, esc))
 
     def test_caps_named_items_with_more(self):
         items = [self.item('approval', f't{i}') for i in range(5)]
@@ -295,7 +309,8 @@ class DoorbellItemizedRunTest(_Base):
         self.assertIn('2 items need your call:', msg)
         self.assertIn('• Approve — dispatch to forge: build X', msg)
         self.assertIn('• Escalation — credential rotation due', msg)
-        self.assertIn('/where-we-are', msg)
+        self.assertIn('/approvals', msg)
+        self.assertNotIn('/where-we-are', msg)
 
     def test_run_drops_parked_items_from_names(self):
         # Parked items ride along in waiting_on_larry.items but are NOT blocking
