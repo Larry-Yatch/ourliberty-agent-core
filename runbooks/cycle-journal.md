@@ -4,6 +4,87 @@
 
 ---
 
+## Iteration ~9927 — 2026-08-27T06:44Z UTC (Larry /cycle direct, Tier 1 [Check 0: wm 544→544, 0 new alerts NOMINAL; Check 4: pending=1 dashboard-return-routing-auto-merge-001 (~302 min); PR#1113 ~245 min, PR#1112 ~354 min, both MONITORING; all other checks NOMINAL; tier-reset consecutive_clean 0→0])
+
+**Health:** ⚠️ SIGNAL — Check 4: pending approval `dashboard-return-routing-auto-merge-001` still awaiting Larry's reply (~302 min, created 2026-08-27T01:39:50Z UTC). All other checks NOMINAL. **Tier 1**, consecutive_clean remains 0. 2026-08-27 UTC (Thursday).
+
+**VERIFY-BEFORE-REASSERT (from iter ~9926 at 06:33Z UTC):**
+- "Check 4: pending=1 dashboard-return-routing-auto-merge-001 (~292 min)": CONFIRMED + UPDATED. Still pending. ~302 min at 06:44Z UTC. CARRY.
+- "PR#1113 ~234 min, MONITORING": CONFIRMED + UPDATED. ~245 min old. MERGEABLE, rd=''. fix/* unrouted. MONITORING.
+- "PR#1112 ~343 min, MONITORING": CONFIRMED + UPDATED. ~354 min old. MERGEABLE, rd=''. fix/* unrouted. MONITORING.
+- "HEAD=477c276a=origin/main": SUPERSEDED. HEAD=1ccecc75 (Pulse cycle 20260827T063504Z). HEAD=origin/main. Clean tree. NOMINAL.
+- "all 4 bots alive=True": CONFIRMED via system-health.json ts=2026-08-27T06:38:16Z UTC (~6 min old). All 4 bots alive=True. NOMINAL.
+- "heal-stale-daemon-code.heartbeat ~5 min old": CONFIRMED + UPDATED. heartbeat=2026-08-27T06:37:46Z UTC (~6 min old at 06:44Z UTC). NOMINAL.
+- "SUPABASE ~223h elapsed, ~5d overdue": CONFIRMED CARRY. last_dm=2026-08-17T23:23:16Z UTC. Elapsed ~223h. Dedup until ~2026-08-31T23:23Z UTC. No re-DM. CARRY.
+- G-rules all: CONFIRMED CARRY (0 new alerts, watermark=544=file_length=544).
+
+**Check 0 (~06:42Z UTC):** repair-watermark → no-op (old_watermark=544, file_length=544). 0 new alerts above watermark. NOMINAL.
+
+**Check 1 (~06:42Z UTC):** outbox-notifier.log last activity 2026-08-26T22:31:36Z UTC (AUTO_MERGE_WORKTREE_TEARDOWN, PR#1114, ~8h ago). heal-pipeline-stall.log last tick 2026-08-27T06:41:29Z UTC (~3 min old). FORGE_NO_PR_SKIP: #1108 pr_exists=merged, #1109 pr_exists=merged, #1114 branch_truncated. PRs #1113+#1112 cooldown-suppressed. "done: 0 new alert(s) fired, 0 recovered, 2 suppressed". No new WARNs. NOMINAL.
+
+**Check 2 (~06:42Z UTC):** beacon_telegram_bot.log last delivery idx=543 at 2026-08-27T04:32:52Z UTC (agent-runner-mirror, transcript-not-persisted:tier1, ~2h ago). Last Larry directive in log: 2026-08-05 ("You said to post this here:...") — no new directives in last 4h. Nightly 502 cluster at 01:12-01:15Z UTC 2026-08-27 already recorded G-rule DISPATCHED ✅. NOMINAL.
+
+**Check 3 (~06:42Z UTC):** heal-pipeline-stall.log last tick 2026-08-27T06:41:29Z UTC (~3 min old). PRs #1113+#1112 cooldown-suppressed. "done: 0 new alert(s) fired, 0 recovered, 2 suppressed". NOMINAL.
+
+**Check 4 (~06:42Z UTC):** READ FROM CANONICAL PATH: state/beacon-pending-approvals.json. pending=1: `dashboard-return-routing-auto-merge-001`. NON-NOMINAL → TIER-RESET.
+  - Plan: "Fix the outbox-notifier return leg so a dashboard-sourced Mirror REVIEW_PASS fires auto-merge + the closing Larry DM instead of archiving as 'no routable target'."
+  - Created: 2026-08-27T01:39:50Z UTC. ~302 min old at 06:44Z UTC. Larry has not replied.
+  - PR#1113 (fix/dashboard-review-verdict-fourth-wall, OPEN, MERGEABLE, rd='', ~245 min) addresses same root cause.
+  - Larry action required: review PR#1113 AND/OR reply "approve."
+
+**Check 5 (~06:42Z UTC):** heal-stale-daemon-code.heartbeat=2026-08-27T06:37:46Z UTC (~6 min old). NOMINAL.
+
+**Check A (~06:42Z UTC):** branch=main, HEAD=1ccecc75=origin/main (Pulse cycle 20260827T063504Z). Clean tree. behind=0, ahead=0. NOMINAL.
+**Check B (~06:42Z UTC):** agent-core-sync.json last_sync=2026-08-27T06:36:50Z UTC (~7 min old). status=no-change. Within 2h. NOMINAL.
+**Check C (~06:42Z UTC):** system-health.json ts=2026-08-27T06:38:16Z UTC (~6 min old). overall=healthy. All 4 bots alive=True (beacon, forge, mirror, pulse). NOMINAL.
+**Check E (~06:42Z UTC):**
+  - PR#1113 (~245 min old): fix/dashboard-review-verdict-fourth-wall, OPEN, MERGEABLE/rd=''. fix/* unrouted. <72h. MONITORING.
+  - PR#1112 (~354 min old): fix/schema-reject-alert, OPEN, MERGEABLE/rd=''. fix/* unrouted. <72h. MONITORING.
+**Check H (~06:42Z UTC):** All agent inboxes empty (beacon=0, forge=0, mirror=0). NOMINAL.
+
+**Section 5.0 one-shots:** audit_due_nudge: no-op. distill_detector: no-op (no un-distilled audits). NOMINAL.
+**Check I (~06:44Z UTC):** Thursday — off-day. Most recent artifact check-i-2026-08-26.json (fired 2026-08-26T14:10Z UTC). Next expected Friday 2026-08-29. CARRY.
+**Check III (~06:44Z UTC):** Most recent artifact check-iii-2026-08-23.json. Next expected 2026-09-06. CARRY.
+
+**Credential rotation watch:** SUPABASE_SERVICE_ROLE_KEY: last_dm=2026-08-17T23:23:16Z UTC (~223h elapsed). next_rotation_due=2026-08-22 (~5d overdue). Dedup window active until ~2026-08-31T23:23Z UTC. No re-DM. Rotate per docs/runbooks/rotate-supabase-keys.md.
+
+**G-rules (this iter):**
+- nightly-502-cluster-001: DISPATCHED ✅. No new events (01:12Z UTC 2026-08-27 window already accounted for). CARRY.
+- unreviewed-merge-without-gate-pattern: DISPATCHED ✅ (iter ~9884). dashboard-return-routing-auto-merge-001 still pending. PR#1113 open ~245 min. CARRY.
+- mirror-to-dashboard-return-routing-failure-001: 1/3. 0 new routing WARNs. CARRY.
+- heal-approvals-surface-drift-missing-card: direction-ask-approvals-opt-b-implement-001 dispatched. 0 new alerts. CARRY.
+- sync-service-deploy-restart-head-drift-tier4-no-translation-001: 1/3 (RE-OPENED iter ~9780). 0 new alerts. Dispatch at 3/3. CARRY.
+- agent-runner-forge-transcript-not-persisted-tier3-001: 2/3 (iter ~9906). 0 new alerts. CARRY.
+- agent-runner-mirror-transcript-not-persisted-tier1-001: 1/3 (iter ~9910). 0 new alerts. CARRY.
+- mirror-queue-wait-gauge-third-review-slot-readiness-tier4-no-translation-001: 2/3 (iter ~9907). 3-day cooldown; next re-fire ~2026-08-30. CARRY.
+
+**PRIME DIRECTIVE:** 1 intervention appended (iter=9927, tier=1, ts=2026-08-27T06:44:03Z UTC, template=check4-pending-approval, detail=dashboard-return-routing-auto-merge-001-302min). Tier state: record --checks-clean false → consecutive_clean 0→0. last_signal_at=2026-08-27T06:44:06Z UTC.
+
+**Actions taken:**
+- Check 0: repair-watermark no-op (old_watermark=544, file_length=544). 0 new alerts.
+- PRIME DIRECTIVE: 1 intervention row appended via cycle_prime_ledger.py append (iter=9927, tier=1, kind=intervention, template=check4-pending-approval).
+- Tier state: cycle_tier_state.py record --checks-clean false → consecutive_clean 0→0. Tier 1 maintained. last_signal_at=2026-08-27T06:44:06Z UTC.
+
+**Escalations:** Outstanding (carried, no new Pulse DMs this iter):
+  1. **[yellow] AWAITING LARRY** — `dashboard-return-routing-auto-merge-001` pending approval (~302 min since DM). Review PR#1113 AND/OR reply "approve."
+  2. **[yellow] CARRY (outbox-notifier DM'd)** — mirror-queue-wait-gauge:third-review-slot-readiness G-rule **2/3** (iter ~9907). p95 start-wait=404.9m, 5 reviews in 24h. Dispatch to Beacon at 3/3. Next re-fire: ~2026-08-30.
+  3. **[yellow] CARRY (outbox-notifier DM'd)** — agent-runner-forge transcript-not-persisted:tier3 G-rule **2/3** (iter ~9906). Dispatch to Beacon at 3/3.
+  4. **[yellow] CARRY (outbox-notifier DM'd)** — agent-runner-mirror transcript-not-persisted:tier1 G-rule **1/3** (iter ~9910). Dispatch to Beacon at 3/3.
+  5. **[yellow] CARRY** — heal-approvals-surface-drift:missing_card; direction-ask-approvals-opt-b-implement-001 dispatched. CARRY.
+  6. Informational-cards impl gap (iter ~9102). Carry.
+  7. Check III artifact 2026-08-23: beacon 232→336s (+45%), mirror 1311→1448s (+10%). Command: `approve threshold-update-2026-08-23`.
+  8. Check I proposal [1]: [parked] cycle-202608192035370000 (4.71σ pulse/cycle). On dashboard Parked lane.
+  9. SUPABASE rotation OVERDUE (~223h elapsed, ~5d past due 2026-08-22). Dedup active until ~2026-08-31. Rotate per docs/runbooks/rotate-supabase-keys.md.
+  10. nightly-502-cluster-001: DISPATCHED ✅. Monitor.
+  11. review-ceiling-fit: Mirror review ceiling RAISE 35→40min recommended. Digest route.
+  12. sync-service-deploy-restart-head-drift-tier4-no-translation-001: 1/3. Dispatch to Beacon at 3/3.
+
+**Patterns:** Check 4 non-nominal 41 consecutive iters (~9884–~9927) — same pending approval (~302 min since DM). PRs #1113 and #1112 both unrouted fix/* PRs aging without review routing. System otherwise fully nominal.
+
+**Tier end-of-iter:** Tier 1, consecutive_clean=0.
+
+---
+
 ## Iteration ~9926 — 2026-08-27T06:33Z UTC (Larry /cycle direct, Tier 1 [Check 0: wm 544→544, 0 new alerts NOMINAL; Check 4: pending=1 dashboard-return-routing-auto-merge-001 (~292 min); PR#1113 ~234 min, PR#1112 ~343 min, both MONITORING; all other checks NOMINAL; tier-reset consecutive_clean 0→0])
 
 **Health:** ⚠️ SIGNAL — Check 4: pending approval `dashboard-return-routing-auto-merge-001` still awaiting Larry's reply (~292 min, created 2026-08-27T01:39:50Z UTC). All other checks NOMINAL. **Tier 1**, consecutive_clean remains 0. 2026-08-27 UTC (Thursday).
@@ -3222,91 +3303,6 @@
   9. sync-service-deploy-restart-head-drift-tier4-no-translation-001: 1/3 (RE-OPENED per iter ~9780). Dispatch to Beacon at 3/3.
 
 **Patterns:** Check 4 has been non-nominal for 3 consecutive iters (~9884, ~9886, ~9887) due to the same pending approval — Larry hasn't yet replied. Beacon bot's 3-502 blip at the nightly window is notable: prior iters confirmed "clean nights" based on pulse bot log only; beacon bot DID have a brief transient. Not the sustained multi-bot cluster profile from the MEMORY G-rule history, but the verify-before-reassert discipline flags the incomplete prior check. PR#1112 aging at ~75 min (fix/* branch, unrouted by design, monitoring).
-
-**Tier end-of-iter:** Tier 1, consecutive_clean=0.
-
----
-
-## Iteration ~9886 — 2026-08-27T01:49Z UTC (Larry /cycle chat, Tier 1 [Check 0: wm 526→532, 6 new alerts all Tier-3 silence — approval_request Tier-3 per PR#1108 fix CONFIRMED; heal-stale-daemon-code 2nd wave restarts (inbox-watcher/mirror-bot/outbox-notifier/pulse-bot/spec-review-runner); Check 4: pending=1 dashboard-return-routing-auto-merge-001 (Beacon processed direction-ask-unreviewed-merge-routing-fix-001, DM delivered 01:41Z UTC, Larry approval needed); all other checks NOMINAL; tier-reset consecutive_clean 1→0])
-
-**Health:** ⚠️ SIGNAL — Check 4: pending approval `dashboard-return-routing-auto-merge-001` awaiting Larry's call. Beacon processed direction-ask-unreviewed-merge-routing-fix-001 (dispatched iter ~9884) into a Forge preflight task — approval DM delivered to Larry at 01:41:17Z UTC. All other checks NOMINAL. PR#1108's Tier-3 silence for outbox-notifier approval_request rows CONFIRMED working. heal-stale-daemon-code completed second wave: 5 more services restarted (total 8 after PR#1108 updated alert_triage_state.py). Nightly 502 cluster absent third consecutive night. **Tier 1**, consecutive_clean reset 1→0. 2026-08-27 UTC (Thursday).
-
-**VERIFY-BEFORE-REASSERT (from iter ~9885 at 01:42Z UTC):**
-- "Tier 1, consecutive_clean 0→1": CONFIRMED + UPDATED. Pre-iter: tier=1, consecutive_clean=1. Non-clean iter (Check 4 signal) → tier-reset, consecutive_clean=0.
-- "wm=526, 4 new alerts all Tier-3": CONFIRMED + UPDATED. repair-watermark: repaired=false, wm=526, file_length=532. 6 new alerts (lines 527-532). All Tier-3. Watermark advanced to 532.
-- "HEAD=4989e3a1=origin/main": SUPERSEDED. Automated cycle committed 80b7e0f4 "Pulse cycle 20260827T014423Z". HEAD=80b7e0f4=origin/main. Clean. NOMINAL.
-- "all 4 bots healthy, system-health ts=01:35:48Z UTC": CONFIRMED + UPDATED. system-health.json ts=2026-08-27T01:40:49Z UTC (~9 min fresh). All 4 desired=up, alive=True. overall=healthy. disk=19%, mem=14%. NOTE: 2nd wave of restarts at 01:40:14-26Z UTC (inbox-watcher, mirror-bot, outbox-notifier, pulse-bot, spec-review-runner) — all alive post-restart. NOMINAL.
-- "SUPABASE ~161h+ overdue": CONFIRMED CARRY. Still ~161h+ overdue (due 2026-08-22; dedup window active until ~2026-08-31T23:23Z UTC). No re-DM. OK.
-- "pending=0 (Check 4 CLEAN)": SUPERSEDED. pending=1 (dashboard-return-routing-auto-merge-001 created by Beacon at 01:39:50Z UTC, DM delivered 01:41:17Z UTC). NON-NOMINAL.
-- "PR#1112 ~65-75 min old, MONITORING": CONFIRMED + UPDATED. Now ~1h old (created 00:47:19Z UTC). OPEN, MERGEABLE, reviewDecision="". fix/* branch, no label — unrouted (expected). < 72h. MONITORING.
-- "direction-ask-unreviewed-merge-routing-fix-001 ARCHIVED by Beacon": CONFIRMED + UPDATED. Beacon processed it and created dashboard-return-routing-auto-merge-001 approval (Forge preflight task). Direction-ask arc complete on Beacon's end; approval awaiting Larry.
-- "nightly 502 cluster NOT observed (second confirmation)": CONFIRMED. No 502 errors after 19:36:14-0600 restart. Window (~01:15Z UTC) passed clean again — THIRD consecutive clean night. NOMINAL.
-
-**Check 0 (Alert triage, ~01:46Z UTC):** repair-watermark: repaired=false, old_watermark=526, file_length=532. 6 new alerts:
-  - **Line 527** (01:39:50Z UTC): source=outbox-notifier, kind=approval_request, subject=dashboard-return-routing-auto-merge-001. triage-alert → **Tier-3 SILENCE** (decision="silence", rationale="delivery-carrying kind: the row was written with route=None, so the bot already DM'd it at write time; Check 0 re-triage would only duplicate the DM"). PR#1108 fix CONFIRMED working. RESOLVED. No DM.
-  - **Line 528** (01:40:14Z UTC): source=heal-stale-daemon-code, subject=auto-restarted:ourliberty-inbox-watcher.service, route=digest, tier=FYI. triage-alert → Tier-3 (known-pattern). SILENCE+JOURNAL. No DM.
-  - **Line 529** (~01:40:14Z UTC): source=heal-stale-daemon-code, subject=auto-restarted:ourliberty-mirror-bot.service, route=digest, tier=FYI. Tier-3. SILENCE. No DM.
-  - **Line 530** (~01:40:14Z UTC): source=heal-stale-daemon-code, subject=auto-restarted:ourliberty-outbox-notifier.service, route=digest, tier=FYI. Tier-3. SILENCE. No DM.
-  - **Line 531** (~01:40:14Z UTC): source=heal-stale-daemon-code, subject=auto-restarted:ourliberty-pulse-bot.service, route=digest, tier=FYI. Tier-3. SILENCE. No DM.
-  - **Line 532** (~01:40:18Z UTC): source=heal-stale-daemon-code, subject=auto-restarted:ourliberty-spec-review-runner.service, route=digest, tier=FYI. Tier-3. SILENCE. No DM.
-  Watermark set to 532. No tier-reset from Check 0 (all Tier-3 per § 3.0). NOMINAL.
-  NOTE: Bot log confirms approval_request idx=526 delivered at 2026-08-26T19:41:17-0600 (= 2026-08-27T01:41:17Z UTC). Larry received Telegram DM.
-
-**Check 1 (Log noise, ~01:46Z UTC):** outbox-notifier.log: last WARNs at 18:54:07Z+18:54:18Z UTC 2026-08-26 (routing failures for PRs #1108+#1109 — pre-existing, PRs merged). No new WARNs. heal-stale-daemon-code.log: last tick 01:40:26Z UTC — 2nd wave auto-restarts + tick summary (auto-restarted=8, fresh=440, unparseable=109). INFO-only, healer functioning correctly. NOMINAL.
-
-**Check 2 (Telegram sweep, ~01:46Z UTC):** beacon_telegram_bot.log: approval_request idx=526 delivered 01:41:17Z UTC. heal-stale-daemon-code alerts idx=527-531 route=digest (skipped DM, correct). No 502 errors after 01:36:14Z UTC bot restart. No new Larry inbound directives. Nightly 502 window (~01:15Z UTC) passed clean. NOMINAL.
-
-**Check 3 (Pipeline stall, ~01:47Z UTC):** heal-pipeline-stall.log last tick 01:36:27Z UTC (~13 min ago — slightly past 10-min freshness window). Tick showed FORGE_NO_PR_SKIP for PRs #1108+#1109 (pr_exists=merged) and no stalls. heal-pipeline-stall-state.json: stalls=0 (scanned_at field epoch — known state file bug per MEMORY.md; log authoritative). NOMINAL.
-
-**Check 4 (Pending directives, ~01:47Z UTC):** beacon-pending-approvals.json pending=1: `dashboard-return-routing-auto-merge-001`. NON-NOMINAL → TIER-RESET.
-  - Plan: "Fix the outbox-notifier return leg so a dashboard-sourced Mirror REVIEW_PASS fires auto-merge + the closing Larry DM instead of archiving as 'no routable target'."
-  - Target: forge, repo=ourliberty-agent-core, type=feature-development, phase=preflight
-  - Files: scripts/outbox_notifier.py + scripts/tests/test_outbox_notifier.py
-  - Created: 01:39:50Z UTC. Delivered to Larry: 01:41:17Z UTC. No reminder needed yet.
-  - **Larry action required:** reply "approve" / "go" / "ok" / "ship it" to trigger Forge preflight.
-
-**Check 5 (Stale daemon code, ~01:47Z UTC):** heal-stale-daemon-code.log last tick 01:40:26Z UTC (~9 min ago). 2nd wave: auto-restarted inbox-watcher, mirror-bot, outbox-notifier, pulse-bot, spec-review-runner (alert_triage_state.py 51.7-51.8 min stale, PR#1108). Total 8 services restarted across two healer waves. All bots alive per system-health (ts=01:40:49Z UTC). Healer functioning correctly. NOMINAL.
-
-**Check A (Source repo, ~01:46Z UTC):** branch=main, HEAD=80b7e0f4=origin/main (Pulse cycle 20260827T014423Z — automated cycle). behind=0, ahead=0. Clean tree. NOMINAL.
-**Check B (Sync health, ~01:46Z UTC):** agent-core-sync.json: last_sync=2026-08-27T01:36:50Z UTC (~12 min fresh; status=no-change, commit=b1f01259). Within 2h threshold. NOMINAL.
-**Check C (Agent liveness, ~01:46Z UTC):** system-health.json ts=2026-08-27T01:40:49Z UTC (~9 min old). All 4 desired=up, alive=True (beacon/forge/mirror/pulse). overall=healthy. disk=19%, mem=14%. NOMINAL.
-**Check E (PR/merge state, ~01:47Z UTC):**
-  - PR#1112 (~1h old): "fix(inbox): alert when a dead-lettered envelope was Larry's action" — branch fix/schema-reject-alert, MERGEABLE, reviewDecision="". fix/* branch, no auto-route label → Mirror not auto-dispatched (expected per G-rule unrouted-pr-is-by-design). G-rule enable-pr-auto-merge-reviewdecision-guard-001: no auto-merge (reviewDecision="" guard). < 72h. MONITORING.
-**Check H (Inboxes, ~01:47Z UTC):** beacon=empty, forge=empty, mirror=empty, pulse=empty. NOMINAL.
-
-**Section 5.0 one-shots:** audit_due_nudge: no-op. distill_detector: no-op. silence_file_auditor: carry. NOMINAL.
-
-**Check I (~01:49Z UTC):** artifact check-i-2026-08-26.json (fired ~14:10Z UTC 2026-08-26, Wednesday). Next expected Friday 2026-08-29. CARRY.
-**Check III (~01:49Z UTC):** No new artifact since 2026-08-23. Next expected 2026-09-06. CARRY.
-
-**Credential rotation watch:** SUPABASE_SERVICE_ROLE_KEY: last_dm=2026-08-17T23:23:16Z UTC. ~161h+ overdue (due 2026-08-22; dedup window active until ~2026-08-31T23:23Z UTC). No re-DM. Larry must rotate per docs/runbooks/rotate-supabase-keys.md.
-
-**G-rules (this iter):**
-- unreviewed-merge-without-gate-pattern: DISPATCHED ✅ (iter ~9884). Beacon responded with dashboard-return-routing-auto-merge-001 approval — the fix targets the outbox-notifier dashboard return leg (root cause). Approval pending Larry's call. Carry.
-- mirror-to-dashboard-return-routing-failure-001: 1/3 → **APPROVAL PENDING** (dashboard-return-routing-auto-merge-001 IS the fix for this G-rule). Once Larry approves and Forge builds, this will become DISPATCHED. Updating tracking: approval-pending, not yet 3/3-dispatch-triggered.
-- heal-approvals-surface-drift-missing-card-tier4-001: carry at 1/2. No new alerts. Fix pending: direction-ask-approvals-opt-b-implement-001.
-- sync-service-deploy-restart-head-drift-tier4-no-translation-001: carry at 1/3. No new alerts of this type. Dispatch to Beacon at 3/3.
-- All other G-rules carried unchanged.
-
-**PRIME DIRECTIVE ratio:** intervention appended (ts=2026-08-27T01:48:53Z UTC, iter=9886, tier=1, kind=intervention, template=check4-pending-approval:dashboard-return-routing-auto-merge-001). Trailing-30d: interventions=2057+, systemic_fixes=8, ratio=257.125 (+0.125 this iter). Tier state: record --checks-clean false → Tier 1, consecutive_clean reset 1→0 (last_signal_at=01:48:58Z UTC).
-
-**Actions taken:**
-- Check 0: watermark 526→532. Lines 527-532 all Tier-3 (silence/known-pattern). triage-alert run on lines 527+528 (representative; all return Tier-3). No DMs.
-- PRIME DIRECTIVE: intervention appended via cycle_prime_ledger.py append (tier=1, iter=9886, ts=01:48:53Z UTC).
-- Tier state: record --checks-clean false → consecutive_clean 1→0. Tier 1 maintained.
-
-**Escalations:** Outstanding (carried):
-  1. **[yellow] AWAITING LARRY** — `dashboard-return-routing-auto-merge-001` pending approval. DM delivered 01:41:17Z UTC. Reply "approve" to trigger Forge preflight for outbox-notifier dashboard-return-leg fix.
-  2. **[yellow] CARRY** heal-approvals-surface-drift:missing_card — informational-cards impl pending (direction-ask-approvals-opt-b-implement-001).
-  3. Informational-cards impl gap (iter ~9102). Carry.
-  4. Check III artifact 2026-08-23: beacon 232→336s (+45%), mirror 1311→1448s (+10%). Command: `approve threshold-update-2026-08-23`.
-  5. Check I proposal [1]: [parked] cycle-202608192035370000 (high-σ pulse/cycle, 4.71σ). On dashboard Parked lane.
-  6. SUPABASE rotation OVERDUE (~161h+, due 2026-08-22). Dedup active until ~2026-08-31. Larry must rotate per docs/runbooks/rotate-supabase-keys.md.
-  7. nightly-502-cluster-001: DISPATCHED ✅. Third consecutive clean night confirmed.
-  8. review-ceiling-fit: Mirror review ceiling RAISE 35→40min recommended. Digest route, no DM.
-  9. sync-service-deploy-restart-head-drift-tier4-no-translation-001: 1/3 (RE-OPENED per iter ~9780). Dispatch to Beacon at 3/3.
-
-**Patterns:** Beacon's response chain is working: direction-ask-unreviewed-merge-routing-fix-001 (dispatched iter ~9884) processed into the dashboard-return-routing-auto-merge-001 approval within ~8 min. The fix scope is correct — targeting the outbox-notifier dashboard return leg rather than Mirror's reviewDecision (confirmed as NOT the root cause per MEMORY.md unreviewed-merge G-rule context). PR#1108's Tier-3 silence for outbox-notifier approval_request rows is confirmed working in production — no spurious Tier-4 DM this iter. heal-stale-daemon-code completed its PR#1108 library-sync cycle (8 total service restarts across two waves over ~4 min span); all services now running updated alert_triage_state.py. Nightly 502 cluster absent for 3rd consecutive night.
 
 **Tier end-of-iter:** Tier 1, consecutive_clean=0.
 
