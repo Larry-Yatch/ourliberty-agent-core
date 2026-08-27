@@ -22775,3 +22775,73 @@ NON-CLEAN → tier-reset (Check 4 non-empty). No auto-fix. Larry action required
 
 ---
 
+## Iteration ~9867 — 2026-08-26T21:31Z UTC (Larry /cycle chat, Tier 1 [Check 0: wm=511→512, 1 new alert (routing-denied:dashboard->mirror, Tier 4, already Telegram-delivered idx=511); Check 4: CLEAN pending=0 — both unreg-approvals resolved BUT both mirror re-dispatches dropped to mirror/.invalid; PRs #1108+#1109 remain open no mirror review; all other checks NOMINAL; HEAD=a3f3eb06=origin/main clean; bots presumed-alive; consecutive_clean stays 0])
+
+**Health:** Non-clean — new routing-denied Tier 4 finding (2 mirror review dispatches dropped; PRs #1108+#1109 in limbo). Check 4 now CLEAN (pending=0). **Tier 1**, consecutive_clean stays 0. 2026-08-26 UTC (Wednesday).
+
+**VERIFY-BEFORE-REASSERT (from iter ~9866 at 21:20Z UTC; automated cycle since: a3f3eb06 Pulse cycle 20260826T212134Z):**
+- "tier=1, consecutive_clean=0": CONFIRMED. cycle_tier_state.py read: tier=1, consecutive_clean=0, last_signal_at=2026-08-26T21:19:06Z UTC. OK
+- "wm=511, 1 new alert (doorbell Tier 3 silenced)": UPDATED. repair-watermark: old_watermark=511, file_length=512. 1 new alert at line 512 (routing-denied:dashboard->mirror, ts=21:18:07Z UTC, Tier 4, already Telegram-delivered as bot idx=511 at 21:20:13Z). Watermark advanced 511→512.
+- "HEAD=0debb66b=origin/main": SUPERSEDED. Wrapper auto-committed a3f3eb06 "Pulse cycle 20260826T212134Z". HEAD=a3f3eb06=origin/main. Clean tree. OK
+- "all 4 bots alive": UNCONFIRMED (system-health.json JSON schema parse failed; heal-stale-daemon-code.log tick=21:24:27Z fresh=448 — healer alive, daemon coverage presumed-OK). Carry as PRESUMED-OK.
+- "SUPABASE ~142h overdue": CONFIRMED CARRY. last_dm=2026-08-17T23:23:16Z UTC. Now ~145h overdue (due 2026-08-22; dedup window active until ~2026-08-31T23:23Z UTC). No re-DM. OK
+- "pending=2 (bc90cfb0b416 + 3c73134d94b5)": RESOLVED. beacon-pending-approvals.json pending=0. Both resolved at ~21:18Z UTC. BUT: dashboard-approved both, resulting dispatches routed dashboard→mirror (not allowed) → both dropped to mirror/.invalid. PRs #1108 + #1109 remain OPEN, mirror never re-reviewed.
+- "PR#1108 Mirror-red, pending unreg-approval-bc90cfb0b416": UPDATED. PR#1108 OPEN, MERGEABLE, reviewDecision="". unreg-approval resolved. Re-dispatch envelope review-check0-delivered-kinds-tier3-001-rev1.json DROPPED to mirror/.invalid (routing-denied:dashboard->mirror). No mirror review occurred. Larry must re-issue via correct channel (dashboard→beacon→mirror).
+- "PR#1109 Mirror-red, pending unreg-approval-3c73134d94b5": UPDATED. PR#1109 OPEN, MERGEABLE, reviewDecision="". unreg-approval resolved at 21:18:04Z UTC. Re-dispatch envelope review-alert-translations-unrouted-pr-nudges-retired-001-rev1.json DROPPED to mirror/.invalid (routing-denied:dashboard->mirror, ts=21:18:07Z UTC). No mirror review occurred. Same resolution path needed.
+
+**Check 0 (Alert triage, ~21:31Z UTC):** repair-watermark: old_watermark=511, file_length=512. 1 new alert at line 512: source=inbox-watcher, kind=warning, subject=routing-denied:dashboard->mirror, ts=2026-08-26T21:18:07Z UTC. Message: "Envelope alert-translations-unrouted-pr-nudges-retired-001 dropped to mirror/.invalid — routing denied: route dashboard -> mirror not allowed (allowed from dashboard: ['beacon']). No auto-replay; re-issue manually if needed." triage-alert: Tier 4, route=escalate, status=triaged-tier-4, decision=ask, rationale="known never-silence pattern in alert-translations.json". Already delivered to Telegram as bot idx=511 at 21:20:13Z UTC. Watermark advanced 511→512. NON-CLEAN (Tier 4).
+
+**Check 1 (Log noise, ~21:31Z UTC):** heal-stale-daemon-code.log tick at 21:24:27Z (INFO-only, fresh=448 unparseable=109). outbox-notifier.log last entry 12:28Z (beacon replan APPROVAL_REQUEST already-approved skip, INFO). heal-pipeline-stall.log last tick 21:18:10Z (FORGE_NO_PR_SKIP for PR#1108+PR#1109, pr_exists; 0 fired, 0 recovered, 1 suppressed). No WARN/ERROR in checked logs. NOMINAL.
+
+**Check 2 (Telegram sweep, ~21:31Z UTC):** Bot log last delivery: idx=511 routing-denied:dashboard->mirror at 21:20:13Z UTC — 1 new delivery since iter ~9866. No new Larry inbound directives. Nightly 502 cluster: next expected ~01:15Z UTC 2026-08-27 (~3.7h away). NOMINAL.
+
+**Check 3 (Pipeline stall, ~21:31Z UTC):** heal-pipeline-stall.log last tick 21:18:10Z UTC (~13 min ago). FORGE_NO_PR_SKIP for both PR#1108 and PR#1109 (pr_exists, already active branches). 0 alerts fired, 0 recovered, 1 suppressed (cooldown: unrouted_open_pr:RSDPM:235). NOMINAL.
+
+**Check 4 (Pending directives, ~21:31Z UTC):** beacon-pending-approvals.json (state/) present. **pending=0 (CLEAN).** Both unreg-approvals resolved at ~21:18Z UTC. No pending items. However: both dashboard-approved dispatches failed routing (see Check 0). PRs #1108+#1109 remain in limbo — approved but not re-reviewed. Escalation required. CLEAN on pending count; NON-CLEAN on system state (routing failure).
+
+**Check 5 (Stale daemon code, ~21:31Z UTC):** heal-stale-daemon-code.log tick 21:24:27Z UTC (~7 min ago, fresh=448 unparseable=109). INFO-only. NOMINAL.
+
+**Check A (Source repo, ~21:31Z UTC):** branch=main, HEAD=a3f3eb06=origin/main (Pulse cycle 20260826T212134Z). Clean tree. Not behind origin. NOMINAL.
+**Check B (Sync health, ~21:31Z UTC):** agent-core-sync.json: last_sync=2026-08-26T21:12:16Z UTC (~19 min; status=no-change, commit=661d2586). Within 2h threshold. NOMINAL.
+**Check C (Agent liveness, ~21:31Z UTC):** system-health.json JSON schema parse failed (field mismatch in parsing script). heal-stale-daemon-code.log tick at 21:24:27Z confirms daemon monitor alive. PRESUMED-NOMINAL — flag for health.json schema investigation if it recurs.
+**Check E (PR/merge state, ~21:31Z UTC):** 2 open Forge PRs:
+  - PR #1108 (~213 min old): "fix(pulse): Tier-3 silence Check 0 re-triage of already-delivered notification/approval_request rows" — MERGEABLE, reviewDecision="". Mirror re-dispatch DROPPED. No auto-merge (reviewDecision="").
+  - PR #1109 (~213 min old): "fix(alerts): silence duplicate Check 0 re-triage of unrouted-pr nudge retractions" — MERGEABLE, reviewDecision="". Mirror re-dispatch DROPPED. No auto-merge (reviewDecision="").
+  Also: mirror/.invalid contains 2 dropped review envelopes (rev1 for both PRs, ts=21:18:07-08Z UTC) + 1 older stale item (review-notifier-concurrent-scan-dup-review-dispatch-001, requeue_count>=3 from 2026-07-10). MONITORING.
+**Check H (Inboxes, ~21:31Z UTC):** beacon=0, forge=0, mirror=0, pulse=0. NOMINAL.
+
+**Section 5.0 one-shots:** audit_due_nudge: no-op (no committed audit baseline). distill_detector: no-op (no un-distilled audits). audit_cadence_signal: no-op (script not found at scripts/ path — non-blocking, carry as per prior iters). NOMINAL.
+
+**Check I (~21:31Z UTC):** artifact check-i-2026-08-26.json (fired 08:10Z UTC today, Wednesday — on schedule). Next expected Friday 2026-08-29. CARRY.
+**Check III (~21:31Z UTC):** No new artifact. Latest check-iii-2026-08-23.json. Next expected 2026-09-06. CARRY.
+
+**Credential rotation watch:** SUPABASE_SERVICE_ROLE_KEY: last_dm=2026-08-17T23:23:16Z UTC. Now ~145h overdue (due 2026-08-22; dedup window active until ~2026-08-31T23:23Z UTC). No re-DM. Larry must rotate per docs/runbooks/rotate-supabase-keys.md.
+
+**G-rules (this iter):**
+- routing-denied:dashboard->mirror-001: **NEW 1/3.** dashboard-approved unreg-approval envelopes route target_agent=beacon but dispatch routing went dashboard→mirror (blocked). This is the first observed occurrence of this specific routing failure class. At 3/3: dispatch to Beacon for routing config fix.
+- All prior G-rules: carried unchanged (see iter ~9866 for counts).
+
+**PRIME DIRECTIVE ratio:** intervention appended (ts=2026-08-26T21:30:22Z UTC, iter=0-normalized, tier=1, kind=intervention, template=routing-denied-dropped-mirror-reviews). iter_clean NOT appended (non-clean iter). Tier state: record --checks-clean false → tier=1, consecutive_clean=0, last_signal_at=2026-08-26T21:30:30Z UTC.
+
+**Actions taken:**
+- Check 0: repair-watermark (no-op), 1 new alert triaged Tier 4 (routing-denied:dashboard->mirror, already Telegram-delivered), watermark 511→512.
+- Section 5.0: all one-shots no-op.
+- PRIME DIRECTIVE: intervention appended via cycle_prime_ledger.py (template=routing-denied-dropped-mirror-reviews, tier=1).
+- Tier state: record --checks-clean false → tier=1, consecutive_clean=0.
+
+**Escalations:**
+  1. **[yellow] NEW** routing-denied:dashboard->mirror — unreg-approval-bc90cfb0b416 (PR#1108) and unreg-approval-3c73134d94b5 (PR#1109) were dashboard-approved at ~21:18Z UTC, but both resulting mirror re-dispatch envelopes dropped to mirror/.invalid. Neither PR has been mirror-reviewed. Alert already Telegram-delivered (bot idx=511, 21:20:13Z). **Larry action needed**: re-issue mirror review for both PRs via the correct channel (dashboard→beacon, not dashboard→mirror). Alternatively: close both PRs if the fixes are no longer needed.
+  2. Informational-cards impl gap (iter ~9102). Carry.
+  3. Check III artifact 2026-08-23: beacon 232→336s (+45%), mirror 1311→1448s (+10%). Command: `approve threshold-update-2026-08-23`.
+  4. Check I proposal [1]: [parked] cycle-202608192035370000 (high-σ pulse/cycle, 4.71σ). On dashboard Parked lane.
+  5. SUPABASE rotation OVERDUE (~145h, due 2026-08-22). Dedup active until ~2026-08-31. Larry must rotate per docs/runbooks/rotate-supabase-keys.md.
+  6. nightly-502-cluster-001: DISPATCHED ✅. Next expected window ~01:15Z UTC 2026-08-27.
+  7. review-ceiling-fit: Mirror review ceiling RAISE 35→40min recommended. Digest route, no DM.
+  8. sync-service-deploy-restart-head-drift-tier4-no-translation-001: 1/3. Dispatch to Beacon at 3/3.
+
+**Patterns:** The key change this iter: both stranded Mirror escalation approvals (PR#1108, PR#1109) were resolved by Larry via the dashboard, but the resulting re-dispatch envelopes hit a routing wall (dashboard→mirror is not an allowed route; dashboard→beacon is). Both PRs remain open, neither mirror-reviewed. The routing-denied alert was already delivered to Telegram. Next action is Larry's: re-issue the mirror reviews through the correct channel. G-rule routing-denied:dashboard->mirror-001 opened at 1/3.
+
+**Tier end-of-iter:** Tier 1, consecutive_clean=0.
+
+---
+
