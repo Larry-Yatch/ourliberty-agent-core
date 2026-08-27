@@ -152,6 +152,22 @@ FIDELITY_FIELDS = ('source', 'intent', 'subject')
 # escalation is their ONLY path to Larry, so they must keep reaching Tier 4.
 SELF_AUTHORED_SOURCES = frozenset({'pulse', 'pulse-triage'})
 
+# Ledger `kind`s that CARRY their own delivery. larry_alerts.append_notification
+# and append_approval_request set neither `route` nor `severity`, and the bot's
+# _check_pending_alerts skips a row only when `route` is in ('digest','hold') AND
+# `severity != 'critical'` — so a route=None row is ALWAYS DM'd at write time.
+# Check 0's Tier-4 escalation on one of these can therefore only be a SECOND DM
+# about a message Larry already holds, never his only path to it. Verified
+# empirically at 0/1314 non-null route across the live ledger plus all archives.
+#
+# This is the mirror image of the 'pulse-check' carve-out above: those rows ARE
+# written route=digest, so Check 0 IS their only path and they must keep reaching
+# Tier 4. These carry their own delivery, so re-triage is pure duplication.
+#
+# Same predicate as heal_unregistered_approval.is_approval_class and
+# held_alert_escalation._is_alert_record, which already exclude these two kinds.
+DELIVERED_KINDS = frozenset({'notification', 'approval_request'})
+
 # Agent name stamped on a Tier-1 auto-fix dispatch row. The remediation is
 # acted by Pulse / existing healers (Phase B does not build a dispatcher); this
 # names the actor for the audit trail.
@@ -729,6 +745,8 @@ def classify(alert: dict[str, Any], *, registry: dict[str, dict[str, Any]],
 
       0. source in ``SELF_AUTHORED_SOURCES`` and NOT
          ``never_silence``                            → Tier 3 (silence→digest)
+      0b. kind in ``DELIVERED_KINDS`` and NOT
+         ``never_silence``                            → Tier 3 (silence→digest)
       1. (source, subject) in ``translations``        → Tier 3 (silence→digest)
       2. registry template, permanent_guard OR
          state != "graduated"                         → Tier 2 (ask→escalate)
@@ -771,6 +789,22 @@ def classify(alert: dict[str, Any], *, registry: dict[str, dict[str, Any]],
                           'larry_alerts.append_alert; the row\'s own route '
                           'already delivered it at write time, so Check 0 '
                           're-triage would only duplicate the DM'),
+            'template': None,
+        }
+
+    # Gate 0b — Tier 3: this row's own write already DM'd Larry (route=None is
+    # never skipped by the bot), so Check 0 re-triage can only duplicate it.
+    # Source-agnostic and subject-agnostic: the delivery guarantee comes from the
+    # kind's writer, not from who called it. A ``never_silence`` entry falls
+    # THROUGH exactly as it does at Gate 0.
+    if alert.get('kind') in DELIVERED_KINDS and not never_silence:
+        return {
+            'tier': 3,
+            'route': 'digest',
+            'decision': 'silence',
+            'rationale': ('delivery-carrying kind: the row was written with '
+                          'route=None, so the bot already DM\'d it at write '
+                          'time; Check 0 re-triage would only duplicate the DM'),
             'template': None,
         }
 

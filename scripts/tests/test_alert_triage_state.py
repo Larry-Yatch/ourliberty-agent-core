@@ -522,6 +522,84 @@ class TestClassify(unittest.TestCase):
         self.assertNotEqual(r['decision'], 'silence')
         self.assertIn('never-silence', r['rationale'])
 
+    def test_delivered_kind_with_subject_silences_at_gate0b(self):
+        # The regression this gate closes. PR #1093 stamped `subject`=approval_id
+        # on every approval_request, which defeated the #491 kind fallback: a
+        # present subject stays authoritative and never falls through to `kind`,
+        # so the row missed its translation entry and landed Tier 4 — a SECOND DM
+        # about an approval Larry was already holding.
+        r = self._classify({
+            'source': 'outbox-notifier', 'kind': 'approval_request',
+            'subject': 'direction-ask-automated-cycle-journal-gap-001'})
+        self.assertEqual(r['tier'], 3)
+        self.assertEqual(r['route'], 'digest')
+        self.assertEqual(r['decision'], 'silence')
+        self.assertIsNone(r['template'])
+        self.assertIn('delivery-carrying', r['rationale'])
+
+    def test_delivered_kind_notification_with_subject_silences(self):
+        # The same holds for kind=notification carrying a non-null subject.
+        r = self._classify({'source': 'doorbell', 'kind': 'notification',
+                            'subject': 'some-novel-doorbell-subject'})
+        self.assertEqual(r['tier'], 3)
+        self.assertEqual(r['route'], 'digest')
+        self.assertEqual(r['decision'], 'silence')
+
+    def test_delivered_kind_gate_is_source_agnostic(self):
+        # The delivery guarantee comes from the kind's WRITER (append_notification
+        # / append_approval_request set no route), not from who called it — so
+        # medic / pulse-check-v / suite-guardian approval_requests silence too,
+        # including sources with no translation entry at all.
+        for source in ('medic', 'pulse-check-v', 'suite-guardian'):
+            with self.subTest(source=source):
+                r = self._classify({'source': source,
+                                    'kind': 'approval_request',
+                                    'subject': f'{source}-approval-42'})
+                self.assertEqual(r['tier'], 3)
+                self.assertEqual(r['decision'], 'silence')
+
+    def test_delivered_kind_never_silence_falls_through_gate0b(self):
+        # The escape hatch, identical to Gate 0's: a never_silence entry matching
+        # a delivery-carrying row still surfaces rather than being muted.
+        r = self._classify({'source': 'wildcard-surfaced',
+                            'kind': 'notification',
+                            'subject': 'must-still-surface'})
+        self.assertNotEqual(r['tier'], 3)
+        self.assertEqual(r['tier'], 4)
+        self.assertNotEqual(r['decision'], 'silence')
+
+    def test_delivered_kinds_gate_does_not_widen_to_other_kinds(self):
+        # Blast-radius invariant: the gate keys on an exact two-member frozenset,
+        # so no other ledger kind changes tier. 'alert' rows are written WITH a
+        # route and must keep reaching Tier 4.
+        self.assertEqual(ats.DELIVERED_KINDS,
+                         frozenset({'notification', 'approval_request'}))
+        for kind in ('alert', 'closure', 'digest', None):
+            with self.subTest(kind=kind):
+                r = self._classify({'source': 'novel-source',
+                                    'kind': kind, 'subject': 'novel-subject'})
+                self.assertEqual(r['tier'], 4)
+                self.assertEqual(r['decision'], 'ask')
+
+    def test_delivered_kind_short_circuits_before_registry(self):
+        # Gate order: 0b sits above the registry gates, so a delivery-carrying row
+        # that also carries a graduated template must NOT be auto-fixed — it was
+        # already delivered, and Check 0 has nothing left to act on.
+        r = self._classify({'source': 'outbox-notifier',
+                            'kind': 'notification', 'subject': 'sub',
+                            'template': 'reinstall-systemd-unit'})
+        self.assertEqual(r['tier'], 3)
+        self.assertIsNone(r['template'])
+
+    def test_self_authored_gate0_wins_over_delivered_kind(self):
+        # Gate 0 is evaluated first and both silence to Tier 3; assert the
+        # rationale still names the self-authored reason so the audit trail
+        # attributes the decision to the gate that actually made it.
+        r = self._classify({'source': 'pulse', 'kind': 'notification',
+                            'subject': 'pulse-authored-subject'})
+        self.assertEqual(r['tier'], 3)
+        self.assertIn('self-authored', r['rationale'])
+
     def test_tier2_probation_template_asks(self):
         r = self._classify({'source': 's', 'subject': 'sub',
                             'template': 'restart-daemon'})
