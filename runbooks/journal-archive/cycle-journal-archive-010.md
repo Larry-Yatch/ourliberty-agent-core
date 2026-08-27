@@ -21212,3 +21212,87 @@ Forge inbox: 2 new task files. NOMINAL (expected resolved state).
 
 ---
 
+## Iteration ~9848 — 2026-08-26T18:36Z UTC (Larry /cycle chat, Tier 3→1 reset [Check 0: wm=500→504, 4 new alerts: 2 Tier-3 (heal-wedged-review-sessions silenced), 2 Tier-4 (outbox-notifier review-escalate PR#1108+#1109, already delivered by outbox-notifier); regression gate INCONCLUSIVE exit 124 on both PRs; HEAD=039d5ebb=origin/main clean; pending=0; consecutive_clean 61→0 tier-reset])
+
+**Health:** Signal — Tier-4 alerts in Check 0 (outbox-notifier review-escalate for PR#1108 and #1109; already delivered by outbox-notifier). **Tier 3→1 reset**, consecutive_clean 61→0. 2026-08-26 UTC (Wednesday).
+
+**VERIFY-BEFORE-REASSERT (from iter ~9847 at ~18:01Z UTC; automated commit since: 039d5ebb Pulse cycle 20260826T180549Z):**
+- "tier=3, consecutive_clean 60→61": CONFIRMED. cycle-tier.json at iter start: tier=3, consecutive_clean=61, last_updated=2026-08-26T18:04:00Z UTC. OK
+- "wm=500, file_length=500, 0 new alerts": SUPERSEDED. file_length=504 (4 new alerts, lines 501-504). OK
+- "HEAD=f8f2d4dc=origin/main": SUPERSEDED. Automated commit 039d5ebb "Pulse cycle 20260826T180549Z" (iter ~9847 wrapper auto-commit). HEAD=039d5ebb=origin/main. Clean tree. OK
+- "all 4 bots alive": CONFIRMED. system-health.json ts=2026-08-26T18:30:07Z UTC: all 4 alive=True. OK
+- "SUPABASE ~116.6h overdue": CONFIRMED CARRY. Now ~117.1h overdue (current ~18:36Z UTC 2026-08-26). OK
+- "pending=0": CONFIRMED. beacon-pending-approvals.json: pending=0. OK
+- "2 new PRs #1108+#1109 (<10 min old, awaiting Mirror)": SUPERSEDED. Both PRs now have INCONCLUSIVE Mirror reviews (regression gate exit 124): PR#1108 (~42 min old), PR#1109 (~38 min old). Mirror DM'd Larry on both. See Check E + escalations.
+
+**Check 0 (Alert triage, ~18:35Z UTC):** repair-watermark: repaired=false, old_watermark=500, file_length=504. 4 new alerts (lines 501-504):
+- Line 501 (ts=18:14:59Z UTC): `source=heal-wedged-review-sessions, subject=wedged-review-silent:wt-mirror-check0-delivered-kinds-tier3-001` → triage-alert: **Tier-3** (known-pattern match, route=digest). Outbox-notifier already delivered (idx=500 at 18:18Z UTC). Silenced. No tier-reset.
+- Line 502 (ts=18:19:58Z UTC): `source=heal-wedged-review-sessions, subject=wedged-review-silent:wt-mirror-alert-translations-unrouted-pr-nudges-retired-001` → triage-alert: **Tier-3** (known-pattern match, route=digest). Outbox-notifier delivered (idx=501 at 18:23Z UTC). Silenced. No tier-reset.
+- Line 503 (ts=18:22:00Z UTC): `source=outbox-notifier, kind=notification, intent=review-escalate, task_id=check0-delivered-kinds-tier3-001` → triage-alert: **Tier-4** (no translation match; novel). Outbox-notifier already delivered directly (idx=502 at 18:23Z UTC). No duplicate Pulse DM. **This is the "check0-delivered-kinds" class that PR#1108 addresses — but PR#1108 is itself in inconclusive review.** Tier-reset triggered.
+- Line 504 (ts=18:26:04Z UTC): `source=outbox-notifier, kind=notification, intent=review-escalate, task_id=alert-translations-unrouted-pr-nudges-retired-001` → triage-alert: **Tier-4** (no translation match; novel). Outbox-notifier delivered (idx=503 at 18:28Z UTC). No duplicate Pulse DM. Tier-reset triggered.
+Watermark advanced 500→504. **Tier-reset: non-clean iter (2 Tier-4 classifications).**
+
+**Check 1 (Log noise, ~18:33Z UTC):** heal-stale-daemon-code.log last tick 2026-08-26T18:23:36Z UTC (~12 min; "tick: fresh=448 unparseable=109"). INFO-only (ActiveEnterTimestamp unparseable for sync/watchdog services) — expected. NOMINAL.
+
+**Check 2 (Telegram sweep, ~18:33Z UTC):** Bot log last entry: [2026-08-26T12:28:40-0600]=18:28:40Z UTC (idx=503 delivered, intent=review-escalate PR#1109). 2 wedged-review-sessions alerts (idx=500,501) + 2 review-escalate notifications (idx=502,503) delivered by bot since iter ~9847. No inbound Larry directives. Nightly cluster at 2026-08-26T02:15-02:18Z UTC — G-rule nightly-502-cluster-001 DISPATCHED ✅. Next expected window ~01:15Z UTC 2026-08-27 (~6.6h away). system-health.json ts=18:30:07Z UTC: all 4 alive=True. NOMINAL.
+
+**Check 3 (Pipeline stall, ~18:33Z UTC):** heal-pipeline-stall.log last tick 2026-08-26T18:20:54Z UTC (~12 min; "no stalls detected"). NOMINAL.
+
+**Check 4 (Pending directives, ~18:36Z UTC):** beacon-pending-approvals.json (state/) present, pending=0. NOMINAL.
+
+**Check 5 (Stale daemon code, ~18:33Z UTC):** heal-stale-daemon-code.heartbeat = 2026-08-26T18:23:25Z UTC (~10 min fresh). NOMINAL.
+
+**Check A (Source repo, ~18:35Z UTC):** branch=main, HEAD=039d5ebb=origin/main (Pulse cycle 20260826T180549Z). Clean tree. NOMINAL.
+**Check B (Sync health, ~18:33Z UTC):** agent-core-sync.json: last_sync=2026-08-26T18:12:16Z UTC (~21 min; status=no-change at 039d5ebb; within 2h threshold). NOMINAL.
+**Check C (Agent liveness, ~18:33Z UTC):** system-health.json ts=2026-08-26T18:30:07Z UTC (~3 min fresh): all desired=up, alive=True (beacon/forge/mirror/pulse). disk=20%, memory=25%. Overall=healthy. NOMINAL.
+**Check E (PR/merge state, ~18:35Z UTC):** 2 open PRs:
+  - PR #1108 (created 17:54Z UTC, ~42 min old): "fix(pulse): Tier-3 silence Check 0 re-triage of already-delivered notification/approval_request rows" — MERGEABLE, reviewDecision="" (Mirror review INCONCLUSIVE: regression gate exit 124). Mirror noted: diff itself reviewed clean; only timing gate failed; re-run on less-loaded host should clear it.
+  - PR #1109 (created 17:58Z UTC, ~38 min old): "fix(alerts): silence duplicate Check 0 re-triage of unrouted-pr nudge retractions" — MERGEABLE, reviewDecision="" (Mirror review INCONCLUSIVE: regression gate exit 124). Same pattern: diff clean (config-only + one test line), only timing gate failed.
+  Both >30 min old, MERGEABLE. G-rule enable-pr-auto-merge-reviewdecision-guard-001 applies: no auto-merge (reviewDecision="" + reviews inconclusive). **FINDING: regression gate timed out (exit 124) on both PRs. Per MEMORY: infra issue (outer_to), not spec gap. Larry already DM'd by outbox-notifier.** Escalation written to pulse-escalations.json.
+**Check H (Inboxes, ~18:35Z UTC):** beacon=1 (notify-alert-translations-unrouted-pr-nudges-retired-001.json — likely approval notification for iter ~9846 Larry resolution; inbox watcher may have consumed already). forge=0, mirror=0, pulse=0. NOMINAL.
+
+**Section 5.0 one-shots:** audit_due_nudge: no-op. distill_detector: no-op. audit_cadence_signal (review/distill/): no-op. NOMINAL.
+
+**Check I (~18:36Z UTC):** Latest artifact: check-i-2026-08-26.json (fired 14:10Z UTC today, Wednesday — on schedule). Already surfaced in iters ~9840–9847. Next expected Friday 2026-08-29. CARRY.
+
+**Check III (~18:36Z UTC):** No new artifact. Latest check-iii-2026-08-23.json. Next expected 2026-09-06. CARRY.
+
+**Credential rotation watch:** SUPABASE_SERVICE_ROLE_KEY: last_dm=2026-08-17T23:23:16Z UTC. Overdue ~117.1h (rotation due 2026-08-22; current ~18:36Z UTC 2026-08-26). Dedup window expires ~2026-08-31T23:23Z UTC. No re-DM. Larry must rotate per docs/runbooks/rotate-supabase-keys.md.
+
+**G-rules (2 Tier-3 silences, 2 Tier-4 new; 0 G-rule count advances this iter):**
+- nightly-502-cluster-001: DISPATCHED ✅. Next expected window ~01:15Z UTC 2026-08-27.
+- outbox-notifier-review-escalate-tier4 NOTE: lines 503+504 are the "check0-delivered-kinds" class (kind=notification, intent=review-escalate) that PR#1108 addresses. No new G-rule started; fix is in-flight (PR#1108 inconclusive). Track against PR#1108 merge/re-dispatch.
+- sync-service-deploy-restart-head-drift-tier4-no-translation-001: 1/3 (carried)
+- ourliberty-health-sync-freshness-tier4-no-translation-001: 1/3 (carried)
+- heal-lost-marker-tier4-no-translation-001: 1/3 (carried)
+- deploy-notifier-vercel-build-failed-tier4-no-translation-001: 2/3 (carried)
+- mirror-queue-wait-gauge-third-review-slot-readiness-tier4-no-translation-001: 1/3 (carried)
+- source-beacon-notifications-tier4-no-translation: 2/3 (carried)
+- enable-pr-auto-merge-reviewdecision-guard-001: 1/3 (carried)
+- heal-pipeline-stall-no-mirror-dispatch-tier4-no-translation-001: 1/3 (carried)
+- suite-guardian-reminder-gap-001: 1/3 (carried)
+
+**PRIME DIRECTIVE ratio:** intervention appended (ts=2026-08-26T18:35:54Z UTC, iter=9848, tier=3, template=check0-tier4-outbox-notifier-review-escalate:PR1108-PR1109-inconclusive-regression-gate). Ratio: 2038/9=226.4 (trend=improving).
+
+**Actions taken:**
+- Check 0: triage-alert lines 501-502 → Tier-3 silence (known pattern; no tier-reset). Lines 503-504 → Tier-4 (novel; no duplicate DM — outbox-notifier already delivered). Watermark advanced 500→504.
+- PRIME DIRECTIVE: intervention appended to cycle-prime-ledger.jsonl (ts=2026-08-26T18:35:54Z UTC, iter=9848, tier=3).
+- Tier state: cycle_tier_state.py record --checks-clean false → tier 3→1 reset, consecutive_clean 61→0 (last_signal_at=2026-08-26T18:35:46Z UTC).
+- Escalation: PR#1108+#1109 regression gate INCONCLUSIVE written to pulse-escalations.json.
+
+**Escalations:** 1 new. Outstanding (carried):
+  **[NEW — yellow] PR#1108 + PR#1109 regression gate INCONCLUSIVE (exit 124):** Both Mirror reviews timed out at 1500s wall-clock ceiling before gate verdict. Diffs reviewed clean by Mirror — only the timing gate failed. Per MEMORY: infra issue (outer_to), not spec gap. Larry DM'd by outbox-notifier at 18:23Z (PR#1108) and 18:28Z (PR#1109) UTC today. Suggested path: re-dispatch to Mirror (beacon→mirror force_ask per MEMORY 2026-08-26 note).
+  2. Informational-cards impl gap (iter ~9102). Carry.
+  3. Check III artifact 2026-08-23: beacon 232→336s (+45%), mirror 1311→1448s (+10%). Command: approve threshold-update-2026-08-23.
+  4. SUPABASE rotation OVERDUE (~117.1h, due 2026-08-22). Dedup active until ~2026-08-31. Larry must rotate per docs/runbooks/rotate-supabase-keys.md.
+  5. nightly-502-cluster-note-001: G-rule dispatched. Next expected window ~01:15Z UTC 2026-08-27.
+  6. review-ceiling-fit: Mirror review ceiling RAISE 35→40min recommended. Digest route, no DM.
+  7. sync-service-deploy-restart-head-drift-tier4-no-translation-001: 1/3 (carried from iter ~9780). Dispatch to Beacon at 3/3.
+  8. Check I proposal [1]: [parked] cycle-202608192035370000 (high-σ pulse/cycle, 4.71σ). On dashboard Parked lane. Next Check I artifact expected Friday 2026-08-29.
+
+**Patterns:** Regression gate timeout (exit 124) hit on both PRs in the same Mirror batch — likely a host-load event at that run window. PR#1108 is the fix for the exact alert class that triggered its own Tier-4 triage this iter (a circular dependency: the fix for outbox-notifier review-escalate Tier-4 is itself in inconclusive review, producing more Tier-4 alerts). If regression gate timeout recurs on a 3rd PR batch, dispatch to Beacon at 3/3 for a systemic outer_to increase.
+
+**Tier end-of-iter:** Tier 1 (reset from 3), consecutive_clean=0.
+
+---
+
