@@ -19747,7 +19747,11 @@
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
       "needs_decision": true,
       "needs_decision_since": "2026-08-25T00:13:19.764210+00:00",
-      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-08-27T01:31:06.427280+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-pr-RSDPM-220",
