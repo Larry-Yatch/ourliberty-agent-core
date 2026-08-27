@@ -6,6 +6,18 @@
 
 ---
 
+## G-rule agent-runner-transcript-not-persisted-post-worktree-teardown-001 — ACTIVE (forge 2/3, mirror 1/3, iter ~9910, 2026-08-27T04:31Z UTC)
+
+**Rule:** Both `source=agent-runner-forge` (subject=transcript-not-persisted:tier3) and `source=agent-runner-mirror` (subject=transcript-not-persisted:tier1) fired on the SAME task (suite-guardian-fix-test_flip_readiness_gauge-20260827) within the SAME auto-merge sequence. Forge transcript alert: iter ~9906 (line 540, 04:04:43Z UTC, severity=critical). Mirror transcript alert: this iter ~9910 (line 544, 04:31:25Z UTC, severity=critical). Both worktrees torn down immediately after auto-merge at 04:31:35-36Z UTC. Transcripts were scoped to worktree-specific project paths that no longer exist after teardown — path contains `wt-forge-*` or `wt-mirror-*` prefix. Root cause hypothesis: AUTO_MERGE_WORKTREE_TEARDOWN fires synchronously at 04:31:36Z UTC, removing the worktree before the transcript write completes or before the transcript file's directory is accessible at resume time. The `suggested_action` says "Verify systemd unit lists the active tier's HOME in ReadWritePaths" — but worktree homes are dynamic, not listed in unit files. Real fix likely: either (a) copy transcript to a stable non-worktree path before teardown, or (b) delay worktree teardown until transcript is confirmed written. Outbox-notifier DM'd Larry on both occurrences. **G-rule tracking: forge=2/3, mirror=1/3. Dispatch COMBINED fix to Beacon at forge=3/3 OR mirror=2/3, whichever comes first.** Do NOT add translation silence — transcripts failing to persist is a real signal.
+
+---
+
+## G-rule mirror-to-dashboard-return-routing-failure-001 — 1/3 (new, iter ~9884, 2026-08-27T01:32Z UTC)
+
+**Rule:** When a PR is reviewed from the Telegram dashboard (Larry triggered the review, not via Forge's standard outbox path), the Mirror review_pass result has no `reply_chat_id` in its marker, so the outbox-notifier archives it as 'no routable target' instead of firing auto-merge + closing Larry DM. This is the fourth-wall routing failure described in PR#1113 (fix/dashboard-review-verdict-fourth-wall). PRs #1108, #1109, #1111, #1114 (and possibly others) hit this routing gap — PR#1114 actually did auto-merge correctly (outbox-notifier found it via review_pass + AUTO_MERGE log), so the exact trigger conditions aren't fully clear. First occurrence: G-rule opened iter ~9884 when direction-ask-unreviewed-merge-routing-fix-001 was dispatched. Fix: PR#1113 open (OPEN, ~119 min, fix/dashboard-review-verdict-fourth-wall); pending approval dashboard-return-routing-auto-merge-001. **Do NOT re-dispatch.** Track PR#1113 for merge.
+
+---
+
 ## Check 3/5 heartbeat substrate — CORRECTED (iter ~9905, 2026-08-27T04:04Z UTC)
 
 **Rule (CORRECTED):** The iter ~9726 note "heal-stale-daemon-code.heartbeat DO NOT EXIST anywhere on the filesystem" was a FALSE PREMISE — verified false in iter ~9905: `cat /home/larry/agents/blackboard/heal-stale-daemon-code.heartbeat` returned `2026-08-27T03:56:40.228605+00:00`. The correct note from iter ~9110 was right all along.
