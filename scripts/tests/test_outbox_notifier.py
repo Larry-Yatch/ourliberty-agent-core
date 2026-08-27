@@ -11925,13 +11925,114 @@ class DashboardDirectDispatchTest(LarryDirectDispatchTest):
                 _mirror_pass_marker(), source='auto-retry', reply_chat_id=None,
             )
             f = self._write_mirror_outbox('alert-boom.json', body)
-            result = on.process_outbox(f)
+            try:
+                result = on.process_outbox(f)
+            except Exception as e:  # noqa: BLE001 — that IS the failure
+                self.fail(
+                    f'an alerting failure must not propagate out of '
+                    f'process_outbox: {type(e).__name__}: {e}'
+                )
 
         self.assertEqual(result, 'archived-no-notify')
         self.assertFalse(f.exists(), 'the outbox must still be archived')
         self.assertIn(
             'unroutable-verdict alert failed',
             on.LOG_FILE.read_text(encoding='utf-8'),
+        )
+
+    def test_alert_subject_actually_matches_its_translation(self):
+        """Gate-and-reader parity (code-discipline item 14). The alert's
+        operator tier and plain-language body come from a config entry keyed by
+        SUBJECT; if the emitter's subject and the config key ever disagree, the
+        alert silently falls back to tier FYI with `[no translation]` — the
+        wrong glyph on "a review's verdict was thrown away", and invisible.
+
+        So the subject is taken from what the code ACTUALLY EMITS, never
+        retyped here, and handed to the real lookup."""
+        with mock.patch.object(
+            on.larry_alerts, 'append_alert', return_value=True,
+        ) as appended:
+            body = _mirror_outbox_body(
+                _mirror_pass_marker(), source='auto-retry', reply_chat_id=None,
+            )
+            f = self._write_mirror_outbox('subject-parity.json', body)
+            on.process_outbox(f)
+
+        self.assertEqual(appended.call_count, 1)
+        emitted_subject = appended.call_args.kwargs['subject']
+        translation = on.larry_alerts.translate_alert(
+            'outbox-notifier', emitted_subject,
+        )
+        self.assertIsNotNone(
+            translation,
+            f'no alert-translations entry matches the emitted subject '
+            f'{emitted_subject!r} — the alert would render as FYI / '
+            f'[no translation]',
+        )
+        tier, tier_source = on.larry_alerts.resolve_tier_for(
+            'outbox-notifier', emitted_subject,
+        )
+        self.assertEqual(tier_source, 'translation')
+        self.assertEqual(tier, 'SOON')
+
+    # ---- EVASION mutations (code-discipline item 10, fourth clause) ------
+    # The rules above are all PRESENCE mutations: put the violation in plain
+    # sight and check the guard fires. These two express the SAME violation —
+    # "a human-dispatched verdict is discarded" — in shapes the guard handles
+    # DIFFERENTLY, which is the half a presence-only set cannot speak to.
+
+    def test_evasion_original_source_overrides_a_human_source(self):
+        """EVASION. `routing_source` is `original_source or source`, so a
+        dashboard envelope that picked up a SYSTEM `original_source` on some
+        hop is judged on the system source and does not route — the human half
+        of its provenance is invisible to the branch.
+
+        This is deliberately NOT "fixed" by preferring `source`: on the
+        marker-error retry path `original_source` is the field that carries
+        the true dispatcher, and overriding it there would break the recovery
+        that #1096 exists for. What this pins instead is the guarantee that
+        actually matters — the verdict may fail to route, but it can NEVER
+        vanish quietly."""
+        body = _load_dashboard_verdict('mirror-pass-pr1108.json')
+        body['original_source'] = 'cron'
+        f = self._write_mirror_outbox('evasion-origsrc.json', body)
+        result = on.process_outbox(f)
+
+        self.assertEqual(self._auto_merge_calls, [])
+        alerts = self._read_alerts()
+        self.assertEqual(len(alerts), 1, 'the verdict vanished silently')
+        self.assertIn('thrown away', alerts[0]['message'])
+        self.assertEqual(result, 'archived-no-notify')
+
+    def test_evasion_human_source_shaped_like_an_agent_name(self):
+        """EVASION. `human_direct` requires `target_agent is None`, and
+        `_primary_agent_id` matches any source that STARTS WITH an agent name
+        plus a hyphen. So a control surface named `forge-console` would be in
+        HUMAN_SOURCES and still never be human-direct — the membership would
+        look wired and do nothing.
+
+        Pinned because the failure is invisible at the config site. It is a
+        naming hazard, not a data loss: the substantive half still runs (the
+        merge fires) and the notify is merely aimed at an agent. Anyone adding
+        a surface to HUMAN_SOURCES must not name it `<agent>-something`."""
+        import dispatch_validator as dv
+        original = dv.HUMAN_SOURCES
+        try:
+            dv.HUMAN_SOURCES = frozenset(original | {'forge-console'})
+            body = _load_dashboard_verdict('mirror-pass-pr1108.json')
+            body['source'] = 'forge-console'
+            f = self._write_mirror_outbox('evasion-agentish.json', body)
+            result = on.process_outbox(f)
+        finally:
+            dv.HUMAN_SOURCES = original
+
+        # NOT human-direct despite being in the set — the hazard itself.
+        self.assertEqual(result, 'notified-marker')
+        # But the verdict is still acted on, so this is a mis-aimed notify and
+        # not a lost verdict.
+        self.assertEqual(len(self._auto_merge_calls), 1)
+        self.assertEqual(
+            len(list((on.INBOXES_ROOT / 'forge').glob('notify-*.json'))), 1,
         )
 
     def test_routing_derives_from_human_sources_not_a_copy(self):
@@ -12490,13 +12591,29 @@ class LarryDirectDispatchNarrowingTest(unittest.TestCase):
         self.assertIn('Mirror approved', alerts[0]['message'])
         self.assertIn('Auto-merged', alerts[0]['message'])
 
-    # ---------------- regression 5: PASS without chat_id archives cleanly ----------------
+    # ---------------- regression 5: PASS without chat_id MERGES, silently to chat ----------------
 
-    def test_mirror_pass_with_larry_source_no_chat_id_archives(self):
-        # Pre-existing skip preserved: without reply_chat_id there is no
-        # Larry-direct target — the marker archives via the
-        # 'no routable target' path and auto-merge does NOT fire (silent
-        # action would be worse than no action).
+    def test_mirror_pass_with_larry_source_no_chat_id_still_merges(self):
+        # REVERSED 2026-08-27 (dashboard-review-verdict-fourth-wall). This is
+        # the SECOND copy of the same assertion — the first lives in
+        # LarryDirectDispatchTest — and it previously read:
+        #
+        #   "without reply_chat_id there is no Larry-direct target — the marker
+        #    archives via the 'no routable target' path and auto-merge does NOT
+        #    fire (silent action would be worse than no action)."
+        #
+        # Two copies of one claim is why this reversal is called out twice
+        # rather than quietly edited once. The claim is now false: the
+        # alternative to merging is not a louder merge, it is NO merge and no
+        # signal at all, because heal_pr_auto_merge only re-tries merges that
+        # were ATTEMPTED and failed — and the archive branch returns before one
+        # is ever attempted. Measured on the live droplet across the
+        # 2026-08-27 #1108/#1109 incident: zero AUTO_MERGE lines, and every
+        # healer tick read `no mirror-passed failures in last 24h`.
+        #
+        # "Not silent" is re-backed by
+        # DashboardDirectDispatchTest.test_merge_without_chat_is_recorded,
+        # which runs the REAL merge fn and asserts both durable records.
         body = _mirror_outbox_body(
             _mirror_pass_marker(task_id='real-19-pass-nochat'),
             task_id='real-19-pass-nochat',
@@ -12506,9 +12623,10 @@ class LarryDirectDispatchNarrowingTest(unittest.TestCase):
         f = self._write_outbox('mirror', 'real-19-pass-nochat.json', body)
 
         result = on.process_outbox(f)
-        self.assertEqual(result, 'archived-no-notify')
-        self.assertEqual(self._auto_merge_calls, [])
+        self.assertEqual(len(self._auto_merge_calls), 1)
+        # Still no DM: a missing chat means no DM, never a missing merge.
         self.assertEqual(self._read_alerts(), [])
+        self.assertEqual(result, 'human-direct-marker')
 
     # ---------------- regression 6: synth DM body branches on intent ----------------
 

@@ -12940,21 +12940,22 @@ def _alert_unroutable_marker_verdict(
             subject=f'unroutable-verdict:{task_id}:{marker_type}',
             task_id=task_id,
             pr_url=pr_url if isinstance(pr_url, str) else None,
+            suggested_action=(
+                f'ls ~/agents/outboxes/{agent}/.archive/ | grep {task_id}'
+            ),
             message=(
-                f'{agent.title()} returned {verdict} on task `{task_id}`'
+                f'A code review finished and its answer was thrown away. '
+                f'{agent.title()} returned {verdict} on `{task_id}`'
                 + (f' ({pr_url})' if pr_url else '')
-                + f', but the result had nowhere to go: its dispatch source '
-                f'`{routing_source}` is neither an agent nor a known human '
-                f'surface, so the verdict was ARCHIVED and NOTHING was acted '
-                f'on — no auto-merge, no revision dispatch, no decision card. '
-                f'The review really ran and really cost money; its answer was '
-                f'thrown away. Nothing retries this: heal-pr-auto-merge only '
-                f'sees merges that were ATTEMPTED and failed, and this one was '
-                f'never attempted. Read the archived outbox under '
-                f'~/agents/outboxes/{agent}/.archive/ to see the verdict, then '
-                f'act on it by hand. If `{routing_source}` is a control '
-                f'surface a person actually uses, the durable fix is to add it '
-                f'to dispatch_validator.HUMAN_SOURCES.'
+                + f', but nothing downstream ran: no merge, no fix dispatched, '
+                f'no card for you. Nothing will retry it — the auto-merge '
+                f'healer only re-tries merges that were attempted and failed, '
+                f'and this one was never attempted. So this PR will sit '
+                f'exactly where it is until a person moves it. The review '
+                f'itself is intact; the command below finds it. '
+                f'(Cause, for whoever fixes it: the dispatch source was '
+                f'`{routing_source}`, which the notifier can route neither to '
+                f'an agent nor to a human surface.)'
             ),
         )
     except Exception as e:  # noqa: BLE001 — surfacing must never break routing
