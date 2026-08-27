@@ -6,9 +6,17 @@
 
 ---
 
-## Check 3/5 heartbeat substrate — phantom file refs corrected (iter ~9726, 2026-08-24T01:17Z UTC)
+## Check 3/5 heartbeat substrate — CORRECTED (iter ~9905, 2026-08-27T04:04Z UTC)
 
-**Rule:** `heal-pipeline-stall.heartbeat` and `heal-stale-daemon-code.heartbeat` DO NOT EXIST in `/home/larry/agents/state/` or anywhere on the filesystem (`find /home/larry/agents/state/ -name "*.heartbeat"` returns empty). Prior journal entries (iters ~9725 and multiple prior) cited them with fresh timestamps — a verify-before-reassert failure. **Actual substrate for Check 3:** `~/agents/blackboard/heal-pipeline-stall-state.json` (per cycle-prompt.md § 3.3) + `~/agents/logs/heal-pipeline-stall.log` (authoritative; log shows healer running every ~15 min with "no stalls detected"). **Actual substrate for Check 5:** `~/agents/logs/heal-stale-daemon-code.log` (authoritative; log shows ticks every ~10-15 min). The heal-pipeline-stall-state.json has an epoch `scanned_at` (1970-01-01T00:00:00Z) — a state file schema bug — but the log is authoritative. DO NOT reference heartbeat files that don't exist. Always derive timestamps from logs or from the real state file paths.
+**Rule (CORRECTED):** The iter ~9726 note "heal-stale-daemon-code.heartbeat DO NOT EXIST anywhere on the filesystem" was a FALSE PREMISE — verified false in iter ~9905: `cat /home/larry/agents/blackboard/heal-stale-daemon-code.heartbeat` returned `2026-08-27T03:56:40.228605+00:00`. The correct note from iter ~9110 was right all along.
+
+**Correct substrate for Check 5:** `/home/larry/agents/blackboard/heal-stale-daemon-code.heartbeat` — a plain-text ISO 8601 UTC timestamp updated each time `heal_stale_daemon_code.py` ticks successfully. Fresh = timestamp < 60 min ago.
+
+**Correct substrate for Check 3:** `~/agents/blackboard/heal-pipeline-stall-state.json` + `~/agents/logs/heal-pipeline-stall.log` (authoritative). The heal-pipeline-stall-state.json has an epoch `scanned_at` (1970-01-01T00:00:00Z) — schema bug — but the log is authoritative.
+
+**`heal-pipeline-stall.heartbeat` status:** NOT verified; don't reference. Use the pipeline-stall log.
+
+DO NOT cite the iter ~9726 phantom-everywhere claim ever again — it is permanently superseded by this correction.
 
 ---
 
