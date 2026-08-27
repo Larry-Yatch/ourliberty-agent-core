@@ -20604,7 +20604,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-08-27T01:46:15.457469+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-08-27T01:39:50.315047+00:00"
+      "orphan_last_activity_ts": "2026-08-27T01:39:50.315047+00:00",
+      "briefing": {
+        "what": "A fix so that when you approve work from the dashboard, the final sign-off actually completes the job and tells you it's done, instead of quietly stopping partway.",
+        "why": "Right now approvals you give from the dashboard can stall without finishing or notifying you, so finished work sits idle and you're left assuming it shipped when it didn't.",
+        "suggest": "Approve this to go ahead, but ask for confirmation that a real dashboard approval runs end-to-end and reaches you before it's called done."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-27T01:56:15.980100+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
