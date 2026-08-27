@@ -32,7 +32,7 @@
 
 **Do NOT re-open or re-dispatch.** Verify fix when Beacon's spec lands.
 
-**2026-08-27 nightly window update (iter ~9887):** Beacon bot logged 3 × HTTP 502 at 01:13:35-41Z UTC (6-second span, auto-recovered). Pulse/forge/mirror bot logs showed NO simultaneous 502s at that time. This is much smaller than the historical 10-15 count, multi-minute clusters — inconsistent with "host-wide event, all 4 bots same minute." Classify as a minor transient blip, not the sustained cluster G-rule pattern. Prior iters (~9884-9886) checked only pulse_telegram_bot.log and declared "clean nights" — those claims need to include all 4 bot logs for completeness. G-rule DISPATCHED ✅ status unchanged.
+**2026-08-27 nightly window update (iter ~9900, CORRECTED):** Beacon bot logged 20 × HTTP 502 + 3 × read timeout from 19:12:40-19:15:36 MDT (=01:12:40-01:15:36Z UTC), spanning ~3 minutes; 23 log lines total in the window. Bot auto-recovered; restarted at 01:36Z UTC. This IS consistent with the historical sustained cluster (10-15+ count, multi-minute). Iter ~9898's "3×502, 6-second span" was a false-read: the tail grep caught only the last 3 lines (01:13:35-41Z UTC) of a 23-line cluster that started at 01:12:40Z UTC. G-rule DISPATCHED ✅ status unchanged. Note: prior iters also need to include all 4 bot logs for completeness on "host-wide vs. beacon-only" diagnosis.
 
 **F24 envelope bug note:** The automated cycle's direction-ask envelope writer uses `body` instead of `prompt`. If this class of dead-letter recurs (wrong field name in auto-generated direction-ask envelopes), dispatch to Forge to fix the envelope writer in the automated cycle path.
 
