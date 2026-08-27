@@ -20619,6 +20619,23 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-suite-guardian-fix-test_flip_readiness_gauge_testmainintegration_test_all_green_writes_artifact_and_rings-20260827",
+      "name": "Suite Guardian Fix Test Flip Readiness Gauge Testmainintegration Test All Green Writes Artifact And Rings 20260827",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `suite-guardian-fix-test_flip_readiness_gauge_testmainintegration_test_all_green_writes_artifact_and_rings-20260827`. Last activity 2026-08-27T03:45:06.026318+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "suite-guardian-fix-test_flip_readiness_gauge_testmainintegration_test_all_green_writes_artifact_and_rings-20260827"
+      ],
+      "repo": null,
+      "created": "2026-08-27",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-27T03:46:45.122447+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-27T03:45:06.026318+00:00"
     }
   ]
 }
