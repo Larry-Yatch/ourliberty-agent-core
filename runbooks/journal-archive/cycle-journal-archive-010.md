@@ -23052,3 +23052,77 @@ NON-CLEAN → tier-reset (Check 4 non-empty). No auto-fix. Larry action required
 
 ---
 
+## Iteration ~9871 — 2026-08-26T22:06Z UTC (Larry /cycle chat, Tier 2→1 ESCALATION [Check 0: wm=512→514, 2 new Tier-4 alerts (heal-approvals-surface-drift missing_card for PR#1108+#1109 mirror reviews, both auto-delivered outbox-notifier idx=512+513 at 21:55Z UTC); all other checks NOMINAL; HEAD=60c6693c=origin/main clean; all 4 bots healthy; Tier 2→1 reset])
+
+**Health:** ⚠️ NON-CLEAN — 2 Tier-4 alerts: `heal-approvals-surface-drift:missing_card` for mirror-review items on PRs #1108+#1109. Items are for-larry but not appearing on the dashboard decide tab (informational-cards impl gap, Option B pending since iter ~8237). **Tier 2→Tier 1 ESCALATION.** 2026-08-26 UTC (Wednesday).
+
+**VERIFY-BEFORE-REASSERT (from iter ~9870 at 21:49Z UTC; automated cycle since: 60c6693c Pulse cycle 20260826T215013Z):**
+- "Tier 2, consecutive_clean=0": SUPERSEDED. Non-clean findings this iter → tier reset Tier 2→1, consecutive_clean=0. Watermark advanced 512→514.
+- "wm=512 stable, 0 new alerts": UPDATED. repair-watermark: repaired=false, old_watermark=512, file_length=514. 2 new alerts at lines 513-514. Watermark advanced to 514.
+- "HEAD=60c6693c=origin/main": CONFIRMED. git status: branch=main, HEAD=60c6693c=origin/main, clean tree. OK
+- "all bots healthy, system-health ts=21:42:56Z UTC": CONFIRMED + UPDATED. system-health.json ts=2026-08-26T22:03:16Z UTC (~3 min fresh): all 4 desired=up, alive=True. overall=healthy. disk=19%, memory=21%. OK
+- "SUPABASE ~146h overdue": CONFIRMED CARRY. last_dm=2026-08-17T23:23:16Z UTC. Now ~146.7h overdue. Dedup window active until ~2026-08-31T23:23Z UTC. No re-DM. OK
+- "pending=0 (Check 4 CLEAN)": CONFIRMED. beacon-pending-approvals.json pending=[]. OK
+- "PR#1108 OPEN no mirror review, re-dispatch DROPPED": CONFIRMED CARRY. PR#1108 OPEN, MERGEABLE, reviewDecision="". No new action from Pulse. OK
+- "PR#1109 OPEN no mirror review, re-dispatch DROPPED": CONFIRMED CARRY. PR#1109 OPEN, MERGEABLE, reviewDecision="". No new action from Pulse. OK
+
+**Check 0 (Alert triage, ~22:03Z UTC):** repair-watermark: repaired=false, old_watermark=512, file_length=514. 2 new alerts:
+  - Line 513 (ts=2026-08-26T21:53:03Z UTC): source=heal-approvals-surface-drift, subject=heal-approvals-surface-drift:missing_card:mirror-review:alert-translations-unrouted-pr-nudges-retired-001. triage-alert: Tier 4 (novel: no registry/translation match), guard-tier4 accepted (same-iter call, classify()==4). Route=escalate. Already delivered by outbox-notifier as idx=512 at 21:55:32Z UTC.
+  - Line 514 (ts=2026-08-26T21:53:03Z UTC): source=heal-approvals-surface-drift, subject=heal-approvals-surface-drift:missing_card:mirror-review:check0-delivered-kinds-tier3-001. Tier 4. Guard accepted. Already delivered as idx=513 at 21:55:32Z UTC.
+  Watermark advanced 512→514. Tier-reset. NON-CLEAN (2× Tier 4).
+
+**Check 1 (Log noise, ~22:06Z UTC):** heal-stale-daemon-code.log last tick 21:54:27Z UTC (~11 min; INFO-only, fresh=448, unparseable=109). outbox-notifier.log last delivery 21:55:32Z UTC (heal-approvals-surface-drift idx=512+513). heal-pipeline-stall.log last tick 21:50:01Z UTC (~16 min). No WARN/ERROR above threshold. NOMINAL.
+
+**Check 2 (Telegram sweep, ~22:06Z UTC):** Bot log last delivery: idx=513 (heal-approvals-surface-drift:missing_card:mirror-review:check0-delivered-kinds-tier3-001) at 21:55:32Z UTC. No new Larry inbound directives. Nightly 502 cluster: next expected ~01:15Z UTC 2026-08-27. NOMINAL.
+
+**Check 3 (Pipeline stall, ~22:06Z UTC):** heal-pipeline-stall.log last tick 21:50:01Z UTC (~16 min ago). FORGE_NO_PR_SKIP for PR#1108+PR#1109 (pr_exists). 0 fired, 0 recovered, 1 suppressed (cooldown: unrouted_open_pr:RSDPM:235). NOMINAL.
+
+**Check 4 (Pending directives, ~22:06Z UTC):** beacon-pending-approvals.json pending=[]. CLEAN. NOMINAL.
+
+**Check 5 (Stale daemon code, ~22:06Z UTC):** heal-stale-daemon-code.log tick 21:54:27Z UTC (~11 min ago, fresh=448, unparseable=109). INFO-only. NOMINAL.
+
+**Check A (Source repo, ~22:06Z UTC):** branch=main, HEAD=60c6693c=origin/main (Pulse cycle 20260826T215013Z). Clean tree. NOMINAL.
+**Check B (Sync health, ~22:06Z UTC):** agent-core-sync.json: last_sync=2026-08-26T21:12:16Z UTC (~54 min; status=no-change, commit=661d2586). Within 2h threshold. NOMINAL.
+**Check C (Agent liveness, ~22:06Z UTC):** system-health.json ts=2026-08-26T22:03:16Z UTC (~3 min fresh): all 4 desired=up, alive=True (beacon/forge/mirror/pulse). overall=healthy. disk=19%, memory=21%. NOMINAL.
+**Check E (PR/merge state, ~22:06Z UTC):** 2 open Forge PRs:
+  - PR #1108 (~4.1h old): "fix(pulse): Tier-3 silence Check 0 re-triage of already-delivered notification/approval_request rows" — MERGEABLE, reviewDecision="". Routing failure carry from iter ~9867; no auto-merge (reviewDecision=""). MONITORING.
+  - PR #1109 (~4.1h old): "fix(alerts): silence duplicate Check 0 re-triage of unrouted-pr nudge retractions" — MERGEABLE, reviewDecision="". Routing failure carry. MONITORING.
+  G-rule enable-pr-auto-merge-reviewdecision-guard-001: no auto-merge on either (reviewDecision="" on both). No new Pulse action available. NOMINAL (both await Mirror review via correct channel).
+**Check H (Inboxes, ~22:06Z UTC):** beacon=0, forge=0, mirror=0, pulse=0. NOMINAL.
+
+**Section 5.0 one-shots:** audit_due_nudge: no-op (carry). distill_detector: no-op (carry). audit_cadence_signal: no-op (carry). NOMINAL.
+
+**Check I (~22:06Z UTC):** artifact check-i-2026-08-26.json (fired ~14:10Z UTC today, Wednesday — on schedule). Next expected Friday 2026-08-29. CARRY.
+**Check III (~22:06Z UTC):** No new artifact. Latest check-iii-2026-08-23.json. Next expected 2026-09-06. CARRY.
+
+**Credential rotation watch:** SUPABASE_SERVICE_ROLE_KEY: last_dm=2026-08-17T23:23:16Z UTC. Now ~146.7h overdue (due 2026-08-22; dedup window active until ~2026-08-31T23:23Z UTC). No re-DM. Larry must rotate per docs/runbooks/rotate-supabase-keys.md.
+
+**G-rules (this iter):**
+- heal-approvals-surface-drift-missing-card-tier4-001: **NEW 1/2.** Two Tier-4 alerts from heal-approvals-surface-drift for mirror-review items (PRs #1108+#1109) not on dashboard decide tab. Root cause: informational-cards impl gap (Option B, fix dispatched iter ~8237 via direction-ask-approvals-opt-b-implement-001). These will continue firing until step-promote merges. At 3/3: note fix dispatched; no new dispatch. Do NOT add Tier-3 silence translation (MEMORY: "would gag a legitimate checker").
+- routing-denied:dashboard->mirror-001: 1/3 (carry — no new routing-denied event this iter). Same carry as prior iters.
+- All other G-rules carried unchanged (see iter ~9870).
+
+**PRIME DIRECTIVE ratio:** intervention appended (ts=2026-08-26T22:06:19Z UTC, iter=9871, tier=2, kind=intervention, template=heal-approvals-surface-drift-missing-card:mirror-review-x2-tier4-informational-cards-impl-gap). Trailing-30d: interventions=2053, systemic_fixes=8, ratio=256.625, trend=improving. Tier state: record --checks-clean false → Tier 2→Tier 1, consecutive_clean=0, last_signal_at=2026-08-26T22:06:19Z UTC.
+
+**Actions taken:**
+- Check 0: watermark advanced 512→514 (2 Tier-4 alerts claimed + guard-tier4 accepted; outbox-notifier already delivered idx=512+513 at 21:55:32Z UTC). Tier-reset.
+- PRIME DIRECTIVE: intervention appended via cycle_prime_ledger.py (template=heal-approvals-surface-drift-missing-card, iter=9871, tier=2).
+- Tier state: record --checks-clean false → Tier 2→Tier 1, consecutive_clean=0.
+
+**Escalations:** None new from Pulse (outbox-notifier handled both Tier-4 deliveries). Outstanding (carried):
+  1. **[yellow] CARRY** routing-denied:dashboard->mirror — PRs #1108+#1109 still open, no Mirror review. Already Telegram-delivered (idx=511, 21:20:13Z UTC). Larry action needed: re-issue mirror reviews via correct channel (dashboard→beacon, not dashboard→mirror).
+  2. **[yellow] AUTO-DELIVERED** heal-approvals-surface-drift:missing_card — mirror-review items for PRs #1108+#1109 not on dashboard decide tab (informational-cards impl gap). Outbox-notifier delivered at 21:55:32Z UTC (idx=512+513). Larry aware. Fix pending: direction-ask-approvals-opt-b-implement-001 (dispatched iter ~8237).
+  3. Informational-cards impl gap (iter ~9102). Carry.
+  4. Check III artifact 2026-08-23: beacon 232→336s (+45%), mirror 1311→1448s (+10%). Command: `approve threshold-update-2026-08-23`.
+  5. Check I proposal [1]: [parked] cycle-202608192035370000 (high-σ pulse/cycle, 4.71σ). On dashboard Parked lane.
+  6. SUPABASE rotation OVERDUE (~146.7h, due 2026-08-22). Dedup active until ~2026-08-31. Larry must rotate per docs/runbooks/rotate-supabase-keys.md.
+  7. nightly-502-cluster-001: DISPATCHED ✅. Next expected window ~01:15Z UTC 2026-08-27.
+  8. review-ceiling-fit: Mirror review ceiling RAISE 35→40min recommended. Digest route, no DM.
+  9. sync-service-deploy-restart-head-drift-tier4-no-translation-001: 1/3. Dispatch to Beacon at 3/3.
+
+**Patterns:** Two new heal-approvals-surface-drift Tier-4 alerts fired at 21:53Z UTC for the mirror-review escalation items on PRs #1108+#1109 (which Mirror sent at 12:22-12:26Z UTC today). Both alerts self-delivered via outbox-notifier (idx=512+513 at 21:55Z UTC). Root cause: informational-cards impl gap means mirror-review escalation items aren't promoted to the dashboard decide tab — the same structural gap that's been a carry since iter ~9102. The routing-denied:dashboard->mirror situation remains the key blocker: both PRs need Larry to re-issue mirror review requests via the correct channel. New G-rule opened: heal-approvals-surface-drift-missing-card-tier4-001 at 1/2; no new dispatch needed (fix already in flight).
+
+**Tier end-of-iter:** Tier 1, consecutive_clean=0.
+
+---
+
