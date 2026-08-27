@@ -81,9 +81,29 @@ class DispatchRouteParityTest(unittest.TestCase):
 
     def test_dashboard_specifically_is_routed(self):
         # The incident source — pin it directly so a regression is unambiguous.
+        #
+        # The exact set is pinned (not just membership) so widening stays a
+        # DELIBERATE, reviewed act. It was {'beacon'} until 2026-08-26, when two
+        # further losses of the same class proved the dashboard builds envelopes
+        # for two other targets and neither was deliverable:
+        #   forge   — the clarify_request branch returns `asking_agent`
+        #             ('forge' today per outbox_notifier) and names its file
+        #             `resume-<task>-r<n>.json`; `resume-m3-pr1-r1.json` was
+        #             denied 2026-07-22 and Larry's answer was discarded.
+        #   mirror  — `_build_recheck_envelope` returns a hardcoded 'mirror' for
+        #             the recheck button and for Approve on a promoted
+        #             stranded-escalation card; two such envelopes were denied
+        #             2026-08-26 and Larry's approvals did nothing.
+        #
+        # THIS test only ever guarded the SOURCE dimension, which is why it was
+        # green through all three incidents. The TARGET dimension is guarded by
+        # test_dashboard_api.DashboardActionRouteLegalityTest, which drives the
+        # real builder for every (event_type, action) and asserts the target it
+        # returns is in this set. Widen this set only alongside that test.
         self.assertIn('dashboard', dv.ALLOWED_SOURCES)
         self.assertIn('dashboard', rv.FRESH_DISPATCH_ROUTES)
-        self.assertEqual(rv.FRESH_DISPATCH_ROUTES['dashboard'], {'beacon'})
+        self.assertEqual(rv.FRESH_DISPATCH_ROUTES['dashboard'],
+                         {'beacon', 'forge', 'mirror'})
 
     def test_documented_exemptions_are_real_allowed_sources(self):
         # Guard the guard: an exemption for a source that isn't even in

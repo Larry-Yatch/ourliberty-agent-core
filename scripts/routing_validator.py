@@ -88,7 +88,52 @@ FRESH_DISPATCH_ROUTES: dict[str, set[str]] = {
     # API returned 200 (two of Larry's rejections lost this way on
     # 2026-06-10). The test_dispatch_route_parity regression guard now fails
     # if a future ALLOWED_SOURCES addition forgets its route the same way.
-    'dashboard': {'beacon'},
+    #
+    # 'mirror' added 2026-08-26 — the SAME gap, one dimension over. The
+    # source had a route; the TARGET this code path actually builds for did
+    # not. `dashboard_api._build_recheck_envelope` returns a hardcoded
+    # 'mirror' target for BOTH the recheck button and Approve on a promoted
+    # stranded-escalation card, and writing to Mirror directly is deliberate
+    # and load-bearing (its docstring: on RSDPM #59 the Beacon hop ran
+    # SUCCESSFULLY, cost $0.78, and still stranded the PR, because "reject"
+    # correctly means dispatch-nothing; re-dispatch is mechanical, so it is
+    # done mechanically with no paid hop that can fail or reinterpret).
+    # Without this entry those envelopes passed source validation and died
+    # here — exactly the 2026-05-28/2026-06-10 shape: Larry clicked Approve
+    # on agent-core #1108 and #1109 on 2026-08-26, the API returned success,
+    # and both `review-*-rev1.json` envelopes were dead-lettered to
+    # mirror/.invalid with no auto-replay. His approval did nothing.
+    #
+    # This widens no reachability: 'beacon' is already a permitted dashboard
+    # target and 'beacon' -> 'mirror' is already permitted, so the pair was
+    # always reachable in two hops. It only removes the hop that fails.
+    # 'forge' added in the same pass, and PROVEN not inferred: the
+    # clarify_request branch returns `asking_agent` (a value read from the
+    # payload; outbox_notifier documents it as 'forge' or (future) 'mirror')
+    # and names its file `resume-<task>-r<n>.json` — which is exactly the
+    # envelope denied on 2026-07-22: `routing denied for resume-m3-pr1-r1.json:
+    # route dashboard -> forge not allowed`. Larry answered a Forge
+    # clarifying question from the dashboard and the answer was discarded.
+    #
+    # Three confirmed instances of ONE class now: 2026-06-10 (dashboard ->
+    # beacon absent, 2 rejections lost), 2026-07-22 (-> forge, 1 clarify
+    # answer lost), 2026-08-26 (-> mirror, 2 approvals lost). The existing
+    # test_dispatch_route_parity guards SOURCE parity — that a source has
+    # *an* entry — which is why it was green through all three. The TARGET
+    # dimension is guarded by test_dashboard_action_targets_are_route_legal,
+    # which drives the real builder for every (event_type, action) the
+    # dashboard supports and asserts the target it returns is permitted here.
+    #
+    # SCOPE, stated so the entry is not read as more than it is: route-legal is
+    # not delivered. inbox_watcher runs dispatch_validator.validate_task BEFORE
+    # this check, and that gate enforces MIN_PROMPT_LEN = 100. A clarify reply's
+    # prompt is Larry's typed comment verbatim, so a SHORT answer is still
+    # dead-lettered — measured on this branch: 43 chars -> schema False, route
+    # True; 185 chars -> both True. Worse, the schema branch emits NO alert,
+    # where this routing branch does. So the 2026-07-22 clarify loss is closed
+    # for answers of 100+ characters and OPEN below that. Separate gate,
+    # pre-existing, deliberately not widened into this change.
+    'dashboard': {'beacon', 'forge', 'mirror'},
 }
 
 # Source suffixes that mark dialogue-leg messages. The notifier writes these

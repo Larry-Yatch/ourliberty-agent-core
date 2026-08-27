@@ -818,5 +818,145 @@ class SystemHealthGitShaTest(unittest.TestCase):
         self.assertEqual(body['git_sha'], 'b' * 40)
 
 
+class DashboardActionRouteLegalityTest(unittest.TestCase):
+    """TARGET-parity guard: every envelope the dashboard BUILDS must be one the
+    routing layer will DELIVER.
+
+    `test_dispatch_route_parity` guards the SOURCE dimension — that a source in
+    ALLOWED_SOURCES has *an* entry in FRESH_DISPATCH_ROUTES. It was green
+    through all three live losses, because in each one 'dashboard' had an entry;
+    the TARGET the code path actually built for was simply not in it:
+
+      2026-06-10  dashboard -> beacon  entry absent entirely   2 rejections lost
+      2026-07-22  dashboard -> forge   clarify answer denied   1 answer lost
+                  (`resume-m3-pr1-r1.json`, the clarify_request branch below)
+      2026-08-26  dashboard -> mirror  recheck dispatch denied 2 approvals lost
+                  (`review-check0-delivered-kinds-tier3-001-rev1.json`)
+
+    Every one failed the same way: layer-1 source validation PASSED, the API
+    returned success, and the envelope was dead-lettered to `<agent>/.invalid`
+    with no auto-replay. The operator is told nothing.
+
+    This drives the REAL builder for every (event_type, action) pair the
+    dashboard supports and asserts the target it returns is permitted — it does
+    not restate the route table, and it does not pattern-match the source. A new
+    action, or a change to an existing one's target, fails here at the seam.
+
+    SCOPE — route-legal is NOT the same as delivered (review finding 2).
+    `inbox_watcher` runs `dispatch_validator.validate_task` BEFORE the routing
+    check, and that gate enforces `MIN_PROMPT_LEN = 100`. A clarify reply's
+    prompt is just Larry's typed comment, so an answer shorter than 100 chars
+    is STILL dead-lettered after this fix — and unlike the routing branch, the
+    schema branch emits NO alert at all, so that loss is even quieter. This
+    class of test closes the ROUTING dimension only; the 2026-07-22 clarify
+    loss is closed for answers of 100+ characters and open below that. Not
+    fixed here (pre-existing, and a different gate) — tracked separately.
+    """
+
+    ALLOWED = None  # resolved in setUp so a route-table edit is picked up live
+
+    def setUp(self):
+        import routing_validator as rv
+        self.ALLOWED = rv.FRESH_DISPATCH_ROUTES['dashboard']
+
+    @staticmethod
+    def _recheck_target():
+        return {
+            'task_id': 'some-review-task-001',
+            'pr_url': 'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/1108',
+            'target_repo': 'ourliberty-agent-core',
+            'round': 1,
+            'replan_count': 0,
+            'head_sha': 'a' * 40,
+        }
+
+    def _cases(self):
+        """(label, source_row, action) for every dashboard-buildable envelope."""
+        promoted = {
+            'event_type': 'approval_request',
+            'task_id': f'{da.PROMOTED_STRANDED_ESCALATION_ID_PREFIX}deadbeef',
+            'event_id': 'evt-promoted',
+            'payload': {
+                'promoted_source': da.PROMOTED_STRANDED_ESCALATION_SOURCE,
+                'prompt': 'healer narration',
+                'recheck_target': self._recheck_target(),
+            },
+        }
+        generic = {
+            'event_type': 'approval_request',
+            'task_id': 'ordinary-task-001',
+            'event_id': 'evt-generic',
+            'payload': {'suggested_envelope_for_approve': {}},
+        }
+        recheckable = {
+            'event_type': 'approval_request',
+            'task_id': 'ordinary-task-002',
+            'event_id': 'evt-recheckable',
+            'payload': {'recheck_target': self._recheck_target()},
+        }
+        cases = [
+            ('approval_request/approve (generic)', generic, 'approve'),
+            ('approval_request/reject', generic, 'reject'),
+            ('approval_request/approve (promoted stranded escalation)',
+             promoted, 'approve'),
+            ('approval_request/recheck', recheckable, 'recheck'),
+        ]
+        # clarify_request returns `asking_agent` STRAIGHT FROM THE PAYLOAD, so
+        # the target is data, not a constant. Drive EVERY value the handler
+        # will accept — da.ALLOWED_TARGET_AGENTS, the set actually enforced at
+        # the write — NOT a hand-listed pair. Review finding 1: hardcoding
+        # ('forge','mirror') left this test green while `asking_agent='pulse'`
+        # passed the handler and died at routing, one live instance of the very
+        # class this PR closes. Reading the real set means the two layers cannot
+        # drift apart again in either direction.
+        for agent in sorted(da.ALLOWED_TARGET_AGENTS):
+            cases.append((
+                f'clarify_request/comment (asking_agent={agent})',
+                {'event_type': 'clarify_request',
+                 'task_id': f'clarify-task-{agent}',
+                 'event_id': f'evt-clarify-{agent}',
+                 'payload': {'asking_agent': agent,
+                             'resume_session_id': 'sess-1'}},
+                'comment',
+            ))
+        return cases
+
+    def test_dashboard_action_targets_are_route_legal(self):
+        for label, source, action in self._cases():
+            with self.subTest(case=label):
+                with mock.patch.object(da, '_gh_pr_head_sha_for_recheck',
+                                       return_value='b' * 40):
+                    target, _filename, _envelope = da._build_envelope_for_action(
+                        source=source, action=action, comment='ack',
+                        actor='larry@example.com')
+                self.assertIn(
+                    target, self.ALLOWED,
+                    f'{label}: the dashboard builds an envelope for '
+                    f'{target!r}, but routing permits only '
+                    f'{sorted(self.ALLOWED)} from "dashboard" — this envelope '
+                    f'is dead-lettered to {target}/.invalid with no replay '
+                    f'while the API returns success')
+
+    def test_allowed_targets_are_all_route_legal(self):
+        """THE CROSS-LAYER INVARIANT, stated directly rather than sampled.
+
+        `ALLOWED_TARGET_AGENTS` is the set the write handler enforces;
+        `FRESH_DISPATCH_ROUTES['dashboard']` is the set routing will deliver. A
+        target in the first but not the second is NOT a safe rejection — the
+        envelope is claimed, the API returns 200, and it is dead-lettered with
+        the operator told nothing. Every loss in this class had that shape.
+
+        Asserting containment here means neither list can grow a member the
+        other lacks, no matter which one a future change edits.
+        """
+        self.assertLessEqual(
+            set(da.ALLOWED_TARGET_AGENTS), set(self.ALLOWED),
+            'the dashboard write handler PERMITS a target routing REFUSES: '
+            f'{sorted(set(da.ALLOWED_TARGET_AGENTS) - set(self.ALLOWED))} — '
+            'such an envelope is claimed, 200 is returned, and it is silently '
+            'dead-lettered. Either give it a route or drop it from '
+            'ALLOWED_TARGET_AGENTS.')
+
+
 if __name__ == '__main__':
     unittest.main()

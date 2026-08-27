@@ -107,9 +107,26 @@ class DashboardRouteTest(unittest.TestCase):
         self.assertEqual(final, 'beacon')
         self.assertFalse(rerouted)
 
-    def test_dashboard_to_non_beacon_still_denied(self):
-        # The fix is scoped: dashboard may only reach beacon, not arbitrary agents.
-        for target in ('forge', 'mirror', 'pulse'):
+    def test_dashboard_to_its_three_built_targets_accepted(self):
+        # Widened 2026-08-26 on evidence, NOT on principle. The dashboard builds
+        # envelopes for exactly three targets, and two of them were undeliverable
+        # — each losing a real operator action silently, API returning success:
+        #   forge  — clarify_request/comment returns `asking_agent`;
+        #            `resume-m3-pr1-r1.json` denied 2026-07-22.
+        #   mirror — recheck + Approve-on-promoted-card return a hardcoded
+        #            'mirror'; two envelopes denied 2026-08-26.
+        # Reachability is unchanged: dashboard->beacon and beacon->{forge,mirror}
+        # were already permitted, so this only removes a paid hop that can fail.
+        for target in ('beacon', 'forge', 'mirror'):
+            ok, reason = rv.check_hard_topology('dashboard', target)
+            self.assertTrue(ok, f'dashboard->{target} should pass, got {reason}')
+
+    def test_dashboard_allow_is_still_scoped_not_blanket(self):
+        # The ORIGINAL intent of this class, preserved: the widening is scoped to
+        # the targets the dashboard actually builds for. An agent it never builds
+        # an envelope for must STILL be denied — otherwise the next real gap gets
+        # masked by an over-broad allow instead of surfacing.
+        for target in ('pulse', 'build_sequence_advancer', 'made-up-agent'):
             ok, _ = rv.check_hard_topology('dashboard', target)
             self.assertFalse(ok, f'dashboard->{target} must remain denied')
 
