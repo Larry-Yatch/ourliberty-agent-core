@@ -80,6 +80,12 @@
 
 ---
 
+## G-rule unreviewed-merge-without-gate-pattern — DISPATCHED ✅ (iter ~9884, 2026-08-27T01:32Z UTC)
+
+**Rule:** Pattern of PRs merged without formal GitHub APPROVED review (unreviewed-merge healer fires). Root cause: Mirror issues review_pass as GitHub commit status=success, but does NOT call `gh pr review --approve` to set GitHub formal reviewDecision=APPROVED. The auto-merge chain requires reviewDecision=APPROVED, so it can't fire. When the dashboard→mirror return routing also fails, there is NO path to auto-merge — Larry must merge manually, generating unreviewed-merge noise. 4 occurrences: unreviewed-merge:1095 (1/4), :1111 (2/4), :1109 (3/4), :1108 (4/4). **DISPATCHED: direction-ask-unreviewed-merge-routing-fix-001.json written to Beacon inbox (iter ~9884, 01:32Z UTC).** Fix requested: Mirror should call `gh pr review <N> --approve` on review_pass (option a — preferred), OR fix dashboard→mirror return routing (option b). **Do NOT re-dispatch.** Track Beacon's response.
+
+---
+
 ## G-rule enable-pr-auto-merge-reviewdecision-guard-001 — 1/3 (new, iter ~7573)
 
 **Rule:** Pulse's `enable-pr-auto-merge` always-allowed action (Check E) fires on `age>30m + MERGEABLE` regardless of `reviewDecision`. In iter ~7572, Pulse triggered `gh pr merge 1095 --auto --squash` on PR#1095 (docs(registry) fix) at 33-min age when `reviewDecision=""` (no Mirror review, intentionally unrouted fix/* no-label PR). The PR merged immediately (no CI, no branch protection blocking). `heal-unreviewed-merge-detector` fired `unreviewed-merge:1095` (Tier-4, never-silence pattern). The specific PR was doc-only with 0 operational impact; no revert needed. Fix: add `reviewDecision=APPROVED` guard before the always-fix fires, OR an explicit skip-review marker for intentionally-unrouted trivial PRs. First occurrence: iter ~7573 (2026-08-04T01:31Z UTC). Dispatch to Beacon at 3/3.
