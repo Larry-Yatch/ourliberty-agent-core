@@ -107,7 +107,18 @@ class RoutingDeniedAlertTest(unittest.TestCase):
         kwargs = appended.call_args.kwargs
         self.assertEqual(kwargs["source"], "inbox-watcher")
         self.assertEqual(kwargs["severity"], "warning")
-        self.assertEqual(kwargs["subject"], "routing-denied:pulse->forge")
+        # Subject gained a trailing ':<envelope>' segment on 2026-08-27. The
+        # constant-per-lane form collapsed a BURST onto one cooldown key (60-min
+        # warning window, keyed `source:subject`), so the 2nd..Nth human routing
+        # loss in an hour was swallowed with no trace — the same defect fixed on
+        # the five non-routing drop branches, left standing on the one with the
+        # MOST traffic (45 routing drops). The lane prefix is unchanged, so the
+        # `routing-denied` translation still matches via the colon-strip lookup.
+        self.assertTrue(
+            kwargs["subject"].startswith("routing-denied:pulse->forge:"),
+            kwargs["subject"])
+        self.assertTrue(kwargs["subject"].endswith("rogue-dispatch-1.json"),
+                        kwargs["subject"])
         # The body identifies the dropped envelope so Larry can re-issue it.
         self.assertIn("rogue-dispatch-1", kwargs["message"])
 

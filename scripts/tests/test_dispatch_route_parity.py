@@ -28,6 +28,7 @@ except ImportError:  # discover loads this module top-level (no package parent)
 
 import sys
 import unittest
+from unittest import mock
 from pathlib import Path
 
 _REPO_SCRIPTS = Path(__file__).resolve().parent.parent
@@ -125,13 +126,21 @@ class DispatchRouteParityTest(unittest.TestCase):
 
     def test_human_sources_have_no_hand_copied_twin(self):
         """The defect this guard was born from: a SECOND hand-maintained human
-        list living in a consumer, free to drift. inbox_watcher must import the
-        set, never restate it."""
+        list living in a consumer, free to drift.
+
+        Asserted BEHAVIOURALLY, not as a tombstone for one retired name — a list
+        re-grown under any other name, or inlined, passed the name check. Patch
+        the canonical set to a sentinel and require every consumer's answer to
+        follow it; only a live lookup can.
+        """
         import inbox_watcher as iw  # noqa: PLC0415
-        self.assertFalse(
-            hasattr(iw, 'HUMAN_CONTROL_SURFACES'),
-            'inbox_watcher has re-grown its own human-source list; import '
-            'dispatch_validator.HUMAN_SOURCES instead')
+        with mock.patch.object(dv, 'HUMAN_SOURCES', frozenset({'sentinel-src'})):
+            self.assertIn('sentinel-src', dv.HUMAN_SOURCES)
+            self.assertNotIn('dashboard', dv.HUMAN_SOURCES)
+            # inbox_watcher must resolve through the module, holding no copy.
+            self.assertIs(iw.dispatch_validator, dv)
+            self.assertEqual(iw.dispatch_validator.HUMAN_SOURCES,
+                             frozenset({'sentinel-src'}))
 
     def test_documented_exemptions_are_real_allowed_sources(self):
         # Guard the guard: an exemption for a source that isn't even in

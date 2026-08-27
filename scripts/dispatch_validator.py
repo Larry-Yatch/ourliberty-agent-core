@@ -31,7 +31,9 @@ KNOWN_CHAT_IDS = set()
 # list drifts — that one shipped containing 'telegram-webhook' (decommissioned
 # 2026-05-12) and missing nothing it needed only by luck. This set is now data,
 # is folded into ALLOWED_SOURCES below so the two CANNOT disagree, and is pinned
-# by test_dispatch_route_parity.HumanSourceParityTest.
+# by test_dispatch_route_parity.DispatchRouteParityTest
+# (test_human_sources_are_allowed_and_routed +
+# test_human_sources_have_no_hand_copied_twin).
 #
 # Membership test: would a PERSON be surprised to learn this envelope vanished?
 # 'larry'     — he typed it (Telegram direction-tasks, self-targeted approvals).
@@ -175,6 +177,12 @@ def _is_routing_signal_prompt(prompt: str) -> bool:
     return False
 
 MIN_PROMPT_LEN = 100  # chars
+# The stable, matchable head of the too-short rejection reason. Named so a
+# CONSUMER can key on it instead of re-typing the prose: inbox_watcher's
+# dead-letter alert appends length advice only for this reason family, and a
+# reworded literal there would silently stop matching (found in agent-core
+# #1112 review round 2 — the restatement class this repo keeps paying for).
+PROMPT_TOO_SHORT = 'prompt too short'
 MAX_PROMPT_LEN = 50000
 MIN_TIMEOUT = 60      # seconds
 MAX_TIMEOUT = 14400
@@ -252,7 +260,8 @@ def validate_task(task):
         or _is_routing_signal_prompt(prompt)
     )
     if not is_routing_signal and len(prompt) < MIN_PROMPT_LEN:
-        return False, f'prompt too short ({len(prompt)} chars, min {MIN_PROMPT_LEN}) — likely F24 empty-prompt bug'
+        return False, (f'{PROMPT_TOO_SHORT} ({len(prompt)} chars, '
+                       f'min {MIN_PROMPT_LEN}) — likely F24 empty-prompt bug')
     if len(prompt) > MAX_PROMPT_LEN:
         return False, f'prompt too long ({len(prompt)} chars, max {MAX_PROMPT_LEN})'
 

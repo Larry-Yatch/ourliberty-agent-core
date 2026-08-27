@@ -37,7 +37,18 @@ if str(_REPO_SCRIPTS) not in sys.path:
 import inbox_watcher as iw  # noqa: E402
 import dispatch_validator as dv  # noqa: E402
 
-SCHEMA_REASON = 'validator: prompt too short (43 chars, min 100)'
+def _real_schema_reason(prompt=''):
+    """The reason string the REAL validator produces, prefixed exactly as
+    inbox_watcher prefixes it. Not retyped: a reworded validator message used to
+    leave the watcher's advice gate silently unmatched while every test stayed
+    green (agent-core #1112 review round 2, finding 5)."""
+    ok, reason = dv.validate_task(
+        {'task_id': 't', 'source': 'dashboard', 'prompt': prompt})
+    assert not ok, 'fixture no longer fails the validator'
+    return f'validator: {reason}'
+
+
+SCHEMA_REASON = _real_schema_reason()
 
 
 class DeadLetterAlertTest(unittest.TestCase):
@@ -53,9 +64,21 @@ class DeadLetterAlertTest(unittest.TestCase):
             f.write_text(json.dumps(body or {
                 'task_id': 't1', 'source': source,
                 'prompt': 'Yes — go with option B, skip the migration.'}))
+        invalid_dir = iw.INBOXES_ROOT / agent / '.invalid'
+        before = set(invalid_dir.glob('*.json')) if invalid_dir.exists() else set()
         with mock.patch.object(iw.larry_alerts, 'append_alert') as al:
             iw.write_invalid(f, reason)
-        return al, iw.INBOXES_ROOT / agent / '.invalid' / f.name
+        # DERIVE the destination from the filesystem, never predict it. The
+        # sandbox is created once per PROCESS, so `.invalid` accumulates across
+        # this module and `_unique_dest` renames collisions to `{stem}.{i}`.
+        # Returning the predicted name made two tests pass for the wrong reason:
+        # one asserted existence against an EARLIER test's residue, the other
+        # only passed because it sorts alphabetically first (agent-core #1112
+        # review round 2, finding 4 — proven by execution, not argument).
+        after = set(invalid_dir.glob('*.json')) if invalid_dir.exists() else set()
+        fresh = after - before
+        dest = fresh.pop() if len(fresh) == 1 else invalid_dir / f.name
+        return al, dest
 
     # ---- the defect ----
 
@@ -151,6 +174,12 @@ class DeadLetterAlertTest(unittest.TestCase):
         digest, no row, no trace. On the live ledger 17 of 26 human losses fell
         inside another's hour, and 2026-05-30T23:00 lost FIFTEEN and would have
         paged ONCE. Distinct envelopes must produce distinct cooldown keys.
+
+        THE CENSUS, stated once here and nowhere else (it disagreed with itself
+        across four places before): 27 human drops at a NON-routing gate (24
+        dashboard schema rejections + 2 larry schema + 1 larry worktree); 26 of
+        them are schema rejections carrying a timestamp; 17 of those 26 land
+        inside another one's hour. Measured 2026-08-27 on the live .invalid dirs.
         """
         subjects = []
         for n in (1, 2, 3):
@@ -177,11 +206,21 @@ class DeadLetterAlertTest(unittest.TestCase):
 
     # ---- finding 2/4: the list is DERIVED, not declared ----
 
+    def test_alert_follows_the_live_human_source_set(self):
+        """BEHAVIOURAL, not a tombstone. The previous version asserted only that
+        one retired NAME was absent — which a list re-grown under any other name,
+        or inlined, passes. This patches `dv.HUMAN_SOURCES` to a sentinel and
+        asserts the alert follows it, which is only possible if the helper does a
+        live lookup rather than holding a copy."""
+        with mock.patch.object(dv, 'HUMAN_SOURCES', frozenset({'sentinel-src'})):
+            al, _ = self._drop('sentinel-src')
+            self.assertTrue(al.called, 'alert did not follow the live set')
+            al2, _ = self._drop('dashboard')
+            self.assertFalse(al2.called,
+                             'alert fired for a source NOT in the live set — '
+                             'the helper is holding its own copy')
+
     def test_human_sources_are_derived_not_restated(self):
-        """The hand-maintained set is gone; this reads dispatch_validator's own
-        data. A restated list is what shipped a decommissioned lane."""
-        self.assertFalse(hasattr(iw, 'HUMAN_CONTROL_SURFACES'),
-                         'the hand-maintained list is back')
         self.assertEqual(dv.HUMAN_SOURCES, frozenset({'larry', 'dashboard'}))
         self.assertTrue(dv.HUMAN_SOURCES <= dv.ALLOWED_SOURCES)
 
@@ -224,6 +263,92 @@ class DeadLetterAlertTest(unittest.TestCase):
 
     def test_routing_prefix_is_a_shared_constant(self):
         self.assertTrue(iw.ROUTING_REASON_PREFIX.startswith('routing:'))
+
+
+    # ---- round 2, finding 2: the notice must survive being away ----
+
+    def test_alert_sets_needs_larry_for_the_persistent_lane(self):
+        """One Telegram DM scrolls past. needs_larry ships the row to
+        chain_events, where the dashboard's Needs-You ACKNOWLEDGE lane filters
+        positively on it — still there an hour later."""
+        al, _ = self._drop('dashboard')
+        self.assertTrue(al.call_args.kwargs.get('needs_larry'),
+                        'the notice has no persistent surface')
+
+    # ---- round 2, finding 8: json: drops do not re-read and re-fail ----
+
+    def test_json_drop_returns_before_re_reading(self):
+        inbox = iw.INBOXES_ROOT / 'forge'
+        inbox.mkdir(parents=True, exist_ok=True)
+        f = inbox / 'unparseable.json'
+        f.write_text('{not json')
+        with mock.patch.object(iw.larry_alerts, 'append_alert') as al:
+            iw.write_invalid(f, f'{iw.JSON_REASON_PREFIX}Expecting value')
+        self.assertFalse(al.called)
+        self.assertTrue((inbox / '.invalid' / 'unparseable.json').exists())
+
+
+class RoutingDenialBurstTest(unittest.TestCase):
+    """ROUND 2, FINDING 1 — the BLOCKING one, and the largest bucket.
+
+    The dead-letter alert defers to the routing branch's own tripwire on
+    `routing:` reasons. That tripwire's subject was constant per lane, so the
+    60-min cooldown swallowed the 2nd..Nth human routing loss in an hour —
+    exactly the defect this PR fixed on the other five branches, left standing
+    on the one with the most traffic (45 routing drops vs 27 non-routing).
+
+    Drives the REAL routing branch in process_task rather than restating its
+    reason string.
+    """
+
+    def _deny(self, name):
+        inbox = iw.INBOXES_ROOT / 'mirror'
+        inbox.mkdir(parents=True, exist_ok=True)
+        f = inbox / name
+        # source=pulse -> mirror is route-illegal (pulse may only reach beacon),
+        # taken from the real table rather than invented.
+        f.write_text(json.dumps({
+            'task_id': name.replace('.json', ''), 'source': 'pulse',
+            'prompt': 'x' * 200}))
+        # The rotation gate sits BETWEEN schema validation and the routing
+        # check and blocks every new top-level task in a sandbox with no model
+        # tier pool ("tier-pool-unavailable"). Neutralise ONLY that unrelated
+        # upstream precondition — the routing branch itself is the seam under
+        # test and is left entirely real.
+        with mock.patch.object(iw, '_rotation_gate_block_reason',
+                               return_value=None), \
+                mock.patch.object(iw.larry_alerts, 'append_alert') as al:
+            iw.process_task('mirror', f, {})
+        return al
+
+    def test_the_route_used_is_actually_illegal(self):
+        """Guard the guard: if pulse->mirror ever becomes legal this test would
+        silently stop exercising the branch."""
+        import routing_validator as rv
+        ok, _ = rv.check_hard_topology('pulse', 'mirror')
+        self.assertFalse(ok, 'fixture route is no longer denied')
+
+    def test_distinct_routing_denials_get_distinct_cooldown_keys(self):
+        subjects = []
+        for n in (1, 2, 3):
+            al = self._deny(f'denied-{n}.json')
+            self.assertTrue(al.called, f'denial {n} did not alert')
+            subjects.append(al.call_args.kwargs['subject'])
+        self.assertEqual(len(set(subjects)), 3,
+                         f'distinct routing losses share one key: {subjects}')
+        for subj in subjects:
+            self.assertTrue(subj.startswith('routing-denied:pulse->mirror:'),
+                            subj)
+
+    def test_routing_subject_still_translates(self):
+        """The widened subject must still reduce to the existing
+        `routing-denied` translation via the colon-strip lookup, or it becomes
+        an untranslatable novelty and Check 0 re-escalates it."""
+        import larry_alerts as la
+        al = self._deny('denied-translate.json')
+        tier, source = la.resolve_tier(
+            la.translate_alert('inbox-watcher', al.call_args.kwargs['subject']))
+        self.assertEqual((tier, source), ('SOON', 'translation'))
 
 
 if __name__ == '__main__':

@@ -372,6 +372,8 @@ def _archive_dir(agent: str, *, lost_result: bool = False) -> Path:
 # way in its alert subject (`routing-denied:`). A reworded prefix would have
 # silently double-paged every human routing denial — 42 historical, so 84.
 ROUTING_REASON_PREFIX = 'routing: '
+# Same shape for the malformed-JSON branch (producer ~900 lines below).
+JSON_REASON_PREFIX = 'json: '
 
 
 def write_invalid(task_file: Path, reason: str) -> None:
@@ -419,6 +421,13 @@ def _alert_if_human_action_lost(dest: Path, agent: str, reason: str) -> None:
     string — is NOT assumed human, and every failure here is logged and
     swallowed. An alerting problem must never stop a dead-letter being recorded.
     """
+    if reason.startswith(JSON_REASON_PREFIX):
+        # This branch fires BECAUSE the envelope would not parse, so re-reading
+        # it here re-raises deterministically and logs a second failure line
+        # right after `malformed task` already said it. Return before that.
+        # Nothing measured is forfeited: the 3.5-month audit counted ZERO human
+        # `json:` drops, and all three human producers write atomically.
+        return
     if reason.startswith(ROUTING_REASON_PREFIX):
         # The routing branch emits its own richer, source-agnostic tripwire
         # alert (it fires for agent sources too). Alerting again here would
@@ -441,7 +450,7 @@ def _alert_if_human_action_lost(dest: Path, agent: str, reason: str) -> None:
         f"Read the envelope at {dest} to see exactly what was lost, then "
         f"re-issue the action."
     )
-    if 'prompt too short' in reason:
+    if dispatch_validator.PROMPT_TOO_SHORT in reason:
         # Appended ONLY for the reason it describes. Unconditionally, it was
         # actively inverted for `prompt too long (max {MAX_PROMPT_LEN})`, which
         # is a real validator branch — telling him to say it at GREATER length.
@@ -471,11 +480,26 @@ def _alert_if_human_action_lost(dest: Path, agent: str, reason: str) -> None:
                 f"still want it done, do it again."
             ),
             suggested_action=advice,
+            # A lost human action is the definition of "only Larry can act on
+            # this": there is no auto-replay and no other actor can re-issue it.
+            # Without this the notice is ONE Telegram DM that scrolls past while
+            # he is away, contradicting its own "do it again" instruction. The
+            # flag ships the row to chain_events via chain_event_shipper, where
+            # the dashboard's Needs-You ACKNOWLEDGE lane filters positively on
+            # needs_larry — a persistent surface that is still there later.
+            # (This is NOT the DECIDE lane, which additionally needs a
+            # for_larry_signal record; that is a heavier interrupt and this is
+            # deliberately the lighter one.)
+            needs_larry=True,
         )
         if not delivered:
-            # Suppression is now only ever a genuine repeat of the SAME
-            # envelope, but never let it be invisible — an unlogged False is
-            # how the burst defect hid.
+            # Suppression is USUALLY a genuine repeat of the same envelope, but
+            # not provably always: `_unique_dest` dedups only against files
+            # currently present, so a hand-authored `source: larry` envelope
+            # reusing a filename after its first .invalid copy was cleared
+            # within the hour would collide onto one cooldown key. Narrow, but
+            # real — so log rather than claim. An unlogged False is how the
+            # burst defect hid in the first place.
             log(f"dead-letter alert suppressed (cooldown) for {dest.name}")
     except Exception as e:  # noqa: BLE001
         log(f"dead-letter alert failed for {dest.name}: {type(e).__name__}: {e}")
@@ -1261,7 +1285,7 @@ def process_task(agent: str, task_file: Path, models_config: dict,
         task = json.loads(task_file.read_text())
     except (OSError, json.JSONDecodeError) as e:
         log(f"[{agent}] malformed task {task_file.name}: {e}")
-        write_invalid(task_file, f"json: {e}")
+        write_invalid(task_file, f"{JSON_REASON_PREFIX}{e}")
         return
 
     # Fixture-pattern dispatch gate (2026-05-28 cost-loop fix). Test/fixture
@@ -1339,7 +1363,16 @@ def process_task(agent: str, task_file: Path, models_config: dict,
         larry_alerts.append_alert(
             source="inbox-watcher",
             severity="warning",
-            subject=f"routing-denied:{src}->{agent}",
+            # Per-envelope identity, for the same reason the dead-letter
+            # alert has it: the 60-min warning cooldown keys on
+            # `source:subject`, so a subject constant per lane collapses a
+            # BURST to one page. This is the largest bucket of all — 45
+            # routing drops vs the 27 non-routing human losses — and it was
+            # left on the old shape while the other five branches were
+            # fixed (agent-core #1112 review round 2, finding 1).
+            # `translate_alert` strips trailing ':'-segments, so the
+            # existing `routing-denied` translation still matches.
+            subject=f"routing-denied:{src}->{agent}:{task_file.name}",
             message=(
                 f"Envelope {envelope_id} dropped to {agent}/.invalid — "
                 f"routing denied: {route_reason}. The {src!r} control surface "
