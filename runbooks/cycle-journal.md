@@ -4,6 +4,83 @@
 
 ---
 
+## Iteration ~9885 — 2026-08-27T01:42Z UTC (Larry /cycle chat, Tier 1 [Check 0: wm 522→526, 4 new alerts all Tier-3 digest/FYI; heal-stale-daemon-code auto-restarted beacon/chain-event-shipper/forge-bot after PR#1108 alert_triage_state.py update; direction-ask-unreviewed-merge-routing-fix-001 ARCHIVED by Beacon; PR#1112 ~65-75 min MONITORING; all checks NOMINAL; consecutive_clean 0→1])
+
+**Health:** ✅ CLEAN — all mandatory + additive checks NOMINAL. 4 new alerts (lines 523-526), all pre-classified Tier-3 (route=digest, tier_source=translation). No Tier-4, no DM. heal-stale-daemon-code correctly auto-restarted beacon-bot, chain-event-shipper, and forge-bot at 01:36Z UTC (alert_triage_state.py updated by PR#1108, 51.8 min after services started). direction-ask-unreviewed-merge-routing-fix-001.json confirmed ARCHIVED by Beacon (processed within ~10 min of dispatch). PR#1112 aging without Mirror review — expected (fix/* branch, no auto-route label). Nightly 502 cluster absent through tonight's window (second confirmation of clean). **Tier 1**, consecutive_clean 0→1. 2026-08-27 UTC (Thursday).
+
+**VERIFY-BEFORE-REASSERT (from iter ~9884 at 01:34Z UTC; automated cycle 4989e3a1 ran at ~01:37Z — "Pulse cycle 20260827T013749Z", no journal entry per known G-rule):**
+- "Tier 2→1 RESET, consecutive_clean=0": CONFIRMED + UPDATED. Pre-iter: tier=1, consecutive_clean=0. This iter CLEAN → cc=0→1. Still Tier 1.
+- "wm=522 stable, 0 new alerts": SUPERSEDED. 4 new alerts (lines 523-526). All Tier-3 (route=digest). Watermark advanced to 526. No tier-reset (Tier-3 silence per § 3.0).
+- "HEAD=ca895aad=origin/main (fast-forwarded this iter)": SUPERSEDED. Automated cycle committed 4989e3a1 "Pulse cycle 20260827T013749Z". HEAD=4989e3a1=origin/main. behind=0, ahead=0. Clean tree. NOMINAL.
+- "all 4 bots healthy, system-health ts=01:25:36Z UTC": CONFIRMED + UPDATED. system-health.json ts=2026-08-27T01:35:48Z UTC (~6 min fresh). All 4 desired=up, alive=True (beacon/forge/mirror/pulse). overall=healthy. disk=19%, mem=19%. NOTE: beacon-bot, chain-event-shipper, forge-bot auto-restarted 01:36Z UTC by heal-stale-daemon-code (PR#1108 changed alert_triage_state.py). Post-restart all alive per system-health. NOMINAL.
+- "SUPABASE ~159h overdue": CONFIRMED CARRY. ~161h+ overdue. Dedup window active until ~2026-08-31T23:23Z UTC. No re-DM. OK.
+- "pending=0 (Check 4 CLEAN)": CONFIRMED. pending=0. OK.
+- "PR#1112 ~40 min old, MONITORING": CONFIRMED + UPDATED. Now ~65-75 min old (created 00:47:19Z UTC). MERGEABLE, reviewDecision="". fix/* branch, no label. < 72h. MONITORING.
+- "direction-ask-unreviewed-merge-routing-fix-001 dispatched to Beacon (01:32Z)": CONFIRMED ARCHIVED. beacon/.archive/ contains direction-ask-unreviewed-merge-routing-fix-001.json. Beacon processed and archived the direction-ask. G-rule tracking already RESET per iter ~9884.
+- "nightly 502 cluster NOT observed tonight": CONFIRMED. pulse_telegram_bot.log: no entries after 18:36:53-0600 restart except "bot starting". No 502s through the ~01:15Z UTC window. NOMINAL.
+- "PRs #1108+#1109 MERGED": CONFIRMED CARRY. PRs merged at 01:21Z. FORGE_NO_PR_SKIP still appears in pipeline-stall log (task matched by PR number, which exists as merged) — not a stall. OK.
+- "unreviewed-merge G-rule DISPATCHED, G-rule tracking RESET": CONFIRMED CARRY (archived confirmed). OK.
+
+**Check 0 (Alert triage, ~01:38Z UTC):** repair-watermark: repaired=false, old_watermark=522, file_length=526. 4 new alerts:
+  - **Line 523** (01:29:40Z UTC): source=heal-dashboard-api-sha-drift, subject=dashboard-api-sha-drift-healed, route=digest, tier=FYI, tier_source=translation. Dashboard API auto-restarted (running ae00f302, on-disk HEAD ca895aad). Pre-classified Tier-3 by producer. SILENCE+JOURNAL. No DM.
+  - **Line 524** (01:36:17Z UTC): source=heal-stale-daemon-code, subject=auto-restarted:ourliberty-beacon-bot.service, route=digest, tier=FYI, tier_source=translation. beacon-bot auto-restarted (alert_triage_state.py 51.8 min stale, PR#1108). Pre-classified Tier-3. SILENCE+JOURNAL. No DM.
+  - **Line 525** (01:36:22Z UTC): source=heal-stale-daemon-code, subject=auto-restarted:ourliberty-chain-event-shipper.service, route=digest, tier=FYI, tier_source=translation. chain-event-shipper auto-restarted (same cause). Pre-classified Tier-3. SILENCE+JOURNAL. No DM.
+  - **Line 526** (01:36:27Z UTC): source=heal-stale-daemon-code, subject=auto-restarted:ourliberty-forge-bot.service, route=digest, tier=FYI, tier_source=translation. forge-bot auto-restarted (same cause). Pre-classified Tier-3. SILENCE+JOURNAL. No DM.
+  Watermark set to 526. No tier-reset (all Tier-3 per § 3.0). NOMINAL.
+
+**Check 1 (Log noise, ~01:39Z UTC):** outbox-notifier.log last WARNs at 18:54:07Z+18:54:18Z UTC 2026-08-26 — routing failures for PRs #1108+#1109 (pre-existing, both PRs now merged). No new WARNs. heal-stale-daemon-code.log: last entries are the 3 auto-restart INFO lines at 01:36:17-27Z UTC (FYI/digest, healer working correctly). NOMINAL.
+
+**Check 2 (Telegram sweep, ~01:39Z UTC):** pulse_telegram_bot.log: last entries from 2026-08-26T06:05:16-0600 (bot start) and 2026-08-26T18:36:53-0600 (bot restart). No 502 errors after the 18:36:53 restart — nightly window (~01:15Z UTC) passed clean. No new Larry inbound directives. NOMINAL.
+
+**Check 3 (Pipeline stall, ~01:39Z UTC):** heal-pipeline-stall.log last tick 01:36:27Z UTC. FORGE_NO_PR_SKIP for tasks check0-delivered-kinds-tier3-001 (PR#1108, pr_exists=merged) and alert-translations-unrouted-pr-nudges-retired-001 (PR#1109, pr_exists=merged). No stalls detected. NOMINAL.
+
+**Check 4 (Pending directives, ~01:39Z UTC):** beacon-pending-approvals.json pending=0. NOMINAL.
+
+**Check 5 (Stale daemon code, ~01:39Z UTC):** heal-stale-daemon-code.log last entries at 01:36:17-27Z UTC — 3 auto-restarts (beacon-bot, chain-event-shipper, forge-bot), all INFO/FYI/digest. Healer functioning correctly after PR#1108 updated alert_triage_state.py. mirror-bot NOT in restart list (either not importing alert_triage_state.py or started after the library mtime). system-health.json confirms all 4 bots alive post-restart. NOMINAL.
+
+**Check A (Source repo, ~01:38Z UTC):** branch=main, HEAD=4989e3a1=origin/main (Pulse cycle 20260827T013749Z — automated cycle). behind=0, ahead=0. Clean tree. NOMINAL.
+**Check B (Sync health, ~01:38Z UTC):** agent-core-sync.json last_sync=2026-08-27T01:36:50Z UTC (~1 min fresh; status=no-change, commit=b1f01259). Well within 2h threshold. NOMINAL.
+**Check C (Agent liveness, ~01:38Z UTC):** system-health.json ts=2026-08-27T01:35:48Z UTC (~6 min old at check). All 4 desired=up, alive=True. overall=healthy. disk=19%, mem=19%. NOMINAL.
+**Check E (PR/merge state, ~01:39Z UTC):**
+  - PR#1112 (~65-75 min old): "fix(inbox): alert when a dead-lettered envelope was Larry's action" — branch fix/schema-reject-alert, MERGEABLE, reviewDecision="". fix/* branch, no auto-route label → Mirror not auto-dispatched (expected per G-rule unrouted-pr-is-by-design). G-rule enable-pr-auto-merge-reviewdecision-guard-001: no auto-merge (reviewDecision="" — formal GitHub approval absent). < 72h. MONITORING.
+**Check H (Inboxes, ~01:39Z UTC):** beacon=empty (active), forge=empty, mirror=empty, pulse=empty. Active inboxes clear. NOMINAL.
+
+**Section 5.0 one-shots:** audit_due_nudge: no-op. distill_detector: no-op. silence_file_auditor: carry. NOMINAL.
+
+**Check I (~01:42Z UTC):** artifact check-i-2026-08-26.json (fired ~14:10Z UTC 2026-08-26, Wednesday). Next expected Friday 2026-08-29. CARRY.
+**Check III (~01:42Z UTC):** No new artifact since 2026-08-23. Next expected 2026-09-06. CARRY.
+
+**Credential rotation watch:** SUPABASE_SERVICE_ROLE_KEY: last_dm=2026-08-17T23:23:16Z UTC. ~161h+ overdue (due 2026-08-22; dedup window active until ~2026-08-31T23:23Z UTC). No re-DM. Larry must rotate per docs/runbooks/rotate-supabase-keys.md.
+
+**G-rules (this iter):**
+- unreviewed-merge-without-gate-pattern: DISPATCHED ✅ (iter ~9884). Beacon archived direction-ask-unreviewed-merge-routing-fix-001.json — confirmed processed. G-rule tracking RESET.
+- mirror-to-dashboard-return-routing-failure-001: carry at 1/3. No new routing WARNs since 18:54Z UTC 2026-08-26. Still 1/3. Dispatch to Beacon at 3/3.
+- heal-approvals-surface-drift-missing-card-tier4-001: carry at 1/2. No new alerts. Fix pending: direction-ask-approvals-opt-b-implement-001.
+- All other G-rules carried unchanged.
+
+**PRIME DIRECTIVE ratio:** iter_clean appended (ts=2026-08-27T01:42:12Z UTC, iter=9885, tier=1, kind=iter_clean). Trailing-30d: interventions=2056, systemic_fixes=8, ratio=257 (unchanged — no new intervention or systemic_fix this iter). Tier state: consecutive_clean 0→1.
+
+**Actions taken:**
+- Check 0: watermark 522→526. Lines 523-526 all Tier-3 (digest/FYI, tier_source=translation). No DMs.
+- PRIME DIRECTIVE: iter_clean appended via cycle_prime_ledger.py (iter=9885, tier=1, ts=01:42:12Z UTC).
+- Tier state: record --checks-clean true → consecutive_clean 0→1. Still Tier 1.
+
+**Escalations:** None new this iter. Outstanding (carried):
+  1. **[yellow] CARRY** heal-approvals-surface-drift:missing_card — mirror-review items for PRs not on dashboard decide tab. Fix pending: direction-ask-approvals-opt-b-implement-001.
+  2. Informational-cards impl gap (iter ~9102). Carry.
+  3. Check III artifact 2026-08-23: beacon 232→336s (+45%), mirror 1311→1448s (+10%). Command: `approve threshold-update-2026-08-23`.
+  4. Check I proposal [1]: [parked] cycle-202608192035370000 (high-σ pulse/cycle, 4.71σ). On dashboard Parked lane.
+  5. SUPABASE rotation OVERDUE (~161h+, due 2026-08-22). Dedup active until ~2026-08-31. Larry must rotate per docs/runbooks/rotate-supabase-keys.md.
+  6. nightly-502-cluster-001: DISPATCHED ✅. Two clean nights now confirmed.
+  7. review-ceiling-fit: Mirror review ceiling RAISE 35→40min recommended. Digest route, no DM.
+  8. sync-service-deploy-restart-head-drift-tier4-no-translation-001: 1/3 (RE-OPENED per iter ~9780). Dispatch to Beacon at 3/3.
+
+**Patterns:** Clean iter. direction-ask-unreviewed-merge-routing-fix-001 already archived by Beacon — response chain expected shortly (Beacon will spec the Mirror `gh pr review --approve` fix and dispatch to Forge). heal-stale-daemon-code correctly cycled 3 services after PR#1108 updated alert_triage_state.py — this is the healer's normal post-merge library-sync function. PR#1112 approaching 90-min age without Mirror review; still within normal unrouted-PR MONITORING window. Nightly 502 cluster second clean confirmation — the dispatched fix may be taking effect or the trigger condition has passed naturally.
+
+**Tier end-of-iter:** Tier 1, consecutive_clean=1.
+
+---
+
 ## Iteration ~9884 — 2026-08-27T01:34Z UTC (Larry /cycle chat, Tier 2→1 RESET [Check 0: wm 519→522, 3 new alerts: doorbell Tier-3 silenced + unreviewed-merge:1109+:1108 Tier-4; PRs #1108+#1109 MERGED by Larry at 01:21Z (Mirror reviewed via commit status, routing gap prevented formal GitHub approval+auto-merge); G-rule unreviewed-merge-without-gate-pattern hits 3/3 DISPATCH; Check A: repo behind — fast-forwarded; nightly 502 cluster NOT observed tonight; PR#1112 ~40 min MONITORING])
 
 **Health:** ⚠️ SIGNAL — Tier-4 escalations: PRs #1108+#1109 merged by Larry without formal GitHub review (Mirror had reviewed via commit status but routing gap prevented APPROVED state → auto-merge couldn't fire). G-rule 3/3 dispatch triggered. Repo was behind origin/main (fast-forwarded). Nightly 502 cluster NOT observed tonight (first clean window).
@@ -3042,90 +3119,6 @@ NOMINAL (carry; Larry holds approval gate).
 **Patterns:** Clean iter. 1 doorbell alert Tier-3 silenced. All 4 bots alive. No stalls, 0 open PRs, all inboxes empty. Sync ~45 min (fresh). Tier 3, consecutive_clean 58→59. System steady-state.
 
 **Tier end-of-iter:** Tier 3, consecutive_clean=59.
-
----
-
-## Iteration ~9844 — 2026-08-26T16:26Z UTC (Larry /cycle chat, Tier 3 [Check 0: wm=503, file_length=503, 0 new alerts; all checks NOMINAL; HEAD=ff9118aa=origin/main clean; 0 open PRs; pending=5 unchanged; consecutive_clean 57→58])
-
-**Health:** Nominal — all checks clean. **Tier 3**, consecutive_clean 57→58. 2026-08-26 UTC (Wednesday).
-
-**VERIFY-BEFORE-REASSERT (from iter ~9843 at ~15:56Z UTC; automated commit since: ff9118aa Pulse cycle 20260826T155907Z):**
-- "tier=3, consecutive_clean 56→57": CONFIRMED. cycle-tier.json at iter start: tier=3, consecutive_clean=57, last_updated=2026-08-26T15:57:03Z UTC. OK
-- "wm=503, file_length=503, 0 new alerts": CONFIRMED. repair-watermark: repaired=false, old_watermark=503, file_length=503. 0 new alerts above watermark. OK
-- "HEAD=cdb96332=origin/main": SUPERSEDED. Automated commit ff9118aa "Pulse cycle 20260826T155907Z". HEAD=ff9118aa=origin/main. Clean tree. OK
-- "all 4 bots alive": CONFIRMED. system-health.json ts=2026-08-26T16:23:12Z UTC (~3 min fresh at iter start): all 4 alive=True. OK
-- "SUPABASE ~114.1h overdue": CONFIRMED CARRY. Now ~114.6h overdue (due 2026-08-22; current ~16:26Z UTC 2026-08-26). OK
-- "pending=5 unchanged": CONFIRMED. Same 5 IDs; ages now ~376.3h/~361.3h/~360.9h/~156.7h/~124.6h (+~0.5h). OK
-- "0 open PRs": CONFIRMED. gh pr list=[] (agent-core and dashboard). OK
-
-**Check 0 (Alert triage, ~16:26Z UTC):** repair-watermark: repaired=false, old_watermark=503, file_length=503. 0 new alerts above watermark. Watermark stable at 503. NOMINAL.
-
-**Check 1 (Log noise, ~16:26Z UTC):** heal-stale-daemon-code.log last tick 2026-08-26T16:23:09Z UTC (~3 min; "tick: fresh=448 unparseable=109"). INFO-only (ActiveEnterTimestamp unparseable for sync/watchdog services) — expected. NOMINAL.
-
-**Check 2 (Telegram sweep, ~16:26Z UTC):** Bot log last entries: [2026-08-26T08:11:23-0600]=14:11:23Z UTC (idx=501 delivered; idx=502 route=digest DM skipped). No inbound Larry directives since. system-health.json ts=2026-08-26T16:23:12Z UTC (~3 min fresh): all 4 alive=True. G-rule nightly-502-cluster-001 DISPATCHED ✅. Next expected nightly window ~01:15Z UTC 2026-08-27 (~8.8h away). NOMINAL.
-
-**Check 3 (Pipeline stall, ~16:26Z UTC):** heal-pipeline-stall.log last tick 2026-08-26T16:14:22Z UTC (~12 min; "no stalls detected"). NOMINAL.
-
-**Check 4 (Pending directives, ~16:26Z UTC):** beacon-pending-approvals.json (state/) present, pending=5 CONFIRMED:
-  1. ~376.3h CRITICAL AGE (alert-translations-unrouted-pr-nudges-retired-001; reminders=[6,24,72] exhausted)
-  2. ~361.3h ALL REMINDERS EXHAUSTED (direction-ask-automated-cycle-journal-gap-001)
-  3. ~360.9h ALL REMINDERS EXHAUSTED (check0-delivered-kinds-tier3-001)
-  4. ~156.7h (suite-guardian-run-2026-08-20; reminders=[])
-  5. ~124.6h (check1-missing-substrate-branch-001; reminders=[6,24,72] ALL EXHAUSTED)
-NOMINAL (carry; Larry holds approval gate).
-
-**Check 5 (Stale daemon code, ~16:26Z UTC):** heal-stale-daemon-code.heartbeat = 2026-08-26T16:22:53Z UTC (~3 min fresh). NOMINAL.
-
-**Check A (Source repo, ~16:26Z UTC):** branch=main, HEAD=ff9118aa=origin/main (Pulse cycle 20260826T155907Z). Clean tree. NOMINAL.
-**Check B (Sync health, ~16:26Z UTC):** agent-core-sync.json: last_sync=2026-08-26T16:12:09Z UTC (~14 min; status=no-change; within 2h threshold). NOMINAL.
-**Check C (Agent liveness, ~16:26Z UTC):** system-health.json ts=2026-08-26T16:23:12Z UTC (~3 min fresh): all desired=up, alive=True (beacon/forge/mirror/pulse). inbox_watcher=ok, outbox_notifier=ok. overall=healthy. NOMINAL.
-**Check E (PR/merge state, ~16:26Z UTC):** 0 open PRs (agent-core and dashboard). NOMINAL.
-**Check H (Inboxes, ~16:26Z UTC):** beacon=0, forge=0, mirror=0, pulse=0 actual task files. NOMINAL.
-
-**Section 5.0 one-shots:** audit_due_nudge: no-op. distill_detector: no-op. audit_cadence_signal: no-op. NOMINAL.
-
-**Check I (~16:26Z UTC):** Latest artifact: check-i-2026-08-26.json (fired 14:10Z UTC today, Wednesday — on schedule). Already surfaced in iters ~9840–9843. Next expected Friday 2026-08-29. CARRY.
-
-**Check III (~16:26Z UTC):** No new artifact. Latest check-iii-2026-08-23.json. Next expected 2026-09-06. CARRY.
-
-**Credential rotation watch:** SUPABASE_SERVICE_ROLE_KEY: last_dm=2026-08-17T23:23:16Z UTC. Overdue ~114.6h (rotation due 2026-08-22; current ~16:26Z UTC 2026-08-26). Dedup window expires ~2026-08-31T23:23Z UTC. No re-DM. Larry must rotate per docs/runbooks/rotate-supabase-keys.md.
-
-**G-rules (0 new alerts; 0 G-rule advances this iter):**
-- nightly-502-cluster-001: DISPATCHED ✅. Next expected window ~01:15Z UTC 2026-08-27.
-- sync-service-deploy-restart-head-drift-tier4-no-translation-001: 1/3 (carried)
-- ourliberty-health-sync-freshness-tier4-no-translation-001: 1/3 (carried)
-- heal-lost-marker-tier4-no-translation-001: 1/3 (carried)
-- deploy-notifier-vercel-build-failed-tier4-no-translation-001: 2/3 (carried)
-- mirror-queue-wait-gauge-third-review-slot-readiness-tier4-no-translation-001: 1/3 (carried)
-- source-beacon-notifications-tier4-no-translation: 2/3 (carried)
-- enable-pr-auto-merge-reviewdecision-guard-001: 1/3 (carried)
-- heal-pipeline-stall-no-mirror-dispatch-tier4-no-translation-001: 1/3 (carried)
-- suite-guardian-reminder-gap-001: 1/3 (carried)
-
-**PRIME DIRECTIVE ratio:** iter_clean appended (ts=2026-08-26T16:26:25Z UTC, iter=9844, tier=3). Ratio: stable (trend=improving).
-
-**Actions taken:**
-- Check 0: watermark stable at 503 (0 new alerts, no advance).
-- PRIME DIRECTIVE: iter_clean appended to cycle-prime-ledger.jsonl (ts=2026-08-26T16:26:25Z UTC, iter=9844, tier=3).
-- Tier state: cycle_tier_state.py record --checks-clean true → consecutive_clean 57→58, tier stays 3 (last_updated=2026-08-26T16:26:10Z UTC).
-
-**Escalations:** None new. Outstanding (carried):
-  1. alert-translations-unrouted-pr-nudges-retired-001: ~376.3h CRITICAL AGE (all reminders exhausted). Carry.
-  2. direction-ask-automated-cycle-journal-gap-001: ~361.3h (all reminders exhausted). Carry.
-  3. check0-delivered-kinds-tier3-001: ~360.9h (all reminders exhausted). Carry.
-  4. Informational-cards impl gap (iter ~9102). Carry.
-  5. Check III artifact 2026-08-23: beacon 232→336s (+45%), mirror 1311→1448s (+10%). Command: approve threshold-update-2026-08-23.
-  6. suite-guardian-run-2026-08-20: ~156.7h, reminders_sent=[]. Carry.
-  7. check1-missing-substrate-branch-001: ~124.6h, reminders=[6,24,72] all exhausted. Carry.
-  8. Check I proposal [1]: [parked] cycle-202608192035370000 (high-σ pulse/cycle, 4.71σ). On dashboard Parked lane. Next Check I artifact expected Friday 2026-08-29.
-  9. SUPABASE rotation OVERDUE (~114.6h, due 2026-08-22). Dedup active until ~2026-08-31. Larry must rotate per docs/runbooks/rotate-supabase-keys.md.
-  10. nightly-502-cluster-note-001: G-rule dispatched. Next expected window ~01:15Z UTC 2026-08-27.
-  11. review-ceiling-fit: Mirror review ceiling RAISE 35→40min recommended. Digest route, no DM.
-  12. sync-service-deploy-restart-head-drift-tier4-no-translation-001: 1/3 (carried from iter ~9780). Dispatch to Beacon at 3/3.
-
-**Patterns:** Clean iter. 0 new alerts. All 4 bots alive. No stalls, 0 open PRs, all inboxes empty. Sync ~14 min (fresh). Tier 3, consecutive_clean 57→58. System steady-state.
-
-**Tier end-of-iter:** Tier 3, consecutive_clean=58.
 
 ---
 
