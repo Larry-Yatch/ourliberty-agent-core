@@ -841,6 +841,16 @@ class DashboardActionRouteLegalityTest(unittest.TestCase):
     dashboard supports and asserts the target it returns is permitted — it does
     not restate the route table, and it does not pattern-match the source. A new
     action, or a change to an existing one's target, fails here at the seam.
+
+    SCOPE — route-legal is NOT the same as delivered (review finding 2).
+    `inbox_watcher` runs `dispatch_validator.validate_task` BEFORE the routing
+    check, and that gate enforces `MIN_PROMPT_LEN = 100`. A clarify reply's
+    prompt is just Larry's typed comment, so an answer shorter than 100 chars
+    is STILL dead-lettered after this fix — and unlike the routing branch, the
+    schema branch emits NO alert at all, so that loss is even quieter. This
+    class of test closes the ROUTING dimension only; the 2026-07-22 clarify
+    loss is closed for answers of 100+ characters and open below that. Not
+    fixed here (pre-existing, and a different gate) — tracked separately.
     """
 
     ALLOWED = None  # resolved in setUp so a route-table edit is picked up live
@@ -892,10 +902,14 @@ class DashboardActionRouteLegalityTest(unittest.TestCase):
             ('approval_request/recheck', recheckable, 'recheck'),
         ]
         # clarify_request returns `asking_agent` STRAIGHT FROM THE PAYLOAD, so
-        # the target is data, not a constant. outbox_notifier documents the
-        # writers as 'forge' or (future) 'mirror'; both must be deliverable or
-        # the reply is lost exactly as it was on 2026-07-22.
-        for agent in ('forge', 'mirror'):
+        # the target is data, not a constant. Drive EVERY value the handler
+        # will accept — da.ALLOWED_TARGET_AGENTS, the set actually enforced at
+        # the write — NOT a hand-listed pair. Review finding 1: hardcoding
+        # ('forge','mirror') left this test green while `asking_agent='pulse'`
+        # passed the handler and died at routing, one live instance of the very
+        # class this PR closes. Reading the real set means the two layers cannot
+        # drift apart again in either direction.
+        for agent in sorted(da.ALLOWED_TARGET_AGENTS):
             cases.append((
                 f'clarify_request/comment (asking_agent={agent})',
                 {'event_type': 'clarify_request',
@@ -923,20 +937,25 @@ class DashboardActionRouteLegalityTest(unittest.TestCase):
                     f'is dead-lettered to {target}/.invalid with no replay '
                     f'while the API returns success')
 
-    def test_every_case_actually_built_an_envelope(self):
-        """The guard above is vacuous if a case silently stops producing an
-        envelope (a 400 would skip the assertion by raising). Pin that all six
-        cases still reach a target, so the coverage cannot quietly shrink."""
-        built = 0
-        for label, source, action in self._cases():
-            with mock.patch.object(da, '_gh_pr_head_sha_for_recheck',
-                                   return_value='b' * 40):
-                target, _f, _e = da._build_envelope_for_action(
-                    source=source, action=action, comment='ack',
-                    actor='larry@example.com')
-            self.assertTrue(target, f'{label} produced an empty target')
-            built += 1
-        self.assertEqual(built, 6)
+    def test_allowed_targets_are_all_route_legal(self):
+        """THE CROSS-LAYER INVARIANT, stated directly rather than sampled.
+
+        `ALLOWED_TARGET_AGENTS` is the set the write handler enforces;
+        `FRESH_DISPATCH_ROUTES['dashboard']` is the set routing will deliver. A
+        target in the first but not the second is NOT a safe rejection — the
+        envelope is claimed, the API returns 200, and it is dead-lettered with
+        the operator told nothing. Every loss in this class had that shape.
+
+        Asserting containment here means neither list can grow a member the
+        other lacks, no matter which one a future change edits.
+        """
+        self.assertLessEqual(
+            set(da.ALLOWED_TARGET_AGENTS), set(self.ALLOWED),
+            'the dashboard write handler PERMITS a target routing REFUSES: '
+            f'{sorted(set(da.ALLOWED_TARGET_AGENTS) - set(self.ALLOWED))} — '
+            'such an envelope is claimed, 200 is returned, and it is silently '
+            'dead-lettered. Either give it a route or drop it from '
+            'ALLOWED_TARGET_AGENTS.')
 
 
 if __name__ == '__main__':

@@ -123,6 +123,16 @@ FRESH_DISPATCH_ROUTES: dict[str, set[str]] = {
     # dimension is guarded by test_dashboard_action_targets_are_route_legal,
     # which drives the real builder for every (event_type, action) the
     # dashboard supports and asserts the target it returns is permitted here.
+    #
+    # SCOPE, stated so the entry is not read as more than it is: route-legal is
+    # not delivered. inbox_watcher runs dispatch_validator.validate_task BEFORE
+    # this check, and that gate enforces MIN_PROMPT_LEN = 100. A clarify reply's
+    # prompt is Larry's typed comment verbatim, so a SHORT answer is still
+    # dead-lettered — measured on this branch: 43 chars -> schema False, route
+    # True; 185 chars -> both True. Worse, the schema branch emits NO alert,
+    # where this routing branch does. So the 2026-07-22 clarify loss is closed
+    # for answers of 100+ characters and OPEN below that. Separate gate,
+    # pre-existing, deliberately not widened into this change.
     'dashboard': {'beacon', 'forge', 'mirror'},
 }
 

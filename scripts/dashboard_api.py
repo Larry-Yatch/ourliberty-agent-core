@@ -351,8 +351,25 @@ LARRY_ACTION_ALLOWED_EMAILS: frozenset[str] = frozenset({
 
 # Per spec § 7.3 — path-injection guard for envelope writes. Both the
 # frozenset check AND the resolve-prefix check fire on every envelope.
+# INVARIANT: every member must be route-legal from 'dashboard' in
+# routing_validator.FRESH_DISPATCH_ROUTES. A target this guard PERMITS but
+# routing REFUSES is not a safe rejection — the envelope is claimed, the API
+# returns 200, and the write is dead-lettered with the operator told nothing.
+# That is the exact class that lost Larry's actions on 2026-06-10, 2026-07-22
+# and 2026-08-26. Pinned by
+# test_dashboard_api.DashboardActionRouteLegalityTest.
+#
+# 'pulse' REMOVED 2026-08-26 (review finding 1). It was reachable: the
+# clarify_request branch returns `asking_agent` straight from the payload, so a
+# card carrying asking_agent='pulse' passed THIS check, got claimed, returned
+# 200 — and then died at routing. No dashboard path builds a pulse envelope and
+# no live producer emits that value, so this is a subtraction, not a new rule:
+# such a card now gets a clean 400 here instead of vanishing. The alternative —
+# widening the route table to include pulse — would have granted the dashboard
+# reach it has no use for, and contradicted
+# test_dashboard_allow_is_still_scoped_not_blanket.
 ALLOWED_TARGET_AGENTS: frozenset[str] = frozenset({
-    'beacon', 'forge', 'mirror', 'pulse',
+    'beacon', 'forge', 'mirror',
 })
 LARRY_ACTION_VALID_ACTIONS: frozenset[str] = frozenset({
     'approve', 'reject', 'comment', 'mark_done',
