@@ -365,6 +365,19 @@ def _archive_dir(agent: str, *, lost_result: bool = False) -> Path:
     return d
 
 
+# Sources that are a HUMAN pressing a control, not an agent dispatching work.
+# A dead-lettered envelope from one of these is an action Larry took that
+# vanished — the API returned success and nothing told him otherwise. Counted on
+# the live droplet 2026-08-26: 27 such envelopes since 2026-05-11 (24 dashboard
+# schema rejections, 2 `larry`, 1 worktree), every one silent, because only the
+# ROUTING branch alerted and these died at other gates.
+#
+# Agent-to-agent drops are deliberately NOT alerted (64 of them over the same
+# period — pulse/beacon worktree and prompt churn). That is plumbing noise, and
+# paging on it is the alert toil the priorities file calls Tier 3.
+HUMAN_CONTROL_SURFACES = frozenset({'dashboard', 'larry', 'telegram-webhook'})
+
+
 def write_invalid(task_file: Path, reason: str) -> None:
     agent = _agent_for_task_file(task_file)
     dest = move_to(task_file, INBOXES_ROOT / agent / ".invalid")
@@ -372,6 +385,65 @@ def write_invalid(task_file: Path, reason: str) -> None:
         dest.with_suffix(dest.suffix + ".reason").write_text(f"{now_iso()}\n{reason}\n")
     except OSError as e:
         log(f"write_invalid sidecar failed for {dest}: {e}")
+    _alert_if_human_action_lost(dest, agent, reason)
+
+
+def _alert_if_human_action_lost(dest: Path, agent: str, reason: str) -> None:
+    """Page Larry when a dead-lettered envelope was HIS action, not an agent's.
+
+    Lives inside write_invalid rather than at the call sites deliberately: every
+    dead-letter in this module goes through write_invalid, so a NEW drop branch
+    inherits this for free. The 2026-08-26 audit found six drop branches and only
+    ONE (routing) alerting — putting it at call sites is what let the other five
+    stay silent, and would let the seventh be silent too.
+
+    The character minimum in the operator text is read from
+    `dispatch_validator.MIN_PROMPT_LEN`, not restated, so the advice cannot
+    drift away from the rule it describes (that is a note for the next reader,
+    NOT something to say to Larry in the alert — an operator message should
+    carry only what he can act on).
+
+    Fail-safe in every direction: a source we cannot read is NOT assumed human
+    (the envelope may be unparseable JSON, which is why it was dropped), and any
+    failure here is logged and swallowed — an alerting problem must never stop a
+    dead-letter from being recorded.
+    """
+    if reason.startswith('routing:'):
+        # The routing branch emits its own richer, source-agnostic tripwire
+        # alert (it fires for agent sources too). Alerting again here would
+        # double-page on every dashboard routing denial — 42 of them so far.
+        return
+    try:
+        source = (json.loads(dest.read_text()) or {}).get('source')
+    except Exception as e:  # noqa: BLE001 — never let this break the drop
+        log(f"dead-letter source read failed for {dest.name}: "
+            f"{type(e).__name__}: {e}")
+        return
+    if source not in HUMAN_CONTROL_SURFACES:
+        return
+    try:
+        larry_alerts.append_alert(
+            source="inbox-watcher",
+            severity="warning",
+            subject=f"dead-letter:{source}->{agent}",
+            message=(
+                f"An action you took on the {source!r} surface was DISCARDED, "
+                f"not performed. Envelope {dest.name} was dropped to "
+                f"{agent}/.invalid — {reason}. The click most likely returned "
+                f"success and told you nothing. There is NO auto-replay: if you "
+                f"still want it done, do it again."
+            ),
+            suggested_action=(
+                f"Read the envelope at ~/agents/inboxes/{agent}/.invalid/"
+                f"{dest.name} to see exactly what was lost, then re-issue the "
+                f"action. If the reason is 'prompt too short', the text you "
+                f"typed was under the "
+                f"{dispatch_validator.MIN_PROMPT_LEN}-character minimum — say "
+                f"the same thing at greater length and it will go through."
+            ),
+        )
+    except Exception as e:  # noqa: BLE001
+        log(f"dead-letter alert failed for {dest.name}: {type(e).__name__}: {e}")
 
 
 def append_cost(record: dict) -> None:
