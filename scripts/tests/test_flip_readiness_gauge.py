@@ -24,9 +24,11 @@ except ImportError:  # discover loads this module top-level (no package parent)
     import _bootstrap  # noqa: F401
 
 import json
+import shutil
 import sys
 import tempfile
 import unittest
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -396,6 +398,52 @@ class TestDarkEscalation(unittest.TestCase):
 # -------------------- main() integration (tmp-rooted, zero live writes) --------------------
 
 
+@contextmanager
+def _pinned_clock(now: datetime):
+    """Pin the clock main() reads so an integration run is wall-clock hermetic."""
+    class _FixedClock(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return now
+
+    real = frg.datetime
+    frg.datetime = _FixedClock
+    try:
+        yield
+    finally:
+        frg.datetime = real
+
+
+def _seed_all_green_substrates(now: datetime) -> None:
+    """Seed all five substrates so every criterion is green *as evaluated at `now`*.
+
+    Ledger timestamps are derived from `now`, never from a fixed date: criteria 1
+    and 5 only count rows inside a trailing window, so a hardcoded date silently
+    rots out of that window as wall-clock advances and turns both indeterminate.
+    """
+    frg.LEDGER_FILE.parent.mkdir(parents=True, exist_ok=True)
+    recent = (now - timedelta(days=1)).isoformat()
+    ledger_lines = [
+        json.dumps({'outcome': 'approved', 'ts': recent, 'notes': 'auto_approved by rule'})
+        for _ in range(19)
+    ]
+    ledger_lines.append(json.dumps({'outcome': 'rejected', 'ts': recent, 'notes': ''}))
+    frg.LEDGER_FILE.write_text('\n'.join(ledger_lines) + '\n')
+
+    # Criterion 3 floors at PR1_CUTOFF with no trailing window, so a cutoff-relative
+    # stamp is already drift-proof.
+    ts = (frg.PR1_CUTOFF + timedelta(days=1)).isoformat()
+    templates = {f't{i}': {'executions': [
+        {'outcome': 'success', 'larry_correction_signal': False, 'ts': ts}
+        for _ in range(21)]} for i in range(3)}
+    frg.TEMPLATES_FILE.write_text(json.dumps({'action_templates': templates}))
+
+    frg.XIV_ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
+    (frg.XIV_ARTIFACT_DIR / f'check-xiv-{now.date().isoformat()}.json').write_text(json.dumps({
+        'sources': {'log': 'ok'}, 'fleet': {'ask_rate': 0.99},
+        'over_silence_findings': []}))
+
+
 class TestMainIntegration(unittest.TestCase):
 
     def setUp(self):
@@ -454,29 +502,19 @@ class TestMainIntegration(unittest.TestCase):
         self.assertFalse(frg.STATE_FILE.exists())
         self.assertEqual(self.rec.calls, [])  # no DM in dry-run
 
+    def _fresh_tree(self):
+        """Wipe the tmp tree back to the state setUp built."""
+        shutil.rmtree(self.tmp, ignore_errors=True)
+        frg.ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
+        (self.tmp / 'state').mkdir(parents=True, exist_ok=True)
+
     def test_all_green_writes_artifact_and_rings(self):
         # Seed all five substrates so every criterion is genuinely green.
-        (frg.LEDGER_FILE).parent.mkdir(parents=True, exist_ok=True)
-        ledger_lines = []
-        for _ in range(19):
-            ledger_lines.append(json.dumps({'outcome': 'approved', 'ts': _iso(1),
-                                            'notes': 'auto_approved by rule'}))
-        ledger_lines.append(json.dumps({'outcome': 'rejected', 'ts': _iso(1),
-                                        'notes': ''}))
-        frg.LEDGER_FILE.write_text('\n'.join(ledger_lines) + '\n')
+        now = datetime.now(timezone.utc)
+        _seed_all_green_substrates(now)
 
-        ts = (frg.PR1_CUTOFF + timedelta(days=1)).isoformat()
-        templates = {f't{i}': {'executions': [
-            {'outcome': 'success', 'larry_correction_signal': False, 'ts': ts}
-            for _ in range(21)]} for i in range(3)}
-        frg.TEMPLATES_FILE.write_text(json.dumps({'action_templates': templates}))
-
-        frg.XIV_ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
-        (frg.XIV_ARTIFACT_DIR / 'check-xiv-2026-07-20.json').write_text(json.dumps({
-            'sources': {'log': 'ok'}, 'fleet': {'ask_rate': 0.99},
-            'over_silence_findings': []}))
-
-        rc = frg.main([])
+        with _pinned_clock(now):
+            rc = frg.main([])
         self.assertEqual(rc, 0)
         art = json.loads(next(frg.ARTIFACT_DIR.glob('flip-readiness-*.json')).read_text())
         self.assertTrue(art['all_green'], art['criteria'])
@@ -486,6 +524,31 @@ class TestMainIntegration(unittest.TestCase):
         # State persisted so a re-run stays silent.
         state = json.loads(frg.STATE_FILE.read_text())
         self.assertTrue(state['last_all_green'])
+
+    def test_poison_test_flip_readiness_gauge_testmainintegration_test_all_green_writes_artifact_and_rings(self):  # noqa: E501
+        """The all-green path must stay green at any wall-clock.
+
+        Guards the frozen-fixture time bomb: seeding the substrates from a hardcoded
+        date instead of the gauge's own clock let criteria 1 and 5 drift out of their
+        trailing windows once real time passed them, turning this suite red with no
+        code change. Fails on the far-future clock if that seeding is ever re-frozen.
+        """
+        base = datetime.now(timezone.utc)
+        for drift_days in (0, 90, 400):
+            with self.subTest(drift_days=drift_days):
+                self._fresh_tree()
+                now = base + timedelta(days=drift_days)
+                _seed_all_green_substrates(now)
+
+                with _pinned_clock(now):
+                    rc = frg.main([])
+
+                self.assertEqual(rc, 0)
+                art = json.loads(
+                    next(frg.ARTIFACT_DIR.glob('flip-readiness-*.json')).read_text())
+                self.assertTrue(art['all_green'], (drift_days, art['criteria']))
+                for key, crit in art['criteria'].items():
+                    self.assertFalse(crit['indeterminate'], (drift_days, key, crit['detail']))
 
 
 if __name__ == '__main__':
