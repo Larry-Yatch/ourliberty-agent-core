@@ -23552,3 +23552,83 @@ NON-CLEAN → tier-reset (Check 4 non-empty). No auto-fix. Larry action required
 
 ---
 
+## Iteration ~9878 — 2026-08-26T23:45Z UTC (Larry /cycle chat, Tier 3 [Check 0: NEW ALERT wm=514→515 unreviewed-merge:1110 Tier-4 escalate; always-fix ff-main PR#1110 merged; PR#1111 NEW routing-fix opened; all other checks NOMINAL; consecutive_clean 0→1])
+
+**Health:** ⚠️ ESCALATION — Check 0 found 1 new alert above watermark: unreviewed-merge:1110 (PR #1110 merged without Mirror review, Tier-4, escalate). All other checks NOMINAL. **Tier 3**, consecutive_clean 0→1. 2026-08-26 UTC (Wednesday).
+
+**VERIFY-BEFORE-REASSERT (from iter ~9877 at 23:13Z UTC; automated cycle since: 5623c00d Pulse cycle 20260826T231431Z):**
+- "Tier 3, consecutive_clean=0": CONFIRMED. cycle-tier.json pre-iter: tier=3, consecutive_clean=0, last_updated=23:13:04Z. This iter CLEAN (except escalated Check 0) → consecutive_clean 0→1. Still Tier 3.
+- "wm=514 stable, 0 new alerts": SUPERSEDED. file_length=515 > watermark=514. 1 new alert (line 515, ts=23:20:16Z): unreviewed-merge:1110 — PR #1110 merged without Mirror review. Watermark advanced to 515. See Check 0 below.
+- "HEAD=5623c00d=origin/main": SUPERSEDED. PR #1110 merged as 34087c4b post-23:13Z. Always-fix applied (git pull --ff-only). HEAD=34087c4b=origin/main. UPDATED.
+- "all 4 bots healthy, system-health ts=23:08:46Z UTC": CONFIRMED+UPDATED. system-health.json ts=2026-08-26T23:39:20Z: all 4 desired=up, alive=True (beacon/forge/mirror/pulse). overall=healthy. disk=19%, memory=15%. OK.
+- "SUPABASE ~152h overdue": CONFIRMED CARRY. ~153h overdue (due 2026-08-22; dedup window active until ~2026-08-31T23:23Z UTC). No re-DM. OK.
+- "pending=0 (Check 4 CLEAN)": CONFIRMED. beacon-pending-approvals.json pending=[]. OK.
+- "PR#1108 OPEN Mirror review_escalate completed, Forge revision pending": CONFIRMED. PR#1108 OPEN, MERGEABLE (~346m old), reviewDecision="". OK.
+- "PR#1109 OPEN Mirror review_escalate completed, Forge revision pending": CONFIRMED. PR#1109 OPEN, MERGEABLE (~342m old), reviewDecision="". OK.
+
+**Check 0 (Alert triage, ~23:45Z UTC):** file_length=515 > watermark=514. **1 new alert above watermark** (line 515, ts=2026-08-26T23:20:16Z):
+  - source: heal-unreviewed-merge-detector
+  - severity: critical
+  - message: "PR #1110 merged without Mirror review (actor=Larry-Yatch). No REVIEW_PASS evidence found. The Mirror-review merge gate did not hold for this merge."
+  - route: escalate, tier: NOW
+  - subject: unreviewed-merge:1110
+  Triage via alert_triage_state.py: tier=4, decision=ask, status=triaged-tier-4. Genuine escalation (known-surface pattern, not suppressed). Watermark advanced 514→515. Intervention recorded. Escalation written to pulse-escalations.json. Outbox-notifier will deliver critical DM to Larry. [ESCALATE → Larry]
+
+**Check 1 (Log noise, ~23:45Z UTC):** heal-stale-daemon-code.log tick 23:35:29Z UTC (~10 min; INFO-only, fresh=448, unparseable=109). No WARN/ERROR above threshold. NOMINAL.
+
+**Check 2 (Telegram sweep, ~23:45Z UTC):** Bot (beacon) last processed tasks ~18:28Z-18:33Z UTC (Mirror review_escalate completions). No new Larry inbound directives. Outbox-notifier.log last activity 18:28:39Z UTC (Mirror review_escalate for PR#1109). New alert (line 515) was appended at 23:20Z — outbox-notifier will deliver on next poll. Nightly 502 cluster: next expected ~01:15Z UTC 2026-08-27 (~1.5h away). NOMINAL (outbox-notifier delivery for line 515 pending).
+
+**Check 3 (Pipeline stall, ~23:45Z UTC):** heal-pipeline-stall.log last tick 23:27:29Z UTC (~18 min ago). FORGE_NO_PR_SKIP for PR#1108+PR#1109 (pr_exists). No stalls detected. PR#1111 (created ~23:27Z) not yet visible to stall healer at last tick — will be assessed on next healer cycle. NOMINAL.
+
+**Check 4 (Pending directives, ~23:45Z UTC):** beacon-pending-approvals.json pending=[]. CLEAN. NOMINAL.
+
+**Check 5 (Stale daemon code, ~23:45Z UTC):** heal-stale-daemon-code.log tick 23:35:29Z UTC (~10 min ago, INFO-only). NOMINAL.
+
+**Check A (Source repo, ~23:45Z UTC):** branch=main. Pre-iter HEAD=5623c00d behind origin/main by 1 commit. **Always-fix applied: git pull --ff-only → HEAD=34087c4b=origin/main** (PR #1110 "fix(doorbell): /approvals link" merged). Clean tree. NOMINAL (after fix).
+**Check B (Sync health, ~23:45Z UTC):** agent-core-sync.json: last_sync=2026-08-26T23:12:29Z UTC (~33 min; status=no-change, commit=75931e38). Within 2h threshold. NOMINAL.
+**Check C (Agent liveness, ~23:45Z UTC):** system-health.json ts=2026-08-26T23:39:20Z (~6 min fresh): all 4 desired=up, alive=True (beacon/forge/mirror/pulse). overall=healthy. disk=19%, memory=15%. NOMINAL.
+**Check E (PR/merge state, ~23:45Z UTC):** 3 open PRs:
+  - PR #1111 (NEW, ~27m old): "fix(routing): let the dashboard reach the targets it actually builds for" — branch fix/dashboard-mirror-route, MERGEABLE, reviewDecision="" (Mirror review pending). Forge PR addressing routing-denied:dashboard->mirror G-rule (Larry's #1108+#1109 approval envelopes were denied at routing gate). Mirror has not yet reviewed. < 72h old. No Pulse action. MONITORING.
+  - PR #1108 (~346m old): Mirror review_escalate completed 18:22Z UTC. Forge revision pending. MONITORING.
+  - PR #1109 (~342m old): Mirror review_escalate completed 18:28Z UTC. Forge revision pending. MONITORING.
+  G-rule enable-pr-auto-merge-reviewdecision-guard-001: no auto-merge on any PR (all reviewDecision="" with outstanding Mirror review_escalate or pending Mirror review). NOMINAL.
+**Check H (Inboxes, ~23:45Z UTC):** beacon=0, forge=0, mirror=0, pulse=0. NOMINAL.
+
+**Section 5.0 one-shots:** audit_due_nudge: no-op. distill_detector: no-op. silence_file_auditor: 1 expired entry (agent-runner-pulse:transcript-not-persisted:tier1, 76.7d+) + 4 permanent heal-pipeline-stall entries — informational, no action. NOMINAL.
+
+**Check I (~23:45Z UTC):** artifact check-i-2026-08-26.json (fired ~14:10Z UTC today, Wednesday — on schedule). Next expected Friday 2026-08-29. CARRY.
+**Check III (~23:45Z UTC):** No new artifact since 2026-08-23. Next expected 2026-09-06. CARRY.
+
+**Credential rotation watch:** SUPABASE_SERVICE_ROLE_KEY: last_dm=2026-08-17T23:23:16Z UTC. ~153h overdue (due 2026-08-22; dedup window active until ~2026-08-31T23:23Z UTC). No re-DM. Larry must rotate per docs/runbooks/rotate-supabase-keys.md.
+
+**G-rules (this iter):**
+- heal-approvals-surface-drift-missing-card-tier4-001: carry at 1/2 (no new heal-approvals-surface-drift alerts this iter). Fix in flight: direction-ask-approvals-opt-b-implement-001. NOTE: PR #1110 merged (doorbell link → /approvals) — informational improvement, separate from missing_card gap. No count change.
+- routing-denied:dashboard->mirror-001: carry at 1/3. PR #1111 OPENED (fix/dashboard-mirror-route) — active fix in flight for the routing gate issue. No new routing-denied event this iter. No dispatch (fix already in flight). MONITORING.
+- All other G-rules carried unchanged.
+
+**PRIME DIRECTIVE ratio:** iter_clean appended (ts=2026-08-26T23:45:38Z, iter=9878, tier=3, kind=iter_clean). Intervention appended (ts=2026-08-26T23:48:02Z, iter=9878, tier=3, kind=intervention, intervention_id=unreviewed-merge-escalate:pr1110). Trailing-30d: interventions=2054, systemic_fixes=8, ratio=256.75 (marginal uptick — 1 new intervention, no systemic fix). Tier state: record --checks-clean true → tier=3, consecutive_clean 0→1.
+
+**Actions taken:**
+- Check 0: triage-alert unreviewed-merge:1110 → Tier-4 escalate. Watermark advanced 514→515. Intervention recorded in prime ledger. Escalation written to pulse-escalations.json.
+- Check A: git pull --ff-only → HEAD=34087c4b=origin/main (PR #1110 merged). Logged to cycle-actions.jsonl.
+- PRIME DIRECTIVE: iter_clean + intervention rows appended via cycle_prime_ledger.py.
+- Tier state: record --checks-clean true → consecutive_clean 0→1.
+
+**Escalations:**
+  1. **[yellow] NEW** unreviewed-merge:1110 — PR #1110 "fix(doorbell)" merged by Larry at 23:16:58Z without Mirror review. Merge gate did not hold. Change is low-risk (URL fix only). Outbox-notifier will DM Larry critical alert. Written to pulse-escalations.json.
+  2. **[yellow] CARRY** PRs #1108+#1109 — Mirror review_escalate completed; Forge revision pending. Telegram-delivered (idx=502+503, 18:23Z+18:28Z UTC). Larry may need to nudge Forge.
+  3. **[yellow] CARRY** heal-approvals-surface-drift:missing_card — mirror-review items for PRs #1108+#1109 not on dashboard decide tab. Fix pending: direction-ask-approvals-opt-b-implement-001 (dispatched iter ~8237).
+  4. Informational-cards impl gap (iter ~9102). Carry.
+  5. Check III artifact 2026-08-23: beacon 232→336s (+45%), mirror 1311→1448s (+10%). Command: `approve threshold-update-2026-08-23`.
+  6. Check I proposal [1]: [parked] cycle-202608192035370000 (high-σ pulse/cycle, 4.71σ). On dashboard Parked lane.
+  7. SUPABASE rotation OVERDUE (~153h, due 2026-08-22). Dedup active until ~2026-08-31. Larry must rotate per docs/runbooks/rotate-supabase-keys.md.
+  8. nightly-502-cluster-001: DISPATCHED ✅. Next expected window ~01:15Z UTC 2026-08-27 (~1.5h away).
+  9. review-ceiling-fit: Mirror review ceiling RAISE 35→40min recommended. Digest route, no DM.
+  10. sync-service-deploy-restart-head-drift-tier4-no-translation-001: 1/3. Dispatch to Beacon at 3/3.
+
+**Patterns:** Check 0 caught 1 genuine new alert: unreviewed-merge:1110 (PR #1110 merged by Larry without Mirror review at 23:16:58Z). The change is low-risk (doorbell link fix), but the gate breach is a real signal. New PR #1111 ("fix(routing)") opened by Forge addresses the routing-denied issue that blocked the #1108+#1109 approval envelopes. PR #1110 also merged (doorbell link now points at /approvals). Two notable developments post-23:13Z iter.
+
+**Tier end-of-iter:** Tier 3, consecutive_clean=1.
+
+---
+
