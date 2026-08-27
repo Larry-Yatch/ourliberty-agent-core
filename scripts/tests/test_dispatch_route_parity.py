@@ -105,6 +105,34 @@ class DispatchRouteParityTest(unittest.TestCase):
         self.assertEqual(rv.FRESH_DISPATCH_ROUTES['dashboard'],
                          {'beacon', 'forge', 'mirror'})
 
+    def test_human_sources_are_allowed_and_routed(self):
+        """HUMAN_SOURCES is the machine-readable answer to "did a person author
+        this?" — the third guard this file now carries, and it exists because
+        that property lived only in a `# Humans` COMMENT until 2026-08-27.
+
+        Being a comment is why agent-core #1112 hand-copied a third source list
+        into inbox_watcher instead of importing one: prose can only be restated,
+        and the restatement shipped containing 'telegram-webhook', a service
+        decommissioned 2026-05-12. A human source that is not allowed, or has no
+        route, cannot deliver Larry's action at all.
+        """
+        self.assertTrue(dv.HUMAN_SOURCES, 'the human set must not be empty')
+        for source in sorted(dv.HUMAN_SOURCES):
+            with self.subTest(source=source):
+                self.assertIn(source, dv.ALLOWED_SOURCES)
+                self.assertIn(source, rv.FRESH_DISPATCH_ROUTES)
+                self.assertTrue(rv.FRESH_DISPATCH_ROUTES[source])
+
+    def test_human_sources_have_no_hand_copied_twin(self):
+        """The defect this guard was born from: a SECOND hand-maintained human
+        list living in a consumer, free to drift. inbox_watcher must import the
+        set, never restate it."""
+        import inbox_watcher as iw  # noqa: PLC0415
+        self.assertFalse(
+            hasattr(iw, 'HUMAN_CONTROL_SURFACES'),
+            'inbox_watcher has re-grown its own human-source list; import '
+            'dispatch_validator.HUMAN_SOURCES instead')
+
     def test_documented_exemptions_are_real_allowed_sources(self):
         # Guard the guard: an exemption for a source that isn't even in
         # ALLOWED_SOURCES is dead weight that hides the real list drifting.

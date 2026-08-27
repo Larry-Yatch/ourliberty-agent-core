@@ -23,9 +23,26 @@ from pathlib import Path
 # narrow until Larry wires up his own chat topology. Extend as needed.
 KNOWN_CHAT_IDS = set()
 
+# THE machine-readable answer to "did a human author this envelope?".
+#
+# It was a `# Humans` COMMENT until 2026-08-27, which is why inbox_watcher's
+# dead-letter alert (#1112) hand-copied a THIRD source list instead of asking:
+# the property existed only in prose, so it could only be restated. A restated
+# list drifts — that one shipped containing 'telegram-webhook' (decommissioned
+# 2026-05-12) and missing nothing it needed only by luck. This set is now data,
+# is folded into ALLOWED_SOURCES below so the two CANNOT disagree, and is pinned
+# by test_dispatch_route_parity.HumanSourceParityTest.
+#
+# Membership test: would a PERSON be surprised to learn this envelope vanished?
+# 'larry'     — he typed it (Telegram direction-tasks, self-targeted approvals).
+# 'dashboard' — he clicked it; the API returns success either way.
+# Agent names are NOT members even when an agent acts on Larry's approval —
+# see the provenance gap documented at inbox_watcher._alert_if_human_action_lost.
+HUMAN_SOURCES = frozenset({'larry', 'dashboard'})
+
 ALLOWED_SOURCES = {
-    # Humans
-    'larry',
+    # Humans — see HUMAN_SOURCES above; both members are unioned in at the end
+    # of this literal so the two definitions can never drift apart.
     # Live agents
     'beacon', 'forge', 'mirror', 'pulse',
     'beacon-result', 'forge-result', 'mirror-result', 'pulse-result',
@@ -55,8 +72,13 @@ ALLOWED_SOURCES = {
     # between 2026-05-27T17:55Z and 2026-05-28T05:30Z, breaking the UI as a
     # control surface. Adding here closes the gap. NOTE: do not auto-replay
     # the stale envelopes already in beacon/.invalid — they predate this fix.
-    'dashboard',
 }
+# Fold the human sources in structurally rather than listing them twice. Adding
+# a human surface to HUMAN_SOURCES therefore allows it here automatically — the
+# 2026-05-28 incident was exactly this pair drifting apart ('dashboard' was a
+# control surface for months before anyone added it to the allowlist, and 4 of
+# Larry's envelopes were dropped in silence over 12 hours).
+ALLOWED_SOURCES |= HUMAN_SOURCES
 
 # Phase D3 — clarification protocol metadata. Optional on dispatch.
 #

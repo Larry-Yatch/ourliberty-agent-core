@@ -365,17 +365,13 @@ def _archive_dir(agent: str, *, lost_result: bool = False) -> Path:
     return d
 
 
-# Sources that are a HUMAN pressing a control, not an agent dispatching work.
-# A dead-lettered envelope from one of these is an action Larry took that
-# vanished — the API returned success and nothing told him otherwise. Counted on
-# the live droplet 2026-08-26: 27 such envelopes since 2026-05-11 (24 dashboard
-# schema rejections, 2 `larry`, 1 worktree), every one silent, because only the
-# ROUTING branch alerted and these died at other gates.
-#
-# Agent-to-agent drops are deliberately NOT alerted (64 of them over the same
-# period — pulse/beacon worktree and prompt churn). That is plumbing noise, and
-# paging on it is the alert toil the priorities file calls Tier 3.
-HUMAN_CONTROL_SURFACES = frozenset({'dashboard', 'larry', 'telegram-webhook'})
+# Prefix of the reason string the routing branch writes (see the
+# `write_invalid(task_file, f"{ROUTING_REASON_PREFIX}...")` call ~900 lines
+# below). Named ONCE and used at both ends: the producer and the suppressor were
+# a bare shared string convention, and the same branch already spells it a THIRD
+# way in its alert subject (`routing-denied:`). A reworded prefix would have
+# silently double-paged every human routing denial — 42 historical, so 84.
+ROUTING_REASON_PREFIX = 'routing: '
 
 
 def write_invalid(task_file: Path, reason: str) -> None:
@@ -393,39 +389,80 @@ def _alert_if_human_action_lost(dest: Path, agent: str, reason: str) -> None:
 
     Lives inside write_invalid rather than at the call sites deliberately: every
     dead-letter in this module goes through write_invalid, so a NEW drop branch
-    inherits this for free. The 2026-08-26 audit found six drop branches and only
-    ONE (routing) alerting — putting it at call sites is what let the other five
-    stay silent, and would let the seventh be silent too.
+    inherits this. The 2026-08-26 audit found six drop branches and only ONE
+    (routing) alerting — putting it at call sites is what let the other five stay
+    silent.
 
-    The character minimum in the operator text is read from
-    `dispatch_validator.MIN_PROMPT_LEN`, not restated, so the advice cannot
-    drift away from the rule it describes (that is a note for the next reader,
-    NOT something to say to Larry in the alert — an operator message should
-    carry only what he can act on).
+    ONE EXCEPTION, and it is structural, not an oversight: the `json:` branch
+    fires precisely BECAUSE the envelope would not parse, and this function has
+    to parse it to learn the source. That branch can never alert for anyone. It
+    is a disclosed residual, not a covered case: all three human producers write
+    atomically (dashboard `_atomic_write_envelope`, `safe_write_inbox`
+    `_atomic_write_json`, Telegram via safe_write_inbox) and the 3.5-month audit
+    counted ZERO human `json:` drops.
 
-    Fail-safe in every direction: a source we cannot read is NOT assumed human
-    (the envelope may be unparseable JSON, which is why it was dropped), and any
-    failure here is logged and swallowed — an alerting problem must never stop a
-    dead-letter from being recorded.
+    KNOWN GAP — approved work dispatched to a non-beacon target. When Larry
+    approves on Telegram, `beacon_approval_handler.dispatch_approved` stamps
+    `source='beacon'` for every target except beacon itself, and nothing else on
+    that envelope records that a human caused it (`reply_chat_id` is DM routing
+    and rides auto-approved dispatches too; `actor` is dashboard-only). So a
+    dead-letter of his approved Forge work is still classified as plumbing churn
+    and stays silent. Closing it means stamping decision provenance at the
+    PRODUCER, which is a change to the approval handler and belongs in its own
+    review — not a wider net guessed at from here.
+
+    `HUMAN_SOURCES` is imported, never restated: it is data in dispatch_validator
+    and folded into ALLOWED_SOURCES there, so this cannot drift from the
+    allowlist the way the hand-copied set it replaces did.
+
+    Fail-safe in every direction: a source we cannot read — or that is not even a
+    string — is NOT assumed human, and every failure here is logged and
+    swallowed. An alerting problem must never stop a dead-letter being recorded.
     """
-    if reason.startswith('routing:'):
+    if reason.startswith(ROUTING_REASON_PREFIX):
         # The routing branch emits its own richer, source-agnostic tripwire
         # alert (it fires for agent sources too). Alerting again here would
         # double-page on every dashboard routing denial — 42 of them so far.
         return
     try:
         source = (json.loads(dest.read_text()) or {}).get('source')
+        # The membership test is INSIDE the try on purpose: `['x'] in frozenset`
+        # raises TypeError, and an envelope is hand-editable JSON, so a
+        # non-hashable source is constructible. Outside the try it escaped
+        # write_invalid entirely and broke this docstring's own contract.
+        if not isinstance(source, str) \
+                or source not in dispatch_validator.HUMAN_SOURCES:
+            return
     except Exception as e:  # noqa: BLE001 — never let this break the drop
         log(f"dead-letter source read failed for {dest.name}: "
             f"{type(e).__name__}: {e}")
         return
-    if source not in HUMAN_CONTROL_SURFACES:
-        return
+    advice = (
+        f"Read the envelope at {dest} to see exactly what was lost, then "
+        f"re-issue the action."
+    )
+    if 'prompt too short' in reason:
+        # Appended ONLY for the reason it describes. Unconditionally, it was
+        # actively inverted for `prompt too long (max {MAX_PROMPT_LEN})`, which
+        # is a real validator branch — telling him to say it at GREATER length.
+        advice += (
+            f" The text you typed was under the "
+            f"{dispatch_validator.MIN_PROMPT_LEN}-character minimum — say the "
+            f"same thing at greater length and it will go through."
+        )
     try:
-        larry_alerts.append_alert(
+        # Subject carries the envelope name as a trailing ':'-segment so the
+        # 60-min warning cooldown (keyed `source:subject`) dedups PER LOST
+        # ACTION rather than per lane. With a constant subject a burst collapsed
+        # to one page and `append_alert` returned False before writing anything
+        # — measured on the live ledger: 17 of 26 human losses fell inside
+        # another's hour, and 2026-05-30T23:00 lost FIFTEEN and would have paged
+        # once. `translate_alert` strips trailing ':'-segments, so a translation
+        # keyed on the stable `dead-letter` prefix still tiers every one of them.
+        delivered = larry_alerts.append_alert(
             source="inbox-watcher",
             severity="warning",
-            subject=f"dead-letter:{source}->{agent}",
+            subject=f"dead-letter:{source}->{agent}:{dest.name}",
             message=(
                 f"An action you took on the {source!r} surface was DISCARDED, "
                 f"not performed. Envelope {dest.name} was dropped to "
@@ -433,15 +470,13 @@ def _alert_if_human_action_lost(dest: Path, agent: str, reason: str) -> None:
                 f"success and told you nothing. There is NO auto-replay: if you "
                 f"still want it done, do it again."
             ),
-            suggested_action=(
-                f"Read the envelope at ~/agents/inboxes/{agent}/.invalid/"
-                f"{dest.name} to see exactly what was lost, then re-issue the "
-                f"action. If the reason is 'prompt too short', the text you "
-                f"typed was under the "
-                f"{dispatch_validator.MIN_PROMPT_LEN}-character minimum — say "
-                f"the same thing at greater length and it will go through."
-            ),
+            suggested_action=advice,
         )
+        if not delivered:
+            # Suppression is now only ever a genuine repeat of the SAME
+            # envelope, but never let it be invisible — an unlogged False is
+            # how the burst defect hid.
+            log(f"dead-letter alert suppressed (cooldown) for {dest.name}")
     except Exception as e:  # noqa: BLE001
         log(f"dead-letter alert failed for {dest.name}: {type(e).__name__}: {e}")
 
@@ -1295,7 +1330,7 @@ def process_task(agent: str, task_file: Path, models_config: dict,
         src = task.get("source", "")
         envelope_id = task.get("task_id") or task_file.stem
         log(f"[{agent}] routing denied for {task_file.name}: {route_reason}")
-        write_invalid(task_file, f"routing: {route_reason}")
+        write_invalid(task_file, f"{ROUTING_REASON_PREFIX}{route_reason}")
         # A routing-denied drop means a (possibly user-facing) control surface
         # silently lost an action — never let that be silent again. The
         # 2026-05-28 dashboard gap dropped Larry's Approve/Reject envelopes to

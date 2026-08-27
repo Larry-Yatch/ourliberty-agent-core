@@ -861,6 +861,13 @@
       "tier": "SOON",
       "plain_language_summary": "No dispatch tier is currently available, so new work is holding in the inbox instead of starting. Every tier is in cooldown or otherwise blocked (the alert body names the per-tier reason). This usually self-clears the moment any tier frees up — dispatches resume automatically. It only needs attention if it persists, which points at a stuck rotation or every tier hitting quota at once.",
       "recommended_action": "First confirm it hasn't already cleared (new work resumes on its own when a tier frees). If it's persisting, inspect the live tier state with `cat ~/agents/blackboard/active-tier.json` and read each tier's block reason from the alert body. To force progress, pin a healthy tier via the dashboard rotation control (set rotation mode to off with a pinned tier) — the same override the /rotation endpoint writes. No action if it has already recovered — the alert only fires after the pool has been fully held past the hold-alert threshold."
+    },
+    "dead-letter": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "never_silence": true,
+      "plain_language_summary": "An action Larry took on a human control surface (dashboard or a Telegram direction-task) was DISCARDED rather than performed: its envelope was dropped to <agent>/.invalid at a gate OTHER than routing -- schema validation, target_repo scope, worktree setup or the requeue cap. His click almost certainly returned success and told him nothing. Counted 2026-08-26 across the live .invalid dirs: 27 such losses since 2026-05-11, every one silent, because only the routing branch alerted. The subject carries source->agent then the envelope filename after a colon, so each LOST ACTION dedups separately -- a constant subject let the 60-minute warning cooldown swallow every later loss in a burst (17 of the 27 fell inside another's hour; 2026-05-30T23:00 lost fifteen). No auto-replay -- the envelope is gone, not retried.",
+      "recommended_action": "Open the envelope named in the alert (the full path is in the alert's own suggested action) to see exactly what was lost, then re-issue the action. If the reason is 'prompt too short', the typed text was under dispatch_validator.MIN_PROMPT_LEN -- say the same thing at greater length. If several of these arrive together, treat it as one incident: a producer or a gate has drifted, not fifteen separate mistakes."
     }
   },
   "ourliberty-health": {
