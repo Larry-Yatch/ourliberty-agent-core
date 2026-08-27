@@ -25629,3 +25629,88 @@ Outstanding (carried):
 
 ---
 
+## Iteration ~9905 — 2026-08-27T04:04Z UTC (Larry /cycle chat, Tier 1 [Check 0: wm 539→539, 0 new alerts NOMINAL; Check 4: pending=1 dashboard-return-routing-auto-merge-001 (~141 min); suite-guardian Forge build in-flight ~12 min; CHECK 5 CORRECTION: heartbeat exists at blackboard/ (prior "doesn't exist anywhere" was false premise); all other checks NOMINAL; tier-reset consecutive_clean 0→0])
+
+**Health:** ⚠️ SIGNAL — Check 4: pending approval `dashboard-return-routing-auto-merge-001` still awaiting Larry's reply (~141 min since DM at 01:39:50Z UTC). All other checks NOMINAL. **Tier 1**, consecutive_clean remains 0. 2026-08-27 UTC (Thursday).
+
+**VERIFY-BEFORE-REASSERT (from iter ~9904 at 03:57Z UTC):**
+- "Tier 1, consecutive_clean=0": CONFIRMED. cycle-tier.json pre-iter: tier=1, consecutive_clean=0, last_signal_at=2026-08-27T03:57:28Z UTC. Non-clean (Check 4) → remains 0.
+- "wm=539, 2 new alerts (lines 538-539)": CONFIRMED + UPDATED. wm=539, file_length=539. 0 new alerts this iter. NOMINAL.
+- "HEAD=2771a623=origin/main": SUPERSEDED. HEAD=ad33cff7 (Pulse cycle 20260827T040002Z). HEAD=origin/main. Clean tree. behind=0, ahead=0. NOMINAL.
+- "all 4 bots healthy, system-health ts=2026-08-27T03:52:00Z UTC": CONFIRMED + UPDATED. ts=2026-08-27T03:57:00Z UTC (~4 min old at iter start). All 4 desired=up, alive=True. overall=healthy. NOMINAL.
+- "SUPABASE ~137h+ overdue": CONFIRMED + UPDATED. last_dm=2026-08-17T23:23:16Z UTC. ~148h+ elapsed; ~148h+ overdue. Dedup window active until ~2026-08-31T23:23Z UTC. No re-DM. CARRY.
+- "pending=1 dashboard-return-routing-auto-merge-001 (~134 min)": CONFIRMED + UPDATED. Still pending. Now ~141 min at 04:04Z UTC. Larry has not replied.
+- "PR#1113 (~80 min old): MONITORING": CONFIRMED + UPDATED. createdAt=02:36:38Z UTC. At 04:04Z = ~87 min old. MERGEABLE, reviewDecision=''. MONITORING.
+- "PR#1112 (~190 min old): MONITORING": CONFIRMED + UPDATED. createdAt=00:47:19Z UTC. At 04:04Z = ~197 min old. MERGEABLE, reviewDecision=''. MONITORING.
+- "suite-guardian build dispatched, Forge inbox, --resume may fail": UPDATED. Build IS being processed: inbox_watcher log shows `[forge] start task=suite-guardian-fix-...` at 03:48:13Z UTC (resume=eb46c0c0-5ab...). Beacon notify COMPLETED 03:49:13Z ($0.39). Build in-flight ~15 min. Outcome TBD.
+- "beacon bot blip 20×502 G-rule DISPATCHED": CONFIRMED. No new 502 events. NOMINAL.
+- "heal-approvals-surface-drift:missing_card G-rule at 2/2": CONFIRMED. wm=539 unchanged, 0 new alerts. CARRY.
+- CHECK 5 CORRECTION: iter ~9904 journal said "heartbeat files do NOT exist on this filesystem per MEMORY." **FALSE.** `heal-stale-daemon-code.heartbeat` DOES EXIST at `/home/larry/agents/blackboard/heal-stale-daemon-code.heartbeat` (content: `2026-08-27T03:56:40.228605+00:00`). The MEMORY note from iter ~9726 saying "DO NOT EXIST anywhere" was the false premise (contradicts the correct iter ~9110 note). MEMORY updated this iter.
+
+**Check 0 (~04:01Z UTC):** repair-watermark: no-op (file_length=539, watermark=539). 0 new alerts. NOMINAL.
+
+**Check 1 (~04:01Z UTC):** outbox-notifier.log: idle since 03:48:09Z UTC (build-phase dispatch INFO). No WARNs. heal-pipeline-stall.log last tick 04:01:01Z UTC (<1 min old): 0 new alerts fired, 2 suppressed (PR#1112+#1113 on cooldown). NOMINAL.
+
+**Check 2 (~04:01Z UTC):** beacon_telegram_bot.log: last delivery idx=538 at 03:52:28Z UTC. No new Larry directives. No 502 events. NOMINAL.
+
+**Check 3 (~04:01Z UTC):** heal-pipeline-stall.log last tick 04:01:01Z UTC (<1 min old). Fresh. NOMINAL.
+
+**Check 4 (~04:01Z UTC):** READ FROM CANONICAL PATH: state/beacon-pending-approvals.json. pending=1: `dashboard-return-routing-auto-merge-001`. NON-NOMINAL → TIER-RESET.
+  - Plan: "Fix the outbox-notifier return leg so a dashboard-sourced Mirror REVIEW_PASS fires auto-merge + the closing Larry DM instead of archiving as 'no routable target'."
+  - Created: 01:39:50Z UTC (2026-08-27). ~141 min old at iter.
+  - PR#1113 (fix/dashboard-review-verdict-fourth-wall, OPEN, MERGEABLE, ~87 min) addresses same root cause.
+  - Larry action required: review PR#1113 AND/OR reply "approve" to avoid duplicate Forge build.
+
+**Check 5 (~04:01Z UTC):** `heal-stale-daemon-code.heartbeat` EXISTS at `/home/larry/agents/blackboard/`: timestamp=2026-08-27T03:56:40Z UTC (~5 min old). NOMINAL. **CORRECTION: the iter ~9726 MEMORY note "heartbeat files DO NOT EXIST anywhere on the filesystem" was FALSE. Heartbeat exists at blackboard/ (per the correct iter ~9110 note). MEMORY updated.**
+
+**Check A (~04:01Z UTC):** branch=main, HEAD=ad33cff7=origin/main (Pulse cycle 20260827T040002Z). Clean tree. behind=0, ahead=0. NOMINAL.
+**Check B (~04:01Z UTC):** agent-core-sync.json last_sync=2026-08-27T03:36:54Z UTC (~24 min old). status=no-change. commit=95687086. Within 2h threshold. NOMINAL.
+**Check C (~04:01Z UTC):** system-health.json ts=2026-08-27T03:57:00Z UTC (~4 min old). overall=healthy. All 4 desired=up, alive=True. NOMINAL.
+**Check E (~04:01Z UTC):**
+  - PR#1113 (~87 min old): fix/dashboard-review-verdict-fourth-wall, OPEN, MERGEABLE, reviewDecision=''. fix/* unrouted. <72h. MONITORING.
+  - PR#1112 (~197 min old): fix/schema-reject-alert, OPEN, MERGEABLE, reviewDecision=''. fix/* unrouted. <72h. MONITORING.
+**Check H (~04:01Z UTC):** 0 open Forge PRs (forge/* branches). Suite-guardian build task in Forge inbox (dispatched 03:48Z, started by inbox-watcher 03:48:13Z UTC, in-flight ~15 min). Beacon notify COMPLETED. MONITORING.
+
+**Section 5.0 one-shots:** No new artifacts. NOMINAL.
+**Check I (~04:01Z UTC):** artifact check-i-2026-08-26.json (fired ~14:10Z UTC 2026-08-26). Next expected Friday 2026-08-29. CARRY.
+**Check III (~04:01Z UTC):** No new artifact since 2026-08-23. Next expected 2026-09-06. CARRY.
+
+**Credential rotation watch:** SUPABASE_SERVICE_ROLE_KEY: last_dm=2026-08-17T23:23:16Z UTC. ~148h+ overdue (due 2026-08-22). Dedup window active until ~2026-08-31T23:23Z UTC. No re-DM. Larry must rotate per docs/runbooks/rotate-supabase-keys.md.
+
+**G-rules (this iter):**
+- nightly-502-cluster-001: DISPATCHED ✅. No new events. CARRY.
+- unreviewed-merge-without-gate-pattern: DISPATCHED ✅ (iter ~9884). Approval still pending. PR#1113 may address. CARRY.
+- mirror-to-dashboard-return-routing-failure-001: 1/3. No new routing WARNs this iter. CARRY.
+- heal-approvals-surface-drift-missing-card-tier4-001: 2/2. 0 new alerts. Fix pending: direction-ask-approvals-opt-b-implement-001. CARRY.
+- sync-service-deploy-restart-head-drift-tier4-no-translation-001: 1/3 (RE-OPENED iter ~9780). 0 new alerts this iter. Dispatch to Beacon at 3/3.
+- agent-runner-forge-transcript-not-persisted-tier3-001: 1/3 (from iter ~9904). Suite-guardian build IS resuming (inbox-watcher confirmed). If build succeeds, G-rule intent is addressed. Monitor for 3/3.
+- All other G-rules unchanged.
+
+**PRIME DIRECTIVE:** 1 intervention appended (iter=9905, tier=1, ts=2026-08-27T04:04:22Z UTC):
+  1. check4-pending-approval: dashboard-return-routing-auto-merge-001 still pending (~141 min); PR#1113 MERGEABLE ~87 min; PR#1112 MERGEABLE ~197 min; suite-guardian Forge build in-flight ~15 min.
+  Tier state: record --checks-clean false → Tier 1, consecutive_clean remains 0 (last_signal_at=04:04:26Z UTC).
+
+**Actions taken:**
+- Check 0: watermark confirmed 539 (no-op, no new alerts).
+- PRIME DIRECTIVE: 1 intervention row appended via cycle_prime_ledger.py append (iter=9905, tier=1, kind=intervention, template=check4-pending-approval).
+- Tier state: cycle_tier_state.py record --checks-clean false → consecutive_clean 0→0. Tier 1. last_signal_at=04:04:26Z UTC.
+- MEMORY updated: corrected heal-stale-daemon-code.heartbeat false-premise from iter ~9726 MEMORY note.
+
+**Escalations:** Outstanding (carried, no new Pulse DMs):
+  1. **[yellow] AWAITING LARRY** — `dashboard-return-routing-auto-merge-001` pending approval. DM delivered ~01:41:17Z UTC 2026-08-27 (~141 min old). NOTE: PR#1113 (fix/dashboard-review-verdict-fourth-wall, OPEN MERGEABLE ~87 min) addresses same root cause — review PR#1113 AND/OR reply "approve."
+  2. **[yellow] CARRY** — agent-runner-forge transcript-not-persisted:tier3 (G-rule 1/3, iter ~9904). Build resuming via inbox-watcher. Monitor.
+  3. **[yellow] CARRY** — heal-approvals-surface-drift:missing_card G-rule at 2/2; informational-cards impl pending.
+  4. Informational-cards impl gap (iter ~9102). Carry.
+  5. Check III artifact 2026-08-23: beacon 232→336s (+45%), mirror 1311→1448s (+10%). Command: `approve threshold-update-2026-08-23`.
+  6. Check I proposal [1]: [parked] cycle-202608192035370000 (high-σ pulse/cycle, 4.71σ). On dashboard Parked lane.
+  7. SUPABASE rotation OVERDUE (~148h past due 2026-08-22). Dedup active until ~2026-08-31. Rotate per docs/runbooks/rotate-supabase-keys.md.
+  8. nightly-502-cluster-001: DISPATCHED ✅. Monitor.
+  9. review-ceiling-fit: Mirror review ceiling RAISE 35→40min recommended. Digest route, no DM.
+  10. sync-service-deploy-restart-head-drift-tier4-no-translation-001: 1/3. Dispatch to Beacon at 3/3.
+
+**Patterns:** Check 4 non-nominal 20 consecutive iters (~9884–~9905) — same pending approval (~141 min since DM). Suite-guardian Forge build in-flight (started 03:48Z). System otherwise fully nominal. Key correction this iter: heal-stale-daemon-code.heartbeat EXISTS at blackboard/ (iter ~9726 MEMORY note was false premise; iter ~9110 note was correct).
+
+**Tier end-of-iter:** Tier 1, consecutive_clean=0.
+
+---
+
