@@ -23,9 +23,26 @@ from pathlib import Path
 # narrow until Larry wires up his own chat topology. Extend as needed.
 KNOWN_CHAT_IDS = set()
 
+# THE machine-readable answer to "did a HUMAN author this envelope?".
+#
+# It was a `# Humans` COMMENT until 2026-08-27. A property that exists only in
+# prose can only ever be RESTATED by the code that needs it, and a restated
+# list drifts — which is how outbox_notifier's marker-routing branch came to
+# ask `routing_source == 'larry'` and silently discard every verdict a human
+# dispatched from the DASHBOARD instead (agent-core #1108/#1109, both reviewed,
+# both REVIEW_PASS, both archived, both hand-merged).
+#
+# Membership test: would a PERSON be surprised to learn this envelope vanished?
+#   'larry'     — he typed it (Telegram direction-tasks, self-targeted approvals)
+#   'dashboard' — he clicked it; the API returns success either way
+# Agent names are NOT members even when an agent acts on Larry's approval.
+#
+# Unioned into ALLOWED_SOURCES below so the two can never disagree.
+HUMAN_SOURCES = frozenset({'larry', 'dashboard'})
+
 ALLOWED_SOURCES = {
-    # Humans
-    'larry',
+    # Humans — see HUMAN_SOURCES above; its members are unioned in at the end
+    # of this literal so the two definitions cannot drift apart.
     # Live agents
     'beacon', 'forge', 'mirror', 'pulse',
     'beacon-result', 'forge-result', 'mirror-result', 'pulse-result',
@@ -55,8 +72,13 @@ ALLOWED_SOURCES = {
     # between 2026-05-27T17:55Z and 2026-05-28T05:30Z, breaking the UI as a
     # control surface. Adding here closes the gap. NOTE: do not auto-replay
     # the stale envelopes already in beacon/.invalid — they predate this fix.
-    'dashboard',
 }
+# Fold the human sources in structurally rather than listing them twice. Adding
+# a human surface to HUMAN_SOURCES therefore allows it here automatically — the
+# 2026-05-28 incident was exactly this pair drifting apart ('dashboard' was a
+# control surface for months before anyone added it to the allowlist, and 4 of
+# Larry's envelopes were dropped in silence over 12 hours).
+ALLOWED_SOURCES |= HUMAN_SOURCES
 
 # Phase D3 — clarification protocol metadata. Optional on dispatch.
 #
