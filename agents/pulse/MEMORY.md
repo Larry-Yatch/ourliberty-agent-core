@@ -58,9 +58,9 @@ DO NOT cite the iter ~9726 phantom-everywhere claim ever again — it is permane
 
 ---
 
-## G-rule mirror-queue-wait-gauge-third-review-slot-readiness-tier4-no-translation-001 — 1/3 (new, iter ~9111, 2026-08-11T03:06Z UTC)
+## G-rule mirror-queue-wait-gauge-third-review-slot-readiness-tier4-no-translation-001 — 2/3 (updated iter ~9907, 2026-08-27T04:12Z UTC)
 
-**Rule:** `source=mirror-queue-wait-gauge, subject=third-review-slot-readiness` returns Tier-4 from the triage helper (no translation match). First occurrence: iter ~9111 (2026-08-11T03:06Z UTC). Alert fires when p95 PR-open→review-start queue-wait exceeds 90min WITH two slots running — signals that two Mirror review slots are saturating during bursts. Fix candidates: (a) raise review_slots to 3 in config/agent-models.json + ConcurrencyGuard RAM re-check, (b) cut per-review service time. Bot delivered directly at idx=560 (route=escalate, tier=FYI, 3-day re-fire cooldown). Fix: add Tier-3 translation entry for source=mirror-queue-wait-gauge in config/alert-translations.json (digest or escalate as appropriate), OR clarify if this alert class needs Larry action before silencing. Dispatch to Beacon at 3/3.
+**Rule:** `source=mirror-queue-wait-gauge, subject=third-review-slot-readiness` returns Tier-4 from the triage helper (no translation match). Occurrences: [1/3] iter ~9111 (2026-08-11T03:06Z UTC); [2/3] iter ~9907 (2026-08-27T04:12:07Z UTC, line 541, p95 wait=404.9m over 5 reviews in 24h). Alert fires when p95 PR-open→review-start queue-wait exceeds 90min WITH two slots running — signals that two Mirror review slots are saturating during bursts. Fix candidates: (a) raise review_slots to 3 in config/agent-models.json + ConcurrencyGuard RAM re-check, (b) cut per-review service time. 3-day re-fire cooldown; next re-fire ~2026-08-30. Bot delivers directly (route=escalate, tier=FYI). Fix: add Tier-3 translation entry for source=mirror-queue-wait-gauge in config/alert-translations.json (digest or escalate as appropriate). Dispatch to Beacon at 3/3.
 
 ---
 
