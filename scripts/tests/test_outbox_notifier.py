@@ -11975,6 +11975,126 @@ class DashboardDirectDispatchTest(LarryDirectDispatchTest):
         self.assertEqual(tier_source, 'translation')
         self.assertEqual(tier, 'SOON')
 
+    # ---- the LAST leg: a human-direct marker whose only signal was a DM ----
+
+    def _forge_marker_outbox(self, name, marker, **extra):
+        body = _good_outbox(
+            agent='forge', source='dashboard', task_id='dash-forge',
+            phase='preflight', result='Preflight narrative.\n\n' + marker,
+        )
+        body['reply_chat_id'] = None
+        body['target_repo'] = 'ourliberty-agent-core'
+        body.update(extra)
+        outbox_dir = on.OUTBOXES_ROOT / 'forge'
+        outbox_dir.mkdir(parents=True, exist_ok=True)
+        f = outbox_dir / name
+        f.write_text(json.dumps(body))
+        return f
+
+    def test_forge_clarify_with_no_chat_alerts_instead_of_evaporating(self):
+        """REPRODUCTION for the last leg. CLARIFY_REQUEST has no follow-up
+        dispatcher, so a synthesized DM was its ONLY closing signal — and a
+        control-surface envelope has no chat to send it to. Before the
+        `had_an_outcome` check this marker routed, ran every handler, matched
+        none of them, and archived having done nothing.
+
+        Counted before closing it: across all 9,055 archived outboxes, 48 carry
+        a marker whose routing source is human, and exactly ONE is a
+        chat-less CLARIFY_REQUEST (`forge-queue-api-preflight-20260603T231401Z`,
+        source=larry, 2026-06-03). Rare — but it is the same class this PR is
+        about, one step further down the same function."""
+        marker = (
+            '=== CLARIFY_REQUEST ===\n'
+            '{"task_id": "dash-forge", "question": "Which repo is this for?"}\n'
+            '=== END_CLARIFY_REQUEST ==='
+        )
+        f = self._forge_marker_outbox('dash-clarify.json', marker)
+        result = on.process_outbox(f)
+
+        alerts = self._read_alerts()
+        self.assertEqual(len(alerts), 1, 'the clarify evaporated silently')
+        self.assertIn('thrown away', alerts[0]['message'])
+        self.assertEqual(result, 'human-direct-marker')
+
+    def test_forge_reject_with_no_chat_alerts_instead_of_evaporating(self):
+        """The sibling leg. REJECT is a TERMINAL intent, so it is handled by
+        `_maybe_dm_larry` rather than the synth-DM path — a different branch,
+        the same hole, and it is why the check asks what the handlers DID
+        rather than listing which intents they cover.
+
+        Zero live occurrences (the 48 human-routed markers include none), so
+        this is the door that was closed because it is the same door, not
+        because it had been walked through."""
+        marker = (
+            '=== REJECT ===\n'
+            '{"task_id": "dash-forge", "reason": "The spec contradicts itself."}\n'
+            '=== END_REJECT ==='
+        )
+        f = self._forge_marker_outbox('dash-reject.json', marker)
+        result = on.process_outbox(f)
+
+        alerts = self._read_alerts()
+        self.assertEqual(len(alerts), 1, 'the reject evaporated silently')
+        self.assertEqual(result, 'human-direct-marker')
+
+    def test_a_marker_that_DID_something_raises_no_extra_alert(self):
+        """The negative control for the check above — without it, "always
+        alert" would pass every test in this section while turning the fix
+        into alert toil. Each of the four outcome answers is exercised.
+
+        (PROCEED is not in this list: `_dispatch_build_phase` skips when the
+        envelope carries no `claude_session_id`, so `has_followup_dispatch`
+        PREDICTS a dispatch that does not happen. That prediction gap is
+        pre-existing and source-agnostic — it logs "Larry should manually
+        re-dispatch" on the beacon path too — and closing it needs
+        `_dispatch_build_phase` to return an answer, which is a signature
+        change this PR deliberately does not make. Disclosed, not hidden.)"""
+        cases = {
+            'merge_result (auto-merge ran)':
+                _load_dashboard_verdict('mirror-pass-pr1108.json'),
+            'no_session_bucket (a decision card was written)':
+                _mirror_outbox_body(
+                    _mirror_escalate_marker(task_id='ctrl-esc'),
+                    source='dashboard', task_id='ctrl-esc',
+                    reply_chat_id=None, target_repo='ourliberty-agent-core',
+                    pr_url=PR_URL_FIXTURE,
+                ),
+            'has_followup_dispatch (Forge got a revision)':
+                _mirror_outbox_body(
+                    _mirror_revision_marker(
+                        task_id='ctrl-rev', confidence='high'),
+                    source='dashboard', task_id='ctrl-rev',
+                    reply_chat_id=None, forge_build_session_id='s1',
+                    target_repo='ourliberty-agent-core',
+                    branch='forge/ctrl', pr_url=PR_URL_FIXTURE,
+                    revision_count=0, max_revisions=3,
+                ),
+            'chat_id present (a DM was deliverable)':
+                _mirror_outbox_body(
+                    _mirror_escalate_marker(task_id='ctrl-chat'),
+                    source='dashboard', task_id='ctrl-chat',
+                    reply_chat_id=12345, target_repo='ourliberty-agent-core',
+                    pr_url=PR_URL_FIXTURE,
+                ),
+        }
+        for label, body in cases.items():
+            with self.subTest(outcome=label):
+                before = len(self._read_alerts())
+                f = self._write_mirror_outbox(
+                    f'ctrl-{abs(hash(label)) % 10000}.json', body,
+                )
+                on.process_outbox(f)
+                new = self._read_alerts()[before:]
+                unroutable = [
+                    a for a in new
+                    if 'thrown away' in a.get('message', '')
+                ]
+                self.assertEqual(
+                    unroutable, [],
+                    f'{label}: an outcome DID occur, so no unroutable-verdict '
+                    f'alert may fire',
+                )
+
     # ---- EVASION mutations (code-discipline item 10, fourth clause) ------
     # The rules above are all PRESENCE mutations: put the violation in plain
     # sight and check the guard fires. These two express the SAME violation —

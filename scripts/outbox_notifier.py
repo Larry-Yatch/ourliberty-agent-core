@@ -14850,6 +14850,15 @@ def process_outbox(outbox_file: Path) -> str:
             #   REJECT / CLARIFY_EXHAUST → terminal DM via _maybe_dm_larry
             #   CLARIFY_REQUEST          → no dispatcher; synth DM with
             #                              clarify-specific body
+            #
+            # Every row of that matrix assumed a chat exists, because in 2026-05
+            # every human-direct dispatch came from Telegram. A CONTROL-SURFACE
+            # dispatch carries `reply_chat_id: null`, so the two rows whose only
+            # closing signal is a DM — Forge REJECT and CLARIFY_REQUEST — reach
+            # the end of this block having done nothing at all. The
+            # `had_an_outcome` check further down catches exactly those and
+            # alerts; it is the same guarantee as the archive branch above, one
+            # step later in the function.
             mtype = marker_decision['marker_type']
             has_followup_dispatch = (
                 (mtype == 'proceed' and agent == 'forge')
@@ -15141,8 +15150,9 @@ def process_outbox(outbox_file: Path) -> str:
         # self-clearing for-Larry record; self-healing → silent). One artifact
         # per escalation, idempotent on PR + head SHA. Runs after the dispatch +
         # obligation bookkeeping above so the self-healing case is observable.
+        no_session_bucket = None
         if agent == 'mirror':
-            _route_no_session_review(data, marker_decision)
+            no_session_bucket = _route_no_session_review(data, marker_decision)
 
         # false-success-notify-fix (2026-06-11): the Mirror REVIEW_PASS
         # auto-merge now runs EARLIER — before the back-leg notify — via
@@ -15162,6 +15172,39 @@ def process_outbox(outbox_file: Path) -> str:
         # behavior where skip cases sent no DM (the notify above still fired).
         if review_pass_skip is None:
             _maybe_dm_larry(data, marker_decision)
+
+        # Closes the LAST leg of this branch's class. A human-direct marker is
+        # no longer archived unread — but for two Forge markers a DM was the
+        # ONLY closing signal, and a control-surface envelope carries no chat,
+        # so CLARIFY_REQUEST and REJECT reached here having done nothing at
+        # all. Same defect one step further down the function: not archived,
+        # just as invisible.
+        #
+        # The test asks the HANDLERS what they did rather than re-listing
+        # which marker types they run for (code-discipline item 14 — a second
+        # copy of a rule diverges the moment either side is amended). Each
+        # disjunct below is an ANSWER:
+        #   has_followup_dispatch     — a task was written to another inbox
+        #   merge_result              — set by _run_review_pass_auto_merge
+        #   no_session_bucket         — returned by _route_no_session_review
+        #   isinstance(chat_id, int)  — a DM was deliverable
+        # The emergency-halt disjunct is the one exception: _trip_emergency_
+        # halt (≈340 lines above, in this same function) returns nothing, so
+        # the marker type stands in for its answer. `_emergency_halt_active()`
+        # is deliberately NOT used — a halt tripped by some earlier, unrelated
+        # task would suppress this alert for every marker until it is cleared.
+        if human_direct:
+            had_an_outcome = (
+                has_followup_dispatch
+                or marker_decision.get('merge_result') is not None
+                or no_session_bucket is not None
+                or isinstance(chat_id, int)
+                or marker_decision['marker_type'] == 'review_emergency_halt'
+            )
+            if not had_an_outcome:
+                _alert_unroutable_marker_verdict(
+                    data, marker_decision, agent, source, routing_source,
+                )
 
         _archive_outbox(outbox_file)
         # false-success-notify-fix (2026-06-11): a review-pass merge SKIP
