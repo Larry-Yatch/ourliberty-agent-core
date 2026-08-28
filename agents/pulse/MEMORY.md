@@ -86,6 +86,12 @@ DO NOT cite the iter ~9726 phantom-everywhere claim ever again — it is permane
 
 ---
 
+## G-rule inbox-watcher-routing-denied-pulse-forge-001 — 1/3 (new, iter ~10218, 2026-08-28T15:53Z UTC)
+
+**Rule:** `source=inbox-watcher, subject=routing-denied:pulse->forge` fires when the automated cycle writes a dispatch envelope to forge's inbox directly (route pulse→forge not allowed; allowed from pulse: ['beacon']). First occurrence: iter ~10218 (2026-08-28T15:53Z UTC, line 505 larry-alerts.jsonl, route=escalate, tier=SOON). Context: automated cycle tried to dispatch the G-rule sync-service-deploy-restart-head-drift direction-ask to Forge directly (twice: sync-deploy-restart-head-drift-translation-001.json + .1.json). Inbox-watcher dead-lettered both. Self-healed: Beacon's pulse-auto-dispatch path processed the direction-ask and registered the approval. Root cause: automated cycle's direction-ask dispatch logic writes to Forge directly — should always route to Beacon. Code bug in the automated cycle's envelope writer. Fix: fix automated cycle direction-ask dispatch to always write to Beacon inbox, not Forge. Dispatch to Beacon at 3/3.
+
+---
+
 ## G-rule outbox-notifier-approval-request-task-id-subject-tier4-001 — CLOSED ✅ (PR#1108 MERGED 2026-08-27T01:21:17Z UTC, verified iter ~10218)
 
 **Rule (CLOSED):** `source=outbox-notifier, kind=approval_request, subject=<task_id>` formerly returned Tier-4 because non-null subject defeated the kind-fallback in `_translation_match`. Fix: PR#1108 made kind-key win over subject when source=outbox-notifier + kind=approval_request. **Verified iter ~10218 (2026-08-28T16:33Z UTC): line 506 (outbox-notifier approval_request for sync-service-deploy-restart-head-drift-tier4-no-translation-001) classified Tier 3 correctly without a Tier-4 alert — PR#1108 fix working.** PR#1108 title: "fix(pulse): Tier-3 silence Check 0 re-triage of already-delivered..." Do NOT dispatch further; do NOT re-open.
