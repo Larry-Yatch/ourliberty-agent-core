@@ -20654,6 +20654,23 @@
       "retired_by": "heal_orphan_autoregister",
       "retired_at": "2026-08-27T04:31:56.539298+00:00",
       "retired_reason": "orphan-terminal"
+    },
+    {
+      "id": "proposed-direction-ask-sync-deploy-restart-head-drift-translation-001",
+      "name": "Direction Ask Sync Deploy Restart Head Drift Translation 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `direction-ask-sync-deploy-restart-head-drift-translation-001`. Last activity 2026-08-28T15:55:22.032503+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "direction-ask-sync-deploy-restart-head-drift-translation-001"
+      ],
+      "repo": null,
+      "created": "2026-08-28",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-28T15:58:15.621463+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-28T15:55:22.032503+00:00"
     }
   ]
 }
