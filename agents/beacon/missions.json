@@ -20670,7 +20670,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-08-28T15:58:15.621463+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-08-28T15:55:22.032503+00:00"
+      "orphan_last_activity_ts": "2026-08-28T15:55:22.032503+00:00",
+      "briefing": {
+        "what": "A question from the team about how our automated deployment system should behave when a restart leaves things out of step, waiting on your call.",
+        "why": "Until it's answered, the same mismatch can quietly resurface and cost time on future releases, and the team is holding rather than guessing.",
+        "suggest": "Take a few minutes to get the plain-English options from the team before deciding, since this one touches live deployment behavior and is worth getting right the first time."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-28T16:02:28.092968+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     }
   ]
 }
