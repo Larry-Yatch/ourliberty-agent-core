@@ -98,6 +98,16 @@ DO NOT cite the iter ~9726 phantom-everywhere claim ever again — it is permane
 
 ---
 
+## Suite guardian heartbeat — path CORRECTED (iter ~10212, 2026-08-28T16:57Z UTC)
+
+**Canonical path:** `/home/larry/agents/blackboard/pulse-check-main-suite-guardian.heartbeat`
+
+Prior iters (~10123–~10209, 83 consecutive) reported "NOT FOUND" because the glob `suite-guardian*.heartbeat` does NOT match this filename. The file has ALWAYS been at the `pulse-check-main-suite-guardian.heartbeat` path. The nightly timer IS running — last run 2026-08-28T03:44:48Z UTC (~13.2h old at correction iter). A 13–24h old timestamp is NOMINAL for a nightly timer; only treat as stale if > 24h old (i.e., missed a nightly run).
+
+**Do NOT use the glob `suite-guardian*.heartbeat` or `suite-guardian.heartbeat`** — use the exact path above.
+
+---
+
 ## G-rule source-beacon-notifications-tier4-no-translation — 2/3 (updated iter ~8351)
 
 **Rule:** `source=beacon, kind=notification` returns Tier-4 from the triage helper (no translation entry). Two confirmed occurrences: iter ~8274 (2026-08-07T06:07Z UTC, intent=review-escalate, RSDPM PR#198 Mirror escalated, Beacon DM idx=570 already delivered) and iter ~8351 (2026-08-07T15:09Z UTC, intent=review-pass, RSDPM PR#198 merged, Beacon sent manual notification, outbox-notifier idx=559 already delivered). Root cause: source=beacon notification intent variants (review-escalate, review-pass, others TBD) lack translation entries; outbox-notifier delivers them directly making any Pulse DM a duplicate. Fix: add a broad Tier-3 translation entry for `source=beacon, kind=notification` in config/alert-translations.json (silence+journal: Beacon delivers these directly). Dispatch to Beacon at 3/3.
