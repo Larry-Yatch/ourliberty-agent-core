@@ -20684,7 +20684,28 @@
         "at": "2026-08-28T16:02:28.092968+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-08-28T16:13:17.669273+00:00",
+      "retired_reason": "orphan-terminal"
+    },
+    {
+      "id": "proposed-sync-service-deploy-restart-head-drift-tier4-no-translation-001",
+      "name": "Sync Service Deploy Restart Head Drift Tier4 No Translation 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `sync-service-deploy-restart-head-drift-tier4-no-translation-001`. Last activity 2026-08-28T15:58:45.924787+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "sync-service-deploy-restart-head-drift-tier4-no-translation-001"
+      ],
+      "repo": null,
+      "created": "2026-08-28",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-28T16:13:17.669273+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-28T15:58:45.924787+00:00"
     }
   ]
 }
