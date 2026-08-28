@@ -20705,7 +20705,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-08-28T16:13:17.669273+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-08-28T15:58:45.924787+00:00"
+      "orphan_last_activity_ts": "2026-08-28T15:58:45.924787+00:00",
+      "briefing": {
+        "what": "A routine, expected system restart that happens after every code update is being flagged to you as if it were a brand-new, unexplained problem.",
+        "why": "It clutters your alerts with noise you don't need to act on, which trains everyone to skim past alerts and risks a real issue slipping by unnoticed.",
+        "suggest": "Approve teaching the system to recognize this restart as normal, but have it verified in a test run first so we don't accidentally silence a genuine failure of the same service."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-28T16:22:34.980868+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     }
   ]
 }
