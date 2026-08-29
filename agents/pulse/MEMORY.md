@@ -76,13 +76,11 @@ DO NOT cite the iter ~9726 phantom-everywhere claim ever again — it is permane
 
 ---
 
-## G-rule sync-service-deploy-restart-head-drift-tier4-no-translation-001 — DISPATCHED ✅ (3/3, iter ~10218, 2026-08-28T15:58Z UTC)
+## G-rule sync-service-deploy-restart-head-drift-tier4-no-translation-001 — CLOSED ✅ (PR#1115 MERGED 2026-08-29T18:19:32Z UTC, verified iter ~10565)
 
-**Rule:** `source=sync.service, subject=deploy-restart-head-drift` returns Tier-4 from the triage helper (no translation match in config/alert-translations.json). Alert fires each Pulse-commit cycle when sync.service sees local HEAD moved to new commit but deploy target is still the prior commit — condition self-resolves on the same sync tick. Occurrences: [1/3] iter ~9780 (2026-08-25T07:40Z UTC); [2/3] iter ~10130 (2026-08-28T09:39Z UTC, line 500); [3/3] iter ~10218 (2026-08-28T15:39Z UTC, line 504).
+**Rule (CLOSED):** `source=sync.service, subject=deploy-restart-head-drift` formerly returned Tier-4 (no translation match). Fix: PR#1115 ("config: silence sync.service deploy-restart-head-drift as Tier-3 FYI") merged at 18:19:32Z UTC 2026-08-29. Translation entry `deploy-restart-head-drift` under `sync.service` VERIFIED in config/alert-translations.json (iter ~10565). G-rule systemic_fix row appended to cycle-prime-ledger.jsonl (iter 10565, template=sync-service-deploy-restart-head-drift-tier4-no-translation-001, detail=pr1115-merged-translation-verified). **Do NOT re-open or re-dispatch.** Next time the alert fires it will be classified Tier-3 silenced by the translation entry.
 
-**DISPATCH:** Automated cycle hit 3/3 and wrote a Beacon direction-ask. Two dead-letters first (pulse→forge routing denied, inbox-watcher caught them), then Beacon's pulse-auto-dispatch path processed the direction-ask at 15:58Z UTC and registered approval_request `sync-service-deploy-restart-head-drift-tier4-no-translation-001` in beacon-pending-approvals.json. DM delivered to Larry by outbox-notifier + doorbell. Fix: add Tier-3 (digest/silence) translation entry for `source=sync.service, subject=deploy-restart-head-drift` in config/alert-translations.json. **Awaiting Larry approval.** Do NOT re-dispatch.
-
-**Prior CLOSED status was a FALSE PREMISE (iter ~8897):** the CLOSED claimed "translation was already in place" but config/alert-translations.json does NOT contain a `deploy-restart-head-drift` key under `sync.service` (verified iter ~9780). **Do NOT re-close without verifying the translation entry actually exists.**
+**History:** Dispatched iter ~10218 (2026-08-28T15:58Z UTC) after 3/3 occurrences. Prior false-CLOSED at iter ~8897 (translation not actually present). Verified REAL close this iter — checked config file directly.
 
 ---
 
