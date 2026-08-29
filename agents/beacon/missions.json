@@ -20767,7 +20767,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-08-29T17:19:37.146068+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-08-29T17:15:17.659865+00:00"
+      "orphan_last_activity_ts": "2026-08-29T17:15:17.659865+00:00",
+      "briefing": {
+        "what": "A piece of finished work is sitting in the review queue waiting for a sign-off before it can go live.",
+        "why": "Work that's done but unreviewed delivers no value and quietly slows everything queued behind it.",
+        "suggest": "Have someone give it a proper look this week rather than waving it through, since a quick check now avoids rework later."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-29T17:29:37.173299+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
