@@ -11270,20 +11270,52 @@ class CostDmTemplateTest(unittest.TestCase):
         self.assertIn('?', body)
 
 
-class LarryDirectDispatchTest(unittest.TestCase):
-    """E1.5.2 source-routing fix: when Larry dispatches Mirror directly
-    (source='larry') and propagates reply_chat_id, the notifier should
-    (a) skip the inter-agent notify (no agent to route to), (b) fire
-    auto-merge if the marker is REVIEW_PASS, and (c) DM Larry the result
-    via the existing reply_chat_id chain.
+class _DirectDispatchHarness:
+    """Sandbox shared by the larry-direct and dashboard-direct suites.
 
-    The bug this fixes: PR #45 dispatch on 2026-05-19 — Larry sent the
-    design PR straight to Mirror; Mirror's REVIEW_PASS was archived with
-    'no routable target' WARN because _primary_agent_id('larry') is None.
-    Auto-merge had to fall through to heal-pr-auto-merge (E1.3) instead.
+    A MIXIN, not a TestCase. `DashboardDirectDispatchTest` used to subclass
+    `LarryDirectDispatchTest` outright just to borrow this setUp, which made
+    unittest collect the parent's six tests a second time, byte-identical,
+    under a second class name — a parent regression reported twice, and every
+    future parent test silently doubling. Splitting the harness out is the
+    whole fix; each suite keeps its own tests.
+
+    WORKTREE TEARDOWN IS MOCKED FOR THE WHOLE HARNESS, and that is load-bearing
+    rather than tidiness. `setUp` sets `_AUTO_MERGE_SKIP_SERIALIZER_FOR_TEST`,
+    and that bypass calls `_teardown_worktrees_for_task` +
+    `_signal_sequence_step_merged` unconditionally on a `merged` outcome.
+    Neither is sandboxed: `_canonical_repo_for_coords` reads the
+    checkout-relative `config/agent-models.json`, and
+    `worktree_manager.WORKTREE_BASE` is `Path.home()/'agent-worktrees'`, which
+    honours no `OURLIBERTY_*` override (`_bootstrap` deliberately does not swap
+    HOME). On a Mac both paths are absent so it no-ops, which is exactly why
+    this was invisible here — but these fixtures carry REAL production task
+    ids, and on 2026-08-27 the droplet really did hold
+    `~/agent-worktrees/wt-mirror-check0-delivered-kinds-tier3-001` and
+    `…-alert-translations-unrouted-pr-nudges-retired-001`. Running this suite
+    there — the house habit for timeout-sensitive tests — would have run
+    `git worktree remove --force --force` on live directories from a unit test.
+
+    Confirmed by spying from INSIDE this module, not from a driver script: the
+    sandbox reloads `outbox_notifier`, so an out-of-band `setattr` on the
+    module object is discarded and the probe reads "never called" — a false
+    clean. The in-file spy returned
+    `[{'task_id': 'check0-delivered-kinds-tier3-001', 'repo_coords':
+    'Larry-Yatch/ourliberty-agent-core'}]`.
     """
 
+    def _install_merge_side_effect_guards(self):
+        """Arm before any test can drive a merge. addCleanup, so it unwinds
+        even when setUp raises partway."""
+        for name in ('_teardown_worktrees_for_task',
+                     '_signal_sequence_step_merged'):
+            patcher = mock.patch.object(on, name)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
     def setUp(self):
+        # FIRST, before anything can drive a merge — see the harness docstring.
+        self._install_merge_side_effect_guards()
         self._tmp = tempfile.TemporaryDirectory()
         self._root = Path(self._tmp.name)
         self._originals = {}
@@ -11371,6 +11403,20 @@ class LarryDirectDispatchTest(unittest.TestCase):
         if not path.exists():
             return []
         return [json.loads(l) for l in path.read_text().splitlines() if l.strip()]
+
+
+class LarryDirectDispatchTest(_DirectDispatchHarness, unittest.TestCase):
+    """E1.5.2 source-routing fix: when Larry dispatches Mirror directly
+    (source='larry') and propagates reply_chat_id, the notifier should
+    (a) skip the inter-agent notify (no agent to route to), (b) fire
+    auto-merge if the marker is REVIEW_PASS, and (c) DM Larry the result
+    via the existing reply_chat_id chain.
+
+    The bug this fixes: PR #45 dispatch on 2026-05-19 — Larry sent the
+    design PR straight to Mirror; Mirror's REVIEW_PASS was archived with
+    'no routable target' WARN because _primary_agent_id('larry') is None.
+    Auto-merge had to fall through to heal-pr-auto-merge (E1.3) instead.
+    """
 
     def test_review_pass_with_larry_source_and_chat_id_auto_merges(self):
         # The bug fix: source='larry' + reply_chat_id set must trigger
@@ -11535,7 +11581,7 @@ def _load_dashboard_verdict(name):
     )
 
 
-class DashboardDirectDispatchTest(LarryDirectDispatchTest):
+class DashboardDirectDispatchTest(_DirectDispatchHarness, unittest.TestCase):
     """The fourth wall: a Mirror review DISPATCHED FROM THE DASHBOARD can
     return REVIEW_PASS and still never auto-merge, because its result leg has
     no routable target and is silently archived.
@@ -11655,9 +11701,11 @@ class DashboardDirectDispatchTest(LarryDirectDispatchTest):
         therefore never ran. It has its own `_primary_chat_id()` fallback, so
         the absence of a reply chat is not a reason to drop the verdict."""
         # A task_id unique to THIS test: the approval store is sandboxed
-        # per-PROCESS (scripts/tests/_bootstrap), not per-test, and the
-        # inherited larry escalate case already writes `mirror-review-real-rev`
-        # — reusing it would let this assertion pass on the sibling's artifact.
+        # per-PROCESS (scripts/tests/_bootstrap), not per-test, so the sibling
+        # larry escalate case in LarryDirectDispatchTest writes
+        # `mirror-review-real-rev` into the SAME store — reusing that id would
+        # let this assertion pass on the sibling's artifact. (The two suites no
+        # longer share a class, but they still share the process.)
         task_id = 'dash-esc-rev'
 
         def _artifacts():
@@ -11824,6 +11872,21 @@ class DashboardDirectDispatchTest(LarryDirectDispatchTest):
             f = self._write_mirror_outbox('dash-record.json', body)
             on.process_outbox(f)
 
+        # The harness guard held: the REAL worktree teardown never ran. Without
+        # it this line reads `<MagicMock ...>` for a call carrying a live
+        # production task id — the droplet-destructive path (see the harness
+        # docstring). Asserted here, not only in setUp, because setUp arming
+        # and setUp arming THE RIGHT THING are different claims.
+        self.assertTrue(
+            isinstance(on._teardown_worktrees_for_task, mock.MagicMock),
+            'worktree teardown is not mocked — this test would run '
+            '`git worktree remove --force --force` on the droplet',
+        )
+        on._teardown_worktrees_for_task.assert_called_once()
+        self.assertEqual(
+            on._teardown_worktrees_for_task.call_args.kwargs['task_id'],
+            'check0-delivered-kinds-tier3-001',
+        )
         # The real merge actually shelled out to `gh pr merge`.
         self.assertEqual(gh.call_count, 1)
         self.assertEqual(
@@ -11890,6 +11953,105 @@ class DashboardDirectDispatchTest(LarryDirectDispatchTest):
         self.assertEqual(len(self._read_alerts()), 1)
         self.assertEqual(self._auto_merge_calls, [])
         self.assertEqual(result, 'archived-no-notify')
+
+    def test_alert_text_fits_the_marker_family_it_describes(self):
+        """This call site sees BOTH Mirror review markers and Forge PREFLIGHT
+        markers, and the first version of the text assumed a code review on a
+        PR for all of them — telling the operator a non-existent PR was stuck.
+
+        Caught by RENDERING the alert and reading it, not by reading the diff:
+        `operator_artifacts.py` reports the f-string as one artifact and cannot
+        know which branch a given run takes. Both shapes are pinned here so a
+        later edit cannot re-collapse them."""
+        forge_marker = (
+            '=== CLARIFY_REQUEST ===\n'
+            '{"task_id": "preflight-x", "question": "Which repo?"}\n'
+            '=== END_CLARIFY_REQUEST ==='
+        )
+        body = _good_outbox(
+            agent='forge', source='auto-retry', task_id='preflight-x',
+            phase='preflight', result='Narrative.\n\n' + forge_marker,
+        )
+        body['reply_chat_id'] = None
+        outbox_dir = on.OUTBOXES_ROOT / 'forge'
+        outbox_dir.mkdir(parents=True, exist_ok=True)
+        f = outbox_dir / 'family-forge.json'
+        f.write_text(json.dumps(body))
+        on.process_outbox(f)
+
+        alerts = self._read_alerts()
+        self.assertEqual(len(alerts), 1)
+        msg = alerts[0]['message']
+        # It is a preflight, so it must not be described as a review...
+        self.assertIn('build preflight', msg)
+        self.assertNotIn('code review', msg)
+        # ...and must not claim a PR is stuck when none exists yet.
+        self.assertIn('no PR yet', msg)
+        self.assertNotIn('The PR will sit', msg)
+
+        # Control: the Mirror shape still gets the PR wording, so this test
+        # cannot be satisfied by blanding the text into saying nothing.
+        self._auto_merge_calls.clear()
+        mirror_body = _mirror_outbox_body(
+            _mirror_pass_marker(task_id='family-mirror'),
+            task_id='family-mirror', source='auto-retry', reply_chat_id=None,
+            pr_url=PR_URL_FIXTURE,
+        )
+        g = self._write_mirror_outbox('family-mirror.json', mirror_body)
+        on.process_outbox(g)
+        mirror_msg = self._read_alerts()[-1]['message']
+        self.assertIn('code review', mirror_msg)
+        self.assertIn('The PR will sit', mirror_msg)
+        self.assertNotIn('no PR yet', mirror_msg)
+
+    def test_alert_does_not_claim_a_card_it_cannot_produce(self):
+        """Gate-and-reader parity for the OTHER reader of this alert.
+
+        `needs_larry=True` means "this owes Larry an Approvals card". Two
+        healers read that stamp and disagree by construction:
+        `heal_approvals_surface_drift.is_actionable_alert` counts the alert as
+        awaiting-Larry, while `heal_unregistered_approval` can only build a
+        card from a BINARY `suggested_action` and returns None for a shell
+        command — so every occurrence would log a `missing_card` drift row that
+        is not a real failure.
+
+        Asserted by asking the REAL readers, not by re-stating their rules, and
+        both directions are checked so "never stamp anything" would not pass
+        this test either. (agent-core #1112 was parked on 2026-08-27 over this
+        same shape; this keeps the two alerting changes consistent.)"""
+        import heal_approvals_surface_drift as drift
+        import heal_unregistered_approval as promoter
+
+        body = _mirror_outbox_body(
+            _mirror_pass_marker(), source='auto-retry', reply_chat_id=None,
+        )
+        f = self._write_mirror_outbox('card-claim.json', body)
+        on.process_outbox(f)
+
+        alerts = self._read_alerts()
+        self.assertEqual(len(alerts), 1)
+        record = alerts[0]
+
+        # The promoter genuinely cannot build a card from this action...
+        self.assertIsNotNone(record.get('suggested_action'))
+        self.assertIsNone(
+            promoter.parse_binary_options(record['suggested_action']),
+            'if the promoter CAN parse this now, the stamp should come back',
+        )
+        # ...so the drift sentinel must not be counting it as awaiting a card.
+        self.assertFalse(
+            drift.is_actionable_alert(record),
+            'the alert claims an Approvals card the promoter will refuse — '
+            'one missing_card drift row per occurrence',
+        )
+        # Control: the stamp is what the sentinel keys on, so this test would
+        # still fail if delivery were silently downgraded instead.
+        self.assertEqual(record['route'], 'escalate')
+        self.assertTrue(
+            drift.is_actionable_alert({**record, 'needs_larry': True}),
+            'control: the sentinel must key on needs_larry, or this test is '
+            'passing for the wrong reason',
+        )
 
     def test_suppressed_alert_is_logged_not_swallowed(self):
         """Item-4's killer question, aimed at the fix itself: construct the
@@ -11974,126 +12136,6 @@ class DashboardDirectDispatchTest(LarryDirectDispatchTest):
         )
         self.assertEqual(tier_source, 'translation')
         self.assertEqual(tier, 'SOON')
-
-    # ---- the LAST leg: a human-direct marker whose only signal was a DM ----
-
-    def _forge_marker_outbox(self, name, marker, **extra):
-        body = _good_outbox(
-            agent='forge', source='dashboard', task_id='dash-forge',
-            phase='preflight', result='Preflight narrative.\n\n' + marker,
-        )
-        body['reply_chat_id'] = None
-        body['target_repo'] = 'ourliberty-agent-core'
-        body.update(extra)
-        outbox_dir = on.OUTBOXES_ROOT / 'forge'
-        outbox_dir.mkdir(parents=True, exist_ok=True)
-        f = outbox_dir / name
-        f.write_text(json.dumps(body))
-        return f
-
-    def test_forge_clarify_with_no_chat_alerts_instead_of_evaporating(self):
-        """REPRODUCTION for the last leg. CLARIFY_REQUEST has no follow-up
-        dispatcher, so a synthesized DM was its ONLY closing signal — and a
-        control-surface envelope has no chat to send it to. Before the
-        `had_an_outcome` check this marker routed, ran every handler, matched
-        none of them, and archived having done nothing.
-
-        Counted before closing it: across all 9,055 archived outboxes, 48 carry
-        a marker whose routing source is human, and exactly ONE is a
-        chat-less CLARIFY_REQUEST (`forge-queue-api-preflight-20260603T231401Z`,
-        source=larry, 2026-06-03). Rare — but it is the same class this PR is
-        about, one step further down the same function."""
-        marker = (
-            '=== CLARIFY_REQUEST ===\n'
-            '{"task_id": "dash-forge", "question": "Which repo is this for?"}\n'
-            '=== END_CLARIFY_REQUEST ==='
-        )
-        f = self._forge_marker_outbox('dash-clarify.json', marker)
-        result = on.process_outbox(f)
-
-        alerts = self._read_alerts()
-        self.assertEqual(len(alerts), 1, 'the clarify evaporated silently')
-        self.assertIn('thrown away', alerts[0]['message'])
-        self.assertEqual(result, 'human-direct-marker')
-
-    def test_forge_reject_with_no_chat_alerts_instead_of_evaporating(self):
-        """The sibling leg. REJECT is a TERMINAL intent, so it is handled by
-        `_maybe_dm_larry` rather than the synth-DM path — a different branch,
-        the same hole, and it is why the check asks what the handlers DID
-        rather than listing which intents they cover.
-
-        Zero live occurrences (the 48 human-routed markers include none), so
-        this is the door that was closed because it is the same door, not
-        because it had been walked through."""
-        marker = (
-            '=== REJECT ===\n'
-            '{"task_id": "dash-forge", "reason": "The spec contradicts itself."}\n'
-            '=== END_REJECT ==='
-        )
-        f = self._forge_marker_outbox('dash-reject.json', marker)
-        result = on.process_outbox(f)
-
-        alerts = self._read_alerts()
-        self.assertEqual(len(alerts), 1, 'the reject evaporated silently')
-        self.assertEqual(result, 'human-direct-marker')
-
-    def test_a_marker_that_DID_something_raises_no_extra_alert(self):
-        """The negative control for the check above — without it, "always
-        alert" would pass every test in this section while turning the fix
-        into alert toil. Each of the four outcome answers is exercised.
-
-        (PROCEED is not in this list: `_dispatch_build_phase` skips when the
-        envelope carries no `claude_session_id`, so `has_followup_dispatch`
-        PREDICTS a dispatch that does not happen. That prediction gap is
-        pre-existing and source-agnostic — it logs "Larry should manually
-        re-dispatch" on the beacon path too — and closing it needs
-        `_dispatch_build_phase` to return an answer, which is a signature
-        change this PR deliberately does not make. Disclosed, not hidden.)"""
-        cases = {
-            'merge_result (auto-merge ran)':
-                _load_dashboard_verdict('mirror-pass-pr1108.json'),
-            'no_session_bucket (a decision card was written)':
-                _mirror_outbox_body(
-                    _mirror_escalate_marker(task_id='ctrl-esc'),
-                    source='dashboard', task_id='ctrl-esc',
-                    reply_chat_id=None, target_repo='ourliberty-agent-core',
-                    pr_url=PR_URL_FIXTURE,
-                ),
-            'has_followup_dispatch (Forge got a revision)':
-                _mirror_outbox_body(
-                    _mirror_revision_marker(
-                        task_id='ctrl-rev', confidence='high'),
-                    source='dashboard', task_id='ctrl-rev',
-                    reply_chat_id=None, forge_build_session_id='s1',
-                    target_repo='ourliberty-agent-core',
-                    branch='forge/ctrl', pr_url=PR_URL_FIXTURE,
-                    revision_count=0, max_revisions=3,
-                ),
-            'chat_id present (a DM was deliverable)':
-                _mirror_outbox_body(
-                    _mirror_escalate_marker(task_id='ctrl-chat'),
-                    source='dashboard', task_id='ctrl-chat',
-                    reply_chat_id=12345, target_repo='ourliberty-agent-core',
-                    pr_url=PR_URL_FIXTURE,
-                ),
-        }
-        for label, body in cases.items():
-            with self.subTest(outcome=label):
-                before = len(self._read_alerts())
-                f = self._write_mirror_outbox(
-                    f'ctrl-{abs(hash(label)) % 10000}.json', body,
-                )
-                on.process_outbox(f)
-                new = self._read_alerts()[before:]
-                unroutable = [
-                    a for a in new
-                    if 'thrown away' in a.get('message', '')
-                ]
-                self.assertEqual(
-                    unroutable, [],
-                    f'{label}: an outcome DID occur, so no unroutable-verdict '
-                    f'alert may fire',
-                )
 
     # ---- EVASION mutations (code-discipline item 10, fourth clause) ------
     # The rules above are all PRESENCE mutations: put the violation in plain

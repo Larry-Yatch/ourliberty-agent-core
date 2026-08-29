@@ -1536,9 +1536,26 @@ def _deliver_mirror_verdict(cand: Candidate, marker_text: str,
     # and, unless larry_direct is True, takes the
     # `(target_agent is None ...) and not larry_direct` archive-no-notify early
     # return — BEFORE auto-merge — silently discarding the verdict (the 760/720
-    # loss this whole healer exists to prevent). larry_direct is True iff
-    # routing_source == 'larry' AND reply_chat_id is an int, so we set both,
-    # mirroring the PR #45 / source='larry' precedent. Under that path every
+    # loss this whole healer exists to prevent).
+    #
+    # STALE AS OF 2026-08-27 (agent-core #1113), left in place deliberately.
+    # That branch is now `human_direct`, which is True iff routing_source is in
+    # `dispatch_validator.HUMAN_SOURCES` — the `reply_chat_id` conjunct was
+    # DELETED, because "no chat to tell him" was making "never merge" (a
+    # dashboard-dispatched REVIEW_PASS strands 100% of the time). So the
+    # chat-id precondition below is now dead weight: process_outbox would route
+    # a chat-less envelope and merge it. The precondition is not removed HERE
+    # because that is a behaviour change to a healer, in a different file, on a
+    # path that does NOT lose verdicts — the decline alerts and preserves the
+    # worktree, and on the droplet the chat id resolves from the systemd env
+    # file. Fast-follow: drop the precondition, write `reply_chat_id: null`
+    # (the dashboard precedent), and update the two tests at
+    # test_heal_wedged_review_sessions.py:1810/1821 that pin the old rule.
+    #
+    # The fabricated `source: 'larry'` below is the SAME workaround #1113's own
+    # comment cites as evidence the branch was the defect. It is now
+    # unnecessary but harmless; retiring it belongs with the fast-follow above.
+    # Under that path every
     # verdict type is still surfaced (the commit status + findings comment +
     # verdict chain-event + emergency-halt trip all fire in process_outbox's
     # pre-routing `if marker_decision:` block); only REVIEW_PASS auto-merges,

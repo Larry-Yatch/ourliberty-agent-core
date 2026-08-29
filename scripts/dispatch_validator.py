@@ -66,18 +66,16 @@ ALLOWED_SOURCES = {
     # outbox_notifier branch added in step 4 (PR #82) keys off this exact
     # source on Beacon's outbox; the envelope source must match.
     'pulse-auto-dispatch',
-    # E4.4 dashboard UI Approve/Reject actions. Pulse iter 97 + iter 97-notify
-    # (2026-05-28) discovered that 'dashboard' was never in this allowlist;
-    # 4 dashboard-sourced envelopes were silently dropped to beacon/.invalid
-    # between 2026-05-27T17:55Z and 2026-05-28T05:30Z, breaking the UI as a
-    # control surface. Adding here closes the gap. NOTE: do not auto-replay
-    # the stale envelopes already in beacon/.invalid — they predate this fix.
 }
-# Fold the human sources in structurally rather than listing them twice. Adding
-# a human surface to HUMAN_SOURCES therefore allows it here automatically — the
-# 2026-05-28 incident was exactly this pair drifting apart ('dashboard' was a
-# control surface for months before anyone added it to the allowlist, and 4 of
-# Larry's envelopes were dropped in silence over 12 hours).
+# Fold the human sources in structurally rather than listing them twice, so
+# adding a surface to HUMAN_SOURCES allows it here automatically.
+#
+# The 2026-05-28 incident (Pulse iter 97 + 97-notify) was exactly this pair
+# drifting apart: 'dashboard' had been a control surface for months without
+# being in this allowlist, and 4 of Larry's envelopes were dropped to
+# beacon/.invalid in silence between 2026-05-27T17:55Z and 2026-05-28T05:30Z,
+# breaking the UI as a control surface. NOTE, still current: do not auto-replay
+# the stale envelopes already in beacon/.invalid — they predate that fix.
 ALLOWED_SOURCES |= HUMAN_SOURCES
 
 # Phase D3 — clarification protocol metadata. Optional on dispatch.

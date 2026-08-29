@@ -12885,6 +12885,21 @@ def _alert_dashboard_delegate_no_outcome(data: dict[str, Any]) -> None:
         )
 
 
+def _verdict_noun(agent: str, marker_type: str) -> str:
+    """What the discarded thing WAS, in the operator's words.
+
+    Keyed on the marker family rather than the agent, because the agent name is
+    an implementation detail to whoever reads the alert and the marker family is
+    what they will recognise on the PR. Falls back to a neutral noun so a marker
+    type added later is described vaguely rather than wrongly.
+    """
+    if marker_type.startswith('review_'):
+        return 'a code review'
+    if marker_type in ('proceed', 'clarify_request', 'reject'):
+        return 'a build preflight'
+    return 'an agent run'
+
+
 def _alert_unroutable_marker_verdict(
     data: dict[str, Any],
     marker_decision: dict[str, Any],
@@ -12936,7 +12951,20 @@ def _alert_unroutable_marker_verdict(
             source='outbox-notifier',
             severity='warning',
             route='escalate',
-            needs_larry=True,
+            # needs_larry is deliberately NOT set. The stamp means "this owes
+            # Larry an Approvals card", and `heal_unregistered_approval` can
+            # only build one from a BINARY suggested_action — it returns None
+            # for a shell command like the one below, so every occurrence would
+            # be counted by heal_approvals_surface_drift and then refused by
+            # the promoter, logging one `missing_card` drift row that is not a
+            # real failure. `route='escalate'` already forces the DM
+            # (larry_alerts B2), so dropping the stamp costs no delivery.
+            # Same call as agent-core/beacon CLAUDE.md:313 ("if you add a new
+            # way for something to need Larry, wire it into the promoter") —
+            # here the honest reading is that this is a notification, not a
+            # decision, so it does not need a card at all. #1112 was parked on
+            # 2026-08-27 over this exact shape; matching it keeps the two
+            # alerting changes consistent instead of landing opposite rulings.
             subject=f'unroutable-verdict:{task_id}:{marker_type}',
             task_id=task_id,
             pr_url=pr_url if isinstance(pr_url, str) else None,
@@ -12944,15 +12972,27 @@ def _alert_unroutable_marker_verdict(
                 f'ls ~/agents/outboxes/{agent}/.archive/ | grep {task_id}'
             ),
             message=(
-                f'A code review finished and its answer was thrown away. '
+                # Derived, not assumed: this site also sees Forge PREFLIGHT
+                # markers (PROCEED / CLARIFY_REQUEST / REJECT), and calling a
+                # clarify question "a code review" is simply false.
+                f'{_verdict_noun(agent, marker_type).capitalize()} finished '
+                f'and its answer was thrown away. '
                 f'{agent.title()} returned {verdict} on `{task_id}`'
                 + (f' ({pr_url})' if pr_url else '')
-                + f', but nothing downstream ran: no merge, no fix dispatched, '
-                f'no card for you. Nothing will retry it — the auto-merge '
-                f'healer only re-tries merges that were attempted and failed, '
-                f'and this one was never attempted. So this PR will sit '
-                f'exactly where it is until a person moves it. The review '
-                f'itself is intact; the command below finds it. '
+                + f', but nothing downstream ran, and nothing will retry it. '
+                # Only say "the PR" when there IS one: this site also sees
+                # Forge preflight markers, which have no PR yet, and telling
+                # the operator a non-existent PR is stuck is worse than saying
+                # less. Same reason the noun above is derived.
+                + (
+                    'The PR will sit exactly where it is until a person moves '
+                    'it — the auto-merge healer only re-tries merges that were '
+                    'ATTEMPTED and failed, and this one was never attempted. '
+                    if pr_url else
+                    'This task is stopped until a person picks it up; there is '
+                    'no PR yet and no healer watching it. '
+                )
+                + f'The result itself is intact; the command below finds it. '
                 f'(Cause, for whoever fixes it: the dispatch source was '
                 f'`{routing_source}`, which the notifier can route neither to '
                 f'an agent nor to a human surface.)'
@@ -14770,6 +14810,13 @@ def process_outbox(outbox_file: Path) -> str:
         # explicitly informational (see the notify block below). Without this
         # branch a human-dispatched verdict silently archives.
         #
+        # SCOPE OF THE GUARANTEE, stated narrowly on purpose (review round 1):
+        # what this closes is "a verdict from an UNROUTABLE source archives
+        # silently" — the archive branch below now alerts. It does NOT close
+        # "routed, but no handler produced anything": a chat-less Forge
+        # CLARIFY_REQUEST / REJECT, and a REVIEW_PASS whose auto-merge SKIPS.
+        # Both are disclosed with counts in the PR body rather than claimed.
+        #
         # THREE incidents, one branch:
         #   PR #45  (2026-05-19) source='larry'     — the carve-out this is.
         #   PR #768             harvest-before-reap — "the PR never merged and
@@ -14851,14 +14898,27 @@ def process_outbox(outbox_file: Path) -> str:
             #   CLARIFY_REQUEST          → no dispatcher; synth DM with
             #                              clarify-specific body
             #
-            # Every row of that matrix assumed a chat exists, because in 2026-05
-            # every human-direct dispatch came from Telegram. A CONTROL-SURFACE
+            # KNOWN LIMIT, measured and deliberately not closed here. Every row
+            # of that matrix assumes a chat exists, because in 2026-05 every
+            # human-direct dispatch came from Telegram. A CONTROL-SURFACE
             # dispatch carries `reply_chat_id: null`, so the two rows whose only
             # closing signal is a DM — Forge REJECT and CLARIFY_REQUEST — reach
-            # the end of this block having done nothing at all. The
-            # `had_an_outcome` check further down catches exactly those and
-            # alerts; it is the same guarantee as the archive branch above, one
-            # step later in the function.
+            # the end of this block having done nothing observable.
+            #
+            # A "did anything happen?" check was built for this and REMOVED
+            # before merge: every formulation of it either re-encoded the
+            # handlers' conditions (the item-14 defect this PR exists to fix)
+            # or trusted `has_followup_dispatch` / `merge_result`, which are a
+            # PREDICTION and a ran-at-all flag rather than answers — both
+            # dispatchers have ~5 silent no-write returns each, and
+            # `_run_review_pass_auto_merge` sets `merge_result` on every skip
+            # path too. Closing this properly means making the dispatchers
+            # RETURN whether they wrote, the way `_route_no_session_review`
+            # already does. That is its own change.
+            #
+            # Counted before deferring it: of 9,055 archived outboxes, 48 carry
+            # a human-routed marker and exactly ONE is a chat-less
+            # CLARIFY_REQUEST (2026-06-03). REJECT: zero.
             mtype = marker_decision['marker_type']
             has_followup_dispatch = (
                 (mtype == 'proceed' and agent == 'forge')
@@ -15150,9 +15210,8 @@ def process_outbox(outbox_file: Path) -> str:
         # self-clearing for-Larry record; self-healing → silent). One artifact
         # per escalation, idempotent on PR + head SHA. Runs after the dispatch +
         # obligation bookkeeping above so the self-healing case is observable.
-        no_session_bucket = None
         if agent == 'mirror':
-            no_session_bucket = _route_no_session_review(data, marker_decision)
+            _route_no_session_review(data, marker_decision)
 
         # false-success-notify-fix (2026-06-11): the Mirror REVIEW_PASS
         # auto-merge now runs EARLIER — before the back-leg notify — via
@@ -15172,39 +15231,6 @@ def process_outbox(outbox_file: Path) -> str:
         # behavior where skip cases sent no DM (the notify above still fired).
         if review_pass_skip is None:
             _maybe_dm_larry(data, marker_decision)
-
-        # Closes the LAST leg of this branch's class. A human-direct marker is
-        # no longer archived unread — but for two Forge markers a DM was the
-        # ONLY closing signal, and a control-surface envelope carries no chat,
-        # so CLARIFY_REQUEST and REJECT reached here having done nothing at
-        # all. Same defect one step further down the function: not archived,
-        # just as invisible.
-        #
-        # The test asks the HANDLERS what they did rather than re-listing
-        # which marker types they run for (code-discipline item 14 — a second
-        # copy of a rule diverges the moment either side is amended). Each
-        # disjunct below is an ANSWER:
-        #   has_followup_dispatch     — a task was written to another inbox
-        #   merge_result              — set by _run_review_pass_auto_merge
-        #   no_session_bucket         — returned by _route_no_session_review
-        #   isinstance(chat_id, int)  — a DM was deliverable
-        # The emergency-halt disjunct is the one exception: _trip_emergency_
-        # halt (≈340 lines above, in this same function) returns nothing, so
-        # the marker type stands in for its answer. `_emergency_halt_active()`
-        # is deliberately NOT used — a halt tripped by some earlier, unrelated
-        # task would suppress this alert for every marker until it is cleared.
-        if human_direct:
-            had_an_outcome = (
-                has_followup_dispatch
-                or marker_decision.get('merge_result') is not None
-                or no_session_bucket is not None
-                or isinstance(chat_id, int)
-                or marker_decision['marker_type'] == 'review_emergency_halt'
-            )
-            if not had_an_outcome:
-                _alert_unroutable_marker_verdict(
-                    data, marker_decision, agent, source, routing_source,
-                )
 
         _archive_outbox(outbox_file)
         # false-success-notify-fix (2026-06-11): a review-pass merge SKIP
