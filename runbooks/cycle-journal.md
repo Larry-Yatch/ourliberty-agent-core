@@ -4,6 +4,84 @@
 
 ---
 
+## Iteration ~10429 — 2026-08-29T04:17Z UTC (Larry /cycle, Tier 1 [Check 0: wm 510→511, 1 new alert Tier-3 dispatch-branch-cleanup/summary; Check 4: pending=2 UNCHANGED; all other checks NOMINAL; tier-reset consecutive_clean 0→0])
+
+**Health:** ⚠️ SIGNAL — Check 4: pending=2 approvals awaiting Larry's action. Check 0: 1 new alert (Tier-3, silence). All other checks NOMINAL. **Tier 1**, consecutive_clean=0. 2026-08-29 UTC (Saturday).
+
+**VERIFY-BEFORE-REASSERT (from iter ~10428 at ~04:07Z UTC, ~10 min ago):**
+- "Check 0: wm 510→510, 0 new alerts NOMINAL": UPDATED. wm=510 but file_length=511 — 1 new alert at line 510 (dispatch-branch-cleanup/summary, 04:11:32Z UTC). Classified Tier 3 via classify(). Watermark advanced 510→511. NOMINAL.
+- "Check 4: pending=2 (dashboard-return-routing-auto-merge-001 ~3027m + sync-service ~724m)": CONFIRMED + UPDATED. dashboard-return-routing-auto-merge-001: created 2026-08-27T01:39:50Z UTC → ~3157m (~52.6h) at ~04:17Z UTC. sync-service-deploy-restart-head-drift-tier4-no-translation-001: created 2026-08-28T15:58:45Z UTC → ~738m (~12.3h). CARRY.
+- "PR#1113 mg=MERGEABLE rd=''": CONFIRMED. OPEN, mg=MERGEABLE, rd=''. Created 2026-08-27T02:36:38Z UTC → ~3100m (~51.7h) at ~04:17Z UTC. CARRY.
+- "PR#1112 mg=MERGEABLE rd=''": CONFIRMED. OPEN, mg=MERGEABLE, rd=''. Created 2026-08-27T00:47:19Z UTC → ~3210m (~53.5h) at ~04:17Z UTC. CARRY.
+- "heal-stale-daemon-code.heartbeat=2026-08-29T04:05:39Z UTC (~2m)": UPDATED. ts=2026-08-29T04:15:40Z UTC (~1.6m old at ~04:17Z UTC). NOMINAL.
+- "all bots alive=True": CONFIRMED. system-health.json ts=2026-08-29T04:16:50Z UTC (~0.4m old). all bots alive=True. disk=null, mem=null (fields absent this snapshot — not alarming). NOMINAL.
+- "Suite guardian heartbeat: ts=2026-08-29T03:41:19Z UTC (~26m)": CONFIRMED UNCHANGED. ~36m old at ~04:17Z UTC. NOMINAL (<24h threshold).
+- "Nightly 502 cluster window (01:12-01:15Z UTC 2026-08-29) passed clean": CONFIRMED. Bot log last entry 2026-08-29T04:12:58Z UTC (idx=510 dispatch-branch-cleanup digest); window clean (G-rule nightly-502-cluster-001 DISPATCHED ✅). NOMINAL.
+
+**Check 0 (~04:17Z UTC):** repair-watermark → {repaired:false, old_watermark:510, file_length:511}. 1 new alert: line 510 — {source=dispatch-branch-cleanup, subject=summary, ts=2026-08-29T04:11:32Z UTC, severity=info, route=digest, tier=FYI}. classify() → Tier 3 / route=digest / decision=silence (known-pattern in alert-translations.json). Watermark advanced 510→511. NOMINAL.
+
+**Check 1 (~04:17Z UTC):** journalctl -p warning last 24h: 0 entries (-- No entries --). NOMINAL.
+
+**Check 2 (~04:17Z UTC):** beacon_telegram_bot.log last entry: [2026-08-28T22:12:58-0600]=2026-08-29T04:12:58Z UTC (~4.4m old at ~04:17Z UTC, idx=510 dispatch-branch-cleanup digest). No `<- 7998341473` Larry directive messages. No agent-distress keywords. Nightly 502 cluster window (01:12-01:15Z UTC 2026-08-29): no entries in window; passed clean (G-rule nightly-502-cluster-001 DISPATCHED ✅). NOMINAL.
+
+**Check 3 (~04:17Z UTC):** heal-pipeline-stall.log last tick 2026-08-29T04:10:47Z UTC (~6.5m old at ~04:17Z UTC). stalls=0, 2 suppressed (PR#1113 cooldown, PR#1112 cooldown). NOMINAL.
+
+**Check 4 (~04:17Z UTC):** `/home/larry/agents/state/beacon-pending-approvals.json`. pending=2. NON-NOMINAL → TIER-RESET.
+  1. `dashboard-return-routing-auto-merge-001`: created 2026-08-27T01:39:50Z UTC. ~3157m (~52.6h). PR#1113 (fix/dashboard-review-verdict-fourth-wall, OPEN, rd='', mg=MERGEABLE, ~3100m) addresses root cause. Larry action required: review/merge PR#1113 AND/OR reply "approve."
+  2. `sync-service-deploy-restart-head-drift-tier4-no-translation-001`: created 2026-08-28T15:58:45Z UTC. ~738m (~12.3h). EXPECTED — Beacon approval_request for G-rule direction-ask (3/3 DISPATCHED ✅ iter ~10218). Larry action required: reply "approve" to Telegram doorbell.
+
+**Check 5 (~04:17Z UTC):** `/home/larry/agents/blackboard/heal-stale-daemon-code.heartbeat`=2026-08-29T04:15:40Z UTC (~1.6m old at ~04:17Z UTC). Within 60m threshold. NOMINAL.
+
+**Check A (~04:17Z UTC):** branch=main, clean tree (git status --short: empty), HEAD=e47503b1=origin/main (wrapper auto-committed "Pulse cycle 20260829T040948Z" between iters ~10428 and ~10429). NOMINAL.
+**Check B (~04:17Z UTC):** agent-core-sync.json last_sync=2026-08-29T03:39:31Z UTC (status=no-change, ~37.7m old at ~04:17Z UTC). Within 2h threshold. NOMINAL.
+**Check C (~04:17Z UTC):** system-health.json ts=2026-08-29T04:16:50Z UTC (~0.4m old). overall=healthy. All 4 bots alive=True (beacon, forge, mirror, pulse — all ourliberty-*-bot.service active+running). disk=null, mem=null (fields absent this snapshot). NOMINAL.
+**Check E (~04:17Z UTC):** PR#1113 (~3100m): fix/dashboard-review-verdict-fourth-wall, OPEN, rd='', mg=MERGEABLE. ~51.7h old. MONITORING. PR#1112 (~3210m): fix/schema-reject-alert, OPEN, rd='', mg=MERGEABLE. ~53.5h old. MONITORING. Both fix/* unrouted (rd=''). No open Forge PRs.
+**Check H (~04:17Z UTC):** All inboxes empty (beacon=0, forge=0, mirror=0, pulse=0). NOMINAL.
+
+**Section 5.0 one-shots:** audit_due_nudge → no-op. distill_detector → no-op. audit_cadence_signal → no-op. Check I: check-i-2026-08-28.json EXISTS (Friday firing; 0 proposals, 0 signals). CARRY. Check III: no-op (latest artifact 2026-08-23, next expected 2026-09-06). Suite guardian heartbeat: ts=2026-08-29T03:41:19Z UTC (~36m old at ~04:17Z UTC). PATH: ~/agents/blackboard/pulse-check-main-suite-guardian.heartbeat. NOMINAL.
+
+**Credential rotation watch:** SUPABASE_SERVICE_ROLE_KEY: last_dm=2026-08-17T23:23:16Z UTC. ~269.6h elapsed (~11.2d). Past due 2026-08-22. Dedup window until 2026-08-31T23:23Z UTC. No re-DM. Rotate per docs/runbooks/rotate-supabase-keys.md.
+
+**G-rules (no new firings this iter — all CARRY):**
+- G-rule sync-service-deploy-restart-head-drift-tier4-no-translation-001: **DISPATCHED ✅** (3/3, iter ~10218). Awaiting Larry approval (~738m). CARRY.
+- G-rule inbox-watcher-routing-denied-pulse-forge-001: **1/3** (iter ~10218, 2026-08-28T15:53Z UTC). CARRY.
+- G-rule agent-runner-transcript-not-persisted-post-worktree-teardown-001: forge=2/3, mirror=1/3. CARRY.
+- G-rule mirror-to-dashboard-return-routing-failure-001: 1/3, PR#1113 OPEN ~3100m. CARRY.
+- G-rule ourliberty-health-sync-freshness-tier4-no-translation-001: 1/3. CARRY.
+- G-rule heal-lost-marker-tier4-no-translation-001: 1/3. CARRY.
+- G-rule deploy-notifier-vercel-build-failed-tier4-no-translation-001: 2/3. CARRY.
+- G-rule automated-cycle-no-journal-entry-001: DISPATCHED ✅. CARRY.
+- G-rule mirror-queue-wait-gauge-third-review-slot-readiness-tier4-no-translation-001: 2/3. CARRY.
+- G-rule outbox-notifier-approval-request-task-id-subject-tier4-001: CLOSED ✅ (PR#1108 MERGED). CARRY.
+- G-rule source-beacon-notifications-tier4-no-translation: 2/3. CARRY.
+- G-rule alert-retraction-no-translation-001: DISPATCHED ✅. CARRY.
+- G-rule unreviewed-merge-without-gate-pattern: DISPATCHED ✅ (PR#1113 addresses root cause). CARRY.
+- G-rule enable-pr-auto-merge-reviewdecision-guard-001: 1/3. CARRY.
+- G-rule nightly-502-cluster-001: DISPATCHED ✅. CARRY.
+- G-rule heal-pipeline-stall-no-mirror-dispatch-tier4-no-translation-001: 1/3. CARRY.
+
+**PRIME DIRECTIVE:** 1 intervention row appended (ts=2026-08-29T04:18:47Z UTC, tier=1, kind=intervention, detail=check4-2pending:dashboard-return-routing-auto-merge-001(~3157m)+sync-service(~738m),check0-1new-tier3(dispatch-branch-cleanup/summary),iter=10429). Tier state: record --checks-clean false → consecutive_clean 0→0. last_signal_at=2026-08-29T04:18:50Z UTC. Tier 1 maintained.
+
+**Actions taken:**
+- Check 0: 1 new alert at line 510 classified Tier 3 (dispatch-branch-cleanup/summary, route=digest, silence). Watermark advanced 510→511.
+- PRIME DIRECTIVE: 1 intervention row appended via cycle_prime_ledger.py append (tier=1, kind=intervention, detail=check4-2pending:dashboard-return-routing-auto-merge-001(~3157m)+sync-service(~738m),iter=10429).
+- Tier state: cycle_tier_state.py record --checks-clean false → consecutive_clean 0→0. Tier 1 maintained.
+
+**Escalations:** Outstanding (no new Pulse DMs this iter — same as iter ~10428):
+  1. **[yellow] AWAITING LARRY** — `dashboard-return-routing-auto-merge-001` pending approval (~3157 min, ~52.6h). Review PR#1113 AND/OR reply "approve."
+  2. **[yellow] AWAITING LARRY** — `sync-service-deploy-restart-head-drift-tier4-no-translation-001` pending approval (~738 min, ~12.3h). Reply "approve" to Telegram doorbell.
+  3. **[yellow] CARRY (outbox-notifier DM'd)** — mirror-queue-wait-gauge:third-review-slot-readiness G-rule **2/3**. Next re-fire ~2026-08-30.
+  4. **[yellow] CARRY (outbox-notifier DM'd)** — agent-runner-forge transcript-not-persisted:tier3 G-rule **2/3** (iter ~9906).
+  5. **[yellow] CARRY (outbox-notifier DM'd)** — agent-runner-mirror transcript-not-persisted:tier1 G-rule **1/3** (iter ~9910).
+  6. **[yellow] CARRY** — heal-approvals-surface-drift:missing_card; direction-ask-approvals-opt-b-implement-001 dispatched.
+  7. Check III artifact 2026-08-23: beacon 232→336s (+45%), mirror 1311→1448s (+10%). Command: `approve threshold-update-2026-08-23`.
+
+**Patterns:** Check 4 non-nominal 373+ consecutive iters (~9884–~10429) — 2 pending approvals unchanged. PR#1112 at ~53.5h open. PR#1113 at ~51.7h open (both mg=MERGEABLE, rd=''). New: dispatch-branch-cleanup/summary Tier-3 digest alert properly classified (existing translation working). System otherwise fully nominal. No new G-rule firings this iter.
+
+**Tier end-of-iter:** Tier 1, consecutive_clean=0.
+
+---
+
 ## Iteration ~10428 — 2026-08-29T04:07Z UTC (Larry /cycle, Tier 1 [Check 0: wm 510→510, 0 new alerts NOMINAL; Check 4: pending=2 UNCHANGED; all other checks NOMINAL; tier-reset consecutive_clean 0→0])
 
 **Health:** ⚠️ SIGNAL — Check 4: pending=2 approvals awaiting Larry's action. All other checks NOMINAL. **Tier 1**, consecutive_clean=0. 2026-08-29 UTC (Saturday).
@@ -3128,87 +3206,6 @@
   7. Check III artifact 2026-08-23: beacon 232→336s (+45%), mirror 1311→1448s (+10%). Command: `approve threshold-update-2026-08-23`.
 
 **Patterns:** Check 4 non-nominal 335+ consecutive iters (~9884–~10390) — 2 pending approvals unchanged. PRs #1113 and #1112 mg=MERGEABLE (recovered from UNKNOWN). System otherwise fully nominal. No new G-rule firings this iter.
-
-**Tier end-of-iter:** Tier 1, consecutive_clean=0.
-
----
-
-## Iteration ~10389 — 2026-08-28T23:37Z UTC (Larry /direct /cycle, Tier 1 [Check 0: wm 509→509, 0 new alerts NOMINAL; Check 4: pending=2 UNCHANGED; all other checks NOMINAL; tier-reset consecutive_clean 0→0])
-
-**Health:** ⚠️ SIGNAL — Check 4: pending=2 approvals awaiting Larry's action. All other checks NOMINAL. **Tier 1**, consecutive_clean=0. 2026-08-28 UTC (Friday).
-
-**VERIFY-BEFORE-REASSERT (from iter ~10388 at ~23:27Z UTC, ~10 min ago):**
-- "Check 0: wm 509→509, 0 new alerts NOMINAL": CONFIRMED. repair-watermark → {repaired:false, old_watermark=509, file_length=509}. CARRY.
-- "Check 4: pending=2 (dashboard-return-routing-auto-merge-001 ~2748m + sync-service ~449m)": CONFIRMED + UPDATED. dashboard-return-routing-auto-merge-001: ~2756m at ~23:37Z UTC (~45.9h). sync-service-deploy-restart-head-drift-tier4-no-translation-001: ~457m (~7.6h). CARRY.
-- "PR#1113 ~2691m rd='', mg=UNKNOWN": CONFIRMED + UPDATED. created=2026-08-27T02:36:38Z UTC → ~2699m at ~23:37Z UTC; mg=MERGEABLE (recovered from UNKNOWN). CARRY.
-- "PR#1112 ~2800m rd='', mg=UNKNOWN": CONFIRMED + UPDATED. created=2026-08-27T00:47:19Z UTC → ~2808m at ~23:37Z UTC; mg=MERGEABLE (recovered from UNKNOWN). CARRY.
-- "HEAD=95ab54b5=origin/main": CONFIRMED. HEAD=95ab54b5=origin/main (Pulse cycle 20260828T232907Z). Clean tree. No divergence. NOMINAL.
-- "heal-stale-daemon-code.heartbeat=2026-08-28T23:24:29Z UTC (~3m)": UPDATED. heartbeat=2026-08-28T23:34:39Z UTC (~3m old at ~23:37Z UTC). NOMINAL.
-- "all bots alive=True": CONFIRMED. system-health.json ts=2026-08-28T23:34:40Z UTC (~3m old). overall=healthy, all 4 bots alive. NOMINAL.
-- "Suite guardian heartbeat: ts=2026-08-28T03:44:48Z UTC (~19.7h)": CONFIRMED + UPDATED. ~19.8h old at ~23:37Z UTC. NOMINAL (within 24h).
-- "SUPABASE ~264.1h elapsed": RECOMPUTED. last_dm=2026-08-17T23:23:16Z UTC → ~264.2h elapsed (~11.0d) at ~23:37Z UTC. Dedup window until 2026-08-31T23:23Z UTC. No re-DM. CARRY.
-- "G-rule sync-service DISPATCHED ✅": CONFIRMED. Approval still pending (~457m). CARRY.
-- "G-rule outbox-notifier-approval-request CLOSED ✅": CONFIRMED (PR#1108 merged). CARRY.
-
-**Check 0 (~23:37Z UTC):** repair-watermark → {repaired:false, old_watermark=509, file_length=509}. 0 new alerts above watermark. NOMINAL.
-
-**Check 1 (~23:37Z UTC):** journalctl -p warning last 24h: 0 entries (-- No entries --). system-health.json ts=2026-08-28T23:34:40Z UTC (~3m old). overall=healthy, all checks ok. NOMINAL.
-
-**Check 2 (~23:37Z UTC):** beacon_telegram_bot.log last outbound: 2026-08-28T15:59:40-0600 MDT = 21:59:40Z UTC (~98m old at ~23:37Z UTC, 6h reminder for sync-service-deploy-restart-head-drift-tier4-no-translation-001). No `<- 7998341473` Larry messages in 4h window. No agent-distress keywords. NOMINAL.
-
-**Check 3 (~23:37Z UTC):** heal-pipeline-stall.log last tick 2026-08-28T23:22:25Z UTC (~15m old at ~23:37Z UTC). stalls=0, 2 suppressed (PR#1113 cooldown, PR#1112 cooldown). NOMINAL.
-
-**Check 4 (~23:37Z UTC):** `/home/larry/agents/state/beacon-pending-approvals.json`. pending=2. NON-NOMINAL → TIER-RESET.
-  1. `dashboard-return-routing-auto-merge-001`: created 2026-08-27T01:39:50Z UTC. ~2756m at ~23:37Z UTC (~45.9h). PR#1113 (fix/dashboard-review-verdict-fourth-wall, OPEN, rd='', mg=MERGEABLE, ~2699m) addresses root cause. Larry action required: review/merge PR#1113 AND/OR reply "approve."
-  2. `sync-service-deploy-restart-head-drift-tier4-no-translation-001`: created 2026-08-28T15:58:45Z UTC. ~457m (~7.6h). EXPECTED — Beacon approval_request for G-rule direction-ask (3/3 DISPATCHED ✅ iter ~10218). Larry action required: reply "approve" to Telegram doorbell.
-
-**Check 5 (~23:37Z UTC):** `/home/larry/agents/blackboard/heal-stale-daemon-code.heartbeat`=2026-08-28T23:34:39Z UTC (~3m old at ~23:37Z UTC). Within 60m threshold. NOMINAL.
-
-**Check A (~23:37Z UTC):** branch=main, HEAD=95ab54b5=origin/main (Pulse cycle 20260828T232907Z). Clean tree. git status empty. NOMINAL.
-**Check B (~23:37Z UTC):** agent-core-sync.json last_sync=2026-08-28T22:39:26Z UTC (status=no-change, ~58m old at ~23:37Z UTC). Within 2h threshold. NOMINAL.
-**Check C (~23:37Z UTC):** system-health.json ts=2026-08-28T23:34:40Z UTC (~3m old). overall=healthy. beacon=alive, forge=alive, mirror=alive, pulse=alive. disk=19%, mem=20%. NOMINAL.
-**Check E (~23:37Z UTC):** PR#1113 (~2699m): fix/dashboard-review-verdict-fourth-wall, OPEN, rd='', mg=MERGEABLE. ~45.0h old. MONITORING. PR#1112 (~2808m): fix/schema-reject-alert, OPEN, rd='', mg=MERGEABLE. ~46.8h old. MONITORING. Both fix/* unrouted (rd=''). No open Forge PRs. No merged Forge PRs since PR#1114.
-**Check H (~23:37Z UTC):** All inboxes empty (beacon=0, forge=0, mirror=0, pulse=0). NOMINAL.
-
-**Section 5.0 one-shots:** audit_due_nudge → no-op. distill_detector → no-op. audit_cadence_signal → no-op. Check I: check-i-2026-08-28.json EXISTS (Friday firing day; mode=heartbeat, 0 proposals, 0 signals). CARRY. Check III: no-op (latest artifact 2026-08-23, next expected 2026-09-06). Suite guardian heartbeat: pulse-check-main-suite-guardian.heartbeat ts=2026-08-28T03:44:48Z UTC (~19.8h old at ~23:37Z UTC). NOMINAL (within 24h; next expected nightly run ~03:44Z UTC 2026-08-29, ~4.1h from now).
-
-**Credential rotation watch:** SUPABASE_SERVICE_ROLE_KEY: last_dm=2026-08-17T23:23:16Z UTC. ~264.2h elapsed (~11.0d). ~11.0d past due 2026-08-22. Dedup window until 2026-08-31T23:23Z UTC. No re-DM. Rotate per docs/runbooks/rotate-supabase-keys.md.
-
-**G-rules (no new firings this iter — all CARRY):**
-- G-rule sync-service-deploy-restart-head-drift-tier4-no-translation-001: **DISPATCHED ✅** (3/3, iter ~10218). Awaiting Larry approval (~457m). CARRY.
-- G-rule inbox-watcher-routing-denied-pulse-forge-001: **1/3** (iter ~10218, 2026-08-28T15:53Z UTC). CARRY.
-- G-rule agent-runner-transcript-not-persisted-post-worktree-teardown-001: forge=2/3, mirror=1/3. CARRY.
-- G-rule mirror-to-dashboard-return-routing-failure-001: 1/3, PR#1113 OPEN ~2699m. CARRY.
-- G-rule ourliberty-health-sync-freshness-tier4-no-translation-001: 1/3. CARRY.
-- G-rule heal-lost-marker-tier4-no-translation-001: 1/3. CARRY.
-- G-rule deploy-notifier-vercel-build-failed-tier4-no-translation-001: 2/3. CARRY.
-- G-rule automated-cycle-no-journal-entry-001: DISPATCHED ✅. CARRY.
-- G-rule mirror-queue-wait-gauge-third-review-slot-readiness-tier4-no-translation-001: 2/3. CARRY.
-- G-rule outbox-notifier-approval-request-task-id-subject-tier4-001: CLOSED ✅ (PR#1108 MERGED). CARRY.
-- G-rule source-beacon-notifications-tier4-no-translation: 2/3. CARRY.
-- G-rule alert-retraction-no-translation-001: DISPATCHED ✅. CARRY.
-- G-rule unreviewed-merge-without-gate-pattern: DISPATCHED ✅ (PR#1113 addresses root cause). CARRY.
-- G-rule enable-pr-auto-merge-reviewdecision-guard-001: 1/3. CARRY.
-- G-rule nightly-502-cluster-001: DISPATCHED ✅. CARRY.
-- G-rule heal-pipeline-stall-no-mirror-dispatch-tier4-no-translation-001: 1/3. CARRY.
-
-**PRIME DIRECTIVE:** 1 intervention row appended (ts=2026-08-28T23:37:50Z UTC, tier=1, kind=intervention, template=pending-approvals; iter ~10389 larry-direct-cycle). Tier state: record --checks-clean false → consecutive_clean 0→0. last_signal_at=2026-08-28T23:37:54Z UTC. Tier 1 maintained.
-
-**Actions taken:**
-- Check 0: watermark confirmed current (repaired=false, 0 new alerts).
-- PRIME DIRECTIVE: 1 intervention row appended via cycle_prime_ledger.py append (tier=1, kind=intervention, template=pending-approvals).
-- Tier state: cycle_tier_state.py record --checks-clean false → consecutive_clean 0→0. Tier 1 maintained.
-
-**Escalations:** Outstanding (no new Pulse DMs this iter — same as iter ~10388):
-  1. **[yellow] AWAITING LARRY** — `dashboard-return-routing-auto-merge-001` pending approval (~2756 min, ~45.9h). Review PR#1113 AND/OR reply "approve."
-  2. **[yellow] AWAITING LARRY** — `sync-service-deploy-restart-head-drift-tier4-no-translation-001` pending approval (~457 min, ~7.6h). Reply "approve" to Telegram doorbell.
-  3. **[yellow] CARRY (outbox-notifier DM'd)** — mirror-queue-wait-gauge:third-review-slot-readiness G-rule **2/3**. Next re-fire ~2026-08-30.
-  4. **[yellow] CARRY (outbox-notifier DM'd)** — agent-runner-forge transcript-not-persisted:tier3 G-rule **2/3** (iter ~9906).
-  5. **[yellow] CARRY (outbox-notifier DM'd)** — agent-runner-mirror transcript-not-persisted:tier1 G-rule **1/3** (iter ~9910).
-  6. **[yellow] CARRY** — heal-approvals-surface-drift:missing_card; direction-ask-approvals-opt-b-implement-001 dispatched.
-  7. Check III artifact 2026-08-23: beacon 232→336s (+45%), mirror 1311→1448s (+10%). Command: `approve threshold-update-2026-08-23`.
-
-**Patterns:** Check 4 non-nominal 334+ consecutive iters (~9884–~10389) — 2 pending approvals unchanged. PRs #1113 and #1112 mg=MERGEABLE (recovered from UNKNOWN in prior iter). System otherwise fully nominal. No new G-rule firings this iter.
 
 **Tier end-of-iter:** Tier 1, consecutive_clean=0.
 
