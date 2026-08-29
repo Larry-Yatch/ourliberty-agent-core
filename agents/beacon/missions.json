@@ -20719,7 +20719,11 @@
         "at": "2026-08-28T16:22:34.980868+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-08-29T18:20:03.337994+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-dashboard-return-routing-superseded-by-pr1113-001",
@@ -20812,7 +20816,11 @@
         "at": "2026-08-29T17:39:41.719058+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-08-29T18:20:03.337994+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-deep-review-hold-pr1113-d6a8e3b5",
