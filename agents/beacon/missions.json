@@ -20782,6 +20782,23 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-sync-service-deploy-restart-head-drift-tier4-no-tr",
+      "name": "Sync Service Deploy Restart Head Drift Tier4 No Tr",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `sync-service-deploy-restart-head-drift-tier4-no-tr`. Last activity 2026-08-29T17:33:48.093556+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "sync-service-deploy-restart-head-drift-tier4-no-tr"
+      ],
+      "repo": null,
+      "created": "2026-08-29",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-08-29T17:34:55.843236+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-29T17:33:48.093556+00:00"
     }
   ]
 }
