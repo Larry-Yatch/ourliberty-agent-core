@@ -71790,3 +71790,75 @@ Watermark advanced 504→506. NOMINAL.
 
 ---
 
+## Iteration ~10631 — 2026-08-30T01:10Z UTC (Larry /cycle direct, Tier 1 [Check 0: wm 503→504 Tier-3 silence heal-dashboard-api-sha-drift; all other checks NOMINAL; tier maintained; consecutive_clean=1])
+
+**Health:** ✅ Nominal — all checks clean. **Tier 1**, consecutive_clean=1 (1/3 toward Tier 2). 2026-08-30 UTC (Sunday — early morning, ~6min after iter ~10630).
+
+**VERIFY-BEFORE-REASSERT (from iter ~10630 at 01:04Z UTC, ~6min ago):**
+- "Check 0: wm-rotation-gap auto-repaired 504→503, 0 new": NOW wm=503, file_length=504. 1 new alert (line 504, heal-dashboard-api-sha-drift, Tier 3 silence). Watermark advanced to 504. UPDATED.
+- "Check A: fast-forwarded to HEAD=3f409796=origin/main": NOW HEAD=5b737fff=origin/main (wrapper auto-commit for iter ~10630). NOMINAL. UPDATED.
+- "Check 4: pending=[] — FIRST ALL-CLEAR": CONFIRMED pending=0. CARRY.
+- "Check 3: stalls=0 (log 00:59:57Z)": CONFIRMED stalls=[]. Last log 00:59:57Z UTC (~10.7min old). NOMINAL. CARRY.
+- "Check E: 0 open PRs": CONFIRMED 0 open PRs. CARRY.
+- "heal-stale-daemon-code.heartbeat ~12min old": NOW ts=2026-08-30T01:02:20Z UTC (~8.3min old). NOMINAL. CARRY.
+- "system-health.json overall=healthy, ~6.8min old": NOW ts=2026-08-30T01:07:20Z UTC (~3.3min old). NOMINAL. UPDATED.
+- "Suite guardian heartbeat ~21.38h": NOW ts=2026-08-29T03:41:19Z UTC (~21.5h old). NOMINAL (<24h). CARRY.
+- "All inboxes empty": CONFIRMED beacon=0, forge=0, mirror=0, pulse=0. CARRY.
+- "agent-core-sync.json last_sync=00:40:40Z (~23.7min old)": NOW same last_sync (~30min old), status=no-change. Within 2h threshold. CARRY.
+
+**Check 0 (~01:10Z UTC):** repair-watermark → {repaired:false, old_watermark:503, file_length:504}. 1 new alert at line 504:
+- `source=heal-dashboard-api-sha-drift, subject=dashboard-api-sha-drift-healed, route=digest, tier=FYI, tier_source=translation, ts=2026-08-30T01:05:07Z UTC`. Context: dashboard-api.service was running stale git_sha ca895aad; auto-restarted to on-disk HEAD 3f409796 (PR#1113 merge commit). Fired ~8min after PR#1113 merged (00:56Z). system-health.json at 01:07Z shows overall=healthy — restart successful. Bot log confirms `route=digest; skipping DM` at 19:09 MDT. triage-alert → tier=3, decision=silence (known-pattern match). Watermark advanced: 503→504. NO DM. **NOMINAL (Tier 3 silence).**
+- **Note (G-rule mirror-to-dashboard-return-routing-failure-001):** The dashboard-api auto-restart is a passive verification signal — the service is now running PR#1113's updated outbox_notifier.py. Monitoring for the positive case (dashboard-triggered review completing without routing failure) before CLOSING the G-rule.
+
+**Check 1 (~01:10Z UTC):** journalctl -u 'ourliberty-*.service' -p warning --since "1h ago" → No entries. NOMINAL.
+
+**Check 2 (~01:10Z UTC):** system-health.json ts=2026-08-30T01:07:20Z UTC (~3.3min old). overall=healthy. All checks ok. Bot log (last 4h since ~21:10 MDT): No Larry directives (last was "Go" at 18:56 MDT → approved PR#1113 deep-review, dispatched to Beacon → PR#1113 merged 00:56Z UTC). No agent-distress keywords. Nightly 502 window at ~01:12-01:15Z UTC (~2-5min from check — imminent). Bot log clean through 19:09 MDT (01:09Z UTC). NOMINAL (watch nightly 502 window).
+
+**Check 3 (~01:10Z UTC):** heal-pipeline-stall log last entry 00:59:57Z UTC (~10.7min old). Entries: retracted dead unrouted-PR nudge lines for PR#1113 (expected post-merge cleanup — healer self-cleaned). stalls=[]. NOMINAL.
+
+**Check 4 (~01:10Z UTC):** beacon-pending-approvals.json pending=0. NOMINAL — 2nd iter of all-clear (started iter ~10630). First all-clear in 75+ iters.
+
+**Check 5 (~01:10Z UTC):** heal-stale-daemon-code.heartbeat=2026-08-30T01:02:20Z UTC (~8.3min old). NOMINAL (<60min).
+
+**Check A (~01:10Z UTC):** branch=main, HEAD=5b737fff=origin/main (wrapper commit for iter ~10630). NOMINAL. Hygiene note: 2 untracked files in agents/pulse/ (`tmp_journal_entry.md`, `tmp_update_actions.py`) — stray artifacts from prior Pulse chat sessions. Visible as `??` in git status; do not block sync/ff. Non-blocking.
+**Check B (~01:10Z UTC):** agent-core-sync.json last_sync=2026-08-30T00:40:40Z UTC (~30min old), status=no-change. Within 2h threshold. NOMINAL.
+**Check C (~01:10Z UTC):** system-health.json ts=01:07:20Z UTC (~3.3min old). overall=healthy. All 4 bots alive (beacon, forge, mirror, pulse — all desired=up, alive=True, action=noop). NOMINAL.
+**Check E (~01:10Z UTC):** gh pr list → [] (0 open PRs). NOMINAL.
+**Check H (~01:10Z UTC):** All inboxes empty (beacon=0, forge=0, mirror=0, pulse=0). NOMINAL.
+
+**Section 5.0 one-shots:** audit_due_nudge → no-op. distill_detector → no-op. audit_cadence_signal → no-op. Check I: latest artifact=check-i-2026-08-28.json (Friday, 0 proposals). Sunday timer fires ~14:13Z UTC today (~13h). No new artifact yet. CARRY. Check III: 14d cadence gate → skip (next real artifact ~2026-09-06). CARRY. Suite guardian heartbeat: ts=2026-08-29T03:41:19Z UTC (~21.5h old). NOMINAL (<24h). Nightly guardian timer fires ~03:41Z UTC tonight (~2.5h from this iter). CARRY.
+
+**Credential rotation watch:** SUPABASE_SERVICE_ROLE_KEY: last_dm=2026-08-17T23:23Z UTC, elapsed=289.8h, dedup_end=2026-08-31T23:23Z UTC (~46.2h remaining). No re-DM. CARRY.
+
+**G-rules (updates this iter):**
+- G-rule sync-service-deploy-restart-head-drift-tier4-no-translation-001: CLOSED ✅. CARRY.
+- G-rule mirror-to-dashboard-return-routing-failure-001: MONITORING (PR#1113 merged; dashboard-api auto-restarted to new code at 01:05Z UTC — passive verification signal. Awaiting dashboard-triggered review to confirm routing fix). CARRY.
+- G-rule inbox-watcher-routing-denied-pulse-forge-001: 1/3. CARRY.
+- G-rule agent-runner-transcript-not-persisted-post-worktree-teardown-001: forge=2/3, mirror=1/3. CARRY.
+- G-rule ourliberty-health-sync-freshness-tier4-no-translation-001: 1/3. CARRY.
+- G-rule heal-lost-marker-tier4-no-translation-001: 1/3. CARRY.
+- G-rule deploy-notifier-vercel-build-failed-tier4-no-translation-001: 2/3. CARRY.
+- G-rule automated-cycle-no-journal-entry-001: DISPATCHED ✅. CARRY.
+- G-rule mirror-queue-wait-gauge-third-review-slot-readiness-tier4-no-translation-001: 2/3. Next re-fire ~04:12Z UTC tonight (~3h). Watch Sunday. CARRY.
+- G-rule outbox-notifier-approval-request-task-id-subject-tier4-001: CLOSED ✅. CARRY.
+- G-rule source-beacon-notifications-tier4-no-translation: 2/3. CARRY.
+- G-rule alert-retraction-no-translation-001: DISPATCHED ✅. CARRY.
+- G-rule enable-pr-auto-merge-reviewdecision-guard-001: 1/3. CARRY.
+- G-rule nightly-502-cluster-001: DISPATCHED ✅. Nightly window ~01:12-01:15Z UTC (~2-5min from this check). Bot log clean through 01:09Z. WATCH — will surface in next automated cycle if cluster fires. CARRY.
+- G-rule heal-pipeline-stall-no-mirror-dispatch-tier4-no-translation-001: 1/3. CARRY.
+
+**PRIME DIRECTIVE:** iter_clean liveness heartbeat appended (ts=2026-08-30T01:13:37Z UTC, iter=10631, tier=1, kind=iter_clean). Tier state: record --checks-clean true → **Tier 1 maintained**, consecutive_clean=1 (1/3 toward Tier 2 de-escalation), last_signal_at=2026-08-30T01:03:49Z UTC (unchanged).
+
+**Actions taken:**
+- Check 0: watermark advanced 503→504 (1 Tier-3 silence: heal-dashboard-api-sha-drift). No DM.
+- PRIME DIRECTIVE: iter_clean heartbeat appended via cycle_prime_ledger.py append --tier 1 --kind iter_clean --iter 10631 --template nominal-all-checks.
+- Tier state: cycle_tier_state.py record --checks-clean true → Tier 1, consecutive_clean=1.
+
+**Escalations:** None this iter. System clean.
+
+**Patterns:** System healthy and clean for 2nd iter in a row. Standout: heal-dashboard-api-sha-drift auto-restart at 01:05Z UTC is expected post-PR#1113 merge behavior (dashboard-api was running stale code from before the merge; healer auto-restarted it; system-health confirms healthy). Tonight's watch items: nightly 502 cluster (~01:12-01:15Z UTC, imminent), mirror-queue-wait-gauge G-rule re-fire (~04:12Z UTC), suite guardian nightly run (~03:41Z UTC), Check I Sunday artifact (~14:13Z UTC). Untracked tmp files in agents/pulse/ are hygiene debt — not urgent. /cycle direct (chat session).
+
+**Tier end-of-iter:** **Tier 1**, consecutive_clean=1.
+
+---
+
