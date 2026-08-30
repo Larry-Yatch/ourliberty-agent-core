@@ -23,9 +23,26 @@ from pathlib import Path
 # narrow until Larry wires up his own chat topology. Extend as needed.
 KNOWN_CHAT_IDS = set()
 
+# THE machine-readable answer to "did a HUMAN author this envelope?".
+#
+# It was a `# Humans` COMMENT until 2026-08-27. A property that exists only in
+# prose can only ever be RESTATED by the code that needs it, and a restated
+# list drifts — which is how outbox_notifier's marker-routing branch came to
+# ask `routing_source == 'larry'` and silently discard every verdict a human
+# dispatched from the DASHBOARD instead (agent-core #1108/#1109, both reviewed,
+# both REVIEW_PASS, both archived, both hand-merged).
+#
+# Membership test: would a PERSON be surprised to learn this envelope vanished?
+#   'larry'     — he typed it (Telegram direction-tasks, self-targeted approvals)
+#   'dashboard' — he clicked it; the API returns success either way
+# Agent names are NOT members even when an agent acts on Larry's approval.
+#
+# Unioned into ALLOWED_SOURCES below so the two can never disagree.
+HUMAN_SOURCES = frozenset({'larry', 'dashboard'})
+
 ALLOWED_SOURCES = {
-    # Humans
-    'larry',
+    # Humans — see HUMAN_SOURCES above; its members are unioned in at the end
+    # of this literal so the two definitions cannot drift apart.
     # Live agents
     'beacon', 'forge', 'mirror', 'pulse',
     'beacon-result', 'forge-result', 'mirror-result', 'pulse-result',
@@ -49,14 +66,17 @@ ALLOWED_SOURCES = {
     # outbox_notifier branch added in step 4 (PR #82) keys off this exact
     # source on Beacon's outbox; the envelope source must match.
     'pulse-auto-dispatch',
-    # E4.4 dashboard UI Approve/Reject actions. Pulse iter 97 + iter 97-notify
-    # (2026-05-28) discovered that 'dashboard' was never in this allowlist;
-    # 4 dashboard-sourced envelopes were silently dropped to beacon/.invalid
-    # between 2026-05-27T17:55Z and 2026-05-28T05:30Z, breaking the UI as a
-    # control surface. Adding here closes the gap. NOTE: do not auto-replay
-    # the stale envelopes already in beacon/.invalid — they predate this fix.
-    'dashboard',
 }
+# Fold the human sources in structurally rather than listing them twice, so
+# adding a surface to HUMAN_SOURCES allows it here automatically.
+#
+# The 2026-05-28 incident (Pulse iter 97 + 97-notify) was exactly this pair
+# drifting apart: 'dashboard' had been a control surface for months without
+# being in this allowlist, and 4 of Larry's envelopes were dropped to
+# beacon/.invalid in silence between 2026-05-27T17:55Z and 2026-05-28T05:30Z,
+# breaking the UI as a control surface. NOTE, still current: do not auto-replay
+# the stale envelopes already in beacon/.invalid — they predate that fix.
+ALLOWED_SOURCES |= HUMAN_SOURCES
 
 # Phase D3 — clarification protocol metadata. Optional on dispatch.
 #

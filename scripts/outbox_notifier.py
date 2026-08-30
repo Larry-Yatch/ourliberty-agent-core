@@ -12885,6 +12885,144 @@ def _alert_dashboard_delegate_no_outcome(data: dict[str, Any]) -> None:
         )
 
 
+def _verdict_noun(agent: str, marker_type: str) -> str:
+    """What the discarded thing WAS, in the operator's words.
+
+    Keyed on the marker family rather than the agent, because the agent name is
+    an implementation detail to whoever reads the alert and the marker family is
+    what they will recognise on the PR. Falls back to a neutral noun so a marker
+    type added later is described vaguely rather than wrongly.
+    """
+    if marker_type.startswith('review_'):
+        return 'a code review'
+    if marker_type in ('proceed', 'clarify_request', 'reject'):
+        return 'a build preflight'
+    return 'an agent run'
+
+
+def _alert_unroutable_marker_verdict(
+    data: dict[str, Any],
+    marker_decision: dict[str, Any],
+    agent: str,
+    source: str,
+    routing_source: str,
+) -> None:
+    """A classified marker VERDICT is about to be archived with nothing acted
+    on. Say so on a surface Larry reads.
+
+    The marker-routing branch archives when there is no agent to notify back
+    and the routing source is not in `dispatch_validator.HUMAN_SOURCES`. That
+    is a legitimate outcome for the notify leg — but the archive also skips
+    every SUBSTANTIVE consequence below it: auto-merge on a review_pass, the
+    Forge revision dispatch on a review_revision, terminal-verdict ledger
+    reconciliation, and the no-session routing that is the only Larry artifact
+    a session-less review produces. A discarded verdict is data loss.
+
+    Before this, the only trace was one WARN line in a daemon log nobody
+    reads, and `heal_pr_auto_merge` — the documented safety net — is
+    structurally blind to it: it finds candidates by scanning
+    outbox-notifier.log for `AUTO_MERGE ... outcome=failed`, and this branch
+    returns BEFORE `_run_review_pass_auto_merge` ever logs a line. Measured on
+    the live droplet for the 2026-08-27 #1108/#1109 incident: zero AUTO_MERGE
+    lines for either task, and every healer tick through the window reported
+    `no mirror-passed failures in last 24h`.
+
+    Volume, counted before adding this rather than guessed: the branch fired
+    SIX times in the notifier log's 107-day life (2026-05-11 → 2026-08-26) —
+    2 larry, 2 dashboard, 1 outbox-notifier(original_source=larry), 1
+    auto-retry. Five of those six are now routed by `human_direct` instead, so
+    this alert's expected rate is well under one per quarter. It is the drift
+    backstop, not a monitor.
+
+    Fire-and-forget — never raises. An alerting failure must not cost us the
+    archive.
+    """
+    task_id = str(data.get('task_id') or 'unknown')
+    marker_type = str(marker_decision.get('marker_type') or 'unknown')
+    payload = marker_decision.get('payload')
+    pr_url = data.get('pr_url') or (
+        payload.get('pr_url') if isinstance(payload, dict) else None
+    )
+    # The operator-facing name of the verdict, derived from the classifier's
+    # own keyword table rather than restated here — the two cannot drift.
+    verdict = mrh.MARKER_KEYWORDS.get(marker_type, marker_type.upper())
+    try:
+        appended = larry_alerts.append_alert(
+            source='outbox-notifier',
+            severity='warning',
+            route='escalate',
+            # needs_larry is deliberately NOT set. The stamp means "this owes
+            # Larry an Approvals card", and `heal_unregistered_approval` can
+            # only build one from a BINARY suggested_action — it returns None
+            # for a shell command like the one below, so every occurrence would
+            # be counted by heal_approvals_surface_drift and then refused by
+            # the promoter, logging one `missing_card` drift row that is not a
+            # real failure. `route='escalate'` already forces the DM
+            # (larry_alerts B2), so dropping the stamp costs no delivery.
+            # Same call as agent-core/beacon CLAUDE.md:313 ("if you add a new
+            # way for something to need Larry, wire it into the promoter") —
+            # here the honest reading is that this is a notification, not a
+            # decision, so it does not need a card at all. #1112 was parked on
+            # 2026-08-27 over this exact shape; matching it keeps the two
+            # alerting changes consistent instead of landing opposite rulings.
+            subject=f'unroutable-verdict:{task_id}:{marker_type}',
+            task_id=task_id,
+            pr_url=pr_url if isinstance(pr_url, str) else None,
+            suggested_action=(
+                f'ls ~/agents/outboxes/{agent}/.archive/ | grep {task_id}'
+            ),
+            message=(
+                # Derived, not assumed: this site also sees Forge PREFLIGHT
+                # markers (PROCEED / CLARIFY_REQUEST / REJECT), and calling a
+                # clarify question "a code review" is simply false.
+                f'{_verdict_noun(agent, marker_type).capitalize()} finished '
+                f'and its answer was thrown away. '
+                f'{agent.title()} returned {verdict} on `{task_id}`'
+                + (f' ({pr_url})' if pr_url else '')
+                + f', but nothing downstream ran, and nothing will retry it. '
+                # Only say "the PR" when there IS one: this site also sees
+                # Forge preflight markers, which have no PR yet, and telling
+                # the operator a non-existent PR is stuck is worse than saying
+                # less. Same reason the noun above is derived.
+                + (
+                    'The PR will sit exactly where it is until a person moves '
+                    'it — the auto-merge healer only re-tries merges that were '
+                    'ATTEMPTED and failed, and this one was never attempted. '
+                    if pr_url else
+                    'This task is stopped until a person picks it up; there is '
+                    'no PR yet and no healer watching it. '
+                )
+                + f'The result itself is intact; the command below finds it. '
+                f'(Cause, for whoever fixes it: the dispatch source was '
+                f'`{routing_source}`, which the notifier can route neither to '
+                f'an agent nor to a human surface.)'
+            ),
+        )
+    except Exception as e:  # noqa: BLE001 — surfacing must never break routing
+        log(
+            f'unroutable-verdict alert failed for {task_id}: '
+            f'{type(e).__name__}: {e}',
+            'WARN',
+        )
+        return
+    if not appended:
+        # `append_alert` returns False for a cooldown hit, a durable silence,
+        # or an append failure — and says nothing in any of those cases. That
+        # is THIS FIX reproducing the very failure it exists to close: a
+        # verdict discarded with no trace. Cooldown is keyed
+        # `outbox-notifier:unroutable-verdict:<task>:<marker>`, so a genuine
+        # repeat is a re-processed outbox for the SAME task and deduping it is
+        # correct — but the suppression itself must not be invisible.
+        log(
+            f'UNROUTABLE_VERDICT_ALERT_SUPPRESSED task={task_id} '
+            f'verdict={verdict} agent={agent} source={source} '
+            f'routing_source={routing_source} pr={pr_url} — the alert was '
+            f'NOT delivered (cooldown, durable silence, or append failure). '
+            f'The verdict is still being archived with nothing acted on.',
+            'WARN',
+        )
+
+
 def _route_beacon_pulse_auto_dispatch_approval(
     data: dict[str, Any],
     *,
@@ -14663,22 +14801,66 @@ def process_outbox(outbox_file: Path) -> str:
         # so the recovered marker reaches the right agent.
         routing_source = data.get('original_source') or source
         target_agent = _primary_agent_id(routing_source)
-        # E1.5.2 source-routing fix: when Larry dispatches an agent directly
-        # (no upstream Beacon hop) and propagates reply_chat_id, the marker
-        # has no agent target but should still (a) DM Larry the result and
-        # (b) fire auto-merge if the marker is review_pass. Without this
-        # branch, larry-direct review dispatches silently archive and the
-        # E1.3 heal_pr_auto_merge healer has to clean up — exactly what
-        # PR #45 surfaced live on 2026-05-19.
+        # E1.5.2 source-routing fix: when a HUMAN dispatches an agent directly
+        # (no upstream Beacon hop) the marker has no agent target, but the
+        # substantive half of the chain still must run — auto-merge on a
+        # review_pass, the Forge revision dispatch on a review_revision, the
+        # terminal-verdict ledger reconciliation, the no-session routing. Only
+        # the inter-agent NOTIFY needs a target agent, and that leg is
+        # explicitly informational (see the notify block below). Without this
+        # branch a human-dispatched verdict silently archives.
+        #
+        # SCOPE OF THE GUARANTEE, stated narrowly on purpose (review round 1):
+        # what this closes is "a verdict from an UNROUTABLE source archives
+        # silently" — the archive branch below now alerts. It does NOT close
+        # "routed, but no handler produced anything": a chat-less Forge
+        # CLARIFY_REQUEST / REJECT, and a REVIEW_PASS whose auto-merge SKIPS.
+        # Both are disclosed with counts in the PR body rather than claimed.
+        #
+        # THREE incidents, one branch:
+        #   PR #45  (2026-05-19) source='larry'     — the carve-out this is.
+        #   PR #768             harvest-before-reap — "the PR never merged and
+        #     the worktree was still removed" (the 760/720 loss). Repaired by
+        #     making heal_wedged_review_sessions WRITE 'source': 'larry' on a
+        #     synthesized envelope to slip past this branch — a workaround that
+        #     is itself evidence the BRANCH, not any one source, is the defect.
+        #   #1108/#1109 (2026-08-27) source='dashboard' — both reviewed (897s /
+        #     907s), both REVIEW_PASS, both `state=success` on GitHub, both
+        #     archived here, both hand-merged by Larry.
+        #
+        # The dashboard failed the old guard on BOTH conjuncts:
+        # `_primary_agent_id('dashboard')` is None (it is a control surface,
+        # not an agent with an inbox) AND a dashboard envelope carries
+        # `reply_chat_id: null` (there is no chat thread). The membership test
+        # is now `dispatch_validator.HUMAN_SOURCES` — data, never restated
+        # here, so a fourth control surface is covered by adding it there.
+        #
+        # `reply_chat_id` is deliberately NOT part of this test any more. It
+        # gates the DM legs below (which degrade to silence on their own when
+        # there is no chat); it must not gate the MERGE. The old conjunct made
+        # "no chat to tell him" mean "never merge", and the documented safety
+        # net does not catch that: heal_pr_auto_merge finds candidates only by
+        # scanning this log for `AUTO_MERGE ... outcome=failed`, and this
+        # branch returns BEFORE `_run_review_pass_auto_merge` logs anything.
+        # Measured on the live droplet for #1108/#1109: zero AUTO_MERGE lines,
+        # and every healer tick through the window read `no mirror-passed
+        # failures in last 24h`.
         chat_id = data.get('reply_chat_id')
-        larry_direct = (
+        human_direct = (
             target_agent is None
-            and routing_source == 'larry'
-            and isinstance(chat_id, int)
+            and routing_source in dispatch_validator.HUMAN_SOURCES
         )
-        if (target_agent is None or target_agent == agent) and not larry_direct:
+        if (target_agent is None or target_agent == agent) and not human_direct:
             # Can't route back (system source with no original_source) or
-            # self-loop — archive.
+            # self-loop — archive. Discarding a classified VERDICT is data
+            # loss whoever dispatched it, so say so on a surface Larry reads
+            # rather than only in the daemon log. This is also the drift
+            # backstop: a future control surface not yet in HUMAN_SOURCES
+            # alerts here instead of vanishing, which is how the dashboard gap
+            # stayed invisible for 107 days.
+            _alert_unroutable_marker_verdict(
+                data, marker_decision, agent, source, routing_source,
+            )
             log(
                 f'marker present but no routable target '
                 f'(source={source}, original_source={data.get("original_source")}, '
@@ -14688,9 +14870,9 @@ def process_outbox(outbox_file: Path) -> str:
             _archive_outbox(outbox_file)
             return 'archived-no-notify'
 
-        if larry_direct:
+        if human_direct:
             log(
-                f'larry-direct dispatch (source={source}, '
+                f'human-direct dispatch (source={source}, '
                 f'intent={marker_decision["intent"]}, '
                 f'chat={chat_id}); skipping inter-agent notify, '
                 f'continuing to dispatch helpers + auto-merge + Larry DM',
@@ -14715,6 +14897,28 @@ def process_outbox(outbox_file: Path) -> str:
             #   REJECT / CLARIFY_EXHAUST → terminal DM via _maybe_dm_larry
             #   CLARIFY_REQUEST          → no dispatcher; synth DM with
             #                              clarify-specific body
+            #
+            # KNOWN LIMIT, measured and deliberately not closed here. Every row
+            # of that matrix assumes a chat exists, because in 2026-05 every
+            # human-direct dispatch came from Telegram. A CONTROL-SURFACE
+            # dispatch carries `reply_chat_id: null`, so the two rows whose only
+            # closing signal is a DM — Forge REJECT and CLARIFY_REQUEST — reach
+            # the end of this block having done nothing observable.
+            #
+            # A "did anything happen?" check was built for this and REMOVED
+            # before merge: every formulation of it either re-encoded the
+            # handlers' conditions (the item-14 defect this PR exists to fix)
+            # or trusted `has_followup_dispatch` / `merge_result`, which are a
+            # PREDICTION and a ran-at-all flag rather than answers — both
+            # dispatchers have ~5 silent no-write returns each, and
+            # `_run_review_pass_auto_merge` sets `merge_result` on every skip
+            # path too. Closing this properly means making the dispatchers
+            # RETURN whether they wrote, the way `_route_no_session_review`
+            # already does. That is its own change.
+            #
+            # Counted before deferring it: of 9,055 archived outboxes, 48 carry
+            # a human-routed marker and exactly ONE is a chat-less
+            # CLARIFY_REQUEST (2026-06-03). REJECT: zero.
             mtype = marker_decision['marker_type']
             has_followup_dispatch = (
                 (mtype == 'proceed' and agent == 'forge')
@@ -14872,12 +15076,12 @@ def process_outbox(outbox_file: Path) -> str:
             notify_task['mirror_escalate_reason'] = escalate_reason
 
         # task-19 (2026-05-19) — gate ONLY the back-leg inter-agent notify
-        # on `not larry_direct`. The dispatch helpers below
+        # on `not human_direct`. The dispatch helpers below
         # (`_dispatch_build_phase`, `_dispatch_revision_to_forge`) write
         # into a different agent's inbox to advance the chain; they don't
         # depend on having an upstream agent to notify, so they MUST fire
         # for source='larry' too. PR #46 incorrectly hid them under the
-        # `not larry_direct` gate, which is what caused Forge's PROCEED on
+        # `not human_direct` gate, which is what caused Forge's PROCEED on
         # task-17's larry-direct preflight to silently skip build-phase
         # dispatch (Larry had to manually bridge the build envelope).
         #
@@ -14901,7 +15105,7 @@ def process_outbox(outbox_file: Path) -> str:
             and not marker_decision.get('budget_exhausted')
             and not data.get('forge_build_session_id')
         )
-        if not larry_direct and not suppress_no_session_backleg:
+        if not human_direct and not suppress_no_session_backleg:
             notify_filename = f'notify-{outbox_file.stem}.json'
             try:
                 dest = safe_write_inbox.safe_write_inbox(
@@ -14939,8 +15143,8 @@ def process_outbox(outbox_file: Path) -> str:
         # (Beacon journals "Forge is proceeding"); the build-phase dispatch
         # below is what actually triggers code work. Two-invocation
         # preflight→build with --resume per signed-off design.
-        # task-19: fires regardless of larry_direct so Larry-direct Forge
-        # preflights still auto-advance to build.
+        # task-19: fires regardless of human_direct so a human-direct Forge
+        # preflight still auto-advances to build.
         if marker_decision['marker_type'] == 'proceed' and agent == 'forge':
             _dispatch_build_phase(data)
 
@@ -14951,8 +15155,8 @@ def process_outbox(outbox_file: Path) -> str:
         # if auto_promoted (low confidence → escalate) or budget_exhausted
         # (over max_revisions → escalate); both downgrade to Beacon-only
         # routing via the intent override above.
-        # task-19: fires regardless of larry_direct so Larry-direct Mirror
-        # reviews still drive Forge through the revision loop.
+        # task-19: fires regardless of human_direct so a human-direct Mirror
+        # review still drives Forge through the revision loop.
         if (
             marker_decision['marker_type'] == 'review_revision'
             and agent == 'mirror'
@@ -15040,7 +15244,7 @@ def process_outbox(outbox_file: Path) -> str:
         # archive above have run.
         if notify_failed:
             return 'notify-failed'
-        return 'larry-direct-marker' if larry_direct else 'notified-marker'
+        return 'human-direct-marker' if human_direct else 'notified-marker'
 
     # task-25 (2026-05-20) — headless Beacon clarification-response handler.
     # Fires BEFORE default notify routing for `agent=beacon AND

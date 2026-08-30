@@ -11270,20 +11270,52 @@ class CostDmTemplateTest(unittest.TestCase):
         self.assertIn('?', body)
 
 
-class LarryDirectDispatchTest(unittest.TestCase):
-    """E1.5.2 source-routing fix: when Larry dispatches Mirror directly
-    (source='larry') and propagates reply_chat_id, the notifier should
-    (a) skip the inter-agent notify (no agent to route to), (b) fire
-    auto-merge if the marker is REVIEW_PASS, and (c) DM Larry the result
-    via the existing reply_chat_id chain.
+class _DirectDispatchHarness:
+    """Sandbox shared by the larry-direct and dashboard-direct suites.
 
-    The bug this fixes: PR #45 dispatch on 2026-05-19 — Larry sent the
-    design PR straight to Mirror; Mirror's REVIEW_PASS was archived with
-    'no routable target' WARN because _primary_agent_id('larry') is None.
-    Auto-merge had to fall through to heal-pr-auto-merge (E1.3) instead.
+    A MIXIN, not a TestCase. `DashboardDirectDispatchTest` used to subclass
+    `LarryDirectDispatchTest` outright just to borrow this setUp, which made
+    unittest collect the parent's six tests a second time, byte-identical,
+    under a second class name — a parent regression reported twice, and every
+    future parent test silently doubling. Splitting the harness out is the
+    whole fix; each suite keeps its own tests.
+
+    WORKTREE TEARDOWN IS MOCKED FOR THE WHOLE HARNESS, and that is load-bearing
+    rather than tidiness. `setUp` sets `_AUTO_MERGE_SKIP_SERIALIZER_FOR_TEST`,
+    and that bypass calls `_teardown_worktrees_for_task` +
+    `_signal_sequence_step_merged` unconditionally on a `merged` outcome.
+    Neither is sandboxed: `_canonical_repo_for_coords` reads the
+    checkout-relative `config/agent-models.json`, and
+    `worktree_manager.WORKTREE_BASE` is `Path.home()/'agent-worktrees'`, which
+    honours no `OURLIBERTY_*` override (`_bootstrap` deliberately does not swap
+    HOME). On a Mac both paths are absent so it no-ops, which is exactly why
+    this was invisible here — but these fixtures carry REAL production task
+    ids, and on 2026-08-27 the droplet really did hold
+    `~/agent-worktrees/wt-mirror-check0-delivered-kinds-tier3-001` and
+    `…-alert-translations-unrouted-pr-nudges-retired-001`. Running this suite
+    there — the house habit for timeout-sensitive tests — would have run
+    `git worktree remove --force --force` on live directories from a unit test.
+
+    Confirmed by spying from INSIDE this module, not from a driver script: the
+    sandbox reloads `outbox_notifier`, so an out-of-band `setattr` on the
+    module object is discarded and the probe reads "never called" — a false
+    clean. The in-file spy returned
+    `[{'task_id': 'check0-delivered-kinds-tier3-001', 'repo_coords':
+    'Larry-Yatch/ourliberty-agent-core'}]`.
     """
 
+    def _install_merge_side_effect_guards(self):
+        """Arm before any test can drive a merge. addCleanup, so it unwinds
+        even when setUp raises partway."""
+        for name in ('_teardown_worktrees_for_task',
+                     '_signal_sequence_step_merged'):
+            patcher = mock.patch.object(on, name)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
     def setUp(self):
+        # FIRST, before anything can drive a merge — see the harness docstring.
+        self._install_merge_side_effect_guards()
         self._tmp = tempfile.TemporaryDirectory()
         self._root = Path(self._tmp.name)
         self._originals = {}
@@ -11372,6 +11404,20 @@ class LarryDirectDispatchTest(unittest.TestCase):
             return []
         return [json.loads(l) for l in path.read_text().splitlines() if l.strip()]
 
+
+class LarryDirectDispatchTest(_DirectDispatchHarness, unittest.TestCase):
+    """E1.5.2 source-routing fix: when Larry dispatches Mirror directly
+    (source='larry') and propagates reply_chat_id, the notifier should
+    (a) skip the inter-agent notify (no agent to route to), (b) fire
+    auto-merge if the marker is REVIEW_PASS, and (c) DM Larry the result
+    via the existing reply_chat_id chain.
+
+    The bug this fixes: PR #45 dispatch on 2026-05-19 — Larry sent the
+    design PR straight to Mirror; Mirror's REVIEW_PASS was archived with
+    'no routable target' WARN because _primary_agent_id('larry') is None.
+    Auto-merge had to fall through to heal-pr-auto-merge (E1.3) instead.
+    """
+
     def test_review_pass_with_larry_source_and_chat_id_auto_merges(self):
         # The bug fix: source='larry' + reply_chat_id set must trigger
         # the auto-merge path (and not the 'no routable target' archive).
@@ -11382,7 +11428,7 @@ class LarryDirectDispatchTest(unittest.TestCase):
         )
         f = self._write_mirror_outbox('real-direct.json', body)
         result = on.process_outbox(f)
-        self.assertEqual(result, 'larry-direct-marker')
+        self.assertEqual(result, 'human-direct-marker')
         # Auto-merge fired.
         self.assertEqual(len(self._auto_merge_calls), 1)
         self.assertEqual(self._auto_merge_calls[0][0], PR_URL_FIXTURE)
@@ -11395,11 +11441,30 @@ class LarryDirectDispatchTest(unittest.TestCase):
         self.assertEqual(alerts[0]['chat_id'], 12345)
         self.assertEqual(alerts[0]['intent'], 'review-pass')
 
-    def test_review_pass_with_larry_source_no_chat_id_archives(self):
-        # Regression: without reply_chat_id, there's no Larry-direct target
-        # either — preserve the existing 'no routable target' archive path.
-        # Auto-merge MUST NOT fire in this case (no closing DM = silent
-        # action).
+    def test_review_pass_with_larry_source_no_chat_id_still_merges(self):
+        # REVERSED 2026-08-27 (dashboard-review-verdict-fourth-wall), and the
+        # reversal is deliberate — this test previously asserted the opposite:
+        #
+        #   "without reply_chat_id, there's no Larry-direct target either —
+        #    preserve the existing 'no routable target' archive path.
+        #    Auto-merge MUST NOT fire in this case (no closing DM = silent
+        #    action)."
+        #
+        # That rationale was written 2026-05-19, when a Telegram DM was the
+        # only Larry surface, and it is now measurably backwards. The
+        # alternative to merging is not "merge later, loudly" — it is "never
+        # merge, silently": heal_pr_auto_merge finds candidates ONLY by
+        # scanning outbox-notifier.log for `AUTO_MERGE ... outcome=failed`,
+        # and the archive branch returns BEFORE _run_review_pass_auto_merge
+        # logs anything, so the documented safety net is structurally blind to
+        # it. Measured live on the droplet for #1108/#1109: zero AUTO_MERGE
+        # lines, and every healer tick through the window read `no
+        # mirror-passed failures in last 24h`.
+        #
+        # The property this test used to carry — a merge Larry cannot see is
+        # not acceptable — is NOT deleted; it is re-backed by
+        # DashboardDirectDispatchTest.test_merge_without_chat_is_recorded,
+        # which runs the REAL merge fn and asserts the durable record.
         body = _mirror_outbox_body(
             _mirror_pass_marker(),
             source='larry',
@@ -11407,8 +11472,10 @@ class LarryDirectDispatchTest(unittest.TestCase):
         )
         f = self._write_mirror_outbox('real-no-chat.json', body)
         result = on.process_outbox(f)
-        self.assertEqual(result, 'archived-no-notify')
-        self.assertEqual(self._auto_merge_calls, [])
+        self.assertEqual(len(self._auto_merge_calls), 1)
+        # Still no DM — a missing chat means no DM, never a missing merge.
+        self.assertEqual(self._read_alerts(), [])
+        self.assertEqual(result, 'human-direct-marker')
 
     def test_review_revision_with_larry_source_dispatches_revision_not_dm(self):
         # task-19 (2026-05-19): clean REVIEW_REVISION on a Larry-direct
@@ -11434,7 +11501,7 @@ class LarryDirectDispatchTest(unittest.TestCase):
         )
         f = self._write_mirror_outbox('real-rev.json', body)
         result = on.process_outbox(f)
-        self.assertEqual(result, 'larry-direct-marker')
+        self.assertEqual(result, 'human-direct-marker')
         self.assertEqual(self._auto_merge_calls, [])
         # Revision dispatched to Forge.
         revisions = list(
@@ -11452,7 +11519,7 @@ class LarryDirectDispatchTest(unittest.TestCase):
         )
         f = self._write_mirror_outbox('real-esc.json', body)
         result = on.process_outbox(f)
-        self.assertEqual(result, 'larry-direct-marker')
+        self.assertEqual(result, 'human-direct-marker')
         self.assertEqual(self._auto_merge_calls, [])
         alerts = self._read_alerts()
         self.assertEqual(len(alerts), 1)
@@ -11497,6 +11564,681 @@ class LarryDirectDispatchTest(unittest.TestCase):
         self.assertIn(result, ('archived-no-notify', 'notified'))
         self.assertEqual(self._auto_merge_calls, [])
 
+
+DASHBOARD_VERDICT_FIXTURES = (
+    Path(__file__).resolve().parent / 'fixtures' / 'dashboard_review_verdicts'
+)
+
+
+def _load_dashboard_verdict(name):
+    """Load one VERBATIM droplet outbox from the dashboard_review_verdicts
+    fixture dir. See that dir's README for provenance + md5s: these are the
+    two real 2026-08-27 envelopes whose REVIEW_PASS was archived instead of
+    merged. Loaded (never edited) so the reproduction runs on the exact
+    envelope shape the daemon saw."""
+    return json.loads(
+        (DASHBOARD_VERDICT_FIXTURES / name).read_text(encoding='utf-8')
+    )
+
+
+class DashboardDirectDispatchTest(_DirectDispatchHarness, unittest.TestCase):
+    """The fourth wall: a Mirror review DISPATCHED FROM THE DASHBOARD can
+    return REVIEW_PASS and still never auto-merge, because its result leg has
+    no routable target and is silently archived.
+
+    Observed live twice on 2026-08-27 (agent-core #1108 and #1109). Larry
+    approved both from the Approvals tab; after the routing fix (#1111) the
+    reviews finally dispatched, ran 897s/907s, and BOTH returned REVIEW_PASS
+    with a `state=success` commit status posted. Then:
+
+        [notifier] [WARN] marker present but no routable target
+          (source=dashboard, original_source=None, agent=mirror); archiving
+
+    Both were archived. Neither merged. Larry hand-merged them.
+
+    Why the existing carve-outs miss it: `_primary_agent_id('dashboard')` is
+    None (the dashboard is a control surface, not an agent with an inbox) and
+    a dashboard envelope carries `reply_chat_id: null` (no chat thread), so a
+    dashboard verdict failed the `larry_direct` guard on BOTH conjuncts.
+
+    THIRD occurrence of one defect, not a one-off. The same branch ate
+    `source='larry'` verdicts (PR #45, 2026-05-19 — fixed by adding
+    `larry_direct`) and the Case-1 harvest verdicts (PR #768 — "the PR never
+    merged and the worktree was still removed", the 760/720 loss; see
+    HarvestedVerdictCrossModuleTest). #768's repair was to make the healer
+    WRITE `'source': 'larry'` on a synthesized envelope so it would slip past
+    this branch — a workaround that is itself evidence the branch, not any one
+    source, is the defect.
+
+    Inherits LarryDirectDispatchTest's harness (temp AGENTS_ROOT, auto-merge
+    override, larry_alerts redirect) and re-runs its cases, so the larry legs
+    and the dashboard legs are pinned side by side.
+    """
+
+    # ---- Reproductions: these FAIL on pre-fix code -----------------------
+
+    def test_real_droplet_pr1108_pass_auto_merges(self):
+        """REPRODUCTION (fails pre-fix: status 'archived-no-notify', 0 merge
+        calls). The verbatim #1108 envelope: source='dashboard', no
+        original_source, reply_chat_id=None, a well-formed REVIEW_PASS."""
+        body = _load_dashboard_verdict('mirror-pass-pr1108.json')
+        # Pin the fixture's own preconditions — if a future edit to the file
+        # changes these, this test is no longer about the observed defect.
+        self.assertEqual(body['source'], 'dashboard')
+        self.assertIsNone(body.get('original_source'))
+        self.assertIsNone(body['reply_chat_id'])
+        self.assertIn('=== REVIEW_PASS ===', body['result'])
+
+        f = self._write_mirror_outbox('dash-1108.json', body)
+        result = on.process_outbox(f)
+
+        # The DEFECT assertion first: pre-fix this is 0 — the verdict was
+        # discarded. Status-string assertions come last throughout this class
+        # so a reproduction can never "fail" on a label instead of the defect.
+        self.assertEqual(len(self._auto_merge_calls), 1)
+        self.assertEqual(
+            self._auto_merge_calls[0][0],
+            'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/1108',
+        )
+        self.assertEqual(
+            self._auto_merge_calls[0][1], 'check0-delivered-kinds-tier3-001',
+        )
+        # No agent notify — there is no agent to notify, which is the point.
+        self.assertEqual(
+            list((on.INBOXES_ROOT / 'beacon').glob('notify-*.json')), [],
+        )
+        self.assertEqual(result, 'human-direct-marker')
+
+    def test_real_droplet_pr1109_pass_auto_merges(self):
+        """REPRODUCTION (fails pre-fix). The second verbatim envelope, whose
+        task_id and PR differ — so the fix is keyed on the ENVELOPE SOURCE and
+        not on anything specific to #1108."""
+        body = _load_dashboard_verdict('mirror-pass-pr1109.json')
+        self.assertEqual(body['source'], 'dashboard')
+        self.assertIsNone(body['reply_chat_id'])
+
+        f = self._write_mirror_outbox('dash-1109.json', body)
+        result = on.process_outbox(f)
+
+        self.assertEqual(len(self._auto_merge_calls), 1)
+        self.assertEqual(
+            self._auto_merge_calls[0][0],
+            'https://github.com/Larry-Yatch/ourliberty-agent-core/pull/1109',
+        )
+        self.assertEqual(result, 'human-direct-marker')
+
+    def test_dashboard_review_revision_dispatches_to_forge(self):
+        """REPRODUCTION (fails pre-fix: no revision envelope is written).
+        The OTHER verdict leg. A dashboard-dispatched REVISION must reach
+        Forge; pre-fix it archived exactly like the PASS did, so the operator
+        got a paid review whose findings nothing acted on."""
+        body = _mirror_outbox_body(
+            _mirror_revision_marker(confidence='high'),
+            source='dashboard',
+            reply_chat_id=None,
+            forge_build_session_id='forge-build-sess',
+            target_repo='ourliberty-agent-core',
+            branch='forge/real-rev',
+            pr_url=PR_URL_FIXTURE,
+            revision_count=0,
+            max_revisions=3,
+        )
+        f = self._write_mirror_outbox('dash-rev.json', body)
+        result = on.process_outbox(f)
+
+        revisions = list(
+            (on.INBOXES_ROOT / 'forge').glob('revision-real-rev-*.json')
+        )
+        self.assertEqual(len(revisions), 1)
+        self.assertEqual(self._auto_merge_calls, [])
+        self.assertEqual(result, 'human-direct-marker')
+
+    def test_dashboard_review_escalate_reaches_a_larry_surface(self):
+        """REPRODUCTION (fails pre-fix: no durable record is written).
+        The THIRD verdict leg. A dashboard ESCALATE has no chat to DM, so the
+        thing that must still happen is the durable no-session artifact —
+        `_route_no_session_review`, which lives BELOW the archive branch and
+        therefore never ran. It has its own `_primary_chat_id()` fallback, so
+        the absence of a reply chat is not a reason to drop the verdict."""
+        # A task_id unique to THIS test: the approval store is sandboxed
+        # per-PROCESS (scripts/tests/_bootstrap), not per-test, so the sibling
+        # larry escalate case in LarryDirectDispatchTest writes
+        # `mirror-review-real-rev` into the SAME store — reusing that id would
+        # let this assertion pass on the sibling's artifact. (The two suites no
+        # longer share a class, but they still share the process.)
+        task_id = 'dash-esc-rev'
+
+        def _artifacts():
+            """Both durable no-session surfaces, addressed the way the code
+            addresses them (`_no_session_record_id` for the feed; the approval
+            id prefix, because `_emit_no_session_decision_approval` appends a
+            head8 when it can resolve one). Derived, never restated."""
+            open_ids = [r['id'] for r in on.for_larry_escalations.list_open()]
+            feed = on._no_session_record_id(task_id) in open_ids
+            pending = [
+                row for row in on.approval.load_state().get('pending', [])
+                if str(row.get('id', '')).startswith(
+                    f'mirror-review-{task_id}'
+                )
+            ]
+            return feed, pending
+
+        self.assertEqual(
+            _artifacts(), (False, []),
+            'pre-state: neither artifact may already exist',
+        )
+
+        body = _mirror_outbox_body(
+            _mirror_escalate_marker(task_id=task_id),
+            source='dashboard',
+            task_id=task_id,
+            reply_chat_id=None,
+            target_repo='ourliberty-agent-core',
+            pr_url=PR_URL_FIXTURE,
+        )
+        f = self._write_mirror_outbox('dash-esc.json', body)
+        result = on.process_outbox(f)
+
+        # A durable Larry-facing artifact now exists (the approval store or the
+        # for-Larry feed, whichever bucket `_classify_no_session_review` picks)
+        # — NOT silence.
+        feed, pending = _artifacts()
+        self.assertTrue(
+            feed or pending,
+            'escalate produced no durable Larry artifact',
+        )
+        self.assertEqual(self._auto_merge_calls, [])
+        self.assertEqual(result, 'human-direct-marker')
+
+    def test_dashboard_emergency_halt_still_trips_and_routes(self):
+        """The fourth verdict leg, and it is TWO claims with different status.
+
+        GUARD (passes pre-fix): the halt file itself. `_trip_emergency_halt`
+        runs ABOVE the archive branch, so an emergency verdict always tripped
+        the halt even while its outbox was being discarded. Pinned here so the
+        fix cannot cost us that.
+
+        REPRODUCTION (fails pre-fix): the ledger reconciliation that runs
+        BELOW the branch. A terminal Mirror verdict must clear this task's
+        revision-in-flight flag and any stale for-Larry record; pre-fix the
+        early return meant a dashboard emergency verdict left both set, so the
+        task stayed permanently 'mid-revision' to every later dispatch."""
+        task_id = 'dash-halt-rev'
+        record_id = on._no_session_record_id(task_id)
+        # Seed the state a terminal verdict is supposed to reconcile.
+        on.revision_in_flight_ledger.mark_in_flight(task_id, round_num=1)
+        on.for_larry_escalations.upsert(
+            record_id, source='mirror-review',
+            headline='stale record from an earlier round',
+            context='must be cleared by the terminal verdict',
+            severity='warning',
+        )
+        self.assertTrue(on.revision_in_flight_ledger.is_in_flight(task_id))
+        self.assertIn(
+            record_id,
+            [r['id'] for r in on.for_larry_escalations.list_open()],
+        )
+
+        body = _mirror_outbox_body(
+            _mirror_emergency_marker(task_id=task_id),
+            source='dashboard',
+            task_id=task_id,
+            reply_chat_id=None,
+            target_repo='ourliberty-agent-core',
+            pr_url=PR_URL_FIXTURE,
+        )
+        f = self._write_mirror_outbox('dash-halt.json', body)
+        result = on.process_outbox(f)
+
+        # REPRODUCTION half — both were still set/open pre-fix.
+        # `for_larry_escalations.clear` marks the row resolved rather than
+        # deleting it, so the open-ness is read through `list_open`, which is
+        # what every consumer of the feed reads.
+        self.assertFalse(on.revision_in_flight_ledger.is_in_flight(task_id))
+        self.assertNotIn(
+            record_id,
+            [r['id'] for r in on.for_larry_escalations.list_open()],
+        )
+        # GUARD half — unchanged by the fix.
+        self.assertTrue(on.EMERGENCY_HALT_FLAG.exists())
+        self.assertEqual(self._auto_merge_calls, [])
+        self.assertEqual(result, 'human-direct-marker')
+
+    def test_larry_source_without_chat_now_merges_instead_of_stranding(self):
+        """DELIBERATE REVERSAL of `test_review_pass_with_larry_source_no_chat_
+        id_archives`, whose rationale was "no closing DM = silent action".
+
+        That rationale was written 2026-05-19, when a Telegram DM was the only
+        Larry surface. It is now measurably backwards: the alternative to
+        merging is not "merge later, loudly" but "never merge, silently".
+        `heal_pr_auto_merge` — the documented safety net for a missed
+        auto-merge — finds candidates ONLY by scanning outbox-notifier.log for
+        `AUTO_MERGE ... outcome=failed`, and this branch returns BEFORE
+        `_run_review_pass_auto_merge` ever logs a line. Measured on the live
+        droplet log for #1108/#1109: zero AUTO_MERGE lines, and every healer
+        tick through the incident window reported `no mirror-passed failures
+        in last 24h`.
+
+        The "not silent" property is re-backed rather than deleted:
+        `test_merge_without_chat_is_recorded_not_silent` below asserts the
+        AUTO_MERGE record the dashboard and the healer both read."""
+        body = _mirror_outbox_body(
+            _mirror_pass_marker(),
+            source='larry',
+            reply_chat_id=None,
+        )
+        f = self._write_mirror_outbox('larry-no-chat.json', body)
+        result = on.process_outbox(f)
+
+        self.assertEqual(len(self._auto_merge_calls), 1)
+        # No DM was invented for it.
+        self.assertEqual(self._read_alerts(), [])
+        self.assertEqual(result, 'human-direct-marker')
+
+    def test_merge_without_chat_is_recorded(self):
+        """Re-backs the property the reversed
+        `test_review_pass_with_larry_source_no_chat_id_still_merges` used to
+        carry: a chat-less merge is OBSERVABLE, so "no DM" is not "no signal".
+
+        The two records are the `AUTO_MERGE task=... pr=... outcome=merged`
+        log line — the ONLY thing `heal_pr_auto_merge` scans — and the
+        `auto_merge` chain_event, which is what reaches the dashboard Larry
+        was looking at when he clicked Approve.
+
+        This test deliberately does NOT use the class's
+        `_AUTO_MERGE_FN_OVERRIDE`: that seam replaces `_auto_merge_pr`
+        wholesale, and BOTH records are written inside it. Asserting them with
+        the override installed would assert the mock. The gh call and the
+        PR-existence probe are mocked at the real external boundary instead,
+        so the production function runs and really writes both."""
+        body = _load_dashboard_verdict('mirror-pass-pr1108.json')
+        emitted = []
+
+        class _Proc:
+            returncode = 0
+            stdout = ''
+            stderr = ''
+
+        with mock.patch.object(on, '_AUTO_MERGE_FN_OVERRIDE', None), \
+                mock.patch.object(
+                    on, 'gh_write', return_value=_Proc()) as gh, \
+                mock.patch.object(
+                    on, '_pr_url_existence_state',
+                    return_value=('OPEN', 'ok (mocked)')), \
+                mock.patch.object(on, '_spawn_post_merge_baseline_warm'), \
+                mock.patch.object(
+                    on, '_emit_auto_merge_chain_event',
+                    side_effect=lambda **kw: emitted.append(kw)):
+            f = self._write_mirror_outbox('dash-record.json', body)
+            on.process_outbox(f)
+
+        # The harness guard held: the REAL worktree teardown never ran. Without
+        # it this line reads `<MagicMock ...>` for a call carrying a live
+        # production task id — the droplet-destructive path (see the harness
+        # docstring). Asserted here, not only in setUp, because setUp arming
+        # and setUp arming THE RIGHT THING are different claims.
+        self.assertTrue(
+            isinstance(on._teardown_worktrees_for_task, mock.MagicMock),
+            'worktree teardown is not mocked — this test would run '
+            '`git worktree remove --force --force` on the droplet',
+        )
+        on._teardown_worktrees_for_task.assert_called_once()
+        self.assertEqual(
+            on._teardown_worktrees_for_task.call_args.kwargs['task_id'],
+            'check0-delivered-kinds-tier3-001',
+        )
+        # The real merge actually shelled out to `gh pr merge`.
+        self.assertEqual(gh.call_count, 1)
+        self.assertEqual(
+            gh.call_args[0][0][:4], ['gh', 'pr', 'merge', '1108'],
+        )
+        # Record 1 — the line heal_pr_auto_merge scans.
+        log_text = on.LOG_FILE.read_text(encoding='utf-8')
+        self.assertIn(
+            'AUTO_MERGE task=check0-delivered-kinds-tier3-001', log_text,
+        )
+        self.assertIn('outcome=merged', log_text)
+        self.assertIn('pull/1108', log_text)
+        # Record 2 — the chain_event the dashboard reads.
+        self.assertEqual(len(emitted), 1)
+        self.assertEqual(emitted[0]['outcome'], 'merged')
+        self.assertEqual(
+            emitted[0]['task_id'], 'check0-delivered-kinds-tier3-001',
+        )
+
+    # ---- The residual archive: it must ALERT, not WARN-and-drop ----------
+
+    def test_unroutable_nonhuman_verdict_alerts_before_archiving(self):
+        """REPRODUCTION (fails pre-fix: the alert file is empty).
+
+        What still reaches the archive after the fix: a marker verdict whose
+        routing source is neither an agent nor a member of
+        `dispatch_validator.HUMAN_SOURCES`. `auto-retry` is the real one — it
+        hit this branch on 2026-06-10. Discarding a verdict is data loss
+        whoever dispatched it, so the branch now says so on a surface Larry
+        reads instead of only in the daemon log.
+
+        This is also the drift backstop: if a future control surface is added
+        without being added to HUMAN_SOURCES, its verdicts alert instead of
+        vanishing — which is how this defect stayed invisible for 107 days."""
+        body = _mirror_outbox_body(
+            _mirror_pass_marker(),
+            source='auto-retry',
+            reply_chat_id=None,
+        )
+        f = self._write_mirror_outbox('auto-retry-pass.json', body)
+        result = on.process_outbox(f)
+
+        alerts = self._read_alerts()
+        self.assertEqual(len(alerts), 1)
+        self.assertEqual(self._auto_merge_calls, [])
+        self.assertEqual(result, 'archived-no-notify')
+        self.assertIn('auto-retry', alerts[0]['message'])
+        self.assertIn('REVIEW_PASS', alerts[0]['message'])
+        self.assertIn(PR_URL_FIXTURE, alerts[0]['message'])
+
+    def test_self_loop_verdict_alerts_before_archiving(self):
+        """The other arm of the same archive condition — `target_agent ==
+        agent` (a verdict whose routing source resolves to the agent that
+        produced it). It has fired zero times in the notifier log's 107-day
+        life, and it is still a discarded verdict, so it alerts too."""
+        body = _mirror_outbox_body(
+            _mirror_pass_marker(),
+            source='mirror-result',
+            reply_chat_id=None,
+        )
+        f = self._write_mirror_outbox('self-loop-pass.json', body)
+        result = on.process_outbox(f)
+
+        self.assertEqual(len(self._read_alerts()), 1)
+        self.assertEqual(self._auto_merge_calls, [])
+        self.assertEqual(result, 'archived-no-notify')
+
+    def test_alert_text_fits_the_marker_family_it_describes(self):
+        """This call site sees BOTH Mirror review markers and Forge PREFLIGHT
+        markers, and the first version of the text assumed a code review on a
+        PR for all of them — telling the operator a non-existent PR was stuck.
+
+        Caught by RENDERING the alert and reading it, not by reading the diff:
+        `operator_artifacts.py` reports the f-string as one artifact and cannot
+        know which branch a given run takes. Both shapes are pinned here so a
+        later edit cannot re-collapse them."""
+        forge_marker = (
+            '=== CLARIFY_REQUEST ===\n'
+            '{"task_id": "preflight-x", "question": "Which repo?"}\n'
+            '=== END_CLARIFY_REQUEST ==='
+        )
+        body = _good_outbox(
+            agent='forge', source='auto-retry', task_id='preflight-x',
+            phase='preflight', result='Narrative.\n\n' + forge_marker,
+        )
+        body['reply_chat_id'] = None
+        outbox_dir = on.OUTBOXES_ROOT / 'forge'
+        outbox_dir.mkdir(parents=True, exist_ok=True)
+        f = outbox_dir / 'family-forge.json'
+        f.write_text(json.dumps(body))
+        on.process_outbox(f)
+
+        alerts = self._read_alerts()
+        self.assertEqual(len(alerts), 1)
+        msg = alerts[0]['message']
+        # It is a preflight, so it must not be described as a review...
+        self.assertIn('build preflight', msg)
+        self.assertNotIn('code review', msg)
+        # ...and must not claim a PR is stuck when none exists yet.
+        self.assertIn('no PR yet', msg)
+        self.assertNotIn('The PR will sit', msg)
+
+        # Control: the Mirror shape still gets the PR wording, so this test
+        # cannot be satisfied by blanding the text into saying nothing.
+        self._auto_merge_calls.clear()
+        mirror_body = _mirror_outbox_body(
+            _mirror_pass_marker(task_id='family-mirror'),
+            task_id='family-mirror', source='auto-retry', reply_chat_id=None,
+            pr_url=PR_URL_FIXTURE,
+        )
+        g = self._write_mirror_outbox('family-mirror.json', mirror_body)
+        on.process_outbox(g)
+        mirror_msg = self._read_alerts()[-1]['message']
+        self.assertIn('code review', mirror_msg)
+        self.assertIn('The PR will sit', mirror_msg)
+        self.assertNotIn('no PR yet', mirror_msg)
+
+    def test_alert_does_not_claim_a_card_it_cannot_produce(self):
+        """Gate-and-reader parity for the OTHER reader of this alert.
+
+        `needs_larry=True` means "this owes Larry an Approvals card". Two
+        healers read that stamp and disagree by construction:
+        `heal_approvals_surface_drift.is_actionable_alert` counts the alert as
+        awaiting-Larry, while `heal_unregistered_approval` can only build a
+        card from a BINARY `suggested_action` and returns None for a shell
+        command — so every occurrence would log a `missing_card` drift row that
+        is not a real failure.
+
+        Asserted by asking the REAL readers, not by re-stating their rules, and
+        both directions are checked so "never stamp anything" would not pass
+        this test either. (agent-core #1112 was parked on 2026-08-27 over this
+        same shape; this keeps the two alerting changes consistent.)"""
+        import heal_approvals_surface_drift as drift
+        import heal_unregistered_approval as promoter
+
+        body = _mirror_outbox_body(
+            _mirror_pass_marker(), source='auto-retry', reply_chat_id=None,
+        )
+        f = self._write_mirror_outbox('card-claim.json', body)
+        on.process_outbox(f)
+
+        alerts = self._read_alerts()
+        self.assertEqual(len(alerts), 1)
+        record = alerts[0]
+
+        # The promoter genuinely cannot build a card from this action...
+        self.assertIsNotNone(record.get('suggested_action'))
+        self.assertIsNone(
+            promoter.parse_binary_options(record['suggested_action']),
+            'if the promoter CAN parse this now, the stamp should come back',
+        )
+        # ...so the drift sentinel must not be counting it as awaiting a card.
+        self.assertFalse(
+            drift.is_actionable_alert(record),
+            'the alert claims an Approvals card the promoter will refuse — '
+            'one missing_card drift row per occurrence',
+        )
+        # Control: the stamp is what the sentinel keys on, so this test would
+        # still fail if delivery were silently downgraded instead.
+        self.assertEqual(record['route'], 'escalate')
+        self.assertTrue(
+            drift.is_actionable_alert({**record, 'needs_larry': True}),
+            'control: the sentinel must key on needs_larry, or this test is '
+            'passing for the wrong reason',
+        )
+
+    def test_suppressed_alert_is_logged_not_swallowed(self):
+        """Item-4's killer question, aimed at the fix itself: construct the
+        input on which the thing I ADDED produces the SAME failure mode it
+        exists to close.
+
+        `larry_alerts.append_alert` returns False — saying nothing — on a
+        cooldown hit, a durable silence, or an append failure. On any of those
+        the verdict would be archived with no trace again, which is the whole
+        defect. The suppression is logged instead."""
+        with mock.patch.object(
+            on.larry_alerts, 'append_alert', return_value=False,
+        ):
+            body = _mirror_outbox_body(
+                _mirror_pass_marker(), source='auto-retry', reply_chat_id=None,
+            )
+            f = self._write_mirror_outbox('suppressed.json', body)
+            result = on.process_outbox(f)
+
+        log_text = on.LOG_FILE.read_text(encoding='utf-8')
+        self.assertIn('UNROUTABLE_VERDICT_ALERT_SUPPRESSED', log_text)
+        self.assertIn('task=real-rev', log_text)
+        self.assertIn('routing_source=auto-retry', log_text)
+        self.assertEqual(result, 'archived-no-notify')
+
+    def test_alert_failure_never_costs_the_archive(self):
+        """Failure path (item 7). An alerting problem must not leave the outbox
+        un-archived — that would re-process it on the next poll forever."""
+        with mock.patch.object(
+            on.larry_alerts, 'append_alert', side_effect=RuntimeError('boom'),
+        ):
+            body = _mirror_outbox_body(
+                _mirror_pass_marker(), source='auto-retry', reply_chat_id=None,
+            )
+            f = self._write_mirror_outbox('alert-boom.json', body)
+            try:
+                result = on.process_outbox(f)
+            except Exception as e:  # noqa: BLE001 — that IS the failure
+                self.fail(
+                    f'an alerting failure must not propagate out of '
+                    f'process_outbox: {type(e).__name__}: {e}'
+                )
+
+        self.assertEqual(result, 'archived-no-notify')
+        self.assertFalse(f.exists(), 'the outbox must still be archived')
+        self.assertIn(
+            'unroutable-verdict alert failed',
+            on.LOG_FILE.read_text(encoding='utf-8'),
+        )
+
+    def test_alert_subject_actually_matches_its_translation(self):
+        """Gate-and-reader parity (code-discipline item 14). The alert's
+        operator tier and plain-language body come from a config entry keyed by
+        SUBJECT; if the emitter's subject and the config key ever disagree, the
+        alert silently falls back to tier FYI with `[no translation]` — the
+        wrong glyph on "a review's verdict was thrown away", and invisible.
+
+        So the subject is taken from what the code ACTUALLY EMITS, never
+        retyped here, and handed to the real lookup."""
+        with mock.patch.object(
+            on.larry_alerts, 'append_alert', return_value=True,
+        ) as appended:
+            body = _mirror_outbox_body(
+                _mirror_pass_marker(), source='auto-retry', reply_chat_id=None,
+            )
+            f = self._write_mirror_outbox('subject-parity.json', body)
+            on.process_outbox(f)
+
+        self.assertEqual(appended.call_count, 1)
+        emitted_subject = appended.call_args.kwargs['subject']
+        translation = on.larry_alerts.translate_alert(
+            'outbox-notifier', emitted_subject,
+        )
+        self.assertIsNotNone(
+            translation,
+            f'no alert-translations entry matches the emitted subject '
+            f'{emitted_subject!r} — the alert would render as FYI / '
+            f'[no translation]',
+        )
+        tier, tier_source = on.larry_alerts.resolve_tier_for(
+            'outbox-notifier', emitted_subject,
+        )
+        self.assertEqual(tier_source, 'translation')
+        self.assertEqual(tier, 'SOON')
+
+    # ---- EVASION mutations (code-discipline item 10, fourth clause) ------
+    # The rules above are all PRESENCE mutations: put the violation in plain
+    # sight and check the guard fires. These two express the SAME violation —
+    # "a human-dispatched verdict is discarded" — in shapes the guard handles
+    # DIFFERENTLY, which is the half a presence-only set cannot speak to.
+
+    def test_evasion_original_source_overrides_a_human_source(self):
+        """EVASION. `routing_source` is `original_source or source`, so a
+        dashboard envelope that picked up a SYSTEM `original_source` on some
+        hop is judged on the system source and does not route — the human half
+        of its provenance is invisible to the branch.
+
+        This is deliberately NOT "fixed" by preferring `source`: on the
+        marker-error retry path `original_source` is the field that carries
+        the true dispatcher, and overriding it there would break the recovery
+        that #1096 exists for. What this pins instead is the guarantee that
+        actually matters — the verdict may fail to route, but it can NEVER
+        vanish quietly."""
+        body = _load_dashboard_verdict('mirror-pass-pr1108.json')
+        body['original_source'] = 'cron'
+        f = self._write_mirror_outbox('evasion-origsrc.json', body)
+        result = on.process_outbox(f)
+
+        self.assertEqual(self._auto_merge_calls, [])
+        alerts = self._read_alerts()
+        self.assertEqual(len(alerts), 1, 'the verdict vanished silently')
+        self.assertIn('thrown away', alerts[0]['message'])
+        self.assertEqual(result, 'archived-no-notify')
+
+    def test_evasion_human_source_shaped_like_an_agent_name(self):
+        """EVASION. `human_direct` requires `target_agent is None`, and
+        `_primary_agent_id` matches any source that STARTS WITH an agent name
+        plus a hyphen. So a control surface named `forge-console` would be in
+        HUMAN_SOURCES and still never be human-direct — the membership would
+        look wired and do nothing.
+
+        Pinned because the failure is invisible at the config site. It is a
+        naming hazard, not a data loss: the substantive half still runs (the
+        merge fires) and the notify is merely aimed at an agent. Anyone adding
+        a surface to HUMAN_SOURCES must not name it `<agent>-something`."""
+        import dispatch_validator as dv
+        original = dv.HUMAN_SOURCES
+        try:
+            dv.HUMAN_SOURCES = frozenset(original | {'forge-console'})
+            body = _load_dashboard_verdict('mirror-pass-pr1108.json')
+            body['source'] = 'forge-console'
+            f = self._write_mirror_outbox('evasion-agentish.json', body)
+            result = on.process_outbox(f)
+        finally:
+            dv.HUMAN_SOURCES = original
+
+        # NOT human-direct despite being in the set — the hazard itself.
+        self.assertEqual(result, 'notified-marker')
+        # But the verdict is still acted on, so this is a mis-aimed notify and
+        # not a lost verdict.
+        self.assertEqual(len(self._auto_merge_calls), 1)
+        self.assertEqual(
+            len(list((on.INBOXES_ROOT / 'forge').glob('notify-*.json'))), 1,
+        )
+
+    def test_routing_derives_from_human_sources_not_a_copy(self):
+        """The membership set is DATA in `dispatch_validator`, and the notifier
+        READS it — it does not hold a copy that can drift.
+
+        Asserted BEHAVIOURALLY, in both directions, because the alternative —
+        grepping outbox_notifier.py for `routing_source == 'larry'` — is a
+        regex over source code standing in for a property, which is the
+        technique code-discipline item 13 says to retire rather than re-tune.
+        (It also reads false: the string appears in the branch's own comment.)
+
+        Direction 1: a source that is NOT in the set today starts routing the
+        moment it is added — so the set really is the switch.
+        Direction 2: removing a member stops it routing — so the notifier is
+        not falling through on some other condition that happens to agree.
+        """
+        import dispatch_validator as dv
+        original = dv.HUMAN_SOURCES
+        # A surface that does not exist anywhere in the codebase today.
+        self.assertNotIn('kiosk', original)
+        try:
+            # --- Direction 1: ADD a member -> its verdict now routes.
+            dv.HUMAN_SOURCES = frozenset(original | {'kiosk'})
+            body = _mirror_outbox_body(
+                _mirror_pass_marker(), source='kiosk', reply_chat_id=None,
+            )
+            f = self._write_mirror_outbox('kiosk-added.json', body)
+            self.assertEqual(on.process_outbox(f), 'human-direct-marker')
+            self.assertEqual(len(self._auto_merge_calls), 1)
+
+            # --- Direction 2: REMOVE dashboard -> its verdict stops routing.
+            self._auto_merge_calls.clear()
+            dv.HUMAN_SOURCES = frozenset(original - {'dashboard'})
+            body = _load_dashboard_verdict('mirror-pass-pr1108.json')
+            f = self._write_mirror_outbox('dash-removed.json', body)
+            self.assertEqual(on.process_outbox(f), 'archived-no-notify')
+            self.assertEqual(self._auto_merge_calls, [])
+        finally:
+            dv.HUMAN_SOURCES = original
+
+        # And the set stays folded into the allowlist, so a surface that can
+        # ROUTE can also DISPATCH (the 2026-05-28 drift incident).
+        self.assertTrue(dv.HUMAN_SOURCES <= dv.ALLOWED_SOURCES)
 
 class HarvestedVerdictCrossModuleTest(unittest.TestCase):
     """Cross-module contract for harvest-verdict-before-reap (PR #768 / B1).
@@ -11683,7 +12425,7 @@ class HarvestedVerdictCrossModuleTest(unittest.TestCase):
             'heal-wedged-review-sessions:harvest-before-reap',
         )
         # Routed larry-direct (NOT archived-no-notify).
-        self.assertEqual(result, 'larry-direct-marker')
+        self.assertEqual(result, 'human-direct-marker')
         # Auto-merge actually fired against the harvested PR.
         self.assertEqual(len(self._auto_merge_calls), 1)
         self.assertEqual(self._auto_merge_calls[0][0], self.HARVEST_PR_URL)
@@ -11699,7 +12441,7 @@ class HarvestedVerdictCrossModuleTest(unittest.TestCase):
         # forge_build_session_id on a synthesized envelope -> cold start, and
         # source='larry'+chat_id -> _dm_larry_no_session_revision.
         result, envelope = self._harvest_and_process('revision')
-        self.assertEqual(result, 'larry-direct-marker')
+        self.assertEqual(result, 'human-direct-marker')
         self.assertEqual(self._auto_merge_calls, [])
         # Surfaced to Larry (cold-start no-session revision DM), not dropped.
         alerts = self._read_alerts()
@@ -11708,7 +12450,7 @@ class HarvestedVerdictCrossModuleTest(unittest.TestCase):
     def test_harvested_escalate_surfaces_without_merge(self):
         # A harvested ESCALATE must DM Larry and NOT merge.
         result, envelope = self._harvest_and_process('escalate')
-        self.assertEqual(result, 'larry-direct-marker')
+        self.assertEqual(result, 'human-direct-marker')
         self.assertEqual(self._auto_merge_calls, [])
         alerts = self._read_alerts()
         self.assertEqual(len(alerts), 1)
@@ -11871,7 +12613,7 @@ class LarryDirectDispatchNarrowingTest(unittest.TestCase):
         f = self._write_outbox('forge', 'real-19-proceed.json', outbox)
 
         result = on.process_outbox(f)
-        self.assertEqual(result, 'larry-direct-marker')
+        self.assertEqual(result, 'human-direct-marker')
 
         # Build phase dispatched — the existing handler fires for
         # source='larry' too. Without the narrowing fix this would be 0.
@@ -11926,7 +12668,7 @@ class LarryDirectDispatchNarrowingTest(unittest.TestCase):
         f = self._write_outbox('forge', 'real-19-clarify.json', outbox)
 
         result = on.process_outbox(f)
-        self.assertEqual(result, 'larry-direct-marker')
+        self.assertEqual(result, 'human-direct-marker')
 
         # CLARIFY must NOT trip build-phase dispatch.
         forge_builds = list(
@@ -11968,7 +12710,7 @@ class LarryDirectDispatchNarrowingTest(unittest.TestCase):
         f = self._write_outbox('mirror', 'real-19-revision.json', body)
 
         result = on.process_outbox(f)
-        self.assertEqual(result, 'larry-direct-marker')
+        self.assertEqual(result, 'human-direct-marker')
         self.assertEqual(self._auto_merge_calls, [])
 
         # Revision dispatched to Forge — the existing handler fires.
@@ -11998,7 +12740,7 @@ class LarryDirectDispatchNarrowingTest(unittest.TestCase):
         f = self._write_outbox('mirror', 'real-19-pass.json', body)
 
         result = on.process_outbox(f)
-        self.assertEqual(result, 'larry-direct-marker')
+        self.assertEqual(result, 'human-direct-marker')
 
         # Auto-merge fired (the PR #46 gap-fill).
         self.assertEqual(len(self._auto_merge_calls), 1)
@@ -12011,13 +12753,29 @@ class LarryDirectDispatchNarrowingTest(unittest.TestCase):
         self.assertIn('Mirror approved', alerts[0]['message'])
         self.assertIn('Auto-merged', alerts[0]['message'])
 
-    # ---------------- regression 5: PASS without chat_id archives cleanly ----------------
+    # ---------------- regression 5: PASS without chat_id MERGES, silently to chat ----------------
 
-    def test_mirror_pass_with_larry_source_no_chat_id_archives(self):
-        # Pre-existing skip preserved: without reply_chat_id there is no
-        # Larry-direct target — the marker archives via the
-        # 'no routable target' path and auto-merge does NOT fire (silent
-        # action would be worse than no action).
+    def test_mirror_pass_with_larry_source_no_chat_id_still_merges(self):
+        # REVERSED 2026-08-27 (dashboard-review-verdict-fourth-wall). This is
+        # the SECOND copy of the same assertion — the first lives in
+        # LarryDirectDispatchTest — and it previously read:
+        #
+        #   "without reply_chat_id there is no Larry-direct target — the marker
+        #    archives via the 'no routable target' path and auto-merge does NOT
+        #    fire (silent action would be worse than no action)."
+        #
+        # Two copies of one claim is why this reversal is called out twice
+        # rather than quietly edited once. The claim is now false: the
+        # alternative to merging is not a louder merge, it is NO merge and no
+        # signal at all, because heal_pr_auto_merge only re-tries merges that
+        # were ATTEMPTED and failed — and the archive branch returns before one
+        # is ever attempted. Measured on the live droplet across the
+        # 2026-08-27 #1108/#1109 incident: zero AUTO_MERGE lines, and every
+        # healer tick read `no mirror-passed failures in last 24h`.
+        #
+        # "Not silent" is re-backed by
+        # DashboardDirectDispatchTest.test_merge_without_chat_is_recorded,
+        # which runs the REAL merge fn and asserts both durable records.
         body = _mirror_outbox_body(
             _mirror_pass_marker(task_id='real-19-pass-nochat'),
             task_id='real-19-pass-nochat',
@@ -12027,9 +12785,10 @@ class LarryDirectDispatchNarrowingTest(unittest.TestCase):
         f = self._write_outbox('mirror', 'real-19-pass-nochat.json', body)
 
         result = on.process_outbox(f)
-        self.assertEqual(result, 'archived-no-notify')
-        self.assertEqual(self._auto_merge_calls, [])
+        self.assertEqual(len(self._auto_merge_calls), 1)
+        # Still no DM: a missing chat means no DM, never a missing merge.
         self.assertEqual(self._read_alerts(), [])
+        self.assertEqual(result, 'human-direct-marker')
 
     # ---------------- regression 6: synth DM body branches on intent ----------------
 
@@ -13529,7 +14288,7 @@ class AutoMergeStructuralValidatorIntegrationTest(unittest.TestCase):
                                   return_value=merged_result) as m_merge:
             m_run.return_value = view_proc
             result = on.process_outbox(f)
-        self.assertIn(result, ('larry-direct-marker', 'notified-marker'))
+        self.assertIn(result, ('human-direct-marker', 'notified-marker'))
         # Existence check fired once.
         self.assertEqual(m_run.call_count, 1)
         # Merge fired exactly once with the canonical repo coords + PR#.

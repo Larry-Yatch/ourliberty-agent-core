@@ -1,0 +1,33 @@
+{
+  "task_id": "check0-delivered-kinds-tier3-001",
+  "agent": "mirror",
+  "source_task_file": "/home/larry/agents/inboxes/mirror/.claimed/0/review-check0-delivered-kinds-tier3-001-rev1.json",
+  "dedup_identity": null,
+  "reply_chat_id": null,
+  "source": "dashboard",
+  "started_at": "2026-08-27T00:39:05.519371+00:00",
+  "completed_at": "2026-08-27T00:54:12.840874+00:00",
+  "duration_sec": 907.32,
+  "exit_code": 0,
+  "model": "claude-opus-4-8",
+  "account_id": "oauth",
+  "account_tier": "tier3",
+  "attempts": 1,
+  "result": "Re-review of PR #1108 complete \u2014 **REVIEW_PASS**.\n\n**Verdict rationale:**\n- **Spec coverage clean**: Gate 0b + `DELIVERED_KINDS = {notification, approval_request}` added to `classify()` exactly as the spec/prior-round analysis documented \u2014 source/subject-agnostic, placed after the self-authored Gate 0 and above the registry gates, with `never_silence` falling through the same way it does at Gate 0.\n- **Scope tight**: only `scripts/alert_triage_state.py` (+34) and its test (+78); config/translations/`_translation_match`/bot-delivery all untouched.\n- **Tests genuine**: 7 new tests cover all 5 success criteria, gate ordering, and the `never_silence` escape (the fall-through test hits a real `wildcard-surfaced '*'` entry, not a vacuous path). The 97-vs-99-row deviation is ledger mutability; tests correctly assert the invariant, not the count.\n- **Regression gate PASS** (exit 0, 0 regressions). One pre-existing failure noted for visibility: `test_flip_readiness_gauge...test_all_green_writes_artifact_and_rings` \u2014 the known date-fixture time-bomb, present on both base and head, unattributable to this diff.\n\n=== REVIEW_PASS ===\n{\n  \"task_id\": \"check0-delivered-kinds-tier3-001\",\n  \"pr_url\": \"https://github.com/Larry-Yatch/ourliberty-agent-core/pull/1108\",\n  \"summary\": \"Gate 0b (DELIVERED_KINDS = {notification, approval_request}) added to classify() exactly as spec'd: source/subject-agnostic, positioned after the self-authored Gate 0 and above the registry gates, with never_silence falling through. Delivery-carrying rows (route=None, always DM'd at write time) no longer get a duplicate Tier-4 DM. Scope is tight (alert_triage_state.py +34, its test +78); no config/translations/bot-delivery touched. 7 new tests cover all 5 success criteria incl. gate ordering + never_silence escape; the count-vs-invariant deviation (97 measured vs 99 spec'd) is ledger mutability and the tests assert the invariant, not the count. Regression gate PASS, 0 regressions. Note: 1 pre-existing failure unaffected by this PR: test_flip_readiness_gauge.TestMainIntegration.test_all_green_writes_artifact_and_rings (known date-fixture time-bomb, fails on clean base). Tracked separately.\"\n}\n=== END_REVIEW_PASS ===",
+  "claude_session_id": "7a8301df-5a20-4a0a-886c-970f5ddc2a5e",
+  "cost_usd": 0.8878298499999998,
+  "usage": {
+    "input_tokens": 8,
+    "output_tokens": 2888,
+    "cache_read": 304743,
+    "cache_creation": 4680
+  },
+  "timed_out": false,
+  "timeout_seconds": null,
+  "phase": "review",
+  "target_repo": "ourliberty-agent-core",
+  "revision_count": 1,
+  "max_revisions": 3,
+  "pr_url": "https://github.com/Larry-Yatch/ourliberty-agent-core/pull/1108",
+  "prompt": "Re-review request. The operator dispatched this from the Approvals tab for task `check0-delivered-kinds-tier3-001`, acting on a stranded session-less escalation (a promoted card: the original review round ended in an escalation that never got a real decision surface).\n\nNo revision has necessarily been applied since that review \u2014 the head may be unchanged. Re-review the PR at its current head on its merits.\n\nTask: `check0-delivered-kinds-tier3-001`\nPR: https://github.com/Larry-Yatch/ourliberty-agent-core/pull/1108\n\nThe promoted card's context (why this stranded):\n  This Mirror review escalation was written to the for-Larry needs-you feed (blackboard/for-larry-escalations.json) but never emitted as an APPROVAL_REQUEST marker, so it never reached the Approvals tab; heal-unregistered-approval promoted it.\n\nRecord id: mirror-review:check0-delivered-kinds-tier3-001\nHeadline: Session-less PR needs you: check0-delivered-kinds-tier3-001\nContext: Mirror wants changes on https://github.com/Larry-Yatch/ourliberty-agent-core/pull/1108 but no session is dispatched and nothing self-healed. Review the PR, then re-dispatch a Forge build for `check0-delivered-kinds-tier3-001` via Beacon, or close the PR.\nPR: https://github.com/Larry-Yatch/ourliberty-agent-core/pull/1108\n\nApprove = re-dispatch the Mirror review at the PR's current head (its verdict then drives the normal pipeline: pass merges, revision routes a Forge fix, escalate raises a properly-wired decision card). Reject = dismiss.\n\nRead the PR diff (`gh pr diff 1108` \u2014 now at head 31cd19d0). Emit one marker per your review protocol: REVIEW_PASS (mergeable on its merits), REVIEW_REVISION (changes needed; next would be round 2), REVIEW_ESCALATE (a human must decide \u2014 state exactly what call is needed), or REVIEW_EMERGENCY_HALT (safety issue)."
+}
