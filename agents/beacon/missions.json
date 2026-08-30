@@ -20785,7 +20785,11 @@
         "at": "2026-08-29T17:29:37.173299+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-08-30T01:07:20.314204+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-sync-service-deploy-restart-head-drift-tier4-no-tr",
@@ -20851,7 +20855,11 @@
         "at": "2026-08-29T18:00:05.108831+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-08-30T01:07:20.314204+00:00",
+      "retired_reason": "orphan-terminal"
     },
     {
       "id": "proposed-pr1113-deep-review-window-closing",
