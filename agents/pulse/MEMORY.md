@@ -32,9 +32,18 @@ DO NOT cite the iter ~9726 phantom-everywhere claim ever again — it is permane
 
 ---
 
-## G-rule ourliberty-health-sync-freshness-tier4-no-translation-001 — DISPATCHED ✅ (iter ~10640, 2026-08-30T02:55Z UTC)
+## G-rule ourliberty-health-sync-freshness-tier4-no-translation-001 — CLOSED (false premise, Beacon decline 2026-08-30T03:xxZ UTC)
 
-**Rule:** `source=ourliberty-health, subject=ourliberty-agent-core health: 1 issue(s) need attention` returns Tier-4 from the triage helper (no translation match). Occurrences: [1/3] iter ~9685 (line 507, 2026-08-23T04:53:41Z UTC) — sync_freshness transient dirty-tree during journal write, self-healed. [2/3] iter ~10635 (line 513, 2026-08-30T01:52:17Z UTC) — clean_tree/untracked: 2 stray files. [3/3] iter ~10640 (line 515, 2026-08-30T02:52:24Z UTC) — same stray files persist. **DISPATCHED:** direction-ask-ourliberty-health-sync-freshness-translation-001.json written to Beacon inbox. Request: add Tier-3 digest translation entry in config/alert-translations.json. **Do NOT re-dispatch.** Pattern: two trigger shapes — (a) transient dirty-tree during journal write (self-heals); (b) persistent untracked stray files (requires manual rm). Both share the same subject. Alert already delivered by outbox-notifier directly; translation entry (digest route) stops repeated Tier-4 escalations.
+**Rule:** CLOSED. The translation-dispatch premise was FALSE on four grounds (Beacon's falsification, direction-ask-ourliberty-health-sync-freshness-translation-001):
+
+1. **Translation can't suppress the DM.** `classify()` hard-sets `route=digest` on triage verdict; DM delivery is gated on the row's own `route` field. All 6 live rows are `route=escalate` → DM fires regardless. Translation entry would have done nothing.
+2. **Subject is a generic f-string envelope.** Built as `f'{len(persisted)} issue(s) need attention'` at `agent_core_health_check.py:447`. Covers 4+ root causes (origin_sync fetch fail, clean_tree, sync_freshness ERRORED). Silencing it would blanket real failures.
+3. **Trigger shape (a) already handled.** Persist-2-runs guard at emit site suppresses transient mid-cycle dirty-tree — nothing to add.
+4. **Alerts were live and correct.** 6 alerts over 27 days across 4 causes. The two same-day alerts (01:52 + 02:52 2026-08-30) fired because the condition (2 stray scratch files) was unresolved.
+
+**Root cause and fix:** Stray scratch files from iter 10630 (`tmp_journal_entry.md`, `tmp_update_actions.py`) in the shared clone triggered the health alerts. Both verified as throwaways and deleted (2026-08-30T03:xxZ UTC). Health alerts should clear on next cycle.
+
+**Do NOT re-open or re-dispatch.** If the alert recurs, check for new stray scratch files in `agents/pulse/` before writing any translation G-rule. The permanent guard Beacon suggested (stop Pulse writing scratch files into the repo tree) needs Larry's word before dispatch.
 
 ---
 
