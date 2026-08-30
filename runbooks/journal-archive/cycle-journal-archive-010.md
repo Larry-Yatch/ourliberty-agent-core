@@ -72455,3 +72455,80 @@ All 8 triaged Tier 3 via `triage-alert`. Watermark advanced: 504→512. NO DM. *
 
 ---
 
+## Iteration ~10640 — 2026-08-30T02:55Z UTC (Larry /cycle direct, Tier 2→1 escalation [Check 0: wm 514→515 1× Tier-4 ourliberty-health untracked files 3/3 → G-rule DISPATCHED; Tier 2→1 escalation])
+
+**Health:** ⚠️ SIGNAL — Check 0: Tier-4 ourliberty-health alert (line 515, ts=02:52:24Z UTC) for 2 stray untracked files in agents/pulse/ — occurrence **3/3** of G-rule ourliberty-health-sync-freshness-tier4-no-translation-001. G-rule dispatched to Beacon ✅. Alert already delivered by outbox-notifier at 02:53:23Z UTC (no re-DM). All other checks NOMINAL. **Tier 2→1 escalation** (last_signal_at updated to 02:59:17Z UTC). 2026-08-30 UTC (Sunday — ~13min after iter ~10639).
+
+**VERIFY-BEFORE-REASSERT (from iter ~10639 at 02:42Z UTC, ~13min ago):**
+- "Check 0: wm=514 0 new alerts NOMINAL": NOW wm=514→515, 1 new alert (line 515). UPDATED.
+- "Check A: HEAD=ee16a424=origin/main": NOW HEAD=4aaa854a=origin/main (wrapper auto-commit for iter ~10639, cycle 20260830T024427Z). NOMINAL. UPDATED.
+- "Check 4: pending=0 (10th consecutive all-clear)": NOW pending=0, history_count=680. 11th consecutive all-clear. CARRY.
+- "Check 3: stalls=0 (log 02:34:11Z)": NOW last log 02:50:27Z UTC (~5min old). "no stalls detected". NOMINAL. UPDATED.
+- "Check E: 0 open PRs": CONFIRMED 0 open PRs. CARRY.
+- "heal-stale-daemon-code.heartbeat ~6min old": NOW ts=2026-08-30T02:53:20Z UTC (~2.5min old at check time). NOMINAL. UPDATED.
+- "system-health.json overall=healthy, ~0.5min old": NOW ts=2026-08-30T02:54:32Z UTC (~1.5min old). overall=healthy. UPDATED.
+- "Suite guardian heartbeat age=~23.0h": NOW ts=2026-08-29T03:41:19Z UTC (age=~23.2h). NOMINAL (<24h). Nightly timer fires ~03:41Z UTC (~46min from this iter). Watch.
+- "All inboxes empty": beacon=0, forge=0, mirror=0, pulse=0. CARRY.
+- "agent-core-sync.json last_sync=02:40:41Z UTC (just synced)": NOW ~15min old. Within 2h threshold. CARRY.
+- "Stray files: tmp_journal_entry.md + tmp_update_actions.py": CONFIRMED still present. Larry's rm is the pending action. CARRY.
+
+**Check 0 (~02:55Z UTC):** repair-watermark → {repaired:false, old_watermark:514, file_length:515}. 1 new alert at line 515:
+- `source=ourliberty-health, subject="ourliberty-agent-core health: 1 issue(s) need attention", ts=2026-08-30T02:52:24Z UTC, route=escalate, tier=FYI`. Context: clean_tree 2 untracked files (same stray files: tmp_journal_entry.md + tmp_update_actions.py). Alert already delivered by outbox-notifier at 02:53:23Z UTC (beacon bot log idx=514).
+- triage-alert → `status=triaged-tier-4, tier=4, rationale="novel: no registry template and no translation match"`. guard_tier4 → `accepted:true, same_iter_call:true` — GENUINE Tier 4.
+- No re-DM (already delivered by outbox-notifier). Watermark advanced: 514→515. **Tier-reset triggered** (Tier 4).
+- **G-rule ourliberty-health-sync-freshness-tier4-no-translation-001: 2/3 → 3/3 → DISPATCHED ✅.** direction-ask-ourliberty-health-sync-freshness-translation-001.json written to Beacon inbox. Request: add Tier-3 digest translation entry for source=ourliberty-health subject="ourliberty-agent-core health: 1 issue(s) need attention" in config/alert-translations.json.
+
+**Check 1 (~02:55Z UTC):** journalctl -u 'ourliberty-*.service' -p warning --since "1h ago" → No entries. NOMINAL.
+
+**Check 2 (~02:55Z UTC):** system-health.json ts=2026-08-30T02:54:32Z UTC (~1.5min old). overall=healthy. inbox_watcher=ok, outbox_notifier=ok, disk=19%, memory=13%, log_growth=ok (idle), bots=ok. All 4 bots alive (beacon, forge, mirror, pulse — desired=up, alive=True, action=noop). NOMINAL.
+
+**Check 3 (~02:55Z UTC):** heal-pipeline-stall log last entry 02:50:27Z UTC (~5min old). "no stalls detected". FORGE_NO_PR_SKIP for sync-service-deploy-restart-head-drift-tier4-no-translation-001 (pr_exists #1115, expected). NOMINAL.
+
+**Check 4 (~02:55Z UTC):** beacon-pending-approvals.json pending=0, history_count=680. NOMINAL — **11th consecutive iter all-clear**.
+
+**Check 5 (~02:55Z UTC):** heal-stale-daemon-code.heartbeat=2026-08-30T02:53:20Z UTC (~2.5min old). NOMINAL (<60min).
+
+**Check A (~02:55Z UTC):** branch=main, HEAD=4aaa854a=origin/main, 2 stray untracked files in agents/pulse/ (escalation sent iter ~10635, alert re-delivered by outbox-notifier 02:53Z UTC — Larry's rm pending). Not ahead/behind origin. NOMINAL.
+**Check B (~02:55Z UTC):** agent-core-sync.json last_sync=2026-08-30T02:40:41Z UTC (~15min old), status=no-change. Within 2h threshold. NOMINAL.
+**Check C (~02:55Z UTC):** system-health.json ts=02:54:32Z UTC. overall=healthy. All 4 bots alive (beacon, forge, mirror, pulse — all desired=up, alive=True, action=noop). NOMINAL.
+**Check E (~02:55Z UTC):** gh pr list → [] (0 open PRs). NOMINAL.
+**Check H (~02:55Z UTC):** All inboxes empty (beacon=0, forge=0, mirror=0, pulse=0). NOMINAL.
+
+**Section 5.0 one-shots:** audit_due_nudge → no-op. distill_detector → no-op. audit_cadence_signal → no-op. Check I: latest artifact=check-i-2026-08-28.json (Friday, 0 proposals). Sunday timer fires ~14:13Z UTC today (~11.3h from this iter). No new artifact. CARRY. Check III: latest artifact=check-iii-2026-08-23.json. 14d cadence gate → skip (next real artifact ~2026-09-06). CARRY. Suite guardian heartbeat: ts=2026-08-29T03:41:19Z UTC (age=~23.2h). NOMINAL (<24h). Nightly timer fires ~03:41Z UTC tonight (~46min from this iter). Watch.
+
+**Nightly 502 window check:** Window ~01:12-01:15Z UTC passed ~100min before this iter. No 502 entries in beacon_telegram_bot.log. No new 502 alerts in larry-alerts.jsonl (prior wm=514, new alert at line 515 is from 02:52Z UTC — well after the window). G-rule nightly-502-cluster-001 DISPATCHED ✅. CARRY.
+
+**Credential rotation watch:** SUPABASE_SERVICE_ROLE_KEY: dedup window until 2026-08-31T23:23Z UTC (~44.4h remaining). No re-DM. CARRY.
+
+**G-rules (updates this iter):**
+- G-rule sync-service-deploy-restart-head-drift-tier4-no-translation-001: CLOSED ✅. CARRY.
+- G-rule mirror-to-dashboard-return-routing-failure-001: MONITORING — PR#1113 live. Awaiting dashboard-triggered review to verify routing fix. CARRY.
+- G-rule inbox-watcher-routing-denied-pulse-forge-001: 1/3. CARRY.
+- G-rule agent-runner-transcript-not-persisted-post-worktree-teardown-001: forge=2/3, mirror=1/3. CARRY.
+- G-rule ourliberty-health-sync-freshness-tier4-no-translation-001: **3/3 → DISPATCHED ✅.** direction-ask-ourliberty-health-sync-freshness-translation-001.json in Beacon inbox. UPDATED.
+- G-rule heal-lost-marker-tier4-no-translation-001: 1/3. CARRY.
+- G-rule deploy-notifier-vercel-build-failed-tier4-no-translation-001: 2/3. CARRY.
+- G-rule automated-cycle-no-journal-entry-001: DISPATCHED ✅. CARRY.
+- G-rule mirror-queue-wait-gauge-third-review-slot-readiness-tier4-no-translation-001: 2/3. Re-fire window ~2026-08-30T04:12Z UTC (~77min from this iter). Watch.
+- G-rule outbox-notifier-approval-request-task-id-subject-tier4-001: CLOSED ✅. CARRY.
+- G-rule source-beacon-notifications-tier4-no-translation: 2/3. CARRY.
+- G-rule alert-retraction-no-translation-001: DISPATCHED ✅. CARRY.
+- G-rule enable-pr-auto-merge-reviewdecision-guard-001: 1/3. CARRY.
+- G-rule nightly-502-cluster-001: DISPATCHED ✅. CARRY.
+- G-rule heal-pipeline-stall-no-mirror-dispatch-tier4-no-translation-001: 1/3. CARRY.
+
+**PRIME DIRECTIVE:** intervention row appended (ts=2026-08-30T02:59:16Z UTC, iter=10640, tier=2, kind=intervention, template=ourliberty-health-sync-freshness-tier4-no-translation-001). Tier state: record --checks-clean false → **Tier 2→1 escalation**, consecutive_clean=0, last_signal_at=2026-08-30T02:59:17Z UTC.
+
+**Actions taken:**
+- Check 0: watermark advanced 514→515 (1 Tier-4 alert: ourliberty-health untracked files, 3/3). No re-DM (alert already delivered by outbox-notifier). G-rule 3/3 → direction-ask dispatched to Beacon inbox.
+- PRIME DIRECTIVE: intervention row appended via cycle_prime_ledger.py append --tier 2 --kind intervention --iter 10640 --template ourliberty-health-sync-freshness-tier4-no-translation-001.
+- Tier state: cycle_tier_state.py record --checks-clean false → **Tier 2→1 escalation**, consecutive_clean=0.
+
+**Escalations:** G-rule direction-ask dispatched to Beacon inbox (direction-ask-ourliberty-health-sync-freshness-translation-001.json) — request to add Tier-3 digest translation entry for ourliberty-health untracked-files alert. Prior [yellow] from iter ~10635 still open: `rm ~/agent-core/agents/pulse/tmp_journal_entry.md ~/agent-core/agents/pulse/tmp_update_actions.py`
+
+**Patterns:** G-rule ourliberty-health-sync-freshness-tier4-no-translation-001 hit 3/3 and dispatched. Two trigger shapes for this alert: (a) transient dirty-tree during journal write (self-heals); (b) persistent untracked stray files (requires Larry rm). Both generate repeated outbox-notifier DMs until resolved — translation entry (digest route) will reduce noise. Next: suite guardian nightly run ~03:41Z UTC (~46min), mirror-queue-wait-gauge re-fire window ~04:12Z UTC (~77min).
+
+**Tier end-of-iter:** **Tier 1**, consecutive_clean=0.
+
+---
+
