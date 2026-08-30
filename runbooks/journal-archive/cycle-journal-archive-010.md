@@ -72532,3 +72532,91 @@ All 8 triaged Tier 3 via `triage-alert`. Watermark advanced: 504→512. NO DM. *
 
 ---
 
+## Iteration ~10641 — 2026-08-30T03:04Z UTC (Larry /cycle direct, Tier 1 [Check 0: wm=515 0 new alerts NOMINAL; Beacon out-of-cycle resolved stray files; all checks NOMINAL; consecutive_clean=1])
+
+**Health:** ✅ Nominal — all checks clean. **Tier 1**, consecutive_clean=1 (1/3 toward Tier 2). 2026-08-30 UTC (Sunday — ~8min after iter ~10640, plus Beacon out-of-cycle activity during this iter).
+
+**VERIFY-BEFORE-REASSERT (from iter ~10640 at 02:55Z UTC, ~8min ago):**
+- "Check 0: wm=514→515 1× Tier-4": NOW wm=515, file_length=515. 0 new alerts. NOMINAL. UPDATED.
+- "Check A: HEAD=4aaa854a=origin/main, 2 stray untracked files": NOW HEAD=8e1e6102=origin/main. **Stray files DELETED by Beacon** (resolved — see out-of-cycle entry below). Modified: agents/pulse/MEMORY.md + runbooks/cycle-journal.md (Pulse runtime paths — wrapper-managed, not a discipline violation). UPDATED.
+- "Check 4: pending=0 (11th consecutive all-clear)": NOW pending=0, history_count=680. 12th consecutive all-clear. CARRY.
+- "Check 3: stalls=0 (log 02:50:27Z)": last log 02:50:27Z UTC (~12min old). "no stalls detected". NOMINAL. CARRY.
+- "Check E: 0 open PRs": CONFIRMED 0 open PRs. CARRY.
+- "heal-stale-daemon-code.heartbeat ~2.5min old": NOW ts=2026-08-30T02:53:20Z UTC (~9.4min old). NOMINAL. UPDATED.
+- "system-health.json overall=healthy, ~1.5min old": NOW ts=2026-08-30T02:59:32Z UTC (~3min old). overall=healthy. UPDATED.
+- "Suite guardian heartbeat age=~23.2h": NOW ts=2026-08-29T03:41:19Z UTC (age=~23.3h). NOMINAL (<24h). Nightly timer fires ~03:41Z UTC tonight (~38min from this iter). Watch.
+- "All inboxes empty": beacon=1 (direction-ask-ourliberty-health-sync-freshness-translation-001.json — Pulse's G-rule dispatch), forge=0, mirror=0, pulse=0. Being processed by Beacon (out-of-cycle result received). NOMINAL.
+- "agent-core-sync.json last_sync=02:40:41Z (~15min old)": NOW ~22min old. Within 2h threshold. CARRY.
+- "Stray files still present": NOW **DELETED by Beacon** ✅. RESOLVED. UPDATED.
+
+**Check 0 (~03:03Z UTC):** repair-watermark → {repaired:false, old_watermark:515, file_length:515}. 0 new alerts (wm=515=file_length). NO DM. **NOMINAL.**
+
+**Check 1 (~03:03Z UTC):** journalctl -u 'ourliberty-*.service' -p warning --since "1h ago" → No entries. NOMINAL.
+
+**Check 2 (~03:03Z UTC):** system-health.json ts=2026-08-30T02:59:32Z UTC (~3min old). overall=healthy. inbox_watcher=ok, outbox_notifier=ok, disk=19%, memory=18%, bots=ok. All 4 bots alive (beacon, forge, mirror, pulse — desired=up, alive=True, action=noop). NOMINAL.
+
+**Check 3 (~03:03Z UTC):** heal-pipeline-stall log last entry 02:50:27Z UTC (~12min old). "no stalls detected". FORGE_NO_PR_SKIP for sync-service-deploy-restart-head-drift-tier4-no-translation-001 (pr_exists #1115, expected). NOMINAL.
+
+**Check 4 (~03:03Z UTC):** beacon-pending-approvals.json pending=0, history_count=680. NOMINAL — **12th consecutive iter all-clear**.
+
+**Check 5 (~03:03Z UTC):** heal-stale-daemon-code.heartbeat=2026-08-30T02:53:20Z UTC (~9.4min old). NOMINAL (<60min).
+
+**Check A (~03:03Z UTC):** branch=main, HEAD=8e1e6102=origin/main. Tree: modified agents/pulse/MEMORY.md + runbooks/cycle-journal.md (Pulse runtime paths, wrapper-managed — not a discipline violation). Stray files DELETED by Beacon ✅. Not ahead/behind origin. NOMINAL.
+**Check B (~03:03Z UTC):** agent-core-sync.json last_sync=2026-08-30T02:40:41Z UTC (~22min old), status=no-change. Within 2h threshold. NOMINAL.
+**Check C (~03:03Z UTC):** system-health.json ts=02:59:32Z UTC. overall=healthy. All 4 bots alive (beacon, forge, mirror, pulse — all desired=up, alive=True, action=noop). NOMINAL.
+**Check E (~03:03Z UTC):** gh pr list → [] (0 open PRs). NOMINAL.
+**Check H (~03:03Z UTC):** Beacon inbox=1 (direction-ask-ourliberty-health-sync-freshness-translation-001.json — Pulse's G-rule dispatch, being processed by Beacon). Forge=0, mirror=0, pulse=0. NOMINAL.
+
+**Section 5.0 one-shots:** audit_due_nudge → no-op. distill_detector → no-op. audit_cadence_signal → no-op. Check I: latest artifact=check-i-2026-08-28.json (Friday, 0 proposals). Sunday timer fires ~14:13Z UTC today (~11.1h from this iter). No new artifact. CARRY. Check III: latest artifact=check-iii-2026-08-23.json. 14d cadence gate → skip (next real artifact ~2026-09-06). CARRY. Suite guardian heartbeat: ts=2026-08-29T03:41:19Z UTC (age=~23.3h). NOMINAL (<24h). Nightly timer fires ~03:41Z UTC tonight (~38min). Watch.
+
+**Nightly 502 window check:** Window ~01:12-01:15Z UTC passed ~108min before this iter. No 502s in beacon_telegram_bot.log for 01:xx window today. G-rule nightly-502-cluster-001 DISPATCHED ✅. CARRY.
+
+**Credential rotation watch:** SUPABASE_SERVICE_ROLE_KEY: dedup window until 2026-08-31T23:23Z UTC (~44.3h remaining). No re-DM. CARRY.
+
+**G-rules (updates this iter):**
+- G-rule sync-service-deploy-restart-head-drift-tier4-no-translation-001: CLOSED ✅. CARRY.
+- G-rule mirror-to-dashboard-return-routing-failure-001: MONITORING — PR#1113 MERGED. Awaiting dashboard-triggered review to verify routing fix. CARRY.
+- G-rule inbox-watcher-routing-denied-pulse-forge-001: 1/3. CARRY.
+- G-rule agent-runner-transcript-not-persisted-post-worktree-teardown-001: forge=2/3, mirror=1/3. CARRY.
+- G-rule ourliberty-health-sync-freshness-tier4-no-translation-001: **RESOLVED ✅** — stray files deleted by Beacon; underlying issue gone. Translation entry not added (correct — silencing subject would blanket real sync failures). UPDATED.
+- G-rule heal-lost-marker-tier4-no-translation-001: 1/3. CARRY.
+- G-rule deploy-notifier-vercel-build-failed-tier4-no-translation-001: 2/3. CARRY.
+- G-rule automated-cycle-no-journal-entry-001: DISPATCHED ✅. CARRY.
+- G-rule mirror-queue-wait-gauge-third-review-slot-readiness-tier4-no-translation-001: 2/3. Re-fire window ~2026-08-30T04:12Z UTC (~68min from this iter). Watch.
+- G-rule outbox-notifier-approval-request-task-id-subject-tier4-001: CLOSED ✅. CARRY.
+- G-rule source-beacon-notifications-tier4-no-translation: 2/3. CARRY.
+- G-rule alert-retraction-no-translation-001: DISPATCHED ✅. CARRY.
+- G-rule enable-pr-auto-merge-reviewdecision-guard-001: 1/3. CARRY.
+- G-rule nightly-502-cluster-001: DISPATCHED ✅. CARRY.
+- G-rule heal-pipeline-stall-no-mirror-dispatch-tier4-no-translation-001: 1/3. CARRY.
+
+**PRIME DIRECTIVE:** iter_clean liveness heartbeat appended (ts=2026-08-30T03:04:01Z UTC, iter=10641, tier=1, kind=iter_clean). Tier state: record --checks-clean true → **Tier 1 maintained**, consecutive_clean=1 (1/3 toward Tier 2 de-escalation), last_signal_at=2026-08-30T02:59:17Z UTC (unchanged).
+
+**Actions taken:**
+- Check 0: wm=515, 0 new alerts. No watermark advance.
+- PRIME DIRECTIVE: iter_clean heartbeat appended via cycle_prime_ledger.py append --tier 1 --kind iter_clean --iter 10641 --template nominal-all-checks.
+- Tier state: cycle_tier_state.py record --checks-clean true → Tier 1, consecutive_clean=1.
+- G-rule ourliberty-health-sync-freshness-tier4-no-translation-001: RESOLVED — updating MEMORY.md.
+
+**Escalations:** None. Stray-file [yellow] from iter ~10635 RESOLVED by Beacon's out-of-cycle deletion ✅. No open escalations.
+
+**Patterns:** Stray files resolved by Beacon (good cross-agent collaboration — dispatch triggered the right investigation). System clean 1st consecutive iter at Tier 1. Beacon correctly declined the translation-silence approach and deleted the root cause instead. Upcoming: suite guardian nightly run ~03:41Z UTC (~38min), mirror-queue-wait-gauge G-rule re-fire window ~04:12Z UTC (~68min), Check I Sunday artifact ~14:13Z UTC.
+
+**Tier end-of-iter:** **Tier 1**, consecutive_clean=1.
+
+---
+
+## Out-of-cycle: Beacon result-notification — direction-ask-ourliberty-health-sync-freshness-translation-001 — 2026-08-30T03:xx UTC
+
+**Summary:** Beacon declined the translation dispatch and correctly diagnosed the root cause: two stray scratch files from iter 10630 (`tmp_journal_entry.md`, `tmp_update_actions.py`) were left untracked in the shared clone, triggering the `ourliberty-health` alerts. Beacon's read-only Bash couldn't remove them.
+
+**Action taken:** Verified both files are genuine throwaways (iter 10630 journal already committed; cycle-actions.jsonl rows already appended). Deleted both.
+
+**Why the translation G-rule was wrong (Beacon's analysis, now in memory):** (1) Translation entries can't carry a route — classify() hard-sets route on the triage verdict; (2) The subject is an f-string envelope (`N issue(s) need attention`) covering 4+ root causes — silencing it would blanket real sync failures; (3) The persist-2-runs guard at the emit site already handles transients; (4) The 6 alerts over 27 days were live and correct.
+
+**No permanent fix dispatch needed** — the underlying issue was my own scratch-file hygiene. Beacon noted the shape for a permanent guard ("stop Pulse writing scratch files into the repo tree") but asked Larry first before speccing. No action from me on that front until Larry says the word.
+
+**PRIME DIRECTIVE:** Intervention — stray-scratch-file cleanup (always-allowed: own-file hygiene). No systemic_fix row (no confirmed merged fix, just the immediate delete).
+
+---
+
