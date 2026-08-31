@@ -20942,6 +20942,19 @@
         "root_signature": "agent-runner-forge::transcript-not-persisted",
         "count_at_proposal": 2,
         "rationale": "Transcripts failing to persist is a genuine data-loss defect in the Forge agent runner that requires a targeted fix to the persistence layer; no allowlist or routing template addresses a write failure."
+      },
+      "briefing": {
+        "what": "A short write-up looking back at a case where the system didn't keep a record of one of its own work sessions.",
+        "why": "Without that record, we lose the trail we'd need to explain or fix what went wrong the next time something similar happens.",
+        "suggest": "Let it proceed as routine housekeeping \u2014 no decision needed from you unless the write-up turns up something bigger."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-31T13:23:32.376690+00:00",
+        "from_state": "proposed"
       }
     },
     {
@@ -20963,6 +20976,19 @@
         "root_signature": "agent-runner-mirror::transcript-not-persisted",
         "count_at_proposal": 1,
         "rationale": "Same persistence-failure class as the Forge variant; both agent runners share the defect and should be fixed together at the persistence layer."
+      },
+      "briefing": {
+        "what": "A review of a recent hiccup where one of the automated helpers finished its work but didn't save a record of what it did.",
+        "why": "Without those records, we can't check the helper's reasoning later or spot patterns when something goes wrong, which slows down every future fix.",
+        "suggest": "Let the team finish the write-up and turn on record-keeping; it's low-stakes housekeeping that doesn't need your attention beyond a nod."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-31T13:23:32.376690+00:00",
+        "from_state": "proposed"
       }
     },
     {
@@ -20984,6 +21010,19 @@
         "root_signature": "heal-unreviewed-merge-detector::unreviewed-merge",
         "count_at_proposal": 4,
         "rationale": "Memory confirms this detector is a false-premise emitter \u2014 the guard only blocks CHANGES_REQUESTED and the detector never reads reviewDecision; the real defect is in the outbox_notifier dashboard return leg and requires a targeted code fix there."
+      },
+      "briefing": {
+        "what": "A routine internal review the team opened after a piece of work went out without the usual second set of eyes.",
+        "why": "It's a small check on our own quality habits, so the same slip doesn't quietly become normal.",
+        "suggest": "Nothing needed from you \u2014 let the team close it out and only flag it to you if a real pattern shows up."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-31T13:23:32.376690+00:00",
+        "from_state": "proposed"
       }
     },
     {
@@ -21005,6 +21044,19 @@
         "root_signature": "heal-wedged-review-sessions::wedged-review-silent",
         "count_at_proposal": 2,
         "rationale": "Ten weeks of recurring silent-wedged sessions with zero operator response indicates the healer detects but never resolves the underlying session-stall condition, requiring a code fix to the recovery logic."
+      },
+      "briefing": {
+        "what": "A routine review step in our automated workflow quietly got stuck, and the team has started looking into why it went silent instead of finishing.",
+        "why": "When a step stalls without telling anyone, work can sit unfinished and unnoticed, which slows delivery and erodes trust in the system that's meant to run on its own.",
+        "suggest": "No action needed from you \u2014 let the team finish the look-back and only bring it to you if it turns out to be a recurring pattern."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-31T13:23:32.376690+00:00",
+        "from_state": "proposed"
       }
     },
     {
@@ -21026,6 +21078,19 @@
         "root_signature": "inbox-watcher::routing-denied",
         "count_at_proposal": 2,
         "rationale": "Recurring and rising routing denials over five weeks with no operator response signals a real routing-table or permission gap in inbox-watcher that cannot be safely closed with a template allowlist before diagnosing which route class is being denied."
+      },
+      "briefing": {
+        "what": "A short write-up looking back at a case where an incoming message got turned away instead of being handed to the right person.",
+        "why": "If requests are being blocked at the front door, work can quietly go missing before anyone sees it \u2014 worth knowing whether that happened once or keeps happening.",
+        "suggest": "Let it finish and skim the findings when they land; no action needed from you right now."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-31T13:23:32.376690+00:00",
+        "from_state": "proposed"
       }
     },
     {
@@ -21047,6 +21112,19 @@
         "root_signature": "outbox-notifier::auto-merge-deep-review-hold",
         "count_at_proposal": 1,
         "rationale": "Nine weeks of consistent operator non-response (all none, never rejected-as-wrong) confirms the hold notification is informational and self-resolving; suppressing the DM while keeping dashboard visibility is safe."
+      },
+      "briefing": {
+        "what": "A look-back review your team opened about a case where an automated change was held for a closer read before going live.",
+        "why": "It tells you whether your safety checks are catching the right things or slowing good work down for no reason.",
+        "suggest": "Let it run its course and skim the conclusion when it lands \u2014 nothing here needs your call today."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-31T13:23:32.376690+00:00",
+        "from_state": "proposed"
       }
     },
     {
@@ -21068,6 +21146,19 @@
         "root_signature": "pulse::pulse-stray-files-cleanup-request",
         "count_at_proposal": 1,
         "rationale": "Recurring stray-file alerts indicate a process or emitter consistently leaving untracked files; memory confirms these cannot be Forge-dispatched, so the root emitter needs a code fix to clean up after itself."
+      },
+      "briefing": {
+        "what": "A cleanup pass to clear stray leftover files from the workspace, kicked off on its own without being attached to any active initiative.",
+        "why": "Leftover clutter slowly makes the system harder to keep tidy and can mask real problems, but nothing customer-facing or revenue-related is at stake here.",
+        "suggest": "Let it proceed as routine housekeeping \u2014 no decision needed from you unless it turns up something unexpected."
+      },
+      "risk": "safe",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-31T13:23:32.376690+00:00",
+        "from_state": "proposed"
       }
     },
     {
@@ -21089,7 +21180,21 @@
         "root_signature": "sync.service::deploy-restart-head-drift",
         "count_at_proposal": 3,
         "rationale": "Memory marks this GENUINE (Tier-4\u21923 verified via classify()), and although PRs #1115/#1113 are merged the alert count is still rising this period, indicating a residual code path that continues to produce drift on deploy-restart."
-      }
+      },
+      "briefing": {
+        "what": "A look-back review of a recent hiccup where the live system briefly ran an older version of itself than the one we had approved.",
+        "why": "If we don't understand why it slipped, the same silent mismatch can put stale behavior in front of customers without anyone noticing.",
+        "suggest": "Let the team finish the write-up and bring you the one-page cause and fix before anyone changes how deployments work."
+      },
+      "risk": "careful",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-08-31T13:23:32.376690+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
     }
   ]
 }
