@@ -20922,6 +20922,174 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "retrospective-agent-runner-forge-transcript-not-persisted-2026-08-31",
+      "name": "retrospective agent-runner-forge-transcript-not-persisted 2026-08-31",
+      "phase": "proposed",
+      "brief": "Weekly elevation retrospective (2026-08-31) \u2014 FIX-PERMANENTLY.\n\nSignature: agent-runner-forge::transcript-not-persisted\nSource: agent-runner-forge  \u00b7  subject: transcript-not-persisted\nThis period: 2 fire(s), 2 week(s) recurring, trend=new.\nResolution histogram: {'approve': 0, 'reject': 0, 'silence': 0, 'ack': 0, 'none': 2}.\n\nRationale: Transcripts failing to persist is a genuine data-loss defect in the Forge agent runner that requires a targeted fix to the persistence layer; no allowlist or routing template addresses a write failure.\n\nRecurring problem with no safe templated auto-fix \u2014 build an objective fix (spec, no code in this card). Accept to start drafting; dismiss to silence.",
+      "spec_docs": [
+        "agents/beacon/specs/alert-pipeline-rework.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-08-31",
+      "deferred_reason": null,
+      "proposed_by": "retrospective-author",
+      "proposed_at": "2026-08-31T13:04:11.692241+00:00",
+      "predraft": {
+        "classification": "fix-permanently",
+        "root_signature": "agent-runner-forge::transcript-not-persisted",
+        "count_at_proposal": 2,
+        "rationale": "Transcripts failing to persist is a genuine data-loss defect in the Forge agent runner that requires a targeted fix to the persistence layer; no allowlist or routing template addresses a write failure."
+      }
+    },
+    {
+      "id": "retrospective-agent-runner-mirror-transcript-not-persisted-2026-08-31",
+      "name": "retrospective agent-runner-mirror-transcript-not-persisted 2026-08-31",
+      "phase": "proposed",
+      "brief": "Weekly elevation retrospective (2026-08-31) \u2014 FIX-PERMANENTLY.\n\nSignature: agent-runner-mirror::transcript-not-persisted\nSource: agent-runner-mirror  \u00b7  subject: transcript-not-persisted\nThis period: 1 fire(s), 2 week(s) recurring, trend=new.\nResolution histogram: {'approve': 0, 'reject': 0, 'silence': 0, 'ack': 0, 'none': 1}.\n\nRationale: Same persistence-failure class as the Forge variant; both agent runners share the defect and should be fixed together at the persistence layer.\n\nRecurring problem with no safe templated auto-fix \u2014 build an objective fix (spec, no code in this card). Accept to start drafting; dismiss to silence.",
+      "spec_docs": [
+        "agents/beacon/specs/alert-pipeline-rework.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-08-31",
+      "deferred_reason": null,
+      "proposed_by": "retrospective-author",
+      "proposed_at": "2026-08-31T13:04:11.837446+00:00",
+      "predraft": {
+        "classification": "fix-permanently",
+        "root_signature": "agent-runner-mirror::transcript-not-persisted",
+        "count_at_proposal": 1,
+        "rationale": "Same persistence-failure class as the Forge variant; both agent runners share the defect and should be fixed together at the persistence layer."
+      }
+    },
+    {
+      "id": "retrospective-heal-unreviewed-merge-detector-unreviewed-merge-2026-08-31",
+      "name": "retrospective heal-unreviewed-merge-detector-unreviewed-merge 2026-08-31",
+      "phase": "proposed",
+      "brief": "Weekly elevation retrospective (2026-08-31) \u2014 FIX-PERMANENTLY.\n\nSignature: heal-unreviewed-merge-detector::unreviewed-merge\nSource: heal-unreviewed-merge-detector  \u00b7  subject: unreviewed-merge\nThis period: 4 fire(s), 9 week(s) recurring, trend=rising.\nResolution histogram: {'approve': 0, 'reject': 0, 'silence': 0, 'ack': 0, 'none': 4}.\n\nRationale: Memory confirms this detector is a false-premise emitter \u2014 the guard only blocks CHANGES_REQUESTED and the detector never reads reviewDecision; the real defect is in the outbox_notifier dashboard return leg and requires a targeted code fix there.\n\nRecurring problem with no safe templated auto-fix \u2014 build an objective fix (spec, no code in this card). Accept to start drafting; dismiss to silence.",
+      "spec_docs": [
+        "agents/beacon/specs/alert-pipeline-rework.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-08-31",
+      "deferred_reason": null,
+      "proposed_by": "retrospective-author",
+      "proposed_at": "2026-08-31T13:04:11.605367+00:00",
+      "predraft": {
+        "classification": "fix-permanently",
+        "root_signature": "heal-unreviewed-merge-detector::unreviewed-merge",
+        "count_at_proposal": 4,
+        "rationale": "Memory confirms this detector is a false-premise emitter \u2014 the guard only blocks CHANGES_REQUESTED and the detector never reads reviewDecision; the real defect is in the outbox_notifier dashboard return leg and requires a targeted code fix there."
+      }
+    },
+    {
+      "id": "retrospective-heal-wedged-review-sessions-wedged-review-silent-2026-08-31",
+      "name": "retrospective heal-wedged-review-sessions-wedged-review-silent 2026-08-31",
+      "phase": "proposed",
+      "brief": "Weekly elevation retrospective (2026-08-31) \u2014 FIX-PERMANENTLY.\n\nSignature: heal-wedged-review-sessions::wedged-review-silent\nSource: heal-wedged-review-sessions  \u00b7  subject: wedged-review-silent\nThis period: 2 fire(s), 10 week(s) recurring, trend=rising.\nResolution histogram: {'approve': 0, 'reject': 0, 'silence': 0, 'ack': 0, 'none': 2}.\n\nRationale: Ten weeks of recurring silent-wedged sessions with zero operator response indicates the healer detects but never resolves the underlying session-stall condition, requiring a code fix to the recovery logic.\n\nRecurring problem with no safe templated auto-fix \u2014 build an objective fix (spec, no code in this card). Accept to start drafting; dismiss to silence.",
+      "spec_docs": [
+        "agents/beacon/specs/alert-pipeline-rework.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-08-31",
+      "deferred_reason": null,
+      "proposed_by": "retrospective-author",
+      "proposed_at": "2026-08-31T13:04:11.752897+00:00",
+      "predraft": {
+        "classification": "fix-permanently",
+        "root_signature": "heal-wedged-review-sessions::wedged-review-silent",
+        "count_at_proposal": 2,
+        "rationale": "Ten weeks of recurring silent-wedged sessions with zero operator response indicates the healer detects but never resolves the underlying session-stall condition, requiring a code fix to the recovery logic."
+      }
+    },
+    {
+      "id": "retrospective-inbox-watcher-routing-denied-2026-08-31",
+      "name": "retrospective inbox-watcher-routing-denied 2026-08-31",
+      "phase": "proposed",
+      "brief": "Weekly elevation retrospective (2026-08-31) \u2014 FIX-PERMANENTLY.\n\nSignature: inbox-watcher::routing-denied\nSource: inbox-watcher  \u00b7  subject: routing-denied\nThis period: 2 fire(s), 5 week(s) recurring, trend=rising.\nResolution histogram: {'approve': 0, 'reject': 0, 'silence': 0, 'ack': 0, 'none': 2}.\n\nRationale: Recurring and rising routing denials over five weeks with no operator response signals a real routing-table or permission gap in inbox-watcher that cannot be safely closed with a template allowlist before diagnosing which route class is being denied.\n\nRecurring problem with no safe templated auto-fix \u2014 build an objective fix (spec, no code in this card). Accept to start drafting; dismiss to silence.",
+      "spec_docs": [
+        "agents/beacon/specs/alert-pipeline-rework.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-08-31",
+      "deferred_reason": null,
+      "proposed_by": "retrospective-author",
+      "proposed_at": "2026-08-31T13:04:11.792394+00:00",
+      "predraft": {
+        "classification": "fix-permanently",
+        "root_signature": "inbox-watcher::routing-denied",
+        "count_at_proposal": 2,
+        "rationale": "Recurring and rising routing denials over five weeks with no operator response signals a real routing-table or permission gap in inbox-watcher that cannot be safely closed with a template allowlist before diagnosing which route class is being denied."
+      }
+    },
+    {
+      "id": "retrospective-outbox-notifier-auto-merge-deep-review-hold-2026-08-31",
+      "name": "retrospective outbox-notifier-auto-merge-deep-review-hold 2026-08-31",
+      "phase": "proposed",
+      "brief": "Weekly elevation retrospective (2026-08-31) \u2014 FIX-PERMANENTLY.\n\nSignature: outbox-notifier::auto-merge-deep-review-hold\nSource: outbox-notifier  \u00b7  subject: auto-merge-deep-review-hold\nThis period: 1 fire(s), 9 week(s) recurring, trend=rising.\nResolution histogram: {'approve': 0, 'reject': 0, 'silence': 0, 'ack': 0, 'none': 1}.\n\nRationale: Nine weeks of consistent operator non-response (all none, never rejected-as-wrong) confirms the hold notification is informational and self-resolving; suppressing the DM while keeping dashboard visibility is safe.\n\nRecurring problem with no safe templated auto-fix \u2014 build an objective fix (spec, no code in this card). Accept to start drafting; dismiss to silence.",
+      "spec_docs": [
+        "agents/beacon/specs/alert-pipeline-rework.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-08-31",
+      "deferred_reason": null,
+      "proposed_by": "retrospective-author",
+      "proposed_at": "2026-08-31T13:04:11.877244+00:00",
+      "predraft": {
+        "classification": "fix-permanently",
+        "root_signature": "outbox-notifier::auto-merge-deep-review-hold",
+        "count_at_proposal": 1,
+        "rationale": "Nine weeks of consistent operator non-response (all none, never rejected-as-wrong) confirms the hold notification is informational and self-resolving; suppressing the DM while keeping dashboard visibility is safe."
+      }
+    },
+    {
+      "id": "retrospective-pulse-pulse-stray-files-cleanup-request-2026-08-31",
+      "name": "retrospective pulse-pulse-stray-files-cleanup-request 2026-08-31",
+      "phase": "proposed",
+      "brief": "Weekly elevation retrospective (2026-08-31) \u2014 FIX-PERMANENTLY.\n\nSignature: pulse::pulse-stray-files-cleanup-request\nSource: pulse  \u00b7  subject: pulse-stray-files-cleanup-request\nThis period: 1 fire(s), 2 week(s) recurring, trend=new.\nResolution histogram: {'approve': 0, 'reject': 0, 'silence': 0, 'ack': 0, 'none': 1}.\n\nRationale: Recurring stray-file alerts indicate a process or emitter consistently leaving untracked files; memory confirms these cannot be Forge-dispatched, so the root emitter needs a code fix to clean up after itself.\n\nRecurring problem with no safe templated auto-fix \u2014 build an objective fix (spec, no code in this card). Accept to start drafting; dismiss to silence.",
+      "spec_docs": [
+        "agents/beacon/specs/alert-pipeline-rework.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-08-31",
+      "deferred_reason": null,
+      "proposed_by": "retrospective-author",
+      "proposed_at": "2026-08-31T13:04:11.919955+00:00",
+      "predraft": {
+        "classification": "fix-permanently",
+        "root_signature": "pulse::pulse-stray-files-cleanup-request",
+        "count_at_proposal": 1,
+        "rationale": "Recurring stray-file alerts indicate a process or emitter consistently leaving untracked files; memory confirms these cannot be Forge-dispatched, so the root emitter needs a code fix to clean up after itself."
+      }
+    },
+    {
+      "id": "retrospective-sync-service-deploy-restart-head-drift-2026-08-31",
+      "name": "retrospective sync-service-deploy-restart-head-drift 2026-08-31",
+      "phase": "proposed",
+      "brief": "Weekly elevation retrospective (2026-08-31) \u2014 FIX-PERMANENTLY.\n\nSignature: sync.service::deploy-restart-head-drift\nSource: sync.service  \u00b7  subject: deploy-restart-head-drift\nThis period: 3 fire(s), 4 week(s) recurring, trend=rising.\nResolution histogram: {'approve': 0, 'reject': 0, 'silence': 0, 'ack': 0, 'none': 3}.\n\nRationale: Memory marks this GENUINE (Tier-4\u21923 verified via classify()), and although PRs #1115/#1113 are merged the alert count is still rising this period, indicating a residual code path that continues to produce drift on deploy-restart.\n\nRecurring problem with no safe templated auto-fix \u2014 build an objective fix (spec, no code in this card). Accept to start drafting; dismiss to silence.",
+      "spec_docs": [
+        "agents/beacon/specs/alert-pipeline-rework.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-08-31",
+      "deferred_reason": null,
+      "proposed_by": "retrospective-author",
+      "proposed_at": "2026-08-31T13:04:11.660256+00:00",
+      "predraft": {
+        "classification": "fix-permanently",
+        "root_signature": "sync.service::deploy-restart-head-drift",
+        "count_at_proposal": 3,
+        "rationale": "Memory marks this GENUINE (Tier-4\u21923 verified via classify()), and although PRs #1115/#1113 are merged the alert count is still rising this period, indicating a residual code path that continues to produce drift on deploy-restart."
+      }
     }
   ]
 }
