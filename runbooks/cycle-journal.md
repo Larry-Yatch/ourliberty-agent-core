@@ -4,6 +4,79 @@
 
 ---
 
+## Iteration ~10697 — 2026-08-31T06:41Z UTC (00:41 MDT) — Tier 3 / manual chat (/cycle)
+
+**Health:** ✅ Nominal
+
+**VERIFY-BEFORE-REASSERT (from iter ~10696 at 06:12Z UTC, ~29min ago):**
+- "Check 0: wm=502 0 new alerts NOMINAL": NOW last_claimed_line=502, file_length=502, 0 new alerts. CARRY.
+- "Check A: HEAD=9dea78de=origin/main": NOW HEAD=c64d2581=origin/main (Pulse cycle 20260831T061336Z wrapper auto-commit). git fetch --dry-run no output = up to date. UPDATED.
+- "All 4 bots alive (06:10Z UTC)": NOW system-health.json ts=2026-08-31T06:40:40Z UTC, overall=healthy, all 4 bots alive. UPDATED.
+- "Check 3: no stalls (log 06:06:54Z)": NOW last log 2026-08-31T06:37:55Z UTC (~3min old). No stalls. UPDATED.
+- "Check 4: pending=0 (63rd consecutive all-clear)": NOW pending=0. 64th consecutive all-clear. UPDATED.
+- "Check 5: heartbeat=06:10:16Z UTC (~2min old)": NOW heartbeat=2026-08-31T06:40:21Z UTC (~1min old). UPDATED.
+- "Check B: last_sync=05:42:24Z UTC (~30min old)": NOW last_sync=2026-08-31T05:42:24Z UTC (~58min old). Still within 2h. CARRY.
+- "Suite guardian heartbeat: 03:43:34Z UTC (~2h29min old)": NOW ~2h57min old. NOMINAL (<24h). CARRY.
+- "0 open PRs": CONFIRMED 0 open PRs. CARRY.
+- "All inboxes empty": CONFIRMED all inboxes empty. CARRY.
+- "Nightly 502 window 01:00-01:30Z UTC passed, 0 matches": RECONFIRMED 0 matches. CARRY.
+
+**Check 0 (~06:41Z UTC):** alert-triage-watermark.json last_claimed_line=502, larry-alerts.jsonl file_length=502, 0 new alerts above watermark. NOTE: larry-alerts.jsonl is at /home/larry/agents/blackboard/ (not /home/larry/agents/logs/ — latter path returns NOT FOUND). **NOMINAL.**
+
+**Check 1 (~06:41Z UTC):** journalctl -u 'ourliberty-*.service' -p warning --since "1h ago" → No entries. NOMINAL.
+
+**Check 2 (~06:41Z UTC):** system-health.json ts=2026-08-31T06:40:40Z UTC (~1min old). overall=healthy. All 4 bots alive (beacon, forge, mirror, pulse — desired=up, alive=True, action=noop). NOMINAL.
+
+**Check 3 (~06:41Z UTC):** heal-pipeline-stall log last entry 2026-08-31T06:37:55Z UTC (~3min old). "no stalls detected." NOMINAL.
+
+**Check 4 (~06:41Z UTC):** beacon-pending-approvals.json (state/) pending=0. NOMINAL — **64th consecutive iter all-clear**.
+
+**Check 5 (~06:41Z UTC):** /agents/blackboard/heal-stale-daemon-code.heartbeat=2026-08-31T06:40:21Z UTC (~1min old). NOMINAL (<60min).
+
+**Check A (~06:41Z UTC):** branch=main, HEAD=c64d2581=origin/main (clean tree, git fetch --dry-run no output). NOMINAL.
+**Check B (~06:41Z UTC):** agent-core-sync.json last_sync=2026-08-31T05:42:24Z UTC (~58min old), status=no-change. Within 2h threshold. NOMINAL.
+**Check C (~06:41Z UTC):** All 4 bots alive (from Check 2). NOMINAL.
+**Check D (~06:41Z UTC):** All inboxes empty (beacon=0, forge=0, mirror=0, pulse=0). NOMINAL.
+**Check E (~06:41Z UTC):** 0 open PRs on Larry-Yatch/ourliberty-agent-core. NOMINAL.
+
+**Section 5.0 one-shots:** audit_due_nudge → no-op. distill_detector → no-op. audit_cadence_signal → no-op. Check I: latest artifact=check-i-2026-08-30.json (Sunday timer, 0 proposals, nominal). CARRY. Check III: latest artifact=check-iii-2026-08-23.json. 14d cadence gate → skip (next real artifact ~2026-09-06). CARRY. Suite guardian heartbeat: ts=2026-08-31T03:43:34Z UTC (~2h57min old). NOMINAL (<24h). CARRY.
+
+**Nightly 502 window check:** Window 01:00-01:30Z UTC verified via journalctl ourliberty-beacon-bot.service: 0 matches. No cluster tonight. G-rule nightly-502-cluster-001 DISPATCHED ✅. CARRY.
+
+**Credential rotation watch:** SUPABASE_SERVICE_ROLE_KEY last_alert=2026-08-17T23:23:06Z UTC. Due 2026-08-22 — 9 days overdue. 14-day dedup window expires 2026-08-31T23:23Z UTC (~16.6h remaining). No re-DM. CARRY.
+
+**G-rules (no changes this iter — all CARRY from iter ~10696):**
+- G-rule sync-service-deploy-restart-head-drift-tier4-no-translation-001: CLOSED ✅. CARRY.
+- G-rule mirror-to-dashboard-return-routing-failure-001: MONITORING — PR#1113 MERGED. Awaiting dashboard-triggered review to verify routing fix. CARRY.
+- G-rule inbox-watcher-routing-denied-pulse-forge-001: 1/3. CARRY.
+- G-rule agent-runner-transcript-not-persisted-post-worktree-teardown-001: forge=2/3, mirror=1/3. CARRY.
+- G-rule ourliberty-health-sync-freshness-tier4-no-translation-001: CLOSED ✅. CARRY.
+- G-rule heal-lost-marker-tier4-no-translation-001: 1/3. CARRY.
+- G-rule deploy-notifier-vercel-build-failed-tier4-no-translation-001: 2/3. CARRY.
+- G-rule automated-cycle-no-journal-entry-001: DISPATCHED ✅. CARRY.
+- G-rule mirror-queue-wait-gauge-third-review-slot-readiness-tier4-no-translation-001: 2/3. Next fire: event-driven. CARRY.
+- G-rule outbox-notifier-approval-request-task-id-subject-tier4-001: CLOSED ✅. CARRY.
+- G-rule source-beacon-notifications-tier4-no-translation: 2/3. CARRY.
+- G-rule alert-retraction-no-translation-001: DISPATCHED ✅. CARRY.
+- G-rule enable-pr-auto-merge-reviewdecision-guard-001: 1/3. CARRY.
+- G-rule nightly-502-cluster-001: DISPATCHED ✅. CARRY.
+- G-rule heal-pipeline-stall-no-mirror-dispatch-tier4-no-translation-001: 1/3. CARRY.
+
+**PRIME DIRECTIVE:** iter_clean liveness heartbeat appended (ts=2026-08-31T06:41:25Z UTC, iter=10697, tier=3, kind=iter_clean). Tier state: record --checks-clean true → **Tier 3 maintained**, consecutive_clean=49, last_signal_at=2026-08-30T02:59:17Z UTC (unchanged).
+
+**Actions taken:**
+- Check 0: watermark=502=file_length, 0 new alerts. No watermark advance.
+- PRIME DIRECTIVE: iter_clean heartbeat appended via cycle_prime_ledger.py append --tier 3 --kind iter_clean --iter 10697.
+- Tier state: cycle_tier_state.py record --checks-clean true → Tier 3, consecutive_clean=49.
+
+**Escalations:** None.
+
+**Patterns:** Forty-ninth consecutive clean iter at Tier 3 (consecutive_clean=49). SUPABASE_SERVICE_ROLE_KEY dedup window clears in ~16.6h (~2026-08-31T23:23Z UTC) — 9 days overdue; credential rotation watcher will re-DM at that point if key still unrotated. Suite guardian last ran ~2h57min ago (nightly, nominal). Check III next artifact ~2026-09-06. Observation (CARRY): repair_watermark.py missing at scripts/ — watermark read directly from alert-triage-watermark.json; larry-alerts.jsonl canonical path is /agents/blackboard/ not /agents/logs/.
+
+**Tier end-of-iter:** **Tier 3**, consecutive_clean=49.
+
+---
+
 ## Iteration ~10696 — 2026-08-31T06:12Z UTC (00:12 MDT) — Tier 3 / manual chat (/cycle)
 
 **Health:** ✅ Nominal
@@ -2798,78 +2871,6 @@ Watermark advanced 500→502. **NOMINAL** (Tier-3 silences do not reset tier).
 **Patterns:** Ninth consecutive clean iter at Tier 3 (consecutive_clean=9). System stable at 30-min cadence. Upcoming: Check I Sunday artifact ~14:13Z UTC today (~5h); SUPABASE_SERVICE_ROLE_KEY dedup window expires ~2026-08-31T23:23Z UTC (~38h); Check III next artifact ~2026-09-06.
 
 **Tier end-of-iter:** **Tier 3**, consecutive_clean=9.
-
----
-
-## Iteration ~10654 — 2026-08-30T08:42Z UTC (Larry /cycle direct, Tier 3 [Check 0: wm=515 0 new alerts NOMINAL; all checks NOMINAL; consecutive_clean=8])
-
-**Health:** ✅ Nominal — all checks clean. **Tier 3**, consecutive_clean=8. 2026-08-30 UTC (Sunday — ~35min after iter ~10653).
-
-**VERIFY-BEFORE-REASSERT (from iter ~10653 at 08:07Z UTC, ~35min ago):**
-- "Check 0: wm=515 0 new alerts NOMINAL": NOW wm=515, file_length=515. 0 new alerts. CARRY.
-- "Check A: HEAD=30e4b97a=origin/main": NOW HEAD=4112f8c7=origin/main (wrapper auto-commit for iter ~10653, cycle 20260830T080814Z). Clean tree. UPDATED.
-- "Check 4: pending=0 (24th consecutive all-clear)": NOW pending=0, history=680. 25th consecutive all-clear. CARRY.
-- "Check 3: stalls=0 (log 07:58:15Z)": NOW last log 08:31:26Z UTC (~9min old at check time). "no stalls detected". UPDATED.
-- "Check E: 0 open PRs": CONFIRMED 0 open PRs. CARRY.
-- "heal-stale-daemon-code.heartbeat ~2min old": NOW ts=2026-08-30T08:35:22Z UTC (~7min old at check time). NOMINAL. UPDATED.
-- "system-health.json overall=healthy, ~2min old": NOW ts=2026-08-30T08:40:52Z UTC (~0min old). overall=healthy. UPDATED.
-- "Suite guardian heartbeat ts=2026-08-30T03:51:47Z UTC (~4h16min old)": NOW same ts (~4h49min old). NOMINAL (<24h). CARRY.
-- "All inboxes empty": beacon=0, forge=0, mirror=0, pulse=0. CARRY.
-- "agent-core-sync.json last_sync=07:41:41Z (~25min old)": NOW last_sync=2026-08-30T07:41:41Z UTC (~59min old). Within 2h threshold. CARRY.
-
-**Check 0 (~08:40Z UTC):** repair-watermark → {repaired:false, old_watermark:515, file_length:515}. 0 new alerts (wm=515=file_length). NO DM. **NOMINAL.**
-
-**Check 1 (~08:40Z UTC):** journalctl -u 'ourliberty-*.service' -p warning --since "1h ago" → No entries. NOMINAL.
-
-**Check 2 (~08:40Z UTC):** system-health.json ts=2026-08-30T08:40:52Z UTC (~0min old). overall=healthy. inbox_watcher=ok, outbox_notifier=ok, disk=19%, memory=17%. All 4 bots alive (beacon, forge, mirror, pulse — desired=up, alive=True, action=noop). NOMINAL.
-
-**Check 3 (~08:40Z UTC):** heal-pipeline-stall log last entry 08:31:26Z UTC (~9min old). "no stalls detected". FORGE_NO_PR_SKIP for sync-service-deploy-restart-head-drift-tier4-no-translation-001 (pr_exists #1115, expected). NOMINAL.
-
-**Check 4 (~08:40Z UTC):** beacon-pending-approvals.json pending=0, history=680. NOMINAL — **25th consecutive iter all-clear**.
-
-**Check 5 (~08:40Z UTC):** heal-stale-daemon-code.heartbeat=2026-08-30T08:35:22Z UTC (~7min old). NOMINAL (<60min).
-
-**Check A (~08:40Z UTC):** branch=main, HEAD=4112f8c7=origin/main, clean tree. NOMINAL.
-**Check B (~08:40Z UTC):** agent-core-sync.json last_sync=2026-08-30T07:41:41Z UTC (~59min old), status=no-change. Within 2h threshold. NOMINAL.
-**Check C (~08:40Z UTC):** system-health.json ts=08:40:52Z UTC (~0min old). overall=healthy. All 4 bots alive (beacon, forge, mirror, pulse — all desired=up, alive=True, action=noop). NOMINAL.
-**Check E (~08:40Z UTC):** gh pr list → [] (0 open PRs). NOMINAL.
-**Check H (~08:40Z UTC):** All inboxes empty (beacon=0, forge=0, mirror=0, pulse=0). NOMINAL.
-
-**Section 5.0 one-shots:** audit_due_nudge → no-op. distill_detector → no-op. audit_cadence_signal (review/distill/) → no-op. Check I: latest artifact=check-i-2026-08-28.json (Thursday, 0 proposals). Sunday timer fires ~14:13Z UTC today (~5.5h from this iter). No new artifact. CARRY. Check III: latest artifact=check-iii-2026-08-23.json. 14d cadence gate → skip (next real artifact ~2026-09-06). CARRY. Suite guardian heartbeat: ts=2026-08-30T03:51:47Z UTC (~4h49min old). NOMINAL (<24h). CARRY.
-
-**Nightly 502 window check:** Window ~01:12-01:15Z UTC passed ~7.5h before this iter. Prior iter ~10653 confirmed clean. beacon_telegram_bot.log grep for 2026-08-30 01:xx → 0 matches for 502/ConnectionError. No cluster tonight. G-rule nightly-502-cluster-001 DISPATCHED ✅. CARRY.
-
-**Credential rotation watch:** credential-rotation-watch.json NOT FOUND (cleaned up per iter ~10642). SUPABASE_SERVICE_ROLE_KEY dedup window until ~2026-08-31T23:23Z UTC — ~38.7h remaining. No re-DM. CARRY.
-
-**G-rules (no changes this iter — all CARRY from iter ~10653):**
-- G-rule sync-service-deploy-restart-head-drift-tier4-no-translation-001: CLOSED ✅. CARRY.
-- G-rule mirror-to-dashboard-return-routing-failure-001: MONITORING — PR#1113 MERGED. Awaiting dashboard-triggered review to verify routing fix. CARRY.
-- G-rule inbox-watcher-routing-denied-pulse-forge-001: 1/3. CARRY.
-- G-rule agent-runner-transcript-not-persisted-post-worktree-teardown-001: forge=2/3, mirror=1/3. CARRY.
-- G-rule ourliberty-health-sync-freshness-tier4-no-translation-001: CLOSED ✅. CARRY.
-- G-rule heal-lost-marker-tier4-no-translation-001: 1/3. CARRY.
-- G-rule deploy-notifier-vercel-build-failed-tier4-no-translation-001: 2/3. CARRY.
-- G-rule automated-cycle-no-journal-entry-001: DISPATCHED ✅. CARRY.
-- G-rule mirror-queue-wait-gauge-third-review-slot-readiness-tier4-no-translation-001: 2/3. Next fire: event-driven. CARRY.
-- G-rule outbox-notifier-approval-request-task-id-subject-tier4-001: CLOSED ✅. CARRY.
-- G-rule source-beacon-notifications-tier4-no-translation: 2/3. CARRY.
-- G-rule alert-retraction-no-translation-001: DISPATCHED ✅. CARRY.
-- G-rule enable-pr-auto-merge-reviewdecision-guard-001: 1/3. CARRY.
-- G-rule nightly-502-cluster-001: DISPATCHED ✅. CARRY.
-- G-rule heal-pipeline-stall-no-mirror-dispatch-tier4-no-translation-001: 1/3. CARRY.
-
-**PRIME DIRECTIVE:** iter_clean liveness heartbeat appended (ts=2026-08-30T08:42:54Z UTC, iter=10654, tier=3, kind=iter_clean). Tier state: record --checks-clean true → **Tier 3 maintained**, consecutive_clean=8, last_signal_at=2026-08-30T02:59:17Z UTC (unchanged).
-
-**Actions taken:**
-- Check 0: wm=515, 0 new alerts. No watermark advance.
-- PRIME DIRECTIVE: iter_clean heartbeat appended via cycle_prime_ledger.py append --tier 3 --kind iter_clean --iter 10654 --template nominal-all-checks.
-- Tier state: cycle_tier_state.py record --checks-clean true → Tier 3, consecutive_clean=8.
-
-**Escalations:** None.
-
-**Patterns:** Eighth consecutive clean iter at Tier 3 (consecutive_clean=8). System stable at 30-min cadence. Upcoming: Check I Sunday artifact ~14:13Z UTC today (~5.5h); SUPABASE_SERVICE_ROLE_KEY dedup window expires ~2026-08-31T23:23Z UTC (~38.7h); Check III next artifact ~2026-09-06.
-
-**Tier end-of-iter:** **Tier 3**, consecutive_clean=8.
 
 ---
 
