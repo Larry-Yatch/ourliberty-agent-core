@@ -22,7 +22,7 @@
 
 **Rule (CORRECTED):** Prior iters through ~10732 cited `suite-guardian.heartbeat` as the suite guardian heartbeat path — that file does NOT exist. Verified in iter ~10733: `ls /home/larry/agents/blackboard/suite-guardian*` → "no-suite-guardian-files". Correct path is `/home/larry/agents/blackboard/pulse-check-main-suite-guardian.heartbeat` — JSON with keys `ts` (ISO 8601) and `check: "main-suite-guardian"`. The suite guardian timer is `ourliberty-main-suite-guardian.timer` (NOT `ourliberty-suite-guardian.timer`). Fresh = ts < 25h ago (fires nightly at ~03:38-03:49Z UTC).
 
-**system-health.json schema change (iter ~10733):** The `bots` section is absent from the current system-health.json schema (top-level keys: timestamp, checks, overall). Bot liveness can no longer be read from `d.get('bots', {})`. Use `overall=healthy` + Check 1 (no systemd warnings) as the liveness proxy until schema is restored or documented.
+**system-health.json bots section (CORRECTED iter ~10736):** The bots section was transiently absent in iter ~10733 — that was a one-iter anomaly. Confirmed present again from iter ~10734 onward: top-level keys include `bots` with per-bot `desired/alive/unit/action` fields. Use `d['checks']['bots']['bots'][agent]['alive']` for bot liveness; fall back to overall=healthy + Check 1 only if bots section missing.
 
 ---
 
