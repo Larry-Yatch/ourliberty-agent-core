@@ -18,6 +18,14 @@
 
 ---
 
+## Suite guardian heartbeat path — CORRECTED (iter ~10733, 2026-09-01T03:57Z UTC)
+
+**Rule (CORRECTED):** Prior iters through ~10732 cited `suite-guardian.heartbeat` as the suite guardian heartbeat path — that file does NOT exist. Verified in iter ~10733: `ls /home/larry/agents/blackboard/suite-guardian*` → "no-suite-guardian-files". Correct path is `/home/larry/agents/blackboard/pulse-check-main-suite-guardian.heartbeat` — JSON with keys `ts` (ISO 8601) and `check: "main-suite-guardian"`. The suite guardian timer is `ourliberty-main-suite-guardian.timer` (NOT `ourliberty-suite-guardian.timer`). Fresh = ts < 25h ago (fires nightly at ~03:38-03:49Z UTC).
+
+**system-health.json schema change (iter ~10733):** The `bots` section is absent from the current system-health.json schema (top-level keys: timestamp, checks, overall). Bot liveness can no longer be read from `d.get('bots', {})`. Use `overall=healthy` + Check 1 (no systemd warnings) as the liveness proxy until schema is restored or documented.
+
+---
+
 ## Check 3/5 heartbeat substrate — CORRECTED (iter ~9905, 2026-08-27T04:04Z UTC)
 
 **Rule (CORRECTED):** The iter ~9726 note "heal-stale-daemon-code.heartbeat DO NOT EXIST anywhere on the filesystem" was a FALSE PREMISE — verified false in iter ~9905: `cat /home/larry/agents/blackboard/heal-stale-daemon-code.heartbeat` returned `2026-08-27T03:56:40.228605+00:00`. The correct note from iter ~9110 was right all along.
