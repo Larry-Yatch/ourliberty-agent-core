@@ -4,6 +4,81 @@
 
 ---
 
+## Iteration ~10778 — 2026-09-02T05:22Z UTC (23:22 MDT) — Tier 3 / manual chat (/cycle)
+
+**Health:** ✅ Nominal
+
+**VERIFY-BEFORE-REASSERT (from iter ~10777 at 04:51Z UTC, ~31min ago):**
+- "Check 0: wm=501=file_length=501, 0 new alerts": NOW wm=501, file_length=501, 0 new alerts. CONFIRMED. CARRY.
+- "Check A: HEAD=9cc5540e=origin/main": NOW HEAD=c5bfd024=origin/main (wrapper auto-commit "Pulse cycle 20260902T045256Z"). UPDATED.
+- "All 4 bots alive": NOW overall=healthy, all 4 bots alive (beacon/forge/mirror/pulse — desired=up, alive=True, action=noop). CONFIRMED. CARRY.
+- "Check 3: last log 04:46:55Z UTC (~4min old)": NOW last log 2026-09-02T05:18:54Z UTC (~4min old). No stalls. UPDATED.
+- "Check 4: pending_count=0 (144th consecutive all-clear)": NOW pending_count=0. **145th consecutive all-clear.** UPDATED.
+- "Check 5: heartbeat=04:48:19Z UTC (~3min old)": NOW 2026-09-02T05:18:29Z UTC (~4min old). UPDATED.
+- "Check B: last_sync=04:45:22Z UTC (~6min old)": NOW last_sync=2026-09-02T04:45:22Z UTC (~37min old). Within 2h threshold. UPDATED.
+- "Suite guardian heartbeat: nightly run FIRED at 03:45Z UTC, status=green, red_count=0": NOW ts=2026-09-02T03:45:03Z UTC (~1h37min old). No new run expected until tonight. CARRY.
+- "0 open PRs": CONFIRMED 0 open PRs. CARRY.
+- "All inboxes empty": CONFIRMED all inboxes empty (beacon=0, forge=0, mirror=0, pulse=0). CARRY.
+- "SUPABASE_SERVICE_ROLE_KEY dedup window EXPIRED (~35h34min ago)": NOW ~38h ago. No re-DM yet. Watcher fires on own schedule. CARRY.
+- "Check I: Wednesday IS a firing day, timer due ~08:10Z UTC; no artifact yet (most recent: check-i-2026-08-31.json)": Current time ~05:22Z UTC. ~2h48min to window. Still no new artifact. CARRY.
+- "Sept 2 nightly 502 window CLOSED cleanly": CONFIRMED. CARRY.
+
+**Check 0 (~05:22Z UTC):** repair-watermark: repaired=false (old_wm=501, file_length=501). 0 new alerts above watermark. **NOMINAL.**
+
+**Check 1 (~05:22Z UTC):** journalctl -u 'ourliberty-*.service' -p warning --since "1h ago" → No entries. NOMINAL.
+
+**Check 2 (~05:22Z UTC):** system-health.json overall=healthy. All 4 bots alive (beacon, forge, mirror, pulse — desired=up, alive=True, action=noop). NOMINAL.
+
+**Check 3 (~05:22Z UTC):** heal-pipeline-stall log last entry 2026-09-02T05:18:54Z UTC (~4min old). "no stalls detected." NOMINAL.
+
+**Check 4 (~05:22Z UTC):** ~/agents/state/beacon-pending-approvals.json pending=[]. NOMINAL — **145th consecutive iter all-clear.**
+
+**Check 5 (~05:22Z UTC):** /agents/blackboard/heal-stale-daemon-code.heartbeat=2026-09-02T05:18:29Z UTC (~4min old). NOMINAL (<60min).
+
+**Check A (~05:22Z UTC):** branch=main, HEAD=c5bfd024=origin/main (0 behind, 0 ahead), working tree clean. Wrapper auto-commit "Pulse cycle 20260902T045256Z" since iter ~10777; HEAD=ORIGIN. NOMINAL.
+**Check B (~05:22Z UTC):** agent-core-sync.json last_sync=2026-09-02T04:45:22Z UTC (~37min old), status=no-change. Within 2h threshold. NOMINAL.
+**Check C (~05:22Z UTC):** All 4 bots alive (from Check 2). NOMINAL.
+**Check D (~05:22Z UTC):** All inboxes empty (beacon=0, forge=0, mirror=0, pulse=0). NOMINAL.
+**Check E (~05:22Z UTC):** 0 open PRs on Larry-Yatch/ourliberty-agent-core. NOMINAL.
+
+**Section 5.0 one-shots:** audit_due_nudge → no-op (no committed audit baseline). distill_detector → no-op (no un-distilled audits). audit_cadence_signal → no-op (correct path: review/distill/audit_cadence_signal.py). Check I: today is Wednesday Sept 2 — IS a firing day (Mon/Wed/Fri/Sun). Timer fires ~08:10Z UTC; current time ~05:22Z UTC (~2h48min to window). No new artifact yet (most recent=check-i-2026-08-31.json). Await timer. Check III: latest artifact=check-iii-2026-08-23.json. 14d gate → skip (next ~2026-09-06). CARRY. Suite guardian: heartbeat=2026-09-02T03:45:03Z UTC (~1h37min old). Nightly run fired at 03:45Z UTC — status=green, red_count=0. No new artifact expected until tonight. CARRY.
+
+**Nightly 502 window check:** Sept 2 window (01:00-01:30Z UTC) CLOSED cleanly (verified prior iters). G-rule nightly-502-cluster-001 DISPATCHED ✅. CARRY.
+
+**Credential rotation watch:** SUPABASE_SERVICE_ROLE_KEY last_dm=2026-08-17T23:23:16Z UTC. Due 2026-08-22 — 11 days overdue. 14-day dedup window expired 2026-08-31T23:23Z UTC (~38h ago). No re-DM yet. Watcher fires on its own schedule. CARRY.
+
+**G-rules (no changes this iter — all CARRY from iter ~10777):**
+- G-rule sync-service-deploy-restart-head-drift-tier4-no-translation-001: CLOSED ✅. CARRY.
+- G-rule mirror-to-dashboard-return-routing-failure-001: MONITORING — PR#1113 MERGED. Awaiting dashboard-triggered review to verify routing fix. CARRY.
+- G-rule inbox-watcher-routing-denied-pulse-forge-001: 1/3. CARRY.
+- G-rule agent-runner-transcript-not-persisted-post-worktree-teardown-001: forge=2/3, mirror=1/3. CARRY.
+- G-rule ourliberty-health-sync-freshness-tier4-no-translation-001: CLOSED ✅. CARRY.
+- G-rule heal-lost-marker-tier4-no-translation-001: 1/3. CARRY.
+- G-rule deploy-notifier-vercel-build-failed-tier4-no-translation-001: 2/3. CARRY.
+- G-rule automated-cycle-no-journal-entry-001: DISPATCHED ✅. CARRY.
+- G-rule mirror-queue-wait-gauge-third-review-slot-readiness-tier4-no-translation-001: 2/3. Next fire: event-driven. CARRY.
+- G-rule outbox-notifier-approval-request-task-id-subject-tier4-001: CLOSED ✅. CARRY.
+- G-rule source-beacon-notifications-tier4-no-translation: 2/3. CARRY.
+- G-rule alert-retraction-no-translation-001: DISPATCHED ✅. CARRY.
+- G-rule enable-pr-auto-merge-reviewdecision-guard-001: 1/3. CARRY.
+- G-rule nightly-502-cluster-001: DISPATCHED ✅. CARRY.
+- G-rule heal-pipeline-stall-no-mirror-dispatch-tier4-no-translation-001: 1/3. CARRY.
+
+**PRIME DIRECTIVE:** iter_clean liveness heartbeat appended (ts=2026-09-02T05:22:04Z UTC, iter=10778, tier=3, kind=iter_clean). Tier state: record --checks-clean true → **Tier 3 maintained**, consecutive_clean=134, last_signal_at=2026-08-30T02:59:17Z UTC (unchanged).
+
+**Actions taken:**
+- Check 0: repair-watermark no-op (repaired=false); watermark=501=file_length=501. 0 new alerts.
+- PRIME DIRECTIVE: iter_clean heartbeat appended via cycle_prime_ledger.py append --tier 3 --kind iter_clean --iter 10778.
+- Tier state: cycle_tier_state.py record --checks-clean true → Tier 3, consecutive_clean=134.
+
+**Escalations:** None.
+
+**Patterns:** One hundred thirty-fourth consecutive clean iter at Tier 3 (consecutive_clean=134). 145th consecutive Check 4 all-clear (pending_count=0). Check 0: 0 new alerts (watermark=501=file_length=501). All 4 bots alive. All healers ticking normally. Suite guardian nightly run FIRED at 03:45Z UTC (~1h37min ago) — status=green, red_count=0, mode=shadow. Check I: Wednesday IS a firing day — timer due ~08:10Z UTC (~2h48min away), no artifact yet; most recent=check-i-2026-08-31.json. Check III: next artifact ~2026-09-06. SUPABASE_SERVICE_ROLE_KEY dedup window expired ~38h ago (11 days overdue) — no re-DM yet; watcher fires on its own schedule. Sept 2 nightly 502 window confirmed closed cleanly.
+
+**Tier end-of-iter:** **Tier 3**, consecutive_clean=134.
+
+---
+
 ## Iteration ~10777 — 2026-09-02T04:51Z UTC (22:51 MDT) — Tier 3 / manual chat (/cycle)
 
 **Health:** ✅ Nominal
@@ -2926,81 +3001,6 @@
 **Patterns:** Ninety-third consecutive clean iter at Tier 3 (consecutive_clean=93). 106th consecutive Check 4 all-clear (pending=0). SUPABASE_SERVICE_ROLE_KEY dedup window expired ~8h ago — no re-DM alert yet (10 days overdue, due 2026-08-22); watcher fires on its own schedule. Suite guardian last ran ~3h26min ago — NOMINAL. Check I: Tuesday, not a firing day. Check III: next artifact ~2026-09-06.
 
 **Tier end-of-iter:** **Tier 3**, consecutive_clean=93.
-
----
-
-## Iteration ~10738 — 2026-09-01T06:41Z UTC (00:41 MDT) — Tier 3 / manual chat (/cycle)
-
-**Health:** ✅ Nominal
-
-**VERIFY-BEFORE-REASSERT (from iter ~10737 at 06:03Z UTC, ~38min ago):**
-- "Check 0: wm=505=file_length=505, 0 new alerts": NOW wm=505, file_length=505, 0 new alerts. CONFIRMED. CARRY.
-- "Check A: HEAD=4f78a87f=origin/main": NOW HEAD=1c013dfd=origin/main (wrapper auto-commit for iter ~10737 "Pulse cycle 20260901T061007Z"). UPDATED.
-- "All 4 bots alive (06:03Z UTC)": NOW system-health.json ts=2026-09-01T06:36:17Z UTC (~5min old), overall=healthy, all 4 bots alive (beacon/forge/mirror/pulse, action=noop). UPDATED.
-- "Check 3: no stalls (05:51:26Z UTC)": NOW last log 2026-09-01T06:38:58Z UTC (~3min old). No stalls. UPDATED.
-- "Check 4: pending=0 (104th consecutive all-clear)": NOW pending=0. **105th consecutive all-clear.** UPDATED.
-- "Check 5: heartbeat=06:02:15Z UTC (~1min old)": NOW 2026-09-01T06:32:39Z UTC (~9min old). UPDATED.
-- "Check B: last_sync=05:44:40Z UTC (~18min old)": NOW last_sync=2026-09-01T05:44:40Z UTC (~57min old). Within 2h. CARRY.
-- "Suite guardian heartbeat: 03:49:44Z UTC (~2h14min old)": NOW ts=2026-09-01T03:49:44Z UTC (~2h52min old). NOMINAL (<24h). CARRY.
-- "0 open PRs": CONFIRMED 0 open PRs. CARRY.
-- "All inboxes empty": CONFIRMED all inboxes empty (beacon=0, forge=0, mirror=0, pulse=0). CARRY.
-- "SUPABASE_SERVICE_ROLE_KEY dedup window EXPIRED at 23:23Z UTC (~6h40min ago)": NOW expired ~7h18min ago. wm=505=file_length=505 — no re-DM alert yet. CARRY.
-- "Check I: Tuesday — not a firing day": CARRY.
-- "Nightly 502 window 01:00-01:30Z UTC CLOSED CLEANLY": CONFIRMED. Last beacon log 2026-08-31T17:18:24Z UTC, no 502s. CARRY.
-
-**Check 0 (~06:41Z UTC):** repair-watermark: no-op (repaired=false, old_wm=505, file_length=505). get-watermark=505, larry-alerts.jsonl file_length=505, 0 new alerts above watermark. **NOMINAL.**
-
-**Check 1 (~06:41Z UTC):** journalctl -u 'ourliberty-*.service' -p warning --since "1h ago" → No entries. NOMINAL.
-
-**Check 2 (~06:41Z UTC):** system-health.json ts=2026-09-01T06:36:17Z UTC (~5min old). overall=healthy. All 4 bots alive (beacon, forge, mirror, pulse — desired=up, alive=True, action=noop). inbox_watcher=ok, outbox_notifier=ok, disk=18%, memory=17%. NOMINAL.
-
-**Check 3 (~06:41Z UTC):** heal-pipeline-stall log last entry 2026-09-01T06:38:58Z UTC (~3min old). "no stalls detected." NOMINAL.
-
-**Check 4 (~06:41Z UTC):** beacon-pending-approvals.json (state/) pending=0. NOMINAL — **105th consecutive iter all-clear.**
-
-**Check 5 (~06:41Z UTC):** /agents/blackboard/heal-stale-daemon-code.heartbeat=2026-09-01T06:32:39Z UTC (~9min old). NOMINAL (<60min).
-
-**Check A (~06:41Z UTC):** branch=main, HEAD=1c013dfd=origin/main, working tree clean. Fetch confirmed HEAD==origin/main. NOMINAL.
-**Check B (~06:41Z UTC):** agent-core-sync.json last_sync=2026-09-01T05:44:40Z UTC (~57min old), status=no-change. Within 2h threshold. NOMINAL.
-**Check C (~06:41Z UTC):** All 4 bots alive (from system-health.json). NOMINAL.
-**Check D (~06:41Z UTC):** All inboxes empty (beacon=0, forge=0, mirror=0, pulse=0). NOMINAL.
-**Check E (~06:41Z UTC):** 0 open PRs on Larry-Yatch/ourliberty-agent-core. NOMINAL.
-
-**Section 5.0 one-shots:** audit_due_nudge → no-op. distill_detector → no-op. audit_cadence_signal → no-op. Check I: today is Tuesday — not a firing day (Mon/Wed/Fri/Sun). Most recent artifact=check-i-2026-08-31.json (fired 14:10Z UTC). CARRY. Check III: latest artifact=check-iii-2026-08-23.json. 14d gate → skip (next ~2026-09-06). CARRY. Suite guardian: ts=2026-09-01T03:49:44Z UTC (~2h52min old). NOMINAL (<24h). CARRY.
-
-**Nightly 502 window check:** Window 01:00-01:30Z UTC CLOSED (current time 06:41Z UTC). Last beacon log 2026-08-31T17:18:24Z UTC — no 502s in the nightly window. G-rule nightly-502-cluster-001 DISPATCHED ✅. CARRY.
-
-**Credential rotation watch:** SUPABASE_SERVICE_ROLE_KEY last_dm=2026-08-17T23:23:16Z UTC. Due 2026-08-22 — 10 days overdue. 14-day dedup window expired 2026-08-31T23:23Z UTC (~7h18min ago). wm=505=file_length=505 — no re-DM alert yet. Watcher fires on its own schedule. CARRY.
-
-**G-rules (no changes this iter — all CARRY from iter ~10737):**
-- G-rule sync-service-deploy-restart-head-drift-tier4-no-translation-001: CLOSED ✅. CARRY.
-- G-rule mirror-to-dashboard-return-routing-failure-001: MONITORING — PR#1113 MERGED. Awaiting dashboard-triggered review to verify routing fix. CARRY.
-- G-rule inbox-watcher-routing-denied-pulse-forge-001: 1/3. CARRY.
-- G-rule agent-runner-transcript-not-persisted-post-worktree-teardown-001: forge=2/3, mirror=1/3. CARRY.
-- G-rule ourliberty-health-sync-freshness-tier4-no-translation-001: CLOSED ✅. CARRY.
-- G-rule heal-lost-marker-tier4-no-translation-001: 1/3. CARRY.
-- G-rule deploy-notifier-vercel-build-failed-tier4-no-translation-001: 2/3. CARRY.
-- G-rule automated-cycle-no-journal-entry-001: DISPATCHED ✅. CARRY.
-- G-rule mirror-queue-wait-gauge-third-review-slot-readiness-tier4-no-translation-001: 2/3. Next fire: event-driven. CARRY.
-- G-rule outbox-notifier-approval-request-task-id-subject-tier4-001: CLOSED ✅. CARRY.
-- G-rule source-beacon-notifications-tier4-no-translation: 2/3. CARRY.
-- G-rule alert-retraction-no-translation-001: DISPATCHED ✅. CARRY.
-- G-rule enable-pr-auto-merge-reviewdecision-guard-001: 1/3. CARRY.
-- G-rule nightly-502-cluster-001: DISPATCHED ✅. CARRY.
-- G-rule heal-pipeline-stall-no-mirror-dispatch-tier4-no-translation-001: 1/3. CARRY.
-
-**PRIME DIRECTIVE:** iter_clean liveness heartbeat appended (ts=2026-09-01T06:41:47Z UTC, iter=10738, tier=3, kind=iter_clean). Tier state: record --checks-clean true → **Tier 3 maintained**, consecutive_clean=92, last_signal_at=2026-08-30T02:59:17Z UTC (unchanged).
-
-**Actions taken:**
-- Check 0: watermark=505=file_length=505, 0 new alerts. No watermark advance needed.
-- PRIME DIRECTIVE: iter_clean heartbeat appended via cycle_prime_ledger.py append --tier 3 --kind iter_clean --iter 10738.
-- Tier state: cycle_tier_state.py record --checks-clean true → Tier 3, consecutive_clean=92.
-
-**Escalations:** None.
-
-**Patterns:** Ninety-second consecutive clean iter at Tier 3 (consecutive_clean=92). 105th consecutive Check 4 all-clear (pending=0). SUPABASE_SERVICE_ROLE_KEY dedup window expired ~7h18min ago — no re-DM alert yet (10 days overdue, due 2026-08-22); watcher fires on its own schedule. Check B: last_sync ~57min old, within 2h threshold. Suite guardian last ran ~2h52min ago — NOMINAL. Check I: Tuesday, not a firing day. Check III: next artifact ~2026-09-06.
-
-**Tier end-of-iter:** **Tier 3**, consecutive_clean=92.
 
 ---
 
