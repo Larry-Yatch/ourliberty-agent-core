@@ -2986,3 +2986,13 @@
 
 ---
 
+
+**Check I (2026-08-31):**
+
+- Ledger total: $805.42; 33 anomaly(ies)
+- Retry overhead: $0.00 (0.0%)
+- Forge marker-discipline: 0 misses (retry-depth 0/0/0, 0% retry-2+), trend flat (+0 vs prior wk)
+- Mode: heartbeat (no proposed optimizations)
+
+---
+
