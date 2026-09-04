@@ -21220,7 +21220,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-09-04T23:17:39.825468+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-08-05T23:21:59.175577+00:00"
+      "orphan_last_activity_ts": "2026-08-05T23:21:59.175577+00:00",
+      "briefing": {
+        "what": "A piece of work the team finished and sent for sign-off, but it stalled in the review queue and got kicked up for your attention.",
+        "why": "Finished work that sits unapproved ties up the team and delays whatever depends on it, and the longer it waits the more likely it conflicts with newer changes.",
+        "suggest": "Ask for a plain summary of what it changes and who is waiting on it before clearing it, since it was flagged rather than passed through cleanly."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-09-04T23:21:49.428044+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
