@@ -21204,6 +21204,23 @@
         "from_state": "proposed"
       },
       "risk_note": "This touches something hard to undo (data, deploys, money, or outside contact) \u2014 worth a careful look before acting."
+    },
+    {
+      "id": "proposed-pr-ourliberty-agent-core-1096",
+      "name": "PR Ourliberty Agent Core 1096",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `pr-ourliberty-agent-core-1096`. Last activity 2026-08-05T23:21:59.175577+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "pr-ourliberty-agent-core-1096"
+      ],
+      "repo": null,
+      "created": "2026-09-04",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-09-04T23:17:39.825468+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-08-05T23:21:59.175577+00:00"
     }
   ]
 }
