@@ -20296,7 +20296,10 @@
         "at": "2026-08-23T10:52:41.232194+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "needs_decision": true,
+      "needs_decision_since": "2026-09-06T00:09:51.649911+00:00",
+      "needs_decision_reason": "14d on the proposed lane with no terminal-PR match \u2014 keep or drop"
     },
     {
       "id": "retrospective-dispatch-branch-cleanup-gh-unavailable-2026-08-24",
