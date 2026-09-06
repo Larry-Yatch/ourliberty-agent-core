@@ -759,3 +759,14 @@ _Smoke dispatch `smoke-and-merge-ledger-pr25-001`: invoked `python3 scripts/ledg
 **Skipped rows:** 0
 **Sentinel:** /home/larry/agents/blackboard/ledger/ledger-ready-2026-08-31
 **DM:** queued
+
+## Iteration 68 — 2026-09-06 14:10 UTC
+
+**Week ending:** 2026-08-31
+**Health:** 🟡 Anomalies
+**Total:** $805.42
+**Vs prior week:** +$389.25 (+93.5%)
+**Anomalies:** 33 σ-flagged
+**Skipped rows:** 0
+**Sentinel:** /home/larry/agents/blackboard/ledger/ledger-ready-2026-08-31
+**DM:** queued
