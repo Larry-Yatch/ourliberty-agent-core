@@ -21269,6 +21269,23 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-graduation-enable-pr-auto-merge-recovery-001",
+      "name": "Graduation Enable PR Auto Merge Recovery 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `graduation-enable-pr-auto-merge-recovery-001`. Last activity 2026-09-07T15:59:52.319496+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "graduation-enable-pr-auto-merge-recovery-001"
+      ],
+      "repo": null,
+      "created": "2026-09-07",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-09-07T16:07:33.490266+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-09-07T15:59:52.319496+00:00"
     }
   ]
 }
