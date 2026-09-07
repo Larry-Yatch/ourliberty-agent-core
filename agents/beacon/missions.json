@@ -21299,7 +21299,11 @@
         "at": "2026-09-07T16:12:36.426585+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-09-07T17:08:09.940613+00:00",
+      "retired_reason": "orphan-terminal"
     }
   ]
 }
