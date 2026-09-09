@@ -30552,3 +30552,92 @@ Awaiting `approve threshold-update-2026-09-06` on Telegram. No Pulse action.
 
 ---
 
+## Iteration ~11087 — 2026-09-09T01:49Z UTC (19:49 MDT) — Tier 3→1 / manual chat (/cycle)
+
+**Health:** ⚠️ Credential Rotation Overdue
+
+**VERIFY-BEFORE-REASSERT (from iter ~11086 at 01:17Z UTC; Pulse cycle wrapper 5d833e26):**
+- "Check 0: watermark=501, file_length=501, 0 new alerts": NOW repair-watermark → repaired=false (501, 501). 0 new alerts. CONFIRMED.
+- "Check A: HEAD=765a0f99=origin/main": NOW HEAD=5d833e26=origin/main (wrapper committed "Pulse cycle 20260909T011830Z"). UPDATED.
+- "All 4 bots idle": NOW system-health.json ts=2026-09-09T01:43:16Z UTC, all 4 desired=up alive=True action=noop. CONFIRMED.
+- "Check 3: last=2026-09-09T01:00:56Z UTC (~16 min old)": NOW last=2026-09-09T01:34:25Z UTC (~15 min old at scan). UPDATED.
+- "Check 4: pending=0, history=682": CONFIRMED (version=1, pending=0, history=682). CARRY.
+- "Check 5: heartbeat=2026-09-09T01:12:35Z UTC (~4 min old)": NOW heartbeat=2026-09-09T01:43:14Z UTC (~6 min old at scan). UPDATED.
+- "Check B: last_sync=2026-09-09T00:57:20Z UTC (~20 min old)": NOW same (~46 min old at scan). Within 2h. CARRY (no new sync).
+- "Suite guardian: ts=2026-09-08T03:49:58Z UTC (~21.5h old)": NOW same (~22h old at scan). Within 25h. CARRY.
+- "0 open PRs": CONFIRMED (agent-core=[], dashboard=[]). CARRY.
+- "Check I: no artifact yet for Sept 9": CONFIRMED (latest=check-i-2026-09-07.json; timer fires ~14:13Z UTC). CARRY.
+- "Check III: 2 proposals pending": CONFIRMED (applied=False, proposals=2, as_of=2026-09-06T10:45Z UTC). CARRY.
+- "MEMORY.md over condensation threshold": CARRY (125,886 bytes).
+- "enable-pr-auto-merge graduation arc: CLOSED ✅": CONFIRMED (0 open PRs). CARRY.
+
+**Check 0 (~01:49Z UTC):** alert_triage_state.py repair-watermark → repaired=false (501, 501). 0 new alerts above watermark. **NOMINAL.**
+
+**Check 1 (~01:49Z UTC):** system-health.json: overall=healthy, ts=2026-09-09T01:43:16Z UTC, all 4 bots desired=up alive=True action=noop. Checks: inbox_watcher ok, outbox_notifier ok, disk 18%, memory 19%, log_growth ok (idle). journalctl --user ourliberty-*.service last 30 min: 0 WARN/ERROR lines. **NOMINAL.**
+
+**Check 2 (~01:49Z UTC):** beacon_telegram_bot.log — last Larry message: "Go" at 2026-09-07T10:27:15-0600 (~43h ago, outside 4h window). No directive messages in last 4h. **NOMINAL.**
+
+**Check 3 (~01:49Z UTC):** heal-pipeline-stall.log last=2026-09-09T01:34:25Z UTC (~15 min old at scan). "no stalls detected." **NOMINAL.**
+
+**Check 4 (~01:49Z UTC):** beacon-pending-approvals.json (state/ path) version=1, pending=0, history=682. **NOMINAL.**
+
+**Check 5 (~01:49Z UTC):** ~/agents/blackboard/heal-stale-daemon-code.heartbeat=2026-09-09T01:43:14Z UTC (~6 min old at scan). **NOMINAL.**
+
+**Check A (~01:49Z UTC):** branch=main, HEAD=5d833e26=origin/main (Pulse cycle 20260909T011830Z). Clean tree. 0 behind, 0 ahead. **NOMINAL.**
+**Check B (~01:49Z UTC):** agent-core-sync.json last_sync=2026-09-09T00:57:20Z UTC (~46 min old at scan), status=no-change. Within 2h threshold. **NOMINAL.**
+**Check C (~01:49Z UTC):** all 4 bots desired=up, alive=True, action=noop (system-health.json ts=2026-09-09T01:43:16Z UTC). **NOMINAL.**
+**Check D (~01:49Z UTC):** All inboxes empty (beacon=0, forge=0, mirror=0, pulse=0). **NOMINAL.**
+**Check E (~01:49Z UTC):** 0 open PRs (agent-core=[], dashboard=[]). **NOMINAL.**
+
+**Section 5.0 one-shots (~01:49Z UTC):** audit_due_nudge.py → no committed audit baseline, no-op. distill_detector.py → no un-distilled audits, no-op. audit_cadence_signal.py (review/distill/ path) → no post-seed decision-grade distill artifacts yet, no-op. **NOMINAL.**
+
+**Credential Rotation Check (~01:49Z UTC):** FINDING — config/token-rotation-schedule.json: **SUPABASE_SERVICE_ROLE_KEY** next_rotation_due=2026-08-22, now **18 days overdue**. severity_if_lapsed=critical, cadence=90d, last_rotated_at=2026-05-24. Key still operational; no current system degradation. Prior cycles reported "token-rotation-schedule.json not found" because those checks searched the wrong path — file exists at `config/token-rotation-schedule.json`. Ask-then-do: rotate per `docs/runbooks/rotate-supabase-keys.md`; update `last_rotated_at` + `next_rotation_due` in registry afterward. **[yellow] ESCALATED via larry_alerts.**
+
+**Check I (carry):** Today is Wednesday Sept 9 — IS a Check I firing day. No artifact yet for Sept 9 (timer fires ~14:13Z UTC). Last artifact: check-i-2026-09-07.json, mode=heartbeat, 0 proposals. Monitor for today's firing.
+
+**Check III (carry, re-verified):** pulse-threshold-proposals.json: applied=False, proposals=2 (as_of=2026-09-06T10:45Z UTC).
+- **(beacon, _default)**: current=232s → proposed=398s [Δ=72%] **[high-attention: regime-change-suspected]**
+- **(mirror, _default)**: current=1311s → proposed=1536s [Δ=17%]
+Awaiting `approve threshold-update-2026-09-06` on Telegram. No Pulse action.
+
+**Suite guardian (~01:49Z UTC):** pulse-check-main-suite-guardian.heartbeat ts=2026-09-08T03:49:58Z UTC (~22h old at scan). Sept 8 nightly run confirmed. Fresh (< 25h). **NOMINAL.**
+
+**Rotations (~01:49Z UTC):** config/token-rotation-schedule.json found (prior "not found" was wrong-path search). SUPABASE_SERVICE_ROLE_KEY overdue — see Credential Rotation Check above. All other credentials within rotation windows.
+
+**MEMORY.md maintenance note:** agents/pulse/MEMORY.md at 125,886 bytes — over condensation threshold (18,000 chars). Carry.
+
+**G-rules:**
+- G-rule agent-runner-transcript-not-persisted-post-worktree-teardown-001: forge=2/3, mirror=1/3. ACTIVE.
+- G-rule mirror-to-dashboard-return-routing-failure-001: DISPATCHED (PR#1113 MERGED 2026-08-30), monitoring for verification. CARRY.
+- G-rule inbox-watcher-routing-denied-pulse-forge-001: 1/3. CARRY.
+- G-rule heal-lost-marker-tier4-no-translation-001: 1/3. CARRY.
+- G-rule nightly-502-cluster-001: DISPATCHED ✅. CARRY.
+- G-rule deploy-notifier-vercel-build-failed-tier4-no-translation-001: 2/3. CARRY.
+- G-rule automated-cycle-no-journal-entry-001: DISPATCHED ✅ (pending verification). CARRY.
+- G-rule mirror-queue-wait-gauge-third-review-slot-readiness-tier4-no-translation-001: 2/3. CARRY.
+- G-rule source-beacon-notifications-tier4-no-translation: 2/3. CARRY.
+- G-rule alert-retraction-no-translation-001: DISPATCHED ✅. CARRY.
+- G-rule unreviewed-merge-without-gate-pattern: DISPATCHED ✅ (fix in PR#1113, MERGED 2026-08-30). CARRY.
+- G-rule enable-pr-auto-merge-reviewdecision-guard-001: 1/3. CARRY.
+- G-rule heal-pipeline-stall-no-mirror-dispatch-tier4-no-translation-001: 1/3. CARRY.
+- G-rule sync-service-deploy-restart-head-drift-tier4-no-translation-001: CLOSED ✅. CARRY.
+- G-rule outbox-notifier-approval-request-task-id-subject-tier4-001: CLOSED ✅. CARRY.
+- enable-pr-auto-merge graduation arc: CLOSED ✅ (PR #1116 merged 81af6c55, state=graduated). Carry as closed.
+
+**PRIME DIRECTIVE:** intervention row appended (credential-rotation-overdue:supabase-service-role-key, tier=3, ts=2026-09-09T01:48:49Z UTC). Tier state: cycle_tier_state.py record --checks-clean false → **tier reset 3→1**, consecutive_clean=0.
+
+**Actions taken:**
+- Credential check: SUPABASE_SERVICE_ROLE_KEY rotation 18d overdue detected (first successful read of config/token-rotation-schedule.json in chat-mode cycle).
+- PRIME DIRECTIVE: intervention appended via cycle_prime_ledger.py (credential-rotation-overdue:supabase-service-role-key, tier=3).
+- Tier state: cycle_tier_state.py record --checks-clean false → tier reset 3→1, consecutive_clean=0.
+- Escalation: larry_alerts.append_alert (source=pulse, severity=warning, route=escalate, needs_larry=True, subject=credential-rotation-overdue:supabase-service-role-key). Result: True.
+- Escalation: pulse-escalations.json appended (entry 4/4).
+
+**Escalations:** [yellow] SUPABASE_SERVICE_ROLE_KEY rotation is 18 days overdue (next_rotation_due=2026-08-22, cadence=90d, severity_if_lapsed=critical). Rotate per `docs/runbooks/rotate-supabase-keys.md`; update `last_rotated_at` + `next_rotation_due` in `config/token-rotation-schedule.json` afterward. Pending Larry actions: `approve threshold-update-2026-09-06` on Telegram for Check III threshold proposals.
+
+**Patterns:** First catch of SUPABASE_SERVICE_ROLE_KEY rotation overdue — credential was 18 days past the 90d window and had gone undetected because prior chat-mode cycles searched the wrong path for token-rotation-schedule.json. Key still operational (no system degradation). The wrong-path check is the systemic finding: credential rotation check needs the correct `config/` path hardcoded so automated cycles catch this too. Will carry 2 more occurrences before proposing a permanent fix per G-rule cadence.
+
+**Tier end-of-iter:** **Tier 1**, consecutive_clean=0 (signal: credential-rotation-overdue:supabase-service-role-key).
+
+---
+
