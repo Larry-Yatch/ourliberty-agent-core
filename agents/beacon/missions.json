@@ -21329,7 +21329,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-09-10T02:58:39.901467+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-09-10T02:48:23.143709+00:00"
+      "orphan_last_activity_ts": "2026-09-10T02:48:23.143709+00:00",
+      "briefing": {
+        "what": "You're being asked whether to restart a small piece of work you paused back in August, which would stop a daily nuisance alert that's been repeating for three days.",
+        "why": "Nothing is broken and the alert is harmless, but it keeps showing up in your queue and crowding out things that actually need you.",
+        "suggest": "If Rob's onboarding is still the priority, say no and I'll mark the alert as known noise so it stops nagging you; revisit it when your plate is clearer."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-09-10T03:05:46.752484+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
