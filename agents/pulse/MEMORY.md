@@ -225,9 +225,11 @@ Prior iters (~10123–~10209, 83 consecutive) reported "NOT FOUND" because the g
 
 **Rule:** `credential-rotation-dedup.json` does NOT exist and has no writer in any script. Prior cycle journal entries referenced it ("prior iters read it normally") but that was itself phantom narration. The real credential rotation DM dedup state lives at `/home/larry/agents/state/pulse-rotation-window-dms.json` — a JSON dict keyed by credential name (e.g., `"SUPABASE_SERVICE_ROLE_KEY": "<ISO 8601 ts of last DM>"`). The dedup window is 14 days. For the credential rotation check: read `pulse-rotation-window-dms.json`, NOT any phantom path.
 
-**DM history:** SUPABASE_SERVICE_ROLE_KEY re-DM'd 2026-08-03T22:52:32Z UTC (first dedup-window expiry after 2026-07-20). Then re-DM'd again at **2026-08-17T23:23:16Z UTC** (14d dedup window expired; this is the CURRENT last_dm as of iter ~9922). Dedup window active until **2026-08-31T23:23:16Z UTC**. next_rotation_due=**2026-08-22** (cadence_days=90 from last_rotated_at=2026-05-24). Do NOT report `credential-rotation-dedup.json` as missing — it never existed.
+**DM history (UPDATED iter ~11322, 2026-09-10T14:53Z UTC):** SUPABASE_SERVICE_ROLE_KEY last DM = **2026-09-09T01:48:59Z UTC** (as read from pulse-rotation-window-dms.json at state/ path). Dedup window ACTIVE until **2026-09-23T01:48:59Z UTC**. next_rotation_due=**2026-08-22** (cadence_days=90 from last_rotated_at=2026-05-24) — currently **19 days overdue** as of 2026-09-10. Do NOT report `credential-rotation-dedup.json` as missing — it never existed.
 
-**CORRECTED elapsed-time calculation (iter ~9922, 2026-08-27T06:09Z UTC, RE-VERIFIED iter ~10008, 2026-08-27T14:52Z UTC):** Iters ~9884–~9921 incorrectly stated "~255h elapsed." The correction at iter ~9922 set the record to ~223h at 06:09Z UTC. Iters ~9963/~9964 fell back into arithmetic errors (~229.4h and ~251.8h — both wrong). Confirmed method: always compute directly from pulse-rotation-window-dms.json last_dm=2026-08-17T23:23:16Z UTC. Reference values: ~228h at 11:19Z UTC (iter ~9965); ~231.5h at 14:52Z UTC (iter ~10008). ALWAYS recompute — never carry forward. The carry-forward pattern is what breaks this every time.
+**PATH TRAP (iter ~11322):** Iters ~11319–~11321 falsely reported "pulse-rotation-window-dms.json NOT FOUND" because they were checking `/home/larry/agents/blackboard/` instead of the correct `/home/larry/agents/state/` path (which MEMORY.md already documents). File confirmed present at state/ path. ALWAYS use state/ path when reading this file.
+
+**Elapsed-time computation:** ALWAYS recompute from the file directly — never carry forward a stale value. The carry-forward pattern has caused repeated arithmetic errors (iters ~9963/~9964 etc.).
 
 ---
 
