@@ -21360,7 +21360,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-09-10T03:59:19.913337+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-09-10T03:45:39.607134+00:00"
+      "orphan_last_activity_ts": "2026-09-10T03:45:39.607134+00:00",
+      "briefing": {
+        "what": "Our automated quality checker is being made stricter, so it catches more problems before work goes out the door.",
+        "why": "Tighter checks mean fewer defects reaching you or customers, but set too tight they can also slow the team down with false alarms.",
+        "suggest": "Approve it, but ask for a check-in after a week to confirm it's catching real issues rather than creating busywork."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-09-10T04:06:17.912925+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
