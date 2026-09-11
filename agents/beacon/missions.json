@@ -21406,6 +21406,23 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "proposed-direction-ask-build-sequence-advancer-supabase-504-nightly-window-001",
+      "name": "Direction Ask Build Sequence Advancer Supabase 504 Nightly Window 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `direction-ask-build-sequence-advancer-supabase-504-nightly-window-001`. Last activity 2026-09-11T19:44:17.224555+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "direction-ask-build-sequence-advancer-supabase-504-nightly-window-001"
+      ],
+      "repo": null,
+      "created": "2026-09-11",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-09-11T19:45:50.778575+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-09-11T19:44:17.224555+00:00"
     }
   ]
 }
