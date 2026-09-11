@@ -21436,7 +21436,28 @@
         "at": "2026-09-11T19:50:18.415447+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-09-11T20:00:50.803250+00:00",
+      "retired_reason": "orphan-terminal"
+    },
+    {
+      "id": "proposed-direction-ask-advancer-504-nightly-window-001",
+      "name": "Direction Ask Advancer 504 Nightly Window 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `direction-ask-advancer-504-nightly-window-001`. Last activity 2026-09-11T19:53:16.639051+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "direction-ask-advancer-504-nightly-window-001"
+      ],
+      "repo": null,
+      "created": "2026-09-11",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-09-11T20:00:50.803250+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-09-11T19:53:16.639051+00:00"
     }
   ]
 }
