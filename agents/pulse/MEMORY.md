@@ -61,9 +61,9 @@ DO NOT cite the iter ~9726 phantom-everywhere claim ever again — it is permane
 
 ---
 
-## G-rule build-sequence-advancer-504-nightly-window-001 — DISPATCHED ✅ (3/3, iter ~11350, 2026-09-11T19:41Z UTC)
+## G-rule build-sequence-advancer-504-nightly-window-001 — DISPATCHED ✅, PENDING LARRY DECISION (Beacon: mis-framed, iter ~11352, 2026-09-11T19:57Z UTC)
 
-**Rule:** `ourliberty-build-sequence-advancer.service` emits WARN `list_open_event_task_ids failed (event_type=sequence_needs_you): APIError: 504 Gateway Timeout` during the nightly window (19:00-19:30Z UTC, local 13:00-13:30 MDT). Three nights confirmed: first 2 occurrences observed in earlier cycle iters; 3rd occurrence at 2026-09-11T19:15:07Z UTC (single transient, auto-recovered by 19:20Z). Pattern: single-tick 504, advancer resumes normally on next tick. **DISPATCHED:** `direction-ask-build-sequence-advancer-supabase-504-nightly-window-001.json` written to Beacon inbox (iter ~11350). Fix requested: add retry logic or INFO-level demotion for transient single-tick 504s in `list_open_event_task_ids`; optionally investigate nightly Supabase resource contention. **Do NOT re-dispatch.**
+**Rule:** `ourliberty-build-sequence-advancer.service` emits WARN `list_open_event_task_ids failed (event_type=sequence_needs_you): APIError: 504 Gateway Timeout`. Three occurrences confirmed during nightly window (3rd at 2026-09-11T19:15:07Z UTC). **DISPATCHED iter ~11350** to Beacon inbox (`direction-ask-build-sequence-advancer-supabase-504-nightly-window-001.json`). **Beacon assessed (iter ~11352):** G-rule mis-framed — only 3/6 occurrences fit the nightly window; pattern is a 3-day new-onset burst after 55 quiet days, not a recurring nightly issue; WARN never reached larry-alerts (0 hits in live + archives). Beacon sent approval_request `direction-ask-advancer-504-nightly-window-001` to Larry. **APPROVE = close as false premise, ship no code; REJECT = ship retry/backoff in list_open_event_task_ids anyway as cheap insulation.** Pending Larry decision. **Do NOT re-dispatch.**
 
 ---
 
