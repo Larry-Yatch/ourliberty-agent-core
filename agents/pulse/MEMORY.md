@@ -61,6 +61,12 @@ DO NOT cite the iter ~9726 phantom-everywhere claim ever again — it is permane
 
 ---
 
+## G-rule build-sequence-advancer-504-nightly-window-001 — DISPATCHED ✅ (3/3, iter ~11350, 2026-09-11T19:41Z UTC)
+
+**Rule:** `ourliberty-build-sequence-advancer.service` emits WARN `list_open_event_task_ids failed (event_type=sequence_needs_you): APIError: 504 Gateway Timeout` during the nightly window (19:00-19:30Z UTC, local 13:00-13:30 MDT). Three nights confirmed: first 2 occurrences observed in earlier cycle iters; 3rd occurrence at 2026-09-11T19:15:07Z UTC (single transient, auto-recovered by 19:20Z). Pattern: single-tick 504, advancer resumes normally on next tick. **DISPATCHED:** `direction-ask-build-sequence-advancer-supabase-504-nightly-window-001.json` written to Beacon inbox (iter ~11350). Fix requested: add retry logic or INFO-level demotion for transient single-tick 504s in `list_open_event_task_ids`; optionally investigate nightly Supabase resource contention. **Do NOT re-dispatch.**
+
+---
+
 ## G-rule heal-lost-marker-tier4-no-translation-001 — 1/3 (new, iter ~9631, 2026-08-22T02:16Z UTC)
 
 **Rule:** `source=heal-lost-marker` returns Tier-4 from the triage helper (no translation match). First occurrence: iter ~9631 (line 506, subject=lost-marker:nightly-502-cluster-note-001, ts=2026-08-22T02:05:09Z UTC). Alert fired because nightly-502-cluster-note-001 approval marker was RENDERED by Beacon at 01:48:06Z UTC but never emitted (not in beacon-pending-approvals.json). Route=escalate, tier=FYI, outbox-notifier delivered at idx=505. Fix: add Tier-3 (or Tier-2 if FYI-tier alerts of this class need Larry action) translation entry for `source=heal-lost-marker` in config/alert-translations.json. Dispatch to Beacon at 3/3.
