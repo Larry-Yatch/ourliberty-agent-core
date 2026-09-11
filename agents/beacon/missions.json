@@ -21457,7 +21457,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-09-11T20:00:50.803250+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-09-11T19:53:16.639051+00:00"
+      "orphan_last_activity_ts": "2026-09-11T19:53:16.639051+00:00",
+      "briefing": {
+        "what": "A proposed fix for a service hiccup that was described as a recurring nightly problem, but the pattern turns out to be a short three-day burst after nearly two months of quiet \u2014 and no warning from it ever actually reached you.",
+        "why": "Building and maintaining a fix for a problem that isn't really happening costs time and adds clutter, while the real question \u2014 whether this was a one-off blip or the start of something \u2014 stays unanswered.",
+        "suggest": "Close it out without building anything, but keep an eye on it for the next week or two in case the hiccups come back."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-09-11T20:10:18.971912+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
