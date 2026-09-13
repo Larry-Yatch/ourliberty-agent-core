@@ -6,6 +6,12 @@
 
 ---
 
+## Check I timer fires at 08:11 MDT (14:11 UTC) — NOT 08:10 UTC (corrected iter ~11423, 2026-09-13T08:47Z UTC)
+
+**Rule:** `ourliberty-pulse-check-i.timer` fires at **08:11:16 MDT = 14:11:16 UTC** on Mon/Wed/Fri/Sun. Prior iters (~11420–11422 and many before) reported the fire time as "~08:10Z UTC" — this was the MDT local filesystem timestamp being misread as UTC. Verified via `systemctl status ourliberty-pulse-check-i.timer` at 08:47 UTC (02:47 MDT): "Trigger: Sun 2026-09-13 08:11:16 MDT; 5h 23min left." Artifacts (check-i-YYYY-MM-DD.json) are created at ~08:10–08:14 MDT = 14:10–14:14 UTC. **Do NOT report the timer as "fired" or "pending at 08:10 UTC" — the correct UTC window is 14:10–14:14 UTC.** Future iters running before 14:00 UTC should say "Check I timer fires at ~14:11 UTC today; artifact not yet present."
+
+---
+
 ## Alert watermark discrepancy: automated cycle vs manual session (iter ~11332, 2026-09-11T09:46Z UTC)
 
 **Rule:** The automated cycle (run_cycle.sh wrapper) has been reporting watermark=513/file_length=513 in iters ~11329–11331. The manual session reads watermark=500/file_length=500 (confirmed via `cat ~/agents/state/alert-triage-watermark.json` + `wc -l ~/agents/blackboard/larry-alerts.jsonl`). A 13-line gap. Since larry-alerts.jsonl is append-only, file_length cannot shrink — the prior claims of 513 must have been reading from a different path or state. Most likely: the automated cycle's `alert_triage_state.py` runs from a CWD where relative paths produce a different state file location, maintaining a separate watermark at 513 while the canonical absolute path remains at 500. **Until investigated**: trust the absolute-path ground truth (500/500). Do NOT report the 13-line discrepancy as "missed alerts" without verifying they actually exist in the file. If the automated cycle's watermark is genuinely at 513 and the file is at 500, the automated cycle is managing phantom lines — dispatch to Beacon for investigation at 2nd occurrence.
