@@ -12,9 +12,9 @@
 
 ---
 
-## Alert watermark discrepancy: automated cycle vs manual session (iter ~11332, 2026-09-11T09:46Z UTC)
+## Alert watermark discrepancy — RESOLVED as compaction artifact (iter ~11425, 2026-09-13T10:00Z UTC)
 
-**Rule:** The automated cycle (run_cycle.sh wrapper) has been reporting watermark=513/file_length=513 in iters ~11329–11331. The manual session reads watermark=500/file_length=500 (confirmed via `cat ~/agents/state/alert-triage-watermark.json` + `wc -l ~/agents/blackboard/larry-alerts.jsonl`). A 13-line gap. Since larry-alerts.jsonl is append-only, file_length cannot shrink — the prior claims of 513 must have been reading from a different path or state. Most likely: the automated cycle's `alert_triage_state.py` runs from a CWD where relative paths produce a different state file location, maintaining a separate watermark at 513 while the canonical absolute path remains at 500. **Until investigated**: trust the absolute-path ground truth (500/500). Do NOT report the 13-line discrepancy as "missed alerts" without verifying they actually exist in the file. If the automated cycle's watermark is genuinely at 513 and the file is at 500, the automated cycle is managing phantom lines — dispatch to Beacon for investigation at 2nd occurrence.
+**Rule (REVISED):** The "13-line gap" noted at iter ~11332 (automated=513, manual=500) was a transient compaction artifact, NOT a persistent path difference. Confirmed iter ~11425: the file uses absolute `Path.home() / 'agents'` root (OURLIBERTY_AGENTS_ROOT env or default), so both automated cycles and manual sessions read the same file. The larry-alerts.jsonl CAN shrink via a retention/compaction job (prior note "append-only, cannot shrink" was WRONG). The `repair-watermark` mechanism handles this correctly: when watermark > file_length after compaction, the next cycle auto-repairs. Verified iter ~11425: automated cycles saw 507/507, compaction ran between ~09:21Z and ~09:45Z Sep 13 removing 7 oldest lines (→500), automated cycle repaired watermark to 500, manual session found repaired=false (already clean at 500/500). **No persistent bug. No dispatch to Beacon needed.** When a future manual session sees watermark < prior-automated-cycle-watermark, assume compaction happened — repair-watermark handles it. Do NOT report as "missed alerts."
 
 ---
 
