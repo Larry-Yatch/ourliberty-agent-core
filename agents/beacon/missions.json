@@ -21565,7 +21565,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-09-14T14:56:27.490890+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-09-14T14:49:44.930504+00:00"
+      "orphan_last_activity_ts": "2026-09-14T14:49:44.930504+00:00",
+      "briefing": {
+        "what": "The team is asking you to decide how the system should react when the database behind our automated fix-and-recovery process briefly flakes out.",
+        "why": "Without a clear rule, a momentary hiccup can stall the recovery work entirely and quietly leave problems unattended until someone notices by hand.",
+        "suggest": "Approve a simple rule to retry a few times and only flag you if it still fails, but ask for a short summary of how often this is actually happening before anything is built."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-09-14T15:01:32.472794+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
