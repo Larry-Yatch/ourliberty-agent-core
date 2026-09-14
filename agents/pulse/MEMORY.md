@@ -28,9 +28,9 @@ Automated cycles use internal paths and are unaffected. Manual sessions must use
 
 ---
 
-## G-rule heal-pipeline-stall-chain-events-supabase-504-001 — 2/3 (iter ~11484, 2026-09-14T14:19Z UTC)
+## G-rule heal-pipeline-stall-chain-events-supabase-504-001 — DISPATCHED ✅ (iter ~11485, 2026-09-14T14:50Z UTC)
 
-**Rule:** `source=heal-pipeline-stall` chain_events queries return transient Supabase errors; healer completes normally after each. Two error variants observed: (1) 504 Gateway Timeout at 11:16:05Z UTC (iter ~11480, 2026-09-14); (2) 500 "JSON could not be generated, Failed to get project config" at 13:27:10Z UTC (missed pickup in iter ~11483, counted in iter ~11484). Both: healer completes normally (0 fired, 2 suppressed). Pattern track: 2/3, threshold 3/10. Dispatch to Beacon at 3/3.
+**Rule:** `source=heal-pipeline-stall` chain_events queries return transient Supabase errors; healer completes normally after each. Three occurrences on 2026-09-14 for task=pr-RSDPM-251: (1) 03:25:06Z UTC 504 "Gateway Timeout" (missed-pickup, never counted until iter ~11485); (2) 11:16:05Z UTC 504 "Gateway Timeout" (iter ~11480); (3) 13:27:10Z UTC 500 "Failed to get project config" (iter ~11484). All three: healer completes normally (0 fired, 2 suppressed). **DISPATCHED** to Beacon at iter ~11485: `direction-ask-heal-pipeline-stall-supabase-transient-error-handling-001.json`. Fix spec: add retry/backoff to chain_events query in `heal_pipeline_stall.py`; demote transient-error WARN→INFO on successful retry; keep WARN only when all retries fail. Tier-reset: 3→1.
 
 ---
 
