@@ -6,6 +6,16 @@
 
 ---
 
+## Check 0 correct paths for manual sessions (iter ~11470, 2026-09-14T06:29Z UTC)
+
+**Rule:** In manual chat sessions, Check 0 requires two path corrections:
+1. **`larry-alerts.jsonl` path:** `/home/larry/agents/blackboard/larry-alerts.jsonl` — NOT `/home/larry/agents/larry-alerts.jsonl`. The automated cycle uses OURLIBERTY_AGENTS_ROOT which resolves to `/home/larry/agents/`, then appends `blackboard/larry-alerts.jsonl`. Manual `wc -l` at the wrong root returns NOT FOUND.
+2. **repair-watermark script:** `python3 /home/larry/agent-core/scripts/alert_triage_state.py repair-watermark` — NOT `cycle_prime_ledger.py repair-watermark` (cycle_prime_ledger.py only supports `ratio`, `append`, `promote`). Returns JSON: `{"repaired": false/true, "old_watermark": N, "file_length": N}`.
+
+Automated cycles use internal paths and are unaffected. Manual sessions must use these explicit paths.
+
+---
+
 ## Check I timer fires at 08:11 MDT (14:11 UTC) — NOT 08:10 UTC (corrected iter ~11423, 2026-09-13T08:47Z UTC)
 
 **Rule:** `ourliberty-pulse-check-i.timer` fires at **08:11:16 MDT = 14:11:16 UTC** on Mon/Wed/Fri/Sun. Prior iters (~11420–11422 and many before) reported the fire time as "~08:10Z UTC" — this was the MDT local filesystem timestamp being misread as UTC. Verified via `systemctl status ourliberty-pulse-check-i.timer` at 08:47 UTC (02:47 MDT): "Trigger: Sun 2026-09-13 08:11:16 MDT; 5h 23min left." Artifacts (check-i-YYYY-MM-DD.json) are created at ~08:10–08:14 MDT = 14:10–14:14 UTC. **Do NOT report the timer as "fired" or "pending at 08:10 UTC" — the correct UTC window is 14:10–14:14 UTC.** Future iters running before 14:00 UTC should say "Check I timer fires at ~14:11 UTC today; artifact not yet present."
