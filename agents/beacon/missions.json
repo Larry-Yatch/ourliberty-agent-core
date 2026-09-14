@@ -21481,6 +21481,48 @@
         "from_state": "proposed"
       },
       "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+    },
+    {
+      "id": "retrospective-pulse-unknown-subject-2026-09-14",
+      "name": "retrospective pulse-unknown-subject 2026-09-14",
+      "phase": "proposed",
+      "brief": "Weekly elevation retrospective (2026-09-14) \u2014 FIX-PERMANENTLY.\n\nSignature: pulse::unknown-subject\nSource: pulse  \u00b7  subject: \nThis period: 7 fire(s), 8 week(s) recurring, trend=rising.\nResolution histogram: {'approve': 0, 'reject': 0, 'silence': 0, 'ack': 0, 'none': 7}.\n\nRationale: Eight weeks of rising events with 100% no-action resolutions indicates a systemic emitter-side subject-assignment gap; per memory, this is a catch-all grouping placeholder from root_signature() \u2014 stamping a generic subject would void kind-fallback, so the fix requires identifying and patching the individual emitters that emit without subjects rather than applying any single template.\n\nRecurring problem with no safe templated auto-fix \u2014 build an objective fix (spec, no code in this card). Accept to start drafting; dismiss to silence.",
+      "spec_docs": [
+        "agents/beacon/specs/alert-pipeline-rework.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-09-14",
+      "deferred_reason": null,
+      "proposed_by": "retrospective-author",
+      "proposed_at": "2026-09-14T13:03:05.695922+00:00",
+      "predraft": {
+        "classification": "fix-permanently",
+        "root_signature": "pulse::unknown-subject",
+        "count_at_proposal": 7,
+        "rationale": "Eight weeks of rising events with 100% no-action resolutions indicates a systemic emitter-side subject-assignment gap; per memory, this is a catch-all grouping placeholder from root_signature() \u2014 stamping a generic subject would void kind-fallback, so the fix requires identifying and patching the individual emitters that emit without subjects rather than applying any single template."
+      }
+    },
+    {
+      "id": "retrospective-pulse-yellow-suite-guardian-l8-milestone-reached-telegram-delivery-dropped-chat-id-0-2026-09-14",
+      "name": "retrospective pulse-yellow-suite-guardian-l8-milestone-reached-telegram-delivery-dropped-chat-id-0 2026-09-14",
+      "phase": "proposed",
+      "brief": "Weekly elevation retrospective (2026-09-14) \u2014 FIX-PERMANENTLY.\n\nSignature: pulse::[yellow]-suite-guardian-l8-milestone-reached-\u2014-telegram-delivery-dropped-(chat-id=0)\nSource: pulse  \u00b7  subject: [yellow]-suite-guardian-l8-milestone-reached-\u2014-telegram-delivery-dropped-(chat-id=0)\nThis period: 1 fire(s), 1 week(s) recurring, trend=new.\nResolution histogram: {'approve': 0, 'reject': 0, 'silence': 0, 'ack': 0, 'none': 1}.\n\nRationale: Null chat-id (=0) silently drops Telegram delivery on suite-guardian milestone events; per memory this is a known code defect (terminal-intent DMs with no reply_chat_id) with a scoped fix path that has not yet landed, requiring a targeted code change rather than any automate-now template.\n\nRecurring problem with no safe templated auto-fix \u2014 build an objective fix (spec, no code in this card). Accept to start drafting; dismiss to silence.",
+      "spec_docs": [
+        "agents/beacon/specs/alert-pipeline-rework.md"
+      ],
+      "task_ids": [],
+      "repo": "ourliberty-agent-core",
+      "created": "2026-09-14",
+      "deferred_reason": null,
+      "proposed_by": "retrospective-author",
+      "proposed_at": "2026-09-14T13:03:05.727784+00:00",
+      "predraft": {
+        "classification": "fix-permanently",
+        "root_signature": "pulse::[yellow]-suite-guardian-l8-milestone-reached-\u2014-telegram-delivery-dropped-(chat-id=0)",
+        "count_at_proposal": 1,
+        "rationale": "Null chat-id (=0) silently drops Telegram delivery on suite-guardian milestone events; per memory this is a known code defect (terminal-intent DMs with no reply_chat_id) with a scoped fix path that has not yet landed, requiring a targeted code change rather than any automate-now template."
+      }
     }
   ]
 }
