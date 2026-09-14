@@ -21579,7 +21579,28 @@
         "at": "2026-09-14T15:01:32.472794+00:00",
         "from_state": "proposed"
       },
-      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check.",
+      "acknowledged": true,
+      "retired_by": "heal_orphan_autoregister",
+      "retired_at": "2026-09-14T15:11:28.836822+00:00",
+      "retired_reason": "orphan-terminal"
+    },
+    {
+      "id": "proposed-direction-ask-supabase-degradation-incident-001",
+      "name": "Direction Ask Supabase Degradation Incident 001",
+      "phase": "proposed",
+      "brief": "Auto-proposed from orphan task `direction-ask-supabase-degradation-incident-001`. Last activity 2026-09-14T14:56:54.558446+00:00. Accept to claim the task_id into a drafting mission; dismiss to stop re-proposing.",
+      "spec_docs": [],
+      "task_ids": [
+        "direction-ask-supabase-degradation-incident-001"
+      ],
+      "repo": null,
+      "created": "2026-09-14",
+      "deferred_reason": null,
+      "proposed_by": "heal_orphan_autoregister",
+      "proposed_at": "2026-09-14T15:11:28.836822+00:00",
+      "orphan_branch": null,
+      "orphan_last_activity_ts": "2026-09-14T14:56:54.558446+00:00"
     }
   ]
 }
