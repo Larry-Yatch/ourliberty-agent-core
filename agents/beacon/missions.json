@@ -21600,7 +21600,21 @@
       "proposed_by": "heal_orphan_autoregister",
       "proposed_at": "2026-09-14T15:11:28.836822+00:00",
       "orphan_branch": null,
-      "orphan_last_activity_ts": "2026-09-14T14:56:54.558446+00:00"
+      "orphan_last_activity_ts": "2026-09-14T14:56:54.558446+00:00",
+      "briefing": {
+        "what": "Our database provider has been quietly failing about one in five of the system's requests for three days, and no warning ever reached you.",
+        "why": "Work is silently being dropped and you had no way to know, so you can't trust that what you asked for actually got done.",
+        "suggest": "Approve the platform-first route: take a quick look at the database account for a billing or capacity problem while I add the missing warnings, and hold off on masking the errors until we know the cause."
+      },
+      "risk": "medium",
+      "recommended_action": "delegate",
+      "briefing_provenance": {
+        "by": "beacon",
+        "model": "claude-opus-5",
+        "at": "2026-09-14T15:21:32.777111+00:00",
+        "from_state": "proposed"
+      },
+      "risk_note": "A change here has wider effects than it first appears \u2014 worth a quick check."
     }
   ]
 }
