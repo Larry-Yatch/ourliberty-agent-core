@@ -28,9 +28,9 @@ Automated cycles use internal paths and are unaffected. Manual sessions must use
 
 ---
 
-## G-rule heal-pipeline-stall-chain-events-supabase-504-001 — DISPATCHED ✅ (iter ~11485, 2026-09-14T14:50Z UTC)
+## G-rule heal-pipeline-stall-chain-events-supabase-504-001 — DISPATCHED ✅, PENDING LARRY DECISION (iter ~11485, 2026-09-14T14:50Z UTC; approval registered 14:56:54Z UTC)
 
-**Rule:** `source=heal-pipeline-stall` chain_events queries return transient Supabase errors; healer completes normally after each. Three occurrences on 2026-09-14 for task=pr-RSDPM-251: (1) 03:25:06Z UTC 504 "Gateway Timeout" (missed-pickup, never counted until iter ~11485); (2) 11:16:05Z UTC 504 "Gateway Timeout" (iter ~11480); (3) 13:27:10Z UTC 500 "Failed to get project config" (iter ~11484). All three: healer completes normally (0 fired, 2 suppressed). **DISPATCHED** to Beacon at iter ~11485: `direction-ask-heal-pipeline-stall-supabase-transient-error-handling-001.json`. Fix spec: add retry/backoff to chain_events query in `heal_pipeline_stall.py`; demote transient-error WARN→INFO on successful retry; keep WARN only when all retries fail. Tier-reset: 3→1.
+**Rule:** `source=heal-pipeline-stall` chain_events queries return transient Supabase errors; healer completes normally after each. Three occurrences on 2026-09-14 for task=pr-RSDPM-251: (1) 03:25:06Z UTC 504 "Gateway Timeout" (missed-pickup, never counted until iter ~11485); (2) 11:16:05Z UTC 504 "Gateway Timeout" (iter ~11480); (3) 13:27:10Z UTC 500 "Failed to get project config" (iter ~11484). All three: healer completes normally (0 fired, 2 suppressed). **DISPATCHED** to Beacon at iter ~11485: `direction-ask-heal-pipeline-stall-supabase-transient-error-handling-001.json`. Beacon merged into broader `direction-ask-supabase-degradation-incident-001` (in beacon-pending-approvals.json, created 2026-09-14T14:56:54Z UTC). APPROVE=platform-first (Supabase contact + retry/backoff in healer). REJECT=code-first (retry/backoff only, no platform contact). **Do NOT re-dispatch.** Awaiting Larry decision via Beacon approvals tab.
 
 ---
 
