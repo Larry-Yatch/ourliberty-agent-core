@@ -28,6 +28,12 @@ Automated cycles use internal paths and are unaffected. Manual sessions must use
 
 ---
 
+## G-rule heal-pipeline-stall-chain-events-supabase-504-001 — 2/3 (iter ~11484, 2026-09-14T14:19Z UTC)
+
+**Rule:** `source=heal-pipeline-stall` chain_events queries return transient Supabase errors; healer completes normally after each. Two error variants observed: (1) 504 Gateway Timeout at 11:16:05Z UTC (iter ~11480, 2026-09-14); (2) 500 "JSON could not be generated, Failed to get project config" at 13:27:10Z UTC (missed pickup in iter ~11483, counted in iter ~11484). Both: healer completes normally (0 fired, 2 suppressed). Pattern track: 2/3, threshold 3/10. Dispatch to Beacon at 3/3.
+
+---
+
 ## G-rule agent-runner-transcript-not-persisted-post-worktree-teardown-001 — ACTIVE (forge 2/3, mirror 1/3, iter ~9910, 2026-08-27T04:31Z UTC)
 
 **Rule:** Both `source=agent-runner-forge` (subject=transcript-not-persisted:tier3) and `source=agent-runner-mirror` (subject=transcript-not-persisted:tier1) fired on the SAME task (suite-guardian-fix-test_flip_readiness_gauge-20260827) within the SAME auto-merge sequence. Forge transcript alert: iter ~9906 (line 540, 04:04:43Z UTC, severity=critical). Mirror transcript alert: this iter ~9910 (line 544, 04:31:25Z UTC, severity=critical). Both worktrees torn down immediately after auto-merge at 04:31:35-36Z UTC. Transcripts were scoped to worktree-specific project paths that no longer exist after teardown — path contains `wt-forge-*` or `wt-mirror-*` prefix. Root cause hypothesis: AUTO_MERGE_WORKTREE_TEARDOWN fires synchronously at 04:31:36Z UTC, removing the worktree before the transcript write completes or before the transcript file's directory is accessible at resume time. The `suggested_action` says "Verify systemd unit lists the active tier's HOME in ReadWritePaths" — but worktree homes are dynamic, not listed in unit files. Real fix likely: either (a) copy transcript to a stable non-worktree path before teardown, or (b) delay worktree teardown until transcript is confirmed written. Outbox-notifier DM'd Larry on both occurrences. **G-rule tracking: forge=2/3, mirror=1/3. Dispatch COMBINED fix to Beacon at forge=3/3 OR mirror=2/3, whichever comes first.** Do NOT add translation silence — transcripts failing to persist is a real signal.
