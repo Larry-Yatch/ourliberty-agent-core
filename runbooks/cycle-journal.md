@@ -99,6 +99,25 @@ Pending Larry actions (carry):
 
 ---
 
+## Addendum to iter ~11552 — 2026-09-15T~16:00Z UTC — Beacon result: direction-ask-check-i-silent-skip-sidecar-001 → FALSE PREMISE
+
+**Result:** Beacon analyzed `direction-ask-check-i-silent-skip-sidecar-001` and returned SUCCESS with a falsification. The G-rule `check-i-no-artifact-post-fire-silent-skip-001` that fired 3× (iters ~11550–11552) rests on three false premises, all verified against ground truth:
+
+1. **Timer never fired Sep 15.** `ourliberty-pulse-check-i.timer` is Mon/Wed/Fri/Sun. Sep 15 2026 is a Tuesday. LAST fire = Sep 14 08:10Z UTC. NEXT = Sep 16 08:11Z UTC. The "14:11:16Z fire" I asserted was the next-elapse timestamp misread as a past fire.
+2. **Weekday gate exits before the sidecar is touched.** `pulse_check_i.py:76` — `CHECK_I_FIRING_WEEKDAYS = frozenset({0,2,4,6})`. The gate at ~L1711 returns 0 before `_load_sidecar` is ever called. Tuesday never reaches sidecar logic.
+3. **Stale guard already writes a SKIPPED artifact.** The >7d stale branch falls through to `assemble_check_i()` whose `if sidecar is None` path writes `{mode: "skipped", skip_reason: ..., fired_at: ISO8601}` unconditionally. No silent-skip path exists to fix.
+
+**Correction to iter ~11552 G-rule/dispatch:** The Check I Sep 15 artifact absence is entirely expected-by-design (non-firing weekday). The intervention row in the PRIME DIRECTIVE ledger stands (append-only), but is marked a false positive in this record. The dispatch consumed a Beacon session on a non-issue.
+
+**Memory:** Beacon saved `project_check_i_tuesday_silent_skip_false_premise.md` to MEMORY.md. Recipe: before asserting "timer fired but no artifact," verify today is a firing weekday (Mon/Wed/Fri/Sun) for the target check.
+
+**Beacon's open question — answered:** Beacon asked if I want them to scope a code change to the detector. My answer: **No — memory-as-fix is sufficient for now.** The detection here is my in-prompt calendar reasoning, not a separate script, so the fix is inherently cognitive. The falsification recipe is now in MEMORY.md and I'll read it before firing this class. If the false alarm recurs despite the memory, *then* yes — scope a code change (e.g., a weekday-aware pre-check helper). Dispatch preemptively before confirming memory-fix holds is over-engineering.
+
+**Pending Larry actions:** No change. The "run `/optimize`" item (item 0 from iter ~11552) is now cleared — the Sep 15 absence was expected, not a system failure. Sep 14 digest remains the most recent valid Check I output.
+
+
+---
+
 ## Iteration ~11551 — 2026-09-15T15:18Z UTC (09:18 MDT Sep 15) — Tier 3 / manual chat (/cycle)
 
 **Health:** ✅ Nominal (watermark 501=file_length, 0 new alerts; all 4 bots alive; sync 15:11:40Z UTC (~7min old); heal-stale-daemon-code 15:14:52Z UTC (~3min old); heal-pipeline-stall 15:03:24Z UTC (~15min old, 0 stalls); suite guardian 03:47:04Z UTC Sep 15 (~11.5h ago, FRESH nightly); all inboxes empty; 4 pending approvals carry; [yellow] Check I Sep 15 artifact still absent >1h post-fire (carry); Check III carry; credential rotation dedup active; Tier 3 consecutive_clean 13→14)
