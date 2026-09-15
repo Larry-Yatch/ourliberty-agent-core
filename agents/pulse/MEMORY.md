@@ -28,6 +28,12 @@ Automated cycles use internal paths and are unaffected. Manual sessions must use
 
 ---
 
+## G-rule check-i-no-artifact-post-fire-silent-skip-001 — DISPATCHED ✅ (iter ~11552, 2026-09-15T15:50Z UTC)
+
+**Rule:** `pulse_check_i.py` silently exits when the ledger sidecar is absent (>7d-stale guard fires), producing no artifact, no alert, no indication of whether it ran-and-skipped vs. crashed vs. was never invoked. First occurrence: Sep 15 2026 — timer fired at 14:11:16Z UTC, no check-i-2026-09-15.json after 99min; all prior firings (Sep 7, 9, 11, 13, 14) produced artifacts. Three consecutive Pulse iters (~11550, ~11551, ~11552) confirmed the same event's missing artifact. **DISPATCHED:** direction-ask-check-i-silent-skip-sidecar-001.json written to Beacon inbox at 15:50Z UTC. Request: (a) write SKIPPED artifact ({mode: "skipped", reason: "sidecar-stale"}) instead of silent exit; (b) optionally emit larry-alerts row on sidecar-stale skip. Low-priority observability improvement. **Do NOT re-dispatch.** Still recommend Larry run `/optimize` to force-surface Sep 15 data.
+
+---
+
 ## G-rule heal-pipeline-stall-chain-events-supabase-504-001 — DISPATCHED ✅, PENDING LARRY DECISION (iter ~11485, 2026-09-14T14:50Z UTC; approval registered 14:56:54Z UTC)
 
 **Rule:** `source=heal-pipeline-stall` chain_events queries return transient Supabase errors; healer completes normally after each. Three occurrences on 2026-09-14 for task=pr-RSDPM-251: (1) 03:25:06Z UTC 504 "Gateway Timeout" (missed-pickup, never counted until iter ~11485); (2) 11:16:05Z UTC 504 "Gateway Timeout" (iter ~11480); (3) 13:27:10Z UTC 500 "Failed to get project config" (iter ~11484). All three: healer completes normally (0 fired, 2 suppressed). **DISPATCHED** to Beacon at iter ~11485: `direction-ask-heal-pipeline-stall-supabase-transient-error-handling-001.json`. Beacon merged into broader `direction-ask-supabase-degradation-incident-001` (in beacon-pending-approvals.json, created 2026-09-14T14:56:54Z UTC). APPROVE=platform-first (Supabase contact + retry/backoff in healer). REJECT=code-first (retry/backoff only, no platform contact). **Do NOT re-dispatch.** Awaiting Larry decision via Beacon approvals tab.
