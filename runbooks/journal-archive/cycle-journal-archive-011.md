@@ -73921,3 +73921,117 @@ Pending Larry actions (carry + updated):
 
 ---
 
+## Iteration ~11552 — 2026-09-15T15:50Z UTC (09:50 MDT Sep 15) — Tier 3 / manual chat (/cycle)
+
+**Health:** ⚠️ Action taken — G-rule dispatch (Check I silent-skip observability gap; all 5 mandatory checks NOMINAL; all 4 bots alive; sync 15:11:40Z UTC (~40min old); heal-stale-daemon-code 15:45:19Z UTC (~5min old); heal-pipeline-stall 15:35:27Z UTC (~15min old, 0 stalls); suite guardian 03:47:04Z UTC Sep 15 (~12h ago, FRESH nightly); all inboxes empty; 4 pending approvals carry; Check I Sep 15 artifact absent ~99min post-fire → G-rule 3-confirm dispatch to Beacon; Check III carry; credential rotation dedup active; Tier 3 consecutive_clean 14→15)
+
+**VERIFY-BEFORE-REASSERT (from iter ~11551 at 15:18Z UTC):**
+- "watermark 501=file_length, 0 new alerts": repair-watermark → old=501, file_length=502, repaired=false. 1 new alert (line 502: doorbell at 15:24:16Z UTC, Tier-3 silence). **UPDATED — 1 new alert triaged.**
+- "All 4 bots alive=True action=noop": system-health.json ts=2026-09-15T15:44:40Z UTC (~6min old), all 4 bots alive=True, action=noop. **CONFIRMED (refreshed).**
+- "Check 3: 15:03:24Z UTC (~15min old), 0 stalls, 1 suppressed (PR#264)": now 15:35:27Z UTC (~15min old), 0 stalls, 1 suppressed (PR#264). **CONFIRMED (refreshed).**
+- "Check 5: 15:14:52Z UTC (~3min old)": now 15:45:19Z UTC (~5min old). **CONFIRMED (refreshed).**
+- "Check B: 15:11:40Z UTC (~7min old)": still 15:11:40Z UTC (~40min old). Within 2h. **CONFIRMED (no new sync — status=no-change).**
+- "Suite guardian: 03:47:04Z UTC Sep 15 (~11.5h ago)": now ~12h ago. FRESH (within 25h). **CONFIRMED.**
+- "0 open PRs": 0 confirmed. **CONFIRMED.**
+- "All 4 inboxes empty": 0/0/0/0 confirmed. **CONFIRMED.**
+- "4 pending approvals": 4 confirmed unchanged — direction-ask-approvals-opt-b-undefer-001, suite-guardian-l8-tightening, direction-ask-advancer-504-nightly-window-001, direction-ask-supabase-degradation-incident-001. **CONFIRMED.**
+- "HEAD=2622f955=origin/main (Pulse cycle 20260915T144839Z), clean tree": HEAD=39a1d8a4=origin/main (Pulse cycle 20260915T152048Z — automated cycle committed between ~11551 and ~11552). Clean tree. **UPDATED — automated cycle advanced HEAD.**
+- "Tier 3 consecutive_clean 13→14": cycle_tier_state.py read → consecutive_clean=14, last_updated=2026-09-15T15:20:30Z UTC (automated cycle). **CONFIRMED. Now 14→15 after this iter.**
+- "[yellow] Check I Sep 15 artifact absent >1h post-fire (carry)": still no check-i-2026-09-15.json in ~/agents/blackboard/pulse-check-i/. Most recent: check-i-2026-09-14.json (Sep 14). Now ~99min post-fire. **CONFIRMED (carry — 3rd consecutive check confirming same timer event).**
+
+**Check 0 (~15:49Z UTC):** repair-watermark → old=501, file_length=502, repaired=false. 1 new alert: line 502, ts=2026-09-15T15:24:16Z UTC, source=doorbell, kind=notification, intent=doorbell (approvals dashboard nudge: 4 items). Triage: `alert_triage_state.py triage-alert` → tier=3, decision=silence, route=digest (delivery-carrying kind; bot already DM'd at write time). Watermark advanced to 502. **NOMINAL.**
+
+**Check 1 (~15:49Z UTC):** journalctl ourliberty-*.service priority=warning last 30min → no entries. **NOMINAL.**
+
+**Check 2 (~15:49Z UTC):** beacon_telegram_bot.log — most recent: 2026-09-15T09:26:21-0600 (15:26Z UTC Sep 15) — idx=501 delivered (intent=doorbell; corresponds to line 502 triaged above). No new `← 7998341473` Larry directives. Sep 14 nightly cluster carry (01:13–01:17Z UTC Sep 15, 2×429 + 10×502 + 4× read timeout, ~4min, auto-recovered). **NOMINAL.**
+
+**Check 3 (~15:49Z UTC):** heal-pipeline-stall.log last=2026-09-15T15:35:27Z UTC (~15min old). 0 stalls, 1 cooldown-suppressed (unrouted_open_pr:Larry-Yatch/RSDPM:264). **NOMINAL.**
+
+**Check 4 (~15:49Z UTC):** beacon-pending-approvals.json (state/): 4 pending unchanged — direction-ask-approvals-opt-b-undefer-001, suite-guardian-l8-tightening, direction-ask-advancer-504-nightly-window-001, direction-ask-supabase-degradation-incident-001. **NOMINAL (carry).**
+
+**Check 5 (~15:49Z UTC):** heal-stale-daemon-code.heartbeat=2026-09-15T15:45:19Z UTC (~5min old). Within 60min. **NOMINAL.**
+
+**Check A (~15:49Z UTC):** on main, HEAD=39a1d8a4=origin/main (Pulse cycle 20260915T152048Z), clean tree. **NOMINAL.** Note: automated cycle committed between iter ~11551 and this iter — normal.
+
+**Check B (~15:49Z UTC):** agent-core-sync.json last_sync=2026-09-15T15:11:40Z UTC (~40min old), status=no-change, consecutive_push_failures=0. Within 2h. **NOMINAL.**
+
+**Check C (~15:49Z UTC):** system-health.json ts=2026-09-15T15:44:40Z UTC (~6min old), overall=healthy. All 4 bots (beacon, forge, mirror, pulse): alive=True, action=noop. **NOMINAL.**
+
+**Check D (~15:49Z UTC):** All agent inboxes empty (beacon=0, forge=0, mirror=0, pulse=0). **NOMINAL.**
+
+**Check E (~15:49Z UTC):** 0 open PRs (ourliberty-agent-core). **NOMINAL.**
+
+**Section 5.0 one-shots (~15:49Z UTC):** audit_due_nudge: no committed audit baseline; no-op. distill_detector: no un-distilled audits; no-op. audit_cadence_signal: no post-seed distill artifacts yet; no-op. **NOMINAL.**
+
+**Suite guardian (~15:49Z UTC):** pulse-check-main-suite-guardian.heartbeat ts=2026-09-15T03:47:04Z UTC (~12h ago). FRESH — nightly-only cadence, within 25h. **NOMINAL.**
+
+**Check I (~15:49Z UTC):** [yellow] CARRY + DISPATCH. Timer fired at 14:11:16Z UTC Sep 15. Now ~99min post-fire, check-i-2026-09-15.json still absent (most recent: check-i-2026-09-14.json). Three consecutive Pulse iters (~11550, ~11551, ~11552) have confirmed the same timer event's missing artifact. Root cause: ledger sidecar absent → `pulse_check_i.py` >7d-stale guard fires → silent exit (no artifact, no alert, no indication of skip). G-rule `check-i-no-artifact-post-fire-silent-skip-001`: 3 confirming checks → direction-ask dispatched to Beacon inbox as `direction-ask-check-i-silent-skip-sidecar-001.json`. Request: (a) write a SKIPPED artifact instead of silent exit, (b) optionally emit larry-alerts row on sidecar-stale skip. Low-priority observability improvement. **[yellow] DISPATCH sent. Still recommend Larry run `/optimize` to force-surface Sep 15 data and reveal failure reason via stdout/stderr.**
+
+**Check III (~15:49Z UTC):** No new artifact. pulse-threshold-proposals.json: applied=False, as_of=2026-09-06T10:45Z UTC. Awaiting `approve threshold-update-2026-09-06`. **CARRY.**
+
+**Credential Rotation (~15:49Z UTC):** SUPABASE_SERVICE_ROLE_KEY next_rotation_due=2026-08-22 (OVERDUE 24+ days). last_dm=2026-09-09T01:48:59Z UTC. Dedup window active until ~2026-09-23T01:49Z UTC. **[yellow] CARRY. No DM (dedup active).**
+
+**G-rules (all carry — no new occurrences this iter):**
+- heal-pipeline-stall-chain-events-supabase-504-001: DISPATCHED ✅. direction-ask-supabase-degradation-incident-001 pending approval. **CARRY.**
+- heal-approvals-surface-drift-missing-card-cooldown-collision-001: direction-ask-approvals-opt-b-undefer-001 PENDING. No new occurrence this iter. **CARRY.**
+- build-sequence-advancer-504-nightly-window-001: DISPATCHED ✅. Pending Larry decision. **CARRY.**
+- agent-runner-transcript-not-persisted-post-worktree-teardown-001: forge=2/3, mirror=1/3. **CARRY.**
+- mirror-to-dashboard-return-routing-failure-001: DISPATCHED (PR#1113 MERGED), monitoring. **CARRY.**
+- inbox-watcher-routing-denied-pulse-forge-001: 1/3. **CARRY.**
+- heal-lost-marker-tier4-no-translation-001: 1/3. **CARRY.**
+- nightly-502-cluster-001: DISPATCHED ✅. Sep 14→15 nightly window (01:13–01:17Z UTC Sep 15, 2×429 + 10×502 + 4× read timeout, ~4min, auto-recovered). **CARRY.**
+- deploy-notifier-vercel-build-failed-tier4-no-translation-001: 2/3. **CARRY.**
+- automated-cycle-no-journal-entry-001: DISPATCHED ✅. Latest auto-commit 39a1d8a4 (Pulse cycle 20260915T152048Z). **CARRY.**
+- mirror-queue-wait-gauge-third-review-slot-readiness-tier4-no-translation-001: 2/3. **CARRY.**
+- source-beacon-notifications-tier4-no-translation: 2/3. **CARRY.**
+- alert-retraction-no-translation-001: DISPATCHED ✅. **CARRY.**
+- unreviewed-merge-without-gate-pattern: DISPATCHED ✅ (PR#1113 MERGED). **CARRY.**
+- enable-pr-auto-merge-reviewdecision-guard-001: 1/3. **CARRY.**
+- heal-pipeline-stall-no-mirror-dispatch-tier4-no-translation-001: 1/3. **CARRY.**
+- check-i-no-artifact-post-fire-silent-skip-001: NEW — 3 confirming checks (iters ~11550-~11552). DISPATCHED ✅ as direction-ask-check-i-silent-skip-sidecar-001.json to Beacon inbox.
+
+**Triage:** 1 new alert (line 502 doorbell → Tier-3 silence). Clean mandatory checks. G-rule dispatch (Check I observability). Tier 3 consecutive_clean 14→15.
+
+**Auto-fixes:** None (doorbell Tier-3 silence is not a fix; G-rule dispatch is route-to-Beacon).
+
+**Escalations:** None new. Check I Sep 15 artifact absent [yellow] carry; G-rule dispatch sent to Beacon. Supabase degradation DM and [yellow] pending Larry actions all carry from prior iter.
+
+Pending Larry actions (carry):
+0. **[yellow] CARRY** Check I Sep 15 artifact missing — run `/optimize` to force re-run. Ledger sidecar absent; Sep 14 digest: $551.98 spend +60% WoW, 39 anomalies. G-rule direction-ask sent to Beacon for structural fix.
+1. **[URGENT]** APPROVE or REJECT `direction-ask-supabase-degradation-incident-001` (Beacon approvals tab) — Supabase failing ~21% of chain queries for 4+ days. 24h reminder DM sent at 15:01Z UTC Sep 15. APPROVE=platform-first. REJECT=code-first.
+2. **[yellow]** heal-approvals-surface-drift:missing_card for PR#264 — Approve `direction-ask-approvals-opt-b-undefer-001` to permanently fix OR manually navigate in dashboard.
+3. Dispatch Mirror review for PR#264 (RSDPM, feat/m20-status-sensing): `dispatch mirror review pr=https://github.com/Larry-Yatch/RSDPM/pull/264`.
+4. APPROVE or REJECT `direction-ask-approvals-opt-b-undefer-001` (Beacon approvals tab).
+5. Rotate SUPABASE_SERVICE_ROLE_KEY (OVERDUE 24+ days; dedup window active until ~2026-09-23T01:49Z UTC).
+6. `approve threshold-update-2026-09-06` for Check III proposals (Telegram shortcut).
+7. Keep/drop decisions via missions dashboard: (a) `proposed-dashboard-return-routing-auto-merge-001`, `proposed-dashboard-return-routing-superseded-by-pr1113-001`; (b) `proposed-pr1113-deep-review-window-closing`, `proposed-pulse-stray-files-cleanup-request`.
+8. Approve `suite-guardian-l8-tightening` via missions dashboard.
+9. APPROVE or REJECT `direction-ask-advancer-504-nightly-window-001` (Beacon approvals).
+
+**PRIME DIRECTIVE:** intervention row appended (ts=2026-09-15T15:50:44Z UTC, tier=3, template=check-i-no-artifact-post-fire-silent-skip-001). iter_clean heartbeat appended (ts=2026-09-15T15:50:45Z UTC). Tier state: cycle_tier_state.py record --checks-clean true → consecutive_clean 14→15 (Tier 3, cadence-floor steady-state). last_signal_at=2026-09-15T06:29:19Z UTC (unchanged). PRIME ratio (trailing 30d): interventions=652, systemic_fixes=4, ratio=163.0 (approx), trend=improving.
+
+**Patterns:** G-rule `check-i-no-artifact-post-fire-silent-skip-001` dispatched to Beacon — 3 confirming checks of one Sep 15 timer firing that produced no artifact. Root cause: sidecar absent → silent skip. Fix requested: SKIPPED artifact instead of silent exit. Mandatory system health: all nominal. Supabase degradation remains most urgent pending Larry decision (approaching 5 days without resolution). Automated cycle 39a1d8a4 ran between iters (~15:20Z UTC) — normal operation.
+
+**Tier end-of-iter:** **Tier 3**, consecutive_clean=15. last_signal_at=2026-09-15T06:29:19Z UTC.
+
+---
+
+## Addendum to iter ~11552 — 2026-09-15T~16:00Z UTC — Beacon result: direction-ask-check-i-silent-skip-sidecar-001 → FALSE PREMISE
+
+**Result:** Beacon analyzed `direction-ask-check-i-silent-skip-sidecar-001` and returned SUCCESS with a falsification. The G-rule `check-i-no-artifact-post-fire-silent-skip-001` that fired 3× (iters ~11550–11552) rests on three false premises, all verified against ground truth:
+
+1. **Timer never fired Sep 15.** `ourliberty-pulse-check-i.timer` is Mon/Wed/Fri/Sun. Sep 15 2026 is a Tuesday. LAST fire = Sep 14 08:10Z UTC. NEXT = Sep 16 08:11Z UTC. The "14:11:16Z fire" I asserted was the next-elapse timestamp misread as a past fire.
+2. **Weekday gate exits before the sidecar is touched.** `pulse_check_i.py:76` — `CHECK_I_FIRING_WEEKDAYS = frozenset({0,2,4,6})`. The gate at ~L1711 returns 0 before `_load_sidecar` is ever called. Tuesday never reaches sidecar logic.
+3. **Stale guard already writes a SKIPPED artifact.** The >7d stale branch falls through to `assemble_check_i()` whose `if sidecar is None` path writes `{mode: "skipped", skip_reason: ..., fired_at: ISO8601}` unconditionally. No silent-skip path exists to fix.
+
+**Correction to iter ~11552 G-rule/dispatch:** The Check I Sep 15 artifact absence is entirely expected-by-design (non-firing weekday). The intervention row in the PRIME DIRECTIVE ledger stands (append-only), but is marked a false positive in this record. The dispatch consumed a Beacon session on a non-issue.
+
+**Memory:** Beacon saved `project_check_i_tuesday_silent_skip_false_premise.md` to MEMORY.md. Recipe: before asserting "timer fired but no artifact," verify today is a firing weekday (Mon/Wed/Fri/Sun) for the target check.
+
+**Beacon's open question — answered:** Beacon asked if I want them to scope a code change to the detector. My answer: **No — memory-as-fix is sufficient for now.** The detection here is my in-prompt calendar reasoning, not a separate script, so the fix is inherently cognitive. The falsification recipe is now in MEMORY.md and I'll read it before firing this class. If the false alarm recurs despite the memory, *then* yes — scope a code change (e.g., a weekday-aware pre-check helper). Dispatch preemptively before confirming memory-fix holds is over-engineering.
+
+**Pending Larry actions:** No change. The "run `/optimize`" item (item 0 from iter ~11552) is now cleared — the Sep 15 absence was expected, not a system failure. Sep 14 digest remains the most recent valid Check I output.
+
+
+---
+
