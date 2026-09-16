@@ -4,6 +4,98 @@
 
 ---
 
+## Iteration ~11597 — 2026-09-16T11:11Z UTC (05:11 MDT Sep 16) — Tier 1 / manual chat (/cycle)
+
+**Health:** ✅ Nominal (0 new alerts, watermark=503=file_length; all 4 bots alive; sync 10:14Z UTC (~57min old, within 2h); heal-stale-daemon-code 11:07:08Z UTC (~4min old); heal-pipeline-stall 10:55:31Z UTC (~16min old, 0 stalls); suite guardian 03:51:43Z UTC (~7.3h ago, fresh nightly); all inboxes empty; 0 open PRs; 4 pending approvals carry; Check I: fire at ~14:11Z UTC (~3h remaining, no artifact yet); Check III carry; credential rotation carry; Tier 1 consecutive_clean 1→2)
+
+**VERIFY-BEFORE-REASSERT (from iter ~11596 at 11:05Z UTC):**
+- "watermark 503=file_length, 0 new alerts": repair-watermark → repaired=false, old_watermark=503, file_length=503. **CONFIRMED — no new alerts.**
+- "All 4 bots alive=True action=noop": system-health.json ts=2026-09-16T11:07:12Z UTC (~4min old), all 4 alive=True, action=noop, overall=healthy. **CONFIRMED (refreshed).**
+- "Check 3: 10:55:31Z UTC, 0 stalls, 2 suppressed (PR#267, PR#268)": still 10:55:31Z UTC (~16min old at check time). **CONFIRMED (same reading — healer hasn't ticked again).**
+- "Check 5: 10:57:08Z UTC (~8min old)": now 11:07:08Z UTC (~4min old). **CONFIRMED (refreshed).**
+- "Check B: 10:14:15Z UTC (~51min old)": still 10:14:15Z UTC (~57min old). Within 2h. **CONFIRMED.**
+- "Suite guardian 03:51:43Z UTC (~7.3h ago)": still 03:51:43Z UTC (~7.3h ago). FRESH (<25h). **CONFIRMED.**
+- "0 open PRs": [] confirmed. **CONFIRMED.**
+- "All 4 inboxes empty": 0/0/0/0. **CONFIRMED.**
+- "4 pending approvals unchanged": 4 pending (direction-ask-approvals-opt-b-undefer-001, suite-guardian-l8-tightening, direction-ask-advancer-504-nightly-window-001, direction-ask-supabase-degradation-incident-001). **CONFIRMED.**
+- "HEAD=d8c65411=origin/main (Pulse cycle 20260916T110207Z)": now HEAD=0ea1e523=origin/main (Pulse cycle 20260916T110645Z). Automated cycle committed between iters. **CONFIRMED (updated).**
+- "Tier 1, consecutive_clean=0→1": tier=1, consecutive_clean=1 at iter start. **CONFIRMED.**
+
+**Check 0 (~11:11Z UTC):** repair-watermark → repaired=false, old_watermark=503, file_length=503. 0 new alerts. **NOMINAL.**
+
+**Check 1 (~11:11Z UTC):** journalctl ourliberty-*.service priority=warning last 60min → no entries. **NOMINAL.**
+
+**Check 2 (~11:11Z UTC):** beacon_telegram_bot.log reviewed. Last delivery: idx=502 heal-approvals-surface-drift:missing_card:unreg-approval-db3218a0d929 at 04:56:54-0600 (=10:56:54Z UTC Sep 16), already documented in iter ~11595/~11596. No new deliveries since then. No new Larry `← 7998341473` messages (last: 2026-09-11). Nightly 502 cluster Sep 15→16 at 19:12-19:14 MDT (01:12-01:14Z UTC Sep 16) documented in prior iters (G-rule nightly-502-cluster-001 DISPATCHED ✅). **NOMINAL.**
+
+**Check 3 (~11:11Z UTC):** heal-pipeline-stall.log last=2026-09-16T10:55:31Z UTC (~16min old). 0 new alerts fired, 0 recovered, 2 cooldown-suppressed (PR#267, PR#268). **NOMINAL.**
+
+**Check 4 (~11:11Z UTC):** beacon-pending-approvals.json: 4 pending unchanged. No new Larry directives. **NOMINAL (carry).**
+
+**Check 5 (~11:11Z UTC):** heal-stale-daemon-code.heartbeat=2026-09-16T11:07:08Z UTC (~4min old). Within 60min. **NOMINAL.**
+
+**Check A (~11:11Z UTC):** on main, HEAD=0ea1e523=origin/main (Pulse cycle 20260916T110645Z), clean tree, 0 behind. **NOMINAL.**
+
+**Check B (~11:11Z UTC):** agent-core-sync.json last_sync=2026-09-16T10:14:15Z UTC (~57min old), status=no-change, consecutive_push_failures=0. Within 2h. **NOMINAL.**
+
+**Check C (~11:11Z UTC):** system-health.json ts=2026-09-16T11:07:12Z UTC (~4min old), overall=healthy. All 4 bots (beacon, forge, mirror, pulse): alive=True, action=noop. **NOMINAL.**
+
+**Check D (~11:11Z UTC):** All agent inboxes empty (beacon=0, forge=0, mirror=0, pulse=0). **NOMINAL.**
+
+**Check E (~11:11Z UTC):** 0 open PRs (ourliberty-agent-core). **NOMINAL.**
+
+**Section 5.0 one-shots (~11:11Z UTC):** audit_due_nudge: no committed audit baseline; no-op. distill_detector: no un-distilled audits; no-op. audit_cadence_signal: no post-seed artifacts; no-op. **NOMINAL.**
+
+**Suite guardian (~11:11Z UTC):** pulse-check-main-suite-guardian.heartbeat ts=2026-09-16T03:51:43Z UTC (~7.3h ago). FRESH (<25h). Nightly run on schedule. **NOMINAL.**
+
+**Check I (~11:11Z UTC):** Sep 16 is Wednesday — fire day. Timer fires at ~14:11Z UTC (~3h remaining at check time). No Sep 16 artifact yet (latest: check-i-2026-09-14.json). **NOMINAL. Artifact expected this afternoon.**
+
+**Check III (~11:11Z UTC):** No new artifact (latest: check-iii-2026-09-06.json). Next fire: Sun Sep 20. pulse-threshold-proposals.json: applied=False, as_of=2026-09-06T10:45Z UTC, count=2. Awaiting `approve threshold-update-2026-09-06`. **CARRY.**
+
+**Credential Rotation (~11:11Z UTC):** SUPABASE_SERVICE_ROLE_KEY next_rotation_due=2026-08-22 (OVERDUE ~25 days). last_dm=2026-09-09T01:48:59Z UTC. Dedup window active until ~2026-09-23T01:49Z UTC. **[yellow] CARRY. No DM (dedup active).**
+
+**G-rules (all carry — no new occurrences this iter):**
+- heal-approvals-surface-drift-missing-card-cooldown-collision-001: direction-ask-approvals-opt-b-undefer-001 PENDING. **CARRY.**
+- heal-pipeline-stall-chain-events-supabase-504-001: DISPATCHED ✅. direction-ask-supabase-degradation-incident-001 pending approval. **CARRY [URGENT].**
+- build-sequence-advancer-504-nightly-window-001: DISPATCHED ✅. Pending Larry decision. **CARRY.**
+- agent-runner-transcript-not-persisted-post-worktree-teardown-001: forge=2/3, mirror=1/3. **CARRY.**
+- mirror-to-dashboard-return-routing-failure-001: DISPATCHED (PR#1113 MERGED), monitoring. **CARRY.**
+- inbox-watcher-routing-denied-pulse-forge-001: 1/3. **CARRY.**
+- heal-lost-marker-tier4-no-translation-001: 1/3. **CARRY.**
+- nightly-502-cluster-001: DISPATCHED ✅. Sep 15→16 cluster at 01:12-01:14Z UTC Sep 16 documented in prior iters. **CARRY.**
+- deploy-notifier-vercel-build-failed-tier4-no-translation-001: 2/3. **CARRY.**
+- automated-cycle-no-journal-entry-001: DISPATCHED ✅. Latest auto-commit 0ea1e523 (Pulse cycle 20260916T110645Z); no journal entry (pattern continues). **CARRY.**
+- mirror-queue-wait-gauge-third-review-slot-readiness-tier4-no-translation-001: 2/3. **CARRY.**
+- source-beacon-notifications-tier4-no-translation: 2/3. **CARRY.**
+- alert-retraction-no-translation-001: DISPATCHED ✅. **CARRY.**
+- unreviewed-merge-without-gate-pattern: DISPATCHED ✅ (PR#1113 MERGED). **CARRY.**
+- enable-pr-auto-merge-reviewdecision-guard-001: 1/3. **CARRY.**
+- heal-pipeline-stall-no-mirror-dispatch-tier4-no-translation-001: 1/3. **CARRY.**
+- check-i-no-artifact-post-fire-silent-skip-001: CLOSED (false premise per Beacon addendum). **CLOSED.**
+
+**Triage:** 0 new alerts. Watermark 503=file_length. Clean iter. Tier 1 consecutive_clean 1→2.
+
+**Auto-fixes:** None.
+
+**Escalations:** None.
+
+Pending Larry actions (unchanged from ~11596):
+1. **[URGENT]** APPROVE or REJECT `direction-ask-supabase-degradation-incident-001` (Beacon approvals tab) — Supabase failing ~21% of chain queries since Sep 11. 72h reminder fires ~14:56Z UTC Sep 17. APPROVE=platform-first. REJECT=code-first.
+2. **[yellow]** Approve `direction-ask-approvals-opt-b-undefer-001` (Beacon approvals tab) — recurring heal-approvals-surface-drift:missing_card. APPROVE=un-defer Option B 3-PR build. REJECT=keep deferring.
+3. Dispatch Mirror review for RSDPM PRs #264, #266, #267, #268 — 4 unrouted PRs still open.
+4. Rotate SUPABASE_SERVICE_ROLE_KEY (OVERDUE ~25 days; dedup window active until ~2026-09-23T01:49Z UTC).
+5. `approve threshold-update-2026-09-06` for Check III proposals (Telegram shortcut).
+6. Keep/drop decisions via missions dashboard: (a) `proposed-dashboard-return-routing-auto-merge-001`, `proposed-dashboard-return-routing-superseded-by-pr1113-001`; (b) `proposed-pr1113-deep-review-window-closing`, `proposed-pulse-stray-files-cleanup-request`.
+7. Approve `suite-guardian-l8-tightening` via missions dashboard.
+8. APPROVE or REJECT `direction-ask-advancer-504-nightly-window-001` (Beacon approvals).
+
+**PRIME DIRECTIVE:** iter_clean heartbeat appended (ts=2026-09-16T11:11:57Z UTC, iter=~11597, tier=1). No intervention rows this iter. Tier state: cycle_tier_state.py record --checks-clean true → consecutive_clean 1→2 (Tier 1). last_signal_at=2026-09-16T10:59:02Z UTC (unchanged). PRIME ratio (trailing 30d): interventions=655, systemic_fixes=4, ratio=163.75.
+
+**Patterns:** Second consecutive clean Tier-1 iter. consecutive_clean now 2/3 toward Tier-2 de-escalation (15-min cadence). If next iter is also clean, tier de-escalates to 2. Check I fires in ~3h (14:11Z UTC); watch for artifact. Supabase degradation direction-ask now 2+ days pending with no Larry response; 72h reminder fires ~14:56Z UTC Sep 17.
+
+**Tier end-of-iter:** **Tier 1**, consecutive_clean=2. last_signal_at=2026-09-16T10:59:02Z UTC.
+
+---
+
 ## Iteration ~11596 — 2026-09-16T11:05Z UTC (05:05 MDT Sep 16) — Tier 1 / manual chat (/cycle)
 
 **Health:** ✅ Nominal (0 new alerts, watermark=503=file_length; all 4 bots alive; sync 10:14Z UTC (~51min old, within 2h); heal-stale-daemon-code 10:57:08Z UTC (~8min old); heal-pipeline-stall 10:55:31Z UTC (~10min old, 0 stalls); suite guardian 03:51:43Z UTC (~7.3h ago, fresh nightly); all inboxes empty; 0 open PRs; 4 pending approvals carry; Check I: fire at ~14:11Z UTC (~3h remaining, no artifact yet); Check III carry; credential rotation carry; Tier 1 consecutive_clean 0→1)
@@ -3603,98 +3695,6 @@ Pending Larry actions (carry):
 **Patterns:** Twenty-first consecutive clean iter at Tier 3. All mandatory checks, additive checks, and substrates nominal. Supabase degradation incident now entering day 5 — most urgent pending action remains unanswered. Nothing else to report.
 
 **Tier end-of-iter:** **Tier 3**, consecutive_clean=21. last_signal_at=2026-09-15T06:29:19Z UTC.
-
----
-
-## Iteration ~11557 — 2026-09-15T18:21Z UTC (12:21 MDT Sep 15) — Tier 3 / manual chat (/cycle via /loop)
-
-**Health:** ✅ Nominal (watermark 502=file_length, 0 new alerts; all 4 bots alive; sync 18:12:20Z UTC (~9min old); heal-stale-daemon-code 18:17:21Z UTC (~4min old); heal-pipeline-stall 18:05:31Z UTC (~16min old, 0 stalls); suite guardian 03:47:04Z UTC Sep 15 (~14.5h ago, FRESH nightly); all inboxes empty; 4 pending approvals carry; Check I: Sep 15 Tuesday — no fire; Check III carry; credential rotation dedup active; Tier 3 consecutive_clean 19→20)
-
-**VERIFY-BEFORE-REASSERT (from iter ~11556 at 17:50Z UTC):**
-- "watermark 502=file_length, 0 new alerts": repair-watermark → old=502, file_length=502, repaired=false. 0 new alerts. **CONFIRMED.**
-- "All 4 bots alive=True action=noop": system-health.json ts=2026-09-15T18:17:21Z UTC (~4min old), overall=healthy, all 4 bots alive=True, action=noop. **CONFIRMED (refreshed).**
-- "Check 3: 17:48:43Z UTC (~2min old), 0 stalls, 1 suppressed (PR#264)": now 18:05:31Z UTC (~16min old), 0 stalls, 1 cooldown-suppressed (unrouted_open_pr:Larry-Yatch/RSDPM:264). **CONFIRMED (refreshed).**
-- "Check 5: 17:46:54Z UTC (~4min old)": now 18:17:21Z UTC (~4min old). **CONFIRMED (refreshed).**
-- "Check B: 17:12:16Z UTC (~38min old)": now 18:12:20Z UTC (~9min old). Within 2h. **CONFIRMED (refreshed — new sync).**
-- "Suite guardian: 03:47:04Z UTC Sep 15 (~14h ago)": now ~14.5h ago. FRESH. **CONFIRMED.**
-- "0 open PRs": [] confirmed. **CONFIRMED.**
-- "All 4 inboxes empty": 0/0/0/0. **CONFIRMED.**
-- "4 pending approvals unchanged": direction-ask-approvals-opt-b-undefer-001, suite-guardian-l8-tightening, direction-ask-advancer-504-nightly-window-001, direction-ask-supabase-degradation-incident-001. **CONFIRMED.**
-- "HEAD=f9b41602=origin/main (Pulse cycle 20260915T172305Z), clean tree": HEAD now 5bcaf08b (Pulse cycle 20260915T175256Z) = origin/main, clean tree. Updated — automated cycle ran at 17:52:56Z UTC. **CONFIRMED (updated).**
-- "Tier 3 consecutive_clean 18→19": consecutive_clean=19 at iter start. **CONFIRMED.**
-
-**Check 0 (~18:21Z UTC):** repair-watermark → old=502, file_length=502, repaired=false. Watermark=502, file=502. 0 new alerts. **NOMINAL.**
-
-**Check 1 (~18:21Z UTC):** journalctl ourliberty-*.service priority=warning last 30min → no entries. **NOMINAL.**
-
-**Check 2 (~18:21Z UTC):** beacon_telegram_bot.log most recent: 2026-09-15T09:26:21-0600 (15:26Z UTC) — unchanged since iter ~11556. No new `← 7998341473` Larry directives. Sep 14→15 nightly cluster (19:13-19:17 MDT = 01:13-01:17Z UTC Sep 15: 2×429, 10×502, 4× read timeout, ~4min, auto-recovered) carry. **NOMINAL.**
-
-**Check 3 (~18:21Z UTC):** heal-pipeline-stall.log last=2026-09-15T18:05:31Z UTC (~16min old). 0 stalls, 1 cooldown-suppressed (unrouted_open_pr:Larry-Yatch/RSDPM:264). **NOMINAL.**
-
-**Check 4 (~18:21Z UTC):** beacon-pending-approvals.json: 4 pending unchanged — direction-ask-approvals-opt-b-undefer-001, suite-guardian-l8-tightening, direction-ask-advancer-504-nightly-window-001, direction-ask-supabase-degradation-incident-001. **NOMINAL (carry).**
-
-**Check 5 (~18:21Z UTC):** heal-stale-daemon-code.heartbeat=2026-09-15T18:17:21Z UTC (~4min old). Within 60min. **NOMINAL.**
-
-**Check A (~18:21Z UTC):** on main, HEAD=5bcaf08b=origin/main (Pulse cycle 20260915T175256Z), clean tree. **NOMINAL.**
-
-**Check B (~18:21Z UTC):** agent-core-sync.json last_sync=2026-09-15T18:12:20Z UTC (~9min old), status=no-change, consecutive_push_failures=0. Within 2h. **NOMINAL.**
-
-**Check C (~18:21Z UTC):** system-health.json ts=2026-09-15T18:17:21Z UTC (~4min old), overall=healthy. All 4 bots (beacon, forge, mirror, pulse): alive=True, action=noop. **NOMINAL.**
-
-**Check D (~18:21Z UTC):** All agent inboxes empty (beacon=0, forge=0, mirror=0, pulse=0). **NOMINAL.**
-
-**Check E (~18:21Z UTC):** 0 open PRs (ourliberty-agent-core). **NOMINAL.**
-
-**Section 5.0 one-shots (~18:21Z UTC):** audit_due_nudge: no committed audit baseline; no-op. distill_detector: no un-distilled audits; no-op. audit_cadence_signal: no post-seed artifacts; no-op. **NOMINAL.**
-
-**Suite guardian (~18:21Z UTC):** pulse-check-main-suite-guardian.heartbeat ts=2026-09-15T03:47:04Z UTC (~14.5h ago). FRESH — nightly-only cadence, within 25h. **NOMINAL.**
-
-**Check I (~18:21Z UTC):** Sep 15 is Tuesday. Timer fires Mon/Wed/Fri/Sun only. No artifact expected today; next fire Wed Sep 16 ~14:11Z UTC. Most recent artifact: check-i-2026-09-14.json. **NOMINAL.**
-
-**Check III (~18:21Z UTC):** No new artifact. pulse-threshold-proposals.json: applied=False, as_of=2026-09-06T10:45Z UTC, count=2. Awaiting `approve threshold-update-2026-09-06`. **CARRY.**
-
-**Credential Rotation (~18:21Z UTC):** SUPABASE_SERVICE_ROLE_KEY next_rotation_due=2026-08-22 (OVERDUE ~24 days). last_dm=2026-09-09T01:48:59Z UTC. Dedup window active until ~2026-09-23T01:49Z UTC. **[yellow] CARRY. No DM (dedup active).**
-
-**G-rules (all carry — no new occurrences this iter):**
-- heal-pipeline-stall-chain-events-supabase-504-001: DISPATCHED ✅. direction-ask-supabase-degradation-incident-001 pending approval. **CARRY.**
-- heal-approvals-surface-drift-missing-card-cooldown-collision-001: direction-ask-approvals-opt-b-undefer-001 PENDING. No new occurrence. **CARRY.**
-- build-sequence-advancer-504-nightly-window-001: DISPATCHED ✅. Pending Larry decision. **CARRY.**
-- agent-runner-transcript-not-persisted-post-worktree-teardown-001: forge=2/3, mirror=1/3. **CARRY.**
-- mirror-to-dashboard-return-routing-failure-001: DISPATCHED (PR#1113 MERGED), monitoring. **CARRY.**
-- inbox-watcher-routing-denied-pulse-forge-001: 1/3. **CARRY.**
-- heal-lost-marker-tier4-no-translation-001: 1/3. **CARRY.**
-- nightly-502-cluster-001: DISPATCHED ✅. Sep 14→15 nightly window confirmed. **CARRY.**
-- deploy-notifier-vercel-build-failed-tier4-no-translation-001: 2/3. **CARRY.**
-- automated-cycle-no-journal-entry-001: DISPATCHED ✅. Latest auto-commit 5bcaf08b (Pulse cycle 20260915T175256Z). **CARRY.**
-- mirror-queue-wait-gauge-third-review-slot-readiness-tier4-no-translation-001: 2/3. **CARRY.**
-- source-beacon-notifications-tier4-no-translation: 2/3. **CARRY.**
-- alert-retraction-no-translation-001: DISPATCHED ✅. **CARRY.**
-- unreviewed-merge-without-gate-pattern: DISPATCHED ✅ (PR#1113 MERGED). **CARRY.**
-- enable-pr-auto-merge-reviewdecision-guard-001: 1/3. **CARRY.**
-- heal-pipeline-stall-no-mirror-dispatch-tier4-no-translation-001: 1/3. **CARRY.**
-- check-i-no-artifact-post-fire-silent-skip-001: CLOSED (false premise per Beacon addendum). **CARRY CLOSED.**
-
-**Triage:** 0 new alerts. Clean iter. Tier 3 consecutive_clean 19→20.
-
-**Auto-fixes:** None.
-
-**Escalations:** None new. All carries unchanged from iter ~11556.
-
-Pending Larry actions (carry):
-1. **[URGENT]** APPROVE or REJECT `direction-ask-supabase-degradation-incident-001` (Beacon approvals tab) — Supabase failing ~21% of chain queries for 5+ days. APPROVE=platform-first. REJECT=code-first.
-2. **[yellow]** Approve `direction-ask-approvals-opt-b-undefer-001` to permanently fix heal-approvals-surface-drift:missing_card for PR#264.
-3. Dispatch Mirror review for PR#264 (RSDPM, feat/m20-status-sensing): `dispatch mirror review pr=https://github.com/Larry-Yatch/RSDPM/pull/264`.
-4. Rotate SUPABASE_SERVICE_ROLE_KEY (OVERDUE ~24 days; dedup window active until ~2026-09-23T01:49Z UTC).
-5. `approve threshold-update-2026-09-06` for Check III proposals (Telegram shortcut).
-6. Keep/drop decisions via missions dashboard: (a) `proposed-dashboard-return-routing-auto-merge-001`, `proposed-dashboard-return-routing-superseded-by-pr1113-001`; (b) `proposed-pr1113-deep-review-window-closing`, `proposed-pulse-stray-files-cleanup-request`.
-7. Approve `suite-guardian-l8-tightening` via missions dashboard.
-8. APPROVE or REJECT `direction-ask-advancer-504-nightly-window-001` (Beacon approvals).
-
-**PRIME DIRECTIVE:** iter_clean heartbeat appended (ts=2026-09-15T18:21:46Z UTC, iter=~11557, tier=3). No intervention rows this iter. Tier state: cycle_tier_state.py record --checks-clean true → consecutive_clean 19→20 (Tier 3, cadence-floor steady-state). last_signal_at=2026-09-15T06:29:19Z UTC (unchanged). PRIME ratio (trailing 30d): interventions=652, systemic_fixes=4, ratio=163.0, trend=improving.
-
-**Patterns:** Twentieth consecutive clean iter at Tier 3. All mandatory checks, additive checks, and substrates nominal. Supabase degradation incident now entering day 5 — most urgent pending action remains unanswered. Nothing else to report.
-
-**Tier end-of-iter:** **Tier 3**, consecutive_clean=20. last_signal_at=2026-09-15T06:29:19Z UTC.
 
 ---
 
