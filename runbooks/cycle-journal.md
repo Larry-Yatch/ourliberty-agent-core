@@ -3697,3 +3697,10 @@ Pending Larry actions (carry — unchanged from iter ~11564):
 
 ---
 
+
+**Check I (2026-09-14):**
+
+- Ledger total: $551.98; 39 anomaly(ies)
+- Retry overhead: $0.00 (0.0%)
+- Forge marker-discipline: 0 misses (retry-depth 0/0/0, 0% retry-2+), trend flat (+0 vs prior wk)
+- Mode: heartbeat (no proposed optimizations)
