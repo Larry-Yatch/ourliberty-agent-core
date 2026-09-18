@@ -31,6 +31,20 @@ Fail-open everywhere: a missing/malformed snapshot or state file → no DM (neve
 nag on a broken read), and the tick never raises (a oneshot must not wedge its
 timer).
 
+STALE SUBSTRATE (2026-09-16 incident): fail-open covered a snapshot that is
+missing or malformed, but not one that parses fine and is simply OLD. When the
+snapshot's sole writer stopped, the doc froze with pending_approvals=4; those
+four approvals expired ~3h43m later, but the doorbell kept reading 4 and rang
+every ~4h for days. The self-silencing rule above ("go quiet when the count
+returns to 0") could never fire, because a frozen count never reaches 0 — so the
+gentle nudge became an unbounded, confidently-wrong nag. Hence: a snapshot older
+than MAX_SNAPSHOT_AGE_HOURS (by its OWN `as_of`, not file mtime — mtime survives
+a touch/copy that carries no new content) is NOT ringable. Staleness is itself
+reported, but exactly ONCE per stale episode (re-armed only when a fresh snapshot
+is seen), so a frozen writer yields one honest signal instead of an endless wrong
+one. An absent/unparseable `as_of` counts as stale — fail toward silence, the
+same posture as a broken read.
+
 Run: python3 scripts/doorbell_notifier.py   (systemd oneshot, every ~30 min)
 """
 from __future__ import annotations
@@ -87,6 +101,21 @@ try:
 except ValueError:
     REMINDER_WINDOW_HOURS = 4.0
 
+# A snapshot older than this is not ringable (see the STALE SUBSTRATE note in the
+# module docstring). Sized against the writer's cadence: the State Log is written
+# on the missions-card-GC tick (~10 min), so 1h leaves room for several skipped
+# ticks before the doorbell distrusts the count. Deliberately looser than
+# state_log_query.STALE_AFTER_SEC (25 min), which only has to caveat a chat reply
+# with "this is N minutes old"; here the consequence is SUPPRESSING a real nudge,
+# so the bar for calling a snapshot dead is higher. Parsed defensively for the
+# same reason as REMINDER_WINDOW_HOURS above — a malformed override must not
+# raise at import.
+try:
+    MAX_SNAPSHOT_AGE_HOURS = float(
+        os.environ.get('OURLIBERTY_DOORBELL_MAX_SNAPSHOT_AGE_HOURS', '1'))
+except ValueError:
+    MAX_SNAPSHOT_AGE_HOURS = 1.0
+
 
 def log(msg: str) -> None:
     try:
@@ -113,16 +142,60 @@ def _primary_chat_id() -> Optional[int]:
     return min(ids) if ids else None
 
 
-def load_waiting() -> Optional[dict]:
-    """Read `waiting_on_larry` from the State Log snapshot. None on any
-    read/parse error — the caller treats None as 'no signal' and never nags on
-    a broken/absent snapshot."""
+def load_snapshot() -> Optional[dict]:
+    """Read the whole State Log doc. None on any read/parse error.
+
+    Split out from `load_waiting` so one tick reads the file ONCE and derives
+    both the counts and the freshness stamp from the same bytes — re-reading
+    would let the writer land between the two reads and pair a fresh `as_of`
+    with a stale count (or vice versa)."""
     try:
         doc = json.loads(STATE_LOG_PATH.read_text())
-        waiting = doc['structured_snapshot']['waiting_on_larry']
-        return waiting if isinstance(waiting, dict) else None
-    except (OSError, KeyError, TypeError, json.JSONDecodeError):
+    except (OSError, json.JSONDecodeError):
         return None
+    return doc if isinstance(doc, dict) else None
+
+
+def load_waiting(doc: Optional[dict] = None) -> Optional[dict]:
+    """Read `waiting_on_larry` from the State Log snapshot. None on any
+    read/parse error — the caller treats None as 'no signal' and never nags on
+    a broken/absent snapshot.
+
+    `doc` lets a caller that already read the snapshot reuse those bytes. The
+    no-argument form re-reads and is the PUBLIC contract other modules depend on
+    (heal_unregistered_approval.doorbell_counts calls `load_waiting()` bare to
+    measure the doorbell against its own source of truth) — keep it working."""
+    if doc is None:
+        doc = load_snapshot()
+    if doc is None:
+        return None
+    try:
+        waiting = doc['structured_snapshot']['waiting_on_larry']
+    except (KeyError, TypeError):
+        return None
+    return waiting if isinstance(waiting, dict) else None
+
+
+def snapshot_as_of(doc: dict) -> Optional[datetime]:
+    """The snapshot's own timestamp: top-level `as_of`, falling back to
+    `structured_snapshot.as_of`. None when both are absent or unparseable."""
+    candidates = [doc.get('as_of')]
+    structured = doc.get('structured_snapshot')
+    if isinstance(structured, dict):
+        candidates.append(structured.get('as_of'))
+    for raw in candidates:
+        parsed = _parse_ts(raw)
+        if parsed is not None:
+            return parsed
+    return None
+
+
+def is_stale(as_of: Optional[datetime], now: datetime) -> bool:
+    """Is this snapshot too old to ring on? An unknown `as_of` is stale — we
+    cannot vouch for a count we cannot date, so we fail toward silence."""
+    if as_of is None:
+        return True
+    return (now - as_of) > timedelta(hours=MAX_SNAPSHOT_AGE_HOURS)
 
 
 def _needs_count(waiting: dict) -> tuple[int, int, int]:
@@ -243,22 +316,117 @@ def format_message(
     return '\n'.join(lines)
 
 
+def _humanize_age(delta: timedelta) -> str:
+    """A coarse '2d 14h' / '3h 5m' / '12m' age — enough to convey how dead the
+    substrate is without pretending to precision."""
+    total_min = int(max(delta.total_seconds(), 0) // 60)
+    days, rem_min = divmod(total_min, 24 * 60)
+    hours, minutes = divmod(rem_min, 60)
+    if days:
+        return f'{days}d {hours}h'
+    if hours:
+        return f'{hours}h {minutes}m'
+    return f'{minutes}m'
+
+
+def format_stale_message(as_of: Optional[datetime], now: datetime) -> str:
+    """The once-per-episode stale-substrate DM. Says the substrate is stale and
+    names its `as_of`, so the silence is explained rather than merely absent."""
+    if as_of is None:
+        dated = 'it carries no readable `as_of` timestamp'
+    else:
+        dated = (
+            f'it is dated {as_of.isoformat()} '
+            f'({_humanize_age(now - as_of)} old)'
+        )
+    return (
+        'Doorbell going quiet: the State Log snapshot it reads is stale — '
+        f'{dated}. Any "N need your call" count from it would be unreliable, '
+        'so no nudge until a fresh snapshot lands. This is the only message '
+        'you will get for this episode.\n'
+        f'→ {_board_link()}'
+    )
+
+
+def _report_stale(
+    state: dict, as_of: Optional[datetime], now: datetime,
+) -> bool:
+    """Handle a stale-snapshot tick. Returns True iff the one-per-episode DM was
+    sent on THIS tick.
+
+    Already-reported episodes return silently WITHOUT rewriting state, so the
+    count cooldown (`last_count` / `last_dm_ts`) is preserved untouched across
+    the outage and the doorbell resumes from its real baseline once the writer
+    recovers."""
+    if state.get('stale_reported'):
+        log(f'State Log snapshot still stale (as_of={as_of}) — already '
+            f'reported this episode; staying quiet')
+        return False
+
+    chat_id = _primary_chat_id()
+    if chat_id is None:
+        log('no TELEGRAM_ALLOWED_CHAT_IDS — cannot route stale-substrate DM; '
+            'skipping (episode stays unreported so it retries)')
+        return False
+
+    sent = larry_alerts.append_notification(
+        source='doorbell', intent='doorbell',
+        message=format_stale_message(as_of, now), chat_id=chat_id,
+    )
+    if not sent:
+        # Leave the episode unflagged so the next tick retries, exactly as the
+        # count path does on a failed append.
+        log(f'append_notification returned False (disk?) for stale snapshot '
+            f'(as_of={as_of}); will retry')
+        return False
+    log(f'stale-substrate DM sent: snapshot as_of={as_of} exceeds '
+        f'{MAX_SNAPSHOT_AGE_HOURS}h — suppressing the count DM')
+    new_state = dict(state)
+    new_state['stale_reported'] = True
+    save_state(new_state)
+    return True
+
+
 def run(now: Optional[datetime] = None) -> bool:
     """One doorbell tick. Returns True iff a DM was sent. Never raises."""
     now = now or datetime.now(timezone.utc)
-    waiting = load_waiting()
-    if waiting is None:
+    doc = load_snapshot()
+    if doc is None:
         log('no readable State Log snapshot — skipping (no nag on a broken read)')
         return False
-    needs, approvals, escalations = _needs_count(waiting)
+    waiting = load_waiting(doc)
+    if waiting is None:
+        log('State Log snapshot has no readable waiting_on_larry — skipping '
+            '(no nag on a broken read)')
+        return False
+
     state = load_state()
+
+    # Freshness gate BEFORE any count is trusted: a stale snapshot's numbers are
+    # unfalsifiable, so the count DM is suppressed entirely and the outage is
+    # reported once (see the STALE SUBSTRATE note in the module docstring).
+    as_of = snapshot_as_of(doc)
+    if is_stale(as_of, now):
+        return _report_stale(state, as_of, now)
+
+    # Fresh snapshot — re-arm the stale episode so a LATER freeze reports again.
+    # Popping is the whole reset: every save below writes an explicit dict that
+    # omits the flag, so a cleared episode never survives to disk.
+    rearmed = bool(state.pop('stale_reported', False))
+    if rearmed:
+        log(f'State Log snapshot is fresh again (as_of={as_of}) — stale episode '
+            f'cleared; normal doorbell cadence resumes')
+
+    needs, approvals, escalations = _needs_count(waiting)
     prev = state.get('last_count')
     prev_count = prev if isinstance(prev, int) else 0
     last_dm = _parse_ts(state.get('last_dm_ts'))
 
     if needs <= 0:
-        # Caught up — reset so the next new item rings promptly.
-        if prev_count != 0 or state.get('last_dm_ts') is not None:
+        # Caught up — reset so the next new item rings promptly. `rearmed` forces
+        # the write in the otherwise-no-op case (count already 0, never DM'd) so
+        # the cleared flag is actually persisted.
+        if rearmed or prev_count != 0 or state.get('last_dm_ts') is not None:
             save_state({'last_count': 0})
         return False
 
