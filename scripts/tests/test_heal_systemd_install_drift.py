@@ -15,6 +15,7 @@ except ImportError:  # discover loads this module top-level (no package parent)
     import _bootstrap  # noqa: F401
 
 import importlib
+import json
 import os
 import shutil
 import sys
@@ -75,6 +76,16 @@ def _make_installed(td: Path, units: list[str]) -> Path:
     for u in units:
         (d / u).write_text(f'# {u}\n')
     return d
+
+
+def _mutations(ran: list[list[str]]) -> list[list[str]]:
+    """The MUTATING shell-outs from a recorded `subprocess.run` log.
+
+    Read-only `systemctl show` probes are filtered out. Several checks probe
+    unit state even in dry-run (the stuck-timer anchor read, the disabled-timer
+    UnitFileState read), and the assertions that use this care about what the
+    healer CHANGES, not what it looks at."""
+    return [c for c in ran if c[:2] != ['systemctl', 'show']]
 
 
 class ListUnitsTest(_IsolatedAgentsRoot):
@@ -912,7 +923,9 @@ class StuckTimerOrchestrationTest(_IsolatedAgentsRoot):
                 'sudo systemctl restart ourliberty-cycle.timer',
                 stuck_dms[0]['message'],
             )
-            self.assertEqual(ran, [], f'no shell-out expected, got {ran!r}')
+            self.assertEqual(
+                _mutations(ran), [],
+                f'no mutating shell-out expected, got {_mutations(ran)!r}')
 
     def test_enabled_mode_heals_via_reload_then_restart(self):
         with tempfile.TemporaryDirectory() as td:
@@ -951,12 +964,13 @@ class StuckTimerOrchestrationTest(_IsolatedAgentsRoot):
             self.assertEqual(counts['stuck_timer'], 1)
             self.assertEqual(counts['timer_healed'], 1)
             # daemon-reload precedes restart.
-            self.assertEqual(len(ran), 2)
+            mutating = _mutations(ran)
+            self.assertEqual(len(mutating), 2)
             self.assertEqual(
-                ran[0], ['sudo', '-n', 'systemctl', 'daemon-reload'],
+                mutating[0], ['sudo', '-n', 'systemctl', 'daemon-reload'],
             )
             self.assertEqual(
-                ran[1],
+                mutating[1],
                 ['sudo', '-n', 'systemctl', 'restart',
                  'ourliberty-cycle.timer'],
             )
@@ -997,15 +1011,15 @@ class StuckTimerOrchestrationTest(_IsolatedAgentsRoot):
                     dry_run_override=True, now=now,
                 )
                 first_dm_count = len(self._dm_calls)
-                first_ran = list(ran)
+                first_ran = _mutations(ran)
                 counts2 = h.run_once(
                     repo_dir=r, installed_dir=i, state=state,
                     dry_run_override=True,
                     now=now + timedelta(hours=1),
                 )
-            # No new DM. No shell-out either (dry-run never shells out anyway).
+            # No new DM. No mutating shell-out either (dry-run never mutates).
             self.assertEqual(len(self._dm_calls), first_dm_count)
-            self.assertEqual(ran, first_ran)
+            self.assertEqual(_mutations(ran), first_ran)
             self.assertEqual(counts2['stuck_timer'], 1)
             self.assertGreaterEqual(counts2['dm_suppressed_dedup'], 1)
 
@@ -2240,6 +2254,275 @@ class TriggeredEntrypointTest(_IsolatedAgentsRoot):
             rc = h.main(['--triggered'])
         self.assertEqual(rc, 0)
         self.assertEqual(dm.call_count, 0)
+
+
+class DetectDisabledTimersTest(_IsolatedAgentsRoot):
+    """The third check: installed + preset=enabled + UnitFileState=disabled.
+
+    The gap it closes sits BETWEEN the other two — install-drift only sees units
+    missing from /etc/systemd/system (these are present), and detect_stuck_timers
+    skips anything not ActiveState=active (these are inactive).
+    """
+
+    def _stub_props(self, per_unit):
+        return mock.patch.object(
+            h, '_unit_file_props', side_effect=lambda u: per_unit.get(u))
+
+    def test_reports_disabled_with_enabled_preset(self):
+        with tempfile.TemporaryDirectory() as td:
+            i = _make_installed(Path(td), ['ourliberty-cycle.timer'])
+            with self._stub_props({
+                'ourliberty-cycle.timer': {
+                    'UnitFileState': 'disabled', 'UnitFilePreset': 'enabled'},
+            }):
+                self.assertEqual(
+                    h.detect_disabled_timers(i), ['ourliberty-cycle.timer'])
+
+    def test_enabled_and_active_timer_not_reported(self):
+        with tempfile.TemporaryDirectory() as td:
+            i = _make_installed(Path(td), ['ourliberty-sync.timer'])
+            with self._stub_props({
+                'ourliberty-sync.timer': {
+                    'UnitFileState': 'enabled', 'UnitFilePreset': 'enabled'},
+            }):
+                self.assertEqual(h.detect_disabled_timers(i), [])
+
+    def test_disabled_preset_not_reported(self):
+        # Preset does not claim this unit should be on — off is a choice here.
+        with tempfile.TemporaryDirectory() as td:
+            i = _make_installed(Path(td), ['optional.timer'])
+            with self._stub_props({
+                'optional.timer': {
+                    'UnitFileState': 'disabled', 'UnitFilePreset': 'disabled'},
+            }):
+                self.assertEqual(h.detect_disabled_timers(i), [])
+
+    def test_allowlisted_unit_not_reported(self):
+        with tempfile.TemporaryDirectory() as td:
+            i = _make_installed(
+                Path(td), ['keep-off.timer', 'ourliberty-cycle.timer'])
+            allow = Path(td) / 'allow.json'
+            allow.write_text(json.dumps({
+                'classes': [], 'disabled_timer_exempt': ['keep-off.timer']}))
+            props = {
+                'UnitFileState': 'disabled', 'UnitFilePreset': 'enabled'}
+            with mock.patch.object(h, 'ALLOWLIST_FILE', allow), \
+                    self._stub_props({
+                        'keep-off.timer': props,
+                        'ourliberty-cycle.timer': props,
+                    }):
+                self.assertEqual(
+                    h.detect_disabled_timers(i), ['ourliberty-cycle.timer'])
+
+    def test_services_and_probe_failures_skipped(self):
+        with tempfile.TemporaryDirectory() as td:
+            i = _make_installed(
+                Path(td), ['a.timer', 'b.timer', 'ourliberty-cycle.service'])
+            with self._stub_props({
+                'a.timer': None,  # probe failure -> skipped, never raises
+                'b.timer': {
+                    'UnitFileState': 'disabled', 'UnitFilePreset': 'enabled'},
+            }):
+                self.assertEqual(h.detect_disabled_timers(i), ['b.timer'])
+
+    def test_probe_is_read_only_systemctl_show(self):
+        # Criterion 7, at the probe: the ONLY shell-out this check makes is a
+        # read-only `systemctl show` — no enable/start/restart, no sudo.
+        ran: list[list[str]] = []
+
+        def fake_run(cmd, **kwargs):
+            ran.append(list(cmd))
+            return mock.MagicMock(
+                returncode=0,
+                stdout='UnitFileState=disabled\nUnitFilePreset=enabled\n',
+                stderr='')
+
+        with tempfile.TemporaryDirectory() as td:
+            i = _make_installed(Path(td), ['ourliberty-cycle.timer'])
+            with mock.patch.object(h.subprocess, 'run', side_effect=fake_run):
+                self.assertEqual(
+                    h.detect_disabled_timers(i), ['ourliberty-cycle.timer'])
+        self.assertEqual(len(ran), 1)
+        self.assertEqual(ran[0][:2], ['systemctl', 'show'])
+        for cmd in ran:
+            self.assertNotIn('sudo', cmd)
+            for verb in ('enable', 'start', 'restart', 'disable', 'stop'):
+                self.assertNotIn(verb, cmd)
+
+
+class DisabledTimerAllowlistTest(_IsolatedAgentsRoot):
+    """`_disabled_timer_exempt` fails OPEN (exempt nothing) — the opposite of
+    `_remediation_allowed`, which fails closed. This one only suppresses a
+    report, so a broken config must not silently re-open the blind spot."""
+
+    def _exempt_with(self, text):
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / 'allow.json'
+            p.write_text(text)
+            with mock.patch.object(h, 'ALLOWLIST_FILE', p):
+                return h._disabled_timer_exempt()
+
+    def test_reads_unit_list(self):
+        self.assertEqual(
+            self._exempt_with(json.dumps({'disabled_timer_exempt': ['x.timer']})),
+            {'x.timer'})
+
+    def test_absent_key_exempts_nothing(self):
+        self.assertEqual(
+            self._exempt_with(json.dumps({'classes': ['install-drift']})), set())
+
+    def test_malformed_shapes_exempt_nothing(self):
+        self.assertEqual(self._exempt_with('{not json'), set())
+        self.assertEqual(self._exempt_with(json.dumps(['a', 'b'])), set())
+        self.assertEqual(
+            self._exempt_with(json.dumps({'disabled_timer_exempt': 'x.timer'})),
+            set())
+        self.assertEqual(
+            self._exempt_with(json.dumps({'disabled_timer_exempt': [1, 2]})),
+            set())
+
+    def test_missing_file_exempts_nothing(self):
+        with tempfile.TemporaryDirectory() as td:
+            missing = Path(td) / 'nope.json'
+            with mock.patch.object(h, 'ALLOWLIST_FILE', missing):
+                self.assertEqual(h._disabled_timer_exempt(), set())
+
+    def test_shipped_config_parses_with_the_new_key(self):
+        # The real repo config must carry a well-formed (empty) exempt list.
+        data = json.loads(
+            (Path(__file__).resolve().parent.parent.parent
+             / 'config' / 'auto-remediation-allowlist.json').read_text())
+        self.assertEqual(data['disabled_timer_exempt'], [])
+        self.assertIn('install-drift', data['classes'])
+
+
+class DisabledTimerOrchestrationTest(_IsolatedAgentsRoot):
+    """run_once's disabled-timer pass: ONE aggregate DM, dedup, no mutation."""
+
+    def setUp(self):
+        super().setUp()
+        self._dm_calls: list[dict] = []
+
+        def fake_dm(message, subject, suggested_action, severity='warning',
+                    route='escalate'):
+            self._dm_calls.append({
+                'message': message, 'subject': subject,
+                'suggested_action': suggested_action})
+            return True
+
+        p = mock.patch.object(h, 'dm_larry', fake_dm)
+        p.start()
+        self.addCleanup(p.stop)
+
+    def _run(self, installed, disabled, state=None, now=None, dry_run=True):
+        with tempfile.TemporaryDirectory() as td:
+            r = _make_repo_systemd(Path(td), [])
+            i = _make_installed(Path(td), installed)
+            props = {
+                u: {'UnitFileState': 'disabled', 'UnitFilePreset': 'enabled'}
+                for u in disabled
+            }
+            with mock.patch.object(h, '_systemctl_show', return_value=None), \
+                    mock.patch.object(
+                        h, '_unit_file_props',
+                        side_effect=lambda u: props.get(
+                            u, {'UnitFileState': 'enabled',
+                                'UnitFilePreset': 'enabled'})):
+                return h.run_once(
+                    repo_dir=r, installed_dir=i,
+                    state=state if state is not None else {
+                        'units': {}, 'stuck_timers': {}},
+                    now=now, dry_run_override=dry_run,
+                )
+
+    def test_sixteen_disabled_timers_produce_ONE_dm(self):
+        # Criterion 6, at the real scale that motivated the rule: 16 disabled
+        # timers must yield one aggregate alert, not 16.
+        units = [f'ourliberty-pulse-check-{n}.timer' for n in range(16)]
+        counts = self._run(installed=units, disabled=units)
+        self.assertEqual(counts['disabled_timers'], 16)
+        self.assertEqual(len(self._dm_calls), 1)
+        dm = self._dm_calls[0]
+        self.assertEqual(dm['subject'], 'disabled-timers')
+        self.assertIn('16 installed timers are DISABLED', dm['message'])
+        # Capped naming keeps it a doorbell, not a wall.
+        self.assertIn('+8 more', dm['message'])
+
+    def test_message_names_the_units_and_disclaims_mutation(self):
+        counts = self._run(
+            installed=['ourliberty-cycle.timer', 'ourliberty-sync.timer'],
+            disabled=['ourliberty-cycle.timer'])
+        self.assertEqual(counts['disabled_timers'], 1)
+        self.assertEqual(len(self._dm_calls), 1)
+        msg = self._dm_calls[0]['message']
+        self.assertIn('ourliberty-cycle.timer', msg)
+        self.assertNotIn('ourliberty-sync.timer', msg)
+        self.assertIn('Detection only', msg)
+
+    def test_no_dm_when_none_disabled(self):
+        counts = self._run(
+            installed=['ourliberty-sync.timer'], disabled=[])
+        self.assertEqual(counts['disabled_timers'], 0)
+        self.assertEqual(self._dm_calls, [])
+
+    def test_dedup_suppresses_second_tick_then_gc_rearms(self):
+        now = datetime(2026, 9, 18, 12, 0, 0, tzinfo=timezone.utc)
+        state = {'units': {}, 'stuck_timers': {}}
+        units = ['ourliberty-cycle.timer']
+        self._run(installed=units, disabled=units, state=state, now=now)
+        self.assertEqual(len(self._dm_calls), 1)
+
+        # Still disabled an hour later — inside RE_DM_WINDOW, so no re-DM.
+        counts2 = self._run(
+            installed=units, disabled=units, state=state,
+            now=now + timedelta(hours=1))
+        self.assertEqual(len(self._dm_calls), 1)
+        self.assertGreaterEqual(counts2['dm_suppressed_dedup'], 1)
+
+        # Re-enabled: the dedup entry is GC'd so a fresh occurrence re-alerts.
+        self._run(installed=units, disabled=[], state=state,
+                  now=now + timedelta(hours=2))
+        self.assertEqual(state.get('disabled_timers', {}), {})
+        self._run(installed=units, disabled=units, state=state,
+                  now=now + timedelta(hours=3))
+        self.assertEqual(len(self._dm_calls), 2)
+
+    def test_check_never_mutates_a_unit(self):
+        # Criterion 7, end-to-end through run_once: detection must not enable,
+        # start, or restart anything. Only the read-only probe shells out.
+        ran: list[list[str]] = []
+
+        def fake_run(cmd, **kwargs):
+            ran.append(list(cmd))
+            return mock.MagicMock(
+                returncode=0,
+                stdout='UnitFileState=disabled\nUnitFilePreset=enabled\n',
+                stderr='')
+
+        with tempfile.TemporaryDirectory() as td:
+            r = _make_repo_systemd(Path(td), [])
+            i = _make_installed(Path(td), ['ourliberty-cycle.timer'])
+            with mock.patch.object(h, '_systemctl_show', return_value=None), \
+                    mock.patch.object(h.subprocess, 'run', side_effect=fake_run):
+                counts = h.run_once(
+                    repo_dir=r, installed_dir=i,
+                    state={'units': {}, 'stuck_timers': {}},
+                    dry_run_override=False,  # even in ENABLED mode
+                )
+        self.assertEqual(counts['disabled_timers'], 1)
+        self.assertEqual(len(self._dm_calls), 1)
+        self.assertEqual(_mutations(ran), [], f'unit was mutated: {ran!r}')
+
+    def test_kill_switch_skips_the_check(self):
+        _kstmp = tempfile.mkdtemp()
+        self.addCleanup(lambda: shutil.rmtree(_kstmp, ignore_errors=True))
+        kill = Path(_kstmp) / 'healers.disabled'
+        kill.write_text('disabled')
+        units = ['ourliberty-cycle.timer']
+        with mock.patch.object(h, 'KILL_SWITCH', kill):
+            counts = self._run(installed=units, disabled=units)
+        self.assertEqual(counts['disabled_timers'], 0)
+        self.assertEqual(self._dm_calls, [])
 
 
 if __name__ == '__main__':

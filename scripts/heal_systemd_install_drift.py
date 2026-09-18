@@ -14,6 +14,17 @@ healer closes.
 (not minute-by-minute). Same dry-run-by-default + activation-on-first-real-
 drift pattern as the credential drift healer; same two-layer kill-switch.
 
+Three independent checks run per tick:
+  1. install drift   — shipped in the repo, not installed on the droplet.
+  2. stuck timers    — ACTIVE but wedged in the infinity-anchor trap.
+  3. disabled timers — installed and expected-on (preset=enabled) but DISABLED.
+
+Check 3 closes the gap BETWEEN the first two (2026-09-16): those timers are
+installed, so check 1 sees nothing, and they are inactive, so check 2's opening
+`ActiveState != 'active'` predicate skips them — a timer could stop and stay
+stopped forever with no signal. It is detection-only and emits ONE aggregate
+alert for the whole set.
+
 Stdlib only.
 """
 from __future__ import annotations
@@ -669,6 +680,90 @@ def _heal_stuck_timer(unit: str) -> tuple[int, str]:
         return -1, 'sudo or systemctl not found in PATH'
 
 
+# -------------------- disabled-timer detection --------------------
+
+_UNIT_FILE_PROPS = ('UnitFileState', 'UnitFilePreset')
+
+
+def _unit_file_props(unit: str) -> Optional[dict[str, str]]:
+    """Return {UnitFileState, UnitFilePreset} for `unit`, or None on any
+    shell-out/parse failure so the caller can skip it without raising.
+
+    A separate probe from `_systemctl_show` on purpose: that one is pinned to
+    `_STUCK_TIMER_PROPS` and is mocked wholesale by the stuck-timer tests, so
+    widening it would perturb a check this change must leave alone. Mirrors
+    `_triggered_unit_active_state`'s error contract.
+    """
+    try:
+        result = subprocess.run(
+            [
+                'systemctl', 'show', unit,
+                '--property=' + ','.join(_UNIT_FILE_PROPS),
+                '--no-pager',
+            ],
+            capture_output=True, text=True, timeout=SYSTEMCTL_TIMEOUT_S,
+        )
+    except (subprocess.TimeoutExpired, FileNotFoundError, OSError) as e:
+        log(f'systemctl show {unit} (unit-file state) raised '
+            f'{type(e).__name__}: {e}', 'INFO')
+        return None
+    if result.returncode != 0:
+        log(f'systemctl show {unit} (unit-file state) rc={result.returncode} '
+            f'stderr={(result.stderr or "").strip()!r}', 'INFO')
+        return None
+    props: dict[str, str] = {}
+    for line in result.stdout.splitlines():
+        key, sep, value = line.partition('=')
+        if sep:
+            props[key.strip()] = value.strip()
+    return props
+
+
+def detect_disabled_timers(
+    installed_dir: Path = INSTALLED_SYSTEMD_DIR,
+) -> list[str]:
+    """Return sorted `.timer` units that are INSTALLED but DISABLED while their
+    vendor preset says enabled — an expected-on timer that is off.
+
+    The blind spot this closes (2026-09-16): a disabled timer is invisible to
+    BOTH existing checks. Install-drift only flags units shipped-but-not-
+    installed, and these ARE installed. detect_stuck_timers opens with
+    `ActiveState != 'active' -> continue`, and a disabled timer is inactive, so
+    it is dropped by the first predicate. A timer could therefore stop and stay
+    stopped indefinitely with no signal — which is what happened when the State
+    Log's sole writer went dark for two days.
+
+    Preset is the intent oracle: `UnitFilePreset=enabled` means the system's own
+    policy says this unit should be on, so disabled-against-an-enabled-preset is
+    drift rather than a choice. A unit deliberately left off is named in the
+    allowlist (`_disabled_timer_exempt`) and never reported.
+
+    DETECTION ONLY — neither this function nor its caller enables, starts, or
+    otherwise mutates a unit; the only shell-out is a read-only `systemctl show`.
+    Whether these timers should be turned back on is a human decision. Per-unit
+    probe failures are logged INFO and skipped; never raises.
+    """
+    exempt = _disabled_timer_exempt()
+    disabled: list[str] = []
+    for unit in sorted(list_installed_units(installed_dir)):
+        if not unit.endswith('.timer'):
+            continue
+        if unit in exempt:
+            log(f'{unit}: exempt from the disabled-timer check via allowlist; '
+                f'skipping', 'INFO')
+            continue
+        props = _unit_file_props(unit)
+        if props is None:
+            continue
+        if props.get('UnitFileState') != 'disabled':
+            continue
+        if props.get('UnitFilePreset') != 'enabled':
+            # Preset does not claim this unit should be on — not drift.
+            continue
+        disabled.append(unit)
+    return sorted(disabled)
+
+
 # -------------------- remediation allowlist --------------------
 
 def _remediation_allowed(class_name: str) -> bool:
@@ -722,6 +817,42 @@ def _remediation_allowed(class_name: str) -> bool:
         )
         return False
     return class_name in classes
+
+
+def _disabled_timer_exempt() -> set[str]:
+    """Unit names deliberately left disabled, from the same allowlist config.
+
+    Reuses `config/auto-remediation-allowlist.json` rather than inventing a
+    second config, but under its OWN key: the existing `classes` list keys on
+    remediation CLASS names ("may this class take sudo action"), a different
+    axis from unit names, so overloading it would conflate two questions.
+
+    Fail direction is deliberately OPPOSITE to `_remediation_allowed`. That gate
+    guards privileged action, so an unreadable config must deny. This one only
+    suppresses a REPORT, so an unreadable config returns the empty set — we
+    report everything rather than let a broken file silently re-open the blind
+    spot this check exists to close. Never raises.
+    """
+    try:
+        data = json.loads(ALLOWLIST_FILE.read_text())
+    except (OSError, json.JSONDecodeError) as e:
+        log(f'disabled-timer allowlist unreadable ({type(e).__name__}: {e}); '
+            f'exempting nothing', 'WARN')
+        return set()
+    if not isinstance(data, dict):
+        log('disabled-timer allowlist top-level not an object; exempting '
+            'nothing', 'WARN')
+        return set()
+    units = data.get('disabled_timer_exempt')
+    if units is None:
+        return set()
+    if not isinstance(units, list) or not all(
+        isinstance(u, str) for u in units
+    ):
+        log('disabled-timer allowlist "disabled_timer_exempt" is not a list of '
+            'strings; exempting nothing', 'WARN')
+        return set()
+    return set(units)
 
 
 # -------------------- shared cp + daemon-reload core --------------------
@@ -1236,6 +1367,47 @@ def _render_install_resolved(unit: str) -> tuple[str, str, str]:
     return message, subject, suggested
 
 
+_DISABLED_TIMERS_SUBJECT = 'disabled-timers'
+# How many unit names to spell out before collapsing to "+N more". A doorbell,
+# never a wall: the full list is one `systemctl list-unit-files` away and is in
+# this healer's log either way.
+_MAX_NAMED_DISABLED = 8
+
+
+def _render_disabled_timers(units: list[str]) -> tuple[str, str, str]:
+    """ONE aggregate signal naming the whole set — never one alert per unit.
+
+    16 timers were disabled when this check was written; 16 separate alerts
+    would be precisely the noise Larry has banned. The subject is deliberately
+    constant (no unit name in it) so the set can grow or shrink without
+    splintering into new alert identities.
+    """
+    named = ', '.join(f'`{u}`' for u in units[:_MAX_NAMED_DISABLED])
+    overflow = len(units) - _MAX_NAMED_DISABLED
+    if overflow > 0:
+        named += f', +{overflow} more'
+    plural = 'timer is' if len(units) == 1 else 'timers are'
+    message = (
+        f'{len(units)} installed {plural} DISABLED despite a vendor preset of '
+        f'`enabled` — expected-on schedules that are currently off and will not '
+        f'fire: {named}. Neither existing check sees this (install-drift only '
+        f'flags units missing from /etc/systemd/system, and the stuck-timer '
+        f'check only examines ACTIVE timers), so a timer in this state can stay '
+        f'stopped indefinitely with no signal. Detection only — nothing was '
+        f'enabled or started; whether to turn these back on is your call.'
+    )
+    suggested = (
+        'Review on the droplet (ssh larry@134.209.44.80):\n'
+        "  systemctl list-unit-files 'ourliberty-*.timer' | grep disabled\n"
+        'Then, for each timer that SHOULD be running:\n'
+        '  sudo systemctl enable --now <unit>\n'
+        'For any that is deliberately off, add it to '
+        '`config/auto-remediation-allowlist.json` under '
+        '`disabled_timer_exempt` so it stops being reported.'
+    )
+    return message, _DISABLED_TIMERS_SUBJECT, suggested
+
+
 def _activation_message() -> tuple[str, str, str]:
     message = (
         f'Heal-systemd-install-drift is in dry-run mode '
@@ -1271,6 +1443,7 @@ def run_once(
         'stuck_timer': 0, 'timer_healed': 0,
         'install_healed': 0,
         'content_drift': 0, 'content_healed': 0,
+        'disabled_timers': 0,
     }
     if kill_switch_active():
         log(f'KILL_SWITCH active at {KILL_SWITCH}; exiting cleanly')
@@ -1522,6 +1695,44 @@ def run_once(
     for gone in list(state.get('stuck_timers', {}).keys()):
         if gone not in stuck_live:
             state['stuck_timers'].pop(gone, None)
+            counts['reconciled_gc'] += 1
+
+    # Disabled-timer pass — the third check, peer to missing-install and
+    # stuck-timer. Detection ONLY: it reports installed-but-disabled timers and
+    # never enables/starts anything, so there is no privileged action for the
+    # dry-run/allowlist remediation gates to guard and it reports in both modes
+    # (the stuck-timer dry-run advisory sets the same precedent). The kill-switch
+    # still covers it — run_once returns above before any check runs.
+    #
+    # Throttled on ONE aggregate key, not per unit: while the condition persists
+    # this re-reports at most once per RE_DM_WINDOW, and each firing names the
+    # set as it stands at that moment.
+    disabled_timers = detect_disabled_timers(
+        installed_dir or INSTALLED_SYSTEMD_DIR)
+    counts['disabled_timers'] = len(disabled_timers)
+    if disabled_timers:
+        if _should_re_dm(
+            state, _DISABLED_TIMERS_SUBJECT, now=now, bucket='disabled_timers',
+        ):
+            msg, subj, sug = _render_disabled_timers(disabled_timers)
+            ok = dm_larry(message=msg, subject=subj, suggested_action=sug)
+            if ok:
+                counts['dm_sent'] += 1
+                _record_dm(
+                    state, _DISABLED_TIMERS_SUBJECT, now=now,
+                    bucket='disabled_timers',
+                )
+                log(f'DM sent for {len(disabled_timers)} disabled timer(s): '
+                    f'{", ".join(disabled_timers)}')
+            else:
+                log('DM append suppressed for disabled timers', 'WARN')
+        else:
+            counts['dm_suppressed_dedup'] += 1
+            log(f'{len(disabled_timers)} disabled timer(s) still present; '
+                f'within re-DM window, suppressing')
+    else:
+        # All clear — drop the dedup entry so a fresh occurrence reports at once.
+        if state.get('disabled_timers', {}).pop(_DISABLED_TIMERS_SUBJECT, None):
             counts['reconciled_gc'] += 1
 
     log(f'tick: dry_run={dry_run} '

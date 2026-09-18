@@ -66,7 +66,12 @@ class _Base(unittest.TestCase):
     # ---- fixtures ----
 
     def write_snapshot(self, *, pending_approvals=0, escalations=0, parked=0,
-                       items=None):
+                       items=None, as_of=_NOW, structured_as_of=None,
+                       omit_as_of=False):
+        """A State Log snapshot. `as_of` defaults to the test clock `_NOW` — i.e.
+        FRESH — so the freshness gate stays transparent to every behavioral test
+        here; the staleness tests pass an explicit older `as_of` (or
+        `omit_as_of` / an unparseable string) to exercise it."""
         doc = {
             'schema_version': 1,
             'narrative_prose': 'x',
@@ -81,6 +86,16 @@ class _Base(unittest.TestCase):
                 },
             },
         }
+        if not omit_as_of:
+            doc['as_of'] = (
+                as_of.isoformat() if isinstance(as_of, datetime) else as_of
+            )
+        if structured_as_of is not None:
+            doc['structured_snapshot']['as_of'] = (
+                structured_as_of.isoformat()
+                if isinstance(structured_as_of, datetime)
+                else structured_as_of
+            )
         self.snapshot_path.write_text(json.dumps(doc))
 
     @staticmethod
@@ -325,6 +340,138 @@ class DoorbellItemizedRunTest(_Base):
         self.assertIn('1 item needs your call:', msg)
         self.assertIn('• Approve — the only blocking thing', msg)
         self.assertNotIn('some funnel suggestion', msg)
+
+
+class StaleSnapshotTest(_Base):
+    """The freshness gate: a snapshot that parses fine but is OLD is not
+    ringable, and the outage is reported exactly once per episode."""
+
+    def test_incident_replay_no_count_dm(self):
+        # The 2026-09-16 incident verbatim: snapshot frozen at 14:29Z reporting
+        # 4 pending approvals, read two days later. It rang '4 items need your
+        # call' every ~4h for days; it must now ring nothing of the sort.
+        frozen = datetime(2026, 9, 16, 14, 29, 0, tzinfo=timezone.utc)
+        read_at = datetime(2026, 9, 18, 3, 37, 0, tzinfo=timezone.utc)
+        self.write_snapshot(pending_approvals=4, as_of=frozen)
+        sent, m = self.run_tick(now=read_at)
+        self.assertTrue(sent)  # the ONE stale report, not the count DM
+        msg = m.call_args.kwargs['message']
+        self.assertNotIn('4 items need your call', msg)
+        self.assertIn('stale', msg.lower())
+        self.assertIn(frozen.isoformat(), msg)
+
+    def test_stale_reported_once_per_episode(self):
+        frozen = _NOW - timedelta(days=2)
+        self.write_snapshot(pending_approvals=4, as_of=frozen)
+        sent, m = self.run_tick()
+        self.assertTrue(sent)
+        self.assertEqual(m.call_count, 1)
+        self.assertTrue(self.read_state()['stale_reported'])
+
+        # Every later tick in the same episode is silent.
+        for hours in (4, 8, 48):
+            sent, m = self.run_tick(now=_NOW + timedelta(hours=hours))
+            self.assertFalse(sent)
+            m.assert_not_called()
+
+    def test_fresh_snapshot_rearms_the_episode(self):
+        self.write_snapshot(pending_approvals=4, as_of=_NOW - timedelta(days=2))
+        self.assertTrue(self.run_tick()[0])
+        self.assertTrue(self.read_state()['stale_reported'])
+
+        # Writer recovers: the flag clears and the doorbell rings normally again.
+        later = _NOW + timedelta(hours=5)
+        self.write_snapshot(pending_approvals=4, as_of=later)
+        sent, m = self.run_tick(now=later)
+        self.assertTrue(sent)
+        self.assertIn('4 items need your call', m.call_args.kwargs['message'])
+        self.assertNotIn('stale_reported', self.read_state())
+
+        # A SECOND freeze reports again (the episode genuinely re-armed).
+        later2 = later + timedelta(days=1)
+        self.write_snapshot(pending_approvals=4, as_of=later)
+        sent, m = self.run_tick(now=later2)
+        self.assertTrue(sent)
+        self.assertIn('stale', m.call_args.kwargs['message'].lower())
+
+    def test_stale_tick_preserves_count_cooldown_state(self):
+        # The outage must not clobber the count baseline, so the doorbell
+        # resumes from real state rather than re-ringing on recovery.
+        prior_dm = (_NOW - timedelta(hours=1)).isoformat()
+        self.write_state(last_count=4, last_dm_ts=prior_dm, stale_reported=True)
+        self.write_snapshot(pending_approvals=4, as_of=_NOW - timedelta(days=2))
+        sent, _ = self.run_tick()
+        self.assertFalse(sent)
+        st = self.read_state()
+        self.assertEqual(st['last_count'], 4)
+        self.assertEqual(st['last_dm_ts'], prior_dm)
+
+    def test_missing_as_of_is_stale(self):
+        self.write_snapshot(pending_approvals=4, omit_as_of=True)
+        sent, m = self.run_tick()
+        self.assertTrue(sent)
+        msg = m.call_args.kwargs['message']
+        self.assertNotIn('4 items need your call', msg)
+        self.assertIn('no readable `as_of`', msg)
+
+    def test_unparseable_as_of_is_stale(self):
+        self.write_snapshot(pending_approvals=4, as_of='not-a-timestamp')
+        sent, m = self.run_tick()
+        self.assertTrue(sent)
+        self.assertNotIn('4 items need your call', m.call_args.kwargs['message'])
+
+    def test_structured_as_of_used_when_top_level_absent(self):
+        self.write_snapshot(
+            pending_approvals=2, omit_as_of=True, structured_as_of=_NOW)
+        sent, m = self.run_tick()
+        self.assertTrue(sent)
+        self.assertIn('2 items need your call', m.call_args.kwargs['message'])
+
+    def test_boundary_just_inside_threshold_still_rings(self):
+        # Default threshold is 1h; 59m old is fresh and must ring normally.
+        self.write_snapshot(
+            pending_approvals=2, as_of=_NOW - timedelta(minutes=59))
+        sent, m = self.run_tick()
+        self.assertTrue(sent)
+        self.assertIn('2 items need your call', m.call_args.kwargs['message'])
+
+    def test_threshold_is_env_overridable(self):
+        os.environ['OURLIBERTY_DOORBELL_MAX_SNAPSHOT_AGE_HOURS'] = '48'
+        try:
+            self.dn = importlib.reload(self.dn)
+            self.assertEqual(self.dn.MAX_SNAPSHOT_AGE_HOURS, 48.0)
+            # 2 days old: stale at the 1h default, fresh under a 48h override.
+            self.write_snapshot(
+                pending_approvals=2, as_of=_NOW - timedelta(hours=47))
+            sent, m = self.run_tick()
+            self.assertTrue(sent)
+            self.assertIn('2 items need your call',
+                          m.call_args.kwargs['message'])
+        finally:
+            os.environ.pop('OURLIBERTY_DOORBELL_MAX_SNAPSHOT_AGE_HOURS', None)
+
+    def test_malformed_threshold_override_falls_back(self):
+        os.environ['OURLIBERTY_DOORBELL_MAX_SNAPSHOT_AGE_HOURS'] = 'banana'
+        try:
+            self.dn = importlib.reload(self.dn)
+            self.assertEqual(self.dn.MAX_SNAPSHOT_AGE_HOURS, 1.0)
+        finally:
+            os.environ.pop('OURLIBERTY_DOORBELL_MAX_SNAPSHOT_AGE_HOURS', None)
+
+    def test_load_waiting_bare_call_still_works(self):
+        # heal_unregistered_approval.doorbell_counts() depends on this exact
+        # no-argument contract; the freshness work must not have broken it.
+        self.write_snapshot(pending_approvals=3, escalations=1)
+        waiting = self.dn.load_waiting()
+        self.assertEqual(waiting['pending_approvals'], 3)
+        self.assertEqual(waiting['escalations'], 1)
+
+    def test_broken_read_still_silent_and_unflagged(self):
+        self.snapshot_path.write_text('{not json')
+        sent, m = self.run_tick()
+        self.assertFalse(sent)
+        m.assert_not_called()
+        self.assertIsNone(self.read_state())
 
 
 if __name__ == '__main__':
