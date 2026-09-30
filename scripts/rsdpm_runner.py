@@ -136,7 +136,7 @@ FIX_EVIDENCE_LIST: Tuple[str, ...] = (
     "The runs: typecheck (`set -o pipefail`, exit printed), the WHOLE vitest suite, "
     "`verify:coverage-floor`, both CI jobs' step lists locally, `bash ops/verify-fresh-db.sh`; "
     "`npm run lab:shoot` + `npm run verify:contrast:live` if a screen changed.",
-    "Item 11: EDIT THE PR BODY so every claim is true at the new head; re-read after `gh pr edit`; "
+    "Item 11: EDIT THE PR BODY so every claim is true at the new head; re-read the body after editing it; "
     "grep the repo for survivors of every deleted claim.",
     "'What I could not verify'. Then ONE line: `COST: <what you can see>`.",
 )
@@ -351,6 +351,19 @@ def guard_branch_absent(repo: Path, branch: str) -> None:
 def guard_slot_name(slot: str) -> None:
     if slot not in SLOTS:
         raise Refusal("slot must be one of %s, got %r" % ("/".join(SLOTS), slot))
+
+
+def guard_dispatch_params(cap: float, wall_seconds: int, claude_cmd: str) -> None:
+    """Refuse the values that would silently disable a safety: a cap of 0 is no
+    cap, `alarm 0` is no wall clock, and a missing dispatcher would only fail
+    AFTER the worktree exists."""
+    if not cap > 0:
+        raise Refusal("--cap must be > 0 (got %r); 0 is no cap" % cap)
+    if not wall_seconds > 0:
+        raise Refusal("--wall-seconds must be > 0 (got %r); `perl alarm 0` is no wall clock" % wall_seconds)
+    cmd = Path(str(claude_cmd)).expanduser()
+    if not (cmd.is_file() and os.access(str(cmd), os.X_OK)):
+        raise Refusal("--claude-cmd %s is not an executable file" % cmd)
 
 
 # --------------------------------------------------------------------------- #
@@ -730,6 +743,7 @@ def file_ledger(state: State, parsed: dict, pr: str, step: str, slot: str, cap, 
 # --------------------------------------------------------------------------- #
 def cmd_build(a, state: State) -> int:
     guard_slot_name(a.slot)
+    guard_dispatch_params(a.cap, a.wall_seconds, a.claude_cmd)
     guard_stop(state)
     guard_builders(state, a.slot)
     guard_auth(a.slot)
@@ -787,6 +801,7 @@ def cmd_build(a, state: State) -> int:
 
 def cmd_fix(a, state: State) -> int:
     guard_slot_name(a.slot)
+    guard_dispatch_params(a.cap, a.wall_seconds, a.claude_cmd)
     guard_stop(state)
     guard_builders(state, a.slot)
     guard_auth(a.slot)

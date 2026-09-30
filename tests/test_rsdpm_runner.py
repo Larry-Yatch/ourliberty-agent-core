@@ -139,8 +139,14 @@ class RunnerTest(unittest.TestCase):
             argv.append("--dry-run")
         argv += list(args)
         out = io.StringIO()
+        # An exception escaping main() is a runner crash. Return it as a code so the
+        # test FAILS on its assertion instead of ERRORING (void_check counts an
+        # errored test as "cannot conclude", never as guarded).
         with contextlib.redirect_stdout(out):
-            code = r.main(argv)
+            try:
+                code = r.main(argv)
+            except Exception as exc:  # noqa: BLE001
+                return "EXC:%s: %s" % (type(exc).__name__, exc), out.getvalue()
         return code, out.getvalue()
 
     def build_args(self, pr="S", slot="b", branch="feat/s", cap="5", **kw):
@@ -205,8 +211,10 @@ class RunnerTest(unittest.TestCase):
     # ---- what the runner may never do ------------------------------------ #
     def test_source_never_reviews_labels_or_merges(self):
         src = (_SCRIPTS / "rsdpm_runner.py").read_text()
-        for banned in ("gh pr merge", "--add-label", "auto-review", "code-review", "rmtree", "deep-review"):
-            self.assertNotIn(banned, src, "runner source contains %r" % banned)
+        for banned in ("gh pr merge", "--add-label", "auto-review", "code-review", "rmtree", "deep-review",
+                       "gh pr close", "gh pr ready", "gh pr edit", "gh pr review", "gh pr create", "--draft"):
+            # assertFalse, not assertNotIn: the latter dumps the whole source into the message
+            self.assertFalse(banned in src, "runner source contains %r" % banned)
         # the `claude/*` branch prefix (an assertion that local review is done) — `~/.claude/` paths are not it
         self.assertIsNone(re.search(r"(?<![.\w])claude/", src), "runner source names a claude/* branch")
         # the only file it ever removes is its own STOP file
@@ -280,6 +288,25 @@ class RunnerTest(unittest.TestCase):
         code, out = self.run_cli(*self.build_args(), dry_run=True)
         self.assertEqual(code, r.EXIT_REFUSED)
         self.assertIn(".env.local", out)
+
+    def test_build_and_fix_refuse_values_that_disable_a_safety(self):
+        # cap 0 = no cap; alarm 0 = no wall clock; a missing dispatcher would fail only after the worktree exists
+        code, out = self.run_cli(*self.build_args(cap="0"), dry_run=True)
+        self.assertEqual(code, r.EXIT_REFUSED)
+        self.assertIn("--cap must be > 0", out)
+        code, out = self.run_cli(*self.build_args(wall="0"), dry_run=True)
+        self.assertEqual(code, r.EXIT_REFUSED)
+        self.assertIn("--wall-seconds must be > 0", out)
+        args = self.build_args()
+        args[args.index("--claude-cmd") + 1] = str(self.root / "no-such-dispatcher")
+        code, out = self.run_cli(*args, dry_run=True)
+        self.assertEqual(code, r.EXIT_REFUSED)
+        self.assertIn("not an executable file", out)
+        self.assertFalse(self.worktree().exists())
+        self.make_worktree_with_meta()
+        code, out = self.run_cli(*self.fix_args(cap="0"), dry_run=True)
+        self.assertEqual(code, r.EXIT_REFUSED)
+        self.assertIn("--cap must be > 0", out)
 
     def test_build_refuses_bad_slot_name(self):
         with self.assertRaises(SystemExit):
@@ -364,7 +391,7 @@ class RunnerTest(unittest.TestCase):
         # the hook lives under the worktree's OWN gitdir, not the shared .git/hooks
         self.assertEqual(hook.resolve(), (self.repo / ".git" / "worktrees" / wt.name / "hooks" / "post-commit").resolve())
         self.assertFalse((self.repo / ".git" / "hooks" / "post-commit").exists())
-        self.assertEqual(_git(wt, "config", "core.hooksPath").stdout.strip(), str(hook.parent))
+        self.assertEqual(_git(wt, "config", "core.hooksPath", check=False).stdout.strip(), str(hook.parent))
         self.assertEqual(_git(self.repo, "config", "core.hooksPath", check=False).stdout.strip(), "")
         self.assertIsNone(_remote_sha(self.bare, "feat/s"))
         (wt / "a.txt").write_text("a\n")
