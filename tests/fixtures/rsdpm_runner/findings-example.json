@@ -1,0 +1,85 @@
+{
+ "level": "high",
+ "findings": [
+  {
+   "file": "components/ui/StatusControl.tsx",
+   "line": 320,
+   "summary": "The reason sheet's Save is never disabled by the sent-pair guard. Once a write succeeds, the sheet closes only when the `state` prop changes. In the gap before the refresh lands (or forever, if the refresh is dropped), the sheet stays open with a live Save that `send()` silently swallows at the \"belt\". So the comment's claim that \"a click never reaches here\" is false for the Save door.",
+   "failure_scenario": "A kind with a reason-required target (D\u2032/E\u2032/F\u2032): the user types a reason and taps Save, and the write succeeds. `pending` goes false before router.refresh() lands, so the sheet shows its text and an enabled Save button. Tapping Save does nothing: no write, no message. On a phone that drops the refetch, the sheet sits open forever looking unsaved, although the move DID land. The user then cancels and re-picks the verb, and finds the option disabled with no explanation.",
+   "category": "correctness",
+   "short_summary": "Reason-sheet Save goes dead after a successful write"
+  },
+  {
+   "file": "components/ui/StatusControl.tsx",
+   "line": 343,
+   "summary": "`pick()` opens the reason sheet without clearing `error`. A \"Not saved.\" left by an earlier failed menu move therefore renders inside a brand-new reason sheet before anything has been sent from it.",
+   "failure_scenario": "A menu move (say, Start) fails, so \"Not saved.\" shows under the chip. The user opens the chip and picks a control whose target requires a reason. The fresh sheet opens with \"Not saved.\" already at the top, above an empty box. It reads as if this reason had failed to save.",
+   "category": "correctness",
+   "short_summary": "Stale 'Not saved.' shows in a fresh reason sheet"
+  },
+  {
+   "file": "ops/verify-lifecycle-substrate.sh",
+   "line": 174,
+   "summary": "This repeats round-1 F9 on the sibling branch. `mutation_spec`'s unknown-mode arm echoes its message to STDOUT and exits 2. It runs inside `f=\"$(mutated_copy \u2026)\"`, so the message is captured into `$f` and never shown. The F9 fix moved only the Python anchor-not-found message to stderr.",
+   "failure_scenario": "`SUBSTRATE_PROOF_MUTATE=plain-fk` (hyphen typo) or any stale mode name: the command substitution captures \"unknown SUBSTRATE_PROOF_MUTATE=\u2026\", `set -e` exits 2, and the operator sees no explanation. That is exactly the symptom F9 was filed for.",
+   "category": "correctness",
+   "short_summary": "Unknown mutation mode error still swallowed (F9 repeat)"
+  },
+  {
+   "file": "supabase/migrations/0063_lifecycle_substrate.sql",
+   "line": 293,
+   "summary": "S re-issues the whole 70-line section_actions_due_today body (DROP + CREATE, both overloads) to carry `status_changed_by_name`, which nothing renders. The header says the only reason is so the \u00a711-8 positive control \"has a definer reader to test\". That adds one more re-issued body that later migrations must re-derive from at merge time. It is the hazard class the re-issue checker and the 'a re-issued body disarms BASE modes' memory exist for, and here it is taken on for a test's convenience rather than a product reader.",
+   "failure_scenario": "D\u2032/F\u2032 (or any lane change before F\u2032 renders the stamp) must now start from 0063's copy, not 0054's. A PR branched before S merges and edits 0054's lane silently drops the stamp column, or reverts S's join, and fresh-db asserts only the newest issuer. The \u00a711-8 control could be proven with an RLS read plus a scratch SECURITY DEFINER probe in the proof script, with no production body re-issued.",
+   "category": "altitude",
+   "short_summary": "Lane body re-issued only to give a test a reader"
+  },
+  {
+   "file": ".github/workflows/test.yml",
+   "line": 256,
+   "summary": "The new CI step's comment is stale after fix round 1. It says the BASE run is RED at \"38 rows\" and names \"eight mutation modes\". The script now has nine modes (`plain_fk` was added) and four more BASE-red rows (F5\u2013F8).",
+   "failure_scenario": "A reviewer or future builder checks the BASE run against \"38 rows\" and reads a mismatch as a regression, or trusts that 8 modes cover the proof. This is the 'prose goes stale within minutes' class: a claim sitting beside code that no longer does what it says.",
+   "category": "stale-claim",
+   "short_summary": "CI comment's red-row and mutation-mode counts stale"
+  },
+  {
+   "file": "lib/lifecycle/kinds.ts",
+   "line": 216,
+   "summary": "`classifyStatusRefusal` (a 13-variant union plus ~15 regexes) has no product caller in S. It classifies RAISE tokens that no migration emits yet, and on the task tokens it is a second copy of lib/tasks/status.ts's classifier, kept in agreement only by a test.",
+   "failure_scenario": "About 95 lines of speculative code ship and must be kept in step with a contract the D\u2032/E\u2032/F\u2032 migrations have not written. The two task classifiers can drift, for example when a new task malformed token is added to one file only. Delete it and let the first PR that raises these tokens add the classifier next to its caller.",
+   "category": "simplification",
+   "short_summary": "Unused second refusal classifier shipped ahead of need"
+  },
+  {
+   "file": "components/ui/UndatedGroup.tsx",
+   "line": 89,
+   "summary": "`Math.max(1, Math.floor(cap))` does not clamp NaN: `Math.max(1, NaN)` is NaN. So `slice(0, NaN)` renders no undated rows and `hidden > 0` is false. The prop doc's \"Clamped to \u2265 1\" is untrue for that input.",
+   "failure_scenario": "A caller passes a computed cap that comes out NaN (e.g. `Math.floor(height / rowHeight)` with rowHeight 0/undefined). The fold summary says \"No date agreed \u00b7 12\", but opening it shows an empty list with no \"and N more\" line. The undated rows are silently dropped, which is the one thing the component promises never happens.",
+   "category": "correctness",
+   "short_summary": "NaN cap hides every undated row silently"
+  },
+  {
+   "file": "supabase/migrations/0063_lifecycle_substrate.sql",
+   "line": 358,
+   "summary": "The lane's new `status_changed_by_name` is described as \"carried, not rendered\". But Houston's `get_my_day` tool passes `section_actions_due_today` rows to the model unprojected (lib/houston/tools.ts `asRows(actions)`), and the briefing worker reads the same lane. So the stamp's name reaches model context and the briefing's row dicts as soon as a transition writes it.",
+   "failure_scenario": "After 0064 writes the first stamp, Houston's context carries \"status_changed_by_name\": \"<teammate>\" on every due-today row. The model may start saying \"Chris parked this\" before F\u2032 has designed how the stamp is worded or checked that surface. No test pins Houston's projection of this lane.",
+   "category": "data-flow",
+   "short_summary": "New actor name flows to Houston's model unprojected"
+  },
+  {
+   "file": "supabase/migrations/0063_lifecycle_substrate.sql",
+   "line": 265,
+   "summary": "The re-issued `queue.action` emitter string lists `park`, `complete` and `restore` twice each (the old run plus the new verbs appended). It is now pinned byte-exact in five places: the migration, the proof's T6, 99_assertions, verify-staging-applied and the mutation anchor.",
+   "failure_scenario": "Any reader that enumerates the queue verbs by splitting the emitter string double-counts three verbs. The contract says no later PR may re-issue the taxonomy, so the duplicates are frozen in for good, and five byte-exact pins make fixing them expensive.",
+   "category": "simplification",
+   "short_summary": "queue.action emitter repeats park/complete/restore"
+  },
+  {
+   "file": "components/ui/StatusControl.tsx",
+   "line": 168,
+   "summary": "`StampDate` re-implements app/queue/components/OccurredAt.tsx line for line: the same no-op `subscribe`, the same `useSyncExternalStore` with an empty server snapshot, the same `<time dateTime>`. Only the formatter differs.",
+   "failure_scenario": "Two copies of the hydration-safe client-only-time idiom exist, so a fix to one (e.g. the #418 hydration lesson, or a prefix/empty-text rule) will not reach the other. Give OccurredAt a `format` prop (or move it to components/ui) and use it here.",
+   "category": "reuse",
+   "short_summary": "StampDate duplicates the OccurredAt client-time idiom"
+  }
+ ]
+}
