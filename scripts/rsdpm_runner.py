@@ -55,6 +55,7 @@ MAX_BUILDERS = 2
 SLOTS = ("b", "c")
 
 EXIT_OK = 0
+CLI_DESCRIPTION = "The RSDPM build runner: the MECHANICAL steps of dispatching one headless builder per PR, watching it, and filing its cost. The manager keeps every judgement."
 EXIT_REFUSED = 2
 EXIT_BUILDER_FAILED = 3
 
@@ -1041,7 +1042,7 @@ def cmd_resume(a, state: State) -> int:
 # CLI
 # --------------------------------------------------------------------------- #
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="rsdpm_runner.py", description=__doc__.split("\n\n")[0])
+    p = argparse.ArgumentParser(prog="rsdpm_runner.py", description=CLI_DESCRIPTION)
     p.add_argument("--state-dir", default=str(DEFAULT_STATE_DIR))
     p.add_argument("--ledger", default=str(DEFAULT_LEDGER))
     p.add_argument("--dry-run", action="store_true", help="print what would be done; dispatch and write nothing outside the state dir")
