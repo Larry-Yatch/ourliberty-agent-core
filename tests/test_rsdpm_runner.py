@@ -223,6 +223,57 @@ class RunnerTest(unittest.TestCase):
         self.assertNotIn("os.remove", src)
 
     # ---- build guards ------------------------------------------------------ #
+    def test_build_refuses_a_brief_the_check_fails_and_dispatches_nothing(self):
+        self.brief.write_text("# Builder brief — PR S\n\n## Rulings\n\nHouston's mirror rule `field_not_allowed` does NOT apply here "
+                              "because the write goes through `merge_records`.\n")
+        code, out = self.run_cli(*self.build_args(), dry_run=True)
+        self.assertEqual(code, r.EXIT_REFUSED)
+        self.assertIn("brief_check:", out)
+        self.assertIn("| claim-quote |", out)
+        self.assertIn("refused by brief_check", out)
+        self.assertNotIn("DRY-RUN: worktree add", out)
+        self.assertFalse(self.worktree("S").exists())
+
+    def test_build_prints_the_brief_check_table_when_it_passes(self):
+        code, out = self.run_cli(*self.build_args(), dry_run=True)
+        self.assertEqual(code, r.EXIT_OK, out)
+        self.assertIn("brief_check:", out)
+        self.assertIn("PASS: 0 FAIL row(s)", out)
+        self.assertLess(out.index("PASS: 0 FAIL row(s)"), out.index("DRY-RUN: worktree add"))
+
+    def test_fix_refuses_decisions_that_assert_without_citing(self):
+        self.make_worktree_with_meta()
+        d = self.root / "decisions.md"
+        d.write_text("## F1\nThe DB's Redate arm KEEPS the stored reason and ignores the resent text — keep it.\n")
+        code, out = self.run_cli(*self.fix_args(decisions=d), dry_run=True)
+        self.assertEqual(code, r.EXIT_REFUSED)
+        self.assertIn("| claim-cite |", out)
+        self.assertIn("decisions refused by brief_check", out)
+        self.assertFalse((self.record / "argv").exists())
+
+    def test_builder_model_env_adds_the_model_flag_and_nothing_else(self):
+        os.environ["RSDPM_BUILDER_MODEL"] = "opus"
+        try:
+            code, out = self.run_cli(*self.build_args())
+        finally:
+            os.environ.pop("RSDPM_BUILDER_MODEL", None)
+        self.assertEqual(code, 0, out)
+        # the runner records the exact argv it launched in the run's meta — read that, not the
+        # detached fake's file (which lands asynchronously)
+        argv = json.loads(next((self.state / "runs" / "S").glob("*.meta.json")).read_text())["argv"]
+        self.assertIn("--model", argv)
+        self.assertEqual(argv[argv.index("--model") + 1], "opus")
+        code, out = self.run_cli(*self.build_args(pr="T", branch="feat/t", slot="c"))
+        self.assertEqual(code, 0, out)
+        argv = json.loads(next((self.state / "runs" / "T").glob("*.meta.json")).read_text())["argv"]
+        self.assertNotIn("--model", argv)
+
+    def test_the_gate_has_no_skip_flag(self):
+        src = (_SCRIPTS / "rsdpm_runner.py").read_text()
+        for word in ("skip-brief", "no-brief-check", "brief-check-waive", "BRIEF_CHECK_WAIVE"):
+            self.assertFalse(word in src, "a flag that disables the brief gate: %r" % word)
+        self.assertEqual(src.count("guard_brief("), 3)  # the def, build, fix
+
     def test_build_refuses_when_stop_present(self):
         self.run_cli("stop")
         code, out = self.run_cli(*self.build_args(), dry_run=True)

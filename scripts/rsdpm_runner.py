@@ -5,9 +5,12 @@ one headless builder per PR, watching it, and filing its cost.
 The manager keeps every judgement (reading findings, deciding per finding, the
 click-through, the merge). This script only:
 
-  build     guards → worktree → per-worktree push hook → wrapper+brief → detached `claude -p`
-  fix       guards → compose a fix brief from the findings JSON + the manager's
-            decisions → a FRESH builder in the EXISTING worktree
+  build     guards → brief_check (REFUSES a brief whose sentences are guesses — no
+            waiver; see scripts/brief_check.py) → worktree → per-worktree push hook
+            → wrapper+brief → detached `claude -p`
+  fix       guards → brief_check on the manager's DECISIONS (claim rules) → compose
+            a fix brief from the findings JSON + the decisions → a FRESH builder in
+            the EXISTING worktree
   watch     poll a run (pid, local vs remote head, PR open, comment count); on exit
             parse the last `result` line and file the ledger row
   ledger    parse one stream-json file → ONE row in the build ledger (idempotent)
@@ -39,6 +42,8 @@ import sys
 import time
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
+
+import brief_check  # beside this file in scripts/; the gate on every brief and decisions file
 
 # --------------------------------------------------------------------------- #
 # Defaults (every path is overridable so the tests never touch the real ones)
@@ -348,6 +353,17 @@ def guard_branch_absent(repo: Path, branch: str) -> None:
         raise Refusal("branch %s already exists on origin (%s) — pick another name" % (branch, sha[:8]))
 
 
+def guard_brief(path: Path, repo: Path, ref: str, decisions: bool = False) -> None:
+    """Print brief_check's table; refuse on any FAIL row. There is no flag that skips this —
+    the nine brief-sentence nights (scripts/brief_check.py header) are why."""
+    rows = brief_check.check_file(path, brief_check.Repo(repo, ref), decisions_only=decisions)
+    print(brief_check.format_table(rows, str(path)))
+    bad = brief_check.failures(rows)
+    if bad:
+        raise Refusal("%s refused by brief_check: %d FAIL row(s) above — fix the %s, never the check"
+                      % ("decisions" if decisions else "brief", len(bad), "decisions file" if decisions else "brief"))
+
+
 def guard_slot_name(slot: str) -> None:
     if slot not in SLOTS:
         raise Refusal("slot must be one of %s, got %r" % ("/".join(SLOTS), slot))
@@ -533,6 +549,11 @@ def launch_builder(state: State, pr: str, step: str, slot: str, cap: float, prom
         str(claude_cmd), slot, "-p", "--output-format", "stream-json", "--verbose",
         "--max-budget-usd", str(cap), "--dangerously-skip-permissions",
     ]
+    # The model override the manager patched into the dispatch copy on 2026-10-02 (wave 6): when the
+    # Fable weekly limit sits near 93% on both spare accounts, builders run on Opus via
+    # RSDPM_BUILDER_MODEL=opus — the CLI ALIAS; "claude-opus-5-5" is refused as unrecognized_model.
+    if os.environ.get("RSDPM_BUILDER_MODEL"):
+        argv += ["--model", os.environ["RSDPM_BUILDER_MODEL"]]
     meta = {
         "pr": pr, "step": step, "slot": slot, "cap": cap, "branch": branch,
         "worktree": str(worktree), "repo": str(repo), "argv": argv,
@@ -762,14 +783,20 @@ def cmd_build(a, state: State) -> int:
         raise Refusal("%s missing — the builder cannot typecheck against staging without it" % env_local)
     e2e_state = repo / "e2e" / ".auth" / "state.json"
     step = "build"
+    fetch = ("git fetch", ["git", "-C", str(repo), "fetch", "origin"], repo)
+    if not a.dry_run:
+        print("RUN %s" % fetch[0])
+        cp = run_cmd(fetch[1], cwd=fetch[2], check=False, timeout=1800)
+        if cp.returncode != 0:
+            raise Refusal("%s failed (exit %d): %s" % (fetch[0], cp.returncode, (cp.stderr or cp.stdout).strip()[-400:]))
+    guard_brief(brief, repo, a.base)
     prompt = compose_prompt(brief.read_text(), a.slot, wt, a.branch)
     plan = [
-        ("git fetch", ["git", "-C", str(repo), "fetch", "origin"], repo),
         ("worktree add", ["git", "-C", str(repo), "worktree", "add", str(wt), "-b", a.branch, a.base], repo),
         ("npm ci", ["npm", "ci"], wt),
     ]
     if a.dry_run:
-        for name, argv, cwd in plan:
+        for name, argv, cwd in [fetch] + plan:
             print("DRY-RUN: %s: %s  (cwd %s)" % (name, " ".join(_sh(x) for x in argv), cwd))
         print("DRY-RUN: copy %s -> %s" % (env_local, wt / ".env.local"))
         if e2e_state.is_file():
@@ -825,6 +852,7 @@ def cmd_fix(a, state: State) -> int:
         raise Refusal("local HEAD %s != origin/%s %s — push or reset first so the fix builder sees the PR head"
                       % (head[:8], branch, remote[:8]))
     findings = load_findings(Path(a.findings).expanduser())
+    guard_brief(Path(a.decisions).expanduser(), repo, "origin/main", decisions=True)
     decisions = parse_decisions(Path(a.decisions).expanduser().read_text())
     body = compose_fix_brief(a.pr, a.round, a.slot, wt, branch, head, findings, decisions)
     prompt = compose_prompt(body, a.slot, wt, branch)

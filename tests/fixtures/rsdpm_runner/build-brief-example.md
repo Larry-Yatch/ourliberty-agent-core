@@ -64,15 +64,21 @@ every stop. Report to the PR body, never to a chat.
    `record.removed` (`remove_record`); `record.restored`'s emitter becomes
    `restore_rejected_restore_removed`; the `queue.action` emitter string gains
    `_abandon_redate_receive_drop_redecide_defer_activate_park_block_complete_archive_unarchive_remove_restore`.
-   These emitters do not exist yet — that is by design (contract §4, "re-issued ONCE"); check every
+   These emitters do not exist yet — that is by design (contract §4, "re-issued ONCE" — quoted below); check every
    taxonomy contract test (`tests/contracts/__tests__/*` grep `event_taxonomy`) still passes and say
    which ones read it.
+
+   ```
+   $ sed -n 61,64p ~/dev/ol-work/rsdpm-lifecycle-contract.md
+   §4 … the taxonomy is re-issued ONCE, in S, with every emitter the later PRs will raise;
+   an emitter named before its raiser exists is by design.
+   ```
 4. Header in the repo's style: WHAT THIS IS (one paragraph citing the contract), the STARTED FROM WHICH
    BODY table (every re-issued function, its newest issuer, what changed), idempotency, no BEGIN/COMMIT,
    Standing Rule 1.
 5. Update `lib/database.types.ts`, `supabase/verify/99_assertions.sql` (a block asserting the twelve
    columns, the four CHECKs, the taxonomy rows, and a `record.updated` payload that carries a
-   `status_reason` fingerprint after an UPDATE of that column), `ops/verify-staging-applied.sql`,
+   `status_reason` fingerprint after an UPDATE of that column — `0053_notes_on_work_records.sql:118`), `ops/verify-staging-applied.sql`,
    `ops/staging-contract-baseline.json` / `ops/verify-staging-contract.mts` as 0054's PR did — read
    that PR's footprint with `git show --stat d03f2bb`.
 6. A proof script `ops/verify-lifecycle-substrate.sh` in `ops/verify-task-status.sh`'s shape, wired
@@ -143,3 +149,10 @@ policies; `rsdpm_purge_note_set`; `project_health`; any other `section_*`; `crea
 The PR body is the report: Scope · What changed (by file) · Evidence (the eight items above, pasted) ·
 What I could not verify · Cost (the `claude -p` JSON usage line). Then stop. The manager runs
 `/code-review high`; findings come back as a PR comment; a FRESH builder fixes them (not you).
+
+## THE PREDICATE TABLE (written by the manager before dispatch)
+
+| DB refusal (0063 raises) | the UI door that prevents the tap |
+|---|---|
+| `status_reason` CHECK > 4000 chars | the reason sheet's textarea has `maxLength={REASON_MAX}`; the counter shows `n / 4000` |
+| none else — 0063 is a substrate: no transition, no verb | n/a |
