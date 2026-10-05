@@ -210,7 +210,9 @@ class Repo:
         self.path, self.ref = path, ref
 
     def _git(self, *args: str) -> subprocess.CompletedProcess:
-        return subprocess.run(["git", "-C", str(self.path), *args], capture_output=True, text=True)
+        # universal_newlines is text=True by its older name — spelled this way so operator_artifacts.py
+        # (which reads `text=` as an emitted message) can see every string this file shows a human
+        return subprocess.run(["git", "-C", str(self.path), *args], capture_output=True, universal_newlines=True)
 
     def available(self) -> Tuple[bool, str]:
         if self.path is None:
@@ -425,7 +427,8 @@ def format_table(rows: Sequence[Row], name: str) -> str:
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
-    p = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
+    p = argparse.ArgumentParser(description="brief_check.py — refuse a builder brief whose sentences are guesses. "
+                                            "Exit 0 passes, 2 refused (fix the brief, never the check), 1 usage error.")
     p.add_argument("brief")
     p.add_argument("--repo", default=None, help="the RSDPM checkout whose `--ref` holds the migrations (default: none)")
     p.add_argument("--ref", default="origin/main")
