@@ -292,6 +292,21 @@ class StructureRules(unittest.TestCase):
         text = "# Builder brief — PR X, STEP 1 of 2\n\n`supabase/migrations/0012_mine.sql`\n\n" + self.TABLE
         self.assertEqual(rows_of("two-clocks", self.check(text)), [])
 
+    def test_a_git_failure_inside_a_lookup_is_a_FAIL_row_not_an_empty_list(self):
+        class Broken(bc.Repo):
+            def _git(self, *args):
+                if args and args[0] == "grep":
+                    return subprocess.CompletedProcess(args, 128, "", "fatal: bad object")
+                return super()._git(*args)
+        r = Broken(self.repo, "origin/main")
+        self.assertIsNone(r.db_functions())
+        self.assertIsNone(r.raise_origins())
+        text = "# Brief\n\n`supabase/migrations/0011_second.sql`\n\n" + self.TABLE
+        rows = bc.check_text(text, repo=r)
+        notes = [x.note for x in bc.failures(rows)]
+        self.assertTrue(any("git grep over supabase/migrations" in n for n in notes), notes)
+        self.assertTrue(any("cannot tell a new refusal from a re-issued one" in n for n in notes), notes)
+
     def test_db_functions_come_from_the_ref(self):
         self.assertEqual(self.r.db_functions(), {"first_verb"})
         self.assertEqual(self.r.raise_origins(), {"a_refused": "0010_first.sql", "b_refused": "0010_first.sql", "c_refused": "0011_second.sql"})

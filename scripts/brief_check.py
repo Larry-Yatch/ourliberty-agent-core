@@ -228,13 +228,14 @@ class Repo:
         cp = self._git("show", "%s:%s" % (self.ref, rel))
         return cp.stdout if cp.returncode == 0 else None
 
-    def raise_origins(self) -> Dict[str, str]:
-        """token -> the LOWEST-numbered migration on the ref that raises it (a re-issued body is not a new refusal)."""
+    def raise_origins(self) -> Optional[Dict[str, str]]:
+        """token -> the LOWEST-numbered migration on the ref that raises it (a re-issued body is not a new
+        refusal). None when git itself failed — the caller prints a FAIL row, never an empty set (item 7)."""
         cp = self._git("grep", "-i", "-o", "-E", r"RAISE[[:space:]]+EXCEPTION[[:space:]]+'[a-z][a-z0-9_]*",
                        self.ref, "--", "supabase/migrations")
         out: Dict[str, str] = {}
         if cp.returncode not in (0, 1):
-            return out
+            return None
         for ln in cp.stdout.split("\n"):
             # <ref>:supabase/migrations/NNNN_x.sql:RAISE EXCEPTION 'token
             m = re.match(r"[^:]*:supabase/migrations/([^:]+):(.*)$", ln)
@@ -249,11 +250,12 @@ class Repo:
                 out[tok] = f
         return out
 
-    def db_functions(self) -> Set[str]:
+    def db_functions(self) -> Optional[Set[str]]:
+        """Every function name a migration on the ref declares; None when git itself failed (see raise_origins)."""
         cp = self._git("grep", "-h", "-i", "-o", "-E", r"FUNCTION[[:space:]]+(public\.)?[a-z_][a-z0-9_]*[[:space:]]*\(",
                        self.ref, "--", "supabase/migrations")
         if cp.returncode not in (0, 1):
-            return set()
+            return None
         return {m.group(1).lower() for m in FUNCTION_RE.finditer(cp.stdout)}
 
 
@@ -270,7 +272,15 @@ def check_text(text: str, repo: Optional[Repo] = None, db_functions: Optional[Se
 
     repo_ok, repo_why = (repo.available() if repo is not None else (False, "no repo"))
     if db_functions is None:
-        db_functions = repo.db_functions() if (repo is not None and repo_ok) else set()
+        if repo is not None and repo_ok:
+            found = repo.db_functions()
+            if found is None:
+                rows.append(Row("repo", None, "FAIL", "git grep over supabase/migrations on %s failed — the DB-function "
+                                "claim rule cannot run; fix the repo, do not proceed on an empty list" % repo.ref))
+                found = set()
+            db_functions = found
+        else:
+            db_functions = set()
     fn_call_re = (re.compile(r"`?\b(%s)\b`?\s*\([^)]*\{" % "|".join(sorted(map(re.escape, db_functions))), re.I)
                   if db_functions else None)
 
@@ -313,6 +323,10 @@ def check_text(text: str, repo: Optional[Repo] = None, db_functions: Optional[Se
         elif named and repo is not None:
             newest = max(named)
             origins = repo.raise_origins()
+            if origins is None:
+                rows.append(Row("refusal-rows", None, "FAIL", "git grep for RAISE EXCEPTION on %s failed — cannot tell a new "
+                                "refusal from a re-issued one; fix the repo first" % repo.ref))
+                origins = {}
             for f in named:
                 t = repo.show("supabase/migrations/" + f)
                 if t is not None:
