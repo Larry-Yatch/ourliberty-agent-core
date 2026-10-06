@@ -683,6 +683,9 @@ DRAWER_TEST = "components/ui/__tests__/record-drawer.test.tsx"
 # round 1 F1: a non-test file defining the English word `task` (the real one is app/houston/fixtures.ts:37 on RSDPM
 # 1d3b893 — brief-E.md:337's "add-a-task's shape" resolved to it and FAILed the quote half)
 FIXTURES_FILE = "app/houston/fixtures.ts"
+# round 2 F2: a SECOND non-test file defining the same `const task` (on RSDPM 3f267b1 `Panel` is defined in 7 non-test
+# files) — a paragraph naming neither file is ambiguous and FAILs; naming one resolves to it
+TASK_STATES = "app/lab/TaskStates.tsx"
 
 
 class MirrorRules(unittest.TestCase):
@@ -702,8 +705,11 @@ class MirrorRules(unittest.TestCase):
         fx = cls.repo / FIXTURES_FILE
         fx.parent.mkdir(parents=True)
         fx.write_text("const task = { ... }\n")
+        ts = cls.repo / TASK_STATES
+        ts.parent.mkdir(parents=True)
+        ts.write_text("export function Chips() {}\n\nconst task = { title: \"Send the deck\" };\n")
         d1 = {"GIT_AUTHOR_DATE": "2026-10-02T21:24:44Z", "GIT_COMMITTER_DATE": "2026-10-02T21:24:44Z"}
-        _git(cls.repo, "add", VERB_FILE, DRAWER_TEST, FIXTURES_FILE)
+        _git(cls.repo, "add", VERB_FILE, DRAWER_TEST, FIXTURES_FILE, TASK_STATES)
         _git(cls.repo, "commit", "-q", "-m", "RemoveVerb", env=d1)
         f.write_text(VERB_V2)
         d2 = {"GIT_AUTHOR_DATE": "2026-10-03T03:09:03Z", "GIT_COMMITTER_DATE": "2026-10-03T03:09:03Z"}
@@ -817,6 +823,24 @@ class MirrorRules(unittest.TestCase):
         self.assertEqual([r.status for r in rows], ["FAIL", "ok"], [r.note for r in rows])
         self.assertIn("task is at %s:1-2 and this paragraph quotes none of it" % FIXTURES_FILE, rows[0].note)
         self.assertIn("task is the newest of its siblings (0)", rows[1].note)
+
+    def test_a_name_defined_in_two_non_test_files_fails_until_the_paragraph_names_one(self):
+        # round 2 F2 (review r1-F5): the first `git grep` hit was taken silently; an unresolved mirror is never a pass
+        rows = self.r3("## S\n\nbuild it in `task`'s shape.\n")
+        self.assertEqual([r.status for r in rows], ["FAIL"], [r.note for r in rows])
+        self.assertIn("task is defined in 2 files on origin/main (%s, %s) — name the file you mean" % (FIXTURES_FILE, TASK_STATES),
+                      rows[0].note)
+        rows = self.r3("## S\n\nbuild it in `task`'s shape (`%s`).\n" % TASK_STATES)
+        self.assertEqual(rows[0].status, "FAIL", [r.note for r in rows])
+        self.assertIn("task is at %s:3-4 and this paragraph quotes none of it" % TASK_STATES, rows[0].note)
+
+    def test_fixture_fake_stub_and_python_test_paths_are_test_paths(self):
+        # round 2 F2(b): names resolved into tests/contracts/__fixtures__/ and workers/tests/*.py on RSDPM main;
+        # tests/contracts/lib/ holds real definitions five corpus briefs cite and must stay resolvable
+        for path in ("tests/contracts/__fixtures__/x/Chip.tsx", "tests/fakes/x.ts", "tests/stubs/x.ts", "workers/tests/t.py"):
+            self.assertTrue(bc.TEST_PATH_RE.search(path), path)
+        for path in ("tests/contracts/lib/rsc-census.ts", "app/detail/components/VerbControls.tsx"):
+            self.assertFalse(bc.TEST_PATH_RE.search(path), path)
 
     def test_318_r2_F1_the_ORIGINAL_S2_paragraph_fails_three_times_on_the_real_sibling_order(self):
         # origin/three: RemoveVerb < MergeVerb < LinkVerb. RemoveVerb: no quote, and its newer sibling MergeVerb is cited

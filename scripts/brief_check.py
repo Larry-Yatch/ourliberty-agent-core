@@ -82,11 +82,16 @@ Rules, each a row in the printed table (FAIL rows exit 2):
                     span such as `cannot_link_kind: <kind>` is skipped).
   mirror-names-the-newest-sibling
                     "X's shape/gate/rule/precedent" or "mirror X", X a symbol on
-                    --ref outside test files (`__tests__/`, `.test.`, `.spec.`,
-                    `e2e/`) and written like one — backticked, or with two or
+                    --ref outside test files (`__tests__/`, `__fixtures__/`,
+                    `.test.`, `.spec.`, `e2e/`, `tests/fakes/`, `tests/stubs/`,
+                    `tests/**.py`; `tests/contracts/lib/` stays resolvable) and
+                    written like one — backticked, or with two or
                     more capitals, or with `_` ("add-a-task's shape" and "PR B's
                     rule" are English), and not inside a quoted phrase —
-                    QUOTES X's region: a backticked span of 20+
+                    QUOTES X's region. X defined in two or more such files with
+                    none of their file names in the paragraph is one FAIL naming
+                    every file (review r1-F5: `Panel` is in 7, and the first grep
+                    hit was taken silently). The quote half: a backticked span of 20+
                     characters with = ( ) { } that the whole file holds at most
                     twice (`router.refresh()` is 16 characters, in 14 places, one
                     inside RemoveVerb's own region), or a fenced block within 2
@@ -149,7 +154,25 @@ the brief's sentence in double quotes and the row disappears. A paragraph
 saying a CONTROL is not rendered reads as a carried field. R4 cannot tell that
 the quoted instruction points at a DIFFERENT, live control (brief-F-step2.md:
 "Save dead until a reason" beside a line telling the human to type it), nor
-that a quoted line is a description, not an instruction. It
+that a quoted line is a description, not an instruction.
+Six more, each counted at 0 where it was measured (review r1, 2026-10-06), with
+the repair to build when one occurs: (a) an unbalanced straight `"` in a
+paragraph re-pairs every later quoted span, so a trigger after it can be
+blanked (0 of 1,591 corpus paragraphs; repair: an odd quote count skips
+blanking for that paragraph with an info row naming the line); (b) a shallow
+clone dates every symbol born before its horizon to the horizon commit, so no
+sibling is ever newer and the sibling half passes (0 of 15 RSDPM checkouts
+shallow; repair: `git rev-parse --is-shallow-repository` in Repo.available →
+every mirror row n/a with that reason); (c) the sibling half reads the raw
+text, so a newer sibling named ONLY inside a quotation counts as named (0 of
+17 R3 FAIL rows; repair: read it from the blanked text); (d) review freshness
+is the file mtime, which a copy without `-p` reorders either way (0 of 3
+review files stale; repair: the review records the brief's sha256); (e)
+`git log -S"const X"` counts substrings, so an earlier `const XProps` dates X
+too early (0 of 8 const pairs on main; repair: anchor the needle with the
+character after the name); (f) `export default function Chip` is never matched
+by find_definitions, so a brief mirroring one gets n/a (21 such files on main:
+18 page, 2 layout, 1 error — none a brief mirrors). It
 converts "did I look?" from a judgement into a check and stops there. Counted over the brief-sentence findings of RSDPM #288 → #318 there are
 16 classes; the word rules catch 9 of 16 by construction. The 7 they still
 cannot: (1) a citation pointing at the wrong lines (#301's finalize JSON, #297
@@ -571,7 +594,7 @@ CAMEL_SUFFIX_RE = re.compile(r"(?<=[a-z0-9])([A-Z][a-z0-9]+)$")
 FILE_SUFFIX_RE = re.compile(r"^.+-([a-z0-9]+)\.tsx?$")
 CONTRAST_RE = re.compile(r"\b(?:not|over|instead\s+of|wrong\s+sibling|right\s+sibling)\b", re.I)
 GUTTER_RE = re.compile(r"^\s*\d+(?::|\t|\s{2,})")
-TEST_PATH_RE = re.compile(r"__tests__/|\.test\.|\.spec\.|^e2e/")
+TEST_PATH_RE = re.compile(r"__tests__/|__fixtures__/|\.test\.|\.spec\.|^e2e/|(^|/)tests/(fakes|stubs)/|(^|/)tests/.*\.py$")
 R3_NOTE = ("quote the lines you are mirroring and say why the older sibling beats the newer one (#318 r2-F1: "
            "'RemoveVerb's gate shape' was the WRONG sibling — Merge, the newest door, keeps its confirm live; it cost a "
            "review round and a fix round)")
@@ -643,7 +666,13 @@ def rule_mirror(lines: Sequence[str], mask: Sequence[bool], paras: Sequence[Para
             if not hits:
                 rows.append(Row(rule, a + 1, "n/a", "%s is not a function/const/class outside test files on %s" % (name, repo.ref)))
                 continue
-            path, def_line, def_text = next((h for h in hits if Path(h[0]).name in text), hits[0])
+            files = list(dict.fromkeys(h[0] for h in hits))
+            named = next((h for h in hits if Path(h[0]).name in text), None)
+            if named is None and len(files) > 1:  # review r1-F5: the first grep hit is a guess, and a guess never passes
+                rows.append(Row(rule, a + 1, "FAIL", "%s is defined in %d files on %s (%s) — name the file you mean in "
+                                "this paragraph" % (name, len(files), repo.ref, ", ".join(files))))
+                continue
+            path, def_line, def_text = named or hits[0]
             src = cached("show:" + path, lambda: repo.show(path)) or ""
             src_lines = src.split("\n")
             defs = [(i + 1, m.group(3), m.group(4)) for i, ln in enumerate(src_lines) for m in [DEF_LINE_RE.match(ln)] if m]
