@@ -256,6 +256,12 @@ class CarriedNoReader(unittest.TestCase):
                   "| `link_reverse_exists` | two sentences, chosen by the SENT call's `selfSide` carried in `failed` |"):
             self.assertEqual(rows_of("carried-no-reader", self.check("## S\n\n%s\n" % s)), [], s)
 
+    def test_a_quoted_trigger_is_cited_not_asserted(self):
+        # round 1 F2: decisions-318-r2.md:16 DELETEs the panel header's quoted "CARRIED and not rendered" sentence;
+        # brief-F-step2.md:89/:157 quote "NOT RENDERED YET — F′" to rewrite it. A quoted phrase is blanked first.
+        rows = self.check('## F2\n\n`createdBy` leaves the row. DELETE the header\'s "CARRIED and not rendered" sentence.\n')
+        self.assertEqual(rows_of("carried-no-reader", rows), [], [(r.status, r.note) for r in rows])
+
     def test_a_reader_two_sentences_away_does_not_count(self):
         # the reader scope is the trigger's sentence and the next one — never the paragraph (round 0: the whole S3
         # paragraph passed on "renders, inside `Panel`" nine lines above the trigger)
@@ -814,6 +820,11 @@ class MirrorRules(unittest.TestCase):
         self.assertIn("MergeVerb is at", merge_q.note)
         self.assertIn("LinkVerb is newer and mentioned at line 30", merge_info.note)
 
+    def test_a_quoted_mirror_is_cited_not_asserted(self):
+        # round 1 F2: a decisions file quotes the sentence it corrects; the quoted mirror is not this document's mirror
+        rows = self.r3('## F1\n\nthe old brief said "mirror RemoveVerb\'s gate" and was wrong\n', decisions_only=True)
+        self.assertEqual(rows, [], [(r.status, r.note) for r in rows])
+
     def test_a_fenced_mirror_is_never_scanned(self):
         self.assertEqual(self.r3("## S\n\n```\nRemoveVerb's gate shape\n```\n"), [])
 
@@ -874,6 +885,18 @@ class DeadUntilRules(unittest.TestCase):
                   "grep for `stays disabled` and `dead until` in the diff"):
             rows = self.r4('## S\n\n%s\n\n"Not linked — try again." shows under the Link button.\n' % s)
             self.assertEqual([r for r in rows if r.status == "FAIL"], [], s)
+
+    def test_backtick_spans_pair_left_to_right_so_a_dead_until_between_two_spans_still_fails(self):
+        # round 1 F2: the shared blanking keeps CITED_SPAN_RE's own left-to-right scan and returns a whitespace-free
+        # backtick span unchanged. A pattern REQUIRING whitespace inside the backticks would pair the closing backtick
+        # of `link_exists` with the opening one of `verb-error`, then blank "Link dead until …" — losing one of the
+        # two TRUE corpus catches (brief-J2-step2.md:169, the line below verbatim)
+        text = ('## Predicate table\n\n'
+                '| `link_exists` | "Already linked." in `verb-error`, Link dead until the sheet is reopened, `router.refresh()` |\n'
+                'the refusal line reads "Not linked — try again."\n')
+        f = [r for r in self.r4(text) if r.status == "FAIL"]
+        self.assertEqual([r.line for r in f], [3], [(r.status, r.line, r.note) for r in self.r4(text)])
+        self.assertIn("'dead until' at line 3", f[0].note)
 
     def test_a_blanked_quote_keeps_every_later_line_number(self):
         # the stripped span is BLANKED with same-length filler, never deleted: line_of counts characters into the

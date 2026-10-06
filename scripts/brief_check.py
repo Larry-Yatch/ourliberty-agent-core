@@ -58,7 +58,13 @@ Rules, each a row in the printed table (FAIL rows exit 2):
                     renders/reads/consumes/displays/shows. Never the whole
                     paragraph (the original S3 passed on a "renders" nine lines
                     above its trigger), and never "carries/keep/kept": those
-                    describe code (176 false refusals in 55 briefs).
+                    describe code (176 false refusals in 55 briefs). A
+                    QUOTED phrase — double quotes, or backticks holding
+                    whitespace — is cited, not asserted: it is blanked before
+                    the trigger, the reader verb and the sentence ends are
+                    looked for, so a reader verb inside a quotation does not
+                    count; a blanked span is ONE token in the six-word window
+                    and no word for the negation look-back.
                     (#318 r2-F2: "the row keeps them" shipped a roster name to
                     the browser past a SECURITY DEFINER join.)
   direction-bearing-refusal
@@ -79,7 +85,8 @@ Rules, each a row in the printed table (FAIL rows exit 2):
                     --ref outside test files (`__tests__/`, `.test.`, `.spec.`,
                     `e2e/`) and written like one — backticked, or with two or
                     more capitals, or with `_` ("add-a-task's shape" and "PR B's
-                    rule" are English) — QUOTES X's region: a backticked span of 20+
+                    rule" are English), and not inside a quoted phrase —
+                    QUOTES X's region: a backticked span of 20+
                     characters with = ( ) { } that the whole file holds at most
                     twice (`router.refresh()` is 16 characters, in 14 places, one
                     inside RemoveVerb's own region), or a fenced block within 2
@@ -125,7 +132,14 @@ the OTHER side's sentence: any quoted span of 3+ words counts, so the original
 Nor that a "direction" in the comment above a raise means an END and not a
 state transition (0066's `project_status_transition_not_allowed` is flagged on
 "the closed direction"). A mirror name with one capital and no backticks
-(Panel, Button) is not resolved — write it in backticks and it is. It
+(Panel, Button) is not resolved — write it in backticks and it is. A
+decisions file that narrates the wrong mirror it corrects in its OWN words, or
+names it in a single-token backtick, reads as a mirror and owes a quote — put
+the brief's sentence in double quotes and the row disappears. A paragraph
+saying a CONTROL is not rendered reads as a carried field. R4 cannot tell that
+the quoted instruction points at a DIFFERENT, live control (brief-F-step2.md:
+"Save dead until a reason" beside a line telling the human to type it), nor
+that a quoted line is a description, not an instruction. It
 converts "did I look?" from a judgement into a check and stops there. Counted over the brief-sentence findings of RSDPM #288 → #318 there are
 16 classes; the word rules catch 9 of 16 by construction. The 7 they still
 cannot: (1) a citation pointing at the wrong lines (#301's finalize JSON, #297
@@ -322,6 +336,20 @@ def _word_index(tokens: Sequence[Tuple[int, int]], offset: int) -> int:
     return k
 
 
+CITED_SPAN_RE = re.compile(r"\"[^\"]*\"|“[^”]*”|`[^`]*`")
+
+
+def blank_cited(text: str) -> str:
+    """`text` with every QUOTED phrase blanked by same-length `#` filler: double-quoted spans (straight or curly) and
+    backticked spans holding whitespace are cited, not asserted (R1, R3 and R4 all read the blanked text). A
+    whitespace-free backtick span is a NAME — R1's field, R3's mirror — and is returned unchanged. One left-to-right scan
+    pairs the spans: a pattern that REQUIRED whitespace inside the backticks would pair one span's closing backtick with
+    the next one's opening backtick and blank the prose between them (brief-J2-step2.md:169's true dead-until). Blank,
+    never delete: line_of counts characters into the joined paragraph, so a shorter text shifts every later line."""
+    return CITED_SPAN_RE.sub(lambda m: m.group(0) if m.group(0)[0] == "`" and not re.search(r"\s", m.group(0))
+                             else "#" * len(m.group(0)), text)
+
+
 # R1 carried-no-reader
 IDENT_SPAN_RE = re.compile(r"`([A-Za-z_$][\w$./-]*)`")
 KEEP_RE = re.compile(r"\bno\s+reader\s+asked\b|\bnot\s+(?:rendered|shown|displayed)\b", re.I)
@@ -356,13 +384,14 @@ def rule_carried_no_reader(lines: Sequence[str], paras: Sequence[Para]) -> List[
     trigger ends its paragraph) — never anywhere in the paragraph: round 0 measured the original S3 paragraph passing
     on a "renders, inside `Panel`" nine lines above its trigger."""
     rows: List[Row] = []
-    for k, (a, _b, text) in enumerate(paras):
+    for k, (a, _b, raw) in enumerate(paras):
+        text = blank_cited(raw)  # a quoted trigger, reader verb or sentence end is cited, not this document's own
         if not IDENT_SPAN_RE.search(text):
             continue
         sents = _sentences(text)
         n_here = len(sents)
         if k + 1 < len(paras):
-            sents += _sentences(paras[k + 1][2])
+            sents += _sentences(blank_cited(paras[k + 1][2]))
         carried: List[str] = []
         readers: List[str] = []
         unread = False
@@ -579,7 +608,7 @@ def rule_mirror(lines: Sequence[str], mask: Sequence[bool], paras: Sequence[Para
         return cache[key]
 
     for a, b, text in paras:
-        for name in mirror_names(text):
+        for name in mirror_names(blank_cited(text)):  # a quoted mirror is the sentence being corrected, not one made
             if repo is None or not repo_ok:
                 rows.append(Row(rule, a + 1, "n/a", "%s: %s" % (name, repo_why)))
                 continue
@@ -681,7 +710,6 @@ def rule_mirror(lines: Sequence[str], mask: Sequence[bool], paras: Sequence[Para
 # R4 instruction-points-at-a-live-control
 IMPERATIVE_RE = re.compile(r"\b(?:try\s+again|unlink|remove|restore|pick|choose|reopen|set|clear|go\s+to|open)\b", re.I)
 DEAD_UNTIL_RE = re.compile(r"\b(?:dead|disabled|not\s+live|never\s+live)\s+until\b|\bstays\s+(?:dead|disabled)\b", re.I)
-CITED_SPAN_RE = re.compile(r"\"[^\"]*\"|“[^”]*”|`[^`]*`")
 CONTROL_RE = re.compile(r"\b(?:button|link|panel|sheet|row|line|chip|radio|field)s?\b"
                         r"|`[^`]*(?:-confirm|-button|testid)[^`]*`", re.I)
 R4_NOTE = ("an instruction the reader cannot obey is wrong copy (#318 r2-F1: 'Not linked — try again.' over a disabled "
@@ -697,9 +725,7 @@ def rule_dead_until(lines: Sequence[str], paras: Sequence[Para]) -> List[Row]:
             q = m.group(1) if m.group(1) is not None else m.group(2)
             if _is_sentence(q) and IMPERATIVE_RE.search(q):
                 instructions.append((line_of(lines, a, m.start()), q, bool(CONTROL_RE.search(text))))
-        # a quoted or backticked phrase is CITED, not asserted; blank it with same-length filler (never delete it —
-        # line_of counts characters into the joined paragraph, so a shorter text would shift every later line)
-        bare = CITED_SPAN_RE.sub(lambda m: "#" * len(m.group(0)), text)
+        bare = blank_cited(text)  # a dead-until phrase holds whitespace, so a name-only backtick never holds one
         dead += [(line_of(lines, a, m.start()), m.group(0)) for m in DEAD_UNTIL_RE.finditer(bare)]
     rows: List[Row] = []
     if instructions:
