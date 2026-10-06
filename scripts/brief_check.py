@@ -174,7 +174,9 @@ review files stale; repair: the review records the brief's sha256); (e)
 too early (0 of 8 const pairs on main; repair: anchor the needle with the
 character after the name); (f) `export default function Chip` is never matched
 by find_definitions, so a brief mirroring one gets n/a (21 such files on main:
-18 page, 2 layout, 1 error — none a brief mirrors). It
+18 page, 2 layout, 1 error — none a brief mirrors) — but since round 3 the
+default export does END the region of the symbol before it (review r2-F2:
+fetchQueueCount's region in app/layout.tsx ran past RootLayout to end of file). It
 converts "did I look?" from a judgement into a check and stops there. Counted over the brief-sentence findings of RSDPM #288 → #318 there are
 16 classes; the word rules catch 9 of 16 by construction. The 7 they still
 cannot: (1) a citation pointing at the wrong lines (#301's finalize JSON, #297
@@ -591,7 +593,7 @@ MIRROR_TRIGGERS = (
     re.compile(r"\b[Mm]irror(?:s|ing|ed)?\s+(?:the\s+)?`?([A-Z_]\w*)"),
     re.compile(r"\bin\s+`?([A-Za-z_]\w*)`?['’]s\s+shape\b"),
 )
-DEF_LINE_RE = re.compile(r"^(export )?(async )?(function|const|class) ([A-Za-z_][A-Za-z0-9_]*)")
+DEF_LINE_RE = re.compile(r"^(export (?:default )?)?(async )?(function|const|class) ([A-Za-z_][A-Za-z0-9_]*)")
 CAMEL_SUFFIX_RE = re.compile(r"(?<=[a-z0-9])([A-Z][a-z0-9]+)$")
 FILE_SUFFIX_RE = re.compile(r"^.+-([a-z0-9]+)\.tsx?$")
 CONTRAST_RE = re.compile(r"\b(?:not|over|instead\s+of|wrong\s+sibling|right\s+sibling)\b", re.I)

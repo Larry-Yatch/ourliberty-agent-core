@@ -686,6 +686,15 @@ FIXTURES_FILE = "app/houston/fixtures.ts"
 # round 2 F2: a SECOND non-test file defining the same `const task` (on RSDPM 3f267b1 `Panel` is defined in 7 non-test
 # files) — a paragraph naming neither file is ambiguous and FAILs; naming one resolves to it
 TASK_STATES = "app/lab/TaskStates.tsx"
+# round 3 F2 (review r2-F2): `export default function` was not a definition to the region bound, so a symbol defined
+# before a default-exported page ran to end of file (RSDPM app/layout.tsx: fetchQueueCount :52, RootLayout :65 — the
+# region read 52-107). The default export does NOT carry QueueCount's stem `Queue` (a `QueuePage` would stay inside by
+# the stem rule). Its own branch, origin/defaultpage, so no shared-fixture line moves.
+PAGE_FILE = "app/queue/page.tsx"
+QUEUE_LINE = "return countRows(await listQueue());"
+LAYOUT_LINE = "const zone = await viewerTimezone();"
+PAGE_SRC = ("function QueueCount() {\n  " + QUEUE_LINE + "\n}\n\n"
+            "export default async function RootLayout() {\n  " + LAYOUT_LINE + "\n  return zone;\n}\n")
 
 
 class MirrorRules(unittest.TestCase):
@@ -724,6 +733,14 @@ class MirrorRules(unittest.TestCase):
             _git(cls.repo, "add", VERB_FILE)
             _git(cls.repo, "commit", "-q", "-m", branch, env={"GIT_AUTHOR_DATE": date, "GIT_COMMITTER_DATE": date})
             _git(cls.repo, "push", "-q", "origin", branch)
+        _git(cls.repo, "checkout", "-q", "-b", "defaultpage", "main")
+        pg = cls.repo / PAGE_FILE
+        pg.parent.mkdir(parents=True)
+        pg.write_text(PAGE_SRC)
+        _git(cls.repo, "add", PAGE_FILE)
+        _git(cls.repo, "commit", "-q", "-m", "defaultpage",
+             env={"GIT_AUTHOR_DATE": "2026-10-05T12:00:00Z", "GIT_COMMITTER_DATE": "2026-10-05T12:00:00Z"})
+        _git(cls.repo, "push", "-q", "origin", "defaultpage")
         _git(cls.repo, "checkout", "-q", "main")
         cls.r = bc.Repo(cls.repo, "origin/main")
 
@@ -891,6 +908,19 @@ class MirrorRules(unittest.TestCase):
         # positive control: RemoveVerb's own helper carries the stem and stays inside
         text = "## S\n\nUse `RemoveVerb`'s gate shape here:\n```\n  " + CAN_REMOVE + "\n```\n"
         self.assertEqual(self.r3(text)[0].status, "ok", [r.note for r in self.r3(text)])
+
+    def test_a_default_exported_definition_ends_the_region(self):
+        # round 3 F2 (review r2-F2): `RootLayout` is `export default async function` and does not carry `Queue`, so
+        # QueueCount's region ends on the line before it — a quote of RootLayout's line is not QueueCount's shape
+        dp = bc.Repo(self.repo, "origin/defaultpage")
+        rows = self.r3("## S\n\nBuild it in `QueueCount`'s shape:\n```\n  " + LAYOUT_LINE + "\n```\n", repo=dp)
+        self.assertEqual([r.status for r in rows], ["FAIL", "ok"], [r.note for r in rows])
+        self.assertIn("QueueCount is at %s:1-4 and this paragraph quotes none of it" % PAGE_FILE, rows[0].note)
+        # positive control: QueueCount's own line is in its region; RootLayout has no `Count` suffix, so no sibling
+        rows = self.r3("## S\n\nBuild it in `QueueCount`'s shape:\n```\n  " + QUEUE_LINE + "\n```\n", repo=dp)
+        self.assertEqual([r.status for r in rows], ["ok", "ok"], [r.note for r in rows])
+        self.assertIn("from %s:1-4" % PAGE_FILE, rows[0].note)
+        self.assertIn("QueueCount is the newest of its siblings (0)", rows[1].note)
 
     def test_the_stem_is_carried_only_at_a_name_boundary(self):
         # round 2 F1: `RemoveVerb` holds "move" but does not CARRY `Move` (the `m` after `Re` is lowercase), so
