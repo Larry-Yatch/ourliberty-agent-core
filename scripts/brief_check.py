@@ -860,8 +860,62 @@ def check_text(text: str, repo: Optional[Repo] = None, db_functions: Optional[Se
     return rows
 
 
+def review_path(brief: Path) -> Path:
+    """The pre-dispatch review file beside a brief or decisions file: brief-J2-step2.md -> brief-review-brief-J2-step2.md."""
+    return brief.with_name("brief-review-%s.md" % brief.stem)
+
+
+REVIEW_HEADINGS = ("## 1. Mirrors", "## 2. Predicate rows", "## 3. Human sentences", "## 4. Carried fields")
+REVIEW_PROMPT = "scripts/brief_review_prompt.md"
+DEFECTS_RE = re.compile(r"^BRIEF DEFECTS:\s*(\d+)")
+LEDGERED_RE = re.compile(r"^LEDGERED D\d+")
+
+
+def check_review(brief: Path) -> List[Row]:
+    """The pre-dispatch review — the step no word rule can do — must exist beside the brief, be NEWER than it, answer
+    the four questions under their headings, and end `BRIEF DEFECTS: 0` (or ledger every defect it found)."""
+    rp = review_path(brief)
+    todo = ("run the review: paste %s to an opus subagent (read-only) with the brief path; write its verdict to %s"
+            % (REVIEW_PROMPT, rp))
+    if not rp.is_file():
+        return [Row("brief-review", None, "FAIL", "no review file — " + todo)]
+    rows: List[Row] = []
+    if rp.stat().st_mtime < brief.stat().st_mtime:
+        rows.append(Row("brief-review", None, "FAIL", "stale — the brief changed after the review; re-run the review — " + todo))
+    lines = rp.read_text().split("\n")
+    mask = fence_mask(lines)
+    heads = [(i, HEADING_RE.match(ln).group(1).strip().lower()) for i, ln in enumerate(lines)
+             if not mask[i] and HEADING_RE.match(ln)]
+    defects = [i for i, ln in enumerate(lines) if not mask[i] and DEFECTS_RE.match(ln)]
+    for want in REVIEW_HEADINGS:
+        key = HEADING_RE.match(want).group(1).strip().lower()
+        k = next((k for k, (_i, h) in enumerate(heads) if h.startswith(key)), None)
+        if k is None:
+            rows.append(Row("brief-review", None, "FAIL", "the review has no '%s' heading — %s" % (want, todo)))
+            continue
+        start = heads[k][0] + 1
+        end = min([i for i, _h in heads if i >= start] + [i for i in defects if i >= start] + [len(lines)])
+        if not any(lines[i].strip() for i in range(start, end)):
+            rows.append(Row("brief-review", heads[k][0] + 1, "FAIL", "'%s' has nothing under it — %s" % (want, todo)))
+    if not defects:
+        rows.append(Row("brief-review", None, "FAIL", "the review has no 'BRIEF DEFECTS: N' line — " + todo))
+    else:
+        d = defects[-1]
+        n = int(DEFECTS_RE.match(lines[d]).group(1))
+        after = [ln.strip() for ln in lines[d + 1:] if ln.strip()]
+        ledgered = [ln for ln in after if LEDGERED_RE.match(ln)]
+        if n > 0 and (len(ledgered) != len(after) or len(ledgered) < n):
+            rows.append(Row("brief-review", d + 1, "FAIL",
+                            "BRIEF DEFECTS: %d with %d of %d line(s) under it as 'LEDGERED D<nn> — <reason>' — fix the brief "
+                            "and re-run the review until N = 0, or ledger each defect; %s" % (n, len(ledgered), max(n, len(after)), todo)))
+        if not rows:
+            rows.append(Row("brief-review", None, "ok", "%s: four answers, BRIEF DEFECTS: %d (%d ledgered)" % (rp.name, n, len(ledgered))))
+    return rows
+
+
 def check_file(path: Path, repo: Optional[Repo], decisions_only: bool = False) -> List[Row]:
-    return check_text(path.read_text(), repo=repo, decisions_only=decisions_only)
+    """check_text over the file, plus the brief-review row (it needs the path; check_text stays text-only)."""
+    return check_text(path.read_text(), repo=repo, decisions_only=decisions_only) + check_review(path)
 
 
 def failures(rows: Sequence[Row]) -> List[Row]:

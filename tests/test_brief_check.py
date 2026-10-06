@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import os
 import re
 import shutil
 import subprocess
@@ -723,6 +724,101 @@ class DeadUntilRules(unittest.TestCase):
         self.assertEqual(len([r for r in rows if r.status == "FAIL"]), 1)
 
 
+# --------------------------------------------------------------------------- #
+# brief-review — the pre-dispatch review file check_file demands beside every brief and decisions file
+# --------------------------------------------------------------------------- #
+VALID_REVIEW = ("# Pre-dispatch review — brief.md\n\n## 1. Mirrors\n- none in this brief\n\n## 2. Predicate rows\n- none\n\n"
+                "## 3. Human sentences\n- none\n\n## 4. Carried fields\n- NONE\n\nBRIEF DEFECTS: 0\n")
+T_BRIEF, T_REVIEW = 1_000_000, 1_000_100  # explicit mtimes: a checkout gives fixtures arbitrary ones
+
+
+def write_reviewed(d, name="brief.md", brief="# Brief\n\nBuild the thing.\n", review=VALID_REVIEW,
+                   brief_mtime=T_BRIEF, review_mtime=T_REVIEW):
+    b = Path(d) / name
+    b.write_text(brief)
+    os.utime(str(b), (brief_mtime, brief_mtime))
+    if review is not None:
+        rp = bc.review_path(b)
+        rp.write_text(review)
+        os.utime(str(rp), (review_mtime, review_mtime))
+    return b
+
+
+class BriefReview(unittest.TestCase):
+    def setUp(self):
+        self._d = tempfile.TemporaryDirectory()
+        self.d = self._d.name
+
+    def tearDown(self):
+        self._d.cleanup()
+
+    def review_rows(self, **kw):
+        return rows_of("brief-review", bc.check_file(write_reviewed(self.d, **kw), None))
+
+    def assertRefused(self, rows, *needles):
+        f = [r for r in rows if r.status == "FAIL"]
+        self.assertEqual(len(f), 1, [(r.status, r.note) for r in rows])
+        for n in needles:
+            self.assertIn(n, f[0].note)
+        self.assertIn("run the review: paste scripts/brief_review_prompt.md to an opus subagent (read-only)", f[0].note)
+
+    def test_the_review_file_is_named_after_the_brief_stem(self):
+        self.assertEqual(bc.review_path(Path("/x/brief-J2-step2.md")), Path("/x/brief-review-brief-J2-step2.md"))
+        self.assertEqual(bc.review_path(Path("/x/decisions-318-r2.md")), Path("/x/brief-review-decisions-318-r2.md"))
+
+    def test_a_missing_review_is_refused(self):
+        self.assertRefused(self.review_rows(review=None), "brief-review-brief.md")
+
+    def test_a_review_OLDER_than_the_brief_is_stale(self):
+        self.assertRefused(self.review_rows(review_mtime=T_BRIEF - 1), "stale — the brief changed after the review; re-run the review")
+
+    def test_an_equal_mtime_passes(self):
+        self.assertEqual([r.status for r in self.review_rows(review_mtime=T_BRIEF)], ["ok"])
+
+    def test_a_missing_heading_is_refused(self):
+        self.assertRefused(self.review_rows(review=VALID_REVIEW.replace("## 3. Human sentences\n- none\n\n", "")),
+                           "## 3. Human sentences")
+
+    def test_an_empty_heading_is_refused(self):
+        self.assertRefused(self.review_rows(review=VALID_REVIEW.replace("## 4. Carried fields\n- NONE\n", "## 4. Carried fields\n")),
+                           "## 4. Carried fields")
+
+    def test_headings_match_case_insensitively(self):
+        rows = self.review_rows(review=VALID_REVIEW.replace("## 1. Mirrors", "### 1. MIRRORS"))
+        self.assertEqual([r.status for r in rows], ["ok"])
+
+    def test_no_defects_line_is_refused(self):
+        self.assertRefused(self.review_rows(review=VALID_REVIEW.replace("BRIEF DEFECTS: 0\n", "")), "BRIEF DEFECTS")
+
+    def test_open_defects_without_a_LEDGERED_line_are_refused(self):
+        rows = self.review_rows(review=VALID_REVIEW.replace("BRIEF DEFECTS: 0\n", "BRIEF DEFECTS: 2\n- S2 mirrors the wrong door\n"
+                                                            "- the row has one sentence\n"))
+        self.assertRefused(rows, "BRIEF DEFECTS: 2")
+
+    def test_open_defects_with_NO_line_under_them_are_refused(self):
+        # "one line per defect": a count with nothing listed under it is not a ledger (fail-closed)
+        self.assertRefused(self.review_rows(review=VALID_REVIEW.replace("BRIEF DEFECTS: 0", "BRIEF DEFECTS: 2")), "BRIEF DEFECTS: 2")
+
+    def test_zero_defects_passes_and_ledgered_defects_pass(self):
+        self.assertEqual([r.status for r in self.review_rows()], ["ok"])
+        led = VALID_REVIEW.replace("BRIEF DEFECTS: 0\n", "BRIEF DEFECTS: 1\nLEDGERED D91 — the cap sentence waits on the second desk\n")
+        self.assertEqual([r.status for r in self.review_rows(review=led)], ["ok"])
+
+    def test_the_LAST_defects_line_counts(self):
+        rerun = VALID_REVIEW.replace("BRIEF DEFECTS: 0\n", "BRIEF DEFECTS: 3\n- a\n- b\n- c\n\nre-run after fixing:\nBRIEF DEFECTS: 0\n")
+        self.assertEqual([r.status for r in self.review_rows(review=rerun)], ["ok"])
+
+    def test_check_text_stays_text_only(self):
+        self.assertEqual(rows_of("brief-review", bc.check_text("# Brief\n\nBuild the thing.\n")), [])
+
+    def test_the_prompt_file_carries_every_heading_the_check_demands(self):
+        prompt = (_SCRIPTS / "brief_review_prompt.md").read_text()
+        for h in bc.REVIEW_HEADINGS:
+            self.assertIn(h, prompt)
+        self.assertIn("BRIEF DEFECTS: N", prompt)
+        self.assertIn("LEDGERED D", prompt)
+
+
 class Cli(unittest.TestCase):
     def run_cli(self, *args):
         buf = io.StringIO()
@@ -732,10 +828,8 @@ class Cli(unittest.TestCase):
 
     def test_exit_codes_and_table(self):
         with tempfile.TemporaryDirectory() as d:
-            good = Path(d) / "good.md"
-            good.write_text("# Brief\n\nBuild the thing.\n")
-            bad = Path(d) / "bad.md"
-            bad.write_text(J_F1)
+            good = write_reviewed(d, "good.md")       # each brief now needs its review file beside it
+            bad = write_reviewed(d, "bad.md", brief=J_F1)
             code, out = self.run_cli(str(good))
             self.assertEqual(code, bc.EXIT_OK)
             self.assertIn("PASS: 0 FAIL row(s)", out)
@@ -745,6 +839,11 @@ class Cli(unittest.TestCase):
             self.assertIn("REFUSED: 1 FAIL row(s)", out)
             code, _ = self.run_cli(str(Path(d) / "missing.md"))
             self.assertEqual(code, bc.EXIT_USAGE)
+            # the CLI demands the review file too (check_file, no flag)
+            bc.review_path(good).unlink()
+            code, out = self.run_cli(str(good))
+            self.assertEqual(code, bc.EXIT_REFUSED)
+            self.assertIn("| brief-review |", out)
 
     def test_there_is_no_waiver_option(self):
         p = bc.main.__globals__["argparse"].ArgumentParser()
