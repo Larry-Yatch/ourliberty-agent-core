@@ -75,6 +75,7 @@ Exit 0 passes, 2 refused, 1 usage error. Python 3.9, stdlib only.
 from __future__ import annotations
 
 import argparse
+import datetime as _dt
 import re
 import subprocess
 import sys
@@ -429,6 +430,138 @@ def rule_direction_bearing(rows_in: Sequence[Tuple[int, str]], mig_texts: Dict[s
     return out
 
 
+# R3 mirror-names-the-newest-sibling
+MIRROR_TRIGGERS = (
+    re.compile(r"\b([A-Za-z_]\w*)`?['’]s\s+(?:\w+\s+){0,2}(?:shape|gate|rule|precedent)\b"),
+    re.compile(r"\b[Mm]irror(?:s|ing|ed)?\s+(?:the\s+)?`?([A-Z_]\w*)"),
+    re.compile(r"\bin\s+`?([A-Za-z_]\w*)`?['’]s\s+shape\b"),
+)
+DEF_LINE_RE = re.compile(r"^(export )?(async )?(function|const|class) ([A-Za-z_][A-Za-z0-9_]*)")
+CAMEL_SUFFIX_RE = re.compile(r"(?<=[a-z0-9])([A-Z][a-z0-9]+)$")
+FILE_SUFFIX_RE = re.compile(r"^.+-([a-z0-9]+)\.tsx?$")
+CONTRAST_RE = re.compile(r"\b(?:not|over|instead\s+of|wrong\s+sibling|right\s+sibling)\b", re.I)
+GUTTER_RE = re.compile(r"^\s*\d+(?::|\t|\s{2,})")
+R3_NOTE = ("quote the lines you are mirroring and say why the older sibling beats the newer one (#318 r2-F1: "
+           "'RemoveVerb's gate shape' was the WRONG sibling — Merge, the newest door, keeps its confirm live; it cost a "
+           "review round and a fix round)")
+
+
+def _ws(s: str) -> str:
+    return re.sub(r"\s+", " ", s).strip()
+
+
+def _quotable(s: str) -> bool:
+    """A quote that can be checked: ≥12 characters with code punctuation in it (`canRemove` alone is a name, not a quote)."""
+    return len(s) >= 12 and any(c in s for c in "=(){}")
+
+
+def _day(ct: int) -> str:
+    return _dt.datetime.utcfromtimestamp(ct).strftime("%Y-%m-%d")
+
+
+def mirror_names(text: str) -> List[str]:
+    out: List[str] = []
+    for rx in MIRROR_TRIGGERS:
+        for m in rx.finditer(text):
+            if m.group(1) not in out:
+                out.append(m.group(1))
+    return out
+
+
+def rule_mirror(lines: Sequence[str], mask: Sequence[bool], paras: Sequence[Para], repo: Optional["Repo"],
+                repo_ok: bool, repo_why: str) -> List[Row]:
+    rule = "mirror-names-the-newest-sibling"
+    rows: List[Row] = []
+    cache: Dict[str, object] = {}
+
+    def cached(key: str, fn):
+        if key not in cache:
+            cache[key] = fn()
+        return cache[key]
+
+    for a, b, text in paras:
+        for name in mirror_names(text):
+            if repo is None or not repo_ok:
+                rows.append(Row(rule, a + 1, "n/a", "%s: %s" % (name, repo_why)))
+                continue
+            hits = cached("def:" + name, lambda: repo.find_definitions(name))
+            if hits is None:
+                rows.append(Row(rule, a + 1, "FAIL", "git grep for the definition of %s on %s failed — fix the repo, "
+                                "then re-run (an unresolved mirror is never a pass)" % (name, repo.ref)))
+                continue
+            if not hits:
+                rows.append(Row(rule, a + 1, "n/a", "%s is not a function/const/class on %s" % (name, repo.ref)))
+                continue
+            path, def_line, def_text = next((h for h in hits if Path(h[0]).name in text), hits[0])
+            src = cached("show:" + path, lambda: repo.show(path)) or ""
+            src_lines = src.split("\n")
+            defs = [(i + 1, m.group(3), m.group(4)) for i, ln in enumerate(src_lines) for m in [DEF_LINE_RE.match(ln)] if m]
+            suf = CAMEL_SUFFIX_RE.search(name)
+            suffix = suf.group(1) if suf else None
+            sibs = [(ln, kw, n) for ln, kw, n in defs
+                    if suffix and kw in ("function", "const") and n != name and n.endswith(suffix) and len(n) > len(suffix)]
+            nxt = min((ln for ln, _k, _n in sibs if ln > def_line), default=len(src_lines) + 1)
+            region = _ws("\n".join(src_lines[def_line - 1:nxt - 1]))
+            where = "%s:%d-%d" % (path, def_line, nxt - 1)
+
+            # ---- quote half ----
+            quote = next((q for q in re.findall(r"`([^`]+)`", text) if _quotable(q) and _ws(q) in region), None)
+            if quote is None:
+                for i in (b + 1, b + 2):
+                    if i < len(lines) and mask[i] and FENCE_RE.match(lines[i]):
+                        j = i + 1
+                        while j < len(lines) and not FENCE_RE.match(lines[j]):
+                            body = GUTTER_RE.sub("", lines[j]).strip()
+                            if _quotable(body) and _ws(body) in region:
+                                quote = body
+                                break
+                            j += 1
+                        break
+            if quote is not None:
+                rows.append(Row(rule, a + 1, "ok", "%s: quotes `%s` from %s" % (name, quote[:60], where)))
+            else:
+                rows.append(Row(rule, a + 1, "FAIL", "%s — %s is at %s and this paragraph quotes none of it" % (R3_NOTE, name, where)))
+
+            # ---- sibling half ----
+            kw = def_text.split(name, 1)[0].split()[-1] if name in def_text else "function"
+            needle = "function %s(" % name if kw == "function" else "%s %s" % (kw, name)
+            born = cached("born:" + needle + path, lambda: repo.birth(needle, path))
+            if suffix:
+                cands = [(n, "function %s(" % n if k == "function" else "%s %s" % (k, n), path) for _l, k, n in sibs]
+            else:
+                fm = FILE_SUFFIX_RE.match(Path(path).name)
+                listing = (cached("ls:" + str(Path(path).parent), lambda: repo.ls_files(str(Path(path).parent))) or []) if fm else []
+                cands = [(Path(p).name, None, p) for p in listing
+                         if p != path and fm and re.match(r"^.+-%s\.tsx?$" % re.escape(fm.group(1)), Path(p).name)]
+            if born is None:
+                rows.append(Row(rule, a + 1, "FAIL", "could not date %s with `git log -S` on %s — fetch the full history "
+                                "(a shallow clone dates nothing) and re-run" % (name, repo.ref)))
+                continue
+            newer: List[Tuple[int, str]] = []
+            for n, nd, p in cands:
+                t = cached("born:%s%s" % (nd, p), (lambda nd=nd, p=p: repo.birth(nd, p) if nd else repo.file_birth(p)))
+                if t is not None and t > born:
+                    newer.append((t, n))
+            newer.sort(reverse=True)
+            if not newer:
+                rows.append(Row(rule, a + 1, "ok", "%s is the newest of its siblings (%d)" % (name, len(cands))))
+                continue
+            listed = ", ".join("%s (%s)" % (n, _day(t)) for t, n in newer)
+            newest = newer[0][1]
+            named_here = re.search(r"\b%s\b" % re.escape(newest), text)
+            if named_here and CONTRAST_RE.search(text):
+                rows.append(Row(rule, a + 1, "ok", "%s: the newer %s is named here with why" % (name, newest)))
+                continue
+            elsewhere = next((i + 1 for i, ln in enumerate(lines)
+                              if not mask[i] and re.search(r"\b%s\b" % re.escape(newest), ln)), None)
+            if elsewhere is not None:
+                rows.append(Row(rule, a + 1, "info", "%s is newer and mentioned at line %d — say in THIS sentence why %s's "
+                                "shape beats it (newer: %s)" % (newest, elsewhere, name, listed)))
+            else:
+                rows.append(Row(rule, a + 1, "FAIL", "%s — newer than %s: %s" % (R3_NOTE, name, listed)))
+    return rows
+
+
 # --------------------------------------------------------------------------- #
 # Repo lookups (git, never the working tree — the laptop checkout is stale)
 # --------------------------------------------------------------------------- #
@@ -476,6 +609,34 @@ class Repo:
             if tok not in out or f < out[tok]:
                 out[tok] = f
         return out
+
+    def find_definitions(self, name: str) -> Optional[List[Tuple[str, int, str]]]:
+        """(path, line, text) of every top-level `function|const|class <name>` on the ref; None when git failed.
+        NEVER `\\b` in this pattern: Apple Git 2.39's `grep -E` does not support it and exits 1 for every symbol."""
+        cp = self._git("grep", "-n", "-E", "^(export )?(async )?(function|const|class) %s([^A-Za-z0-9_]|$)" % name, self.ref)
+        if cp.returncode not in (0, 1):
+            return None
+        out: List[Tuple[str, int, str]] = []
+        for ln in cp.stdout.split("\n"):
+            m = re.match(r"%s:([^:]+):(\d+):(.*)$" % re.escape(self.ref), ln)
+            if m:
+                out.append((m.group(1), int(m.group(2)), m.group(3)))
+        return out
+
+    def birth(self, needle: str, path: str) -> Optional[int]:
+        """Commit time of the first commit on the ref that added `needle` to `path` (`git log -S`)."""
+        cp = self._git("log", "--reverse", "--format=%ct", "-S" + needle, self.ref, "--", path)
+        first = cp.stdout.split("\n")[0].strip() if cp.returncode == 0 else ""
+        return int(first) if first.isdigit() else None
+
+    def file_birth(self, path: str) -> Optional[int]:
+        cp = self._git("log", "--reverse", "--format=%ct", self.ref, "--", path)
+        first = cp.stdout.split("\n")[0].strip() if cp.returncode == 0 else ""
+        return int(first) if first.isdigit() else None
+
+    def ls_files(self, directory: str) -> Optional[List[str]]:
+        cp = self._git("ls-tree", "--name-only", self.ref, directory.rstrip("/") + "/")
+        return [x for x in cp.stdout.split("\n") if x] if cp.returncode == 0 else None
 
     def db_functions(self) -> Optional[Set[str]]:
         """Every function name a migration on the ref declares; None when git itself failed (see raise_origins)."""
@@ -615,6 +776,7 @@ def check_text(text: str, repo: Optional[Repo] = None, db_functions: Optional[Se
     # ---- sentence rules (v2): both modes ---------------------------------- #
     paras = [p for _h, s, e in secs for p in paragraph_ranges(lines, mask, s, e)]
     rows += rule_carried_no_reader(lines, paras)
+    rows += rule_mirror(lines, mask, paras, repo, repo_ok, repo_why)
 
     # ---- claim rules ------------------------------------------------------ #
     n_claims = n_ok = 0
