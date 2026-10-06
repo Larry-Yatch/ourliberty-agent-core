@@ -88,10 +88,12 @@ Rules, each a row in the printed table (FAIL rows exit 2):
                     written like one — backticked, or with two or
                     more capitals, or with `_` ("add-a-task's shape" and "PR B's
                     rule" are English), and not inside a quoted phrase —
-                    QUOTES X's region. X defined in two or more such files with
-                    none of their file names in the paragraph is one FAIL naming
-                    every file (review r1-F5: `Panel` is in 7, and the first grep
-                    hit was taken silently). The quote half: a backticked span of 20+
+                    QUOTES X's region. X defined in two or more such files is
+                    one FAIL naming them unless the paragraph names exactly one
+                    — by its full path, or by its file name at a name boundary
+                    (review r1-F5: `Panel` is in 7, and the first grep hit was
+                    taken silently; review r2-F1: `AddTaskPanel.tsx` named
+                    `Panel.tsx`; `page.tsx` alone names every page). The quote half: a backticked span of 20+
                     characters with = ( ) { } that the whole file holds at most
                     twice (`router.refresh()` is 16 characters, in 14 places, one
                     inside RemoveVerb's own region), or a fenced block within 2
@@ -667,12 +669,21 @@ def rule_mirror(lines: Sequence[str], mask: Sequence[bool], paras: Sequence[Para
                 rows.append(Row(rule, a + 1, "n/a", "%s is not a function/const/class outside test files on %s" % (name, repo.ref)))
                 continue
             files = list(dict.fromkeys(h[0] for h in hits))
-            named = next((h for h in hits if Path(h[0]).name in text), None)
-            if named is None and len(files) > 1:  # review r1-F5: the first grep hit is a guess, and a guess never passes
+            # a hit is NAMED by its full path in the paragraph, or else by its file name at a name boundary (review
+            # r2-F1: a bare substring let `AddTaskPanel.tsx` name `Panel.tsx`); a full path wins over a bare name
+            named_hits = [h for h in hits if h[0] in text] or [
+                h for h in hits if re.search(r"(?<![\w.-])%s(?![\w-])" % re.escape(Path(h[0]).name), text)]
+            named_files = list(dict.fromkeys(h[0] for h in named_hits))
+            if len(named_files) > 1:  # `page.tsx` alone names every page: still a guess
+                rows.append(Row(rule, a + 1, "FAIL", "%s is defined in %d files on %s; this paragraph names %d of them "
+                                "(%s) — name only the one you mean, by its full path"
+                                % (name, len(files), repo.ref, len(named_files), ", ".join(named_files))))
+                continue
+            if not named_files and len(files) > 1:  # review r1-F5: the first grep hit is a guess, and a guess never passes
                 rows.append(Row(rule, a + 1, "FAIL", "%s is defined in %d files on %s (%s) — name the file you mean in "
                                 "this paragraph" % (name, len(files), repo.ref, ", ".join(files))))
                 continue
-            path, def_line, def_text = named or hits[0]
+            path, def_line, def_text = (named_hits or hits)[0]
             src = cached("show:" + path, lambda: repo.show(path)) or ""
             src_lines = src.split("\n")
             defs = [(i + 1, m.group(3), m.group(4)) for i, ln in enumerate(src_lines) for m in [DEF_LINE_RE.match(ln)] if m]

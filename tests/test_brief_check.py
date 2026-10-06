@@ -834,6 +834,30 @@ class MirrorRules(unittest.TestCase):
         self.assertEqual(rows[0].status, "FAIL", [r.note for r in rows])
         self.assertIn("task is at %s:3-4 and this paragraph quotes none of it" % TASK_STATES, rows[0].note)
 
+    def test_a_file_name_inside_a_longer_file_name_does_not_name_that_file(self):
+        # round 3 F1 (review r2-F1): the file name was a bare SUBSTRING of the paragraph, so `AddTaskPanel.tsx` named
+        # `Panel.tsx` and resolved RSDPM's 7-way `Panel` ambiguity silently (fixture-r3-F1.md:5); `BigTaskStates.tsx`
+        # holds `TaskStates.tsx` the same way. A file name names a file only at a name boundary.
+        rows = self.r3("## S\n\nbuild it in `task`'s shape (`app/lab/BigTaskStates.tsx`).\n")
+        self.assertEqual([r.status for r in rows], ["FAIL"], [r.note for r in rows])
+        self.assertIn("task is defined in 2 files on origin/main (%s, %s) — name the file you mean" % (FIXTURES_FILE, TASK_STATES),
+                      rows[0].note)
+        # positive control: the full path, and the bare file name at a boundary, both name it
+        for named in ("`%s`" % TASK_STATES, "`TaskStates.tsx`", "in TaskStates.tsx"):
+            rows = self.r3("## S\n\nbuild it in `task`'s shape (%s).\n" % named)
+            self.assertEqual(rows[0].status, "FAIL", (named, [r.note for r in rows]))
+            self.assertIn("task is at %s:3-4 and this paragraph quotes none of it" % TASK_STATES, rows[0].note, named)
+
+    def test_a_paragraph_naming_two_of_the_files_fails_until_one_full_path_wins(self):
+        # round 3 F1: two named files is the same ambiguity — the first named hit was taken silently
+        rows = self.r3("## S\n\nbuild it in `task`'s shape (fixtures.ts, or TaskStates.tsx).\n")
+        self.assertEqual([r.status for r in rows], ["FAIL"], [r.note for r in rows])
+        self.assertIn("task is defined in 2 files on origin/main; this paragraph names 2 of them (%s, %s) — name only the "
+                      "one you mean, by its full path" % (FIXTURES_FILE, TASK_STATES), rows[0].note)
+        rows = self.r3("## S\n\nbuild it in `task`'s shape (`%s`, not fixtures.ts).\n" % TASK_STATES)
+        self.assertEqual(rows[0].status, "FAIL", [r.note for r in rows])
+        self.assertIn("task is at %s:3-4 and this paragraph quotes none of it" % TASK_STATES, rows[0].note)
+
     def test_fixture_fake_stub_and_python_test_paths_are_test_paths(self):
         # round 2 F2(b): names resolved into tests/contracts/__fixtures__/ and workers/tests/*.py on RSDPM main;
         # tests/contracts/lib/ holds real definitions five corpus briefs cite and must stay resolvable
