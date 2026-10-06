@@ -168,6 +168,64 @@ class ClaimRules(unittest.TestCase):
 
 
 # --------------------------------------------------------------------------- #
+# R1 carried-no-reader — the ORIGINAL brief-J2-step2.md S3 sentence (#318 r2-F2)
+# --------------------------------------------------------------------------- #
+R1_RED = ("`created_by_name` / `created_at` are NOT rendered in step 2 (no reader asked; the row keeps them — one line in "
+          "the panel's header comment).")
+R1_GREEN = ("`created_by` / `created_by_name` / `created_at` are NOT carried into the app row at all — a field with no "
+            "reader is not carried.")
+R1_GREEN_READER = "… `created_at` is kept on the row; `RecordLinksPanel.tsx:140` renders it as the \"linked on\" line."
+
+
+class CarriedNoReader(unittest.TestCase):
+    def check(self, text, **kw):
+        return bc.check_text(text, repo=None, db_functions=set(), **kw)
+
+    def test_318_r2_F2_a_kept_field_with_no_reader_is_refused(self):
+        f = fails(self.check("## S3\n\n" + R1_RED + "\n"), "carried-no-reader")
+        self.assertEqual(len(f), 1, [r.note for r in self.check(R1_RED)])
+        self.assertEqual(f[0].line, 3)
+        self.assertIn("name the reader or do not carry it", f[0].note)
+        self.assertIn("`created_by_name`", f[0].note)
+
+    def test_the_same_sentence_is_refused_in_a_decisions_file(self):
+        self.assertEqual(len(fails(self.check("## F2\n" + R1_RED + "\n", decisions_only=True), "carried-no-reader")), 1)
+
+    def test_a_negated_keep_is_a_drop_and_passes(self):
+        rows = self.check("## S3\n\n" + R1_GREEN + "\n")
+        self.assertEqual(fails(rows, "carried-no-reader"), [])
+        self.assertEqual(rows_of("carried-no-reader", rows), [])  # nothing is kept, so nothing is asked
+
+    def test_a_named_reader_passes(self):
+        rows = self.check("## S3\n\n" + R1_GREEN_READER + "\n")
+        self.assertEqual([r.status for r in rows_of("carried-no-reader", rows)], ["ok"])
+
+    def test_a_reader_in_the_NEXT_paragraph_passes(self):
+        rows = self.check("## S3\n\n`created_at` is kept on the row.\n\n`RecordLinksPanel` renders it as the linked-on line.\n")
+        self.assertEqual([r.status for r in rows_of("carried-no-reader", rows)], ["ok"])
+
+    def test_a_negated_reader_verb_is_not_a_reader(self):
+        for s in ("`x` is kept; nothing reads it.", "`x` is kept; `Panel.tsx:40` never renders it."):
+            self.assertEqual(len(fails(self.check("## S\n\n%s\n" % s), "carried-no-reader")), 1, s)
+
+    def test_the_carried_field_is_not_its_own_reader(self):
+        f = fails(self.check("## S\n\n`created_at` is kept; `created_at` renders nothing new.\n"), "carried-no-reader")
+        self.assertEqual(len(f), 1)
+
+    def test_a_reader_verb_more_than_six_words_away_does_not_count(self):
+        s = "`x` is kept; `Panel` is the component on the page that eventually, much later, renders things."
+        self.assertEqual(len(fails(self.check("## S\n\n%s\n" % s), "carried-no-reader")), 1)
+
+    def test_the_keep_word_and_the_field_in_different_sentences_still_trigger(self):
+        f = fails(self.check("## S\n\nThe app row gains `created_at`. The row keeps it.\n"), "carried-no-reader")
+        self.assertEqual(len(f), 1)
+        self.assertIn("`created_at`", f[0].note)
+
+    def test_a_fenced_keep_is_never_scanned(self):
+        self.assertEqual(rows_of("carried-no-reader", self.check("## S\n\n```\n`x` is kept\n```\n")), [])
+
+
+# --------------------------------------------------------------------------- #
 # Structure rules against a throwaway repo
 # --------------------------------------------------------------------------- #
 MIG_10 = """-- 0010_first.sql

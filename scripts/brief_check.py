@@ -155,19 +155,19 @@ def sections(lines: Sequence[str], mask: Sequence[bool]) -> List[Tuple[str, int,
     return [s for s in out if s[2] > s[1]]
 
 
-def paragraphs(lines: Sequence[str], mask: Sequence[bool], start: int, end: int) -> List[Tuple[int, str]]:
-    """(first line number 1-based, joined text) for every prose paragraph in [start, end).
+def paragraph_ranges(lines: Sequence[str], mask: Sequence[bool], start: int, end: int) -> List[Tuple[int, int, str]]:
+    """(first line index, last line index, joined text) for every prose paragraph in [start, end).
 
     A list item or table row starts a new paragraph; fenced lines and headings are skipped.
     """
-    out: List[Tuple[int, str]] = []
+    out: List[Tuple[int, int, str]] = []
     cur: List[str] = []
     cur_start = -1
 
     def flush() -> None:
         nonlocal cur, cur_start
         if cur:
-            out.append((cur_start + 1, " ".join(s.strip() for s in cur)))
+            out.append((cur_start, cur_start + len(cur) - 1, " ".join(s.strip() for s in cur)))
         cur, cur_start = [], -1
 
     for i in range(start, end):
@@ -182,6 +182,23 @@ def paragraphs(lines: Sequence[str], mask: Sequence[bool], start: int, end: int)
         cur.append(ln)
     flush()
     return out
+
+
+def paragraphs(lines: Sequence[str], mask: Sequence[bool], start: int, end: int) -> List[Tuple[int, str]]:
+    """(first line number 1-based, joined text) for every prose paragraph in [start, end)."""
+    return [(a + 1, t) for a, _b, t in paragraph_ranges(lines, mask, start, end)]
+
+
+def line_of(lines: Sequence[str], first: int, offset: int) -> int:
+    """1-based line number of character `offset` in a paragraph joined by paragraph_ranges from line index `first`."""
+    i, pos = first, 0
+    while i < len(lines):
+        n = len(lines[i].strip())
+        if offset <= pos + n:
+            return i + 1
+        pos += n + 1
+        i += 1
+    return first + 1
 
 
 def fenced_texts(lines: Sequence[str], mask: Sequence[bool], start: int, end: int) -> List[str]:
@@ -200,6 +217,84 @@ def fenced_texts(lines: Sequence[str], mask: Sequence[bool], start: int, end: in
 def _norm(s: str) -> str:
     s = re.sub(r"^\s*(?:--|\*|\||>|#+)\s*", "", s)
     return re.sub(r"\s+", " ", s).strip().lower()
+
+
+# --------------------------------------------------------------------------- #
+# Sentence rules (v2) — each earned by a #318 finding whose cause was a brief sentence
+# --------------------------------------------------------------------------- #
+Para = Tuple[int, int, str]  # (first line index, last line index, joined text)
+
+NEGATORS = {"not", "never", "no", "nor", "nothing", "none", "nobody", "without", "dropped",
+            "isn't", "aren't", "doesn't", "don't", "won't", "wasn't", "weren't"}
+WORD_RE = re.compile(r"[A-Za-z]+(?:['’][a-z]+)?")
+
+
+def _negated(text: str, start: int, n: int) -> bool:
+    """True when one of the n words before `start` is a negator ('not carried', 'nothing reads')."""
+    words = [w.lower().replace("’", "'") for w in WORD_RE.findall(text[:start])][-n:]
+    return any(w in NEGATORS for w in words)
+
+
+def _word_index(tokens: Sequence[Tuple[int, int]], offset: int) -> int:
+    k = 0
+    for j, (a, _b) in enumerate(tokens):
+        if a <= offset:
+            k = j
+        else:
+            break
+    return k
+
+
+# R1 carried-no-reader
+IDENT_SPAN_RE = re.compile(r"`([A-Za-z_$][\w$./-]*)`")
+KEEP_RE = re.compile(r"\bno\s+reader\s+asked\b|\bnot\s+(?:rendered|shown|displayed)\b"
+                     r"|\b(?:carried|carries|carry|kept|keeps|keep|retained|retains)\b", re.I)
+READER_VERB_RE = re.compile(r"\brendered\s+by\b|\bread\s+by\b|\b(?:renders|reads|consumes|displays|shows)\b", re.I)
+SENTENCE_SPLIT_RE = re.compile(r"(?<=[.;!?])\s+")
+R1_NOTE = ("name the reader or do not carry it — a field with no reader crosses a boundary for nothing "
+           "(#318 r2-F2: a roster name shipped to the browser past a SECURITY DEFINER join)")
+
+
+def _reader_in(text: str, carried: Set[str]) -> Optional[str]:
+    """The first reader named in `text`: a backticked identifier that is not a carried field, or a file:line
+    citation, within six words of an un-negated reader verb. None when there is none."""
+    tokens = [(m.start(), m.end()) for m in re.finditer(r"\S+", text)]
+    verbs = [_word_index(tokens, m.start()) for m in READER_VERB_RE.finditer(text) if not _negated(text, m.start(), 2)]
+    if not verbs:
+        return None
+    cands = [(m.start(), m.group(0)) for m in CITATION_RE.finditer(text)]
+    cands += [(m.start(), "`%s`" % m.group(1)) for m in IDENT_SPAN_RE.finditer(text) if m.group(1) not in carried]
+    for off, name in sorted(cands):
+        wi = _word_index(tokens, off)
+        if any(abs(wi - v) <= 6 for v in verbs):
+            return name
+    return None
+
+
+def rule_carried_no_reader(lines: Sequence[str], paras: Sequence[Para]) -> List[Row]:
+    rows: List[Row] = []
+    for k, (a, _b, text) in enumerate(paras):
+        if not IDENT_SPAN_RE.search(text):
+            continue
+        carried: List[str] = []
+        kept = False
+        for sent in SENTENCE_SPLIT_RE.split(text):
+            live = [m for m in KEEP_RE.finditer(sent) if not _negated(sent, m.start(), 3)]
+            if live:
+                kept = True
+                carried += [m.group(1) for m in IDENT_SPAN_RE.finditer(sent) if m.group(1) not in carried]
+        if not kept:
+            continue
+        if not carried:  # the keep-word and the field sit in different sentences of one paragraph
+            carried = list(dict.fromkeys(m.group(1) for m in IDENT_SPAN_RE.finditer(text)))
+        nxt = paras[k + 1][2] if k + 1 < len(paras) else ""
+        reader = _reader_in(text, set(carried)) or _reader_in(nxt, set(carried))
+        fields = ", ".join("`%s`" % c for c in carried)
+        if reader:
+            rows.append(Row("carried-no-reader", a + 1, "ok", "%s kept; reader %s" % (fields, reader)))
+        else:
+            rows.append(Row("carried-no-reader", a + 1, "FAIL", "%s (kept here: %s)" % (R1_NOTE, fields)))
+    return rows
 
 
 # --------------------------------------------------------------------------- #
@@ -375,6 +470,10 @@ def check_text(text: str, repo: Optional[Repo] = None, db_functions: Optional[Se
                     rows.append(Row("two-clocks", s + 1, "FAIL", "the TWO CLOCKS section is empty"))
                 else:
                     rows.append(Row("two-clocks", s + 1, "ok", "present (%d lines; no named migration on the ref to compare)" % len(body)))
+
+    # ---- sentence rules (v2): both modes ---------------------------------- #
+    paras = [p for _h, s, e in secs for p in paragraph_ranges(lines, mask, s, e)]
+    rows += rule_carried_no_reader(lines, paras)
 
     # ---- claim rules ------------------------------------------------------ #
     n_claims = n_ok = 0
