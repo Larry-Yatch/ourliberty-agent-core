@@ -370,6 +370,170 @@ class StructureRules(unittest.TestCase):
         self.assertEqual(self.r.raise_origins(), {"a_refused": "0010_first.sql", "b_refused": "0010_first.sql", "c_refused": "0011_second.sql"})
 
 
+# --------------------------------------------------------------------------- #
+# R2 direction-bearing-refusal — the REAL 0072 excerpt (#318 r1-F1)
+# --------------------------------------------------------------------------- #
+# `git -C ~/dev/RSDPM show origin/main:supabase/migrations/0072_record_links.sql | sed -n '520,575p'`, verbatim.
+# RSDPM origin/main 1d3b89333a6a14f5629acf50c5b65562797bdd9d (the file last changed in 8a5a55543523d347277a1b770ebdc87558990b5c).
+# Excerpt line k (0-based) is the full file's line 520 + k.
+MIG_0072_EXCERPT = '''  EXECUTE format(v_fetch, public.rsdpm_table_for(v_b_type)) USING v_b_id INTO v_b_status;
+  -- record_status is NOT NULL on every one of the seven tables, so NULL here
+  -- means "no such row inside the wall" and nothing else.
+  IF v_a_status IS NULL OR v_b_status IS NULL THEN
+    RAISE EXCEPTION 'record_not_found' USING errcode = 'no_data_found';
+  END IF;
+  -- 7 — in the CALLER's from/to terms, whichever way round the locks went
+  v_from_status := CASE WHEN v_swap THEN v_b_status ELSE v_a_status END;
+  v_to_status   := CASE WHEN v_swap THEN v_a_status ELSE v_b_status END;
+  IF v_from_status <> 'confirmed' THEN
+    RAISE EXCEPTION 'cannot_link_%: from', v_from_status USING errcode = 'check_violation';
+  END IF;
+  IF v_to_status <> 'confirmed' THEN
+    RAISE EXCEPTION 'cannot_link_%: to', v_to_status USING errcode = 'check_violation';
+  END IF;
+
+  -- 8 — `related` is stored ONCE, canonically. This runs BEFORE the duplicate
+  -- door so the reverse call (B~A after A~B) finds the row that exists and
+  -- refuses by name instead of meeting the CHECK or the UNIQUE.
+  IF v_rel = 'related' AND v_swap THEN
+    v_ft := v_a_type; v_fi := v_a_id; v_tt := v_b_type; v_ti := v_b_id;
+  END IF;
+
+  -- 9 — the duplicate door. Read as the definer (the owner is outside RLS), so
+  -- the WALL is written out rather than inherited from the policy.
+  PERFORM 1 FROM public.record_links rl
+   WHERE rl.workspace_id = public.current_workspace()
+     AND rl.from_type = v_ft AND rl.from_id = v_fi
+     AND rl.to_type = v_tt AND rl.to_id = v_ti
+     AND rl.relation = v_rel;
+  IF FOUND THEN
+    RAISE EXCEPTION 'link_exists' USING errcode = 'unique_violation';
+  END IF;
+  IF v_rel = 'blocks' THEN
+    PERFORM 1 FROM public.record_links rl
+     WHERE rl.workspace_id = public.current_workspace()
+       AND rl.from_type = v_tt AND rl.from_id = v_ti
+       AND rl.to_type = v_ft AND rl.to_id = v_fi
+       AND rl.relation = 'blocks';
+    IF FOUND THEN
+      RAISE EXCEPTION 'link_reverse_exists' USING errcode = 'check_violation';
+    END IF;
+  END IF;
+
+  -- 9b
+  v_person := public.rsdpm_viewer_person(v_actor);
+  IF v_person IS NULL THEN
+    RAISE EXCEPTION 'no_roster_person_for_caller' USING errcode = 'insufficient_privilege';
+  END IF;
+
+  -- 10
+  INSERT INTO public.record_links
+    (workspace_id, from_type, from_id, to_type, to_id, relation, created_by)
+  VALUES (public.current_workspace(), v_ft, v_fi, v_tt, v_ti, v_rel, v_person)
+  RETURNING record_links.id INTO v_id;
+
+'''
+R2_TABLE_HEAD = ("# Brief\n\nBuild on `supabase/migrations/0072_record_links.sql`.\n\n"
+                 "## THE PREDICATE TABLE\n\n| DB refusal / state | step 2 renders |\n|---|---|\n")
+R2_RED_ROW = ('| `link_reverse_exists` | "<other> already blocks this record — unlink that first if it is the other way '
+              'round." (the Unlink is in the panel) |')
+R2_GREEN_ROW = ('| `link_reverse_exists` | DIRECTION-BEARING — two sentences, chosen by the SENT call\'s `selfSide`: when this '
+                'record was the `from` ("<this> blocks <other>"): "<other> already blocks this record — unlink that first if '
+                'it is the other way round."; when this record was the `to` ("<other> blocks <this>"): "This record already '
+                'blocks <other> — unlink that first if it is the other way round." (the Unlink is in the panel). |')
+R2_REMOVED_ROW = ('| `cannot_link_removed: from` / `: to` | "Not linked — <other> was removed. It\'s on the Removed bench." (the '
+                  'name is the OTHER\'s — the end that is not this record; for "<other> blocks <this>" the removed `from` IS '
+                  'the other) |')
+
+
+class DirectionRules(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = Path(tempfile.mkdtemp(prefix="brief-check-r2-"))
+        cls.repo = cls.tmp / "repo"
+        bare = cls.tmp / "origin.git"
+        subprocess.run(["git", "init", "-q", "--bare", str(bare)], check=True)
+        subprocess.run(["git", "init", "-q", "-b", "main", str(cls.repo)], check=True)
+        mig = cls.repo / "supabase" / "migrations"
+        mig.mkdir(parents=True)
+        # the sha comment goes LAST so the excerpt's line numbers stay full-file minus 520
+        (mig / "0072_record_links.sql").write_text(
+            MIG_0072_EXCERPT + "-- excerpt of RSDPM 1d3b89333a6a14f5629acf50c5b65562797bdd9d:"
+            "supabase/migrations/0072_record_links.sql lines 520-575\n")
+        _git(cls.repo, "add", "-A")
+        _git(cls.repo, "commit", "-q", "-m", "init")
+        _git(cls.repo, "remote", "add", "origin", str(bare))
+        _git(cls.repo, "push", "-q", "-u", "origin", "main")
+        cls.r = bc.Repo(cls.repo, "origin/main")
+
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(cls.tmp, ignore_errors=True)
+
+    def r2(self, text, repo="default", **kw):
+        return rows_of("direction-bearing-refusal", bc.check_text(text, repo=self.r if repo == "default" else repo, **kw))
+
+    def test_each_of_the_six_raises_is_classified_by_its_own_statement_group(self):
+        ml = MIG_0072_EXCERPT.split("\n")
+        expected = {524: ("record_not_found", False), 530: ("cannot_link_%: from", True), 533: ("cannot_link_%: to", True),
+                    551: ("link_exists", False), 560: ("link_reverse_exists", True),
+                    567: ("no_roster_person_for_caller", False)}
+        for full_line, (lit, want) in expected.items():
+            i = full_line - 520
+            self.assertIn("'%s'" % lit, ml[i], full_line)
+            self.assertEqual(bc.direction_bearing(ml, i), want, "%s at :%d" % (lit, full_line))
+
+    def test_318_r1_F1_one_sentence_for_a_reversed_pair_is_refused(self):
+        rows = self.r2(R2_TABLE_HEAD + R2_RED_ROW + "\n")
+        f = [r for r in rows if r.status == "FAIL"]
+        self.assertEqual(len(f), 1, [(r.status, r.note) for r in rows])
+        self.assertEqual(f[0].line, 9)
+        self.assertIn("has two truths", f[0].note)
+        self.assertIn("link_reverse_exists", f[0].note)
+
+    def test_318_r1_F1_two_quoted_sentences_pass(self):
+        rows = self.r2(R2_TABLE_HEAD + R2_GREEN_ROW + "\n")
+        self.assertEqual([r.status for r in rows], ["ok"], [r.note for r in rows])
+
+    def test_both_ends_said_in_words_passes(self):
+        row = '| `link_reverse_exists` | "These two are already linked the other way round." — one sentence, true at both ends |'
+        self.assertEqual([r.status for r in self.r2(R2_TABLE_HEAD + row + "\n")], ["ok"])
+
+    def test_a_split_cell_is_flagged_ONCE_per_row(self):
+        rows = self.r2(R2_TABLE_HEAD + R2_REMOVED_ROW + "\n")
+        self.assertEqual(len(rows), 1, [r.note for r in rows])
+        self.assertEqual(rows[0].status, "ok")  # the original row carries two quoted sentences
+        bare = '| `cannot_link_removed: from` / `: to` | "Not linked — <other> was removed. It\'s on the Removed bench." |'
+        rows = self.r2(R2_TABLE_HEAD + bare + "\n")
+        self.assertEqual([r.status for r in rows], ["FAIL"])
+
+    def test_rows_that_are_states_or_straight_refusals_are_not_direction_bearing(self):
+        rows = self.r2(R2_TABLE_HEAD + '| `link_exists` | "Already linked." |\n| `record_not_found` (link) | "Not linked — one of '
+                       'these records is no longer here." |\n| PGRST202 on `link_records` | `LINK_FAILED_LINE` |\n'
+                       '| `success (link)` | the sheet closes |\n')
+        self.assertEqual([r.status for r in rows], ["ok"], [r.note for r in rows])
+        self.assertIn("none direction-bearing", rows[0].note)
+
+    def test_the_fallback_keeps_only_the_longest_fixed_prefix(self):
+        mig = ("CREATE FUNCTION f() AS $$\nBEGIN\n  RAISE EXCEPTION 'cannot_link_kind: %', v_kind;\n\n"
+               "  RAISE EXCEPTION 'cannot_link_%: from', v_s;\nEND $$;\n")
+        sites = bc.raise_sites({"0099_x.sql": mig})
+        self.assertEqual([s.literal for s in bc.match_raises("cannot_link_kind", sites)], ["cannot_link_kind: %"])
+        self.assertEqual([s.literal for s in bc.match_raises("cannot_link_removed: from", sites)], ["cannot_link_%: from"])
+        self.assertEqual(bc.match_raises(": to", sites), [])
+        for skipped in ("cannot_link_draft|rejected: …", "cannot_link_kind: <kind>"):
+            self.assertFalse(bc.r2_span_ok(skipped), skipped)
+
+    def test_without_a_repo_or_the_migration_it_is_one_n_a_row(self):
+        rows = self.r2(R2_TABLE_HEAD + R2_RED_ROW + "\n", repo=None)
+        self.assertEqual([r.status for r in rows], ["n/a"])
+        rows = self.r2(R2_TABLE_HEAD.replace("0072_record_links", "0073_not_here") + R2_RED_ROW + "\n")
+        self.assertEqual([r.status for r in rows], ["n/a"])
+
+    def test_decisions_mode_has_no_predicate_table_so_no_R2(self):
+        self.assertEqual(self.r2(R2_TABLE_HEAD + R2_RED_ROW + "\n", decisions_only=True), [])
+
+
 class Cli(unittest.TestCase):
     def run_cli(self, *args):
         buf = io.StringIO()

@@ -297,6 +297,138 @@ def rule_carried_no_reader(lines: Sequence[str], paras: Sequence[Para]) -> List[
     return rows
 
 
+# R2 direction-bearing-refusal
+RAISE_LIT_RE = re.compile(r"RAISE\s+EXCEPTION\s+'((?:[^']|'')*)'(.*)$", re.I)
+DIR_LITERAL_RE = re.compile(r":\s(?:from|to)\b", re.I)
+DIR_ARGS_RE = re.compile(r"v_ft|v_tt|from_type|to_type|v_from_|v_to_", re.I)
+DIR_SWAP_RE = re.compile(r"from_type\s*=\s*v_tt|to_type\s*=\s*v_ft|from_id\s*=\s*v_ti|to_id\s*=\s*v_fi", re.I)
+DIR_COMMENT_RE = re.compile(r"direction|reverse|opposite|either\s+way\s+round|caller['’]s\s+from|from/to", re.I)
+BOTH_ENDS_RE = re.compile(r"both\s+directions|either\s+direction|both\s+ends|either\s+end|whichever\s+end", re.I)
+QUOTED_RE = re.compile(r"\"([^\"]+)\"|“([^”]+)”")
+R2_NOTE = ("a refusal raised in the caller's from/to terms has two truths — one sentence is wrong in one of them "
+           "(#318 r1-F1: 'X already blocks this record' was inverted under 'blocked by') — write one quoted sentence "
+           "per side, or say 'both ends' and how the one sentence covers both")
+
+
+class RaiseSite:
+    __slots__ = ("file", "index", "literal")
+
+    def __init__(self, file: str, index: int, literal: str):
+        self.file, self.index, self.literal = file, index, literal
+
+
+def raise_sites(mig_texts: Dict[str, str]) -> List[RaiseSite]:
+    out: List[RaiseSite] = []
+    for f, t in sorted(mig_texts.items()):
+        for i, ln in enumerate(t.split("\n")):
+            m = RAISE_LIT_RE.search(ln)
+            if m:
+                out.append(RaiseSite(f, i, m.group(1).replace("''", "'")))
+    return out
+
+
+def _lit_rx(literal: str) -> str:
+    return "".join("[a-z0-9_]+" if part == "%" else re.escape(part) for part in re.split(r"(%)", literal))
+
+
+def match_raises(span: str, sites: Sequence[RaiseSite]) -> List[RaiseSite]:
+    """The raises a predicate-table span names: a FULL match of the literal (`%` = a token), else the span's prefix
+    before its first `:` against each literal's prefix — keeping only the LONGEST fixed text before the first `%`."""
+    full = [s for s in sites if re.fullmatch(_lit_rx(s.literal), span, re.I)]
+    if full:
+        return full
+    prefix = span.split(":", 1)[0].strip()
+    if not prefix:
+        return []
+    cands = [s for s in sites if re.fullmatch(_lit_rx(s.literal.split(":", 1)[0].strip()), prefix, re.I)]
+    if not cands:
+        return []
+    best = max(len(s.literal.split("%", 1)[0]) for s in cands)
+    return [s for s in cands if len(s.literal.split("%", 1)[0]) == best]
+
+
+def r2_span_ok(span: str) -> bool:
+    """A placeholder span (`<kind>`, `…`, `a|b`) names no single raise."""
+    return not any(c in span for c in "|<…")
+
+
+def direction_bearing(mig_lines: Sequence[str], raise_index: int) -> bool:
+    """Is the RAISE at mig_lines[raise_index] phrased in the caller's from/to terms? (a) its literal says `: from` /
+    `: to` or its format arguments name a side; (b) its STATEMENT GROUP (the contiguous non-blank, non-`--` lines
+    ending at it) compares sides SWAPPED; (c) the `--` comment block directly above that group speaks of direction."""
+    m = RAISE_LIT_RE.search(mig_lines[raise_index])
+    if not m:
+        return False
+    args = re.split(r"\bUSING\b", m.group(2), maxsplit=1, flags=re.I)[0]
+    if DIR_LITERAL_RE.search(m.group(1)) or DIR_ARGS_RE.search(args):
+        return True
+    j = raise_index
+    while j > 0 and mig_lines[j - 1].strip() and not mig_lines[j - 1].strip().startswith("--"):
+        j -= 1
+    if any(DIR_SWAP_RE.search(mig_lines[k]) for k in range(j, raise_index + 1)):
+        return True
+    k = j - 1
+    comment: List[str] = []
+    while k >= 0 and mig_lines[k].strip().startswith("--"):
+        comment.append(mig_lines[k])
+        k -= 1
+    return any(DIR_COMMENT_RE.search(c) for c in comment)
+
+
+def table_cells(row: str) -> List[str]:
+    """Split a markdown table row on `|` OUTSIDE backticks (`cannot_link_draft|rejected` is one span)."""
+    cells, cur, tick = [], [], False
+    for ch in row.strip():
+        if ch == "`":
+            tick = not tick
+        if ch == "|" and not tick:
+            cells.append("".join(cur))
+            cur = []
+        else:
+            cur.append(ch)
+    cells.append("".join(cur))
+    if cells and not cells[0].strip():
+        cells = cells[1:]
+    if cells and not cells[-1].strip():
+        cells = cells[:-1]
+    return [c.strip() for c in cells]
+
+
+def quoted_sentences(text: str) -> List[str]:
+    out = []
+    for m in QUOTED_RE.finditer(text):
+        q = m.group(1) if m.group(1) is not None else m.group(2)
+        if len([w for w in re.findall(r"\S+", q) if re.search(r"\w", w)]) >= 3:
+            out.append(q)
+    return out
+
+
+def rule_direction_bearing(rows_in: Sequence[Tuple[int, str]], mig_texts: Dict[str, str]) -> List[Row]:
+    sites = raise_sites(mig_texts)
+    lines_of = {f: t.split("\n") for f, t in mig_texts.items()}
+    out: List[Row] = []
+    for idx, row in rows_in:
+        cells = table_cells(row)
+        if len(cells) < 2:
+            continue
+        hits: List[RaiseSite] = []
+        for span in re.findall(r"`([^`]+)`", cells[0]):
+            if r2_span_ok(span):
+                hits += [s for s in match_raises(span.strip(), sites) if s not in hits]
+        bearing = [s for s in hits if direction_bearing(lines_of[s.file], s.index)]
+        if not bearing:
+            continue
+        where = ", ".join("'%s' (%s:%d)" % (s.literal, s.file, s.index + 1) for s in bearing)
+        rest = " ".join(cells[1:])
+        if len(quoted_sentences(rest)) >= 2 or BOTH_ENDS_RE.search(rest):
+            out.append(Row("direction-bearing-refusal", idx + 1, "ok", "direction-bearing %s — the row says both sides" % where))
+        else:
+            out.append(Row("direction-bearing-refusal", idx + 1, "FAIL", "%s — raised as %s" % (R2_NOTE, where)))
+    if not out:
+        out.append(Row("direction-bearing-refusal", None, "ok", "%d table row(s), none direction-bearing" % len(rows_in)))
+    return out
+
+
 # --------------------------------------------------------------------------- #
 # Repo lookups (git, never the working tree — the laptop checkout is stale)
 # --------------------------------------------------------------------------- #
@@ -389,12 +521,12 @@ def check_text(text: str, repo: Optional[Repo] = None, db_functions: Optional[Se
         refus = sum(len(re.findall(r"refus", ln, re.I)) for i, ln in enumerate(lines) if not mask[i])
         needs_table = bool(named) or refus >= 4
         pt = [s for s in secs if "predicate table" in s[0].lower()]
-        table_rows: List[str] = []
+        table_rows: List[Tuple[int, str]] = []  # (line index, row) for every DATA row (the header row dropped)
         pt_text = ""
         if pt:
             h, s, e = pt[0]
-            body = [lines[i] for i in range(s + 1, e) if not mask[i]]
-            data = [ln for ln in body if TABLE_ROW_RE.match(ln) and not TABLE_SEP_RE.match(ln)]
+            data = [(i, lines[i]) for i in range(s + 1, e)
+                    if not mask[i] and TABLE_ROW_RE.match(lines[i]) and not TABLE_SEP_RE.match(lines[i])]
             table_rows = data[1:] if len(data) >= 1 else []
             pt_text = "\n".join(lines[s:e]).lower()
         if needs_table and not pt:
@@ -444,6 +576,15 @@ def check_text(text: str, repo: Optional[Repo] = None, db_functions: Optional[Se
                                     % (newest, len(new_tokens), len(tokens) - len(new_tokens))))
         elif named:
             rows.append(Row("refusal-rows", None, "n/a", "no repo to read the migration(s) from"))
+
+        # direction-bearing-refusal: reuses mig_texts (read above); never FAILs for want of a repo or a file
+        if not table_rows:
+            rows.append(Row("direction-bearing-refusal", None, "n/a", "no predicate-table data row"))
+        elif not mig_texts:
+            rows.append(Row("direction-bearing-refusal", None, "n/a",
+                            "no named migration readable on the ref (%s)" % ("no repo" if repo is None else repo.ref)))
+        else:
+            rows += rule_direction_bearing(table_rows, mig_texts)
 
         # two-clocks for a step-2 brief
         if STEP2_RE.search(title):
