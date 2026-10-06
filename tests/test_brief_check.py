@@ -820,6 +820,21 @@ class MirrorRules(unittest.TestCase):
         once = bc.Repo(self.repo, "origin/once")
         self.assertEqual([r.status for r in self.r3(text, repo=once)][0], "ok")
 
+    def test_a_fenced_common_short_line_no_longer_satisfies_the_quote_half(self):
+        # round 3 F3 (review r2-F3): the fence path asked only 12 characters with code punctuation, so a fence of
+        # `router.refresh();` (17 characters; in RemoveVerb's real region at :2268) passed where the same backticked
+        # span FAILed (fixture-r3-F3.md:5 vs :12). Both paths ask one predicate now.
+        rows = self.r3("## S2\n\n" + R3_RED + "\n```\nrouter.refresh();\n```\n")
+        self.assertEqual([r.status for r in rows], ["FAIL", "FAIL"], [r.note for r in rows])
+        self.assertIn("RemoveVerb is at %s:4-17 and this paragraph quotes none of it" % VERB_FILE, rows[0].note)
+
+    def test_a_fenced_line_that_occurs_more_than_twice_in_the_file_is_not_a_quote(self):
+        # round 3 F3: the fenced twin of the backtick test above — `aria-disabled={busy}` three times on origin/main
+        text = "## S2\n\nRemoveVerb's gate shape:\n```\naria-disabled={busy}\n```\n"
+        self.assertEqual([r.status for r in self.r3(text)][0], "FAIL", [r.note for r in self.r3(text)])
+        once = bc.Repo(self.repo, "origin/once")
+        self.assertEqual([r.status for r in self.r3(text, repo=once)][0], "ok", [r.note for r in self.r3(text, repo=once)])
+
     def test_a_name_that_resolves_only_into_a_test_file_is_n_a(self):
         # round 0: 12 of 23 refusals resolved into tests — "the drawer's own rule" → `const drawer` in a test file
         self.assertEqual(self.r.find_definitions("drawer")[0][0], DRAWER_TEST)
@@ -1014,6 +1029,16 @@ class DeadUntilRules(unittest.TestCase):
         f = [r for r in self.r4(text) if r.status == "FAIL"]
         self.assertEqual([r.line for r in f], [3], [(r.status, r.line, r.note) for r in self.r4(text)])
         self.assertIn("'dead until' at line 3", f[0].note)
+
+    def test_blank_cited_keeps_a_name_and_blanks_quoted_spans_at_the_same_length(self):
+        # round 3 F6: the direct test of the shared blanking (R1, R3 and R4 read its output) — a whitespace-free
+        # backtick span is a NAME and survives verbatim; a double-quoted span and a backtick span holding whitespace
+        # are blanked with `#` of the same length, so the text keeps its length and every later line number
+        text = 'the `created_by_name` field, "the row keeps them", and `a b` here'
+        out = bc.blank_cited(text)
+        self.assertEqual(len(out), len(text))
+        self.assertIn("`created_by_name`", out)
+        self.assertEqual(out, text.replace('"the row keeps them"', "#" * 20).replace("`a b`", "#" * 5))
 
     def test_a_blanked_quote_keeps_every_later_line_number(self):
         # the stripped span is BLANKED with same-length filler, never deleted: line_of counts characters into the

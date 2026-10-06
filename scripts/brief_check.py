@@ -93,12 +93,15 @@ Rules, each a row in the printed table (FAIL rows exit 2):
                     — by its full path, or by its file name at a name boundary
                     (review r1-F5: `Panel` is in 7, and the first grep hit was
                     taken silently; review r2-F1: `AddTaskPanel.tsx` named
-                    `Panel.tsx`; `page.tsx` alone names every page). The quote half: a backticked span of 20+
-                    characters with = ( ) { } that the whole file holds at most
-                    twice (`router.refresh()` is 16 characters, in 14 places, one
-                    inside RemoveVerb's own region), or a fenced block within 2
-                    lines after whose line is in the region. X's REGION runs
-                    from X to the first following top-level definition whose
+                    `Panel.tsx`; `page.tsx` alone names every page). The quote
+                    half, ONE predicate for a backticked span and for a line of
+                    a fenced block within 2 lines after: 20+ characters with
+                    = ( ) { }, inside the region, that the whole file holds at
+                    most twice (`router.refresh();` is 17 characters, in 11
+                    places, one inside RemoveVerb's own region; review r2-F3: a
+                    fence of it passed where the backticked span did not). X's
+                    REGION runs from X to the first following top-level
+                    definition (`export default` included, since round 3) whose
                     name does not carry X's stem (X minus its CamelCase suffix)
                     at a name boundary — starts with it, `_` + it, or it
                     capitalised after a lowercase letter or digit — so
@@ -157,7 +160,7 @@ saying a CONTROL is not rendered reads as a carried field. R4 cannot tell that
 the quoted instruction points at a DIFFERENT, live control (brief-F-step2.md:
 "Save dead until a reason" beside a line telling the human to type it), nor
 that a quoted line is a description, not an instruction.
-Six more, each counted at 0 where it was measured (review r1, 2026-10-06), with
+Seven more, each counted at 0 where it was measured (reviews r1 and r2, 2026-10-06), with
 the repair to build when one occurs: (a) an unbalanced straight `"` in a
 paragraph re-pairs every later quoted span, so a trigger after it can be
 blanked (0 of 1,591 corpus paragraphs; repair: an odd quote count skips
@@ -176,7 +179,15 @@ character after the name); (f) `export default function Chip` is never matched
 by find_definitions, so a brief mirroring one gets n/a (21 such files on main:
 18 page, 2 layout, 1 error — none a brief mirrors) — but since round 3 the
 default export does END the region of the symbol before it (review r2-F2:
-fetchQueueCount's region in app/layout.tsx ran past RootLayout to end of file). It
+fetchQueueCount's region in app/layout.tsx ran past RootLayout to end of file);
+(g) direction-bearing-refusal reads ONE line per raise — the literal and its
+format arguments only from the `RAISE EXCEPTION` line — so a literal or a side
+argument on a continuation line is never seen and that row passes (RSDPM
+5c83e862a: 460 RAISE EXCEPTION lines in supabase/migrations, 7 of them comments;
+8 carry no literal on the line, 104 the literal and no `;`; joined up to the
+`;`, 0 of the 453 statements is direction-bearing where the one-line read is
+not; repair: join each RAISE EXCEPTION statement up to its `;` before
+matching). It
 converts "did I look?" from a judgement into a check and stops there. Counted over the brief-sentence findings of RSDPM #288 → #318 there are
 16 classes; the word rules catch 9 of 16 by construction. The 7 they still
 cannot: (1) a citation pointing at the wrong lines (#301's finalize JSON, #297
@@ -614,7 +625,7 @@ def _quotable(s: str) -> bool:
 
 
 def _day(ct: int) -> str:
-    return _dt.datetime.utcfromtimestamp(ct).strftime("%Y-%m-%d")
+    return _dt.datetime.fromtimestamp(ct, _dt.timezone.utc).strftime("%Y-%m-%d")
 
 
 def carries_stem(name: str, stem: str) -> bool:
@@ -701,18 +712,23 @@ def rule_mirror(lines: Sequence[str], mask: Sequence[bool], paras: Sequence[Para
             region = _ws("\n".join(src_lines[def_line - 1:nxt - 1]))
             where = "%s:%d-%d" % (path, def_line, nxt - 1)
 
-            # ---- quote half: a backticked span of 20+ chars from X's region that the file holds at most twice
-            # (`router.refresh()` is 16 chars and in 14 places), or a fence right after the paragraph ----
+            # ---- quote half: a backticked span, or a line of a fence right after the paragraph, of 20+ chars with
+            # code punctuation, from X's region, that the file holds at most twice (`router.refresh();` is 17 chars and
+            # in 11 places) — ONE predicate for both paths (review r2-F3: the fence asked only `_quotable`) ----
             whole = _ws(src)
-            quote = next((q for q in re.findall(r"`([^`]+)`", text)
-                          if len(q) >= 20 and _quotable(q) and _ws(q) in region and whole.count(_ws(q)) <= 2), None)
+
+            def is_quote(s: str) -> bool:
+                w = _ws(s)
+                return len(w) >= 20 and _quotable(w) and w in region and whole.count(w) <= 2
+
+            quote = next((q for q in re.findall(r"`([^`]+)`", text) if is_quote(q)), None)
             if quote is None:
                 for i in (b + 1, b + 2):
                     if i < len(lines) and mask[i] and FENCE_RE.match(lines[i]):
                         j = i + 1
                         while j < len(lines) and not FENCE_RE.match(lines[j]):
                             body = GUTTER_RE.sub("", lines[j]).strip()
-                            if _quotable(body) and _ws(body) in region:
+                            if is_quote(body):
                                 quote = body
                                 break
                             j += 1
