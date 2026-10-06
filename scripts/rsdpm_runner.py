@@ -1100,9 +1100,12 @@ def build_parser() -> argparse.ArgumentParser:
         sp.add_argument("--claude-cmd", default=str(DEFAULT_CLAUDE_CMD))
         sp.add_argument("--wall-seconds", type=int, default=DEFAULT_WALL_SECONDS)
 
-    build_help = ("worktree + hook + wrapper+brief → one detached builder; refuses unless brief-review-<stem>.md "
-                  "(scripts/brief_review_prompt.md) sits beside the brief, newer than it")
-    b = sub.add_parser("build", help=build_help, description=build_help)
+    # the help text is spelled out twice (help= is the listing, description= is `build --help`) so operator_artifacts.py
+    # can read every string this file shows a human — a variable passed in is unreadable to it
+    b = sub.add_parser("build", help="worktree + hook + wrapper+brief → one detached builder; refuses unless "
+                                     "brief-review-<stem>.md (scripts/brief_review_prompt.md) sits beside the brief, newer than it",
+                       description="worktree + hook + wrapper+brief → one detached builder; refuses unless "
+                                   "brief-review-<stem>.md (scripts/brief_review_prompt.md) sits beside the brief, newer than it")
     dispatch_args(b)
     b.add_argument("--brief", required=True)
     b.add_argument("--branch", required=True)
@@ -1110,9 +1113,10 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--base", default="origin/main")
     b.set_defaults(fn=cmd_build)
 
-    fix_help = ("compose a fix brief and dispatch a FRESH builder in the existing worktree; refuses unless "
-                "brief-review-<stem>.md sits beside the decisions file, newer than it")
-    f = sub.add_parser("fix", help=fix_help, description=fix_help)
+    f = sub.add_parser("fix", help="compose a fix brief and dispatch a FRESH builder in the existing worktree; refuses "
+                                   "unless brief-review-<stem>.md sits beside the decisions file, newer than it",
+                       description="compose a fix brief and dispatch a FRESH builder in the existing worktree; refuses "
+                                   "unless brief-review-<stem>.md sits beside the decisions file, newer than it")
     dispatch_args(f)
     f.add_argument("--round", required=True, type=int)
     f.add_argument("--findings", required=True, help="ReportFindings JSON")
