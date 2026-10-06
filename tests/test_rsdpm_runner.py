@@ -35,6 +35,46 @@ FIXTURES = _REPO_ROOT / "tests" / "fixtures" / "rsdpm_runner"
 
 import rsdpm_runner as r  # noqa: E402
 
+# Every brief and decisions file now needs its pre-dispatch review beside it (brief_check.check_review). The mtimes
+# are SET, never left to write order: a checkout gives files arbitrary mtimes and a review older than its brief is stale.
+VALID_REVIEW = ("# Pre-dispatch review\n\n## 1. Mirrors\n- none in this brief\n\n## 2. Predicate rows\n- none\n\n"
+                "## 3. Human sentences\n- none\n\n## 4. Carried fields\n- NONE\n\nBRIEF DEFECTS: 0\n")
+T_BRIEF, T_REVIEW = 1_000_000, 1_000_100
+
+
+def stamp_review(brief: Path, review: str = VALID_REVIEW) -> Path:
+    """Write brief-review-<stem>.md beside `brief` and set both mtimes (review newer)."""
+    rp = r.brief_check.review_path(brief)
+    rp.write_text(review)
+    os.utime(str(brief), (T_BRIEF, T_BRIEF))
+    os.utime(str(rp), (T_REVIEW, T_REVIEW))
+    return rp
+
+
+def _drop_heading(rp: Path) -> None:
+    rp.write_text(VALID_REVIEW.replace("## 3. Human sentences\n- none\n\n", ""))
+    os.utime(str(rp), (T_REVIEW, T_REVIEW))
+
+
+def _empty_heading(rp: Path) -> None:
+    rp.write_text(VALID_REVIEW.replace("## 4. Carried fields\n- NONE\n", "## 4. Carried fields\n"))
+    os.utime(str(rp), (T_REVIEW, T_REVIEW))
+
+
+def _open_defects(rp: Path) -> None:
+    rp.write_text(VALID_REVIEW.replace("BRIEF DEFECTS: 0\n", "BRIEF DEFECTS: 2\n- one\n- two\n"))
+    os.utime(str(rp), (T_REVIEW, T_REVIEW))
+
+
+# the five ways a review file is not a review; each must stop build AND fix
+BAD_REVIEWS = {
+    "missing": lambda rp: rp.unlink(),
+    "stale": lambda rp: os.utime(str(rp), (T_BRIEF - 1, T_BRIEF - 1)),
+    "missing heading": _drop_heading,
+    "empty heading": _empty_heading,
+    "BRIEF DEFECTS: 2, none ledgered": _open_defects,
+}
+
 FAKE_CLAUDE = """#!/bin/sh
 # fake `claude`: only `auth status` is ever called by the runner
 if [ "$FAKE_LOGGED_IN" = "no" ]; then
@@ -121,6 +161,7 @@ class RunnerTest(unittest.TestCase):
         _git(self.repo, "push", "-q", "-u", "origin", "main")
         self.brief = self.root / "brief.md"
         self.brief.write_text("# Builder brief — PR S\n\nBuild the thing.\n")
+        stamp_review(self.brief)  # brief-review-brief.md
         self._children = []
 
     def tearDown(self):
@@ -226,6 +267,7 @@ class RunnerTest(unittest.TestCase):
     def test_build_refuses_a_brief_the_check_fails_and_dispatches_nothing(self):
         self.brief.write_text("# Builder brief — PR S\n\n## Rulings\n\nHouston's mirror rule `field_not_allowed` does NOT apply here "
                               "because the write goes through `merge_records`.\n")
+        stamp_review(self.brief)  # the brief changed: re-stamp so claim-quote is the ONLY reason it is refused
         code, out = self.run_cli(*self.build_args(), dry_run=True)
         self.assertEqual(code, r.EXIT_REFUSED)
         self.assertIn("brief_check:", out)
@@ -250,6 +292,29 @@ class RunnerTest(unittest.TestCase):
         self.assertIn("| claim-cite |", out)
         self.assertIn("decisions refused by brief_check", out)
         self.assertFalse((self.record / "argv").exists())
+
+    def test_build_refuses_a_brief_without_a_valid_review_and_dispatches_nothing(self):
+        for case, spoil in BAD_REVIEWS.items():
+            with self.subTest(case=case):
+                spoil(stamp_review(self.brief))
+                code, out = self.run_cli(*self.build_args(), dry_run=True)
+                self.assertEqual(code, r.EXIT_REFUSED, out)
+                self.assertIn("| brief-review |", out)
+                self.assertIn("brief refused by brief_check: 1 FAIL row(s)", out)
+                self.assertNotIn("DRY-RUN: worktree add", out)
+                self.assertFalse(self.worktree("S").exists())
+
+    def test_fix_refuses_decisions_without_a_valid_review(self):
+        self.make_worktree_with_meta()
+        for case, spoil in BAD_REVIEWS.items():
+            with self.subTest(case=case):
+                args = self.fix_args()  # writes decisions.md and a valid brief-review-decisions.md
+                spoil(r.brief_check.review_path(self.root / "decisions.md"))
+                code, out = self.run_cli(*args, dry_run=True)
+                self.assertEqual(code, r.EXIT_REFUSED, out)
+                self.assertIn("| brief-review |", out)
+                self.assertIn("decisions refused by brief_check: 1 FAIL row(s)", out)
+                self.assertFalse((self.record / "argv").exists())
 
     def test_builder_model_env_adds_the_model_flag_and_nothing_else(self):
         os.environ["RSDPM_BUILDER_MODEL"] = "opus"
@@ -380,9 +445,10 @@ class RunnerTest(unittest.TestCase):
         prompts = list(self.state.rglob("*.prompt.md"))
         self.assertEqual(len(prompts), 1)
         self.assertIn("Build the thing.", prompts[0].read_text())
-        # nothing written outside the state dir + the throwaway repo's own files
+        # nothing written outside the state dir + the throwaway repo's own files (brief-review-brief.md is setUp's fixture)
         self.assertEqual(sorted(p.name for p in self.root.iterdir()),
-                         sorted(["home", "state", "ledger.md", "record", "bin", "fake-dispatch", "dev", "brief.md"]))
+                         sorted(["home", "state", "ledger.md", "record", "bin", "fake-dispatch", "dev", "brief.md",
+                                 "brief-review-brief.md"]))
         self.assertEqual(sorted(p.name for p in (self.root / "dev").iterdir()), ["RSDPM", "origin.git"])
 
     # ---- build for real (fake dispatcher) ----------------------------------- #
@@ -486,6 +552,7 @@ class RunnerTest(unittest.TestCase):
             decisions = self.root / "decisions.md"
             n = len(json.loads((FIXTURES / "findings-example.json").read_text())["findings"])
             decisions.write_text("".join("## F%d\nDECISION %d: fix it.\n\n" % (i, i) for i in range(1, n + 1)))
+        stamp_review(Path(decisions))  # brief-review-decisions.md (or brief-review-d.md) beside it
         return ["fix", "--pr", pr, "--round", round_no, "--findings", str(findings), "--decisions", str(decisions),
                 "--slot", slot, "--cap", cap, "--claude-cmd", str(self.dispatch), "--wall-seconds", "60"]
 
