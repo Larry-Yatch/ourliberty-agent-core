@@ -71,15 +71,22 @@ Rules, each a row in the printed table (FAIL rows exit 2):
                     inverted under "blocked by".) Briefs only; n/a with no repo.
   mirror-names-the-newest-sibling
                     "X's shape/gate/rule/precedent" or "mirror X", X a symbol on
-                    --ref, QUOTES a line of X's region (a backticked span of 12+
-                    characters with = ( ) { }, or a fence within 2 lines after),
-                    and names the NEWEST sibling of X's kind with why — named
-                    elsewhere is an info row, nowhere is FAIL. (#318 r2-F1:
-                    "RemoveVerb's gate shape" was the wrong sibling; Merge, the
-                    newest door, keeps its confirm live.) KNOWN WEAKNESS: a
-                    common span such as `router.refresh()` satisfies the quote
-                    half — a word rule cannot judge relevance; the review's
-                    question 1 is the net for that.
+                    --ref outside test files (`__tests__/`, `.test.`, `.spec.`,
+                    `e2e/`), QUOTES X's region: a backticked span of 20+
+                    characters with = ( ) { } that the whole file holds at most
+                    twice (`router.refresh()` is 16 characters, in 14 places, one
+                    inside RemoveVerb's own region), or a fenced block within 2
+                    lines after whose line is in the region. Every NEWER sibling
+                    of X's kind cited in the same paragraph has a contrast word
+                    (not / over / instead of / wrong or right sibling) within 12
+                    words of its name, and the newest is named somewhere; the
+                    rest are one info row. (#318 r2-F1: "RemoveVerb's gate
+                    shape" was the wrong sibling; Merge, the newest door, keeps
+                    its confirm live.) KNOWN CONSEQUENCE: a correct "MergeVerb's
+                    rule" owes a fenced quote of Merge's lines. KNOWN WEAKNESS:
+                    a rare 20+ span from the region that is not the rule being
+                    mirrored still passes — a word rule cannot judge relevance;
+                    the review's question 1 is the net for that.
   instruction-points-at-a-live-control
                     A quoted sentence carrying an imperative ("try again",
                     "unlink", "pick", "reopen" …) and a "dead/disabled until" or
@@ -507,6 +514,7 @@ CAMEL_SUFFIX_RE = re.compile(r"(?<=[a-z0-9])([A-Z][a-z0-9]+)$")
 FILE_SUFFIX_RE = re.compile(r"^.+-([a-z0-9]+)\.tsx?$")
 CONTRAST_RE = re.compile(r"\b(?:not|over|instead\s+of|wrong\s+sibling|right\s+sibling)\b", re.I)
 GUTTER_RE = re.compile(r"^\s*\d+(?::|\t|\s{2,})")
+TEST_PATH_RE = re.compile(r"__tests__/|\.test\.|\.spec\.|^e2e/")
 R3_NOTE = ("quote the lines you are mirroring and say why the older sibling beats the newer one (#318 r2-F1: "
            "'RemoveVerb's gate shape' was the WRONG sibling — Merge, the newest door, keeps its confirm live; it cost a "
            "review round and a fix round)")
@@ -551,12 +559,14 @@ def rule_mirror(lines: Sequence[str], mask: Sequence[bool], paras: Sequence[Para
                 rows.append(Row(rule, a + 1, "n/a", "%s: %s" % (name, repo_why)))
                 continue
             hits = cached("def:" + name, lambda: repo.find_definitions(name))
+            if hits is not None:  # a test file's local `const drawer` is never what a brief mirrors
+                hits = [h for h in hits if not TEST_PATH_RE.search(h[0])]
             if hits is None:
                 rows.append(Row(rule, a + 1, "FAIL", "git grep for the definition of %s on %s failed — fix the repo, "
                                 "then re-run (an unresolved mirror is never a pass)" % (name, repo.ref)))
                 continue
             if not hits:
-                rows.append(Row(rule, a + 1, "n/a", "%s is not a function/const/class on %s" % (name, repo.ref)))
+                rows.append(Row(rule, a + 1, "n/a", "%s is not a function/const/class outside test files on %s" % (name, repo.ref)))
                 continue
             path, def_line, def_text = next((h for h in hits if Path(h[0]).name in text), hits[0])
             src = cached("show:" + path, lambda: repo.show(path)) or ""
@@ -570,8 +580,11 @@ def rule_mirror(lines: Sequence[str], mask: Sequence[bool], paras: Sequence[Para
             region = _ws("\n".join(src_lines[def_line - 1:nxt - 1]))
             where = "%s:%d-%d" % (path, def_line, nxt - 1)
 
-            # ---- quote half ----
-            quote = next((q for q in re.findall(r"`([^`]+)`", text) if _quotable(q) and _ws(q) in region), None)
+            # ---- quote half: a backticked span of 20+ chars from X's region that the file holds at most twice
+            # (`router.refresh()` is 16 chars and in 14 places), or a fence right after the paragraph ----
+            whole = _ws(src)
+            quote = next((q for q in re.findall(r"`([^`]+)`", text)
+                          if len(q) >= 20 and _quotable(q) and _ws(q) in region and whole.count(_ws(q)) <= 2), None)
             if quote is None:
                 for i in (b + 1, b + 2):
                     if i < len(lines) and mask[i] and FENCE_RE.match(lines[i]):
@@ -612,19 +625,31 @@ def rule_mirror(lines: Sequence[str], mask: Sequence[bool], paras: Sequence[Para
             if not newer:
                 rows.append(Row(rule, a + 1, "ok", "%s is the newest of its siblings (%d)" % (name, len(cands))))
                 continue
+            # EVERY newer sibling: cited in this paragraph with no contrast word within 12 words of it → FAIL; the
+            # newest named nowhere → FAIL; the rest (named here with why, or only elsewhere) → one info row
             listed = ", ".join("%s (%s)" % (n, _day(t)) for t, n in newer)
-            newest = newer[0][1]
-            named_here = re.search(r"\b%s\b" % re.escape(newest), text)
-            if named_here and CONTRAST_RE.search(text):
-                rows.append(Row(rule, a + 1, "ok", "%s: the newer %s is named here with why" % (name, newest)))
-                continue
-            elsewhere = next((i + 1 for i, ln in enumerate(lines)
-                              if not mask[i] and re.search(r"\b%s\b" % re.escape(newest), ln)), None)
-            if elsewhere is not None:
-                rows.append(Row(rule, a + 1, "info", "%s is newer and mentioned at line %d — say in THIS sentence why %s's "
-                                "shape beats it (newer: %s)" % (newest, elsewhere, name, listed)))
-            else:
-                rows.append(Row(rule, a + 1, "FAIL", "%s — newer than %s: %s" % (R3_NOTE, name, listed)))
+            tokens = [(m.start(), m.end()) for m in re.finditer(r"\S+", text)]
+            contrast = [_word_index(tokens, m.start()) for m in CONTRAST_RE.finditer(text)]
+            bad: List[str] = []
+            info: List[str] = []
+            for t, n in newer:
+                here = [_word_index(tokens, m.start()) for m in re.finditer(r"\b%s\b" % re.escape(n), text)]
+                if here and not any(abs(h - c) <= 12 for h in here for c in contrast):
+                    bad.append("%s (%s) is named here with no why" % (n, _day(t)))
+                elif here:
+                    info.append("%s (%s) is newer and named here with why" % (n, _day(t)))
+                else:
+                    at = next((i + 1 for i, ln in enumerate(lines)
+                               if not mask[i] and re.search(r"\b%s\b" % re.escape(n), ln)), None)
+                    if at is not None:
+                        info.append("%s is newer and mentioned at line %d — say in THIS sentence why %s's shape beats it"
+                                    % (n, at, name))
+                    elif n == newer[0][1]:
+                        bad.append("the newest, %s, is named nowhere" % n)
+            if bad:
+                rows.append(Row(rule, a + 1, "FAIL", "%s — %s; newer than %s: %s" % (R3_NOTE, "; ".join(bad), name, listed)))
+            if info:
+                rows.append(Row(rule, a + 1, "info", "%s (newer: %s)" % ("; ".join(info), listed)))
     return rows
 
 

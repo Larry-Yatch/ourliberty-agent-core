@@ -579,6 +579,35 @@ class DirectionRules(unittest.TestCase):
 R3_RED = ("refusal → the classified sentence in `verb-error`, the Link button dead until the sheet is reopened "
           "(RemoveVerb's gate shape at `VerbControls.tsx:2057`'s `canRemove`, cite the current line)")
 CAN_REMOVE = 'const canRemove = blockers.phase === "ready" && !busy && error === null;'
+# brief-J2-step2.md:80-103 as it read BEFORE the r2 ruling (ol-work runner/brief-gate-v2/brief-J2-step2-ORIGINAL.md),
+# verbatim: RemoveVerb mirrored at :102 beside `router.refresh()` (16 chars), MergeVerb cited at :103 with no why
+# within 12 words (the paragraph's only contrast word is the "NOT danger" at :98).
+R3_S2_ORIGINAL = (
+    '**S2 — The Link sheet has THREE steps and the record you opened it from is THIS record.**\n'
+    'Step 1 "Link to a…": the KIND chooser — one row per `LINKABLE_KINDS` entry in the human noun (`KIND_NOUN` in\n'
+    '`lib/records/merge-refusal.ts:134-146` — `mission` reads "business area"; EXPORT a `kindNoun(kind, n)` beside\n'
+    "`mergeKindPlural` rather than a second table), the record's own kind included (task → task is the ruling's own example).\n"
+    'Step 2 "Which one?": the SAME `MergeCandidatePicker` (`components/records/MergeCandidatePicker.tsx`), fed by\n'
+    '`mergeCandidatesAction(kind, selfId, query)` (`app/actions/merge.ts:146`) WIDENED from `MergeableKind` to `LinkableKind`:\n'
+    'three more arms in its per-kind table — `missions` (`id, name`; no hint), `decisions` and `waiting_ons` (`id, name,\n'
+    "project_id` → the project's name as the hint, the task arm's shape at `:196-203`). The widening is a type and three\n"
+    'arms; the name, the cap (`MERGE_LIST_CAP`, `merge-refusal.ts:402`), the LIKE escaping and `neq("id", selfId)` are\n'
+    "untouched (`selfId` on another kind's table excludes nothing and that is correct — the picker never offers\n"
+    "`cannot_link_self` only when kind = this record's kind; say it in a comment). `MergeCandidatesState`/`MergeCandidateOption`\n"
+    "are reused as they are. Picker third states are the picker's own (loading / failed / empty / searching / cap — the\n"
+    'testids already exist and `/lab` already renders them).\n'
+    'Step 3 "How are they linked?": THREE radio rows, in words, with the two names in them —\n'
+    '"**<other>** blocks **<this>** — this record waits on it" (sends `from = other, to = this, \'blocks\'`),\n'
+    '"**<this>** blocks **<other>**" (sends `from = this, to = other, \'blocks\'`),\n'
+    '"**Related** — the same piece of work seen from two places" (sends `from = this, to = other, \'related\'`; the DB stores\n'
+    'it canonically). **"Related" is PRE-SELECTED** (Houston drafts, humans adjust — a required choice never arrives blank;\n'
+    'Related is the choice with no direction to get wrong). Then the **Link** button (`variant="primary"`, NOT danger: a link\n'
+    'is undone by Unlink, class **W**) → `linkRecords(...)` with telemetry `{surface, via: \'manual\'}`; busy → "Linking…",\n'
+    "Cancel dead; success → the sheet closes, `router.refresh()` (the page re-reads; in the drawer the provider's `withReread`\n"
+    '(`components/ui/RecordDrawerProvider.tsx:82`) re-runs the peek — no navigation, this record IS the record); refusal →\n'
+    'the classified sentence in `verb-error`, the Link button dead until the sheet is reopened (RemoveVerb\'s gate shape at `VerbControls.tsx:2057`\'s `canRemove`, cite the current line), `router.refresh()`. "Back" from step 2 returns to the\n'
+    "kind chooser and re-reads the un-queried list (MergeVerb's repick rule, `:2363-2367`)."
+)
 # brief-J2-step2.md:80-103 as it reads after the r2 ruling (ol-work runner/overnight-2026-10-05-wave7), verbatim
 R3_S2_CORRECTED = (
     '**S2 — The Link sheet has THREE steps and the record you opened it from is THIS record.**\n'
@@ -610,19 +639,29 @@ R3_S2_CORRECTED = (
 # The REAL layout of app/detail/components/VerbControls.tsx, cut down: RemoveVerb is born first (RSDPM
 # 2026-10-02T21:24:44Z), its helper RemoveSheetBody holds the REAL canRemove line; MergeVerb and MergeSheetBody are
 # born in a later commit (2026-10-03T03:09:03Z), `router.refresh()` inside MergeVerb (real :2608) and — as in the real
-# file at :2268 — inside RemoveVerb too; `disabled={busy}` only in MergeSheetBody (real :2801).
+# file at :2268 — inside RemoveVerb too; `disabled={busy}` only in MergeSheetBody (real :2801). SYNTHETIC, for the
+# quote half's "at most twice in the file" clause: `aria-disabled={busy}` (20 chars) THREE times on origin/main — once
+# in RemoveSheetBody (RemoveVerb's region), twice in MergeSheetBody — and once only on origin/once. origin/three adds
+# LinkVerb (2026-10-06T13:55:00Z), the real newest door. A test file defines `const drawer` (the real one is
+# components/ui/__tests__/record-drawer.test.tsx:149) — never a mirror target.
 VERB_FILE = "app/detail/components/VerbControls.tsx"
 VERB_V1 = ('"use client";\nimport { useRouter } from "next/navigation";\n\n'
            "function RemoveVerb({ record }: { record: Rec }) {\n  const router = useRouter();\n"
            "  async function onRemove() {\n    setBusy(true);\n    router.refresh();\n  }\n"
            "  return <RemoveSheetBody record={record} onRemove={onRemove} />;\n}\n\n"
            "export function RemoveSheetBody({ blockers, busy, error }: Props) {\n  " + CAN_REMOVE + "\n"
-           "  return <Button disabled={!canRemove}>Remove</Button>;\n}\n")
+           "  return <Button disabled={!canRemove} aria-disabled={busy}>Remove</Button>;\n}\n")
 VERB_V2 = VERB_V1 + ("\nfunction MergeVerb({ record }: { record: Rec }) {\n  const router = useRouter();\n"
                      "  async function onMerge() {\n    router.refresh();\n  }\n"
                      "  return <MergeSheetBody record={record} onMerge={onMerge} />;\n}\n\n"
                      "export function MergeSheetBody({ busy }: Props) {\n"
-                     "  return <Button data-testid=\"merge-confirm\" disabled={busy}>Merge</Button>;\n}\n")
+                     "  const cancel = <Button aria-disabled={busy}>Cancel</Button>;\n"
+                     "  return <Button data-testid=\"merge-confirm\" disabled={busy} aria-disabled={busy}>Merge</Button>;\n}\n")
+VERB_ONCE = VERB_V2.replace("<Button aria-disabled={busy}>Cancel", "<Button>Cancel").replace(
+    "disabled={busy} aria-disabled={busy}>Merge", "disabled={busy}>Merge")
+VERB_THREE = VERB_V2 + ("\nfunction LinkVerb({ record }: { record: Rec }) {\n"
+                        "  return <LinkSheetBody record={record} />;\n}\n")
+DRAWER_TEST = "components/ui/__tests__/record-drawer.test.tsx"
 
 
 class MirrorRules(unittest.TestCase):
@@ -636,8 +675,11 @@ class MirrorRules(unittest.TestCase):
         f = cls.repo / VERB_FILE
         f.parent.mkdir(parents=True)
         f.write_text(VERB_V1)
+        t = cls.repo / DRAWER_TEST
+        t.parent.mkdir(parents=True)
+        t.write_text("const drawer = render(<RecordDrawer />);\n")
         d1 = {"GIT_AUTHOR_DATE": "2026-10-02T21:24:44Z", "GIT_COMMITTER_DATE": "2026-10-02T21:24:44Z"}
-        _git(cls.repo, "add", VERB_FILE)
+        _git(cls.repo, "add", VERB_FILE, DRAWER_TEST)
         _git(cls.repo, "commit", "-q", "-m", "RemoveVerb", env=d1)
         f.write_text(VERB_V2)
         d2 = {"GIT_AUTHOR_DATE": "2026-10-03T03:09:03Z", "GIT_COMMITTER_DATE": "2026-10-03T03:09:03Z"}
@@ -645,6 +687,13 @@ class MirrorRules(unittest.TestCase):
         _git(cls.repo, "commit", "-q", "-m", "MergeVerb", env=d2)
         _git(cls.repo, "remote", "add", "origin", str(bare))
         _git(cls.repo, "push", "-q", "-u", "origin", "main")
+        for branch, body, date in (("once", VERB_ONCE, "2026-10-04T00:00:00Z"), ("three", VERB_THREE, "2026-10-06T13:55:00Z")):
+            _git(cls.repo, "checkout", "-q", "-b", branch, "main")
+            f.write_text(body)
+            _git(cls.repo, "add", VERB_FILE)
+            _git(cls.repo, "commit", "-q", "-m", branch, env={"GIT_AUTHOR_DATE": date, "GIT_COMMITTER_DATE": date})
+            _git(cls.repo, "push", "-q", "origin", branch)
+        _git(cls.repo, "checkout", "-q", "main")
         cls.r = bc.Repo(cls.repo, "origin/main")
 
     @classmethod
@@ -681,17 +730,23 @@ class MirrorRules(unittest.TestCase):
         text = ("## S2\n\n" + R3_RED + " MergeVerb (newer) is not the sibling here because its refusals are per (pair, "
                 "relation) and this door's are terminal.\n```\n" + CAN_REMOVE + "\n```\n")
         rows = self.r3(text)
-        self.assertEqual([r.status for r in rows], ["ok", "ok"], [r.note for r in rows])
+        # round 0 F2(c): a newer sibling named with its why is an info row (listed with its date), never a FAIL
+        self.assertEqual([r.status for r in rows], ["ok", "info"], [r.note for r in rows])
+        self.assertIn("MergeVerb (2026-10-03) is newer and named here with why", rows[1].note)
 
-    def test_the_corrected_S2_paragraph_as_it_really_reads_passes(self):
+    def test_the_corrected_S2_paragraph_owes_a_fenced_quote_of_merges_lines(self):
+        # KNOWN CONSEQUENCE (round 0 F2): "MergeVerb's rule" with only `router.refresh()` (16 chars) and
+        # `variant="primary"` (17) beside it quotes nothing; ONE row per symbol per paragraph (:102 and :103 both name it)
         rows = self.r3("## S2\n\n" + R3_S2_CORRECTED + "\n")
-        self.assertEqual(bc.failures(rows), [], [(r.status, r.note) for r in rows])
         merge = [r for r in rows if "MergeVerb" in r.note]
-        self.assertEqual([r.status for r in merge], ["ok", "ok"], [r.note for r in rows])
-        self.assertIn("router.refresh()", merge[0].note)
+        self.assertEqual([r.status for r in merge], ["FAIL", "ok"], [r.note for r in rows])
+        self.assertIn("quote the lines you are mirroring", merge[0].note)
+        fence = "\n```\n  return <Button data-testid=\"merge-confirm\" disabled={busy} aria-disabled={busy}>Merge</Button>;\n```\n"
+        rows = self.r3("## S2\n\n" + R3_S2_CORRECTED + fence)
+        self.assertEqual([r.status for r in rows if "MergeVerb" in r.note], ["ok", "ok"], [r.note for r in rows])
 
     def test_negative_control_mergeverbs_rule_quoting_its_region_passes(self):
-        rows = self.r3("## S\n\nTake MergeVerb's rule: `disabled={busy}` on the confirm, never a refusal gate.\n")
+        rows = self.r3("## S\n\nTake MergeVerb's rule: `data-testid=\"merge-confirm\" disabled={busy}` on the confirm, never a refusal gate.\n")
         self.assertEqual([r.status for r in rows], ["ok", "ok"], [r.note for r in rows])
 
     def test_mirror_X_and_a_backticked_name_trigger_too(self):
@@ -702,11 +757,40 @@ class MirrorRules(unittest.TestCase):
         self.assertEqual([r.status for r in self.r3("## S\n\nHouston's rule and the header's rule hold.\n")], ["n/a", "n/a"])
         self.assertEqual([r.status for r in self.r3("## S2\n\n" + R3_RED + "\n", repo=None)], ["n/a"])
 
-    def test_KNOWN_WEAKNESS_a_common_span_satisfies_the_quote_half(self):
-        # the ORIGINAL S2 line also held `router.refresh()`, which is inside RemoveVerb's real region (:2268): the
-        # quote half cannot judge relevance — the pre-dispatch review's question 1 is the net. The sibling half holds.
+    def test_a_common_short_span_no_longer_satisfies_the_quote_half(self):
+        # the ORIGINAL S2 line also held `router.refresh()`, which is inside RemoveVerb's real region (:2268) and
+        # occurs 14 times in the real file; it is 16 characters, under the 20 a quote now needs
         rows = self.r3("## S2\n\n" + R3_RED + ", `router.refresh()`.\n")
-        self.assertEqual([r.status for r in rows], ["ok", "FAIL"], [r.note for r in rows])
+        self.assertEqual([r.status for r in rows], ["FAIL", "FAIL"], [r.note for r in rows])
+
+    def test_a_span_that_occurs_more_than_twice_in_the_file_is_not_a_quote(self):
+        # `aria-disabled={busy}`: 20 chars, has `=`, sits in RemoveVerb's region — and three times in the file
+        text = "## S2\n\nRemoveVerb's gate shape: `aria-disabled={busy}` on the confirm.\n"
+        self.assertEqual([r.status for r in self.r3(text)][0], "FAIL")
+        once = bc.Repo(self.repo, "origin/once")
+        self.assertEqual([r.status for r in self.r3(text, repo=once)][0], "ok")
+
+    def test_a_name_that_resolves_only_into_a_test_file_is_n_a(self):
+        # round 0: 12 of 23 refusals resolved into tests — "the drawer's own rule" → `const drawer` in a test file
+        self.assertEqual(self.r.find_definitions("drawer")[0][0], DRAWER_TEST)
+        text = ("## S3\n\nin the drawer it is under `RecordLinksNavigate` and navigates — the drawer's own rule, "
+                "`RecordDrawer.tsx:96-98`.\n")
+        self.assertEqual([r.status for r in self.r3(text)], ["n/a"], [r.note for r in self.r3(text)])
+
+    def test_318_r2_F1_the_ORIGINAL_S2_paragraph_fails_three_times_on_the_real_sibling_order(self):
+        # origin/three: RemoveVerb < MergeVerb < LinkVerb. RemoveVerb: no quote, and its newer sibling MergeVerb is cited
+        # at :103 with no why within 12 words (the paragraph's "NOT danger" is far away); LinkVerb, named elsewhere,
+        # is info. MergeVerb ("repick rule"): no quote; LinkVerb info.
+        three = bc.Repo(self.repo, "origin/three")
+        rows = [r for r in self.r3("## S2\n\n" + R3_S2_ORIGINAL + "\n\n## Build\n\n3. `LinkVerb` in VerbControls.tsx.\n",
+                                   repo=three) if r.status != "n/a"]
+        self.assertEqual([r.status for r in rows], ["FAIL", "FAIL", "info", "FAIL", "info"], [r.note for r in rows])
+        remove_q, remove_sib, remove_info, merge_q, merge_info = rows
+        self.assertIn("RemoveVerb is at", remove_q.note)
+        self.assertIn("MergeVerb (2026-10-03) is named here with no why", remove_sib.note)
+        self.assertIn("LinkVerb is newer and mentioned at line 30", remove_info.note)
+        self.assertIn("MergeVerb is at", merge_q.note)
+        self.assertIn("LinkVerb is newer and mentioned at line 30", merge_info.note)
 
     def test_a_fenced_mirror_is_never_scanned(self):
         self.assertEqual(self.r3("## S\n\n```\nRemoveVerb's gate shape\n```\n"), [])
