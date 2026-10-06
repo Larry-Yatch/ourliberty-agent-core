@@ -677,6 +677,52 @@ class MirrorRules(unittest.TestCase):
         self.assertEqual([r.status for r in self.r3("## F1\n" + R3_RED + "\n", decisions_only=True)], ["FAIL", "FAIL"])
 
 
+# --------------------------------------------------------------------------- #
+# R4 instruction-points-at-a-live-control — two ORIGINAL brief-J2-step2.md paragraphs (#318 r2-F1)
+# --------------------------------------------------------------------------- #
+R4_DEAD = R3_RED
+R4_SENTENCES = '`LINK_FAILED_LINE` = "Not linked — try again.", `UNLINK_FAILED_LINE` = "Not unlinked — try again."'
+R4_FIXED = ("the Link button is NEVER disabled by a refusal — only while busy — and ANY input change (relation, pick, kind) "
+            "clears the refusal")
+
+
+class DeadUntilRules(unittest.TestCase):
+    def r4(self, text, **kw):
+        return rows_of("instruction-points-at-a-live-control", bc.check_text(text, repo=None, db_functions=set(), **kw))
+
+    def test_318_r2_F1_try_again_over_a_dead_until_control_is_refused(self):
+        rows = self.r4("## S2\n\n" + R4_DEAD + "\n\n## S4\n\n" + R4_SENTENCES + "\n")
+        f = [r for r in rows if r.status == "FAIL"]
+        self.assertEqual(len(f), 1, [(r.status, r.note) for r in rows])
+        self.assertEqual(f[0].line, 3)
+        self.assertIn("an instruction the reader cannot obey is wrong copy", f[0].note)
+        self.assertIn("line 3", f[0].note)
+        self.assertIn("line 7", f[0].note)
+
+    def test_the_corrected_sentence_passes(self):
+        rows = self.r4("## S2\n\n" + R4_FIXED + "\n\n## S4\n\n" + R4_SENTENCES + "\n")
+        self.assertEqual([r for r in rows if r.status == "FAIL"], [])
+
+    def test_a_quoted_instruction_whose_paragraph_names_no_control_is_info(self):
+        rows = self.r4("## S4\n\n" + R4_SENTENCES + "\n")
+        self.assertEqual([r.status for r in rows], ["info", "info"], [r.note for r in rows])
+        rows = self.r4('## S4\n\n"Not linked — try again." shows under the Link button.\n')
+        self.assertEqual([r.status for r in rows], ["ok"], [r.note for r in rows])
+
+    def test_stays_disabled_is_a_dead_until_phrase_and_a_fence_is_not_scanned(self):
+        rows = self.r4('## S\n\nThe confirm stays disabled.\n\n"Pick another record and try again."\n')
+        self.assertEqual([r.status for r in rows if r.status == "FAIL"], ["FAIL"])
+        rows = self.r4('## S\n\n```\nThe confirm stays disabled.\n```\n\n"Pick another record and try again."\n')
+        self.assertEqual([r.status for r in rows if r.status == "FAIL"], [])
+
+    def test_no_quoted_instruction_means_no_row(self):
+        self.assertEqual(self.r4("## S2\n\n" + R4_DEAD + "\n"), [])
+
+    def test_decisions_mode_runs_R4(self):
+        rows = self.r4("## F1\n" + R4_DEAD + "\n\n" + R4_SENTENCES + "\n", decisions_only=True)
+        self.assertEqual(len([r for r in rows if r.status == "FAIL"]), 1)
+
+
 class Cli(unittest.TestCase):
     def run_cli(self, *args):
         buf = io.StringIO()

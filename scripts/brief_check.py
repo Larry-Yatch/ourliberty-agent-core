@@ -395,13 +395,14 @@ def table_cells(row: str) -> List[str]:
     return [c.strip() for c in cells]
 
 
+def _is_sentence(q: str) -> bool:
+    """A quoted span of three or more words ("Already linked." is two and is a label, not a sentence)."""
+    return len([w for w in re.findall(r"\S+", q) if re.search(r"\w", w)]) >= 3
+
+
 def quoted_sentences(text: str) -> List[str]:
-    out = []
-    for m in QUOTED_RE.finditer(text):
-        q = m.group(1) if m.group(1) is not None else m.group(2)
-        if len([w for w in re.findall(r"\S+", q) if re.search(r"\w", w)]) >= 3:
-            out.append(q)
-    return out
+    qs = [m.group(1) if m.group(1) is not None else m.group(2) for m in QUOTED_RE.finditer(text)]
+    return [q for q in qs if _is_sentence(q)]
 
 
 def rule_direction_bearing(rows_in: Sequence[Tuple[int, str]], mig_texts: Dict[str, str]) -> List[Row]:
@@ -559,6 +560,40 @@ def rule_mirror(lines: Sequence[str], mask: Sequence[bool], paras: Sequence[Para
                                 "shape beats it (newer: %s)" % (newest, elsewhere, name, listed)))
             else:
                 rows.append(Row(rule, a + 1, "FAIL", "%s — newer than %s: %s" % (R3_NOTE, name, listed)))
+    return rows
+
+
+# R4 instruction-points-at-a-live-control
+IMPERATIVE_RE = re.compile(r"\b(?:try\s+again|unlink|remove|restore|pick|choose|reopen|set|clear|go\s+to|open)\b", re.I)
+DEAD_UNTIL_RE = re.compile(r"\b(?:dead|disabled|not\s+live|never\s+live)\s+until\b|\bstays\s+(?:dead|disabled)\b", re.I)
+CONTROL_RE = re.compile(r"\b(?:button|link|panel|sheet|row|line|chip|radio|field)s?\b"
+                        r"|`[^`]*(?:-confirm|-button|testid)[^`]*`", re.I)
+R4_NOTE = ("an instruction the reader cannot obey is wrong copy (#318 r2-F1: 'Not linked — try again.' over a disabled "
+           "Link) — delete the dead-until clause or change the sentence")
+
+
+def rule_dead_until(lines: Sequence[str], paras: Sequence[Para]) -> List[Row]:
+    rule = "instruction-points-at-a-live-control"
+    instructions: List[Tuple[int, str, bool]] = []  # (line, sentence, its paragraph names a control)
+    dead: List[Tuple[int, str]] = []
+    for a, _b, text in paras:
+        for m in QUOTED_RE.finditer(text):
+            q = m.group(1) if m.group(1) is not None else m.group(2)
+            if _is_sentence(q) and IMPERATIVE_RE.search(q):
+                instructions.append((line_of(lines, a, m.start()), q, bool(CONTROL_RE.search(text))))
+        dead += [(line_of(lines, a, m.start()), m.group(0)) for m in DEAD_UNTIL_RE.finditer(text)]
+    rows: List[Row] = []
+    if instructions:
+        q_lines = ", ".join(str(n) for n in sorted({n for n, _q, _c in instructions}))
+        for d_line, phrase in dead:
+            rows.append(Row(rule, d_line, "FAIL", "%s — '%s' at line %d; quoted instruction(s) at line %s"
+                            % (R4_NOTE, phrase, d_line, q_lines)))
+    for n, q, has_control in instructions:
+        if has_control:
+            rows.append(Row(rule, n, "ok", "\"%s\" — its paragraph names the control" % q[:60]))
+        else:
+            rows.append(Row(rule, n, "info", "\"%s\" — its paragraph names no control: say which button/link it "
+                            "points at and that it is live when this shows" % q[:60]))
     return rows
 
 
@@ -777,6 +812,7 @@ def check_text(text: str, repo: Optional[Repo] = None, db_functions: Optional[Se
     paras = [p for _h, s, e in secs for p in paragraph_ranges(lines, mask, s, e)]
     rows += rule_carried_no_reader(lines, paras)
     rows += rule_mirror(lines, mask, paras, repo, repo_ok, repo_why)
+    rows += rule_dead_until(lines, paras)
 
     # ---- claim rules ------------------------------------------------------ #
     n_claims = n_ok = 0
