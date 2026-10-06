@@ -657,7 +657,12 @@ VERB_V1 = ('"use client";\nimport { useRouter } from "next/navigation";\n\n'
            "  return <RemoveSheetBody record={record} onRemove={onRemove} />;\n}\n\n"
            "export function RemoveSheetBody({ blockers, busy, error }: Props) {\n  " + CAN_REMOVE + "\n"
            "  return <Button disabled={!canRemove} aria-disabled={busy}>Remove</Button>;\n}\n")
-VERB_V2 = VERB_V1 + ("\nfunction MergeVerb({ record }: { record: Rec }) {\n  const router = useRouter();\n"
+# round 2 F1: a top-level definition that does NOT carry RemoveVerb's stem sits between RemoveVerb's helpers and
+# MergeVerb (on RSDPM 3f267b1 `StatusVerbs` sat inside OwnerVerb's same-suffix region, :1041-1836) — X's region ends
+# there. Appended after RemoveSheetBody, so no VERB_V1 line moves (`RemoveSheetBody` stays at 13).
+FOREIGN_LINE = 'return <Chip tone="neutral" onPick={pickStatus}>Status</Chip>;'
+VERB_V2 = VERB_V1 + ("\nfunction StatusChips({ busy }: Props) {\n  " + FOREIGN_LINE + "\n}\n"
+                     "\nfunction MergeVerb({ record }: { record: Rec }) {\n  const router = useRouter();\n"
                      "  async function onMerge() {\n    router.refresh();\n  }\n"
                      "  return <MergeSheetBody record={record} onMerge={onMerge} />;\n}\n\n"
                      "export function MergeSheetBody({ busy }: Props) {\n"
@@ -667,6 +672,13 @@ VERB_ONCE = VERB_V2.replace("<Button aria-disabled={busy}>Cancel", "<Button>Canc
     "disabled={busy} aria-disabled={busy}>Merge", "disabled={busy}>Merge")
 VERB_THREE = VERB_V2 + ("\nfunction LinkVerb({ record }: { record: Rec }) {\n"
                         "  return <LinkSheetBody record={record} />;\n}\n")
+# round 2 F1, the NAME BOUNDARY: `move` sits inside `remove`, so a substring stem would run MoveVerb's region through
+# RemoveVerb (brief-G-step2.md:69 quotes Remove's real button for "MoveVerb's shape"). Its own branch, origin/moveremove,
+# so no shared-fixture line moves.
+MOVE_LINE = "return <MoveSheetBody record={record} onMove={onMove} />;"
+REMOVE_BUTTON = 'return <Button variant="danger" data-testid="detail-remove">Remove</Button>;'
+VERB_MOVE_REMOVE = ('"use client";\n\nfunction MoveVerb({ record }: { record: Rec }) {\n  ' + MOVE_LINE + "\n}\n\n"
+                    "function RemoveVerb({ record }: { record: Rec }) {\n  " + REMOVE_BUTTON + "\n}\n")
 DRAWER_TEST = "components/ui/__tests__/record-drawer.test.tsx"
 # round 1 F1: a non-test file defining the English word `task` (the real one is app/houston/fixtures.ts:37 on RSDPM
 # 1d3b893 — brief-E.md:337's "add-a-task's shape" resolved to it and FAILed the quote half)
@@ -699,7 +711,8 @@ class MirrorRules(unittest.TestCase):
         _git(cls.repo, "commit", "-q", "-m", "MergeVerb", env=d2)
         _git(cls.repo, "remote", "add", "origin", str(bare))
         _git(cls.repo, "push", "-q", "-u", "origin", "main")
-        for branch, body, date in (("once", VERB_ONCE, "2026-10-04T00:00:00Z"), ("three", VERB_THREE, "2026-10-06T13:55:00Z")):
+        for branch, body, date in (("once", VERB_ONCE, "2026-10-04T00:00:00Z"), ("three", VERB_THREE, "2026-10-06T13:55:00Z"),
+                                   ("moveremove", VERB_MOVE_REMOVE, "2026-10-05T00:00:00Z")):
             _git(cls.repo, "checkout", "-q", "-b", branch, "main")
             f.write_text(body)
             _git(cls.repo, "add", VERB_FILE)
@@ -819,6 +832,32 @@ class MirrorRules(unittest.TestCase):
         self.assertIn("LinkVerb is newer and mentioned at line 30", remove_info.note)
         self.assertIn("MergeVerb is at", merge_q.note)
         self.assertIn("LinkVerb is newer and mentioned at line 30", merge_info.note)
+
+    def test_a_foreign_definition_between_a_door_and_its_sibling_ends_the_region(self):
+        # round 2 F1 (review r1-F6): `StatusChips` does not carry RemoveVerb's stem `Remove`, so RemoveVerb's region ends
+        # at :17 — a quote of StatusChips' line is a quote of a different door, never RemoveVerb's lines
+        text = "## S\n\nUse `RemoveVerb`'s gate shape here:\n```\n  " + FOREIGN_LINE + "\n```\n"
+        rows = self.r3(text)
+        self.assertEqual(rows[0].status, "FAIL", [r.note for r in rows])
+        self.assertIn("RemoveVerb is at %s:4-17 and this paragraph quotes none of it" % VERB_FILE, rows[0].note)
+        # positive control: RemoveVerb's own helper carries the stem and stays inside
+        text = "## S\n\nUse `RemoveVerb`'s gate shape here:\n```\n  " + CAN_REMOVE + "\n```\n"
+        self.assertEqual(self.r3(text)[0].status, "ok", [r.note for r in self.r3(text)])
+
+    def test_the_stem_is_carried_only_at_a_name_boundary(self):
+        # round 2 F1: `RemoveVerb` holds "move" but does not CARRY `Move` (the `m` after `Re` is lowercase), so
+        # MoveVerb's region ends before it and a quote of Remove's button is not Move's shape
+        mr = bc.Repo(self.repo, "origin/moveremove")
+        rows = self.r3("## S\n\nBuild the door in `MoveVerb`'s shape:\n```\n  " + REMOVE_BUTTON + "\n```\n", repo=mr)
+        self.assertEqual(rows[0].status, "FAIL", [r.note for r in rows])
+        self.assertIn("MoveVerb is at %s:3-6" % VERB_FILE, rows[0].note)
+        rows = self.r3("## S\n\nBuild the door in `MoveVerb`'s shape:\n```\n  " + MOVE_LINE + "\n```\n", repo=mr)
+        self.assertEqual(rows[0].status, "ok", [r.note for r in rows])
+        for name, stem, want in (("fetchMergeProposal", "Merge", True), ("sameOwner", "Owner", True),
+                                 ("REMOVE_LINE", "Remove", True), ("removeBlockersLine", "Remove", True),
+                                 ("RemoveVerb", "Move", False), ("StatusVerbs", "Owner", False),
+                                 ("KIND_LABEL", "ProjectStatus", False), ("narrowCounts", "mergeRecords", False)):
+            self.assertEqual(bc.carries_stem(name, stem), want, (name, stem))
 
     def test_a_quoted_mirror_is_cited_not_asserted(self):
         # round 1 F2: a decisions file quotes the sentence it corrects; the quoted mirror is not this document's mirror

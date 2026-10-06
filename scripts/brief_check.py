@@ -90,14 +90,24 @@ Rules, each a row in the printed table (FAIL rows exit 2):
                     characters with = ( ) { } that the whole file holds at most
                     twice (`router.refresh()` is 16 characters, in 14 places, one
                     inside RemoveVerb's own region), or a fenced block within 2
-                    lines after whose line is in the region. Every NEWER sibling
+                    lines after whose line is in the region. X's REGION runs
+                    from X to the first following top-level definition whose
+                    name does not carry X's stem (X minus its CamelCase suffix)
+                    at a name boundary — starts with it, `_` + it, or it
+                    capitalised after a lowercase letter or digit — so
+                    RemoveSheetBody and MergeConfirmStep stay in their door and
+                    StatusVerbs ends OwnerVerb's region (review r1-F6: a quote
+                    of StatusVerbs passed as Owner's lines). Every NEWER sibling
                     of X's kind cited in the same paragraph has a contrast word
                     (not / over / instead of / wrong or right sibling) within 12
                     words of its name, and the newest is named somewhere; the
                     rest are one info row. (#318 r2-F1: "RemoveVerb's gate
                     shape" was the wrong sibling; Merge, the newest door, keeps
                     its confirm live.) KNOWN CONSEQUENCE: a correct "MergeVerb's
-                    rule" owes a fenced quote of Merge's lines. KNOWN WEAKNESS:
+                    rule" owes a fenced quote of Merge's lines; a door helper
+                    that does not carry the door's name (`useConfirmState`,
+                    merge.ts's `narrowCounts`) is outside the region — quote the
+                    door's own lines. KNOWN WEAKNESS:
                     a rare 20+ span from the region that is not the rule being
                     mirrored still passes — a word rule cannot judge relevance;
                     the review's question 1 is the net for that.
@@ -580,6 +590,17 @@ def _day(ct: int) -> str:
     return _dt.datetime.utcfromtimestamp(ct).strftime("%Y-%m-%d")
 
 
+def carries_stem(name: str, stem: str) -> bool:
+    """`name` carries `stem` only at a NAME BOUNDARY: it starts with the stem, or holds `_` + stem (both case-
+    insensitive), or holds the stem with its first letter upper-cased right after a lowercase letter or digit
+    (`fetchMergeProposal` carries `Merge`, `sameOwner` carries `Owner`). Never a bare substring: `move` sits inside
+    `remove`, and a substring rule hands the Move door the whole Remove door (brief-G-step2.md:69 would pass)."""
+    low, st = name.lower(), stem.lower()
+    if low.startswith(st) or ("_" + st) in low:
+        return True
+    return re.search(r"(?<=[a-z0-9])" + re.escape(stem[:1].upper() + stem[1:]), name) is not None
+
+
 def mirror_names(text: str) -> List[str]:
     """Every capture that looks like a symbol: backticked, or holding two or more capitals, or holding `_`. Any other
     capture is English or a one-letter label (round 1: "add-a-task's shape", "a row's shape" and "PR B's rule"
@@ -630,7 +651,11 @@ def rule_mirror(lines: Sequence[str], mask: Sequence[bool], paras: Sequence[Para
             suffix = suf.group(1) if suf else None
             sibs = [(ln, kw, n) for ln, kw, n in defs
                     if suffix and kw in ("function", "const") and n != name and n.endswith(suffix) and len(n) > len(suffix)]
-            nxt = min((ln for ln, _k, _n in sibs if ln > def_line), default=len(src_lines) + 1)
+            # X's region ends at the first following top-level definition that does not carry X's STEM (X minus its
+            # CamelCase suffix): a door's own helpers (RemoveSheetBody, MergeConfirmStep) stay in, another door's
+            # code (StatusVerbs inside OwnerVerb's old region, review r1-F6) does not
+            stem = name[:suf.start()] if suf else name
+            nxt = next((ln for ln, _k, n in defs if ln > def_line and not carries_stem(n, stem)), len(src_lines) + 1)
             region = _ws("\n".join(src_lines[def_line - 1:nxt - 1]))
             where = "%s:%d-%d" % (path, def_line, nxt - 1)
 
@@ -667,8 +692,9 @@ def rule_mirror(lines: Sequence[str], mask: Sequence[bool], paras: Sequence[Para
                 cands = [(Path(p).name, None, p) for p in listing
                          if p != path and fm and re.match(r"^.+-%s\.tsx?$" % re.escape(fm.group(1)), Path(p).name)]
             if born is None:
-                rows.append(Row(rule, a + 1, "FAIL", "could not date %s with `git log -S` on %s — fetch the full history "
-                                "(a shallow clone dates nothing) and re-run" % (name, repo.ref)))
+                rows.append(Row(rule, a + 1, "FAIL", "could not date %s — git log -S found no commit adding \"%s\" to %s "
+                                "on %s (a differently spelled signature such as function %s<T>(, or a git error) — check "
+                                "the definition line and re-run" % (name, needle, path, repo.ref, name)))
                 continue
             newer: List[Tuple[int, str]] = []
             for n, nd, p in cands:
