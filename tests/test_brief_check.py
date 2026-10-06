@@ -662,6 +662,9 @@ VERB_ONCE = VERB_V2.replace("<Button aria-disabled={busy}>Cancel", "<Button>Canc
 VERB_THREE = VERB_V2 + ("\nfunction LinkVerb({ record }: { record: Rec }) {\n"
                         "  return <LinkSheetBody record={record} />;\n}\n")
 DRAWER_TEST = "components/ui/__tests__/record-drawer.test.tsx"
+# round 1 F1: a non-test file defining the English word `task` (the real one is app/houston/fixtures.ts:37 on RSDPM
+# 1d3b893 — brief-E.md:337's "add-a-task's shape" resolved to it and FAILed the quote half)
+FIXTURES_FILE = "app/houston/fixtures.ts"
 
 
 class MirrorRules(unittest.TestCase):
@@ -678,8 +681,11 @@ class MirrorRules(unittest.TestCase):
         t = cls.repo / DRAWER_TEST
         t.parent.mkdir(parents=True)
         t.write_text("const drawer = render(<RecordDrawer />);\n")
+        fx = cls.repo / FIXTURES_FILE
+        fx.parent.mkdir(parents=True)
+        fx.write_text("const task = { ... }\n")
         d1 = {"GIT_AUTHOR_DATE": "2026-10-02T21:24:44Z", "GIT_COMMITTER_DATE": "2026-10-02T21:24:44Z"}
-        _git(cls.repo, "add", VERB_FILE, DRAWER_TEST)
+        _git(cls.repo, "add", VERB_FILE, DRAWER_TEST, FIXTURES_FILE)
         _git(cls.repo, "commit", "-q", "-m", "RemoveVerb", env=d1)
         f.write_text(VERB_V2)
         d2 = {"GIT_AUTHOR_DATE": "2026-10-03T03:09:03Z", "GIT_COMMITTER_DATE": "2026-10-03T03:09:03Z"}
@@ -754,7 +760,9 @@ class MirrorRules(unittest.TestCase):
             self.assertEqual([r.status for r in self.r3("## S\n\n%s\n" % t)], ["FAIL", "FAIL"], t)
 
     def test_a_name_that_is_not_a_symbol_or_no_repo_is_n_a(self):
-        self.assertEqual([r.status for r in self.r3("## S\n\nHouston's rule and the header's rule hold.\n")], ["n/a", "n/a"])
+        self.assertEqual([r.status for r in self.r3("## S\n\n`Houston`'s rule and the `header`'s rule hold.\n")], ["n/a", "n/a"])
+        # round 1 F1: unticked, one capital, no `_` — English, never resolved (KNOWN CONSEQUENCE: an unticked Panel too)
+        self.assertEqual(self.r3("## S\n\nHouston's rule and the header's rule hold.\n"), [])
         self.assertEqual([r.status for r in self.r3("## S2\n\n" + R3_RED + "\n", repo=None)], ["n/a"])
 
     def test_a_common_short_span_no_longer_satisfies_the_quote_half(self):
@@ -773,9 +781,23 @@ class MirrorRules(unittest.TestCase):
     def test_a_name_that_resolves_only_into_a_test_file_is_n_a(self):
         # round 0: 12 of 23 refusals resolved into tests — "the drawer's own rule" → `const drawer` in a test file
         self.assertEqual(self.r.find_definitions("drawer")[0][0], DRAWER_TEST)
-        text = ("## S3\n\nin the drawer it is under `RecordLinksNavigate` and navigates — the drawer's own rule, "
+        # round 1 F1: the name is backticked so it still reaches resolution (an unticked "drawer" is dropped before it)
+        text = ("## S3\n\nin the drawer it is under `RecordLinksNavigate` and navigates — the `drawer`'s own rule, "
                 "`RecordDrawer.tsx:96-98`.\n")
         self.assertEqual([r.status for r in self.r3(text)], ["n/a"], [r.note for r in self.r3(text)])
+
+    def test_an_english_word_is_not_resolved_as_a_mirror(self):
+        # round 1 F1: brief-E.md:337 "add-a-task's shape" resolved `task` to a non-test `const` on RSDPM main and
+        # FAILed; a capture is resolved only when backticked, holding 2+ capitals, or holding `_`
+        self.assertEqual(self.r.find_definitions("task")[0][0], FIXTURES_FILE)
+        rows = self.r3("## S\n\nbuild it in add-a-task's shape (`app/houston/fixtures.ts`)\n")
+        self.assertEqual(rows, [], [(r.status, r.note) for r in rows])
+
+    def test_a_backticked_lowercase_name_is_still_resolved(self):
+        rows = self.r3("## S\n\nbuild it in `task`'s shape (`app/houston/fixtures.ts`)\n")
+        self.assertEqual([r.status for r in rows], ["FAIL", "ok"], [r.note for r in rows])
+        self.assertIn("task is at %s:1-2 and this paragraph quotes none of it" % FIXTURES_FILE, rows[0].note)
+        self.assertIn("task is the newest of its siblings (0)", rows[1].note)
 
     def test_318_r2_F1_the_ORIGINAL_S2_paragraph_fails_three_times_on_the_real_sibling_order(self):
         # origin/three: RemoveVerb < MergeVerb < LinkVerb. RemoveVerb: no quote, and its newer sibling MergeVerb is cited

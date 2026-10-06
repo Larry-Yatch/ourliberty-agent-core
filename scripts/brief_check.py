@@ -77,7 +77,9 @@ Rules, each a row in the printed table (FAIL rows exit 2):
   mirror-names-the-newest-sibling
                     "X's shape/gate/rule/precedent" or "mirror X", X a symbol on
                     --ref outside test files (`__tests__/`, `.test.`, `.spec.`,
-                    `e2e/`), QUOTES X's region: a backticked span of 20+
+                    `e2e/`) and written like one — backticked, or with two or
+                    more capitals, or with `_` ("add-a-task's shape" and "PR B's
+                    rule" are English) — QUOTES X's region: a backticked span of 20+
                     characters with = ( ) { } that the whole file holds at most
                     twice (`router.refresh()` is 16 characters, in 14 places, one
                     inside RemoveVerb's own region), or a fenced block within 2
@@ -122,8 +124,9 @@ the OTHER side's sentence: any quoted span of 3+ words counts, so the original
 `cannot_link_removed` row passed on its parenthetical "<other> blocks <this>".
 Nor that a "direction" in the comment above a raise means an END and not a
 state transition (0066's `project_status_transition_not_allowed` is flagged on
-"the closed direction"). It converts "did I look?" from a judgement into a check and stops
-there. Counted over the brief-sentence findings of RSDPM #288 → #318 there are
+"the closed direction"). A mirror name with one capital and no backticks
+(Panel, Button) is not resolved — write it in backticks and it is. It
+converts "did I look?" from a judgement into a check and stops there. Counted over the brief-sentence findings of RSDPM #288 → #318 there are
 16 classes; the word rules catch 9 of 16 by construction. The 7 they still
 cannot: (1) a citation pointing at the wrong lines (#301's finalize JSON, #297
 Redate); (2) a gate predicate that needs a per-reader question row (#306 F1);
@@ -549,11 +552,18 @@ def _day(ct: int) -> str:
 
 
 def mirror_names(text: str) -> List[str]:
+    """Every capture that looks like a symbol: backticked, or holding two or more capitals, or holding `_`. Any other
+    capture is English or a one-letter label (round 1: "add-a-task's shape", "a row's shape" and "PR B's rule"
+    resolved to non-test consts on RSDPM main) and is dropped before resolution."""
     out: List[str] = []
     for rx in MIRROR_TRIGGERS:
         for m in rx.finditer(text):
-            if m.group(1) not in out:
-                out.append(m.group(1))
+            name = m.group(1)
+            ticked = m.start(1) > 0 and text[m.start(1) - 1] == "`"
+            if not (ticked or sum(c.isupper() for c in name) >= 2 or "_" in name):
+                continue
+            if name not in out:
+                out.append(name)
     return out
 
 
