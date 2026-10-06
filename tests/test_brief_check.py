@@ -840,9 +840,27 @@ class DeadUntilRules(unittest.TestCase):
     def test_no_quoted_instruction_means_no_row(self):
         self.assertEqual(self.r4("## S2\n\n" + R4_DEAD + "\n"), [])
 
-    def test_decisions_mode_runs_R4(self):
+    def test_decisions_mode_has_no_R4(self):
+        # round 0 F3: a decisions file NARRATES the defect it removes — decisions-318-r2.md:6 quotes the reviewer's
+        # "button stays disabled", :12 says DELETE every "Link dead until …" claim — so R4 is briefs only
         rows = self.r4("## F1\n" + R4_DEAD + "\n\n" + R4_SENTENCES + "\n", decisions_only=True)
-        self.assertEqual(len([r for r in rows if r.status == "FAIL"]), 1)
+        self.assertEqual(rows, [], [(r.status, r.note) for r in rows])
+
+    def test_a_quoted_or_backticked_dead_until_phrase_is_cited_not_asserted(self):
+        for s in ('the old caption read "Link dead until the sheet is reopened"',
+                  "the old caption read \u201cLink dead until the sheet is reopened\u201d",
+                  "grep for `stays disabled` and `dead until` in the diff"):
+            rows = self.r4('## S\n\n%s\n\n"Not linked — try again." shows under the Link button.\n' % s)
+            self.assertEqual([r for r in rows if r.status == "FAIL"], [], s)
+
+    def test_a_blanked_quote_keeps_every_later_line_number(self):
+        # the stripped span is BLANKED with same-length filler, never deleted: line_of counts characters into the
+        # joined paragraph, so a deleted span before the phrase would report it a line early
+        text = ('## S\n\nThe caption "Link dead until the sheet is reopened" was deleted, and\n'
+                'the confirm stays disabled while busy.\n\n"Pick another record and try again."\n')
+        f = [r for r in self.r4(text) if r.status == "FAIL"]
+        self.assertEqual([r.line for r in f], [4], [(r.line, r.note) for r in f])
+        self.assertIn("'stays disabled' at line 4", f[0].note)
 
 
 # --------------------------------------------------------------------------- #

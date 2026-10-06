@@ -69,6 +69,11 @@ Rules, each a row in the printed table (FAIL rows exit 2):
                     block above it — carries two quoted sentences or says "both
                     ends". (#318 r1-F1: "X already blocks this record" was
                     inverted under "blocked by".) Briefs only; n/a with no repo.
+                    `cannot_link_kind: %` and `cannot_confirm: %` are direction-
+                    bearing by their side format arguments (v_ft / v_tt,
+                    0072_record_links.sql:493-503): a row naming either as a
+                    whole span owes "both ends" or two sentences (a placeholder
+                    span such as `cannot_link_kind: <kind>` is skipped).
   mirror-names-the-newest-sibling
                     "X's shape/gate/rule/precedent" or "mirror X", X a symbol on
                     --ref outside test files (`__tests__/`, `.test.`, `.spec.`,
@@ -93,7 +98,10 @@ Rules, each a row in the printed table (FAIL rows exit 2):
                     "stays dead/disabled" clause anywhere in the same document
                     is one FAIL naming both lines; a quoted instruction whose
                     paragraph names no control is an info row. Document-wide on
-                    purpose: #318 r2-F1's two sentences sat in S2 and S5.
+                    purpose: #318 r2-F1's two sentences sat in S2 and S5. A
+                    dead-until phrase inside double quotes or backticks is
+                    cited, not asserted, and is ignored. Briefs only; a
+                    decisions file describes the defect it removes.
   brief-review      The pre-dispatch review: `brief-review-<stem>.md` beside the
                     brief (or decisions file) exists, is no older than it,
                     answers under the four REVIEW_HEADINGS, and ends `BRIEF
@@ -109,7 +117,12 @@ evidence, not assertion. Headings are not paragraphs.
 It CANNOT check that a quote was read, that a citation points at the governing
 lines, or that an instruction traces the operator's next step (#308 r1-F1 was
 a conscious ruling, "merge, then edit", whose edit landed on a row with no
-fields). It converts "did I look?" from a judgement into a check and stops
+fields). It cannot tell that a direction-bearing row's second quoted string is
+the OTHER side's sentence: any quoted span of 3+ words counts, so the original
+`cannot_link_removed` row passed on its parenthetical "<other> blocks <this>".
+Nor that a "direction" in the comment above a raise means an END and not a
+state transition (0066's `project_status_transition_not_allowed` is flagged on
+"the closed direction"). It converts "did I look?" from a judgement into a check and stops
 there. Counted over the brief-sentence findings of RSDPM #288 → #318 there are
 16 classes; the word rules catch 9 of 16 by construction. The 7 they still
 cannot: (1) a citation pointing at the wrong lines (#301's finalize JSON, #297
@@ -124,9 +137,11 @@ USAGE
 -----
     brief_check.py BRIEF.md [--repo ~/dev/RSDPM] [--ref origin/main] [--decisions]
 
-`--decisions` runs the claim rules and the sentence rules that need no predicate
-table (a manager's per-finding decisions file is code-shaped instruction too —
-#283 r2 F1/F10 traced to decision text). Every file also needs its review file,
+`--decisions` runs the claim rules, carried-no-reader and the mirror rule — no
+predicate-table rules and no instruction-points-at-a-live-control, because a
+decisions file describes the defect it removes (a manager's per-finding
+decisions file is code-shaped instruction too — #283 r2 F1/F10 traced to
+decision text). Every file also needs its review file,
 `brief-review-<stem>.md`, beside it.
 Exit 0 passes, 2 refused, 1 usage error. Python 3.9, stdlib only.
 """
@@ -656,6 +671,7 @@ def rule_mirror(lines: Sequence[str], mask: Sequence[bool], paras: Sequence[Para
 # R4 instruction-points-at-a-live-control
 IMPERATIVE_RE = re.compile(r"\b(?:try\s+again|unlink|remove|restore|pick|choose|reopen|set|clear|go\s+to|open)\b", re.I)
 DEAD_UNTIL_RE = re.compile(r"\b(?:dead|disabled|not\s+live|never\s+live)\s+until\b|\bstays\s+(?:dead|disabled)\b", re.I)
+CITED_SPAN_RE = re.compile(r"\"[^\"]*\"|“[^”]*”|`[^`]*`")
 CONTROL_RE = re.compile(r"\b(?:button|link|panel|sheet|row|line|chip|radio|field)s?\b"
                         r"|`[^`]*(?:-confirm|-button|testid)[^`]*`", re.I)
 R4_NOTE = ("an instruction the reader cannot obey is wrong copy (#318 r2-F1: 'Not linked — try again.' over a disabled "
@@ -671,7 +687,10 @@ def rule_dead_until(lines: Sequence[str], paras: Sequence[Para]) -> List[Row]:
             q = m.group(1) if m.group(1) is not None else m.group(2)
             if _is_sentence(q) and IMPERATIVE_RE.search(q):
                 instructions.append((line_of(lines, a, m.start()), q, bool(CONTROL_RE.search(text))))
-        dead += [(line_of(lines, a, m.start()), m.group(0)) for m in DEAD_UNTIL_RE.finditer(text)]
+        # a quoted or backticked phrase is CITED, not asserted; blank it with same-length filler (never delete it —
+        # line_of counts characters into the joined paragraph, so a shorter text would shift every later line)
+        bare = CITED_SPAN_RE.sub(lambda m: "#" * len(m.group(0)), text)
+        dead += [(line_of(lines, a, m.start()), m.group(0)) for m in DEAD_UNTIL_RE.finditer(bare)]
     rows: List[Row] = []
     if instructions:
         q_lines = ", ".join(str(n) for n in sorted({n for n, _q, _c in instructions}))
@@ -898,11 +917,12 @@ def check_text(text: str, repo: Optional[Repo] = None, db_functions: Optional[Se
                 else:
                     rows.append(Row("two-clocks", s + 1, "ok", "present (%d lines; no named migration on the ref to compare)" % len(body)))
 
-    # ---- sentence rules (v2): both modes ---------------------------------- #
+    # ---- sentence rules (v2): R1 and R3 in both modes, R4 in briefs only --- #
     paras = [p for _h, s, e in secs for p in paragraph_ranges(lines, mask, s, e)]
     rows += rule_carried_no_reader(lines, paras)
     rows += rule_mirror(lines, mask, paras, repo, repo_ok, repo_why)
-    rows += rule_dead_until(lines, paras)
+    if not decisions_only:  # a decisions file describes the defect it removes ("stays disabled" is the reproduction)
+        rows += rule_dead_until(lines, paras)
 
     # ---- claim rules ------------------------------------------------------ #
     n_claims = n_ok = 0
@@ -1030,7 +1050,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     p.add_argument("brief")
     p.add_argument("--repo", default=None, help="the RSDPM checkout whose `--ref` holds the migrations (default: none)")
     p.add_argument("--ref", default="origin/main")
-    p.add_argument("--decisions", action="store_true", help="a decisions file: no predicate-table rules")
+    p.add_argument("--decisions", action="store_true",
+                   help="a decisions file: no predicate-table rules and no instruction-points-at-a-live-control "
+                        "(a decisions file describes the defect it removes)")
     a = p.parse_args(argv)
     path = Path(a.brief).expanduser()
     if not path.is_file():
