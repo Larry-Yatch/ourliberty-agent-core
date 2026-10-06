@@ -169,13 +169,36 @@ class ClaimRules(unittest.TestCase):
 
 
 # --------------------------------------------------------------------------- #
-# R1 carried-no-reader — the ORIGINAL brief-J2-step2.md S3 sentence (#318 r2-F2)
+# R1 carried-no-reader — the ORIGINAL brief-J2-step2.md S3 paragraph (#318 r2-F2)
 # --------------------------------------------------------------------------- #
-R1_RED = ("`created_by_name` / `created_at` are NOT rendered in step 2 (no reader asked; the row keeps them — one line in "
-          "the panel's header comment).")
+# brief-J2-step2.md:105-124 as it read BEFORE the r2 ruling (ol-work runner/brief-gate-v2/brief-J2-step2-ORIGINAL.md),
+# the WHOLE S3 paragraph, verbatim: the trigger sentence sits at :122, nine lines below the "renders, inside `Panel`"
+# at :113 that a paragraph-wide reader scope accepted (round 0's corpus measurement).
+R1_RED = (
+    '**S3 — The links block is READ ON THE SERVER and rendered on BOTH surfaces as ONE client panel with Unlink.**\n'
+    '`app/detail/links.ts` (`import "server-only"`, `verb-inputs.ts`\'s shape): `fetchRecordLinks(kind, id): Promise<RecordLinksState>`\n'
+    '= `supabase.rpc("record_links_for", { record_type, id })` through the session client → `{ ok: true, rows: RecordLinkRow[] }`\n'
+    "or `{ ok: false }` on ANY error (PGRST202 included). It is called in `DetailPage`'s existing `Promise.all`\n"
+    '(`app/detail/DetailPage.tsx:107-108`) and in `peekRecordAction` (`app/actions/peek.ts:39-51`), and the plain value is\n'
+    'handed down: `DetailView` (`app/detail/components/DetailView.tsx:250`) mounts `<RecordLinksPanel record links actions />`\n'
+    'AFTER `detail-backlinks` (`:498-545`) and BEFORE `detail-earlier-decisions`; `RecordDrawerBody` (`components/ui/\n'
+    'RecordDrawer.tsx:156`) mounts the same panel after `drawer-fields`. `RecordLinksPanel` (`components/records/\n'
+    'RecordLinksPanel.tsx`, `"use client"`, every prop REQUIRED and undefaulted) renders, inside `Panel` (`components/ui/\n'
+    'Panel.tsx:33`, label "Links", count = rows), three groups in this order: "Blocked by" (direction `in`), "Blocks" (`out`),\n'
+    '"Related" — each line a `RecordLink` to the other record (`components/ui/RecordLink.tsx`; on the page it PEEKS like a\n'
+    "backlink row, in the drawer it is under `RecordLinksNavigate` and navigates — the drawer's own rule, `RecordDrawer.tsx:\n"
+    '96-98`) followed by an **Unlink** button (`aria-label="Unlink — <other name>"`) → `unlinkRecords(linkId, fromType, toType, telemetry)`;\n'
+    "busy per line; success → `router.refresh()` / the provider's re-read; refusal → ONE quiet `Notice` line under the group\n"
+    '(the classified sentence) and the line stays until the re-read drops it. **Empty state: the panel renders NOTHING** (a\n'
+    'link is information, not a prompt — no "Add a link" nudge; the door is in the verb row). **Third state (`ok: false`):\n'
+    'the panel renders with ONE line `LINKS_UNAVAILABLE_LINE` = "Couldn\'t load links" and no Unlink** (what the reader LOSES:\n'
+    "the lines; a failed EXTRA read is a third state with one honest line, never a silent empty block). `created_by_name` / `created_at` are NOT rendered in step 2 (no reader asked; the row keeps them — one line in the panel's header comment).\n"
+    'Census: the new `links` prop on both boundary edges is DATA (a call result) → `m26` `PINNED_UNKNOWNS` rows in the\n'
+    '`DetailView → VerbControls` shape (`tests/contracts/__tests__/m26-rsc-boundary-census.contract.test.ts:231-241`).'
+)
 R1_GREEN = ("`created_by` / `created_by_name` / `created_at` are NOT carried into the app row at all — a field with no "
             "reader is not carried.")
-R1_GREEN_READER = "… `created_at` is kept on the row; `RecordLinksPanel.tsx:140` renders it as the \"linked on\" line."
+R1_GREEN_READER = "… `created_at` is not rendered in the drawer; `RecordLinksPanel.tsx:140` renders it as the \"linked on\" line."
 
 
 class CarriedNoReader(unittest.TestCase):
@@ -192,7 +215,7 @@ class CarriedNoReader(unittest.TestCase):
     def test_the_same_sentence_is_refused_in_a_decisions_file(self):
         self.assertEqual(len(fails(self.check("## F2\n" + R1_RED + "\n", decisions_only=True), "carried-no-reader")), 1)
 
-    def test_a_negated_keep_is_a_drop_and_passes(self):
+    def test_the_corrected_row_carries_nothing_and_raises_no_row(self):
         rows = self.check("## S3\n\n" + R1_GREEN + "\n")
         self.assertEqual(fails(rows, "carried-no-reader"), [])
         self.assertEqual(rows_of("carried-no-reader", rows), [])  # nothing is kept, so nothing is asked
@@ -201,29 +224,43 @@ class CarriedNoReader(unittest.TestCase):
         rows = self.check("## S3\n\n" + R1_GREEN_READER + "\n")
         self.assertEqual([r.status for r in rows_of("carried-no-reader", rows)], ["ok"])
 
-    def test_a_reader_in_the_NEXT_paragraph_passes(self):
-        rows = self.check("## S3\n\n`created_at` is kept on the row.\n\n`RecordLinksPanel` renders it as the linked-on line.\n")
+    def test_a_reader_in_the_NEXT_sentence_passes_even_across_a_paragraph_break(self):
+        rows = self.check("## S3\n\n`created_at` is not rendered in the drawer.\n\n`RecordLinksPanel` renders it as the linked-on line.\n")
         self.assertEqual([r.status for r in rows_of("carried-no-reader", rows)], ["ok"])
 
     def test_a_negated_reader_verb_is_not_a_reader(self):
-        for s in ("`x` is kept; nothing reads it.", "`x` is kept; `Panel.tsx:40` never renders it."):
+        for s in ("`x` is not shown; nothing reads it.", "`x` is not shown; `Panel.tsx:40` never renders it."):
             self.assertEqual(len(fails(self.check("## S\n\n%s\n" % s), "carried-no-reader")), 1, s)
 
     def test_the_carried_field_is_not_its_own_reader(self):
-        f = fails(self.check("## S\n\n`created_at` is kept; `created_at` renders nothing new.\n"), "carried-no-reader")
+        f = fails(self.check("## S\n\n`created_at` is not displayed; `created_at` renders nothing new.\n"), "carried-no-reader")
         self.assertEqual(len(f), 1)
 
     def test_a_reader_verb_more_than_six_words_away_does_not_count(self):
-        s = "`x` is kept; `Panel` is the component on the page that eventually, much later, renders things."
+        s = "`x` is not rendered; `Panel` is the component on the page that eventually, much later, renders things."
         self.assertEqual(len(fails(self.check("## S\n\n%s\n" % s), "carried-no-reader")), 1)
 
-    def test_the_keep_word_and_the_field_in_different_sentences_still_trigger(self):
-        f = fails(self.check("## S\n\nThe app row gains `created_at`. The row keeps it.\n"), "carried-no-reader")
+    def test_the_trigger_and_the_field_in_different_sentences_still_trigger(self):
+        f = fails(self.check("## S\n\nThe app row gains `created_at`. It is not rendered.\n"), "carried-no-reader")
         self.assertEqual(len(f), 1)
         self.assertIn("`created_at`", f[0].note)
 
     def test_a_fenced_keep_is_never_scanned(self):
-        self.assertEqual(rows_of("carried-no-reader", self.check("## S\n\n```\n`x` is kept\n```\n")), [])
+        self.assertEqual(rows_of("carried-no-reader", self.check("## S\n\n```\n`x` is not rendered\n```\n")), [])
+
+    def test_keep_carries_and_kept_no_longer_trigger(self):
+        # round 0's corpus: 176 refusals in 55 files, nearly all code DESCRIBED ("`x` carries the id") or an
+        # instruction ("KEEP it", brief-J2-step2.md:57) — no field crossing a boundary unread
+        for s in ("the newer text is #315's — KEEP it and add yours beside it: `fetchVerbInputs` / `needsRoster`.",
+                  "`RecordLinkRow` carries the link id; the row is kept and retained.",
+                  "| `link_reverse_exists` | two sentences, chosen by the SENT call's `selfSide` carried in `failed` |"):
+            self.assertEqual(rows_of("carried-no-reader", self.check("## S\n\n%s\n" % s)), [], s)
+
+    def test_a_reader_two_sentences_away_does_not_count(self):
+        # the reader scope is the trigger's sentence and the next one — never the paragraph (round 0: the whole S3
+        # paragraph passed on "renders, inside `Panel`" nine lines above the trigger)
+        s = "`Panel` renders the links. The row has an id. `created_at` is not rendered. The row has a kind."
+        self.assertEqual(len(fails(self.check("## S\n\n%s\n" % s), "carried-no-reader")), 1)
 
 
 # --------------------------------------------------------------------------- #

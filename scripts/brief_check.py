@@ -51,11 +51,14 @@ Rules, each a row in the printed table (FAIL rows exit 2):
   claim-cap         A paragraph that names a cap ("capped at", "cap of",
                     LIST_CAP) says, in the same section, what the first EXCLUDED
                     item means for the human. (#309 r1-F2.)
-  carried-no-reader A paragraph that says a backticked field is carried / kept /
-                    retained / not rendered (an un-negated keep — "NOT carried"
-                    is a drop and passes) names its READER in that paragraph or
-                    the next: another identifier or a file:line within six words
-                    of an un-negated renders/reads/consumes/displays/shows.
+  carried-no-reader A sentence that says a backticked field is "not rendered",
+                    "not shown", "not displayed" or "no reader asked" names its
+                    READER in that sentence or the next: another identifier or
+                    a file:line within six words of an un-negated
+                    renders/reads/consumes/displays/shows. Never the whole
+                    paragraph (the original S3 passed on a "renders" nine lines
+                    above its trigger), and never "carries/keep/kept": those
+                    describe code (176 false refusals in 55 briefs).
                     (#318 r2-F2: "the row keeps them" shipped a roster name to
                     the browser past a SECURITY DEFINER join.)
   direction-bearing-refusal
@@ -296,10 +299,9 @@ def _word_index(tokens: Sequence[Tuple[int, int]], offset: int) -> int:
 
 # R1 carried-no-reader
 IDENT_SPAN_RE = re.compile(r"`([A-Za-z_$][\w$./-]*)`")
-KEEP_RE = re.compile(r"\bno\s+reader\s+asked\b|\bnot\s+(?:rendered|shown|displayed)\b"
-                     r"|\b(?:carried|carries|carry|kept|keeps|keep|retained|retains)\b", re.I)
+KEEP_RE = re.compile(r"\bno\s+reader\s+asked\b|\bnot\s+(?:rendered|shown|displayed)\b", re.I)
 READER_VERB_RE = re.compile(r"\brendered\s+by\b|\bread\s+by\b|\b(?:renders|reads|consumes|displays|shows)\b", re.I)
-SENTENCE_SPLIT_RE = re.compile(r"(?<=[.;!?])\s+")
+SENTENCE_SPLIT_RE = re.compile(r"(?<=\.\))\s*|\.\s+|;\s+|\.$")
 R1_NOTE = ("name the reader or do not carry it — a field with no reader crosses a boundary for nothing "
            "(#318 r2-F2: a roster name shipped to the browser past a SECURITY DEFINER join)")
 
@@ -320,29 +322,44 @@ def _reader_in(text: str, carried: Set[str]) -> Optional[str]:
     return None
 
 
+def _sentences(text: str) -> List[str]:
+    return [x for x in SENTENCE_SPLIT_RE.split(text) if x and x.strip()]
+
+
 def rule_carried_no_reader(lines: Sequence[str], paras: Sequence[Para]) -> List[Row]:
+    """The reader must sit in the trigger's OWN sentence or the next one (the next paragraph's first sentence when the
+    trigger ends its paragraph) — never anywhere in the paragraph: round 0 measured the original S3 paragraph passing
+    on a "renders, inside `Panel`" nine lines above its trigger."""
     rows: List[Row] = []
     for k, (a, _b, text) in enumerate(paras):
         if not IDENT_SPAN_RE.search(text):
             continue
+        sents = _sentences(text)
+        n_here = len(sents)
+        if k + 1 < len(paras):
+            sents += _sentences(paras[k + 1][2])
         carried: List[str] = []
-        kept = False
-        for sent in SENTENCE_SPLIT_RE.split(text):
-            live = [m for m in KEEP_RE.finditer(sent) if not _negated(sent, m.start(), 3)]
-            if live:
-                kept = True
-                carried += [m.group(1) for m in IDENT_SPAN_RE.finditer(sent) if m.group(1) not in carried]
-        if not kept:
+        readers: List[str] = []
+        unread = False
+        for i in range(n_here):
+            if not [m for m in KEEP_RE.finditer(sents[i]) if not _negated(sents[i], m.start(), 3)]:
+                continue
+            fields = [m.group(1) for m in IDENT_SPAN_RE.finditer(sents[i])]
+            if not fields:  # the trigger and the field sit in different sentences of one paragraph
+                fields = [m.group(1) for m in IDENT_SPAN_RE.finditer(text)]
+            carried += [f for f in fields if f not in carried]
+            reader = _reader_in(" ".join(sents[i:i + 2]), set(fields))
+            if reader:
+                readers.append(reader)
+            else:
+                unread = True
+        if not carried:
             continue
-        if not carried:  # the keep-word and the field sit in different sentences of one paragraph
-            carried = list(dict.fromkeys(m.group(1) for m in IDENT_SPAN_RE.finditer(text)))
-        nxt = paras[k + 1][2] if k + 1 < len(paras) else ""
-        reader = _reader_in(text, set(carried)) or _reader_in(nxt, set(carried))
         fields = ", ".join("`%s`" % c for c in carried)
-        if reader:
-            rows.append(Row("carried-no-reader", a + 1, "ok", "%s kept; reader %s" % (fields, reader)))
-        else:
+        if unread:
             rows.append(Row("carried-no-reader", a + 1, "FAIL", "%s (kept here: %s)" % (R1_NOTE, fields)))
+        else:
+            rows.append(Row("carried-no-reader", a + 1, "ok", "%s kept; reader %s" % (fields, ", ".join(readers))))
     return rows
 
 
