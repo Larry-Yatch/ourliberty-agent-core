@@ -51,6 +51,47 @@ Rules, each a row in the printed table (FAIL rows exit 2):
   claim-cap         A paragraph that names a cap ("capped at", "cap of",
                     LIST_CAP) says, in the same section, what the first EXCLUDED
                     item means for the human. (#309 r1-F2.)
+  carried-no-reader A paragraph that says a backticked field is carried / kept /
+                    retained / not rendered (an un-negated keep — "NOT carried"
+                    is a drop and passes) names its READER in that paragraph or
+                    the next: another identifier or a file:line within six words
+                    of an un-negated renders/reads/consumes/displays/shows.
+                    (#318 r2-F2: "the row keeps them" shipped a roster name to
+                    the browser past a SECURITY DEFINER join.)
+  direction-bearing-refusal
+                    Every predicate-table row whose refusal the named migration
+                    raises in the caller's from/to terms — `: from`/`: to` in the
+                    literal or a side in its arguments, a SWAPPED side comparison
+                    in its statement group, or direction words in the comment
+                    block above it — carries two quoted sentences or says "both
+                    ends". (#318 r1-F1: "X already blocks this record" was
+                    inverted under "blocked by".) Briefs only; n/a with no repo.
+  mirror-names-the-newest-sibling
+                    "X's shape/gate/rule/precedent" or "mirror X", X a symbol on
+                    --ref, QUOTES a line of X's region (a backticked span of 12+
+                    characters with = ( ) { }, or a fence within 2 lines after),
+                    and names the NEWEST sibling of X's kind with why — named
+                    elsewhere is an info row, nowhere is FAIL. (#318 r2-F1:
+                    "RemoveVerb's gate shape" was the wrong sibling; Merge, the
+                    newest door, keeps its confirm live.) KNOWN WEAKNESS: a
+                    common span such as `router.refresh()` satisfies the quote
+                    half — a word rule cannot judge relevance; the review's
+                    question 1 is the net for that.
+  instruction-points-at-a-live-control
+                    A quoted sentence carrying an imperative ("try again",
+                    "unlink", "pick", "reopen" …) and a "dead/disabled until" or
+                    "stays dead/disabled" clause anywhere in the same document
+                    is one FAIL naming both lines; a quoted instruction whose
+                    paragraph names no control is an info row. Document-wide on
+                    purpose: #318 r2-F1's two sentences sat in S2 and S5.
+  brief-review      The pre-dispatch review: `brief-review-<stem>.md` beside the
+                    brief (or decisions file) exists, is no older than it,
+                    answers under the four REVIEW_HEADINGS, and ends `BRIEF
+                    DEFECTS: 0` or ledgers every defect (`LEDGERED D<nn>`). The
+                    questions are scripts/brief_review_prompt.md. Computed in
+                    check_file (it needs the path), so the CLI and both runner
+                    calls demand it. (#318: the same subagent asked the brief's
+                    rules before review r1 caught 4 of 5 findings.)
 
 Fenced blocks (``` … ```) are never scanned for claims: pasted output is
 evidence, not assertion. Headings are not paragraphs.
@@ -59,17 +100,24 @@ It CANNOT check that a quote was read, that a citation points at the governing
 lines, or that an instruction traces the operator's next step (#308 r1-F1 was
 a conscious ruling, "merge, then edit", whose edit landed on a row with no
 fields). It converts "did I look?" from a judgement into a check and stops
-there; the external review remains the net for the rest. Measured on the 26
-briefs written 2026-09-30 → 2026-10-02: it refuses 5 of the 12 brief-sentence
-findings by construction (the table is in the PR body); the other 7 are
-omissions, rulings and reader-question defects no text rule can see.
+there. Counted over the brief-sentence findings of RSDPM #288 → #318 there are
+16 classes; the word rules catch 9 of 16 by construction. The 7 they still
+cannot: (1) a citation pointing at the wrong lines (#301's finalize JSON, #297
+Redate); (2) a gate predicate that needs a per-reader question row (#306 F1);
+(3) "no row → no rows" fail-open (#306 F2); (4) a ruling's operator trace
+(#308); (5) a header "unchanged" claim (#293); (6) an omission (#288, #290);
+(7) a screen-state implication against a standing principle (#292 F5). The
+pre-dispatch review (brief-review) is the net for those, not the word rules;
+the external review remains the net behind it.
 
 USAGE
 -----
     brief_check.py BRIEF.md [--repo ~/dev/RSDPM] [--ref origin/main] [--decisions]
 
-`--decisions` runs only the claim rules (a manager's per-finding decisions file
-is code-shaped instruction too — #283 r2 F1/F10 traced to decision text).
+`--decisions` runs the claim rules and the sentence rules that need no predicate
+table (a manager's per-finding decisions file is code-shaped instruction too —
+#283 r2 F1/F10 traced to decision text). Every file also needs its review file,
+`brief-review-<stem>.md`, beside it.
 Exit 0 passes, 2 refused, 1 usage error. Python 3.9, stdlib only.
 """
 from __future__ import annotations
@@ -934,11 +982,13 @@ def format_table(rows: Sequence[Row], name: str) -> str:
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     p = argparse.ArgumentParser(description="brief_check.py — refuse a builder brief whose sentences are guesses. "
+                                            "The pre-dispatch review file brief-review-<stem>.md (the questions are "
+                                            "scripts/brief_review_prompt.md) must sit beside the brief, newer than it. "
                                             "Exit 0 passes, 2 refused (fix the brief, never the check), 1 usage error.")
     p.add_argument("brief")
     p.add_argument("--repo", default=None, help="the RSDPM checkout whose `--ref` holds the migrations (default: none)")
     p.add_argument("--ref", default="origin/main")
-    p.add_argument("--decisions", action="store_true", help="a decisions file: claim rules only")
+    p.add_argument("--decisions", action="store_true", help="a decisions file: no predicate-table rules")
     a = p.parse_args(argv)
     path = Path(a.brief).expanduser()
     if not path.is_file():

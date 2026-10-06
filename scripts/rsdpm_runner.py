@@ -6,9 +6,11 @@ The manager keeps every judgement (reading findings, deciding per finding, the
 click-through, the merge). This script only:
 
   build     guards → brief_check (REFUSES a brief whose sentences are guesses — no
-            waiver; see scripts/brief_check.py) → worktree → per-worktree push hook
-            → wrapper+brief → detached `claude -p`
-  fix       guards → brief_check on the manager's DECISIONS (claim rules) → compose
+            waiver; see scripts/brief_check.py — and a brief with no pre-dispatch
+            review file brief-review-<stem>.md beside it, newer than it) → worktree
+            → per-worktree push hook → wrapper+brief → detached `claude -p`
+  fix       guards → brief_check on the manager's DECISIONS (claim rules, and the
+            decisions file's own brief-review-<stem>.md) → compose
             a fix brief from the findings JSON + the decisions → a FRESH builder in
             the EXISTING worktree
   watch     poll a run (pid, local vs remote head, PR open, comment count); on exit
@@ -1098,7 +1100,9 @@ def build_parser() -> argparse.ArgumentParser:
         sp.add_argument("--claude-cmd", default=str(DEFAULT_CLAUDE_CMD))
         sp.add_argument("--wall-seconds", type=int, default=DEFAULT_WALL_SECONDS)
 
-    b = sub.add_parser("build", help="worktree + hook + wrapper+brief → one detached builder")
+    build_help = ("worktree + hook + wrapper+brief → one detached builder; refuses unless brief-review-<stem>.md "
+                  "(scripts/brief_review_prompt.md) sits beside the brief, newer than it")
+    b = sub.add_parser("build", help=build_help, description=build_help)
     dispatch_args(b)
     b.add_argument("--brief", required=True)
     b.add_argument("--branch", required=True)
@@ -1106,7 +1110,9 @@ def build_parser() -> argparse.ArgumentParser:
     b.add_argument("--base", default="origin/main")
     b.set_defaults(fn=cmd_build)
 
-    f = sub.add_parser("fix", help="compose a fix brief and dispatch a FRESH builder in the existing worktree")
+    fix_help = ("compose a fix brief and dispatch a FRESH builder in the existing worktree; refuses unless "
+                "brief-review-<stem>.md sits beside the decisions file, newer than it")
+    f = sub.add_parser("fix", help=fix_help, description=fix_help)
     dispatch_args(f)
     f.add_argument("--round", required=True, type=int)
     f.add_argument("--findings", required=True, help="ReportFindings JSON")
