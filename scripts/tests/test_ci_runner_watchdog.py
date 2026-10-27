@@ -324,7 +324,7 @@ class MainTest(_IsolatedAgentsRoot):
         add.assert_not_called()
         after = json.loads(w.STATE_FILE.read_text())
         self.assertEqual(after['mac-2019'], before['mac-2019'])
-        self.assertEqual(after['_fetch']['failures'], 1)
+        self.assertEqual(after.get('_fetch', {}).get('failures'), 1, 'the failed read was counted')
 
     def test_corrupt_state_file_is_the_zeroth_run(self):
         w.STATE_FILE.write_text('{not json')
@@ -374,13 +374,14 @@ class MessageTest(unittest.TestCase):
             self.assertTrue(w.send_alert('offline', 'mac-2019', T0, T0 + 600, []))
         kw = aa.call_args.kwargs
         self.assertEqual((aa.call_args.args[0], aa.call_args.args[1]), (w.SOURCE, 'warning'))
-        self.assertEqual((kw['route'], kw['needs_larry'], kw['subject']), ('escalate', True, 'mac-2019-offline'))
-        self.assertEqual(kw['suggested_action'], w.MAC_SERVICE_CMD)
+        self.assertEqual((kw.get('route'), kw.get('needs_larry'), kw.get('subject')),
+                         ('escalate', True, 'mac-2019-offline'))
+        self.assertEqual(kw.get('suggested_action'), w.MAC_SERVICE_CMD)
 
     def test_back_alert_is_a_dm_too(self):
         with patch.object(w.larry_alerts, 'append_alert', return_value=True) as aa:
             w.send_alert('back', 'mac-2019', T0, T0 + 600, [])
-        self.assertEqual(aa.call_args.kwargs['route'], 'escalate', 'an info alert defaults to digest; this one must DM')
+        self.assertEqual(aa.call_args.kwargs.get('route'), 'escalate', 'an info alert defaults to digest; this one must DM')
 
 
 # -------------------- gh plumbing --------------------
