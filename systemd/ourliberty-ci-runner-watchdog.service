@@ -16,7 +16,10 @@ Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 # script's only privileged acts are label adds/removes on RSDPM's runners,
 # which it records and reverses itself.
 ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/ci_runner_watchdog.py
-TimeoutStartSec=180
+# One tick makes at most three gh calls (read + two label adds or removes),
+# each with a 60 s timeout; 300 leaves headroom so a slow GitHub cannot have
+# systemd kill the run between adding a label and recording that it did.
+TimeoutStartSec=300
 Nice=10
 StandardOutput=journal
 StandardError=journal

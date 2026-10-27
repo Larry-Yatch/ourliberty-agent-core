@@ -227,15 +227,13 @@ def offline_message(name: str, since: Optional[float], now: float, fallback: lis
     ]
     if fallback:
         parts.append(
-            f'I moved them to the droplet for now ({moved}). It is slower, and its '
-            'unit tests flake about one run in two there, so a red vitest on the '
-            'droplet may be the host, not the code.')
+            f'I moved them to the droplet for now ({moved}); a red vitest there '
+            'may be the host, not the code.')
     else:
         parts.append('The droplet fallback could not be applied yet; checks are waiting.')
-    parts.append(
-        'Walk to the Mac: if it is off, press the power button (it boots '
-        'unattended; nothing to type). If it looks on, run the command below. '
-        'The checks move back to the Mac on their own when it reconnects.')
+    # What to do at the Mac is the translation entry for this subject
+    # (config/alert-translations.json → ci-runner-watchdog → offline), which
+    # the DM renders ABOVE this text; this text carries only the specifics.
     return ' '.join(parts)
 
 
@@ -248,15 +246,19 @@ def back_message(name: str, since: Optional[float], now: float, removed: list) -
 def send_alert(kind: str, name: str, since: Optional[float], now: float, pairs: list) -> bool:
     """One DM to Larry. Returns False when nothing was sent (cooldown, write
     failure) so the caller retries next tick instead of believing it told him."""
+    # Subjects are literals so the translation-coverage test can see them;
+    # SOURCE already names the watchdog and WATCHED is one runner.
     if kind == 'offline':
         return larry_alerts.append_alert(
             SOURCE, 'warning', offline_message(name, since, now, pairs),
-            subject=f'{name}-offline', suggested_action=MAC_SERVICE_CMD,
+            subject='offline', suggested_action=MAC_SERVICE_CMD,
             route='escalate', needs_larry=True)
     if kind == 'back':
+        # 'warning', not 'info': an info alert's cooldown is 6 h per subject,
+        # which would swallow the 'back' of a second outage the same afternoon.
         return larry_alerts.append_alert(
-            SOURCE, 'info', back_message(name, since, now, pairs),
-            subject=f'{name}-back', route='escalate')
+            SOURCE, 'warning', back_message(name, since, now, pairs),
+            subject='back', route='escalate')
     if kind == 'blind':
         return larry_alerts.append_alert(
             SOURCE, 'warning',
@@ -306,7 +308,12 @@ def tick(runners: dict, state: dict, now: float, *,
         removed = []
         for runner, label in s['fallback']:
             rid = (runners.get(runner) or {}).get('id')
-            if rid is not None and remove_label(rid, label):
+            if rid is None:
+                # The runner is gone from GitHub and its labels went with it;
+                # there is nothing left to remove.
+                removed.append([runner, label])
+                log(f'{runner} is no longer registered; {label} went with it', 'WARN')
+            elif remove_label(rid, label):
                 removed.append([runner, label])
                 log(f'{label} removed from {runner} (back on {WATCHED})')
             else:
@@ -325,10 +332,13 @@ def tick(runners: dict, state: dict, now: float, *,
         return state
 
     # Offline (or no longer registered — same thing for the labels' purpose).
-    if s.get('back_sent'):
-        # The previous outage was announced over; this is a new one.
+    if s['offline_ticks'] == 0 and s['offline_since'] is not None:
+        # An entry that has seen the Mac ONLINE since its last offline tick is
+        # a recovery still being finished (a label not yet removed, a 'back'
+        # DM not yet sent). This is a NEW outage: fresh clock, fresh DM. The
+        # labels we still hold on the droplet stay recorded as ours.
         s = {'offline_ticks': 0, 'offline_since': None, 'alerted_at': None,
-             'fallback': [], 'back_sent': False}
+             'fallback': s['fallback'], 'back_sent': False}
     s['offline_ticks'] += 1
     if s['offline_since'] is None:
         s['offline_since'] = now

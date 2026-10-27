@@ -274,8 +274,40 @@ class RecoveryTest(unittest.TestCase):
         st = f.tick(runners(mac='offline'), st, T0 + 3 * TICK)
         self.assertEqual(st['mac-2019']['offline_ticks'], 1)
         self.assertEqual(st['mac-2019']['offline_since'], T0 + 3 * TICK)
+        self.assertEqual(sorted(st['mac-2019']['fallback']), [['droplet-a', 'proofs'], ['droplet-b', 'vitest']],
+                         'the labels still on the droplet stay recorded as ours')
         st = f.tick(runners(mac='offline'), st, T0 + 4 * TICK)
         self.assertEqual([a[0] for a in f.alerts], ['offline', 'back', 'offline'])
+        self.assertEqual(len(f.added), 2, 'labels we still hold are not added again')
+
+    def test_second_outage_after_muted_back_dm_pages(self):
+        """Review finding: a recovery whose 'back' DM was swallowed by the
+        alert cooldown used to leave the old outage open, so the next outage
+        inherited its alerted_at and never paged until the 6 h reminder."""
+        f = Fake()
+        st = self._outage(f)
+        f.alert_ok = False
+        st = f.tick(runners(), st, T0 + 2 * TICK)      # labels removed, back DM muted
+        self.assertIn('mac-2019', st)
+        self.assertFalse(st['mac-2019']['back_sent'])
+        f.alert_ok = True
+        st = f.tick(runners(mac='offline'), st, T0 + 3 * TICK)
+        self.assertEqual(st['mac-2019']['offline_since'], T0 + 3 * TICK, 'a fresh outage clock')
+        st = f.tick(runners(mac='offline'), st, T0 + 4 * TICK)
+        self.assertEqual([a[0] for a in f.alerts], ['offline', 'back', 'offline'])
+        self.assertEqual(st['mac-2019']['alerted_at'], T0 + 4 * TICK)
+
+    def test_vanished_runner_label_counts_as_removed(self):
+        """Review finding: a label recorded on a runner that is no longer
+        registered has nothing left to remove; it must not block recovery."""
+        f = Fake()
+        st = self._outage(f)
+        rs = runners()
+        del rs['droplet-b']
+        st = f.tick(rs, st, T0 + 2 * TICK)
+        self.assertEqual(f.removed, [(A, 'proofs')])
+        self.assertNotIn('mac-2019', st)
+        self.assertEqual(f.alerts[-1][0], 'back')
 
 
 # -------------------- a blind watchdog --------------------
@@ -358,7 +390,18 @@ class MessageTest(unittest.TestCase):
         self.assertIn('2 h 05 min', m)
         self.assertIn('proofs → droplet-a', m)
         self.assertIn('vitest → droplet-b', m)
-        self.assertIn('press the power button', m)
+
+    def test_every_subject_has_a_translation_and_the_offline_one_says_what_to_do(self):
+        """The DM renders the translation ABOVE the message, so the walk-to-
+        the-Mac instruction lives there; this pins the three entries to the
+        three subjects send_alert uses."""
+        w.larry_alerts._TRANSLATIONS_CACHE = None  # noqa: SLF001
+        for subject in ('offline', 'back', 'blind'):
+            self.assertIsNotNone(w.larry_alerts.translate_alert(w.SOURCE, subject), subject)
+        offline = w.larry_alerts.translate_alert(w.SOURCE, 'offline')
+        self.assertIn('power button', offline['recommended_action'])
+        self.assertIn('launchctl', offline['recommended_action'])
+        self.assertEqual(offline['tier'], 'NOW')
 
     def test_offline_message_without_fallback_says_checks_are_waiting(self):
         m = w.offline_message('mac-2019', T0, T0 + 600, [])
@@ -375,13 +418,16 @@ class MessageTest(unittest.TestCase):
         kw = aa.call_args.kwargs
         self.assertEqual((aa.call_args.args[0], aa.call_args.args[1]), (w.SOURCE, 'warning'))
         self.assertEqual((kw.get('route'), kw.get('needs_larry'), kw.get('subject')),
-                         ('escalate', True, 'mac-2019-offline'))
+                         ('escalate', True, 'offline'))
         self.assertEqual(kw.get('suggested_action'), w.MAC_SERVICE_CMD)
 
     def test_back_alert_is_a_dm_too(self):
         with patch.object(w.larry_alerts, 'append_alert', return_value=True) as aa:
             w.send_alert('back', 'mac-2019', T0, T0 + 600, [])
         self.assertEqual(aa.call_args.kwargs.get('route'), 'escalate', 'an info alert defaults to digest; this one must DM')
+        self.assertEqual(aa.call_args.args[1], 'warning',
+                         "info's 6 h cooldown would swallow the back DM of a second outage the same afternoon")
+        self.assertEqual(aa.call_args.kwargs.get('subject'), 'back')
 
 
 # -------------------- gh plumbing --------------------
