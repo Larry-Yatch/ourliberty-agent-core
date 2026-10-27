@@ -1,0 +1,10 @@
+[Unit]
+Description=Run ci_runner_watchdog every 5 minutes (two offline ticks = 10 min before it acts)
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=5min
+Unit=ourliberty-ci-runner-watchdog.service
+
+[Install]
+WantedBy=timers.target
