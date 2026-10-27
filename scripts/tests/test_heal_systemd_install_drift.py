@@ -2256,6 +2256,22 @@ class TriggeredEntrypointTest(_IsolatedAgentsRoot):
         self.assertEqual(dm.call_count, 0)
 
 
+def _isolate_allowlist(tc):
+    """Point h.ALLOWLIST_FILE at a private config with an EMPTY exempt list for
+    the duration of one test. The shipped config has carried the idled
+    factory's 98 timers since 2026-10-26, so a test that uses a real unit name
+    as its "disabled timer" fixture and reads the shipped list would see it
+    exempted and pass or fail on the factory's state, not on the code."""
+    td = tempfile.mkdtemp()
+    tc.addCleanup(lambda: shutil.rmtree(td, ignore_errors=True))
+    allow = Path(td) / 'allow.json'
+    allow.write_text(json.dumps({
+        'classes': ['install-drift', 'stuck-timer'], 'disabled_timer_exempt': []}))
+    p = mock.patch.object(h, 'ALLOWLIST_FILE', allow)
+    p.start()
+    tc.addCleanup(p.stop)
+
+
 class DetectDisabledTimersTest(_IsolatedAgentsRoot):
     """The third check: installed + preset=enabled + UnitFileState=disabled.
 
@@ -2263,6 +2279,10 @@ class DetectDisabledTimersTest(_IsolatedAgentsRoot):
     missing from /etc/systemd/system (these are present), and detect_stuck_timers
     skips anything not ActiveState=active (these are inactive).
     """
+
+    def setUp(self):
+        super().setUp()
+        _isolate_allowlist(self)
 
     def _stub_props(self, per_unit):
         return mock.patch.object(
@@ -2388,11 +2408,25 @@ class DisabledTimerAllowlistTest(_IsolatedAgentsRoot):
                 self.assertEqual(h._disabled_timer_exempt(), set())
 
     def test_shipped_config_parses_with_the_new_key(self):
-        # The real repo config must carry a well-formed (empty) exempt list.
+        # The real repo config must carry a well-formed exempt list. Since
+        # 2026-10-26 it is FILLED: the idled factory's timers, every one off on
+        # purpose (Larry: "turn it all off"). Each name must be a ourliberty
+        # timer, listed once; two of them (ourliberty-graph-*) are installed
+        # from another repo and are not in systemd/, so "exists in systemd/"
+        # is deliberately not asserted.
         data = json.loads(
             (Path(__file__).resolve().parent.parent.parent
              / 'config' / 'auto-remediation-allowlist.json').read_text())
-        self.assertEqual(data['disabled_timer_exempt'], [])
+        units = data['disabled_timer_exempt']
+        self.assertIsInstance(units, list)
+        self.assertTrue(units, "the idled factory's timers are exempt on purpose")
+        self.assertEqual(len(units), len(set(units)), 'no duplicates')
+        for u in units:
+            self.assertIsInstance(u, str)
+            self.assertRegex(u, r'^ourliberty-[a-z0-9-]+\.timer$')
+        for kept in ('ourliberty-sync.timer', 'ourliberty-rsdpm-extractor.timer',
+                     'ourliberty-system-resource-watch.timer'):
+            self.assertNotIn(kept, units, 'a kept unit must never be exempt')
         self.assertIn('install-drift', data['classes'])
 
 
@@ -2401,6 +2435,7 @@ class DisabledTimerOrchestrationTest(_IsolatedAgentsRoot):
 
     def setUp(self):
         super().setUp()
+        _isolate_allowlist(self)
         self._dm_calls: list[dict] = []
 
         def fake_dm(message, subject, suggested_action, severity='warning',
