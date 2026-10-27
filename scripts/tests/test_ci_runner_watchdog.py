@@ -459,16 +459,35 @@ class GhTest(_IsolatedAgentsRoot):
             self.assertIsNone(w.fetch_runners())
 
     def test_remove_label_treats_404_as_gone(self):
-        with patch.object(w.subprocess, 'run', return_value=self._run(1, '', 'gh: Not Found (HTTP 404)')):
+        with patch.object(w, 'gh_write', return_value=self._run(1, '', 'gh: Not Found (HTTP 404)')):
             self.assertTrue(w.remove_label(21, 'proofs'))
-        with patch.object(w.subprocess, 'run', return_value=self._run(1, '', 'HTTP 500')):
+        with patch.object(w, 'gh_write', return_value=self._run(1, '', 'HTTP 500')):
             self.assertFalse(w.remove_label(21, 'proofs'))
 
     def test_add_label_command_shape(self):
-        with patch.object(w.subprocess, 'run', return_value=self._run(0, '{}')) as run:
+        with patch.object(w, 'gh_write', return_value=self._run(0, '{}')) as gw:
             self.assertTrue(w.add_label(21, 'proofs'))
-        self.assertEqual(run.call_args.args[0],
+        self.assertEqual(gw.call_args.args[0],
                          ['gh', 'api', '-X', 'POST', f'repos/{w.REPO}/actions/runners/21/labels', '-f', 'labels[]=proofs'])
+        with patch.object(w, 'gh_write', return_value=self._run(1, '', 'HTTP 403')):
+            self.assertFalse(w.add_label(21, 'proofs'))
+
+    def test_label_writes_go_through_the_guarded_wrapper(self):
+        """The chokepoint census (test_chokepoint_census) requires every
+        destructive gh write to go through test_isolation_guard.gh_write,
+        which refuses to run from a test process. Pin it from this side too:
+        a bare subprocess.run must never carry a POST or DELETE."""
+        with patch.object(w, 'gh_write', return_value=self._run(0, '{}')) as gw, \
+                patch.object(w.subprocess, 'run') as run:
+            w.add_label(21, 'proofs')
+            w.remove_label(22, 'vitest')
+        self.assertEqual([c.args[0][2:4] for c in gw.call_args_list], [['-X', 'POST'], ['-X', 'DELETE']])
+        run.assert_not_called()
+
+    def test_gh_write_subprocess_failure_is_false(self):
+        with patch.object(w, 'gh_write', side_effect=OSError('no gh')):
+            self.assertFalse(w.add_label(21, 'proofs'))
+            self.assertFalse(w.remove_label(21, 'proofs'))
 
 
 if __name__ == '__main__':

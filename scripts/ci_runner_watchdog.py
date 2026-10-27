@@ -60,6 +60,7 @@ if str(_SCRIPTS_DIR) not in sys.path:
 
 import larry_alerts  # noqa: E402
 from atomic_io import atomic_write_json  # noqa: E402
+from test_isolation_guard import gh_write  # noqa: E402  (every gh WRITE goes through it)
 
 AGENTS_ROOT = Path(os.environ.get('OURLIBERTY_AGENTS_ROOT', '/home/larry/agents'))
 KILL_SWITCH = AGENTS_ROOT / 'healers.disabled'
@@ -143,8 +144,10 @@ def save_state(state: dict) -> None:
 
 
 def gh_json(*args: str) -> Optional[Any]:
-    """`gh api …` parsed, or None on any failure (logged). None is "could not
-    read", which callers must never confuse with "offline"."""
+    """A READ-ONLY `gh api …` (GET) parsed, or None on any failure (logged).
+    None is "could not read", which callers must never confuse with "offline".
+    Writes never go through here: `_gh_write` below routes them through the
+    repo's guarded wrapper, which the chokepoint census enforces."""
     try:
         r = subprocess.run(['gh', 'api', *args], capture_output=True, text=True, timeout=60)
     except (subprocess.SubprocessError, OSError) as e:
@@ -181,19 +184,32 @@ def fetch_runners() -> Optional[dict]:
     return out
 
 
+def _gh_write(*args: str):
+    """A `gh api` WRITE (POST/DELETE) through `test_isolation_guard.gh_write`,
+    which refuses to run from a test process; the CompletedProcess, or None
+    when the subprocess itself could not run (logged)."""
+    try:
+        return gh_write(['gh', 'api', *args], capture_output=True, text=True, timeout=60)
+    except (subprocess.SubprocessError, OSError) as e:
+        log(f'gh api {" ".join(args[:2])}: {type(e).__name__}: {e}', 'WARN')
+        return None
+
+
 def add_label(runner_id: int, label: str) -> bool:
-    return gh_json('-X', 'POST', f'repos/{REPO}/actions/runners/{runner_id}/labels',
-                   '-f', f'labels[]={label}') is not None
+    r = _gh_write('-X', 'POST', f'repos/{REPO}/actions/runners/{runner_id}/labels',
+                  '-f', f'labels[]={label}')
+    if r is None:
+        return False
+    if r.returncode == 0:
+        return True
+    log(f'add label {label} to {runner_id}: rc={r.returncode} {r.stderr.strip()[:200]}', 'WARN')
+    return False
 
 
 def remove_label(runner_id: int, label: str) -> bool:
     """True once the label is not on the runner — a 404 (already gone) counts."""
-    try:
-        r = subprocess.run(
-            ['gh', 'api', '-X', 'DELETE', f'repos/{REPO}/actions/runners/{runner_id}/labels/{label}'],
-            capture_output=True, text=True, timeout=60)
-    except (subprocess.SubprocessError, OSError) as e:
-        log(f'remove label {label} from {runner_id}: {type(e).__name__}: {e}', 'WARN')
+    r = _gh_write('-X', 'DELETE', f'repos/{REPO}/actions/runners/{runner_id}/labels/{label}')
+    if r is None:
         return False
     if r.returncode == 0 or 'HTTP 404' in r.stderr:
         return True
