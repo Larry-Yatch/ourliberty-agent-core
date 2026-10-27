@@ -906,5 +906,25 @@
       "plain_language_summary": "The daily silence-file auditor (scripts/silence_file_auditor.py) found one or more alert silences that are still actively eating alerts. A silence is a deliberate mute Medic wrote for a confirmed false positive; while it holds, matching alerts are dropped with no DM. This digest fires only for silences that are permanent AND aged AND still suppressing alerts (or any silence over a hard volume ceiling) -- a sign the muted condition may have turned into a real, recurring signal that nobody is seeing.",
       "recommended_action": "Review the listed silences (each shows key, age, and how many alerts it has suppressed). If the underlying condition is genuinely back, clear the mute so the alert surfaces again -- delete the file under ~/agents/state/alert-silenced/ for that key (or call larry_alerts.unsilence). If it is still a known false positive, leave it. This is a route=digest report surfaced in the CEO digest, not a page; thresholds live in scripts/silence_file_auditor.py."
     }
+  },
+  "ci-runner-watchdog": {
+    "offline": {
+      "severity": "WARNING",
+      "tier": "NOW",
+      "plain_language_summary": "The spare Mac that runs RSDPM's pull-request checks (runner mac-2019) has been off GitHub for at least 10 minutes. Until it is back, every pull request's checks would sit queued and look merely slow. The watchdog hands those checks to the droplet meanwhile (slower; its unit tests flake about one run in two there) and moves them back on its own when the Mac reconnects. The detail below says since when and which labels moved.",
+      "recommended_action": "Walk to the Mac. If it is off, press the power button (it boots unattended; nothing to type). If it looks on, from your laptop: ssh -6 -t Larry@Larrys-Mac-2021.local 'sudo launchctl print system/com.ourliberty.actions-runner | grep state' — it should say running; if not: sudo launchctl bootstrap system /Library/LaunchDaemons/com.ourliberty.actions-runner.plist. Producer: scripts/ci_runner_watchdog.py."
+    },
+    "back": {
+      "severity": "INFO",
+      "tier": "FYI",
+      "plain_language_summary": "The spare Mac is back on GitHub. Pull-request checks run on it again, and any labels the watchdog had moved to the droplet are removed.",
+      "recommended_action": "None. Producer: scripts/ci_runner_watchdog.py."
+    },
+    "blind": {
+      "severity": "WARNING",
+      "tier": "SOON",
+      "plain_language_summary": "The watchdog that watches the spare Mac cannot read GitHub from the droplet (gh api has failed for 30+ minutes), so it cannot tell whether the Mac is up and cannot hand checks to the droplet.",
+      "recommended_action": "On the droplet (ssh larry@134.209.44.80): gh auth status, then gh api repos/Larry-Yatch/RSDPM/actions/runners. Until this clears, check the Mac yourself if checks look slow. Producer: scripts/ci_runner_watchdog.py."
+    }
   }
 }

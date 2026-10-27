@@ -1,0 +1,26 @@
+[Unit]
+Description=CI runner watchdog — DM Larry when the spare Mac (RSDPM pull-request runner) drops off GitHub; move its labels to the droplet meanwhile
+Documentation=https://github.com/Larry-Yatch/ourliberty-agent-core/blob/main/scripts/ci_runner_watchdog.py
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=larry
+Group=larry
+EnvironmentFile=/home/larry/credentials/.env.larry
+Environment="HOME=/home/larry"
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+# `gh` authenticates from /home/larry/.config/gh (Larry-Yatch, scope repo) —
+# the same login every other healer's gh call uses. No activation flag: the
+# script's only privileged acts are label adds/removes on RSDPM's runners,
+# which it records and reverses itself.
+ExecStart=/usr/bin/python3 /home/larry/agent-core/scripts/ci_runner_watchdog.py
+# One tick makes at most three gh calls (read + two label adds or removes),
+# each with a 60 s timeout; 300 leaves headroom so a slow GitHub cannot have
+# systemd kill the run between adding a label and recording that it did.
+TimeoutStartSec=300
+Nice=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ourliberty-ci-runner-watchdog
