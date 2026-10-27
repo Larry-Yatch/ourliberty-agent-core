@@ -233,8 +233,8 @@ def offline_message(name: str, since: Optional[float], now: float, fallback: lis
     else:
         parts.append('The droplet fallback could not be applied yet; checks are waiting.')
     parts.append(
-        'Walk to the Mac: if it is off, press the power button; if it shows a '
-        'password screen, type it. If it looks on, run the command below. '
+        'Walk to the Mac: if it is off, press the power button (it boots '
+        'unattended; nothing to type). If it looks on, run the command below. '
         'The checks move back to the Mac on their own when it reconnects.')
     return ' '.join(parts)
 
